@@ -1,0 +1,33 @@
+{
+  "name": "@eden/genesis",
+  "version": "0.1.0",
+  "description": "Genesis - In the beginning... Package and bundle Eden applications into .edenite format.",
+  "main": "dist/index.js",
+  "bin": {
+    "genesis": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "eden",
+    "bundler",
+    "packager",
+    "edenite",
+    "genesis"
+  ],
+  "author": "Eden Team",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
