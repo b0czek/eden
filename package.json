@@ -2,7 +2,7 @@
   "name": "eden",
   "version": "0.1.0",
   "description": "A modular Electron desktop environment with extensible app support",
-  "main": "dist/main/index.js",
+  "main": "dist/main/main.js",
   "author": "Eden Team",
   "license": "MIT",
   "scripts": {
