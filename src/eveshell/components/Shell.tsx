@@ -313,13 +313,6 @@ export default function Shell() {
     window.addEventListener("resize", () => {
       updateRunningAppBounds();
     });
-
-    // Refresh system info periodically
-    const interval = setInterval(() => {
-      loadSystemInfo();
-    }, 5000);
-
-    return () => clearInterval(interval);
   });
 
   return (
