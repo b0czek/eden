@@ -29,6 +29,11 @@ export class WorkerManager extends EventEmitter {
       throw new Error(`Worker for app ${appId} already exists`);
     }
 
+    // Check if app has a backend
+    if (!manifest.backend?.entry) {
+      throw new Error(`App ${appId} does not have a backend`);
+    }
+
     const backendPath = path.join(installPath, manifest.backend.entry);
 
     // Create worker with resource limits if specified

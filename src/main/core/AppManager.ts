@@ -451,6 +451,24 @@ export class AppManager extends EventEmitter {
             args.bounds
           );
           return { success };
+        case "set-view-visibility":
+          const visibilityInstance = this.getAppInstance(args.appId);
+          if (!visibilityInstance) {
+            throw new Error(`App ${args.appId} is not running`);
+          }
+          const visibilitySuccess = args.visible
+            ? this.viewManager.showView(visibilityInstance.viewId)
+            : this.viewManager.hideView(visibilityInstance.viewId);
+          return { success: visibilitySuccess };
+        case "focus-app":
+          const focusInstance = this.getAppInstance(args.appId);
+          if (!focusInstance) {
+            throw new Error(`App ${args.appId} is not running`);
+          }
+          const focusSuccess = this.viewManager.bringToFront(
+            focusInstance.viewId
+          );
+          return { success: focusSuccess };
         default:
           console.warn(`Unknown shell command: ${command}`);
           return { error: "Unknown command" };

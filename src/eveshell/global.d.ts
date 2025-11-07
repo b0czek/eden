@@ -9,6 +9,7 @@ interface EdenAPI {
   installApp: (sourcePath: string) => Promise<any>;
   uninstallApp: (appId: string) => Promise<any>;
   selectDirectory: () => Promise<string | null>;
+  selectFile: (options: any) => Promise<string | null>;
 }
 
 interface Window {

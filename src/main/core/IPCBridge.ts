@@ -117,6 +117,19 @@ export class IPCBridge extends EventEmitter {
 
       return result.canceled ? null : result.filePaths[0];
     });
+
+    // Generic file selection dialog
+    ipcMain.handle("select-file", async (_event, options: any) => {
+      if (!this.mainWindow) return null;
+
+      const result = await dialog.showOpenDialog(this.mainWindow, {
+        properties: ["openFile"],
+        title: options?.title || "Select File",
+        filters: options?.filters || [{ name: "All Files", extensions: ["*"] }],
+      });
+
+      return result.canceled ? null : result.filePaths[0];
+    });
   }
 
   /**
@@ -462,5 +475,6 @@ export class IPCBridge extends EventEmitter {
     ipcMain.removeHandler("shell-command");
     ipcMain.removeHandler("system-info");
     ipcMain.removeHandler("select-directory");
+    ipcMain.removeHandler("select-file");
   }
 }

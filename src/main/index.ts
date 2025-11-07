@@ -68,7 +68,7 @@ class EdenApp {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(__dirname, "../renderer/eve-preload.js"),
+        preload: path.join(__dirname, "../eveshell/eve-preload.js"),
       },
       backgroundColor: "#1e1e1e",
       autoHideMenuBar: true,
@@ -80,7 +80,7 @@ class EdenApp {
     this.ipcBridge.setMainWindow(this.mainWindow);
 
     // Load the shell UI
-    const shellPath = path.join(__dirname, "../renderer/index.html");
+    const shellPath = path.join(__dirname, "../eveshell/index.html");
     this.mainWindow.loadFile(shellPath);
 
     // Show window when ready

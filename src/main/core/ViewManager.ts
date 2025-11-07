@@ -62,7 +62,7 @@ export class ViewManager extends EventEmitter {
     // Use universal preload that provides safe API
     const universalPreload = path.join(
       __dirname,
-      "../../renderer/app-preload.js"
+      "../../eveshell/app-preload.js"
     );
     console.log(
       `Creating view for ${appId} with universal preload: ${universalPreload}`
@@ -160,6 +160,13 @@ export class ViewManager extends EventEmitter {
     const viewInfo = this.views.get(viewId);
     if (!viewInfo) {
       return false;
+    }
+
+    // Don't update bounds if view is hidden
+    if (!viewInfo.visible) {
+      // Still store the bounds for when view becomes visible again
+      viewInfo.bounds = bounds;
+      return true;
     }
 
     try {

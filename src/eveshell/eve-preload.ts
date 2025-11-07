@@ -30,4 +30,5 @@ contextBridge.exposeInMainWorld("edenAPI", {
 
   // File system
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
+  selectFile: (options: any) => ipcRenderer.invoke("select-file", options),
 });
