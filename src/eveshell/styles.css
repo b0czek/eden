@@ -44,7 +44,8 @@ body {
   padding: 0 20px;
   box-shadow: 0 -2px 30px rgba(0, 0, 0, 0.15);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
+
 }
 
 .dock::before {
@@ -113,16 +114,17 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 2px 4px;
   cursor: pointer;
   border-radius: 10px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   min-width: 44px;
+  
 }
 
 .app-icon:hover {
-  transform: translateY(-8px) scale(1.15);
+  transform: translateY(-4px) scale(1.1);
 }
 
 .app-icon:hover .icon-container {

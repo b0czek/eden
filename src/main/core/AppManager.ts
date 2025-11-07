@@ -5,8 +5,16 @@ import AdmZip from "adm-zip";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "./ViewManager";
 import { IPCBridge } from "./IPCBridge";
-import { AppManifest, AppInstance } from "../../types";
+import {
+  AppManifest,
+  AppInstance,
+  ShellCommandType,
+  ShellCommandArgs,
+  AppManagerEventType,
+  AppManagerEventData,
+} from "../../types";
 import { randomUUID } from "crypto";
+import { CommandHandler, getCommandHandlers } from "./CommandDecorators";
 
 /**
  * AppManager
@@ -37,6 +45,16 @@ export class AppManager extends EventEmitter {
     this.appsDirectory = appsDirectory;
 
     this.setupEventHandlers();
+  }
+
+  /**
+   * Type-safe event emitter
+   */
+  private emitEvent<T extends AppManagerEventType>(
+    event: T,
+    data: AppManagerEventData<T>
+  ): boolean {
+    return this.emit(event, data);
   }
 
   /**
@@ -188,7 +206,7 @@ export class AppManager extends EventEmitter {
     // Register app
     this.installedApps.set(manifest.id, manifest);
 
-    this.emit("app-installed", { manifest });
+    this.emitEvent("app-installed", { manifest });
     this.ipcBridge.systemBroadcast("app-installed", { manifest });
 
     return manifest;
@@ -215,7 +233,7 @@ export class AppManager extends EventEmitter {
     // Unregister
     this.installedApps.delete(appId);
 
-    this.emit("app-uninstalled", { appId });
+    this.emitEvent("app-uninstalled", { appId });
     this.ipcBridge.systemBroadcast("app-uninstalled", { appId });
   }
 
@@ -272,7 +290,7 @@ export class AppManager extends EventEmitter {
 
       this.runningApps.set(appId, instance);
 
-      this.emit("app-launched", { instance });
+      this.emitEvent("app-launched", { instance });
       this.ipcBridge.systemBroadcast("app-launched", { appId, instanceId });
 
       // Return serializable data only
@@ -309,7 +327,7 @@ export class AppManager extends EventEmitter {
       // Remove from running apps
       this.runningApps.delete(appId);
 
-      this.emit("app-stopped", { appId });
+      this.emitEvent("app-stopped", { appId });
 
       // Only broadcast if not shutting down
       if (!this.isShuttingDown) {
@@ -387,7 +405,7 @@ export class AppManager extends EventEmitter {
     const instance = this.runningApps.get(appId);
     if (instance) {
       instance.state = "error";
-      this.emit("app-error", { appId, error });
+      this.emitEvent("app-error", { appId, error });
     }
   }
 
@@ -405,79 +423,132 @@ export class AppManager extends EventEmitter {
 
       this.runningApps.delete(appId);
 
-      this.emit("app-exited", { appId, code });
+      this.emitEvent("app-exited", { appId, code });
     }
   }
 
   /**
-   * Handle shell commands
+   * Handle shell commands using decorated handlers
    */
-  private async handleShellCommand(command: string, args: any): Promise<any> {
+  private async handleShellCommand<T extends ShellCommandType>(
+    command: T,
+    args: ShellCommandArgs<T>
+  ): Promise<any> {
     try {
-      switch (command) {
-        case "launch-app":
-          return await this.launchApp(args.appId, args.bounds);
-        case "stop-app":
-          await this.stopApp(args.appId);
-          return { success: true };
-        case "install-app":
-          return await this.installApp(args.sourcePath);
-        case "uninstall-app":
-          await this.uninstallApp(args.appId);
-          return { success: true };
-        case "list-apps":
-          // Serialize running apps to avoid cloning issues
-          const runningApps = this.getRunningApps().map((instance) => ({
-            appId: instance.manifest.id,
-            name: instance.manifest.name,
-            version: instance.manifest.version,
-            instanceId: instance.instanceId,
-            state: instance.state,
-            viewId: instance.viewId,
-            installedAt: instance.installedAt,
-            lastLaunched: instance.lastLaunched,
-          }));
-          return {
-            installed: this.getInstalledApps(),
-            running: runningApps,
-          };
-        case "update-view-bounds":
-          const instance = this.getAppInstance(args.appId);
-          if (!instance) {
-            throw new Error(`App ${args.appId} is not running`);
-          }
-          const success = this.viewManager.setViewBounds(
-            instance.viewId,
-            args.bounds
-          );
-          return { success };
-        case "set-view-visibility":
-          const visibilityInstance = this.getAppInstance(args.appId);
-          if (!visibilityInstance) {
-            throw new Error(`App ${args.appId} is not running`);
-          }
-          const visibilitySuccess = args.visible
-            ? this.viewManager.showView(visibilityInstance.viewId)
-            : this.viewManager.hideView(visibilityInstance.viewId);
-          return { success: visibilitySuccess };
-        case "focus-app":
-          const focusInstance = this.getAppInstance(args.appId);
-          if (!focusInstance) {
-            throw new Error(`App ${args.appId} is not running`);
-          }
-          const focusSuccess = this.viewManager.bringToFront(
-            focusInstance.viewId
-          );
-          return { success: focusSuccess };
-        default:
-          console.warn(`Unknown shell command: ${command}`);
-          return { error: "Unknown command" };
+      const handlers = getCommandHandlers(this);
+      const handlerMethod = handlers.get(command);
+
+      if (handlerMethod && typeof (this as any)[handlerMethod] === "function") {
+        return await (this as any)[handlerMethod](args);
       }
+
+      console.warn(`Unknown shell command: ${command}`);
+      return { error: "Unknown command" };
     } catch (error) {
       console.error(`Error handling shell command ${command}:`, error);
-      this.emit("command-error", { command, error });
+      this.emitEvent("command-error", { command, error });
       throw error;
     }
+  }
+
+  /**
+   * Command Handlers (decorated)
+   */
+
+  @CommandHandler("launch-app")
+  private async handleLaunchApp(
+    args: ShellCommandArgs<"launch-app">
+  ): Promise<any> {
+    const { appId, bounds } = args;
+    return await this.launchApp(appId, bounds);
+  }
+
+  @CommandHandler("stop-app")
+  private async handleStopApp(
+    args: ShellCommandArgs<"stop-app">
+  ): Promise<any> {
+    const { appId } = args;
+    await this.stopApp(appId);
+    return { success: true };
+  }
+
+  @CommandHandler("install-app")
+  private async handleInstallApp(
+    args: ShellCommandArgs<"install-app">
+  ): Promise<any> {
+    const { sourcePath } = args;
+    return await this.installApp(sourcePath);
+  }
+
+  @CommandHandler("uninstall-app")
+  private async handleUninstallApp(
+    args: ShellCommandArgs<"uninstall-app">
+  ): Promise<any> {
+    const { appId } = args;
+    await this.uninstallApp(appId);
+    return { success: true };
+  }
+
+  @CommandHandler("list-apps")
+  private async handleListApps(
+    args: ShellCommandArgs<"list-apps">
+  ): Promise<any> {
+    // Serialize running apps to avoid cloning issues
+    const runningApps = this.getRunningApps().map((instance) => ({
+      appId: instance.manifest.id,
+      name: instance.manifest.name,
+      version: instance.manifest.version,
+      instanceId: instance.instanceId,
+      state: instance.state,
+      viewId: instance.viewId,
+      installedAt: instance.installedAt,
+      lastLaunched: instance.lastLaunched,
+    }));
+    return {
+      installed: this.getInstalledApps(),
+      running: runningApps,
+    };
+  }
+
+  @CommandHandler("update-view-bounds")
+  private async handleUpdateViewBounds(
+    args: ShellCommandArgs<"update-view-bounds">
+  ): Promise<any> {
+    const { appId, bounds } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+    const success = this.viewManager.setViewBounds(instance.viewId, bounds);
+    return { success };
+  }
+
+  @CommandHandler("set-view-visibility")
+  private async handleSetViewVisibility(
+    args: ShellCommandArgs<"set-view-visibility">
+  ): Promise<any> {
+    const { appId, visible } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+    const success = visible
+      ? this.viewManager.showView(instance.viewId)
+      : this.viewManager.hideView(instance.viewId);
+    return { success };
+  }
+
+  @CommandHandler("focus-app")
+  private async handleFocusApp(
+    args: ShellCommandArgs<"focus-app">
+  ): Promise<any> {
+    const { appId } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+    const success = this.viewManager.bringToFront(instance.viewId);
+    return { success };
   }
 
   /**

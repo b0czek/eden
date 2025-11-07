@@ -137,3 +137,132 @@ export interface IPCMessage {
   /** Timestamp */
   timestamp: number;
 }
+
+/**
+ * Shell Command Types
+ *
+ * Type-safe command definitions for shell operations
+ */
+
+export interface ViewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type ShellCommand =
+  | {
+      command: "launch-app";
+      args: {
+        appId: string;
+        bounds?: ViewBounds;
+      };
+    }
+  | {
+      command: "stop-app";
+      args: {
+        appId: string;
+      };
+    }
+  | {
+      command: "install-app";
+      args: {
+        sourcePath: string;
+      };
+    }
+  | {
+      command: "uninstall-app";
+      args: {
+        appId: string;
+      };
+    }
+  | {
+      command: "list-apps";
+      args: Record<string, never>;
+    }
+  | {
+      command: "update-view-bounds";
+      args: {
+        appId: string;
+        bounds: ViewBounds;
+      };
+    }
+  | {
+      command: "set-view-visibility";
+      args: {
+        appId: string;
+        visible: boolean;
+      };
+    }
+  | {
+      command: "focus-app";
+      args: {
+        appId: string;
+      };
+    };
+
+export type ShellCommandType = ShellCommand["command"];
+export type ShellCommandArgs<T extends ShellCommandType> = Extract<
+  ShellCommand,
+  { command: T }
+>["args"];
+
+/**
+ * AppManager Event Types
+ *
+ * Type-safe event definitions for AppManager
+ */
+
+export type AppManagerEvent =
+  | {
+      event: "app-installed";
+      data: {
+        manifest: AppManifest;
+      };
+    }
+  | {
+      event: "app-uninstalled";
+      data: {
+        appId: string;
+      };
+    }
+  | {
+      event: "app-launched";
+      data: {
+        instance: AppInstance;
+      };
+    }
+  | {
+      event: "app-stopped";
+      data: {
+        appId: string;
+      };
+    }
+  | {
+      event: "app-error";
+      data: {
+        appId: string;
+        error: any;
+      };
+    }
+  | {
+      event: "app-exited";
+      data: {
+        appId: string;
+        code: number;
+      };
+    }
+  | {
+      event: "command-error";
+      data: {
+        command: string;
+        error: any;
+      };
+    };
+
+export type AppManagerEventType = AppManagerEvent["event"];
+export type AppManagerEventData<T extends AppManagerEventType> = Extract<
+  AppManagerEvent,
+  { event: T }
+>["data"];

@@ -14,7 +14,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/main/**/*", "src/types/**/*", "src/eveshell/eve-preload.ts"],
   "exclude": ["node_modules", "dist", "src/eveshell/components", "src/eveshell/index.tsx"],
