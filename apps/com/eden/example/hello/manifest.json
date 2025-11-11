@@ -10,6 +10,19 @@
   "frontend": {
     "entry": "index.html"
   },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 600,
+      "height": 400
+    },
+    "minSize": {
+      "width": 400,
+      "height": 300
+    },
+    "resizable": true,
+    "movable": true
+  },
   "permissions": {
     "system": {
       "notifications": true

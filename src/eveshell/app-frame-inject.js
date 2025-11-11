@@ -16,6 +16,9 @@
 
   let appId = null;
   let appName = 'App';
+  
+  // Track current window bounds for floating windows
+  let currentBounds = null;
 
   // Inject CSS
   const style = document.createElement('style');
@@ -199,9 +202,21 @@
   // Create the overlay
   const overlay = document.createElement('div');
   overlay.id = 'eden-app-frame-overlay';
+  
+  // Check if app supports mode toggling
+  const windowConfig = window.__edenWindowConfig || {};
+  const supportsToggle = windowConfig.mode === 'both';
+  const currentMode = window.__edenWindowMode || 'tiled';
+  
+  // Create toggle button HTML if supported
+  const toggleButtonHtml = supportsToggle 
+    ? `<button class="eden-app-frame-button toggle-mode" id="eden-toggle-mode-btn" title="Toggle Window Mode">⊞</button>` 
+    : '';
+  
   overlay.innerHTML = `
     <div id="eden-app-frame-title">App</div>
     <div id="eden-app-frame-controls">
+      ${toggleButtonHtml}
       <button class="eden-app-frame-button minimize" id="eden-minimize-btn" title="Minimize">−</button>
       <button class="eden-app-frame-button close" id="eden-close-btn" title="Close">×</button>
     </div>
@@ -291,6 +306,262 @@
       });
     }
 
+    // Toggle mode button (only for apps that support 'both')
+    const toggleBtn = document.getElementById('eden-toggle-mode-btn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const toggleMode = () => {
+          if (window.edenAPI && appId) {
+            window.edenAPI.shellCommand('toggle-view-mode', { 
+              appId 
+            }).then(() => {
+              console.log('[Eden Frame] View mode toggled');
+            }).catch(console.error);
+          } else {
+            setTimeout(toggleMode, 100);
+          }
+        };
+        toggleMode();
+      });
+    }
+
+    // Setup floating window dragging and resizing
+    setupFloatingWindowControls();
+
+    // Listen for mode changes from backend
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'view-mode-changed') {
+        const { mode, bounds } = event.data;
+        console.log('[Eden Frame] View mode changed to:', mode, 'with bounds:', bounds);
+        
+        // Update window mode and bounds
+        window.__edenWindowMode = mode;
+        if (bounds) {
+          window.__edenInitialBounds = bounds;
+          currentBounds = { ...bounds };
+        }
+        
+        // Re-setup controls for new mode
+        setupFloatingWindowControls();
+      }
+    });
+  };
+
+  const setupFloatingWindowControls = () => {
+    const windowMode = window.__edenWindowMode || 'tiled';
+    const windowConfig = window.__edenWindowConfig || {};
+    const initialBounds = window.__edenInitialBounds || null;
+
+    console.log('[Eden Frame] Window mode:', windowMode, 'Config:', windowConfig, 'Initial bounds:', initialBounds);
+
+    // Only enable dragging/resizing for floating windows
+    if (windowMode !== 'floating') {
+      return;
+    }
+
+    // Initialize current bounds from the actual bounds set by ViewManager
+    if (initialBounds && initialBounds.x !== undefined) {
+      currentBounds = { ...initialBounds };
+      console.log('[Eden Frame] Initialized bounds from backend:', currentBounds);
+    } else if (windowConfig.defaultSize) {
+      // Fallback to config if no initial bounds provided
+      const workspaceX = 0;
+      const workspaceY = 0;
+      
+      const x = windowConfig.defaultPosition?.x || 0;
+      const y = windowConfig.defaultPosition?.y || 0;
+      
+      currentBounds = {
+        x: workspaceX + x,
+        y: workspaceY + y,
+        width: windowConfig.defaultSize.width || 800,
+        height: windowConfig.defaultSize.height || 600
+      };
+      
+      console.log('[Eden Frame] Initialized bounds from config:', currentBounds);
+    }
+
+    // Check if dragging is allowed
+    const isMovable = windowConfig.movable !== false; // default true
+    const isResizable = windowConfig.resizable !== false; // default true
+
+    console.log('[Eden Frame] Movable:', isMovable, 'Resizable:', isResizable);
+
+    // Setup window dragging
+    if (isMovable) {
+      setupWindowDragging();
+    }
+
+    // Setup window resizing
+    if (isResizable) {
+      setupWindowResizing(windowConfig);
+    }
+  };
+
+  const setupWindowDragging = () => {
+    const titleBar = overlay;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let dragStartBounds = null;
+
+    titleBar.addEventListener('mousedown', (e) => {
+      // Only drag on the title bar itself, not on buttons
+      if (e.target.closest('.eden-app-frame-button')) {
+        return;
+      }
+
+      // Initialize current bounds if not set
+      if (!currentBounds) {
+        const windowConfig = window.__edenWindowConfig || {};
+        currentBounds = {
+          x: 0,
+          y: 0,
+          width: windowConfig.defaultSize?.width || 800,
+          height: windowConfig.defaultSize?.height || 600
+        };
+      }
+
+      isDragging = true;
+      startX = e.screenX;
+      startY = e.screenY;
+      // Copy current bounds at drag start
+      dragStartBounds = { ...currentBounds };
+
+      console.log('[Eden Frame] Drag started at:', { x: startX, y: startY }, 'Current bounds:', currentBounds);
+
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || !dragStartBounds) return;
+
+      const deltaX = e.screenX - startX;
+      const deltaY = e.screenY - startY;
+
+      const newBounds = {
+        x: dragStartBounds.x + deltaX,
+        y: dragStartBounds.y + deltaY,
+        width: dragStartBounds.width,
+        height: dragStartBounds.height
+      };
+
+      // Update tracked bounds
+      currentBounds = newBounds;
+
+      // Send update to backend
+      if (window.edenAPI && appId) {
+        window.edenAPI.shellCommand('update-view-bounds', {
+          appId,
+          bounds: newBounds
+        }).catch(console.error);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        console.log('[Eden Frame] Drag ended, final bounds:', currentBounds);
+        isDragging = false;
+        dragStartBounds = null;
+      }
+    });
+  };
+
+  const setupWindowResizing = (windowConfig) => {
+    // Create resize handle in bottom-right corner
+    const resizeHandle = document.createElement('div');
+    resizeHandle.id = 'eden-resize-handle';
+    resizeHandle.style.cssText = `
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      width: 20px;
+      height: 20px;
+      cursor: nwse-resize;
+      z-index: 2147483647;
+      -webkit-app-region: no-drag;
+    `;
+
+    document.body.appendChild(resizeHandle);
+
+    let isResizing = false;
+    let startX = 0;
+    let startY = 0;
+    let resizeStartBounds = null;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      // Initialize current bounds if not set
+      if (!currentBounds) {
+        currentBounds = {
+          x: 0,
+          y: 0,
+          width: windowConfig.defaultSize?.width || 800,
+          height: windowConfig.defaultSize?.height || 600
+        };
+      }
+
+      isResizing = true;
+      startX = e.screenX;
+      startY = e.screenY;
+
+      // Copy current bounds at resize start
+      resizeStartBounds = { ...currentBounds };
+
+      console.log('[Eden Frame] Resize started at:', { x: startX, y: startY }, 'Current bounds:', currentBounds);
+
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing || !resizeStartBounds) return;
+
+      const deltaX = e.screenX - startX;
+      const deltaY = e.screenY - startY;
+
+      let newWidth = resizeStartBounds.width + deltaX;
+      let newHeight = resizeStartBounds.height + deltaY;
+
+      // Apply min/max constraints
+      if (windowConfig.minSize) {
+        newWidth = Math.max(newWidth, windowConfig.minSize.width || 200);
+        newHeight = Math.max(newHeight, windowConfig.minSize.height || 200);
+      } else {
+        newWidth = Math.max(newWidth, 200);
+        newHeight = Math.max(newHeight, 200);
+      }
+
+      if (windowConfig.maxSize) {
+        newWidth = Math.min(newWidth, windowConfig.maxSize.width || 2000);
+        newHeight = Math.min(newHeight, windowConfig.maxSize.height || 2000);
+      }
+
+      const newBounds = {
+        x: resizeStartBounds.x,
+        y: resizeStartBounds.y,
+        width: Math.round(newWidth),
+        height: Math.round(newHeight)
+      };
+
+      // Update tracked bounds
+      currentBounds = newBounds;
+
+      // Send update to backend
+      if (window.edenAPI && appId) {
+        window.edenAPI.shellCommand('update-view-bounds', {
+          appId,
+          bounds: newBounds
+        }).catch(console.error);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        console.log('[Eden Frame] Resize ended, final bounds:', currentBounds);
+        isResizing = false;
+        resizeStartBounds = null;
+      }
+    });
   };
 
   // Inject when DOM is ready

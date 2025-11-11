@@ -1,6 +1,7 @@
 import { createSignal, onMount, createEffect, For, Show } from "solid-js";
 import Dock from "./Dock";
 import AppIcon from "./AppIcon";
+import AllApps from "./AllApps";
 
 interface AppManifest {
   id: string;
@@ -21,14 +22,6 @@ export default function Shell() {
   const [runningApps, setRunningApps] = createSignal<Set<string>>(new Set());
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
-  const [contextMenu, setContextMenu] = createSignal<{
-    appId: string;
-    appName: string;
-    isRunning: boolean;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [longPressTimer, setLongPressTimer] = createSignal<number | null>(null);
 
   // Combine installed and running apps for the dock
   const dockApps = () => {
@@ -191,7 +184,6 @@ export default function Shell() {
   const handleStopApp = async (appId: string) => {
     try {
       await window.edenAPI.shellCommand("stop-app", { appId });
-      setContextMenu(null);
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -206,57 +198,11 @@ export default function Shell() {
       // Confirm before uninstalling
       if (confirm(`Are you sure you want to uninstall this app?`)) {
         await window.edenAPI.shellCommand("uninstall-app", { appId });
-        setContextMenu(null);
         // Refresh app list
         await loadSystemInfo();
       }
     } catch (error) {
       console.error("Failed to uninstall app:", error);
-    }
-  };
-
-  const handleContextMenu = (
-    e: MouseEvent,
-    appId: string,
-    appName: string,
-    isRunning: boolean
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({
-      appId,
-      appName,
-      isRunning,
-      x: e.clientX,
-      y: e.clientY,
-    });
-  };
-
-  const handleLongPressStart = (
-    e: TouchEvent | MouseEvent,
-    appId: string,
-    appName: string,
-    isRunning: boolean
-  ) => {
-    const timer = window.setTimeout(() => {
-      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-      setContextMenu({
-        appId,
-        appName,
-        isRunning,
-        x: clientX,
-        y: clientY,
-      });
-    }, 500); // 500ms long press
-    setLongPressTimer(timer);
-  };
-
-  const handleLongPressEnd = () => {
-    const timer = longPressTimer();
-    if (timer) {
-      clearTimeout(timer);
-      setLongPressTimer(null);
     }
   };
 
@@ -335,117 +281,15 @@ export default function Shell() {
       />
 
       <Show when={showAllApps()}>
-        <div class="apps-view-overlay" onClick={handleShowAllApps}>
-          <div class="apps-view" onClick={(e) => e.stopPropagation()}>
-            <div class="apps-view-header">
-              <h2>All Applications</h2>
-              <button onClick={handleInstallApp} class="install-btn">
-                Install App
-              </button>
-              <button onClick={handleShowAllApps} class="close-btn">
-                ✕
-              </button>
-            </div>
-            <div class="apps-grid">
-              <For each={allApps()}>
-                {(app) => (
-                  <div
-                    class="app-grid-item"
-                    classList={{ running: app.isRunning }}
-                    onClick={async (e) => {
-                      // Only handle click if not opening context menu
-                      if (!contextMenu()) {
-                        // Close apps view first
-                        setShowAllApps(false);
-                        
-                        // Show all running apps
-                        const running = runningApps();
-                        for (const appId of running) {
-                          try {
-                            await window.edenAPI.shellCommand("set-view-visibility", {
-                              appId,
-                              visible: true,
-                            });
-                          } catch (error) {
-                            console.error(`Failed to set visibility for ${appId}:`, error);
-                          }
-                        }
-                        
-                        // Then handle the app click
-                        await handleAppClick(app.id);
-                      }
-                    }}
-                    onContextMenu={(e) =>
-                      handleContextMenu(e, app.id, app.name, app.isRunning)
-                    }
-                    onMouseDown={(e) => {
-                      if (e.button === 0) {
-                        // Left click only
-                        handleLongPressStart(
-                          e,
-                          app.id,
-                          app.name,
-                          app.isRunning
-                        );
-                      }
-                    }}
-                    onMouseUp={handleLongPressEnd}
-                    onMouseLeave={handleLongPressEnd}
-                    onTouchStart={(e) =>
-                      handleLongPressStart(e, app.id, app.name, app.isRunning)
-                    }
-                    onTouchEnd={handleLongPressEnd}
-                    onTouchCancel={handleLongPressEnd}
-                  >
-                    <AppIcon
-                      appId={app.id}
-                      appName={app.name}
-                      icon={app.icon}
-                      isRunning={app.isRunning}
-                    />
-                  </div>
-                )}
-              </For>
-            </div>
-          </div>
-        </div>
-      </Show>
-
-      {/* Context Menu */}
-      <Show when={contextMenu()}>
-        {(menu) => (
-          <>
-            <div
-              class="context-menu-overlay"
-              onClick={() => setContextMenu(null)}
-            />
-            <div
-              class="context-menu"
-              style={{
-                left: `${menu().x}px`,
-                top: `${menu().y}px`,
-              }}
-            >
-              <div class="context-menu-header">{menu().appName}</div>
-              <Show when={menu().isRunning}>
-                <button
-                  class="context-menu-item"
-                  onClick={() => handleStopApp(menu().appId)}
-                >
-                  <span class="context-menu-icon stop-icon">■</span>
-                  Stop App
-                </button>
-              </Show>
-              <button
-                class="context-menu-item danger"
-                onClick={() => handleUninstallApp(menu().appId)}
-              >
-                <span class="context-menu-icon trash-icon">×</span>
-                Uninstall
-              </button>
-            </div>
-          </>
-        )}
+        <AllApps
+          apps={allApps()}
+          runningApps={runningApps()}
+          onClose={handleShowAllApps}
+          onInstall={handleInstallApp}
+          onAppClick={handleAppClick}
+          onStopApp={handleStopApp}
+          onUninstallApp={handleUninstallApp}
+        />
       </Show>
     </div>
   );

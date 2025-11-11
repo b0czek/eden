@@ -23,6 +23,48 @@ export interface TilingConfig {
 }
 
 /**
+ * Window Mode Configuration
+ *
+ * Defines how an app's window can be displayed
+ */
+export type WindowMode = "floating" | "tiled" | "both";
+
+export interface WindowConfig {
+  /** Window display modes supported by the app */
+  mode: WindowMode;
+
+  /** Default window size for floating mode */
+  defaultSize?: {
+    width: number;
+    height: number;
+  };
+
+  /** Default window position for floating mode (if not specified, will be centered) */
+  defaultPosition?: {
+    x: number;
+    y: number;
+  };
+
+  /** Minimum window size */
+  minSize?: {
+    width: number;
+    height: number;
+  };
+
+  /** Maximum window size */
+  maxSize?: {
+    width: number;
+    height: number;
+  };
+
+  /** Whether the window can be resized (default: true for floating, false for tiled) */
+  resizable?: boolean;
+
+  /** Whether the window can be moved (default: true for floating, false for tiled) */
+  movable?: boolean;
+}
+
+/**
  * App Manifest Interface
  *
  * Defines the structure of an Eden app package.
@@ -78,6 +120,9 @@ export interface AppManifest {
       preload?: string;
     };
   };
+
+  /** Window configuration */
+  window?: WindowConfig;
 
   /** Permissions requested by the app */
   permissions?: {
@@ -229,6 +274,13 @@ export type ShellCommand =
       command: "focus-app";
       args: {
         appId: string;
+      };
+    }
+  | {
+      command: "toggle-view-mode";
+      args: {
+        appId: string;
+        mode?: "floating" | "tiled";
       };
     };
 

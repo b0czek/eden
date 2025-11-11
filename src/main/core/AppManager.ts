@@ -291,7 +291,10 @@ export class AppManager extends EventEmitter {
       this.runningApps.set(appId, instance);
 
       this.emitEvent("app-launched", { instance });
-      this.ipcBridge.systemBroadcast("app-launched", { appId, instanceId });
+      this.ipcBridge.systemBroadcast("app-launched", {
+        appId,
+        instanceId,
+      });
 
       // Return serializable data only
       return {
@@ -558,6 +561,19 @@ export class AppManager extends EventEmitter {
     const { bounds } = args;
     this.viewManager.setWorkspaceBounds(bounds);
     return { success: true };
+  }
+
+  @CommandHandler("toggle-view-mode")
+  private async handleToggleViewMode(
+    args: ShellCommandArgs<"toggle-view-mode">
+  ): Promise<any> {
+    const { appId, mode } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+    const success = this.viewManager.setViewMode(instance.viewId, mode);
+    return { success };
   }
 
   /**

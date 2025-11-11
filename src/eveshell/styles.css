@@ -42,7 +42,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 8px 24px;
+  padding: 8px 8px;
   position: relative;
   overflow: visible;
 }
@@ -51,8 +51,8 @@ body {
   /* Frosted panel behind dock content */
   content: '';
   position: absolute;
-  left: 24px;
-  right: 24px;
+  left: 8px;
+  right: 8px;
   bottom: 8px;
   height: 56px;
   border-radius: 20px;
@@ -76,7 +76,7 @@ body {
 
 .dock-right {
   position: absolute;
-  right: 28px;
+  right: 8px;
   display: flex;
   align-items: center;
   padding: 8px 16px;
@@ -293,143 +293,177 @@ body {
 /* Apps View Overlay */
 .apps-view-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(20px) saturate(180%);
+  inset: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  padding: 48px;
+  background: rgba(8, 12, 24, 0.62);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
   z-index: 1000;
-  animation: fadeIn 0.3s ease;
+  animation: appsOverlayFadeIn 0.28s ease forwards;
 }
 
-@keyframes fadeIn {
+.apps-view-overlay.closing {
+  animation: appsOverlayFadeOut 0.22s ease forwards;
+}
+
+@keyframes appsOverlayFadeIn {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes appsOverlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
 .apps-view {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(40px) saturate(180%);
-  border-radius: 20px;
-  padding: 32px;
-  max-width: 800px;
-  max-height: 80vh;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 24px;
+  padding: 36px 48px 48px;
+  border-radius: 28px;
+  background: rgba(18, 24, 42, 0.55);
+  backdrop-filter: blur(34px) saturate(170%);
+  -webkit-backdrop-filter: blur(34px) saturate(170%);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  width: min(1400px, 100%);
+  animation: appsViewEnter 0.32s cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
-@keyframes slideUp {
+.apps-view.closing {
+  animation: appsViewExit 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes appsViewEnter {
   from {
-    transform: translateY(30px) scale(0.96);
     opacity: 0;
+    transform: translateY(24px) scale(0.98);
   }
   to {
-    transform: translateY(0) scale(1);
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
-.apps-view-header {
+@keyframes appsViewExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+}
+
+.apps-view-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 20px;
+}
+
+.apps-view-topbar h2 {
+  color: rgba(239, 244, 255, 0.96);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+
+.apps-view-actions {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.apps-view-header h2 {
-  color: #1a1a1a;
-  font-size: 28px;
-  font-weight: 700;
-  flex: 1;
-  letter-spacing: -0.5px;
-}
-
-.apps-view-header button {
-  padding: 10px 20px;
+.apps-action-button {
+  width: 44px;
+  height: 44px;
   border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  letter-spacing: -0.2px;
-}
-
-.install-btn {
-  background: linear-gradient(135deg, #007AFF, #0051D5);
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-}
-
-.install-btn:hover {
-  background: linear-gradient(135deg, #0051D5, #003D9E);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
-  transform: translateY(-1px);
-}
-
-.install-btn:active {
-  transform: translateY(0);
-}
-
-.close-btn {
-  background: rgba(0, 0, 0, 0.06);
-  color: #1a1a1a;
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 26px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  line-height: 1;
 }
 
-.close-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
+.apps-action-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.apps-action-button:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.apps-action-button.install {
+  background: linear-gradient(135deg, rgba(82, 163, 255, 0.95), rgba(54, 123, 255, 0.95));
+  box-shadow: 0 8px 20px rgba(54, 123, 255, 0.28);
+}
+
+.apps-action-button.install:hover {
+  background: linear-gradient(135deg, rgba(66, 144, 255, 0.98), rgba(40, 106, 242, 0.98));
+}
+
+.apps-action-button.close {
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  padding-top: 1px;
 }
 
 .apps-grid {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
+  justify-content: center;
+  justify-items: center;
+  align-items: start;
+  gap: 24px;
+  padding: 16px 24px 24px;
   overflow-y: auto;
-  max-height: calc(80vh - 120px);
-  padding: 8px;
+  overflow-x: hidden;
 }
 
 .apps-grid::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .apps-grid::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-  margin: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
 }
 
 .apps-grid::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
 }
 
 .apps-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .app-grid-item {
@@ -437,17 +471,22 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 8px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  padding: 10px;
+  border-radius: 18px;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-width: 200px;
+  width: 100%;
+  height: auto;
 }
 
 .app-grid-item:hover {
-  transform: scale(1.05);
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.2);
 }
 
 .app-grid-item:active {
@@ -456,21 +495,39 @@ body {
 
 .app-grid-item .app-icon {
   min-width: auto;
-  width: 100%;
+  width: auto;
+  max-width: 156px;
+}
+
+/* Make the grid icon square and larger than dock */
+.app-grid-item .icon-container {
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+}
+
+.app-grid-item .icon-container img {
+  width: 64px;
+  height: 64px;
 }
 
 .app-grid-item .app-name {
   opacity: 1;
-  color: #1a1a1a;
+  color: rgba(239, 244, 255, 0.95);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  max-width: 200px;
+  position: static;
+  transform: none;
+  left: auto;
+  top: auto;
 }
 
 .app-grid-item.running {
-  background: rgba(0, 122, 255, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
-}
-
-.app-grid-item.running .app-icon {
-  background: transparent;
+  background: rgba(52, 126, 255, 0.22);
+  border-color: rgba(80, 150, 255, 0.5);
+  box-shadow: 0 8px 16px rgba(52, 126, 255, 0.2);
 }
 
 /* Context Menu Styles */

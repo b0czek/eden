@@ -10,5 +10,22 @@
   "backend": {
     "entry": "backend.js"
   },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 400,
+      "height": 600
+    },
+    "minSize": {
+      "width": 300,
+      "height": 400
+    },
+    "maxSize": {
+      "width": 600,
+      "height": 800
+    },
+    "resizable": true,
+    "movable": true
+  },
   "permissions": {}
 }
