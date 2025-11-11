@@ -432,7 +432,7 @@ export default function Shell() {
                   class="context-menu-item"
                   onClick={() => handleStopApp(menu().appId)}
                 >
-                  <span class="context-menu-icon">⏹</span>
+                  <span class="context-menu-icon stop-icon">■</span>
                   Stop App
                 </button>
               </Show>
@@ -440,7 +440,7 @@ export default function Shell() {
                 class="context-menu-item danger"
                 onClick={() => handleUninstallApp(menu().appId)}
               >
-                <span class="context-menu-icon">🗑</span>
+                <span class="context-menu-icon trash-icon">×</span>
                 Uninstall
               </button>
             </div>

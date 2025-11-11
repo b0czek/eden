@@ -20,87 +20,178 @@
   // Inject CSS
   const style = document.createElement('style');
   style.textContent = `
-    #eden-app-frame-overlay {
+    /* Squircle container styling */
+    html {
+      background: transparent !important;
+    }
+    
+    html, body {
+      border-radius: 20px;
+      overflow: hidden;
+      clip-path: inset(0 round 20px);
+    }
+    
+    body {
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
+                  inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    #eden-app-frame-overlay#eden-app-frame-overlay {
+      all: revert;
+      /* Now only set what we actually need */
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 32px;
-      background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
-      border-bottom: 1px solid #d0d0d0;
+      height: 40px;
+      background: transparent;
+      border-bottom: none;
+      border-radius: 20px 20px 0 0;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 0 8px;
+      justify-content: flex-end;
+      padding: 0 16px;
       user-select: none;
-      z-index: 999999;
+      z-index: 2147483647;
       -webkit-app-region: drag;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      box-sizing: border-box;
     }
 
-    #eden-app-frame-overlay.dark {
-      background: linear-gradient(to bottom, #3c3c3c, #2d2d2d);
-      border-bottom: 1px solid #1e1e1e;
+    #eden-app-frame-overlay.dark#eden-app-frame-overlay.dark {
+      background: transparent;
+      border-bottom: none;
       color: #cccccc;
     }
 
-    #eden-app-frame-title {
-      font-size: 13px;
-      font-weight: 500;
+    #eden-app-frame-overlay #eden-app-frame-title {
+      all: revert;
+      /* Now only set what we actually need */
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      font-weight: 600;
       color: #333;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      flex: 1;
+      max-width: calc(100% - 200px);
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1;
+      letter-spacing: -0.3px;
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      padding: 8px 16px;
+      border-radius: 10px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
-    #eden-app-frame-overlay.dark #eden-app-frame-title {
-      color: #cccccc;
+        #eden-app-frame-overlay.dark #eden-app-frame-title {
+      color: #ffffff;
+      background: rgba(40, 40, 40, 0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
-    #eden-app-frame-controls {
+    #eden-app-frame-overlay #eden-app-frame-controls {
+      all: revert;
+      /* Now only set what we actually need */
       display: flex;
       gap: 8px;
       -webkit-app-region: no-drag;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      padding: 4px;
+      border-radius: 10px;
+      height: 32px;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
-    .eden-app-frame-button {
+    #eden-app-frame-overlay.dark #eden-app-frame-controls {
+      background: rgba(40, 40, 40, 0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    #eden-app-frame-overlay .eden-app-frame-button {
+      all: revert;
+      /* Now only set what we actually need */
       width: 24px;
       height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      max-width: 24px;
+      max-height: 24px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       background: transparent;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
-      transition: background-color 0.15s;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       color: #666;
       line-height: 1;
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-weight: 400;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
 
     #eden-app-frame-overlay.dark .eden-app-frame-button {
       color: #aaa;
     }
 
-    .eden-app-frame-button:hover {
-      background: rgba(0, 0, 0, 0.05);
+    #eden-app-frame-overlay .eden-app-frame-button:hover {
+      background: rgba(0, 0, 0, 0.08);
+      transform: scale(1.05);
     }
 
     #eden-app-frame-overlay.dark .eden-app-frame-button:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(1.05);
     }
 
-    .eden-app-frame-button.close:hover {
+    #eden-app-frame-overlay .eden-app-frame-button.close:hover {
       background: #e81123;
       color: white;
+      transform: scale(1.05);
+    }
+
+    #eden-app-frame-overlay .eden-app-frame-button:active {
+      transform: scale(0.95);
+    }
+
+    #eden-app-frame-overlay .eden-app-frame-button.minimize {
+      font-size: 20px;
+      font-weight: 300;
+    }
+
+    #eden-app-frame-overlay .eden-app-frame-button.close {
+      font-size: 20px;
+      font-weight: 400;
     }
 
     /* Adjust body to account for title bar */
-    body.eden-framed {
-      padding-top: 33px !important;
+    body.eden-framed.eden-framed {
+      padding-top: 41px;
     }
   `;
   document.head.appendChild(style);
@@ -200,27 +291,6 @@
       });
     }
 
-    // Maximize button (show if hidden, bring to front)
-    const maxBtn = document.getElementById('eden-maximize-btn');
-    if (maxBtn) {
-      maxBtn.addEventListener('click', () => {
-        const maximize = () => {
-          if (window.edenAPI && appId) {
-            // First make sure it's visible
-            window.edenAPI.shellCommand('set-view-visibility', { 
-              appId, 
-              visible: true 
-            }).then(() => {
-              // Then bring to front
-              return window.edenAPI.shellCommand('focus-app', { appId });
-            }).catch(console.error);
-          } else {
-            setTimeout(maximize, 100);
-          }
-        };
-        maximize();
-      });
-    }
   };
 
   // Inject when DOM is ready

@@ -175,18 +175,11 @@ export class ViewManager extends EventEmitter {
       .filter(([_, info]) => info.visible)
       .sort((a, b) => (a[1].tileIndex || 0) - (b[1].tileIndex || 0));
 
-    console.log(
-      `Recalculating ${visibleViews.length} tiled views in ${this.tilingConfig.mode} mode`
-    );
-
     visibleViews.forEach(([viewId, info], index) => {
       const bounds = this.calculateTileBounds(index);
       info.tileIndex = index;
       info.bounds = bounds;
       info.view.setBounds(bounds);
-      console.log(
-        `View ${viewId} (${info.appId}): x=${bounds.x}, y=${bounds.y}, w=${bounds.width}, h=${bounds.height}`
-      );
     });
   }
 
@@ -266,6 +259,8 @@ export class ViewManager extends EventEmitter {
         contextIsolation: true,
         sandbox: false,
         preload: universalPreload,
+        transparent: true,
+        backgroundThrottling: false,
       },
     });
 
