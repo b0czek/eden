@@ -1,7 +1,8 @@
 import { BrowserWindow, WebContentsView } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
-import { AppManifest } from "../../types";
+import * as fs from "fs/promises";
+import { AppManifest, TilingConfig } from "../../types";
 
 interface ViewInfo {
   view: WebContentsView;
@@ -9,6 +10,7 @@ interface ViewInfo {
   manifest: AppManifest;
   bounds: { x: number; y: number; width: number; height: number };
   visible: boolean;
+  tileIndex?: number; // Index in the tiling grid
 }
 
 /**
@@ -21,12 +23,183 @@ export class ViewManager extends EventEmitter {
   private views: Map<number, ViewInfo> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private nextViewId = 1;
+  private tilingConfig: TilingConfig;
+  private workspaceBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } = { x: 0, y: 0, width: 800, height: 600 };
+
+  constructor(tilingConfig?: TilingConfig) {
+    super();
+    this.tilingConfig = tilingConfig || {
+      mode: "none",
+      gap: 0,
+      padding: 0,
+    };
+  }
 
   /**
    * Set the main window that will host the views
    */
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
+  }
+
+  /**
+   * Set workspace bounds (the area where views can be placed)
+   */
+  setWorkspaceBounds(bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): void {
+    this.workspaceBounds = bounds;
+    // Recalculate all tile bounds if using tiling
+    if (this.tilingConfig.mode !== "none") {
+      this.recalculateTiledViews();
+    }
+  }
+
+  /**
+   * Calculate bounds for a tile based on tiling configuration
+   */
+  private calculateTileBounds(tileIndex: number): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
+    const {
+      mode,
+      gap = 0,
+      padding = 0,
+      columns = 2,
+      rows = 2,
+    } = this.tilingConfig;
+    const {
+      x: workX,
+      y: workY,
+      width: workWidth,
+      height: workHeight,
+    } = this.workspaceBounds;
+
+    // Apply padding
+    const availableX = workX + padding;
+    const availableY = workY + padding;
+    const availableWidth = workWidth - padding * 2;
+    const availableHeight = workHeight - padding * 2;
+
+    switch (mode) {
+      case "horizontal": {
+        // Split horizontally into equal tiles
+        const visibleViews = Array.from(this.views.values()).filter(
+          (v) => v.visible
+        );
+        const count = visibleViews.length;
+        if (count === 0)
+          return {
+            x: availableX,
+            y: availableY,
+            width: availableWidth,
+            height: availableHeight,
+          };
+
+        const tileWidth = (availableWidth - gap * (count - 1)) / count;
+        return {
+          x: availableX + tileIndex * (tileWidth + gap),
+          y: availableY,
+          width: tileWidth,
+          height: availableHeight,
+        };
+      }
+
+      case "vertical": {
+        // Split vertically into equal tiles
+        const visibleViews = Array.from(this.views.values()).filter(
+          (v) => v.visible
+        );
+        const count = visibleViews.length;
+        if (count === 0)
+          return {
+            x: availableX,
+            y: availableY,
+            width: availableWidth,
+            height: availableHeight,
+          };
+
+        const tileHeight = (availableHeight - gap * (count - 1)) / count;
+        return {
+          x: availableX,
+          y: availableY + tileIndex * (tileHeight + gap),
+          width: availableWidth,
+          height: tileHeight,
+        };
+      }
+
+      case "grid": {
+        // Grid layout
+        const col = tileIndex % columns;
+        const row = Math.floor(tileIndex / columns);
+        const tileWidth = (availableWidth - gap * (columns - 1)) / columns;
+        const tileHeight = (availableHeight - gap * (rows - 1)) / rows;
+
+        return {
+          x: availableX + col * (tileWidth + gap),
+          y: availableY + row * (tileHeight + gap),
+          width: tileWidth,
+          height: tileHeight,
+        };
+      }
+
+      default:
+        // No tiling, return full workspace
+        return {
+          x: availableX,
+          y: availableY,
+          width: availableWidth,
+          height: availableHeight,
+        };
+    }
+  }
+
+  /**
+   * Recalculate bounds for all tiled views
+   */
+  private recalculateTiledViews(): void {
+    if (this.tilingConfig.mode === "none") return;
+
+    const visibleViews = Array.from(this.views.entries())
+      .filter(([_, info]) => info.visible)
+      .sort((a, b) => (a[1].tileIndex || 0) - (b[1].tileIndex || 0));
+
+    console.log(
+      `Recalculating ${visibleViews.length} tiled views in ${this.tilingConfig.mode} mode`
+    );
+
+    visibleViews.forEach(([viewId, info], index) => {
+      const bounds = this.calculateTileBounds(index);
+      info.tileIndex = index;
+      info.bounds = bounds;
+      info.view.setBounds(bounds);
+      console.log(
+        `View ${viewId} (${info.appId}): x=${bounds.x}, y=${bounds.y}, w=${bounds.width}, h=${bounds.height}`
+      );
+    });
+  }
+
+  /**
+   * Get the next available tile index
+   */
+  private getNextTileIndex(): number {
+    const indices = Array.from(this.views.values())
+      .filter((v) => v.visible && v.tileIndex !== undefined)
+      .map((v) => v.tileIndex!);
+
+    if (indices.length === 0) return 0;
+    return Math.max(...indices) + 1;
   }
 
   /**
@@ -44,6 +217,25 @@ export class ViewManager extends EventEmitter {
     });
 
     console.log(`Sent app API init for ${appId}`);
+  }
+
+  /**
+   * Inject app frame script into the view
+   * This adds a title bar with close button to each app
+   */
+  private async injectAppFrame(view: WebContentsView): Promise<void> {
+    try {
+      const frameScriptPath = path.join(
+        __dirname,
+        "../../eveshell/app-frame-inject.js"
+      );
+      const frameScript = await fs.readFile(frameScriptPath, "utf-8");
+
+      await view.webContents.executeJavaScript(frameScript);
+      console.log("App frame injected successfully");
+    } catch (error) {
+      console.error("Failed to inject app frame:", error);
+    }
   }
 
   /**
@@ -79,8 +271,17 @@ export class ViewManager extends EventEmitter {
 
     const viewId = this.nextViewId++;
 
+    // Calculate bounds based on tiling configuration
+    let viewBounds = bounds;
+    let tileIndex: number | undefined = undefined;
+
+    if (this.tilingConfig.mode !== "none") {
+      tileIndex = this.getNextTileIndex();
+      viewBounds = this.calculateTileBounds(tileIndex);
+    }
+
     // Set bounds
-    view.setBounds(bounds);
+    view.setBounds(viewBounds);
 
     // Load the frontend HTML
     const frontendPath = path.join(installPath, manifest.frontend.entry);
@@ -88,6 +289,9 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
+      // Inject the app frame script
+      this.injectAppFrame(view);
+
       // Inject the app API after page load
       this.injectAppAPI(view, appId);
       this.emit("view-loaded", { viewId, appId });
@@ -114,9 +318,15 @@ export class ViewManager extends EventEmitter {
       view,
       appId,
       manifest,
-      bounds,
+      bounds: viewBounds,
       visible: true,
+      tileIndex,
     });
+
+    // Recalculate all tiles if using tiling
+    if (this.tilingConfig.mode !== "none") {
+      this.recalculateTiledViews();
+    }
 
     return viewId;
   }
@@ -141,6 +351,12 @@ export class ViewManager extends EventEmitter {
 
       // Always remove from our tracking map
       this.views.delete(viewId);
+
+      // Recalculate tiles if using tiling
+      if (this.tilingConfig.mode !== "none") {
+        this.recalculateTiledViews();
+      }
+
       return true;
     } catch (error) {
       console.error(`Failed to remove view ${viewId}:`, error);
@@ -160,6 +376,15 @@ export class ViewManager extends EventEmitter {
     const viewInfo = this.views.get(viewId);
     if (!viewInfo) {
       return false;
+    }
+
+    // If tiling is enabled, ignore individual bounds updates
+    // Bounds are managed by the tiling system
+    if (this.tilingConfig.mode !== "none") {
+      console.log(
+        `Ignoring individual bounds update for view ${viewId} - tiling mode is active`
+      );
+      return true;
     }
 
     // Don't update bounds if view is hidden
@@ -216,12 +441,21 @@ export class ViewManager extends EventEmitter {
     }
 
     try {
-      // Remove and re-add to bring to front
-      this.mainWindow.contentView.removeChildView(viewInfo.view);
-      this.mainWindow.contentView.addChildView(viewInfo.view);
-      // Restore original bounds
-      viewInfo.view.setBounds(viewInfo.bounds);
+      // Mark as visible first
       viewInfo.visible = true;
+
+      // If tiling is enabled, recalculate all tiles
+      if (this.tilingConfig.mode !== "none") {
+        this.recalculateTiledViews();
+      } else {
+        // No tiling - just bring to front with stored bounds
+        // Remove and re-add to bring to front
+        this.mainWindow.contentView.removeChildView(viewInfo.view);
+        this.mainWindow.contentView.addChildView(viewInfo.view);
+        // Restore original bounds
+        viewInfo.view.setBounds(viewInfo.bounds);
+      }
+
       return true;
     } catch (error) {
       console.error(`Failed to show view ${viewId}:`, error);
@@ -239,9 +473,17 @@ export class ViewManager extends EventEmitter {
     }
 
     try {
-      // Hide by setting bounds to zero size
-      viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      // Mark as hidden
       viewInfo.visible = false;
+
+      // Always hide by setting bounds to zero
+      viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+
+      // If tiling is enabled, recalculate tiles for remaining visible views
+      if (this.tilingConfig.mode !== "none") {
+        this.recalculateTiledViews();
+      }
+
       return true;
     } catch (error) {
       console.error(`Failed to hide view ${viewId}:`, error);

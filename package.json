@@ -9,7 +9,7 @@
     "build": "npm run clean && npm run build:main && npm run build:shell && npm run copy-assets",
     "build:main": "tsc",
     "build:shell": "vite build",
-    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/",
+    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/ && cp src/eveshell/app-frame-inject.js dist/eveshell/",
     "dev": "npm run build && electron .",
     "start": "electron .",
     "clean": "rm -rf dist"

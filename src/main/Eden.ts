@@ -4,6 +4,7 @@ import { WorkerManager } from "./core/WorkerManager";
 import { ViewManager } from "./core/ViewManager";
 import { IPCBridge } from "./core/IPCBridge";
 import { AppManager } from "./core/AppManager";
+import { TilingConfig } from "../types";
 
 export interface EdenConfig {
   appsDirectory?: string;
@@ -13,6 +14,7 @@ export interface EdenConfig {
     title?: string;
     backgroundColor?: string;
   };
+  tiling?: TilingConfig;
   development?: boolean;
 }
 
@@ -35,7 +37,7 @@ export class Eden {
 
     // Initialize core managers
     this.workerManager = new WorkerManager();
-    this.viewManager = new ViewManager();
+    this.viewManager = new ViewManager(config.tiling);
     this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager);
     this.appManager = new AppManager(
       this.workerManager,

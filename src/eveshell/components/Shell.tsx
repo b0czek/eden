@@ -150,13 +150,13 @@ export default function Shell() {
     const next = !showAllApps();
     setShowAllApps(next);
 
-    // Hide/show running apps when toggling the apps view
+    // Show/hide running apps when toggling the apps view
     const running = runningApps();
     for (const appId of running) {
       try {
         await window.edenAPI.shellCommand("set-view-visibility", {
           appId,
-          visible: !next,
+          visible: !next, // visible when apps view is hidden
         });
       } catch (error) {
         console.error(`Failed to set visibility for ${appId}:`, error);
@@ -262,9 +262,8 @@ export default function Shell() {
 
   const updateRunningAppBounds = async () => {
     const workspace = document.getElementById("workspace");
-    const running = runningApps();
 
-    if (!workspace || running.size === 0) return;
+    if (!workspace) return;
 
     const rect = workspace.getBoundingClientRect();
     const bounds = {
@@ -274,22 +273,31 @@ export default function Shell() {
       height: Math.round(rect.height),
     };
 
-    // Update bounds for all running apps
-    for (const appId of running) {
-      try {
-        await window.edenAPI.shellCommand("update-view-bounds", {
-          appId,
-          bounds,
-        });
-      } catch (error) {
-        console.error(`Failed to update bounds for ${appId}:`, error);
-      }
+    // Send workspace bounds update to backend
+    // ViewManager will handle tiling recalculation if enabled
+    try {
+      await window.edenAPI.shellCommand("update-workspace-bounds", { bounds });
+    } catch (error) {
+      console.error("Failed to update workspace bounds:", error);
     }
   };
 
   onMount(() => {
     // Load initial system info
     loadSystemInfo();
+
+    // Send initial workspace bounds
+    const workspace = document.getElementById("workspace");
+    if (workspace) {
+      const rect = workspace.getBoundingClientRect();
+      const bounds = {
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+      window.edenAPI.shellCommand("update-workspace-bounds", { bounds }).catch(console.error);
+    }
 
     // Listen for system messages
     window.edenAPI.onSystemMessage((message) => {
@@ -301,7 +309,6 @@ export default function Shell() {
     });
 
     // Watch for workspace resize
-    const workspace = document.getElementById("workspace");
     if (workspace) {
       const resizeObserver = new ResizeObserver(() => {
         updateRunningAppBounds();
@@ -345,11 +352,27 @@ export default function Shell() {
                   <div
                     class="app-grid-item"
                     classList={{ running: app.isRunning }}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       // Only handle click if not opening context menu
                       if (!contextMenu()) {
-                        handleAppClick(app.id);
-                        handleShowAllApps();
+                        // Close apps view first
+                        setShowAllApps(false);
+                        
+                        // Show all running apps
+                        const running = runningApps();
+                        for (const appId of running) {
+                          try {
+                            await window.edenAPI.shellCommand("set-view-visibility", {
+                              appId,
+                              visible: true,
+                            });
+                          } catch (error) {
+                            console.error(`Failed to set visibility for ${appId}:`, error);
+                          }
+                        }
+                        
+                        // Then handle the app click
+                        await handleAppClick(app.id);
                       }
                     }}
                     onContextMenu={(e) =>

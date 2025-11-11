@@ -551,6 +551,15 @@ export class AppManager extends EventEmitter {
     return { success };
   }
 
+  @CommandHandler("update-workspace-bounds")
+  private async handleUpdateWorkspaceBounds(
+    args: ShellCommandArgs<"update-workspace-bounds">
+  ): Promise<any> {
+    const { bounds } = args;
+    this.viewManager.setWorkspaceBounds(bounds);
+    return { success: true };
+  }
+
   /**
    * Shutdown all apps
    */

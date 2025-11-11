@@ -80,4 +80,17 @@ contextBridge.exposeInMainWorld('appAPI', {
   }
 });
 
+// Also expose edenAPI for shell commands (needed by app frame)
+contextBridge.exposeInMainWorld('edenAPI', {
+  /**
+   * Execute shell commands (e.g., stop-app, set-view-visibility)
+   * @param {string} command - The command to execute
+   * @param {object} args - Command arguments
+   * @returns {Promise} Command result
+   */
+  shellCommand: (command, args) => {
+    return ipcRenderer.invoke('shell-command', command, args);
+  }
+});
+
 console.log('Universal app preload loaded');
