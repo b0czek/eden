@@ -7,7 +7,8 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, sans-serif;
-  background: #1e1e1e;
+  /* Apply workspace gradient to the whole shell */
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
   color: #e0e0e0;
   overflow: hidden;
   height: 100vh;
@@ -28,38 +29,41 @@ body {
 
 .workspace {
   flex: 1;
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  /* Make workspace transparent so body background is visible across shell */
+  background: transparent;
   position: relative;
 }
 
 /* Dock Styles */
 .dock {
-  height: 64px;
-  background: rgba(240, 240, 245, 0.8);
-  backdrop-filter: blur(30px) saturate(180%);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  height: 72px;
+  /* Make dock visually float with transparent, frosted background */
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0 20px;
-  box-shadow: 0 -2px 30px rgba(0, 0, 0, 0.15);
+  padding: 8px 24px;
   position: relative;
-  overflow: hidden;
-
+  overflow: visible;
 }
 
 .dock::before {
+  /* Frosted panel behind dock content */
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, 
-    transparent,
-    rgba(255, 255, 255, 0.5) 50%,
-    transparent
-  );
+  left: 24px;
+  right: 24px;
+  bottom: 8px;
+  height: 56px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  /* Avoid inset border which can produce hairline seams on some displays */
+  border: none;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .dock-left {
@@ -67,33 +71,97 @@ body {
   align-items: center;
   justify-content: center;
   flex: 1;
+  z-index: 1; /* above frosted background */
 }
 
 .dock-right {
   position: absolute;
-  right: 20px;
+  right: 28px;
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
   padding: 8px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  z-index: 1;
+}
+
+.dock-right,
+.dock-right * {
+  color: rgba(234, 234, 234, 0.95);
+}
+
+.dock-right .clock .time {
+  color: rgba(234, 234, 234, 0.98);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.dock-right .clock .date {
+  color: rgba(189, 189, 189, 0.9);
+}
+
+.dock-right .separator {
+  background: linear-gradient(to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.18) 20%,
+    rgba(255, 255, 255, 0.18) 80%,
+    transparent
+  );
 }
 
 .app-icons {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1),
-              inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  /* Subtle dark container so icons sit naturally on the background */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
   overflow: visible;
+  z-index: 1;
+}
+
+.app-icons.magnify .app-icon:hover {
+  transform: none;
+}
+
+.app-icons.magnify .icon-container {
+  transform-origin: bottom center;
+}
+
+.app-icons.magnify.magnify-active .icon-container {
+  filter: brightness(1.05);
+}
+
+/* Gdy aktywna magnifikacja: zmniejsz bazowy gap, a sąsiadów rozpchnij marginesem zależnym od wpływu */
+/* usunięto specjalny gap podczas magnify, zostaje bazowy gap z .app-icons */
+
+/* rozpychanie realizujemy translacją w JS, nie marginesem */
+
+.dock-left,
+.dock-left * {
+  color: rgba(234, 234, 234, 0.95);
+}
+
+.dock-left .app-name {
+  color: rgba(234, 234, 234, 0.9);
+}
+
+.dock-left .separator {
+  background: linear-gradient(to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.18) 20%,
+    rgba(255, 255, 255, 0.18) 80%,
+    transparent
+  );
 }
 
 .separator {
@@ -113,7 +181,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0px;
   padding: 2px 4px;
   cursor: pointer;
   border-radius: 10px;
@@ -124,7 +192,7 @@ body {
 }
 
 .app-icon:hover {
-  transform: translateY(-4px) scale(1.1);
+  transform: none; /* JS steruje skalą przy efekcie dock magnify */
 }
 
 .app-icon:hover .icon-container {
@@ -146,16 +214,16 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  /* Make icon containers darker and flatter to match the shell */
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.16s ease-out, box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
   backdrop-filter: blur(10px);
 }
 
 .app-icon:hover .icon-container {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
 }
 
 .icon-container img {
@@ -165,7 +233,7 @@ body {
 }
 
 .app-name {
-  font-size: 9px;
+  font-size: 11px;
   color: #1a1a1a;
   text-align: center;
   max-width: 60px;
@@ -173,7 +241,12 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  transform: translateX(-50%);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.2s ease;
 }
 
@@ -184,11 +257,13 @@ body {
 .running-indicator {
   position: absolute;
   bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 4px;
   height: 4px;
-  background: linear-gradient(135deg, #007AFF, #0051D5);
+  background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(0, 122, 255, 0.5);
+  box-shadow: none;
 }
 
 /* Clock Styles */

@@ -21,11 +21,11 @@ export default function AppIcon(props: AppIconProps) {
     >
       <div class="icon-container">
         <img src={props.icon || defaultIcon} alt={props.appName} />
+        <Show when={props.isRunning}>
+          <div class="running-indicator"></div>
+        </Show>
       </div>
       <div class="app-name">{props.appName}</div>
-      <Show when={props.isRunning}>
-        <div class="running-indicator"></div>
-      </Show>
     </div>
   );
 }
