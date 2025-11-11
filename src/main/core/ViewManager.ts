@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView } from "electron";
+import { BrowserWindow, WebContentsView, globalShortcut } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
 import * as fs from "fs/promises";
@@ -45,6 +45,60 @@ export class ViewManager extends EventEmitter {
    */
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
+    // Register shortcut to open DevTools for focused view: Ctrl+Shift+D
+    try {
+      // Use accelerator consistent with Electron on Linux/Windows/macOS
+      const accelerator = "CommandOrControl+Shift+D";
+      // Avoid multiple registrations
+      if (!globalShortcut.isRegistered(accelerator)) {
+        globalShortcut.register(accelerator, () => {
+          const focusedView = this.findFocusedView();
+          if (focusedView) {
+            try {
+              focusedView.webContents.openDevTools({ mode: "right" });
+              console.log("Opened DevTools for focused view");
+            } catch (err) {
+              console.error("Failed to open DevTools for focused view:", err);
+            }
+          } else {
+            console.log("No focused view found to open DevTools");
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Failed to register global shortcut for DevTools:", err);
+    }
+
+    // Cleanup when main window is closed/destroyed
+    window.on("closed", () => {
+      try {
+        const accelerator = "CommandOrControl+Shift+D";
+        if (globalShortcut.isRegistered(accelerator)) {
+          globalShortcut.unregister(accelerator);
+        }
+      } catch (err) {
+        console.error("Failed to unregister global shortcut:", err);
+      }
+    });
+  }
+
+  /**
+   * Find the focused WebContentsView (if any) among managed views.
+   */
+  private findFocusedView(): WebContentsView | undefined {
+    for (const info of this.views.values()) {
+      try {
+        if (
+          !info.view.webContents.isDestroyed() &&
+          info.view.webContents.isFocused()
+        ) {
+          return info.view;
+        }
+      } catch (err) {
+        // ignore checks that fail when webcontents is not available
+      }
+    }
+    return undefined;
   }
 
   /**
