@@ -98,7 +98,7 @@
                   inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
-        #eden-app-frame-overlay.dark #eden-app-frame-title {
+    #eden-app-frame-overlay.dark #eden-app-frame-title {
       color: #ffffff;
       background: rgba(40, 40, 40, 0.7);
       backdrop-filter: blur(20px) saturate(180%);
@@ -420,6 +420,11 @@
           width: windowConfig.defaultSize?.width || 800,
           height: windowConfig.defaultSize?.height || 600
         };
+      }
+
+      // Bring window to front when starting to drag
+      if (window.edenAPI && appId) {
+        window.edenAPI.shellCommand('focus-app', { appId }).catch(console.error);
       }
 
       isDragging = true;

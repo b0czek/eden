@@ -1,8 +1,14 @@
-import { BrowserWindow, WebContentsView, globalShortcut } from "electron";
+import {
+  BrowserWindow,
+  Rectangle as Bounds,
+  WebContentsView,
+  globalShortcut,
+} from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { AppManifest, TilingConfig, WindowConfig } from "../../types";
+import { LayoutCalculator } from "./LayoutCalculator";
 
 type ViewMode = "floating" | "tiled";
 
@@ -10,7 +16,7 @@ interface ViewInfo {
   view: WebContentsView;
   appId: string;
   manifest: AppManifest;
-  bounds: { x: number; y: number; width: number; height: number };
+  bounds: Bounds;
   visible: boolean;
   mode: ViewMode; // Whether this view is floating or tiled
   tileIndex?: number; // Index in the tiling grid (only for tiled views)
@@ -28,12 +34,12 @@ export class ViewManager extends EventEmitter {
   private mainWindow: BrowserWindow | null = null;
   private nextViewId = 1;
   private tilingConfig: TilingConfig;
-  private workspaceBounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } = { x: 0, y: 0, width: 800, height: 600 };
+  private workspaceBounds: Bounds = {
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+  };
 
   constructor(tilingConfig?: TilingConfig) {
     super();
@@ -59,9 +65,7 @@ export class ViewManager extends EventEmitter {
           const focusedView = this.findFocusedView();
           if (focusedView) {
             try {
-              focusedView.webContents.openDevTools({
-                mode: "right",
-              });
+              focusedView.webContents.openDevTools();
               console.log("Opened DevTools for focused view");
             } catch (err) {
               console.error("Failed to open DevTools for focused view:", err);
@@ -110,12 +114,7 @@ export class ViewManager extends EventEmitter {
   /**
    * Set workspace bounds (the area where views can be placed)
    */
-  setWorkspaceBounds(bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }): void {
+  setWorkspaceBounds(bounds: Bounds): void {
     this.workspaceBounds = bounds;
     // Recalculate all tile bounds if using tiling
     if (this.tilingConfig.mode !== "none") {
@@ -126,103 +125,19 @@ export class ViewManager extends EventEmitter {
   /**
    * Calculate bounds for a tile based on tiling configuration
    */
-  private calculateTileBounds(tileIndex: number): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } {
-    const {
-      mode,
-      gap = 0,
-      padding = 0,
-      columns = 2,
-      rows = 2,
-    } = this.tilingConfig;
-    const {
-      x: workX,
-      y: workY,
-      width: workWidth,
-      height: workHeight,
-    } = this.workspaceBounds;
+  private calculateTileBounds(tileIndex: number): Bounds {
+    // Count visible tiled views for dynamic layout
+    const visibleTiledViews = Array.from(this.views.values()).filter(
+      (v) => v.visible && v.mode === "tiled"
+    );
 
-    // Apply padding
-    const availableX = workX + padding;
-    const availableY = workY + padding;
-    const availableWidth = workWidth - padding * 2;
-    const availableHeight = workHeight - padding * 2;
-
-    switch (mode) {
-      case "horizontal": {
-        // Split horizontally into equal tiles (only count tiled views)
-        const visibleTiledViews = Array.from(this.views.values()).filter(
-          (v) => v.visible && v.mode === "tiled"
-        );
-        const count = visibleTiledViews.length;
-        if (count === 0)
-          return {
-            x: availableX,
-            y: availableY,
-            width: availableWidth,
-            height: availableHeight,
-          };
-
-        const tileWidth = (availableWidth - gap * (count - 1)) / count;
-        return {
-          x: availableX + tileIndex * (tileWidth + gap),
-          y: availableY,
-          width: tileWidth,
-          height: availableHeight,
-        };
-      }
-
-      case "vertical": {
-        // Split vertically into equal tiles (only count tiled views)
-        const visibleTiledViews = Array.from(this.views.values()).filter(
-          (v) => v.visible && v.mode === "tiled"
-        );
-        const count = visibleTiledViews.length;
-        if (count === 0)
-          return {
-            x: availableX,
-            y: availableY,
-            width: availableWidth,
-            height: availableHeight,
-          };
-
-        const tileHeight = (availableHeight - gap * (count - 1)) / count;
-        return {
-          x: availableX,
-          y: availableY + tileIndex * (tileHeight + gap),
-          width: availableWidth,
-          height: tileHeight,
-        };
-      }
-
-      case "grid": {
-        // Grid layout
-        const col = tileIndex % columns;
-        const row = Math.floor(tileIndex / columns);
-        const tileWidth = (availableWidth - gap * (columns - 1)) / columns;
-        const tileHeight = (availableHeight - gap * (rows - 1)) / rows;
-
-        return {
-          x: availableX + col * (tileWidth + gap),
-          y: availableY + row * (tileHeight + gap),
-          width: tileWidth,
-          height: tileHeight,
-        };
-      }
-
-      default:
-        // No tiling, return full workspace
-        return {
-          x: availableX,
-          y: availableY,
-          width: availableWidth,
-          height: availableHeight,
-        };
-    }
+    // Use the generic LayoutCalculator
+    return LayoutCalculator.calculateTileBounds({
+      workspace: this.workspaceBounds,
+      tileIndex,
+      visibleCount: visibleTiledViews.length,
+      config: this.tilingConfig,
+    });
   }
 
   /**
@@ -297,12 +212,7 @@ export class ViewManager extends EventEmitter {
   /**
    * Calculate initial bounds for a floating window
    */
-  private calculateFloatingBounds(windowConfig?: WindowConfig): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } {
+  private calculateFloatingBounds(windowConfig?: WindowConfig): Bounds {
     const {
       x: workX,
       y: workY,
@@ -346,7 +256,7 @@ export class ViewManager extends EventEmitter {
     x += offset;
     y += offset;
 
-    return { x, y, width: finalWidth, height: finalHeight };
+    return { x, y, width: finalWidth, height: finalHeight } as Bounds;
   }
 
   /**
@@ -374,7 +284,7 @@ export class ViewManager extends EventEmitter {
     view: WebContentsView,
     viewMode: ViewMode,
     windowConfig?: WindowConfig,
-    bounds?: { x: number; y: number; width: number; height: number }
+    bounds?: Bounds
   ): Promise<void> {
     try {
       const frameScriptPath = path.join(
@@ -409,7 +319,7 @@ export class ViewManager extends EventEmitter {
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    bounds: { x: number; y: number; width: number; height: number }
+    bounds: Bounds
   ): number {
     if (!this.mainWindow) {
       throw new Error("Main window not set. Call setMainWindow first.");
@@ -492,10 +402,7 @@ export class ViewManager extends EventEmitter {
       }
     );
 
-    // Add to main window's contentView
-    this.mainWindow.contentView.addChildView(view);
-
-    // Store view info
+    // Store view info first (before adding to window)
     this.views.set(viewId, {
       view,
       appId,
@@ -511,6 +418,9 @@ export class ViewManager extends EventEmitter {
     if (viewMode === "tiled" && this.tilingConfig.mode !== "none") {
       this.recalculateTiledViews();
     }
+
+    // Add to main window's contentView and maintain proper layering
+    this.reorderViewLayers();
 
     return viewId;
   }
@@ -553,10 +463,7 @@ export class ViewManager extends EventEmitter {
   /**
    * Update view bounds
    */
-  setViewBounds(
-    viewId: number,
-    bounds: { x: number; y: number; width: number; height: number }
-  ): boolean {
+  setViewBounds(viewId: number, bounds: Bounds): boolean {
     const viewInfo = this.views.get(viewId);
     if (!viewInfo) {
       return false;
@@ -655,15 +562,13 @@ export class ViewManager extends EventEmitter {
       if (viewInfo.mode === "tiled") {
         // Tiled view - recalculate all tiles
         this.recalculateTiledViews();
+        // Ensure proper layering (floating windows stay on top)
+        this.reorderViewLayers();
       } else {
-        // Floating view - bring to front and update z-index
-        // Remove and re-add to bring to front
-        this.mainWindow.contentView.removeChildView(viewInfo.view);
-        this.mainWindow.contentView.addChildView(viewInfo.view);
-        // Update z-index to be on top
+        // Floating view - update z-index to be on top of other floating windows
         viewInfo.zIndex = this.getNextZIndex();
-        // Restore bounds
-        viewInfo.view.setBounds(viewInfo.bounds);
+        // Reorder all views to maintain proper layering
+        this.reorderViewLayers();
       }
 
       return true;
@@ -702,6 +607,44 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Reorder all views to maintain proper layering:
+   * - Tiled views on bottom
+   * - Floating views on top, ordered by zIndex
+   */
+  private reorderViewLayers(): void {
+    if (!this.mainWindow) return;
+
+    try {
+      // Get all views sorted by layer
+      const tiledViews = Array.from(this.views.values())
+        .filter((v) => v.mode === "tiled")
+        .sort((a, b) => (a.tileIndex || 0) - (b.tileIndex || 0));
+
+      const floatingViews = Array.from(this.views.values())
+        .filter((v) => v.mode === "floating")
+        .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+      // Remove all views
+      for (const info of this.views.values()) {
+        this.mainWindow.contentView.removeChildView(info.view);
+      }
+
+      // Add back in order: tiled first (bottom), then floating (top)
+      for (const info of tiledViews) {
+        this.mainWindow.contentView.addChildView(info.view);
+        info.view.setBounds(info.bounds);
+      }
+
+      for (const info of floatingViews) {
+        this.mainWindow.contentView.addChildView(info.view);
+        info.view.setBounds(info.bounds);
+      }
+    } catch (error) {
+      console.error("Failed to reorder view layers:", error);
+    }
+  }
+
+  /**
    * Bring a view to the front (highest z-index)
    */
   bringToFront(viewId: number): boolean {
@@ -709,7 +652,7 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Send a view to the back (lowest z-index)
+   * Send a view to the back (lowest z-index within its layer)
    */
   sendToBack(viewId: number): boolean {
     const viewInfo = this.views.get(viewId);
@@ -718,30 +661,18 @@ export class ViewManager extends EventEmitter {
     }
 
     try {
-      // Get all child views
-      const allViews = Array.from(this.views.values()).map((v) => v.view);
-
-      // Remove all views
-      for (const v of allViews) {
-        this.mainWindow.contentView.removeChildView(v);
+      if (viewInfo.mode === "floating") {
+        // For floating views, set to lowest zIndex among floating windows
+        const floatingViews = Array.from(this.views.values()).filter(
+          (v) => v.mode === "floating" && v.zIndex !== undefined
+        );
+        const minZIndex = Math.min(...floatingViews.map((v) => v.zIndex!));
+        viewInfo.zIndex = minZIndex - 1;
       }
+      // For tiled views, no need to change anything as they're always below floating
 
-      // Add target view first (back), then all others
-      this.mainWindow.contentView.addChildView(viewInfo.view);
-      viewInfo.view.setBounds(viewInfo.bounds);
-
-      for (const v of allViews) {
-        if (v !== viewInfo.view) {
-          this.mainWindow.contentView.addChildView(v);
-          // Restore bounds from stored info
-          const info = Array.from(this.views.values()).find(
-            (i) => i.view === v
-          );
-          if (info) {
-            v.setBounds(info.bounds);
-          }
-        }
-      }
+      // Reorder all views to maintain proper layering
+      this.reorderViewLayers();
 
       return true;
     } catch (error) {
@@ -751,9 +682,9 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Set the z-order of a view relative to other views
+   * Set the z-order of a view relative to other views in the same layer
    * @param viewId - The view to reorder
-   * @param position - Position in z-order (0 = back, higher = more front)
+   * @param position - Position in z-order within its layer (0 = back, higher = more front)
    */
   setZOrder(viewId: number, position: number): boolean {
     const viewInfo = this.views.get(viewId);
@@ -762,29 +693,24 @@ export class ViewManager extends EventEmitter {
     }
 
     try {
-      const allViews = Array.from(this.views.values()).map((v) => v.view);
-      const targetIndex = Math.max(0, Math.min(position, allViews.length - 1));
+      if (viewInfo.mode === "floating") {
+        // For floating views, adjust zIndex within floating layer
+        const floatingViews = Array.from(this.views.values())
+          .filter((v) => v.mode === "floating" && v.zIndex !== undefined)
+          .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
-      // Remove all views
-      for (const v of allViews) {
-        this.mainWindow.contentView.removeChildView(v);
+        const targetIndex = Math.max(
+          0,
+          Math.min(position, floatingViews.length - 1)
+        );
+        // Set zIndex based on position
+        const baseZIndex = floatingViews[0]?.zIndex || 1;
+        viewInfo.zIndex = baseZIndex + targetIndex;
       }
+      // For tiled views, z-order within tiled layer is managed by tileIndex
 
-      // Re-add in desired order
-      const otherViews = allViews.filter((v) => v !== viewInfo.view);
-      const orderedViews = [
-        ...otherViews.slice(0, targetIndex),
-        viewInfo.view,
-        ...otherViews.slice(targetIndex),
-      ];
-
-      for (const v of orderedViews) {
-        this.mainWindow.contentView.addChildView(v);
-        const info = Array.from(this.views.values()).find((i) => i.view === v);
-        if (info) {
-          v.setBounds(info.bounds);
-        }
-      }
+      // Reorder all views to maintain proper layering
+      this.reorderViewLayers();
 
       return true;
     } catch (error) {
@@ -880,15 +806,13 @@ export class ViewManager extends EventEmitter {
         // Update view bounds
         viewInfo.view.setBounds(floatingBounds);
 
-        // Bring to front (floating windows are on top)
-        this.mainWindow.contentView.removeChildView(viewInfo.view);
-        this.mainWindow.contentView.addChildView(viewInfo.view);
-        viewInfo.view.setBounds(floatingBounds);
-
         // Recalculate remaining tiled views
         if (this.tilingConfig.mode !== "none") {
           this.recalculateTiledViews();
         }
+
+        // Reorder all views to maintain proper layering (floating on top)
+        this.reorderViewLayers();
 
         // Notify the view about mode change
         viewInfo.view.webContents
@@ -920,6 +844,9 @@ export class ViewManager extends EventEmitter {
           // Recalculate all tiles
           this.recalculateTiledViews();
 
+          // Reorder all views to maintain proper layering (tiled below floating)
+          this.reorderViewLayers();
+
           // Notify the view about mode change
           viewInfo.view.webContents
             .executeJavaScript(
@@ -937,7 +864,11 @@ export class ViewManager extends EventEmitter {
           const bounds = { ...this.workspaceBounds };
           viewInfo.bounds = bounds;
           viewInfo.mode = "tiled";
+
           viewInfo.view.setBounds(bounds);
+
+          // Reorder all views to maintain proper layering (tiled below floating)
+          this.reorderViewLayers();
 
           // Notify the view about mode change
           viewInfo.view.webContents
