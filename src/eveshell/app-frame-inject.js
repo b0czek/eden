@@ -56,7 +56,12 @@
       padding: 0 16px;
       user-select: none;
       z-index: 2147483647;
-      -webkit-app-region: drag;
+      -webkit-app-region: no-drag;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      pointer-events: auto;
+      will-change: transform;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       box-sizing: border-box;
     }
@@ -404,45 +409,128 @@
     let startX = 0;
     let startY = 0;
     let dragStartBounds = null;
+    let isTouch = false;
+    let rafId = null;
+    let pendingBounds = null;
 
-    titleBar.addEventListener('mousedown', (e) => {
+    const getScreenCoords = (e) => {
+      // For mouse events, use screenX/screenY directly
+      if (e.screenX !== undefined && e.screenY !== undefined) {
+        return { x: e.screenX, y: e.screenY };
+      }
+      
+      // For touch events, calculate screen coordinates from client coordinates
+      if (e.touches && e.touches[0]) {
+        const touch = e.touches[0];
+        // Try touch.screenX/screenY first (if available)
+        if (touch.screenX !== undefined && touch.screenY !== undefined) {
+          return { x: touch.screenX, y: touch.screenY };
+        }
+        // Fallback: calculate from clientX/clientY + view bounds position
+        // Use currentBounds which has the actual view position
+        if (currentBounds) {
+          return {
+            x: currentBounds.x + touch.clientX,
+            y: currentBounds.y + touch.clientY
+          };
+        }
+        // Last resort: use window.screenX/screenY
+        return {
+          x: touch.clientX + (window.screenX || 0),
+          y: touch.clientY + (window.screenY || 0)
+        };
+      }
+      
+      return { x: 0, y: 0 };
+    };
+
+    const startDrag = (e) => {
       // Only drag on the title bar itself, not on buttons
       if (e.target.closest('.eden-app-frame-button')) {
         return;
       }
 
-      // Initialize current bounds if not set
-      if (!currentBounds) {
-        const windowConfig = window.__edenWindowConfig || {};
-        currentBounds = {
-          x: 0,
-          y: 0,
-          width: windowConfig.defaultSize?.width || 800,
-          height: windowConfig.defaultSize?.height || 600
-        };
-      }
+      console.log('[Eden Frame] startDrag called, event type:', e.type);
+      console.log('[Eden Frame] currentBounds before refresh:', currentBounds);
 
-      // Bring window to front when starting to drag
-      if (window.edenAPI && appId) {
-        window.edenAPI.shellCommand('focus-app', { appId }).catch(console.error);
+      // ALWAYS refresh currentBounds at start to handle case where mouse drag updated position
+      const initialBounds = window.__edenInitialBounds;
+      if (initialBounds && initialBounds.x !== undefined) {
+        currentBounds = { ...initialBounds };
+        console.log('[Eden Frame] Refreshed currentBounds from __edenInitialBounds:', currentBounds);
+      } else if (!currentBounds) {
+        console.warn('[Eden Frame] Cannot start drag - currentBounds not initialized!');
+        return;
       }
 
       isDragging = true;
-      startX = e.screenX;
-      startY = e.screenY;
-      // Copy current bounds at drag start
+      isTouch = e.type.startsWith('touch');
+      
+      // Get screen coordinates
+      const coords = getScreenCoords(e);
+      startX = coords.x;
+      startY = coords.y;
       dragStartBounds = { ...currentBounds };
+      
+      console.log('[Eden Frame] Drag started at:', coords, 'isTouch:', isTouch);
 
-      console.log('[Eden Frame] Drag started at:', { x: startX, y: startY }, 'Current bounds:', currentBounds);
-
+      // IMPORTANT: Prevent default FIRST to stop touch from being canceled
       e.preventDefault();
-    });
+      e.stopPropagation();
+      e.stopImmediatePropagation();
 
-    document.addEventListener('mousemove', (e) => {
-      if (!isDragging || !dragStartBounds) return;
+      // Start animation frame loop for smooth updates
+      if (isTouch) {
+        rafId = requestAnimationFrame(updatePosition);
+      }
 
-      const deltaX = e.screenX - startX;
-      const deltaY = e.screenY - startY;
+      // Bring window to front - but ONLY for mouse events
+      // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
+      // Touch users need to tap elsewhere to focus, then tap title bar to drag
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('focus-app', { appId }).catch(console.error);
+      }
+
+      // For mouse events, use global tracking in main process
+      // For touch events, we'll handle updates in touchmove
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('start-drag', {
+          appId,
+          startX: coords.x,
+          startY: coords.y
+        }).catch(console.error);
+      }
+    };
+
+    // Animation frame update function - throttles IPC to 60fps
+    const updatePosition = () => {
+      if (pendingBounds && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('update-view-bounds', {
+          appId,
+          bounds: pendingBounds
+        }).catch(console.error);
+        
+        pendingBounds = null;
+      }
+      
+      if (isDragging) {
+        rafId = requestAnimationFrame(updatePosition);
+      }
+    };
+
+    const moveDrag = (e) => {
+      // Prevent default immediately
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!isDragging || !dragStartBounds) {
+        return;
+      }
+
+      // Get current coordinates
+      const coords = getScreenCoords(e);
+      const deltaX = coords.x - startX;
+      const deltaY = coords.y - startY;
 
       const newBounds = {
         x: dragStartBounds.x + deltaX,
@@ -451,25 +539,74 @@
         height: dragStartBounds.height
       };
 
-      // Update tracked bounds
+      // Update tracked bounds immediately for next move calculation
       currentBounds = newBounds;
+      
+      // Store pending update for next animation frame
+      pendingBounds = newBounds;
+    };
 
-      // Send update to backend
-      if (window.edenAPI && appId) {
-        window.edenAPI.shellCommand('update-view-bounds', {
-          appId,
-          bounds: newBounds
-        }).catch(console.error);
+    const endDrag = (e) => {
+      console.log('[Eden Frame] endDrag called, event type:', e.type, 'isDragging:', isDragging, 'isTouch:', isTouch);
+      
+      // For touch events, only end if there are no remaining touches
+      if (e.type.startsWith('touch') && e.touches && e.touches.length > 0) {
+        console.log('[Eden Frame] Ignoring touchend - still have active touches');
+        return;
       }
-    });
-
-    document.addEventListener('mouseup', () => {
+      
       if (isDragging) {
-        console.log('[Eden Frame] Drag ended, final bounds:', currentBounds);
+        console.log('[Eden Frame] Drag ended, final currentBounds:', currentBounds);
         isDragging = false;
         dragStartBounds = null;
+
+        // Cancel animation frame and send final position
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+          
+          // Send final pending bounds immediately
+          if (pendingBounds && window.edenAPI && appId) {
+            window.edenAPI.shellCommand('update-view-bounds', {
+              appId,
+              bounds: pendingBounds
+            }).catch(console.error);
+            
+            // Update __edenInitialBounds so next interaction starts from correct position
+            window.__edenInitialBounds = { ...pendingBounds };
+            pendingBounds = null;
+          }
+        }
+
+        // For touch drag, ensure __edenInitialBounds is updated with final position
+        if (isTouch && currentBounds) {
+          window.__edenInitialBounds = { ...currentBounds };
+          console.log('[Eden Frame] Updated __edenInitialBounds after touch drag:', window.__edenInitialBounds);
+        }
+
+        // Stop global drag tracking in main process (for mouse events)
+        if (!isTouch && window.edenAPI && appId) {
+          window.edenAPI.shellCommand('end-drag', { appId }).catch(console.error);
+        }
       }
-    });
+    };
+
+    // Mouse events
+    titleBar.addEventListener('mousedown', startDrag);
+    
+    // Touch events - don't use capture for start, do use for move
+    titleBar.addEventListener('touchstart', startDrag, { passive: false });
+
+    // Move events for touch (mouse uses main process tracking)  
+    // Use capture for move to ensure we get it
+    document.addEventListener('touchmove', moveDrag, { passive: false, capture: true });
+
+    // Use window for up/end events to catch events even when cursor leaves bounds
+    window.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag, { passive: false });
+    document.addEventListener('touchcancel', endDrag, { passive: false });
+    
+    console.log('[Eden Frame] Drag event listeners registered');
   };
 
   const setupWindowResizing = (windowConfig) => {
@@ -485,6 +622,7 @@
       cursor: nwse-resize;
       z-index: 2147483647;
       -webkit-app-region: no-drag;
+      touch-action: none;
     `;
 
     document.body.appendChild(resizeHandle);
@@ -493,36 +631,126 @@
     let startX = 0;
     let startY = 0;
     let resizeStartBounds = null;
+    let isTouch = false;
+    let rafId = null;
+    let pendingBounds = null;
 
-    resizeHandle.addEventListener('mousedown', (e) => {
+    const getScreenCoords = (e) => {
+      // For mouse events, use screenX/screenY directly
+      if (e.screenX !== undefined && e.screenY !== undefined) {
+        return { x: e.screenX, y: e.screenY };
+      }
+      
+      // For touch events, calculate screen coordinates from client coordinates
+      if (e.touches && e.touches[0]) {
+        const touch = e.touches[0];
+        // Try touch.screenX/screenY first (if available)
+        if (touch.screenX !== undefined && touch.screenY !== undefined) {
+          return { x: touch.screenX, y: touch.screenY };
+        }
+        // Fallback: calculate from clientX/clientY + view bounds position
+        // Use currentBounds which has the actual view position
+        if (currentBounds) {
+          return {
+            x: currentBounds.x + touch.clientX,
+            y: currentBounds.y + touch.clientY
+          };
+        }
+        // Last resort: use window.screenX/screenY
+        return {
+          x: touch.clientX + (window.screenX || 0),
+          y: touch.clientY + (window.screenY || 0)
+        };
+      }
+      
+      return { x: 0, y: 0 };
+    };
+
+    const startResize = (e) => {
+      console.log('[Eden Frame] startResize called, event type:', e.type);
+
       // Initialize current bounds if not set
       if (!currentBounds) {
-        currentBounds = {
-          x: 0,
-          y: 0,
-          width: windowConfig.defaultSize?.width || 800,
-          height: windowConfig.defaultSize?.height || 600
-        };
+        const initialBounds = window.__edenInitialBounds;
+        if (initialBounds && initialBounds.x !== undefined) {
+          currentBounds = { ...initialBounds };
+          console.log('[Eden Frame] Initialized currentBounds from __edenInitialBounds:', currentBounds);
+        } else {
+          console.warn('[Eden Frame] Cannot start resize - currentBounds not initialized!');
+          return;
+        }
       }
 
       isResizing = true;
-      startX = e.screenX;
-      startY = e.screenY;
-
-      // Copy current bounds at resize start
+      isTouch = e.type.startsWith('touch');
+      
+      // Get screen coordinates
+      const coords = getScreenCoords(e);
+      startX = coords.x;
+      startY = coords.y;
       resizeStartBounds = { ...currentBounds };
 
-      console.log('[Eden Frame] Resize started at:', { x: startX, y: startY }, 'Current bounds:', currentBounds);
+      console.log('[Eden Frame] Resize started at:', coords, 'isTouch:', isTouch);
 
       e.preventDefault();
       e.stopPropagation();
-    });
 
-    document.addEventListener('mousemove', (e) => {
-      if (!isResizing || !resizeStartBounds) return;
+      // Start animation frame loop for smooth updates
+      if (isTouch) {
+        rafId = requestAnimationFrame(updateResizePosition);
+      }
 
-      const deltaX = e.screenX - startX;
-      const deltaY = e.screenY - startY;
+      // Bring window to front - but ONLY for mouse events
+      // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
+      // Touch users need to tap elsewhere to focus, then tap resize handle
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('focus-app', { appId }).catch(console.error);
+      }
+
+      // For mouse events, use global tracking in main process
+      // For touch events, we'll handle updates in touchmove
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('start-resize', {
+          appId,
+          startX: coords.x,
+          startY: coords.y
+        }).catch(console.error);
+      }
+    };
+
+    // Animation frame update function - throttles IPC to 60fps
+    const updateResizePosition = () => {
+      if (pendingBounds && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('update-view-bounds', {
+          appId,
+          bounds: pendingBounds
+        }).catch(console.error);
+        
+        pendingBounds = null;
+      }
+      
+      if (isResizing) {
+        rafId = requestAnimationFrame(updateResizePosition);
+      }
+    };
+
+    const moveResize = (e) => {
+      console.log('[Eden Frame] moveResize called, isResizing:', isResizing, 'event type:', e.type);
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!isResizing || !resizeStartBounds) {
+        console.log('[Eden Frame] moveResize returning early - isResizing:', isResizing, 'resizeStartBounds:', resizeStartBounds);
+        return;
+      }
+
+      // Get current coordinates
+      const coords = getScreenCoords(e);
+      const deltaX = coords.x - startX;
+      const deltaY = coords.y - startY;
+
+      console.log('[Eden Frame] moveResize coords:', coords, 'delta:', { deltaX, deltaY });
 
       let newWidth = resizeStartBounds.width + deltaX;
       let newHeight = resizeStartBounds.height + deltaY;
@@ -548,26 +776,92 @@
         height: Math.round(newHeight)
       };
 
-      // Update tracked bounds
+      console.log('[Eden Frame] moveResize newBounds:', newBounds);
+
+      // Update tracked bounds immediately for next move calculation
       currentBounds = newBounds;
+      
+      // Store pending update for next animation frame
+      pendingBounds = newBounds;
+    };
 
-      // Send update to backend
-      if (window.edenAPI && appId) {
-        window.edenAPI.shellCommand('update-view-bounds', {
-          appId,
-          bounds: newBounds
-        }).catch(console.error);
-      }
-    });
-
-    document.addEventListener('mouseup', () => {
+    const endResize = (e) => {
       if (isResizing) {
-        console.log('[Eden Frame] Resize ended, final bounds:', currentBounds);
+        console.log('[Eden Frame] Resize ended, final currentBounds:', currentBounds);
         isResizing = false;
         resizeStartBounds = null;
+
+        // Cancel animation frame and send final position
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+          
+          // Send final pending bounds immediately
+          if (pendingBounds && window.edenAPI && appId) {
+            window.edenAPI.shellCommand('update-view-bounds', {
+              appId,
+              bounds: pendingBounds
+            }).catch(console.error);
+            
+            // Update __edenInitialBounds so next interaction starts from correct position
+            window.__edenInitialBounds = { ...pendingBounds };
+            pendingBounds = null;
+          }
+        }
+
+        // For touch resize, ensure __edenInitialBounds is updated with final position
+        if (isTouch && currentBounds) {
+          window.__edenInitialBounds = { ...currentBounds };
+          console.log('[Eden Frame] Updated __edenInitialBounds after touch resize:', window.__edenInitialBounds);
+        }
+
+        // Stop global resize tracking in main process (for mouse events)
+        if (!isTouch && window.edenAPI && appId) {
+          window.edenAPI.shellCommand('end-resize', { appId }).catch(console.error);
+        }
       }
-    });
+    };
+
+    // Mouse events
+    resizeHandle.addEventListener('mousedown', startResize);
+    
+    // Touch events
+    resizeHandle.addEventListener('touchstart', startResize, { passive: false });
+
+    // Move events for touch (mouse uses main process tracking)
+    // Use document and capture to ensure we get all touch moves
+    document.addEventListener('touchmove', moveResize, { passive: false, capture: true });
+
+    // Use window for up/end events to catch events even when cursor leaves bounds
+    window.addEventListener('mouseup', endResize);
+    document.addEventListener('touchend', endResize, { passive: false });
+    document.addEventListener('touchcancel', endResize, { passive: false });
+    
+    console.log('[Eden Frame] Resize event listeners registered');
   };
+
+  // Listen for bounds updates from main process (during mouse drag/resize)
+  // This keeps currentBounds in sync even when main process is controlling movement
+  if (window.appAPI && window.appAPI.onBoundsUpdated) {
+    window.appAPI.onBoundsUpdated((newBounds) => {
+      console.log('[Eden Frame] Received bounds update from main process:', newBounds);
+      currentBounds = { ...newBounds };
+      window.__edenInitialBounds = { ...newBounds };
+    });
+    console.log('[Eden Frame] Registered bounds update listener');
+  } else {
+    console.warn('[Eden Frame] appAPI.onBoundsUpdated not available');
+  }
+
+  // Add global touch handler to diagnose issues
+  document.addEventListener('touchstart', (e) => {
+    console.log('[Eden Frame] Global touchstart on:', e.target);
+  }, { passive: false, capture: true });
+  
+  document.addEventListener('touchcancel', (e) => {
+    console.log('[Eden Frame] Global touchcancel on:', e.target);
+    console.log('[Eden Frame] Stack trace:', new Error().stack);
+  }, { capture: true });
 
   // Inject when DOM is ready
   if (document.readyState === 'loading') {

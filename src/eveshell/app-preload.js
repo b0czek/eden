@@ -14,6 +14,9 @@ let appChannel = null;
 let appRequestChannel = null;
 const messageListeners = [];
 
+// Bounds update listeners (for keeping renderer in sync)
+const boundsListeners = [];
+
 // Wait for initialization from main process
 ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }) => {
   appId = id;
@@ -32,6 +35,18 @@ ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }
         console.error('Error in message listener:', err);
       }
     });
+  });
+});
+
+// Listen for bounds updates from main process
+ipcRenderer.on('bounds-updated', (_event, newBounds) => {
+  console.log('[App Preload] Received bounds-updated:', newBounds);
+  boundsListeners.forEach(callback => {
+    try {
+      callback(newBounds);
+    } catch (err) {
+      console.error('Error in bounds listener:', err);
+    }
   });
 });
 
@@ -77,6 +92,17 @@ contextBridge.exposeInMainWorld('appAPI', {
    */
   getAppId: () => {
     return appId;
+  },
+
+  /**
+   * Listen for bounds updates from the main process
+   * @param {function} callback - Called when bounds are updated
+   */
+  onBoundsUpdated: (callback) => {
+    if (typeof callback !== 'function') {
+      throw new Error('Callback must be a function');
+    }
+    boundsListeners.push(callback);
   }
 });
 

@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
+import { screen } from "electron";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "./ViewManager";
 import { IPCBridge } from "./IPCBridge";
@@ -31,6 +32,23 @@ export class AppManager extends EventEmitter {
   private installedApps: Map<string, AppManifest> = new Map();
   private runningApps: Map<string, AppInstance> = new Map();
   private isShuttingDown: boolean = false;
+
+  // Global drag/resize tracking
+  private dragState: {
+    appId: string;
+    startX: number;
+    startY: number;
+    startBounds: { x: number; y: number; width: number; height: number };
+    interval: NodeJS.Timeout;
+  } | null = null;
+
+  private resizeState: {
+    appId: string;
+    startX: number;
+    startY: number;
+    startBounds: { x: number; y: number; width: number; height: number };
+    interval: NodeJS.Timeout;
+  } | null = null;
 
   constructor(
     workerManager: WorkerManager,
@@ -574,6 +592,143 @@ export class AppManager extends EventEmitter {
     }
     const success = this.viewManager.setViewMode(instance.viewId, mode);
     return { success };
+  }
+
+  @CommandHandler("start-drag")
+  private async handleStartDrag(
+    args: ShellCommandArgs<"start-drag">
+  ): Promise<any> {
+    const { appId, startX, startY } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+
+    // Get current view bounds
+    const viewInfo = this.viewManager.getViewInfo(instance.viewId);
+    if (!viewInfo) {
+      throw new Error(`View ${instance.viewId} not found`);
+    }
+
+    // Stop any existing drag
+    if (this.dragState) {
+      clearInterval(this.dragState.interval);
+    }
+
+    // Start tracking global mouse position
+    this.dragState = {
+      appId,
+      startX,
+      startY,
+      startBounds: { ...viewInfo.bounds },
+      interval: setInterval(() => {
+        if (!this.dragState) return;
+
+        const cursorPos = screen.getCursorScreenPoint();
+        const deltaX = cursorPos.x - this.dragState.startX;
+        const deltaY = cursorPos.y - this.dragState.startY;
+
+        const newBounds = {
+          x: this.dragState.startBounds.x + deltaX,
+          y: this.dragState.startBounds.y + deltaY,
+          width: this.dragState.startBounds.width,
+          height: this.dragState.startBounds.height,
+        };
+
+        this.viewManager.setViewBounds(instance.viewId, newBounds);
+
+        // Notify renderer of bounds update so it stays in sync
+        const view = this.viewManager.getView(instance.viewId);
+        if (view) {
+          view.webContents.send("bounds-updated", newBounds);
+        }
+      }, 16), // ~60fps
+    };
+
+    return { success: true };
+  }
+
+  @CommandHandler("end-drag")
+  private async handleEndDrag(
+    args: ShellCommandArgs<"end-drag">
+  ): Promise<any> {
+    if (this.dragState) {
+      clearInterval(this.dragState.interval);
+      this.dragState = null;
+    }
+    return { success: true };
+  }
+
+  @CommandHandler("start-resize")
+  private async handleStartResize(
+    args: ShellCommandArgs<"start-resize">
+  ): Promise<any> {
+    const { appId, startX, startY } = args;
+    const instance = this.getAppInstance(appId);
+    if (!instance) {
+      throw new Error(`App ${appId} is not running`);
+    }
+
+    // Get current view bounds
+    const viewInfo = this.viewManager.getViewInfo(instance.viewId);
+    if (!viewInfo) {
+      throw new Error(`View ${instance.viewId} not found`);
+    }
+
+    // Stop any existing resize
+    if (this.resizeState) {
+      clearInterval(this.resizeState.interval);
+    }
+
+    // Start tracking global mouse position
+    this.resizeState = {
+      appId,
+      startX,
+      startY,
+      startBounds: { ...viewInfo.bounds },
+      interval: setInterval(() => {
+        if (!this.resizeState) return;
+
+        const cursorPos = screen.getCursorScreenPoint();
+        const deltaX = cursorPos.x - this.resizeState.startX;
+        const deltaY = cursorPos.y - this.resizeState.startY;
+
+        let newWidth = this.resizeState.startBounds.width + deltaX;
+        let newHeight = this.resizeState.startBounds.height + deltaY;
+
+        // Apply minimum size
+        newWidth = Math.max(newWidth, 200);
+        newHeight = Math.max(newHeight, 200);
+
+        const newBounds = {
+          x: this.resizeState.startBounds.x,
+          y: this.resizeState.startBounds.y,
+          width: Math.round(newWidth),
+          height: Math.round(newHeight),
+        };
+
+        this.viewManager.setViewBounds(instance.viewId, newBounds);
+
+        // Notify renderer of bounds update so it stays in sync
+        const view = this.viewManager.getView(instance.viewId);
+        if (view) {
+          view.webContents.send("bounds-updated", newBounds);
+        }
+      }, 16), // ~60fps
+    };
+
+    return { success: true };
+  }
+
+  @CommandHandler("end-resize")
+  private async handleEndResize(
+    args: ShellCommandArgs<"end-resize">
+  ): Promise<any> {
+    if (this.resizeState) {
+      clearInterval(this.resizeState.interval);
+      this.resizeState = null;
+    }
+    return { success: true };
   }
 
   /**

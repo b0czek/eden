@@ -282,6 +282,34 @@ export type ShellCommand =
         appId: string;
         mode?: "floating" | "tiled";
       };
+    }
+  | {
+      command: "start-drag";
+      args: {
+        appId: string;
+        startX: number;
+        startY: number;
+      };
+    }
+  | {
+      command: "end-drag";
+      args: {
+        appId: string;
+      };
+    }
+  | {
+      command: "start-resize";
+      args: {
+        appId: string;
+        startX: number;
+        startY: number;
+      };
+    }
+  | {
+      command: "end-resize";
+      args: {
+        appId: string;
+      };
     };
 
 export type ShellCommandType = ShellCommand["command"];
