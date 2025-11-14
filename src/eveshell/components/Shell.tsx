@@ -262,10 +262,6 @@ export default function Shell() {
       resizeObserver.observe(workspace);
     }
 
-    // Also handle window resize as a fallback
-    window.addEventListener("resize", () => {
-      updateRunningAppBounds();
-    });
   });
 
   return (
