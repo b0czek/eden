@@ -45,6 +45,10 @@ export class ViewManager extends EventEmitter {
   private static designSystemCSSCache: string | null = null;
   private static designSystemCSSPath: string | null = null;
 
+  // Constants for window constraints
+  private static readonly TITLE_BAR_HEIGHT = 40;
+  private static readonly MIN_GRABBABLE_WIDTH = 100; // Minimum width that must remain visible
+
   constructor(tilingConfig?: TilingConfig) {
     super();
     this.tilingConfig = tilingConfig || {
@@ -214,6 +218,30 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Constrain bounds to ensure title bar is always accessible
+   * This prevents windows from being dragged above the workspace or completely off-screen
+   */
+  private constrainBoundsToWorkspace(bounds: Bounds): Bounds {
+    const { x: workX, y: workY, width: workWidth } = this.workspaceBounds;
+
+    let constrainedBounds = { ...bounds };
+
+    // Ensure title bar never goes above workspace top
+    constrainedBounds.y = Math.max(workY, constrainedBounds.y);
+
+    // Ensure at least MIN_GRABBABLE_WIDTH of the window is visible from the left
+    const maxX = workX + workWidth - ViewManager.MIN_GRABBABLE_WIDTH;
+    constrainedBounds.x = Math.min(constrainedBounds.x, maxX);
+
+    // Ensure at least MIN_GRABBABLE_WIDTH of the window is visible from the right
+    const minX =
+      workX - (constrainedBounds.width - ViewManager.MIN_GRABBABLE_WIDTH);
+    constrainedBounds.x = Math.max(constrainedBounds.x, minX);
+
+    return constrainedBounds;
+  }
+
+  /**
    * Calculate initial bounds for a floating window
    */
   private calculateFloatingBounds(windowConfig?: WindowConfig): Bounds {
@@ -260,7 +288,10 @@ export class ViewManager extends EventEmitter {
     x += offset;
     y += offset;
 
-    return { x, y, width: finalWidth, height: finalHeight } as Bounds;
+    const bounds = { x, y, width: finalWidth, height: finalHeight } as Bounds;
+
+    // Constrain to ensure title bar is always accessible
+    return this.constrainBoundsToWorkspace(bounds);
   }
 
   /**
@@ -575,6 +606,9 @@ export class ViewManager extends EventEmitter {
         );
       }
 
+      // Constrain to ensure title bar is always accessible
+      finalBounds = this.constrainBoundsToWorkspace(finalBounds);
+
       viewInfo.view.setBounds(finalBounds);
       viewInfo.bounds = finalBounds;
       return true;
@@ -863,6 +897,7 @@ export class ViewManager extends EventEmitter {
         viewInfo.tileIndex = undefined;
 
         // Calculate floating bounds (centered or with cascade)
+        // The calculateFloatingBounds already applies constraints
         const floatingBounds = this.calculateFloatingBounds(windowConfig);
         viewInfo.bounds = floatingBounds;
         viewInfo.zIndex = this.getNextZIndex();
