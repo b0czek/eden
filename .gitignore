@@ -26,3 +26,9 @@ eden-apps/
 
 # TypeScript
 *.tsbuildinfo
+
+# Design System - Auto-generated files
+# These files are generated from tokens.json by Style Dictionary
+src/design-system/tokens.css
+src/design-system/tokens.ts
+src/design-system/tokens.d.ts

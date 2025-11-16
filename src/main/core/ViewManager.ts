@@ -277,6 +277,32 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Inject Eden Design System CSS into the view
+   * Makes design tokens and utilities available to all apps
+   */
+  private async injectDesignSystemCSS(view: WebContentsView): Promise<void> {
+    try {
+      // Path to design system CSS files
+      const designSystemPath = path.join(__dirname, "../../design-system");
+      const tokensPath = path.join(designSystemPath, "tokens.css");
+      const utilitiesPath = path.join(designSystemPath, "utilities.css");
+
+      // Read CSS files
+      const tokensCSS = await fs.readFile(tokensPath, "utf-8");
+      const utilitiesCSS = await fs.readFile(utilitiesPath, "utf-8");
+
+      // Inject CSS into the view
+      await view.webContents.insertCSS(tokensCSS);
+      await view.webContents.insertCSS(utilitiesCSS);
+
+      console.log("Successfully injected Eden Design System CSS into view");
+    } catch (err) {
+      console.error("Failed to inject design system CSS:", err);
+      // Don't throw - app should still work without design system
+    }
+  }
+
+  /**
    * Inject app frame script into the view
    * This adds a title bar with close button to each app
    */
@@ -381,6 +407,11 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
+      // Inject the Eden Design System CSS first
+      this.injectDesignSystemCSS(view).catch((err) => {
+        console.error(`Failed to inject design system CSS for ${appId}:`, err);
+      });
+
       // Inject the app frame script with window mode info and actual bounds
       this.injectAppFrame(view, viewMode, manifest.window, viewBounds);
 

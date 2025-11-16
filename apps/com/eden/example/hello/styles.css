@@ -1,0 +1,96 @@
+/**
+ * Hello World App - Using Eden Design System
+ * 
+ * This demonstrates how to use the auto-injected design system
+ * in a real Eden app with actual functionality.
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-secondary);
+  color: var(--eden-color-text-on-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--eden-space-lg);
+}
+
+.container {
+  max-width: 600px;
+  text-align: center;
+}
+
+h1 {
+  font-size: var(--eden-font-size-4xl);
+  margin-bottom: var(--eden-space-md);
+  animation: fadeInDown 0.6s ease-out;
+  font-weight: var(--eden-font-weight-bold);
+}
+
+p {
+  font-size: var(--eden-font-size-xl);
+  margin-bottom: var(--eden-space-2xl);
+  opacity: 0.9;
+  animation: fadeInUp 0.6s ease-out 0.2s both;
+  line-height: var(--eden-font-line-height-relaxed);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-md);
+  margin-top: var(--eden-space-2xl);
+  animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+#status {
+  margin-top: var(--eden-space-lg);
+  padding: var(--eden-space-md);
+  background: var(--eden-color-bg-glass-light);
+  border-radius: var(--eden-radius-md);
+  font-size: var(--eden-font-size-md);
+  font-family: var(--eden-font-mono);
+  text-align: left;
+  max-height: 200px;
+  overflow-y: auto;
+  animation: fadeInUp 0.6s ease-out 0.6s both;
+  backdrop-filter: var(--eden-glass-light);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+#status p {
+  margin: var(--eden-space-xs) 0;
+  font-size: var(--eden-font-size-md);
+  animation: none;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

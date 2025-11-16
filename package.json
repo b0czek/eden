@@ -6,10 +6,12 @@
   "author": "Eden Team",
   "license": "MIT",
   "scripts": {
-    "build": "npm run clean && npm run build:main && npm run build:shell && npm run copy-assets",
+    "build": "npm run clean && npm run tokens:build && npm run build:main && npm run build:shell && npm run copy-assets",
     "build:main": "tsc",
     "build:shell": "vite build",
-    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/ && cp src/eveshell/app-frame-inject.js dist/eveshell/",
+    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/ && cp src/eveshell/app-frame-inject.js dist/eveshell/ && cp src/design-system/*.css dist/design-system/",
+    "tokens:build": "style-dictionary build --config style-dictionary.config.mjs",
+    "tokens:watch": "style-dictionary build --watch --config style-dictionary.config.mjs",
     "dev": "npm run build && electron .",
     "start": "electron .",
     "clean": "rm -rf dist"
@@ -19,6 +21,8 @@
     "@types/node": "^20.10.0",
     "electron": "^32.0.0",
     "solid-js": "^1.9.10",
+    "style-dictionary": "^5.1.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.0",
     "vite": "^7.2.1",
     "vite-plugin-solid": "^2.11.10"
