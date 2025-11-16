@@ -1,0 +1,189 @@
+/**
+ * Eden Design System - Tab Components
+ * Frosted glass styled tabs and navigation
+ */
+
+/* ===== Tab Container ===== */
+.eden-tabs {
+  width: 100%;
+}
+
+/* ===== Tab List ===== */
+.eden-tab-list {
+  display: flex;
+  gap: var(--eden-space-xs);
+  padding: var(--eden-space-xs);
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  
+  border-radius: var(--eden-radius-lg);
+  border: 1px solid var(--eden-color-border-light);
+  
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.eden-tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== Tab Button ===== */
+.eden-tab {
+  flex-shrink: 0;
+  padding: var(--eden-space-sm) var(--eden-space-lg);
+  border-radius: var(--eden-radius-md);
+  border: none;
+  background: transparent;
+  color: var(--eden-color-text-secondary);
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+  user-select: none;
+  white-space: nowrap;
+  outline: none;
+}
+
+.eden-tab:hover {
+  background: var(--eden-color-bg-glass-light);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-tab-active {
+  background: var(--eden-color-surface-elevated);
+  color: var(--eden-color-text-primary);
+  box-shadow: var(--eden-shadow-sm);
+}
+
+.eden-tab:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary);
+  outline-offset: 2px;
+}
+
+.eden-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Tab Panels ===== */
+.eden-tab-panels {
+  padding: var(--eden-space-lg);
+}
+
+.eden-tab-panel {
+  display: none;
+  animation: eden-fade-in var(--eden-duration-normal) var(--eden-transition-ease-out);
+}
+
+.eden-tab-panel-active {
+  display: block;
+}
+
+/* ===== Underline Tabs ===== */
+.eden-tab-list-underline {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--eden-color-border-light);
+  border-radius: 0;
+  gap: var(--eden-space-lg);
+  padding: 0;
+}
+
+.eden-tab-underline {
+  border-radius: 0;
+  padding: var(--eden-space-md) 0;
+  position: relative;
+}
+
+.eden-tab-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background var(--eden-transition-base);
+}
+
+.eden-tab-underline:hover::after {
+  background: var(--eden-color-border-medium);
+}
+
+.eden-tab-underline.eden-tab-active::after {
+  background: var(--eden-color-accent-primary);
+}
+
+/* ===== Pill Tabs ===== */
+.eden-tab-list-pills {
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: var(--eden-space-sm);
+}
+
+.eden-tab-pill {
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-light);
+  -webkit-backdrop-filter: var(--eden-glass-light);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.eden-tab-pill:hover {
+  background: var(--eden-color-bg-glass-strong);
+  border-color: var(--eden-color-border-medium);
+}
+
+.eden-tab-pill.eden-tab-active {
+  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  border-color: transparent;
+  color: white;
+}
+
+/* ===== Vertical Tabs ===== */
+.eden-tabs-vertical {
+  display: flex;
+  gap: var(--eden-space-lg);
+}
+
+.eden-tab-list-vertical {
+  flex-direction: column;
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.eden-tab-list-vertical .eden-tab {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+}
+
+/* ===== Tab with Icon ===== */
+.eden-tab-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+}
+
+.eden-tab-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Tab with Badge ===== */
+.eden-tab-badge {
+  margin-left: var(--eden-space-xs);
+  padding: 2px var(--eden-space-xs);
+  border-radius: var(--eden-radius-xs);
+  background: var(--eden-color-danger);
+  color: white;
+  font-size: 10px;
+  font-weight: var(--eden-font-weight-bold);
+}
+

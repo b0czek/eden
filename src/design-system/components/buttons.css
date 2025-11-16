@@ -1,0 +1,223 @@
+/**
+ * Eden Design System - Button Components
+ * Frosted glass styled buttons with various states and sizes
+ */
+
+/* ===== Base Button ===== */
+.eden-btn {
+  font-family: var(--eden-font-family-base);
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-medium);
+  padding: var(--eden-space-md) var(--eden-space-lg);
+  border-radius: var(--eden-radius-md);
+  border: 1px solid var(--eden-color-border-light);
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+  
+  /* Frosted glass effect */
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  box-shadow: var(--eden-shadow-sm);
+  
+  color: var(--eden-color-text-primary);
+  
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--eden-space-sm);
+  
+  user-select: none;
+  outline: none;
+}
+
+.eden-btn:hover {
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  -webkit-backdrop-filter: var(--eden-glass-strong);
+  border-color: var(--eden-color-border-medium);
+  transform: translateY(-1px);
+  box-shadow: var(--eden-shadow-md);
+}
+
+.eden-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--eden-shadow-sm);
+}
+
+.eden-btn:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary);
+  outline-offset: 2px;
+}
+
+.eden-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== Button Variants ===== */
+.eden-btn-primary {
+  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  border-color: transparent;
+  color: white;
+  box-shadow: var(--eden-shadow-md);
+  font-weight: var(--eden-font-weight-semibold);
+}
+
+.eden-btn-primary:hover {
+  filter: brightness(1.15);
+  box-shadow: var(--eden-shadow-lg);
+  border-color: transparent;
+}
+
+.eden-btn-secondary {
+  background: var(--eden-color-surface-tertiary);
+  border-color: var(--eden-color-border-medium);
+}
+
+.eden-btn-secondary:hover {
+  background: var(--eden-color-surface-hover);
+}
+
+.eden-btn-success {
+  background: var(--eden-color-success);
+  border-color: transparent;
+  color: white;
+  font-weight: var(--eden-font-weight-semibold);
+}
+
+.eden-btn-success:hover {
+  background: var(--eden-color-success-hover);
+  box-shadow: var(--eden-shadow-lg);
+}
+
+.eden-btn-danger {
+  background: var(--eden-color-danger);
+  border-color: transparent;
+  color: white;
+  font-weight: var(--eden-font-weight-semibold);
+}
+
+.eden-btn-danger:hover {
+  background: var(--eden-color-danger-hover);
+  box-shadow: var(--eden-shadow-lg);
+}
+
+.eden-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.eden-btn-ghost:hover {
+  background: var(--eden-color-bg-glass-light);
+  border-color: var(--eden-color-border-light);
+}
+
+.eden-btn-outline {
+  background: transparent;
+  border-color: var(--eden-color-border-medium);
+}
+
+.eden-btn-outline:hover {
+  background: var(--eden-color-bg-glass-light);
+  border-color: var(--eden-color-accent-primary);
+}
+
+/* ===== Button Sizes ===== */
+.eden-btn-xs {
+  font-size: var(--eden-font-size-xs);
+  padding: var(--eden-space-xs) var(--eden-space-sm);
+  border-radius: var(--eden-radius-xs);
+}
+
+.eden-btn-sm {
+  font-size: var(--eden-font-size-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-sm);
+}
+
+.eden-btn-lg {
+  font-size: var(--eden-font-size-lg);
+  padding: var(--eden-space-lg) var(--eden-space-xl);
+  border-radius: var(--eden-radius-lg);
+}
+
+.eden-btn-xl {
+  font-size: var(--eden-font-size-xl);
+  padding: var(--eden-space-xl) var(--eden-space-2xl);
+  border-radius: var(--eden-radius-xl);
+}
+
+/* ===== Button Shapes ===== */
+.eden-btn-square {
+  aspect-ratio: 1;
+  padding: var(--eden-space-md);
+}
+
+.eden-btn-icon {
+  aspect-ratio: 1;
+  padding: var(--eden-space-sm);
+  border-radius: var(--eden-radius-md);
+}
+
+.eden-btn-pill {
+  border-radius: 999px;
+}
+
+/* ===== Button Groups ===== */
+.eden-btn-group {
+  display: inline-flex;
+  gap: 0;
+}
+
+.eden-btn-group .eden-btn {
+  border-radius: 0;
+}
+
+.eden-btn-group .eden-btn:first-child {
+  border-top-left-radius: var(--eden-radius-md);
+  border-bottom-left-radius: var(--eden-radius-md);
+}
+
+.eden-btn-group .eden-btn:last-child {
+  border-top-right-radius: var(--eden-radius-md);
+  border-bottom-right-radius: var(--eden-radius-md);
+}
+
+.eden-btn-group .eden-btn:not(:last-child) {
+  border-right: none;
+}
+
+/* ===== Floating Action Button ===== */
+.eden-fab {
+  position: fixed;
+  bottom: var(--eden-space-2xl);
+  right: var(--eden-space-2xl);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--eden-radius-round);
+  
+  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  border: none;
+  box-shadow: var(--eden-shadow-2xl);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+  z-index: var(--eden-z-sticky);
+}
+
+.eden-fab:hover {
+  transform: scale(1.1);
+  box-shadow: var(--eden-shadow-xl);
+}
+
+.eden-fab:active {
+  transform: scale(1);
+}
+

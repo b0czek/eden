@@ -1,0 +1,242 @@
+/**
+ * Eden Design System - List Components
+ * Frosted glass styled lists and menus
+ */
+
+/* ===== Base List ===== */
+.eden-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  
+  border-radius: var(--eden-radius-lg);
+  overflow: hidden;
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  
+  border: 1px solid var(--eden-color-border-light);
+  box-shadow: var(--eden-shadow-md);
+}
+
+/* ===== List Item ===== */
+.eden-list-item {
+  padding: var(--eden-space-md) var(--eden-space-lg);
+  border-bottom: 1px solid var(--eden-color-border-light);
+  transition: all var(--eden-transition-base);
+  color: var(--eden-color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+}
+
+.eden-list-item:last-child {
+  border-bottom: none;
+}
+
+.eden-list-item:hover {
+  background: var(--eden-color-surface-hover);
+}
+
+.eden-list-item-active {
+  background: var(--eden-color-surface-active);
+  border-left: 3px solid var(--eden-color-accent-primary);
+  padding-left: calc(var(--eden-space-lg) - 3px);
+}
+
+.eden-list-item-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.eden-list-item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eden-list-item-disabled:hover {
+  background: transparent;
+}
+
+/* ===== List Item Content ===== */
+.eden-list-item-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--eden-color-accent-primary);
+}
+
+.eden-list-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xs);
+}
+
+.eden-list-item-title {
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-list-item-description {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-list-item-meta {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  flex-shrink: 0;
+}
+
+/* ===== Menu ===== */
+.eden-menu {
+  list-style: none;
+  padding: var(--eden-space-sm);
+  margin: 0;
+  
+  border-radius: var(--eden-radius-lg);
+  
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+  
+  border: 1px solid var(--eden-color-border-medium);
+  box-shadow: var(--eden-shadow-xl);
+  
+  min-width: 200px;
+}
+
+.eden-menu-item {
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-sm);
+  cursor: pointer;
+  transition: all var(--eden-transition-fast);
+  color: var(--eden-color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  font-size: var(--eden-font-size-md);
+  user-select: none;
+}
+
+.eden-menu-item:hover {
+  background: var(--eden-color-surface-hover);
+}
+
+.eden-menu-item-active {
+  background: var(--eden-color-surface-active);
+  color: var(--eden-color-accent-primary);
+}
+
+.eden-menu-divider {
+  height: 1px;
+  background: var(--eden-color-border-light);
+  margin: var(--eden-space-sm) 0;
+}
+
+.eden-menu-title {
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  font-size: var(--eden-font-size-xs);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--eden-font-letter-spacing-wide);
+}
+
+/* ===== Dropdown Menu ===== */
+.eden-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.eden-dropdown-menu {
+  position: absolute;
+  top: calc(100% + var(--eden-space-sm));
+  left: 0;
+  z-index: var(--eden-z-dropdown);
+  
+  animation: eden-fade-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+}
+
+.eden-dropdown-menu-right {
+  left: auto;
+  right: 0;
+}
+
+/* ===== Steps List ===== */
+.eden-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-lg);
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  
+  border-radius: var(--eden-radius-lg);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.eden-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  position: relative;
+}
+
+.eden-step::after {
+  content: '';
+  position: absolute;
+  left: calc(100% + var(--eden-space-sm));
+  width: var(--eden-space-md);
+  height: 2px;
+  background: var(--eden-color-border-light);
+}
+
+.eden-step:last-child::after {
+  display: none;
+}
+
+.eden-step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--eden-radius-round);
+  background: var(--eden-color-bg-glass-light);
+  border: 2px solid var(--eden-color-border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-muted);
+  flex-shrink: 0;
+}
+
+.eden-step-active .eden-step-number {
+  background: var(--eden-color-accent-primary);
+  border-color: var(--eden-color-accent-primary);
+  color: white;
+}
+
+.eden-step-completed .eden-step-number {
+  background: var(--eden-color-success);
+  border-color: var(--eden-color-success);
+  color: white;
+}
+
+.eden-step-label {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-step-active .eden-step-label {
+  color: var(--eden-color-text-primary);
+  font-weight: var(--eden-font-weight-medium);
+}
+

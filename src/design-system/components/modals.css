@@ -1,0 +1,207 @@
+/**
+ * Eden Design System - Modal Components
+ * Frosted glass styled dialogs and overlays
+ */
+
+/* ===== Modal Overlay ===== */
+.eden-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--eden-z-modal);
+  
+  background: var(--eden-color-bg-overlay);
+  backdrop-filter: var(--eden-glass-strong);
+  -webkit-backdrop-filter: var(--eden-glass-strong);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-2xl);
+  
+  animation: eden-fade-in var(--eden-duration-normal) var(--eden-transition-ease-out);
+}
+
+/* ===== Modal Container ===== */
+.eden-modal {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  
+  border-radius: var(--eden-radius-2xl);
+  
+  /* Ultra frosted glass effect */
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+  
+  border: 1px solid var(--eden-color-border-medium);
+  box-shadow: var(--eden-shadow-2xl);
+  
+  display: flex;
+  flex-direction: column;
+  
+  animation: eden-scale-in var(--eden-duration-normal) var(--eden-transition-ease-out);
+  overflow: hidden;
+}
+
+.eden-modal-lg {
+  max-width: 800px;
+}
+
+.eden-modal-sm {
+  max-width: 400px;
+}
+
+.eden-modal-full {
+  max-width: 95vw;
+  max-height: 95vh;
+}
+
+/* ===== Modal Header ===== */
+.eden-modal-header {
+  padding: var(--eden-space-xl);
+  padding-bottom: var(--eden-space-lg);
+  border-bottom: 1px solid var(--eden-color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eden-space-md);
+}
+
+.eden-modal-title {
+  font-size: var(--eden-font-size-2xl);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.eden-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--eden-radius-md);
+  border: none;
+  background: var(--eden-color-bg-glass-light);
+  color: var(--eden-color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--eden-transition-base);
+  flex-shrink: 0;
+}
+
+.eden-modal-close:hover {
+  background: var(--eden-color-surface-hover);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Modal Body ===== */
+.eden-modal-body {
+  padding: var(--eden-space-xl);
+  overflow-y: auto;
+  flex: 1;
+  color: var(--eden-color-text-secondary);
+}
+
+/* ===== Modal Footer ===== */
+.eden-modal-footer {
+  padding: var(--eden-space-xl);
+  padding-top: var(--eden-space-lg);
+  border-top: 1px solid var(--eden-color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--eden-space-md);
+}
+
+/* ===== Alert Modal ===== */
+.eden-alert-modal {
+  text-align: center;
+  padding: var(--eden-space-2xl);
+}
+
+.eden-alert-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--eden-space-lg) auto;
+  border-radius: var(--eden-radius-round);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--eden-font-size-3xl);
+}
+
+.eden-alert-icon-info {
+  background: rgba(77, 171, 247, 0.2);
+  color: var(--eden-color-info);
+}
+
+.eden-alert-icon-success {
+  background: rgba(81, 207, 102, 0.2);
+  color: var(--eden-color-success);
+}
+
+.eden-alert-icon-warning {
+  background: rgba(255, 217, 61, 0.2);
+  color: var(--eden-color-warning);
+}
+
+.eden-alert-icon-danger {
+  background: rgba(255, 59, 48, 0.2);
+  color: var(--eden-color-danger);
+}
+
+/* ===== Tooltip ===== */
+.eden-tooltip {
+  position: absolute;
+  z-index: var(--eden-z-tooltip);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-sm);
+  
+  background: var(--eden-color-surface-secondary);
+  backdrop-filter: var(--eden-glass-strong);
+  -webkit-backdrop-filter: var(--eden-glass-strong);
+  
+  border: 1px solid var(--eden-color-border-light);
+  box-shadow: var(--eden-shadow-lg);
+  
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
+  white-space: nowrap;
+  
+  pointer-events: none;
+  animation: eden-fade-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+}
+
+/* ===== Popover ===== */
+.eden-popover {
+  position: absolute;
+  z-index: var(--eden-z-popover);
+  min-width: 200px;
+  max-width: 400px;
+  border-radius: var(--eden-radius-lg);
+  padding: var(--eden-space-lg);
+  
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+  
+  border: 1px solid var(--eden-color-border-medium);
+  box-shadow: var(--eden-shadow-xl);
+  
+  color: var(--eden-color-text-primary);
+  
+  animation: eden-scale-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+}
+
+.eden-popover-title {
+  font-weight: var(--eden-font-weight-semibold);
+  margin: 0 0 var(--eden-space-sm) 0;
+}
+
+.eden-popover-content {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+

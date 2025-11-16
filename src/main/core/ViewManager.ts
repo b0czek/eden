@@ -41,6 +41,10 @@ export class ViewManager extends EventEmitter {
     height: 600,
   };
 
+  // Static cache for design system CSS (loaded once, reused for all views)
+  private static designSystemCSSCache: string | null = null;
+  private static designSystemCSSPath: string | null = null;
+
   constructor(tilingConfig?: TilingConfig) {
     super();
     this.tilingConfig = tilingConfig || {
@@ -228,14 +232,14 @@ export class ViewManager extends EventEmitter {
     const finalWidth = windowConfig?.minSize?.width
       ? Math.max(width, windowConfig.minSize.width)
       : windowConfig?.maxSize?.width
-      ? Math.min(width, windowConfig.maxSize.width)
-      : width;
+        ? Math.min(width, windowConfig.maxSize.width)
+        : width;
 
     const finalHeight = windowConfig?.minSize?.height
       ? Math.max(height, windowConfig.minSize.height)
       : windowConfig?.maxSize?.height
-      ? Math.min(height, windowConfig.maxSize.height)
-      : height;
+        ? Math.min(height, windowConfig.maxSize.height)
+        : height;
 
     // Get position from config or center the window
     let x: number, y: number;
@@ -277,25 +281,53 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Clear the cached design system CSS
+   * Useful for development or when CSS is updated
+   */
+  public static clearDesignSystemCache(): void {
+    ViewManager.designSystemCSSCache = null;
+    console.log("Design system CSS cache cleared");
+  }
+
+  /**
    * Inject Eden Design System CSS into the view
    * Makes design tokens and utilities available to all apps
+   *
+   * Uses a static cache to avoid reading the CSS file multiple times.
+   * The CSS is loaded once on first injection, then reused for all subsequent views.
    */
   private async injectDesignSystemCSS(view: WebContentsView): Promise<void> {
     try {
-      // Path to design system CSS files
-      const designSystemPath = path.join(__dirname, "../../design-system");
-      const tokensPath = path.join(designSystemPath, "tokens.css");
-      const utilitiesPath = path.join(designSystemPath, "utilities.css");
+      // Initialize cache path if not set
+      if (!ViewManager.designSystemCSSPath) {
+        const designSystemPath = path.join(__dirname, "../../design-system");
+        ViewManager.designSystemCSSPath = path.join(
+          designSystemPath,
+          "eden.css"
+        );
+      }
 
-      // Read CSS files
-      const tokensCSS = await fs.readFile(tokensPath, "utf-8");
-      const utilitiesCSS = await fs.readFile(utilitiesPath, "utf-8");
+      // Load CSS from cache or read from disk on first call
+      if (!ViewManager.designSystemCSSCache) {
+        console.log("Loading Eden Design System CSS from disk...");
+        ViewManager.designSystemCSSCache = await fs.readFile(
+          ViewManager.designSystemCSSPath,
+          "utf-8"
+        );
+        const sizeKB = (ViewManager.designSystemCSSCache.length / 1024).toFixed(
+          2
+        );
+        console.log(
+          `✓ Loaded Eden CSS: ${sizeKB} KB (cached for future views)`
+        );
+      }
 
-      // Inject CSS into the view
-      await view.webContents.insertCSS(tokensCSS);
-      await view.webContents.insertCSS(utilitiesCSS);
+      // Inject the cached CSS
+      await view.webContents.insertCSS(ViewManager.designSystemCSSCache);
 
-      console.log("Successfully injected Eden Design System CSS into view");
+      console.log(
+        "Successfully injected Eden Design System CSS into view (from cache)"
+      );
     } catch (err) {
       console.error("Failed to inject design system CSS:", err);
       // Don't throw - app should still work without design system

@@ -1,0 +1,186 @@
+/**
+ * Eden Design System - Progress Components
+ * Frosted glass styled progress indicators
+ */
+
+/* ===== Progress Bar ===== */
+.eden-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-light);
+  -webkit-backdrop-filter: var(--eden-glass-light);
+  
+  border: 1px solid var(--eden-color-border-light);
+  position: relative;
+}
+
+.eden-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  transition: width var(--eden-duration-slow) var(--eden-transition-ease-out);
+  box-shadow: 0 0 10px rgba(82, 163, 255, 0.5);
+}
+
+.eden-progress-bar-success {
+  background: linear-gradient(90deg, var(--eden-color-success), var(--eden-color-success-hover));
+  box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
+}
+
+.eden-progress-bar-danger {
+  background: linear-gradient(90deg, var(--eden-color-danger), var(--eden-color-danger-hover));
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
+}
+
+.eden-progress-bar-warning {
+  background: var(--eden-color-warning);
+  box-shadow: 0 0 10px rgba(255, 217, 61, 0.5);
+}
+
+.eden-progress-animated .eden-progress-bar {
+  animation: eden-progress-shimmer 2s infinite;
+  background-size: 200% 100%;
+}
+
+@keyframes eden-progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ===== Progress Sizes ===== */
+.eden-progress-sm {
+  height: 4px;
+}
+
+.eden-progress-lg {
+  height: 12px;
+}
+
+.eden-progress-xl {
+  height: 16px;
+}
+
+/* ===== Circular Progress ===== */
+.eden-progress-circle {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eden-progress-circle-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.eden-progress-circle-bg {
+  fill: none;
+  stroke: var(--eden-color-bg-glass-medium);
+  stroke-width: 4;
+}
+
+.eden-progress-circle-bar {
+  fill: none;
+  stroke: var(--eden-color-accent-primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--eden-duration-slow) var(--eden-transition-ease-out);
+}
+
+.eden-progress-circle-text {
+  position: absolute;
+  font-size: var(--eden-font-size-lg);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Spinner ===== */
+.eden-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--eden-color-bg-glass-medium);
+  border-top-color: var(--eden-color-accent-primary);
+  border-radius: var(--eden-radius-round);
+  animation: eden-spin 0.8s linear infinite;
+}
+
+@keyframes eden-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.eden-spinner-sm {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.eden-spinner-lg {
+  width: 60px;
+  height: 60px;
+  border-width: 4px;
+}
+
+/* ===== Skeleton Loader ===== */
+.eden-skeleton {
+  background: var(--eden-color-bg-glass-medium);
+  border-radius: var(--eden-radius-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.eden-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--eden-color-surface-hover),
+    transparent
+  );
+  animation: eden-skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes eden-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.eden-skeleton-text {
+  height: 1em;
+  width: 100%;
+}
+
+.eden-skeleton-title {
+  height: 2em;
+  width: 70%;
+}
+
+.eden-skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--eden-radius-round);
+}
+
+.eden-skeleton-button {
+  height: 40px;
+  width: 120px;
+}
+

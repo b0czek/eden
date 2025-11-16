@@ -1,0 +1,180 @@
+/**
+ * Eden Design System - Badge and Tag Components
+ * Frosted glass styled badges and tags
+ */
+
+/* ===== Base Badge ===== */
+.eden-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-xs) var(--eden-space-sm);
+  border-radius: var(--eden-radius-sm);
+  font-size: var(--eden-font-size-xs);
+  font-weight: var(--eden-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--eden-font-letter-spacing-wide);
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-light);
+  -webkit-backdrop-filter: var(--eden-glass-light);
+  
+  border: 1px solid var(--eden-color-border-light);
+  color: var(--eden-color-text-secondary);
+}
+
+/* ===== Badge Variants ===== */
+.eden-badge-primary {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: var(--eden-color-accent-primary);
+  color: var(--eden-color-accent-primary);
+}
+
+.eden-badge-success {
+  background: rgba(81, 207, 102, 0.2);
+  border-color: var(--eden-color-success);
+  color: var(--eden-color-success);
+}
+
+.eden-badge-danger {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: var(--eden-color-danger);
+  color: var(--eden-color-danger);
+}
+
+.eden-badge-warning {
+  background: rgba(255, 217, 61, 0.2);
+  border-color: var(--eden-color-warning);
+  color: var(--eden-color-warning);
+}
+
+.eden-badge-info {
+  background: rgba(77, 171, 247, 0.2);
+  border-color: var(--eden-color-info);
+  color: var(--eden-color-info);
+}
+
+/* ===== Badge Sizes ===== */
+.eden-badge-sm {
+  font-size: 9px;
+  padding: 2px var(--eden-space-xs);
+}
+
+.eden-badge-lg {
+  font-size: var(--eden-font-size-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+}
+
+/* ===== Badge Dot ===== */
+.eden-badge-dot {
+  padding: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--eden-radius-round);
+  border: none;
+}
+
+.eden-badge-dot-animated {
+  animation: eden-pulse 2s infinite;
+}
+
+@keyframes eden-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ===== Tag ===== */
+.eden-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--eden-space-xs);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  
+  border: 1px solid var(--eden-color-border-light);
+  color: var(--eden-color-text-primary);
+  
+  transition: all var(--eden-transition-base);
+}
+
+.eden-tag:hover {
+  border-color: var(--eden-color-border-medium);
+  background: var(--eden-color-bg-glass-strong);
+}
+
+/* ===== Tag with Close Button ===== */
+.eden-tag-close {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--eden-radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--eden-color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all var(--eden-transition-fast);
+  padding: 0;
+  margin-left: var(--eden-space-xs);
+}
+
+.eden-tag-close:hover {
+  background: var(--eden-color-surface-hover);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Tag Group ===== */
+.eden-tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eden-space-sm);
+}
+
+/* ===== Notification Badge ===== */
+.eden-notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--eden-space-xs);
+  border-radius: 999px;
+  
+  background: var(--eden-color-danger);
+  border: 2px solid var(--eden-color-surface-primary);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  font-size: 10px;
+  font-weight: var(--eden-font-weight-bold);
+  color: white;
+  
+  animation: eden-badge-pop var(--eden-duration-normal) var(--eden-transition-ease-out);
+}
+
+@keyframes eden-badge-pop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+

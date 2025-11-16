@@ -1,0 +1,201 @@
+/**
+ * Eden Design System - Card Components
+ * Frosted glass styled card containers
+ */
+
+/* ===== Base Card ===== */
+.eden-card {
+  border-radius: var(--eden-radius-lg);
+  padding: var(--eden-space-lg);
+  
+  /* Frosted glass effect */
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  
+  border: 1px solid var(--eden-color-border-light);
+  box-shadow: var(--eden-shadow-md);
+  color: var(--eden-color-text-primary);
+  
+  transition: all var(--eden-transition-base);
+}
+
+.eden-card:hover {
+  box-shadow: var(--eden-shadow-lg);
+  border-color: var(--eden-color-border-medium);
+}
+
+/* ===== Glass Card ===== */
+.eden-card-glass {
+  border-radius: var(--eden-radius-2xl);
+  padding: var(--eden-space-xl);
+  
+  /* Ultra frosted glass effect */
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+  
+  border: 1px solid var(--eden-color-border-light);
+  box-shadow: var(--eden-shadow-2xl);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Elevated Card ===== */
+.eden-card-elevated {
+  background: var(--eden-color-surface-elevated);
+  box-shadow: var(--eden-shadow-xl);
+}
+
+.eden-card-elevated:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--eden-shadow-2xl);
+}
+
+/* ===== Interactive Card ===== */
+.eden-card-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.eden-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--eden-color-accent-primary);
+}
+
+.eden-card-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--eden-shadow-md);
+}
+
+/* ===== Card Header ===== */
+.eden-card-header {
+  padding: var(--eden-space-lg);
+  padding-bottom: var(--eden-space-md);
+  border-bottom: 1px solid var(--eden-color-border-light);
+}
+
+.eden-card-title {
+  font-size: var(--eden-font-size-xl);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.eden-card-subtitle {
+  font-size: var(--eden-font-size-md);
+  color: var(--eden-color-text-secondary);
+  margin: var(--eden-space-xs) 0 0 0;
+}
+
+/* ===== Card Body ===== */
+.eden-card-body {
+  padding: var(--eden-space-lg);
+}
+
+/* ===== Card Footer ===== */
+.eden-card-footer {
+  padding: var(--eden-space-lg);
+  padding-top: var(--eden-space-md);
+  border-top: 1px solid var(--eden-color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--eden-space-md);
+}
+
+/* ===== Card Variants ===== */
+.eden-card-sm {
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
+}
+
+.eden-card-lg {
+  padding: var(--eden-space-2xl);
+  border-radius: var(--eden-radius-2xl);
+}
+
+/* ===== Card Image ===== */
+.eden-card-image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--eden-radius-lg);
+  margin-bottom: var(--eden-space-md);
+  object-fit: cover;
+}
+
+.eden-card-image-top {
+  border-radius: var(--eden-radius-lg) var(--eden-radius-lg) 0 0;
+  margin-bottom: 0;
+}
+
+/* ===== Info Card ===== */
+.eden-info-card {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
+  
+  background: var(--eden-color-bg-glass-light);
+  backdrop-filter: var(--eden-glass-light);
+  -webkit-backdrop-filter: var(--eden-glass-light);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.eden-info-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--eden-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--eden-color-accent-primary);
+  color: white;
+  font-size: var(--eden-font-size-xl);
+  flex-shrink: 0;
+}
+
+.eden-info-card-content {
+  flex: 1;
+}
+
+.eden-info-card-title {
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0 0 var(--eden-space-xs) 0;
+}
+
+.eden-info-card-description {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+  margin: 0;
+}
+
+/* ===== Stats Card ===== */
+.eden-stats-card {
+  text-align: center;
+  padding: var(--eden-space-xl);
+}
+
+.eden-stats-value {
+  font-size: var(--eden-font-size-4xl);
+  font-weight: var(--eden-font-weight-bold);
+  color: var(--eden-color-accent-primary);
+  line-height: 1;
+  margin: 0 0 var(--eden-space-sm) 0;
+}
+
+.eden-stats-label {
+  font-size: var(--eden-font-size-md);
+  color: var(--eden-color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--eden-font-letter-spacing-wide);
+}
+
+/* ===== Card Grid ===== */
+.eden-card-grid {
+  display: grid;
+  gap: var(--eden-space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
