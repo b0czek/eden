@@ -310,6 +310,10 @@ export type ShellCommand =
       args: {
         appId: string;
       };
+    }
+  | {
+      command: "global-mouseup";
+      args: Record<string, never>;
     };
 
 export type ShellCommandType = ShellCommand["command"];

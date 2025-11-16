@@ -505,6 +505,11 @@
           startY: coords.y
         }).catch(console.error);
       }
+
+      // Add mouseup listener when drag starts (removed when drag ends)
+      if (!isTouch) {
+        window.addEventListener('mouseup', endDrag);
+      }
     };
 
     // Animation frame update function - throttles IPC to 60fps
@@ -552,47 +557,49 @@
     };
 
     const endDrag = (e) => {
-      console.log('[Eden Frame] endDrag called, event type:', e.type, 'isDragging:', isDragging, 'isTouch:', isTouch);
-      
       // For touch events, only end if there are no remaining touches
       if (e.type.startsWith('touch') && e.touches && e.touches.length > 0) {
-        console.log('[Eden Frame] Ignoring touchend - still have active touches');
         return;
       }
       
-      if (isDragging) {
-        console.log('[Eden Frame] Drag ended, final currentBounds:', currentBounds);
-        isDragging = false;
-        dragStartBounds = null;
+      if (!isDragging) {
+        return;
+      }
 
-        // Cancel animation frame and send final position
-        if (rafId) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
+      console.log('[Eden Frame] Drag ended, final currentBounds:', currentBounds);
+      isDragging = false;
+      dragStartBounds = null;
+
+      // Remove mouseup listener since drag is done
+      window.removeEventListener('mouseup', endDrag);
+
+      // Cancel animation frame and send final position
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        
+        // Send final pending bounds immediately
+        if (pendingBounds && window.edenAPI && appId) {
+          window.edenAPI.shellCommand('update-view-bounds', {
+            appId,
+            bounds: pendingBounds
+          }).catch(console.error);
           
-          // Send final pending bounds immediately
-          if (pendingBounds && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('update-view-bounds', {
-              appId,
-              bounds: pendingBounds
-            }).catch(console.error);
-            
-            // Update __edenInitialBounds so next interaction starts from correct position
-            window.__edenInitialBounds = { ...pendingBounds };
-            pendingBounds = null;
-          }
+          // Update __edenInitialBounds so next interaction starts from correct position
+          window.__edenInitialBounds = { ...pendingBounds };
+          pendingBounds = null;
         }
+      }
 
-        // For touch drag, ensure __edenInitialBounds is updated with final position
-        if (isTouch && currentBounds) {
-          window.__edenInitialBounds = { ...currentBounds };
-          console.log('[Eden Frame] Updated __edenInitialBounds after touch drag:', window.__edenInitialBounds);
-        }
+      // For touch drag, ensure __edenInitialBounds is updated with final position
+      if (isTouch && currentBounds) {
+        window.__edenInitialBounds = { ...currentBounds };
+        console.log('[Eden Frame] Updated __edenInitialBounds after touch drag:', window.__edenInitialBounds);
+      }
 
-        // Stop global drag tracking in main process (for mouse events)
-        if (!isTouch && window.edenAPI && appId) {
-          window.edenAPI.shellCommand('end-drag', { appId }).catch(console.error);
-        }
+      // Stop global drag tracking in main process (for mouse events)
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('end-drag', { appId }).catch(console.error);
       }
     };
 
@@ -606,8 +613,7 @@
     // Use capture for move to ensure we get it
     document.addEventListener('touchmove', moveDrag, { passive: false, capture: true });
 
-    // Use window for up/end events to catch events even when cursor leaves bounds
-    window.addEventListener('mouseup', endDrag);
+    // Touch end/cancel events (mouseup is added dynamically when drag starts)
     document.addEventListener('touchend', endDrag, { passive: false });
     document.addEventListener('touchcancel', endDrag, { passive: false });
     
@@ -721,6 +727,11 @@
           startY: coords.y
         }).catch(console.error);
       }
+
+      // Add mouseup listener when resize starts (removed when resize ends)
+      if (!isTouch) {
+        window.addEventListener('mouseup', endResize);
+      }
     };
 
     // Animation frame update function - throttles IPC to 60fps
@@ -791,39 +802,44 @@
     };
 
     const endResize = (e) => {
-      if (isResizing) {
-        console.log('[Eden Frame] Resize ended, final currentBounds:', currentBounds);
-        isResizing = false;
-        resizeStartBounds = null;
+      if (!isResizing) {
+        return;
+      }
 
-        // Cancel animation frame and send final position
-        if (rafId) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
+      console.log('[Eden Frame] Resize ended, final currentBounds:', currentBounds);
+      isResizing = false;
+      resizeStartBounds = null;
+
+      // Remove mouseup listener since resize is done
+      window.removeEventListener('mouseup', endResize);
+
+      // Cancel animation frame and send final position
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        
+        // Send final pending bounds immediately
+        if (pendingBounds && window.edenAPI && appId) {
+          window.edenAPI.shellCommand('update-view-bounds', {
+            appId,
+            bounds: pendingBounds
+          }).catch(console.error);
           
-          // Send final pending bounds immediately
-          if (pendingBounds && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('update-view-bounds', {
-              appId,
-              bounds: pendingBounds
-            }).catch(console.error);
-            
-            // Update __edenInitialBounds so next interaction starts from correct position
-            window.__edenInitialBounds = { ...pendingBounds };
-            pendingBounds = null;
-          }
+          // Update __edenInitialBounds so next interaction starts from correct position
+          window.__edenInitialBounds = { ...pendingBounds };
+          pendingBounds = null;
         }
+      }
 
-        // For touch resize, ensure __edenInitialBounds is updated with final position
-        if (isTouch && currentBounds) {
-          window.__edenInitialBounds = { ...currentBounds };
-          console.log('[Eden Frame] Updated __edenInitialBounds after touch resize:', window.__edenInitialBounds);
-        }
+      // For touch resize, ensure __edenInitialBounds is updated with final position
+      if (isTouch && currentBounds) {
+        window.__edenInitialBounds = { ...currentBounds };
+        console.log('[Eden Frame] Updated __edenInitialBounds after touch resize:', window.__edenInitialBounds);
+      }
 
-        // Stop global resize tracking in main process (for mouse events)
-        if (!isTouch && window.edenAPI && appId) {
-          window.edenAPI.shellCommand('end-resize', { appId }).catch(console.error);
-        }
+      // Stop global resize tracking in main process (for mouse events)
+      if (!isTouch && window.edenAPI && appId) {
+        window.edenAPI.shellCommand('end-resize', { appId }).catch(console.error);
       }
     };
 
@@ -837,8 +853,7 @@
     // Use document and capture to ensure we get all touch moves
     document.addEventListener('touchmove', moveResize, { passive: false, capture: true });
 
-    // Use window for up/end events to catch events even when cursor leaves bounds
-    window.addEventListener('mouseup', endResize);
+    // Touch end/cancel events (mouseup is added dynamically when resize starts)
     document.addEventListener('touchend', endResize, { passive: false });
     document.addEventListener('touchcancel', endResize, { passive: false });
     
@@ -849,7 +864,6 @@
   // This keeps currentBounds in sync even when main process is controlling movement
   if (window.appAPI && window.appAPI.onBoundsUpdated) {
     window.appAPI.onBoundsUpdated((newBounds) => {
-      console.log('[Eden Frame] Received bounds update from main process:', newBounds);
       currentBounds = { ...newBounds };
       window.__edenInitialBounds = { ...newBounds };
     });

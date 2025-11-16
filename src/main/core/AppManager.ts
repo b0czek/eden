@@ -2,10 +2,10 @@ import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
-import { screen } from "electron";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "./ViewManager";
 import { IPCBridge } from "./IPCBridge";
+import { MouseTracker } from "./MouseTracker";
 import {
   AppManifest,
   AppInstance,
@@ -33,13 +33,15 @@ export class AppManager extends EventEmitter {
   private runningApps: Map<string, AppInstance> = new Map();
   private isShuttingDown: boolean = false;
 
+  // mouse tracking
+  private mouseTracker: MouseTracker;
+
   // Global drag/resize tracking
   private dragState: {
     appId: string;
     startX: number;
     startY: number;
     startBounds: { x: number; y: number; width: number; height: number };
-    interval: NodeJS.Timeout;
   } | null = null;
 
   private resizeState: {
@@ -47,7 +49,8 @@ export class AppManager extends EventEmitter {
     startX: number;
     startY: number;
     startBounds: { x: number; y: number; width: number; height: number };
-    interval: NodeJS.Timeout;
+    currentWidth: number;
+    currentHeight: number;
   } | null = null;
 
   constructor(
@@ -61,6 +64,7 @@ export class AppManager extends EventEmitter {
     this.viewManager = viewManager;
     this.ipcBridge = ipcBridge;
     this.appsDirectory = appsDirectory;
+    this.mouseTracker = new MouseTracker(8); // ~120fps
 
     this.setupEventHandlers();
   }
@@ -612,7 +616,7 @@ export class AppManager extends EventEmitter {
 
     // Stop any existing drag
     if (this.dragState) {
-      clearInterval(this.dragState.interval);
+      this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
     }
 
     // Start tracking global mouse position
@@ -621,29 +625,30 @@ export class AppManager extends EventEmitter {
       startX,
       startY,
       startBounds: { ...viewInfo.bounds },
-      interval: setInterval(() => {
-        if (!this.dragState) return;
-
-        const cursorPos = screen.getCursorScreenPoint();
-        const deltaX = cursorPos.x - this.dragState.startX;
-        const deltaY = cursorPos.y - this.dragState.startY;
-
-        const newBounds = {
-          x: this.dragState.startBounds.x + deltaX,
-          y: this.dragState.startBounds.y + deltaY,
-          width: this.dragState.startBounds.width,
-          height: this.dragState.startBounds.height,
-        };
-
-        this.viewManager.setViewBounds(instance.viewId, newBounds);
-
-        // Notify renderer of bounds update so it stays in sync
-        const view = this.viewManager.getView(instance.viewId);
-        if (view) {
-          view.webContents.send("bounds-updated", newBounds);
-        }
-      }, 16), // ~60fps
     };
+
+    // Subscribe to mouse updates
+    this.mouseTracker.subscribe(`drag-${appId}`, (position) => {
+      if (!this.dragState) return;
+
+      const deltaX = position.x - this.dragState.startX;
+      const deltaY = position.y - this.dragState.startY;
+
+      const newBounds = {
+        x: this.dragState.startBounds.x + deltaX,
+        y: this.dragState.startBounds.y + deltaY,
+        width: this.dragState.startBounds.width,
+        height: this.dragState.startBounds.height,
+      };
+
+      this.viewManager.setViewBounds(instance.viewId, newBounds);
+
+      // Notify renderer of bounds update so it stays in sync
+      const view = this.viewManager.getView(instance.viewId);
+      if (view) {
+        view.webContents.send("bounds-updated", newBounds);
+      }
+    });
 
     return { success: true };
   }
@@ -653,8 +658,25 @@ export class AppManager extends EventEmitter {
     args: ShellCommandArgs<"end-drag">
   ): Promise<any> {
     if (this.dragState) {
-      clearInterval(this.dragState.interval);
+      this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
       this.dragState = null;
+    }
+    return { success: true };
+  }
+
+  @CommandHandler("global-mouseup")
+  private async handleGlobalMouseUp(): Promise<any> {
+    // Cleanup any active drag or resize operations when mouse is released
+    // This is called by the shell window which covers the entire screen
+    if (this.dragState) {
+      console.log("[AppManager] Global mouseup - cleaning up drag state");
+      this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
+      this.dragState = null;
+    }
+    if (this.resizeState) {
+      console.log("[AppManager] Global mouseup - cleaning up resize state");
+      this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
+      this.resizeState = null;
     }
     return { success: true };
   }
@@ -677,45 +699,58 @@ export class AppManager extends EventEmitter {
 
     // Stop any existing resize
     if (this.resizeState) {
-      clearInterval(this.resizeState.interval);
+      this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
     }
 
-    // Start tracking global mouse position
+    // Initialize resize state with smoothing variables
     this.resizeState = {
       appId,
       startX,
       startY,
       startBounds: { ...viewInfo.bounds },
-      interval: setInterval(() => {
-        if (!this.resizeState) return;
-
-        const cursorPos = screen.getCursorScreenPoint();
-        const deltaX = cursorPos.x - this.resizeState.startX;
-        const deltaY = cursorPos.y - this.resizeState.startY;
-
-        let newWidth = this.resizeState.startBounds.width + deltaX;
-        let newHeight = this.resizeState.startBounds.height + deltaY;
-
-        // Apply minimum size
-        newWidth = Math.max(newWidth, 200);
-        newHeight = Math.max(newHeight, 200);
-
-        const newBounds = {
-          x: this.resizeState.startBounds.x,
-          y: this.resizeState.startBounds.y,
-          width: Math.round(newWidth),
-          height: Math.round(newHeight),
-        };
-
-        this.viewManager.setViewBounds(instance.viewId, newBounds);
-
-        // Notify renderer of bounds update so it stays in sync
-        const view = this.viewManager.getView(instance.viewId);
-        if (view) {
-          view.webContents.send("bounds-updated", newBounds);
-        }
-      }, 16), // ~60fps
+      currentWidth: viewInfo.bounds.width,
+      currentHeight: viewInfo.bounds.height,
     };
+
+    // Subscribe to mouse updates
+    this.mouseTracker.subscribe(`resize-${appId}`, (position) => {
+      if (!this.resizeState) return;
+
+      const deltaX = position.x - this.resizeState.startX;
+      const deltaY = position.y - this.resizeState.startY;
+
+      let targetWidth = this.resizeState.startBounds.width + deltaX;
+      let targetHeight = this.resizeState.startBounds.height + deltaY;
+
+      // Apply minimum size
+      targetWidth = Math.max(targetWidth, 200);
+      targetHeight = Math.max(targetHeight, 200);
+
+      // Smooth interpolation for more fluid resize (lerp factor based on frame time)
+      // const smoothingFactor = Math.min(1, (position.deltaTime / 16) * 1); // Adaptive smoothing
+      // this.resizeState.currentWidth +=
+      //   (targetWidth - this.resizeState.currentWidth) * smoothingFactor;
+      // this.resizeState.currentHeight +=
+      //   (targetHeight - this.resizeState.currentHeight) * smoothingFactor;
+
+      this.resizeState.currentWidth = targetWidth;
+      this.resizeState.currentHeight = targetHeight;
+
+      const newBounds = {
+        x: this.resizeState.startBounds.x,
+        y: this.resizeState.startBounds.y,
+        width: Math.round(this.resizeState.currentWidth),
+        height: Math.round(this.resizeState.currentHeight),
+      };
+
+      this.viewManager.setViewBounds(instance.viewId, newBounds);
+
+      // Notify renderer of bounds update so it stays in sync
+      const view = this.viewManager.getView(instance.viewId);
+      if (view) {
+        view.webContents.send("bounds-updated", newBounds);
+      }
+    });
 
     return { success: true };
   }
@@ -725,7 +760,7 @@ export class AppManager extends EventEmitter {
     args: ShellCommandArgs<"end-resize">
   ): Promise<any> {
     if (this.resizeState) {
-      clearInterval(this.resizeState.interval);
+      this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
       this.resizeState = null;
     }
     return { success: true };
@@ -750,6 +785,9 @@ export class AppManager extends EventEmitter {
         console.error(`✗ Error stopping app ${appId} during shutdown:`, error);
       }
     }
+
+    // Cleanup mouse tracker
+    this.mouseTracker.dispose();
 
     // Give a brief moment for any async cleanup
     await new Promise((resolve) => setTimeout(resolve, 100));

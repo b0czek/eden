@@ -262,6 +262,19 @@ export default function Shell() {
       resizeObserver.observe(workspace);
     }
 
+    // Listen for global mouseup to cleanup any active drag/resize operations
+    // This catches mouse releases that happen outside individual app windows
+    const handleGlobalMouseUp = () => {
+      window.edenAPI.shellCommand("global-mouseup", {}).catch((error) => {
+        console.error("Failed to send global-mouseup:", error);
+      });
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
   });
 
   return (

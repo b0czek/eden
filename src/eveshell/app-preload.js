@@ -40,7 +40,6 @@ ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }
 
 // Listen for bounds updates from main process
 ipcRenderer.on('bounds-updated', (_event, newBounds) => {
-  console.log('[App Preload] Received bounds-updated:', newBounds);
   boundsListeners.forEach(callback => {
     try {
       callback(newBounds);
