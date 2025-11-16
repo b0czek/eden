@@ -322,7 +322,7 @@ export class ViewManager extends EventEmitter {
         );
       }
 
-      // Inject the cached CSS
+      // Inject the CSS
       await view.webContents.insertCSS(ViewManager.designSystemCSSCache);
 
       console.log(
@@ -400,6 +400,8 @@ export class ViewManager extends EventEmitter {
         preload: universalPreload,
         transparent: true,
         backgroundThrottling: false,
+        // Enable overlay scrollbars
+        scrollBounce: false,
       },
     });
 

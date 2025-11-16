@@ -30,10 +30,13 @@ export class Eden {
   constructor(config: EdenConfig = {}) {
     this.config = config;
 
+    // Enable overlay scrollbars
+    app.commandLine.appendSwitch("enable-features", "OverlayScrollbar");
+    app.commandLine.appendSwitch("enable-overlay-scrollbar");
+
     // Set apps directory to user data + /eden-apps or custom path
     this.appsDirectory =
-      config.appsDirectory ||
-      path.join(app.getPath("userData"), "eden-apps");
+      config.appsDirectory || path.join(app.getPath("userData"), "eden-apps");
 
     // Initialize core managers
     this.workerManager = new WorkerManager();

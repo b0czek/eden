@@ -26,17 +26,22 @@
     /* Squircle container styling */
     html {
       background: transparent !important;
+      overflow: hidden;
     }
     
     html, body {
       border-radius: 20px;
-      overflow: hidden;
       clip-path: inset(0 round 20px);
+      margin: 0;
+      padding: 0;
+      height: 100%;
     }
     
     body {
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
                   inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     #eden-app-frame-overlay#eden-app-frame-overlay {
