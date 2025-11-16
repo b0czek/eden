@@ -1,0 +1,28 @@
+{
+  "id": "com.eden.example.showcase",
+  "name": "Design Showcase",
+  "version": "1.0.0",
+  "description": "A showcase of Eden's frosted glass design system components",
+  "author": "Eden Team",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "backend": {
+    "entry": "backend.js"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 1200,
+      "height": 800
+    },
+    "minSize": {
+      "width": 800,
+      "height": 600
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": {}
+}
+

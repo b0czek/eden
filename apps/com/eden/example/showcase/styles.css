@@ -1,0 +1,195 @@
+/* Design Showcase App Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-primary);
+  color: var(--eden-color-text-primary);
+  overflow-x: hidden;
+}
+
+.showcase-container {
+  min-height: 100vh;
+  padding: var(--eden-space-2xl);
+}
+
+.showcase-header {
+  text-align: center;
+  margin-bottom: var(--eden-space-3xl);
+}
+
+.showcase-title {
+  font-size: var(--eden-font-size-4xl);
+  font-weight: var(--eden-font-weight-bold);
+  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--eden-space-md);
+  letter-spacing: var(--eden-font-letter-spacing-tight);
+}
+
+.showcase-subtitle {
+  font-size: var(--eden-font-size-xl);
+  color: var(--eden-color-text-secondary);
+  font-weight: var(--eden-font-weight-normal);
+}
+
+.showcase-section {
+  margin-bottom: var(--eden-space-3xl);
+}
+
+.section-title {
+  font-size: var(--eden-font-size-3xl);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin-bottom: var(--eden-space-lg);
+  padding-bottom: var(--eden-space-md);
+  border-bottom: 2px solid var(--eden-color-border-light);
+}
+
+.section-description {
+  font-size: var(--eden-font-size-md);
+  color: var(--eden-color-text-secondary);
+  margin-bottom: var(--eden-space-xl);
+  line-height: var(--eden-font-line-height-relaxed);
+}
+
+.component-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xl);
+  margin-bottom: var(--eden-space-2xl);
+}
+
+.component-demo {
+  padding: var(--eden-space-xl);
+  border-radius: var(--eden-radius-2xl);
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.demo-title {
+  font-size: var(--eden-font-size-lg);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin-bottom: var(--eden-space-md);
+  text-transform: uppercase;
+  letter-spacing: var(--eden-font-letter-spacing-wide);
+}
+
+.demo-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eden-space-md);
+  align-items: center;
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--eden-space-lg);
+}
+
+.demo-vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Color palette showcase */
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--eden-space-md);
+}
+
+.color-swatch {
+  aspect-ratio: 1;
+  border-radius: var(--eden-radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--eden-color-border-light);
+  padding: var(--eden-space-md);
+  text-align: center;
+  box-shadow: var(--eden-shadow-md);
+}
+
+.color-name {
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-semibold);
+  margin-top: auto;
+  color: var(--eden-color-text-primary);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .showcase-container {
+    padding: var(--eden-space-lg);
+  }
+  
+  .showcase-title {
+    font-size: var(--eden-font-size-3xl);
+  }
+  
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tab content styling */
+.tab-content {
+  padding: var(--eden-space-lg);
+  min-height: 200px;
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-glass-light);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+/* Custom checkbox/radio label styling */
+.form-check-label {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Notification positioning for demo */
+.notification-demo {
+  position: relative;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal demo button container */
+.modal-demo-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--eden-space-md);
+}
+
+/* Sample list items */
+.sample-list-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--eden-space-lg);
+}
+
