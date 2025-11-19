@@ -9,6 +9,3 @@ import "./components/badges.css";
 import "./components/progress.css";
 import "./components/lists.css";
 import "./components/tabs.css";
-
-// Export all generated tokens and helper functions
-export * from "./design-system";

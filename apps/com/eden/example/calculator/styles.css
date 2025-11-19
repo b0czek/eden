@@ -1,3 +1,10 @@
+/**
+ * Calculator App - Using Eden Design System
+ * 
+ * This app uses the auto-injected design system CSS
+ * All design tokens and component classes are available
+ */
+
 * {
     margin: 0;
     padding: 0;
@@ -5,86 +12,72 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: var(--eden-font-family-base);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: var(--eden-space-md);
+    background: var(--eden-color-bg-primary);
+    overflow: hidden;
 }
 
 .calculator {
-    background: #1e1e2e;
-    border-radius: 20px;
-    padding: 20px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    background: var(--eden-color-surface-elevated);
+    backdrop-filter: var(--eden-glass-medium);
+    -webkit-backdrop-filter: var(--eden-glass-medium);
+    border-radius: var(--eden-radius-xl);
+    padding: var(--eden-space-lg);
+    box-shadow: var(--eden-shadow-xl);
     width: 320px;
+    border: 1px solid var(--eden-color-border-light);
 }
 
 .display {
-    background: #2d2d44;
-    color: #fff;
+    background: var(--eden-color-surface-secondary);
+    color: var(--eden-color-text-primary);
     font-size: 2.5rem;
-    padding: 20px;
-    border-radius: 10px;
+    font-weight: var(--eden-font-weight-semibold);
+    padding: var(--eden-space-lg);
+    border-radius: var(--eden-radius-md);
     text-align: right;
-    margin-bottom: 20px;
+    margin-bottom: var(--eden-space-md);
     min-height: 80px;
+    max-height: 80px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     word-wrap: break-word;
     word-break: break-all;
     overflow: hidden;
+    border: 1px solid var(--eden-color-border-light);
+    font-family: var(--eden-font-family-mono);
 }
 
 .buttons {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: var(--eden-space-sm);
+    width: 100%;
 }
 
-.btn {
-    background: #3d3d5c;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 20px;
-    font-size: 1.5rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-weight: 500;
+/* Override button styles for calculator-specific sizing */
+.buttons .eden-btn {
+    font-size: 1.25rem;
+    font-weight: var(--eden-font-weight-semibold);
+    height: 60px;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border-radius: var(--eden-radius-md);
 }
 
-.btn:hover {
-    background: #4d4d6c;
-    transform: scale(1.05);
+.buttons .eden-btn[style*="grid-column: span 2"] {
+    grid-column: span 2;
 }
 
-.btn:active {
-    transform: scale(0.95);
-}
-
-.btn.function {
-    background: #ff6b6b;
-}
-
-.btn.function:hover {
-    background: #ff8787;
-}
-
-.btn.operator {
-    background: #667eea;
-}
-
-.btn.operator:hover {
-    background: #7c92f0;
-}
-
-.btn.equals {
-    background: #51cf66;
-}
-
-.btn.equals:hover {
-    background: #69db7c;
+.buttons .eden-btn[style*="grid-row: span 2"] {
+    grid-row: span 2;
+    height: auto;
+    min-height: calc(60px * 2 + var(--eden-space-sm));
 }

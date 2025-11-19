@@ -62,6 +62,9 @@ export interface WindowConfig {
 
   /** Whether the window can be moved (default: true for floating, false for tiled) */
   movable?: boolean;
+
+  /** Whether to show the title in the title bar (default: true) */
+  showTitle?: boolean;
 }
 
 /**

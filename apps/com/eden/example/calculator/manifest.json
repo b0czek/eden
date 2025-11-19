@@ -25,7 +25,8 @@
       "height": 800
     },
     "resizable": true,
-    "movable": true
+    "movable": true,
+    "showTitle": false
   },
   "permissions": {}
 }

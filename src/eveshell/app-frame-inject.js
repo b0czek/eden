@@ -217,14 +217,20 @@
   const windowConfig = window.__edenWindowConfig || {};
   const supportsToggle = windowConfig.mode === 'both';
   const currentMode = window.__edenWindowMode || 'tiled';
+  const showTitle = windowConfig.showTitle !== false; // Default to true if not specified
   
   // Create toggle button HTML if supported
   const toggleButtonHtml = supportsToggle 
     ? `<button class="eden-app-frame-button toggle-mode" id="eden-toggle-mode-btn" title="Toggle Window Mode">⊞</button>` 
     : '';
   
+  // Create title HTML if showTitle is true
+  const titleHtml = showTitle 
+    ? `<div id="eden-app-frame-title">App</div>`
+    : '';
+  
   overlay.innerHTML = `
-    <div id="eden-app-frame-title">App</div>
+    ${titleHtml}
     <div id="eden-app-frame-controls">
       ${toggleButtonHtml}
       <button class="eden-app-frame-button minimize" id="eden-minimize-btn" title="Minimize">−</button>
