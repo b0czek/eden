@@ -7,14 +7,11 @@
   "frontend": {
     "entry": "index.html"
   },
-  "backend": {
-    "entry": "backend.js"
-  },
   "window": {
     "mode": "floating",
     "defaultSize": {
-      "width": 1200,
-      "height": 800
+      "width": 800,
+      "height": 600
     },
     "minSize": {
       "width": 800,
@@ -25,4 +22,3 @@
   },
   "permissions": {}
 }
-

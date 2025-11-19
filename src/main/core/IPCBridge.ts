@@ -18,6 +18,7 @@ export class IPCBridge extends EventEmitter {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
   private mainWindow: BrowserWindow | null = null;
+  private runningAppIds: Set<string> = new Set();
   private pendingResponses: Map<
     string,
     {
@@ -409,8 +410,11 @@ export class IPCBridge extends EventEmitter {
    * Broadcast message to all apps
    */
   broadcastToApps(message: IPCMessage): void {
-    const workers = this.workerManager.getRunningWorkers();
-    for (const appId of workers) {
+    if (this.runningAppIds.size === 0) {
+      return;
+    }
+
+    for (const appId of this.runningAppIds) {
       this.sendToApp(appId, message);
     }
   }
@@ -441,9 +445,20 @@ export class IPCBridge extends EventEmitter {
       arch: process.arch,
       nodeVersion: process.version,
       electronVersion: process.versions.electron,
-      runningApps: this.workerManager.getRunningWorkers(),
+      runningApps: Array.from(this.runningAppIds),
       activeViews: this.viewManager.getActiveViews(),
     };
+  }
+
+  /**
+   * Provide running-app updates from the AppManager
+   */
+  updateRunningApps(appIds: Iterable<string>): void {
+    this.runningAppIds = new Set(appIds);
+  }
+
+  getRunningAppIds(): string[] {
+    return Array.from(this.runningAppIds);
   }
 
   /**

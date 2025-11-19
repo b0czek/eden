@@ -88,6 +88,7 @@ export class AppManager extends EventEmitter {
 
     // Load installed apps
     await this.loadInstalledApps();
+    this.syncRunningAppsState();
 
     console.log(
       `AppManager initialized. Found ${this.installedApps.size} installed apps.`
@@ -283,12 +284,10 @@ export class AppManager extends EventEmitter {
     const viewBounds = bounds || { x: 0, y: 0, width: 800, height: 600 };
 
     try {
-      // Create worker for backend
-      const worker = await this.workerManager.createWorker(
-        appId,
-        manifest,
-        installPath
-      );
+      // Create worker for backend if one is defined
+      const worker = manifest.backend?.entry
+        ? await this.workerManager.createWorker(appId, manifest, installPath)
+        : null;
 
       // Create view for frontend
       const viewId = this.viewManager.createView(
@@ -311,6 +310,7 @@ export class AppManager extends EventEmitter {
       };
 
       this.runningApps.set(appId, instance);
+      this.syncRunningAppsState();
 
       this.emitEvent("app-launched", { instance });
       this.ipcBridge.systemBroadcast("app-launched", {
@@ -340,8 +340,10 @@ export class AppManager extends EventEmitter {
     }
 
     try {
-      // Terminate worker
-      await this.workerManager.terminateWorker(appId);
+      // Terminate worker if it exists
+      if (this.workerManager.hasWorker(appId)) {
+        await this.workerManager.terminateWorker(appId);
+      }
 
       // Remove view
       this.viewManager.removeView(instance.viewId);
@@ -351,6 +353,7 @@ export class AppManager extends EventEmitter {
 
       // Remove from running apps
       this.runningApps.delete(appId);
+      this.syncRunningAppsState();
 
       this.emitEvent("app-stopped", { appId });
 
@@ -386,6 +389,13 @@ export class AppManager extends EventEmitter {
   }
 
   /**
+   * Sync running app IDs with the IPC bridge
+   */
+  private syncRunningAppsState(): void {
+    this.ipcBridge.updateRunningApps(this.runningApps.keys());
+  }
+
+  /**
    * Validate app manifest
    */
   private validateManifest(manifest: AppManifest): void {
@@ -395,12 +405,14 @@ export class AppManager extends EventEmitter {
       );
     }
 
-    if (!manifest.backend?.entry) {
-      throw new Error("Invalid manifest: missing backend.entry");
-    }
-
     if (!manifest.frontend?.entry) {
       throw new Error("Invalid manifest: missing frontend.entry");
+    }
+
+    if (manifest.backend && !manifest.backend.entry) {
+      throw new Error(
+        "Invalid manifest: backend.entry must be specified when backend is defined"
+      );
     }
   }
 
@@ -447,6 +459,7 @@ export class AppManager extends EventEmitter {
       this.ipcBridge.unregisterAppChannels(appId);
 
       this.runningApps.delete(appId);
+      this.syncRunningAppsState();
 
       this.emitEvent("app-exited", { appId, code });
     }

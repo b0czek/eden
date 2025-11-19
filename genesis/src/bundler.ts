@@ -8,7 +8,7 @@ export interface AppManifest {
   version: string;
   description?: string;
   author?: string;
-  backend: {
+  backend?: {
     entry: string;
     options?: any;
   };
@@ -65,10 +65,8 @@ export class GenesisBundler {
         );
       }
 
-      // Backend validation
-      if (!manifest.backend) {
-        errors.push("Missing required field: backend");
-      } else if (!manifest.backend.entry) {
+      // Backend validation (optional, but ensure entry if provided)
+      if (manifest.backend && !manifest.backend.entry) {
         errors.push("Missing required field: backend.entry");
       }
 
@@ -99,12 +97,14 @@ export class GenesisBundler {
   ): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
 
-    // Check backend entry
-    const backendPath = path.join(appDirectory, manifest.backend.entry);
-    try {
-      await fs.access(backendPath);
-    } catch {
-      errors.push(`Backend entry file not found: ${manifest.backend.entry}`);
+    // Check backend entry if defined
+    if (manifest.backend?.entry) {
+      const backendPath = path.join(appDirectory, manifest.backend.entry);
+      try {
+        await fs.access(backendPath);
+      } catch {
+        errors.push(`Backend entry file not found: ${manifest.backend.entry}`);
+      }
     }
 
     // Check frontend entry

@@ -196,6 +196,16 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Determine whether a specific runtime helper should be injected
+   */
+  private shouldInject(
+    feature: "css" | "appFrame",
+    windowConfig?: WindowConfig
+  ): boolean {
+    return windowConfig?.injections?.[feature] !== false;
+  }
+
+  /**
    * Inject app API into the view's webContents
    * Sends the channel info so the universal preload can set up the API
    */
@@ -339,6 +349,8 @@ export class ViewManager extends EventEmitter {
 
     const viewId = this.nextViewId++;
 
+    const windowConfig = manifest.window;
+
     // Determine view mode based on manifest
     const viewMode = this.determineViewMode(manifest);
 
@@ -349,7 +361,7 @@ export class ViewManager extends EventEmitter {
 
     if (viewMode === "floating") {
       // Floating window - calculate bounds from manifest or use defaults
-      viewBounds = this.floatingWindows.calculateInitialBounds(manifest.window);
+      viewBounds = this.floatingWindows.calculateInitialBounds(windowConfig);
       zIndex = this.floatingWindows.getNextZIndex();
       console.log(
         `Creating floating view for ${appId} with bounds:`,
@@ -373,16 +385,28 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
-      // Inject the Eden Design System CSS first
-      this.injectDesignSystemCSS(view).catch((err) => {
-        console.error(`Failed to inject design system CSS for ${appId}:`, err);
-      });
+      // Inject the Eden Design System CSS first (if enabled)
+      if (this.shouldInject("css", windowConfig)) {
+        this.injectDesignSystemCSS(view).catch((err) => {
+          console.error(
+            `Failed to inject design system CSS for ${appId}:`,
+            err
+          );
+        });
+      }
 
-      // Inject the app frame script with window mode info and actual bounds
-      this.injectAppFrame(view, viewMode, manifest.window, viewBounds);
+      // Inject the app frame script with window mode info and actual bounds (if enabled)
+      if (this.shouldInject("appFrame", windowConfig)) {
+        this.injectAppFrame(view, viewMode, windowConfig, viewBounds).catch(
+          (err) => {
+            console.error(`Failed to inject app frame for ${appId}:`, err);
+          }
+        );
+      }
 
-      // Inject the app API after page load
+      // Inject the app API after page load (always enabled)
       this.injectAppAPI(view, appId);
+
       this.emit("view-loaded", { viewId, appId });
     });
 

@@ -7,9 +7,6 @@
   "frontend": {
     "entry": "index.html"
   },
-  "backend": {
-    "entry": "backend.js"
-  },
   "window": {
     "mode": "floating",
     "defaultSize": {

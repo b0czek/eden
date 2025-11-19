@@ -30,11 +30,12 @@ export class WorkerManager extends EventEmitter {
     }
 
     // Check if app has a backend
-    if (!manifest.backend?.entry) {
+    const backendConfig = manifest.backend;
+    if (!backendConfig?.entry) {
       throw new Error(`App ${appId} does not have a backend`);
     }
 
-    const backendPath = path.join(installPath, manifest.backend.entry);
+    const backendPath = path.join(installPath, backendConfig.entry);
 
     // Create worker with resource limits if specified
     const workerOptions = {
@@ -43,7 +44,7 @@ export class WorkerManager extends EventEmitter {
         manifest,
         installPath,
       },
-      resourceLimits: manifest.backend.options?.resourceLimits,
+      resourceLimits: backendConfig.options?.resourceLimits,
     };
 
     const worker = new Worker(backendPath, workerOptions);

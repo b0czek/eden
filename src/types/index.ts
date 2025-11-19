@@ -29,6 +29,14 @@ export interface TilingConfig {
  */
 export type WindowMode = "floating" | "tiled" | "both";
 
+export interface WindowInjectionOptions {
+  /** Inject the Eden design system CSS into the view (default: true) */
+  css?: boolean;
+
+  /** Inject the Eden app frame with title bar controls (default: true) */
+  appFrame?: boolean;
+}
+
 export interface WindowConfig {
   /** Window display modes supported by the app */
   mode: WindowMode;
@@ -65,6 +73,9 @@ export interface WindowConfig {
 
   /** Whether to show the title in the title bar (default: true) */
   showTitle?: boolean;
+
+  /** Controls which Eden runtime helpers are injected into the app */
+  injections?: WindowInjectionOptions;
 }
 
 /**
@@ -91,7 +102,7 @@ export interface AppManifest {
   author?: string;
 
   /** Entry point for the backend worker thread */
-  backend: {
+  backend?: {
     /** Path to the backend entry file (relative to app root) */
     entry: string;
 
@@ -166,8 +177,8 @@ export interface AppInstance {
   /** Installation path on disk */
   installPath: string;
 
-  /** Worker thread handle */
-  worker: any; // Worker type from worker_threads
+  /** Worker thread handle (only present if backend exists) */
+  worker?: any | null; // Worker type from worker_threads
 
   /** WebContentsView ID */
   viewId: number;

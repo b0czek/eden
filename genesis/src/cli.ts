@@ -66,7 +66,7 @@ program
         chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend.entry}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
       );
       console.log(
         chalk.gray(`  Frontend:    ${result.manifest.frontend.entry}\n`)
@@ -118,7 +118,7 @@ program
         chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend.entry}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
       );
       console.log(
         chalk.gray(`  Frontend:    ${result.manifest.frontend.entry}\n`)
