@@ -3,9 +3,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
 import { WorkerManager } from "./WorkerManager";
-import { ViewManager } from "./ViewManager";
+import { ViewManager } from "../window-manager/ViewManager";
 import { IPCBridge } from "./IPCBridge";
-import { MouseTracker } from "./MouseTracker";
+import { MouseTracker } from "../window-manager/MouseTracker";
 import {
   AppManifest,
   AppInstance,

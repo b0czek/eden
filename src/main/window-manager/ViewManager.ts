@@ -9,19 +9,8 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { AppManifest, TilingConfig, WindowConfig } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
-
-type ViewMode = "floating" | "tiled";
-
-interface ViewInfo {
-  view: WebContentsView;
-  appId: string;
-  manifest: AppManifest;
-  bounds: Bounds;
-  visible: boolean;
-  mode: ViewMode; // Whether this view is floating or tiled
-  tileIndex?: number; // Index in the tiling grid (only for tiled views)
-  zIndex?: number; // Z-order for floating windows
-}
+import { FloatingWindowController } from "./FloatingWindowController";
+import { ViewInfo, ViewMode } from "./types";
 
 /**
  * ViewManager
@@ -34,6 +23,7 @@ export class ViewManager extends EventEmitter {
   private mainWindow: BrowserWindow | null = null;
   private nextViewId = 1;
   private tilingConfig: TilingConfig;
+  private floatingWindows: FloatingWindowController;
   private workspaceBounds: Bounds = {
     x: 0,
     y: 0,
@@ -45,10 +35,6 @@ export class ViewManager extends EventEmitter {
   private static designSystemCSSCache: string | null = null;
   private static designSystemCSSPath: string | null = null;
 
-  // Constants for window constraints
-  private static readonly TITLE_BAR_HEIGHT = 40;
-  private static readonly MIN_GRABBABLE_WIDTH = 100; // Minimum width that must remain visible
-
   constructor(tilingConfig?: TilingConfig) {
     super();
     this.tilingConfig = tilingConfig || {
@@ -56,6 +42,10 @@ export class ViewManager extends EventEmitter {
       gap: 0,
       padding: 0,
     };
+    this.floatingWindows = new FloatingWindowController(
+      () => this.workspaceBounds,
+      () => this.views.values()
+    );
   }
 
   /**
@@ -181,18 +171,6 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Get the next available z-index for floating windows
-   */
-  private getNextZIndex(): number {
-    const zIndices = Array.from(this.views.values())
-      .filter((v) => v.mode === "floating" && v.zIndex !== undefined)
-      .map((v) => v.zIndex!);
-
-    if (zIndices.length === 0) return 1;
-    return Math.max(...zIndices) + 1;
-  }
-
-  /**
    * Determine view mode based on manifest and tiling configuration
    */
   private determineViewMode(manifest: AppManifest): ViewMode {
@@ -215,83 +193,6 @@ export class ViewManager extends EventEmitter {
       default:
         return this.tilingConfig.mode !== "none" ? "tiled" : "floating";
     }
-  }
-
-  /**
-   * Constrain bounds to ensure title bar is always accessible
-   * This prevents windows from being dragged above the workspace or completely off-screen
-   */
-  private constrainBoundsToWorkspace(bounds: Bounds): Bounds {
-    const { x: workX, y: workY, width: workWidth } = this.workspaceBounds;
-
-    let constrainedBounds = { ...bounds };
-
-    // Ensure title bar never goes above workspace top
-    constrainedBounds.y = Math.max(workY, constrainedBounds.y);
-
-    // Ensure at least MIN_GRABBABLE_WIDTH of the window is visible from the left
-    const maxX = workX + workWidth - ViewManager.MIN_GRABBABLE_WIDTH;
-    constrainedBounds.x = Math.min(constrainedBounds.x, maxX);
-
-    // Ensure at least MIN_GRABBABLE_WIDTH of the window is visible from the right
-    const minX =
-      workX - (constrainedBounds.width - ViewManager.MIN_GRABBABLE_WIDTH);
-    constrainedBounds.x = Math.max(constrainedBounds.x, minX);
-
-    return constrainedBounds;
-  }
-
-  /**
-   * Calculate initial bounds for a floating window
-   */
-  private calculateFloatingBounds(windowConfig?: WindowConfig): Bounds {
-    const {
-      x: workX,
-      y: workY,
-      width: workWidth,
-      height: workHeight,
-    } = this.workspaceBounds;
-
-    // Get default size from config or use reasonable defaults
-    const width = windowConfig?.defaultSize?.width || 800;
-    const height = windowConfig?.defaultSize?.height || 600;
-
-    // Apply min/max constraints
-    const finalWidth = windowConfig?.minSize?.width
-      ? Math.max(width, windowConfig.minSize.width)
-      : windowConfig?.maxSize?.width
-        ? Math.min(width, windowConfig.maxSize.width)
-        : width;
-
-    const finalHeight = windowConfig?.minSize?.height
-      ? Math.max(height, windowConfig.minSize.height)
-      : windowConfig?.maxSize?.height
-        ? Math.min(height, windowConfig.maxSize.height)
-        : height;
-
-    // Get position from config or center the window
-    let x: number, y: number;
-    if (windowConfig?.defaultPosition) {
-      x = workX + windowConfig.defaultPosition.x;
-      y = workY + windowConfig.defaultPosition.y;
-    } else {
-      // Center the window in the workspace
-      x = workX + (workWidth - finalWidth) / 2;
-      y = workY + (workHeight - finalHeight) / 2;
-    }
-
-    // Apply offset to cascade windows
-    const floatingCount = Array.from(this.views.values()).filter(
-      (v) => v.mode === "floating"
-    ).length;
-    const offset = floatingCount * 30; // Cascade offset
-    x += offset;
-    y += offset;
-
-    const bounds = { x, y, width: finalWidth, height: finalHeight } as Bounds;
-
-    // Constrain to ensure title bar is always accessible
-    return this.constrainBoundsToWorkspace(bounds);
   }
 
   /**
@@ -448,8 +349,8 @@ export class ViewManager extends EventEmitter {
 
     if (viewMode === "floating") {
       // Floating window - calculate bounds from manifest or use defaults
-      viewBounds = this.calculateFloatingBounds(manifest.window);
-      zIndex = this.getNextZIndex();
+      viewBounds = this.floatingWindows.calculateInitialBounds(manifest.window);
+      zIndex = this.floatingWindows.getNextZIndex();
       console.log(
         `Creating floating view for ${appId} with bounds:`,
         viewBounds
@@ -582,32 +483,10 @@ export class ViewManager extends EventEmitter {
     try {
       // Apply min/max constraints if specified in window config
       const windowConfig = viewInfo.manifest.window;
-      let finalBounds = { ...bounds };
-
-      if (windowConfig?.minSize) {
-        finalBounds.width = Math.max(
-          finalBounds.width,
-          windowConfig.minSize.width
-        );
-        finalBounds.height = Math.max(
-          finalBounds.height,
-          windowConfig.minSize.height
-        );
-      }
-
-      if (windowConfig?.maxSize) {
-        finalBounds.width = Math.min(
-          finalBounds.width,
-          windowConfig.maxSize.width
-        );
-        finalBounds.height = Math.min(
-          finalBounds.height,
-          windowConfig.maxSize.height
-        );
-      }
-
-      // Constrain to ensure title bar is always accessible
-      finalBounds = this.constrainBoundsToWorkspace(finalBounds);
+      const finalBounds = this.floatingWindows.applyWindowConstraints(
+        bounds,
+        windowConfig
+      );
 
       viewInfo.view.setBounds(finalBounds);
       viewInfo.bounds = finalBounds;
@@ -665,7 +544,7 @@ export class ViewManager extends EventEmitter {
         this.reorderViewLayers();
       } else {
         // Floating view - update z-index to be on top of other floating windows
-        viewInfo.zIndex = this.getNextZIndex();
+        viewInfo.zIndex = this.floatingWindows.getNextZIndex();
         // Reorder all views to maintain proper layering
         this.reorderViewLayers();
       }
@@ -719,9 +598,7 @@ export class ViewManager extends EventEmitter {
         .filter((v) => v.mode === "tiled")
         .sort((a, b) => (a.tileIndex || 0) - (b.tileIndex || 0));
 
-      const floatingViews = Array.from(this.views.values())
-        .filter((v) => v.mode === "floating")
-        .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+      const floatingViews = this.floatingWindows.getOrderedFloatingViews();
 
       // Remove all views
       for (const info of this.views.values()) {
@@ -761,12 +638,10 @@ export class ViewManager extends EventEmitter {
 
     try {
       if (viewInfo.mode === "floating") {
-        // For floating views, set to lowest zIndex among floating windows
-        const floatingViews = Array.from(this.views.values()).filter(
-          (v) => v.mode === "floating" && v.zIndex !== undefined
-        );
-        const minZIndex = Math.min(...floatingViews.map((v) => v.zIndex!));
-        viewInfo.zIndex = minZIndex - 1;
+        const newZIndex = this.floatingWindows.getBackmostZIndex();
+        if (newZIndex !== undefined) {
+          viewInfo.zIndex = newZIndex;
+        }
       }
       // For tiled views, no need to change anything as they're always below floating
 
@@ -793,18 +668,10 @@ export class ViewManager extends EventEmitter {
 
     try {
       if (viewInfo.mode === "floating") {
-        // For floating views, adjust zIndex within floating layer
-        const floatingViews = Array.from(this.views.values())
-          .filter((v) => v.mode === "floating" && v.zIndex !== undefined)
-          .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-
-        const targetIndex = Math.max(
-          0,
-          Math.min(position, floatingViews.length - 1)
-        );
-        // Set zIndex based on position
-        const baseZIndex = floatingViews[0]?.zIndex || 1;
-        viewInfo.zIndex = baseZIndex + targetIndex;
+        const newZIndex = this.floatingWindows.getZIndexForPosition(position);
+        if (newZIndex !== undefined) {
+          viewInfo.zIndex = newZIndex;
+        }
       }
       // For tiled views, z-order within tiled layer is managed by tileIndex
 
@@ -897,10 +764,10 @@ export class ViewManager extends EventEmitter {
         viewInfo.tileIndex = undefined;
 
         // Calculate floating bounds (centered or with cascade)
-        // The calculateFloatingBounds already applies constraints
-        const floatingBounds = this.calculateFloatingBounds(windowConfig);
+        const floatingBounds =
+          this.floatingWindows.calculateInitialBounds(windowConfig);
         viewInfo.bounds = floatingBounds;
-        viewInfo.zIndex = this.getNextZIndex();
+        viewInfo.zIndex = this.floatingWindows.getNextZIndex();
         viewInfo.mode = "floating";
 
         // Update view bounds

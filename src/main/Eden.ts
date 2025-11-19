@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { WorkerManager } from "./core/WorkerManager";
-import { ViewManager } from "./core/ViewManager";
+import { ViewManager } from "./window-manager/ViewManager";
 import { IPCBridge } from "./core/IPCBridge";
 import { AppManager } from "./core/AppManager";
 import { TilingConfig } from "../types";
