@@ -198,6 +198,13 @@ export class ViewManager extends EventEmitter {
   /**
    * Determine whether a specific runtime helper should be injected
    */
+  /**
+   * Determine if a frontend entry points to a remote URL
+   */
+  private isRemoteEntry(entry: string): boolean {
+    return /^https?:\/\//i.test(entry);
+  }
+
   private shouldInject(
     feature: "css" | "appFrame",
     windowConfig?: WindowConfig
@@ -379,9 +386,15 @@ export class ViewManager extends EventEmitter {
     // Set bounds
     view.setBounds(viewBounds);
 
-    // Load the frontend HTML
-    const frontendPath = path.join(installPath, manifest.frontend.entry);
-    view.webContents.loadFile(frontendPath);
+    // Load the frontend HTML or remote URL
+    const frontendEntry = manifest.frontend.entry;
+    if (this.isRemoteEntry(frontendEntry)) {
+      console.log(`Loading remote frontend for ${appId}: ${frontendEntry}`);
+      view.webContents.loadURL(frontendEntry);
+    } else {
+      const frontendPath = path.join(installPath, frontendEntry);
+      view.webContents.loadFile(frontendPath);
+    }
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {

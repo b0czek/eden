@@ -41,6 +41,10 @@ export interface BundleResult {
  * Packages Eden apps into .edenite format
  */
 export class GenesisBundler {
+  private static isRemoteEntry(entry?: string): boolean {
+    return !!entry && /^https?:\/\//i.test(entry);
+  }
+
   /**
    * Validate an app manifest
    */
@@ -75,6 +79,11 @@ export class GenesisBundler {
         errors.push("Missing required field: frontend");
       } else if (!manifest.frontend.entry) {
         errors.push("Missing required field: frontend.entry");
+      } else if (
+        !this.isRemoteEntry(manifest.frontend.entry) &&
+        manifest.frontend.entry.startsWith("http")
+      ) {
+        errors.push("Invalid frontend.entry URL");
       }
 
       return {
@@ -107,12 +116,16 @@ export class GenesisBundler {
       }
     }
 
-    // Check frontend entry
-    const frontendPath = path.join(appDirectory, manifest.frontend.entry);
-    try {
-      await fs.access(frontendPath);
-    } catch {
-      errors.push(`Frontend entry file not found: ${manifest.frontend.entry}`);
+    // Check frontend entry unless it references a remote URL
+    if (!this.isRemoteEntry(manifest.frontend.entry)) {
+      const frontendPath = path.join(appDirectory, manifest.frontend.entry);
+      try {
+        await fs.access(frontendPath);
+      } catch {
+        errors.push(
+          `Frontend entry file not found: ${manifest.frontend.entry}`
+        );
+      }
     }
 
     // Check icon if specified (warn but don't fail)
