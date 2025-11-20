@@ -133,20 +133,20 @@ export default function AllApps(props: AllAppsProps) {
 	return (
 		<>
 			<div
-				class="apps-view-overlay"
+				class="eden-modal-overlay"
 				classList={{ closing: isClosing() }}
 				onClick={handleOverlayClick}
 			>
 				<div
-					class="apps-view"
+					class="eden-modal eden-modal-lg"
 					classList={{ closing: isClosing() }}
 					onClick={(e) => e.stopPropagation()}
 				>
-					<div class="apps-view-topbar">
-						<h2>All Applications</h2>
-						<div class="apps-view-actions">
+					<div class="eden-modal-header">
+						<h2 class="eden-modal-title">All Applications</h2>
+						<div style="display: flex; gap: var(--eden-space-sm);">
 							<button
-								class="apps-action-button install"
+								class="eden-btn eden-btn-icon eden-btn-primary"
 								aria-label="Install App"
 								onClick={(e) => {
 									e.stopPropagation();
@@ -158,7 +158,7 @@ export default function AllApps(props: AllAppsProps) {
 								+
 							</button>
 							<button
-								class="apps-action-button close"
+								class="eden-btn eden-btn-icon eden-btn-ghost"
 								aria-label="Close"
 								onClick={(e) => {
 									e.stopPropagation();
@@ -169,11 +169,12 @@ export default function AllApps(props: AllAppsProps) {
 							</button>
 						</div>
 					</div>
-					<div class="apps-grid">
+					<div class="eden-card-grid" style="padding: var(--eden-space-lg); overflow-y: auto;">
 						<For each={props.apps}>
 							{(app) => (
 								<div
-									class="app-grid-item"
+									class="eden-card eden-card-interactive"
+									style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;"
 									classList={{ running: app.isRunning }}
 									onClick={async () => {
 										if (contextMenu() || isClosing()) {
@@ -214,37 +215,40 @@ export default function AllApps(props: AllAppsProps) {
 				{(menu) => (
 					<>
 						<div
-							class="context-menu-overlay"
+							class="eden-modal-overlay"
+							style="background: transparent; backdrop-filter: none;"
 							onClick={() => setContextMenu(null)}
 						/>
 						<div
-							class="context-menu"
+							class="eden-popover"
 							style={{
 								left: `${menu().x}px`,
 								top: `${menu().y}px`,
 							}}
 						>
-							<div class="context-menu-header">{menu().appName}</div>
+							<div class="eden-popover-title" style="border-bottom: 1px solid var(--eden-color-border-light); padding-bottom: var(--eden-space-xs); margin-bottom: var(--eden-space-xs);">{menu().appName}</div>
 							<Show when={menu().isRunning}>
 								<button
-									class="context-menu-item"
+									class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-full"
+									style="justify-content: flex-start; width: 100%;"
 									onClick={async () => {
 										await props.onStopApp(menu().appId);
 										setContextMenu(null);
 									}}
 								>
-									<span class="context-menu-icon stop-icon">■</span>
+									<span class="eden-icon">■</span>
 									Stop App
 								</button>
 							</Show>
 							<button
-								class="context-menu-item danger"
+								class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger"
+								style="justify-content: flex-start; width: 100%;"
 								onClick={async () => {
 									await props.onUninstallApp(menu().appId);
 									setContextMenu(null);
 								}}
 							>
-								<span class="context-menu-icon trash-icon">×</span>
+								<span class="eden-icon">×</span>
 								Uninstall
 							</button>
 						</div>

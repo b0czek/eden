@@ -1,7 +1,6 @@
 import { render } from "solid-js/web";
 import Shell from "./components/Shell";
-import "../design-system/tokens.css";
-import "../design-system/utilities.css";
+import "../design-system/eden.css";
 import "./styles.css";
 
 const root = document.getElementById("root");

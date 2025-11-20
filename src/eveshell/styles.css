@@ -5,11 +5,10 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+  font-family: var(--eden-font-family-base);
   /* Apply workspace gradient to the whole shell */
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-  color: #e0e0e0;
+  background: var(--eden-color-bg-primary);
+  color: var(--eden-color-text-primary);
   overflow: hidden;
   height: 100vh;
   width: 100vw;
@@ -36,13 +35,13 @@ body {
 
 /* Dock Styles */
 .dock {
-  height: 72px;
+  height: var(--eden-layout-dock-height);
   /* Make dock visually float with transparent, frosted background */
   background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 8px 8px;
+  padding: var(--eden-space-sm);
   position: relative;
   overflow: visible;
 }
@@ -51,17 +50,17 @@ body {
   /* Frosted panel behind dock content */
   content: '';
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  height: 56px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  left: var(--eden-space-sm);
+  right: var(--eden-space-sm);
+  bottom: var(--eden-space-sm);
+  height: calc(var(--eden-layout-dock-height) - var(--eden-space-md));
+  border-radius: var(--eden-radius-xl);
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  box-shadow: var(--eden-shadow-lg);
   /* Avoid inset border which can produce hairline seams on some displays */
-  border: none;
+  border: 1px solid var(--eden-color-border-light);
   pointer-events: none;
   z-index: 0;
 }
@@ -76,11 +75,11 @@ body {
 
 .dock-right {
   position: absolute;
-  right: 8px;
+  right: var(--eden-space-sm);
   display: flex;
   align-items: center;
-  padding: 8px 16px;
-  border-radius: 12px;
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -91,24 +90,24 @@ body {
 
 .dock-right,
 .dock-right * {
-  color: rgba(234, 234, 234, 0.95);
+  color: var(--eden-color-text-primary);
 }
 
 .dock-right .clock .time {
-  color: rgba(234, 234, 234, 0.98);
-  font-size: 16px;
-  line-height: 1.2;
+  color: var(--eden-color-text-primary);
+  font-size: var(--eden-font-size-lg);
+  line-height: var(--eden-font-line-height-tight);
 }
 
 .dock-right .clock .date {
-  color: rgba(189, 189, 189, 0.9);
+  color: var(--eden-color-text-secondary);
 }
 
 .dock-right .separator {
   background: linear-gradient(to bottom,
     transparent,
-    rgba(255, 255, 255, 0.18) 20%,
-    rgba(255, 255, 255, 0.18) 80%,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
     transparent
   );
 }
@@ -116,9 +115,9 @@ body {
 .app-icons {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 14px;
+  gap: var(--eden-space-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
   /* Subtle dark container so icons sit naturally on the background */
   background: transparent;
   backdrop-filter: none;
@@ -141,25 +140,20 @@ body {
   filter: brightness(1.05);
 }
 
-/* Gdy aktywna magnifikacja: zmniejsz bazowy gap, a sąsiadów rozpchnij marginesem zależnym od wpływu */
-/* usunięto specjalny gap podczas magnify, zostaje bazowy gap z .app-icons */
-
-/* rozpychanie realizujemy translacją w JS, nie marginesem */
-
 .dock-left,
 .dock-left * {
-  color: rgba(234, 234, 234, 0.95);
+  color: var(--eden-color-text-primary);
 }
 
 .dock-left .app-name {
-  color: rgba(234, 234, 234, 0.9);
+  color: var(--eden-color-text-secondary);
 }
 
 .dock-left .separator {
   background: linear-gradient(to bottom,
     transparent,
-    rgba(255, 255, 255, 0.18) 20%,
-    rgba(255, 255, 255, 0.18) 80%,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
     transparent
   );
 }
@@ -169,11 +163,11 @@ body {
   height: 32px;
   background: linear-gradient(to bottom,
     transparent,
-    rgba(0, 0, 0, 0.15) 20%,
-    rgba(0, 0, 0, 0.15) 80%,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
     transparent
   );
-  margin: 0 4px;
+  margin: 0 var(--eden-space-xs);
 }
 
 /* App Icon Styles */
@@ -184,8 +178,8 @@ body {
   gap: 0px;
   padding: 2px 4px;
   cursor: pointer;
-  border-radius: 10px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--eden-radius-sm);
+  transition: all var(--eden-transition-base);
   position: relative;
   min-width: 44px;
   
@@ -204,7 +198,7 @@ body {
 }
 
 .app-icon.running {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--eden-color-bg-dark);
 }
 
 .icon-container {
@@ -213,17 +207,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--eden-radius-sm);
   position: relative;
   /* Make icon containers darker and flatter to match the shell */
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  transition: transform 0.16s ease-out, box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+  background: var(--eden-color-surface-secondary);
+  box-shadow: var(--eden-shadow-sm);
+  transition: transform 0.16s ease-out, box-shadow var(--eden-transition-base), filter 0.2s ease;
   backdrop-filter: blur(10px);
 }
 
 .app-icon:hover .icon-container {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--eden-shadow-md);
 }
 
 .icon-container img {
@@ -233,14 +227,14 @@ body {
 }
 
 .app-name {
-  font-size: 11px;
-  color: #1a1a1a;
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
   text-align: center;
   max-width: 60px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: var(--eden-font-weight-medium);
   position: absolute;
   left: 50%;
   top: calc(100% + 2px);
@@ -261,7 +255,7 @@ body {
   transform: translateX(-50%);
   width: 4px;
   height: 4px;
-  background: #ffffff;
+  background: var(--eden-color-text-primary);
   border-radius: 50%;
   box-shadow: none;
 }
@@ -276,36 +270,26 @@ body {
 }
 
 .clock .time {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a1a1a;
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.2px;
+  letter-spacing: var(--eden-font-letter-spacing-normal);
 }
 
 .clock .date {
-  font-size: 10px;
-  color: #666;
-  font-weight: 500;
-  letter-spacing: -0.1px;
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-secondary);
+  font-weight: var(--eden-font-weight-medium);
+  letter-spacing: var(--eden-font-letter-spacing-tight);
 }
 
-/* Apps View Overlay */
-.apps-view-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  padding: 48px;
-  background: rgba(8, 12, 24, 0.62);
-  backdrop-filter: blur(26px) saturate(160%);
-  -webkit-backdrop-filter: blur(26px) saturate(160%);
-  z-index: 1000;
-  animation: appsOverlayFadeIn 0.28s ease forwards;
-}
+/* Apps View Overlay (Replaced by Eden Components, keeping animations if needed or relying on Eden's) */
+/* Keeping animations as they might be used by classList toggling in component, but Eden modals have their own animations. */
+/* If AllApps.tsx uses .eden-modal-overlay, we can remove .apps-view-overlay styles unless we need to override something. */
+/* The component uses classList={{ closing: isClosing() }} which might rely on these animations. */
 
-.apps-view-overlay.closing {
+.eden-modal-overlay.closing {
   animation: appsOverlayFadeOut 0.22s ease forwards;
 }
 
@@ -327,26 +311,7 @@ body {
   }
 }
 
-.apps-view {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 36px 48px 48px;
-  border-radius: 28px;
-  background: rgba(18, 24, 42, 0.55);
-  backdrop-filter: blur(34px) saturate(170%);
-  -webkit-backdrop-filter: blur(34px) saturate(170%);
-  box-shadow:
-    0 28px 80px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-  width: min(1400px, 100%);
-  animation: appsViewEnter 0.32s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
-
-.apps-view.closing {
+.eden-modal.closing {
   animation: appsViewExit 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -372,151 +337,40 @@ body {
   }
 }
 
-.apps-view-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.apps-view-topbar h2 {
-  color: rgba(239, 244, 255, 0.96);
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.6px;
-}
-
-.apps-view-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.apps-action-button {
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  line-height: 1;
-}
-
-.apps-action-button:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.apps-action-button:active {
-  transform: translateY(0);
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.apps-action-button.install {
-  background: linear-gradient(135deg, rgba(82, 163, 255, 0.95), rgba(54, 123, 255, 0.95));
-  box-shadow: 0 8px 20px rgba(54, 123, 255, 0.28);
-}
-
-.apps-action-button.install:hover {
-  background: linear-gradient(135deg, rgba(66, 144, 255, 0.98), rgba(40, 106, 242, 0.98));
-}
-
-.apps-action-button.close {
-  font-size: 22px;
-  background: rgba(255, 255, 255, 0.08);
-  padding-top: 1px;
-}
-
-.apps-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
-  justify-content: center;
-  justify-items: center;
-  align-items: start;
-  gap: 24px;
-  padding: 16px 24px 24px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.apps-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.apps-grid::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
-}
-
-.apps-grid::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
-}
-
-.apps-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.26);
-}
-
-.app-grid-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 10px;
-  border-radius: 18px;
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  background: transparent;
-  border: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  max-width: 200px;
-  width: 100%;
-  height: auto;
-}
-
-.app-grid-item:hover {
+/* App Grid Item Overrides for Eden Card */
+.eden-card.eden-card-interactive:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--eden-shadow-xl);
 }
 
-.app-grid-item:active {
+.eden-card.eden-card-interactive:active {
   transform: scale(0.98);
 }
 
-.app-grid-item .app-icon {
+.eden-card .app-icon {
   min-width: auto;
   width: auto;
   max-width: 156px;
 }
 
 /* Make the grid icon square and larger than dock */
-.app-grid-item .icon-container {
+.eden-card .icon-container {
   width: 88px;
   height: 88px;
-  border-radius: 18px;
+  border-radius: var(--eden-radius-lg);
 }
 
-.app-grid-item .icon-container img {
+.eden-card .icon-container img {
   width: 64px;
   height: 64px;
 }
 
-.app-grid-item .app-name {
+.eden-card .app-name {
   opacity: 1;
-  color: rgba(239, 244, 255, 0.95);
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 10px;
+  color: var(--eden-color-text-primary);
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  margin-top: var(--eden-space-sm);
   max-width: 200px;
   position: static;
   transform: none;
@@ -524,126 +378,23 @@ body {
   top: auto;
 }
 
-.app-grid-item.running {
-  background: rgba(52, 126, 255, 0.22);
-  border-color: rgba(80, 150, 255, 0.5);
-  box-shadow: 0 8px 16px rgba(52, 126, 255, 0.2);
+.eden-card.running {
+  background: var(--eden-color-surface-active);
+  border-color: var(--eden-color-accent-primary);
+  box-shadow: var(--eden-shadow-md);
 }
 
-/* Context Menu Styles */
-.context-menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2000;
-}
-
-.context-menu {
-  position: fixed;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(40px) saturate(180%);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2),
-              0 0 0 1px rgba(0, 0, 0, 0.1);
-  z-index: 2001;
-  min-width: 180px;
-  overflow: hidden;
-  animation: contextMenuAppear 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: top left;
-}
-
-@keyframes contextMenuAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.context-menu-header {
-  padding: 10px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.02);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.context-menu-item {
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
-  background: transparent;
-  color: #1a1a1a;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.context-menu-item:last-child {
-  border-bottom: none;
-}
-
-.context-menu-item:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.context-menu-item:active {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.context-menu-item.danger {
-  color: #ff3b30;
-}
-
-.context-menu-item.danger:hover {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.context-menu-icon {
-  font-size: 16px;
+/* Context Menu Icons */
+.eden-icon {
+  font-size: var(--eden-font-size-lg);
   width: 20px;
   text-align: center;
   flex-shrink: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  font-weight: 600;
+  font-family: var(--eden-font-family-base);
+  font-weight: var(--eden-font-weight-semibold);
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.stop-icon {
-  font-size: 14px;
-  color: #666;
-}
-
-.context-menu-item:hover .stop-icon {
-  color: #333;
-}
-
-.trash-icon {
-  font-size: 24px;
-  font-weight: 400;
-  color: #ff3b30;
-  line-height: 0.8;
-}
-
-.context-menu-item.danger:hover .trash-icon {
-  color: #ff3b30;
 }
 
