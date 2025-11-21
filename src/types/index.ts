@@ -328,6 +328,10 @@ export type ShellCommand =
   | {
       command: "global-mouseup";
       args: Record<string, never>;
+    }
+  | {
+      command: "get-window-size";
+      args: Record<string, never>;
     };
 
 export type ShellCommandType = ShellCommand["command"];

@@ -62,6 +62,14 @@ export class IPCBridge extends EventEmitter {
   }
 
   /**
+   * Get the main window instance
+   */
+  getMainWindow(): BrowserWindow | null {
+    return this.mainWindow;
+  }
+
+
+  /**
    * Setup IPC handlers for renderer processes
    */
   private setupIPCHandlers(): void {
@@ -356,17 +364,16 @@ export class IPCBridge extends EventEmitter {
   }
 
   /**
-   * Send message to shell
+   * Send message to shell overlay view
    */
   private sendToShell(message: IPCMessage): void {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      try {
-        this.mainWindow.webContents.send("system-message", message);
-      } catch (error) {
-        // Window is being destroyed, ignore
-        console.log("Could not send to shell, window destroyed");
-      }
-    }
+    // Find the shell overlay view (eden.shell-overlay)
+    const shellViewIds = this.viewManager.getViewsByAppId("eden.shell-overlay");
+    
+    if (shellViewIds.length > 0) {
+      // Send to shell overlay view
+      this.viewManager.sendToView(shellViewIds[0], "system-message", message);
+    } 
   }
 
   /**
@@ -432,7 +439,6 @@ export class IPCBridge extends EventEmitter {
       timestamp: Date.now(),
     };
 
-    this.broadcastToApps(message);
     this.sendToShell(message);
   }
 

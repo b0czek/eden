@@ -20,6 +20,7 @@ export interface EdenConfig {
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
+  private shellOverlayViewId: number | null = null; // Track shell overlay view
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
@@ -78,7 +79,7 @@ export class Eden {
   }
 
   /**
-   * Create the main Eden window (shell)
+   * Create the main Eden window with foundation layer
    */
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
@@ -91,7 +92,7 @@ export class Eden {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(__dirname, "../eveshell/eve-preload.js"),
+        preload: path.join(__dirname, "../foundation/foundation-preload.js"),
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
@@ -102,11 +103,16 @@ export class Eden {
     this.viewManager.setMainWindow(this.mainWindow);
     this.ipcBridge.setMainWindow(this.mainWindow);
 
-    // Load the shell UI
-    const shellPath = path.join(__dirname, "../eveshell/index.html");
-    this.mainWindow.loadFile(shellPath);
+    // Load the foundation layer (not eveshell!)
+    const foundationPath = path.join(__dirname, "../foundation/foundation.html");
+    this.mainWindow.loadFile(foundationPath);
 
-    // Show window when ready
+    // Create shell overlay as an overlay view after foundation loads
+    this.mainWindow.webContents.once("did-finish-load", () => {
+      this.createShellOverlay();
+    });
+
+    // Show window when foundation and overlay are ready
     this.mainWindow.once("ready-to-show", () => {
       this.mainWindow?.show();
     });
@@ -114,6 +120,7 @@ export class Eden {
     // Handle window close
     this.mainWindow.on("closed", () => {
       this.mainWindow = null;
+      this.shellOverlayViewId = null;
     });
 
     // Development: Open DevTools
@@ -121,6 +128,56 @@ export class Eden {
       this.mainWindow.webContents.openDevTools();
     }
   }
+
+  /**
+   * Create the shell overlay as an overlay view
+   */
+  private createShellOverlay(): void {
+    if (!this.mainWindow) {
+      console.error("Cannot create shell overlay: main window not available");
+      return;
+    }
+
+    // Create a minimal manifest for the shell overlay
+    const shellManifest = {
+      id: "eden.shell-overlay",
+      name: "Shell Overlay",
+      version: "1.0.0",
+      frontend: {
+        entry: "index.html",
+      },
+      window: {
+        mode: "floating" as const,
+        injections: {
+          css: true,
+          appFrame: false, // Shell doesn't need the app frame
+        },
+      },
+    };
+
+    const eveshellPath = path.join(__dirname, "../eveshell");
+    const windowBounds = this.mainWindow.getBounds();
+    const DOCK_HEIGHT = 80; // Should match CSS variable
+
+    // Initial bounds: dock mode at bottom
+    const initialBounds = {
+      x: 0,
+      y: windowBounds.height - DOCK_HEIGHT,
+      width: windowBounds.width,
+      height: DOCK_HEIGHT,
+    };
+
+    // Create overlay view
+    this.shellOverlayViewId = this.viewManager.createOverlayView(
+      "eden.shell-overlay",
+      shellManifest,
+      eveshellPath,
+      initialBounds
+    );
+
+    console.log(`Shell overlay created with viewId: ${this.shellOverlayViewId}`);
+  }
+
 
   /**
    * Handle all windows closed

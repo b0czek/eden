@@ -9,7 +9,7 @@
     "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:main && npm run build:shell && npm run copy-assets",
     "build:main": "tsc",
     "build:shell": "vite build",
-    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/ && cp src/eveshell/app-frame-inject.js dist/eveshell/",
+    "copy-assets": "cp src/eveshell/app-preload.js dist/eveshell/ && cp src/eveshell/app-frame-inject.js dist/eveshell/ && mkdir -p dist/foundation && cp src/foundation/* dist/foundation/",
     "css:build": "lightningcss --bundle --minify --targets '>= 0.25%' src/design-system/eden.css -o dist/design-system/eden.css",
     "tokens:build": "style-dictionary build --config style-dictionary.config.mjs",
     "tokens:watch": "style-dictionary build --watch --config style-dictionary.config.mjs",

@@ -290,7 +290,7 @@ export class AppManager extends EventEmitter {
         : null;
 
       // Create view for frontend
-      const viewId = this.viewManager.createView(
+      const viewId = this.viewManager.createAppView(
         appId,
         manifest,
         installPath,
@@ -553,12 +553,23 @@ export class AppManager extends EventEmitter {
     args: ShellCommandArgs<"update-view-bounds">
   ): Promise<any> {
     const { appId, bounds } = args;
+    
+    // Check if it's a regular app
     const instance = this.getAppInstance(appId);
-    if (!instance) {
-      throw new Error(`App ${appId} is not running`);
+    if (instance) {
+      const success = this.viewManager.setViewBounds(instance.viewId, bounds);
+      return { success };
     }
-    const success = this.viewManager.setViewBounds(instance.viewId, bounds);
-    return { success };
+    
+    // Check if it's a view (app or overlay) by appId
+    const viewIds = this.viewManager.getViewsByAppId(appId);
+    if (viewIds.length > 0) {
+      // Use the first view (typically there's only one per appId)
+      const success = this.viewManager.setViewBounds(viewIds[0], bounds);
+      return { success };
+    }
+    
+    throw new Error(`App or view ${appId} is not running`);
   }
 
   @CommandHandler("set-view-visibility")
@@ -595,6 +606,13 @@ export class AppManager extends EventEmitter {
   ): Promise<any> {
     const { bounds } = args;
     this.viewManager.setWorkspaceBounds(bounds);
+    
+    // Notify all views (especially overlays) about workspace bounds change
+    // Overlays can recalculate their desired position and send update-view-bounds
+    this.ipcBridge.systemBroadcast("workspace-bounds-changed", {
+      bounds,
+    });
+    
     return { success: true };
   }
 
@@ -778,6 +796,24 @@ export class AppManager extends EventEmitter {
     }
     return { success: true };
   }
+
+  @CommandHandler("get-window-size")
+  private async handleGetWindowSize(
+    args: ShellCommandArgs<"get-window-size">
+  ): Promise<any> {
+    // Get main window size from ipcBridge or eden instance
+    const mainWindow = this.ipcBridge.getMainWindow();
+    if (!mainWindow) {
+      throw new Error("Main window not available");
+    }
+
+    const windowBounds = mainWindow.getBounds();
+    return {
+      width: windowBounds.width,
+      height: windowBounds.height,
+    };
+  }
+
 
   /**
    * Shutdown all apps

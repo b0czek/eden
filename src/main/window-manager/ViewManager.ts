@@ -10,7 +10,7 @@ import * as fs from "fs/promises";
 import { AppManifest, TilingConfig, WindowConfig } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
-import { ViewInfo, ViewMode } from "./types";
+import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
 
 /**
  * ViewManager
@@ -22,6 +22,7 @@ export class ViewManager extends EventEmitter {
   private views: Map<number, ViewInfo> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private nextViewId = 1;
+  private nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
   private tilingConfig: TilingConfig;
   private floatingWindows: FloatingWindowController;
   private workspaceBounds: Bounds = {
@@ -320,25 +321,27 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Create a view for an app
+   * Create a view (internal method - use createAppView or createOverlayView instead)
    */
-  createView(
-    appId: string,
-    manifest: AppManifest,
-    installPath: string,
-    bounds: Bounds
-  ): number {
+  private createView(options: CreateViewOptions): number {
+    const {
+      appId,
+      manifest,
+      installPath,
+      preloadScript,
+      viewType,
+      viewMode,
+      viewBounds,
+      tileIndex,
+      zIndex,
+    } = options;
+
     if (!this.mainWindow) {
       throw new Error("Main window not set. Call setMainWindow first.");
     }
-
-    // Use universal preload that provides safe API
-    const universalPreload = path.join(
-      __dirname,
-      "../../eveshell/app-preload.js"
-    );
+    
     console.log(
-      `Creating view for ${appId} with universal preload: ${universalPreload}`
+      `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
     );
 
     const view = new WebContentsView({
@@ -346,7 +349,7 @@ export class ViewManager extends EventEmitter {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: universalPreload,
+        preload: preloadScript,
         transparent: true,
         backgroundThrottling: false,
         // Enable overlay scrollbars
@@ -357,31 +360,6 @@ export class ViewManager extends EventEmitter {
     const viewId = this.nextViewId++;
 
     const windowConfig = manifest.window;
-
-    // Determine view mode based on manifest
-    const viewMode = this.determineViewMode(manifest);
-
-    // Calculate bounds based on view mode
-    let viewBounds = bounds;
-    let tileIndex: number | undefined = undefined;
-    let zIndex: number | undefined = undefined;
-
-    if (viewMode === "floating") {
-      // Floating window - calculate bounds from manifest or use defaults
-      viewBounds = this.floatingWindows.calculateInitialBounds(windowConfig);
-      zIndex = this.floatingWindows.getNextZIndex();
-      console.log(
-        `Creating floating view for ${appId} with bounds:`,
-        viewBounds
-      );
-    } else if (viewMode === "tiled") {
-      // Tiled window - calculate tile position
-      if (this.tilingConfig.mode !== "none") {
-        tileIndex = this.getNextTileIndex();
-        viewBounds = this.calculateTileBounds(tileIndex);
-      }
-      console.log(`Creating tiled view for ${appId} with bounds:`, viewBounds);
-    }
 
     // Set bounds
     view.setBounds(viewBounds);
@@ -408,8 +386,8 @@ export class ViewManager extends EventEmitter {
         });
       }
 
-      // Inject the app frame script with window mode info and actual bounds (if enabled)
-      if (this.shouldInject("appFrame", windowConfig)) {
+      // Inject the app frame script (only for app views, not overlays)
+      if (viewType === "app" && this.shouldInject("appFrame", windowConfig)) {
         this.injectAppFrame(view, viewMode, windowConfig, viewBounds).catch(
           (err) => {
             console.error(`Failed to inject app frame for ${appId}:`, err);
@@ -420,13 +398,17 @@ export class ViewManager extends EventEmitter {
       // Inject the app API after page load (always enabled)
       this.injectAppAPI(view, appId);
 
-      this.emit("view-loaded", { viewId, appId });
+      this.emit("view-loaded", { 
+        viewId, 
+        appId, 
+        overlay: viewType === "overlay" 
+      });
     });
 
     view.webContents.on(
       "did-fail-load",
       (_event: any, errorCode: any, errorDescription: any) => {
-        console.error(`View load failed for app ${appId}:`, errorDescription);
+        console.error(`View load failed for ${appId}:`, errorDescription);
         this.emit("view-load-failed", {
           viewId,
           appId,
@@ -436,7 +418,7 @@ export class ViewManager extends EventEmitter {
       }
     );
 
-    // Store view info first (before adding to window)
+    // Store view info
     this.views.set(viewId, {
       view,
       appId,
@@ -444,6 +426,7 @@ export class ViewManager extends EventEmitter {
       bounds: viewBounds,
       visible: true,
       mode: viewMode,
+      viewType,
       tileIndex,
       zIndex,
     });
@@ -457,6 +440,99 @@ export class ViewManager extends EventEmitter {
     this.reorderViewLayers();
 
     return viewId;
+  }
+
+  /**
+   * Create a view for a regular app
+   * Uses sandboxed app-preload that provides limited, safe API
+   */
+  public createAppView(
+    appId: string,
+    manifest: AppManifest,
+    installPath: string,
+    bounds: Bounds
+  ): number {
+    const preloadScript = path.join(
+      __dirname,
+      "../../eveshell/app-preload.js"
+    );
+
+    const windowConfig = manifest.window;
+    
+    // Determine view mode based on manifest
+    const viewMode = this.determineViewMode(manifest);
+
+    // Calculate bounds based on view mode
+    let viewBounds = bounds;
+    let tileIndex: number | undefined = undefined;
+    let zIndex: number | undefined = undefined;
+
+    if (viewMode === "floating") {
+      // Floating window - calculate bounds from manifest or use defaults
+      viewBounds = this.floatingWindows.calculateInitialBounds(windowConfig);
+      zIndex = this.floatingWindows.getNextZIndex();
+      console.log(
+        `Creating floating app view for ${appId} with bounds:`,
+        viewBounds
+      );
+    } else if (viewMode === "tiled") {
+      // Tiled window - calculate tile position
+      if (this.tilingConfig.mode !== "none") {
+        tileIndex = this.getNextTileIndex();
+        viewBounds = this.calculateTileBounds(tileIndex);
+      }
+      console.log(`Creating tiled app view for ${appId} with bounds:`, viewBounds);
+    }
+
+    return this.createView({
+      appId,
+      manifest,
+      installPath,
+      preloadScript,
+      viewType: "app",
+      viewMode,
+      viewBounds,
+      tileIndex,
+      zIndex,
+    });
+  }
+
+  /**
+   * Create an overlay view (e.g., shell overlay)
+   * Uses eve-preload that provides full edenAPI access
+   * Overlays are always floating and use their own z-index counter
+   */
+  public createOverlayView(
+    appId: string,
+    manifest: AppManifest,
+    installPath: string,
+    bounds: Bounds
+  ): number {
+    const preloadScript = path.join(
+      __dirname,
+      "../../eveshell/eve-preload.js"
+    );
+
+    // Overlays are always floating mode
+    const viewMode: ViewMode = "floating";
+    
+    // Overlays use their own z-index counter and provided bounds
+    const zIndex = this.nextOverlayZIndex++;
+    const viewBounds = bounds;
+
+    console.log(`Creating overlay view for ${appId} at Z=${zIndex}`);
+
+    return this.createView({
+      appId,
+      manifest,
+      installPath,
+      preloadScript,
+      viewType: "overlay",
+      viewMode,
+      viewBounds,
+      tileIndex: undefined,
+      zIndex,
+    });
   }
 
   /**
@@ -477,11 +553,11 @@ export class ViewManager extends EventEmitter {
         }
       }
 
-      // Always remove from our tracking map
+      // Remove from tracking map
       this.views.delete(viewId);
 
-      // Recalculate tiles if using tiling
-      if (this.tilingConfig.mode !== "none") {
+      // Recalculate tiles if using tiling and this was an app view
+      if (viewInfo.viewType === "app" && this.tilingConfig.mode !== "none") {
         this.recalculateTiledViews();
       }
 
@@ -501,6 +577,18 @@ export class ViewManager extends EventEmitter {
     const viewInfo = this.views.get(viewId);
     if (!viewInfo) {
       return false;
+    }
+
+    // If this is an overlay view, set bounds directly without constraints
+    if (viewInfo.viewType === "overlay") {
+      try {
+        viewInfo.view.setBounds(bounds);
+        viewInfo.bounds = bounds;
+        return true;
+      } catch (error) {
+        console.error(`Failed to set bounds for overlay view ${viewId}:`, error);
+        return false;
+      }
     }
 
     // If this is a tiled view, ignore individual bounds updates
@@ -559,6 +647,13 @@ export class ViewManager extends EventEmitter {
       }
     }
     return viewIds;
+  }
+
+  /**
+   * Get all views (as entries for iteration)
+   */
+  getAllViews(): [number, ViewInfo][] {
+    return Array.from(this.views.entries());
   }
 
   /**
@@ -623,32 +718,47 @@ export class ViewManager extends EventEmitter {
 
   /**
    * Reorder all views to maintain proper layering:
-   * - Tiled views on bottom
-   * - Floating views on top, ordered by zIndex
+   * - Tiled app views on bottom
+   * - Floating app views in middle, ordered by zIndex
+   * - Overlay views on top, ordered by zIndex
    */
   private reorderViewLayers(): void {
     if (!this.mainWindow) return;
 
     try {
-      // Get all views sorted by layer
-      const tiledViews = Array.from(this.views.values())
+      // Get app views sorted by layer (tiled and floating)
+      const appViews = Array.from(this.views.values()).filter(
+        (v) => v.viewType === "app"
+      );
+
+      const tiledViews = appViews
         .filter((v) => v.mode === "tiled")
         .sort((a, b) => (a.tileIndex || 0) - (b.tileIndex || 0));
 
-      const floatingViews = this.floatingWindows.getOrderedFloatingViews();
+      const floatingAppViews = this.floatingWindows.getOrderedFloatingViews();
+
+      // Get overlay views sorted by zIndex
+      const overlayViews = Array.from(this.views.values())
+        .filter((v) => v.viewType === "overlay")
+        .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
       // Remove all views
       for (const info of this.views.values()) {
         this.mainWindow.contentView.removeChildView(info.view);
       }
 
-      // Add back in order: tiled first (bottom), then floating (top)
+      // Add back in order: tiled (bottom), floating apps (middle), overlays (top)
       for (const info of tiledViews) {
         this.mainWindow.contentView.addChildView(info.view);
         info.view.setBounds(info.bounds);
       }
 
-      for (const info of floatingViews) {
+      for (const info of floatingAppViews) {
+        this.mainWindow.contentView.addChildView(info.view);
+        info.view.setBounds(info.bounds);
+      }
+
+      for (const info of overlayViews) {
         this.mainWindow.contentView.addChildView(info.view);
         info.view.setBounds(info.bounds);
       }
