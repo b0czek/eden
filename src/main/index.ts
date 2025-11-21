@@ -7,4 +7,4 @@ export { WorkerManager } from "./core/WorkerManager";
 export { IPCBridge } from "./core/IPCBridge";
 
 // Window management exports
-export { ViewManager, LayoutCalculator, MouseTracker } from "./window-manager";
+export { ViewManager, LayoutCalculator, MouseTracker } from "./view-manager";
