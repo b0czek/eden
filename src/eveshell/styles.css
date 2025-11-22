@@ -55,6 +55,23 @@ body {
   overflow: visible;
 }
 
+/* One-time slide-in animation on initial load */
+.dock.dock-initial {
+  animation: dockSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes dockSlideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .dock::before {
   /* Frosted panel behind dock content */
   content: '';
