@@ -1,36 +1,53 @@
-import { ShellCommandType } from "../../types";
+import {
+  setManagerNamespace,
+  addCommandHandler,
+} from "./CommandRegistry";
 
 /**
- * Metadata storage for command handlers
+ * Class decorator to set the namespace for all command handlers in a manager
+ * @param namespace - The namespace for this manager (e.g., "app", "view")
+ * 
+ * @example
+ * ```typescript
+ * @CommandNamespace("app")
+ * class AppManager {
+ *   @CommandHandler("launch")
+ *   async handleLaunch(args: { appId: string }) {
+ *     // This becomes "app/launch"
+ *   }
+ * }
+ * ```
  */
-const COMMAND_HANDLERS = new Map<any, Map<ShellCommandType, string>>();
+export function CommandNamespace(namespace: string) {
+  return function <T extends { new (...args: any[]): {} }>(constructor: T) {
+    setManagerNamespace(constructor, namespace);
+    return constructor;
+  };
+}
 
 /**
- * Decorator to register a method as a command handler
+ * Method decorator to register a method as a command handler
+ * @param command - The command name (will be prefixed with the class namespace)
+ * 
+ * @example
+ * ```typescript
+ * @CommandNamespace("app")
+ * class AppManager {
+ *   @CommandHandler("launch")
+ *   async handleLaunch(args: { appId: string }) {
+ *     // Registered as "app/launch"
+ *   }
+ * }
+ * ```
  */
-export function CommandHandler(commandType: ShellCommandType) {
+export function CommandHandler(command: string) {
   return function (
     target: any,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
-    // Get or create handlers map for this class
-    if (!COMMAND_HANDLERS.has(target.constructor)) {
-      COMMAND_HANDLERS.set(target.constructor, new Map());
-    }
-
-    const handlers = COMMAND_HANDLERS.get(target.constructor)!;
-    handlers.set(commandType, propertyKey);
-
+    // Register this handler in metadata
+    addCommandHandler(target.constructor, command, propertyKey);
     return descriptor;
   };
-}
-
-/**
- * Get all registered command handlers for a class instance
- */
-export function getCommandHandlers(
-  instance: any
-): Map<ShellCommandType, string> {
-  return COMMAND_HANDLERS.get(instance.constructor) || new Map();
 }

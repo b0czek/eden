@@ -4,6 +4,7 @@ import { WorkerManager } from "./core/WorkerManager";
 import { ViewManager } from "./view-manager/ViewManager";
 import { IPCBridge } from "./core/IPCBridge";
 import { AppManager } from "./core/AppManager";
+import { CommandRegistry } from "./core/CommandRegistry";
 import { TilingConfig } from "../types";
 
 export interface EdenConfig {
@@ -25,6 +26,7 @@ export class Eden {
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
   private appManager: AppManager;
+  private commandRegistry: CommandRegistry;
   private appsDirectory: string;
   private config: EdenConfig;
 
@@ -42,13 +44,23 @@ export class Eden {
     // Initialize core managers
     this.workerManager = new WorkerManager();
     this.viewManager = new ViewManager(config.tiling);
-    this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager);
+    
+    // Create command registry
+    this.commandRegistry = new CommandRegistry();
+    
+    // Create IPC bridge with command registry
+    this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager, this.commandRegistry);
+    
+    // Create app manager
     this.appManager = new AppManager(
       this.workerManager,
       this.viewManager,
       this.ipcBridge,
       this.appsDirectory
     );
+    
+    // Register app manager's commands with the registry
+    this.commandRegistry.registerManager(this.appManager);
 
     this.setupAppEventHandlers();
   }

@@ -4,6 +4,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCMessage } from "../../types";
 import { randomUUID } from "crypto";
+import { CommandRegistry } from "./CommandRegistry";
 
 /**
  * IPCBridge
@@ -17,6 +18,7 @@ import { randomUUID } from "crypto";
 export class IPCBridge extends EventEmitter {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
+  private commandRegistry: CommandRegistry;
   private mainWindow: BrowserWindow | null = null;
   private runningAppIds: Set<string> = new Set();
   private pendingResponses: Map<
@@ -45,10 +47,11 @@ export class IPCBridge extends EventEmitter {
     }
   > = new Map();
 
-  constructor(workerManager: WorkerManager, viewManager: ViewManager) {
+  constructor(workerManager: WorkerManager, viewManager: ViewManager, commandRegistry: CommandRegistry) {
     super();
     this.workerManager = workerManager;
     this.viewManager = viewManager;
+    this.commandRegistry = commandRegistry;
 
     this.setupIPCHandlers();
     this.setupWorkerMessageHandlers();
@@ -382,17 +385,37 @@ export class IPCBridge extends EventEmitter {
   private async handleShellCommand(command: string, args: any): Promise<any> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
+    console.log(`[IPCBridge] Executing shell command: ${command}`, args);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) timed out after 10s`);
         this.pendingCommands.delete(commandId);
-        reject(new Error("Command timeout"));
+        reject(new Error(`Command '${command}' timed out`));
       }, 10000);
 
       this.pendingCommands.set(commandId, { resolve, reject, timeout });
 
-      // Emit command event
-      this.emit("shell-command", { command, args, commandId });
+      // Try to execute via CommandRegistry first (new system)
+      if (this.commandRegistry.has(command)) {
+        this.commandRegistry
+          .execute(command, args)
+          .then((result) => {
+            clearTimeout(timeout);
+            this.pendingCommands.delete(commandId);
+            resolve(result);
+          })
+          .catch((error) => {
+            console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`, error);
+            clearTimeout(timeout);
+            this.pendingCommands.delete(commandId);
+            reject(error);
+          });
+      } else {
+        // Fallback to old event-based system for backward compatibility
+        console.warn(`[IPCBridge] Command '${command}' not found in registry, emitting event`);
+        this.emit("shell-command", { command, args, commandId });
+      }
     });
   }
 

@@ -74,7 +74,7 @@ export default function AllApps(props: AllAppsProps) {
 		const running = props.runningApps;
 		for (const runningAppId of running) {
 			try {
-				await window.edenAPI.shellCommand("set-view-visibility", {
+				await window.edenAPI.shellCommand("app/set-view-visibility", {
 					appId: runningAppId,
 					visible: true,
 				});

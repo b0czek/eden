@@ -9,13 +9,11 @@ import { MouseTracker } from "../view-manager/MouseTracker";
 import {
   AppManifest,
   AppInstance,
-  ShellCommandType,
-  ShellCommandArgs,
   AppManagerEventType,
   AppManagerEventData,
 } from "../../types";
 import { randomUUID } from "crypto";
-import { CommandHandler, getCommandHandlers } from "./CommandDecorators";
+import { CommandHandler, CommandNamespace } from "./CommandDecorators";
 
 /**
  * AppManager
@@ -24,6 +22,7 @@ import { CommandHandler, getCommandHandlers } from "./CommandDecorators";
  * Handles app installation, loading, lifecycle, and coordination
  * between workers and views.
  */
+@CommandNamespace("app")
 export class AppManager extends EventEmitter {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
@@ -111,15 +110,6 @@ export class AppManager extends EventEmitter {
       this.handleAppExit(appId, code);
     });
 
-    // Handle shell commands from IPC
-    this.ipcBridge.on("shell-command", async ({ command, args, commandId }) => {
-      try {
-        const result = await this.handleShellCommand(command, args);
-        this.ipcBridge.respondToCommand(commandId, result);
-      } catch (error: any) {
-        this.ipcBridge.respondToCommand(commandId, null, error);
-      }
-    });
 
     // Register per-app channels when a view loads
     this.viewManager.on(
@@ -465,71 +455,48 @@ export class AppManager extends EventEmitter {
     }
   }
 
-  /**
-   * Handle shell commands using decorated handlers
-   */
-  private async handleShellCommand<T extends ShellCommandType>(
-    command: T,
-    args: ShellCommandArgs<T>
-  ): Promise<any> {
-    try {
-      const handlers = getCommandHandlers(this);
-      const handlerMethod = handlers.get(command);
-
-      if (handlerMethod && typeof (this as any)[handlerMethod] === "function") {
-        return await (this as any)[handlerMethod](args);
-      }
-
-      console.warn(`Unknown shell command: ${command}`);
-      return { error: "Unknown command" };
-    } catch (error) {
-      console.error(`Error handling shell command ${command}:`, error);
-      this.emitEvent("command-error", { command, error });
-      throw error;
-    }
-  }
 
   /**
    * Command Handlers (decorated)
    */
 
-  @CommandHandler("launch-app")
-  private async handleLaunchApp(
-    args: ShellCommandArgs<"launch-app">
+  @CommandHandler("launch")
+  async handleLaunchApp(
+    args: { appId: string; bounds?: { x: number; y: number; width: number; height: number } }
   ): Promise<any> {
     const { appId, bounds } = args;
     return await this.launchApp(appId, bounds);
   }
 
-  @CommandHandler("stop-app")
-  private async handleStopApp(
-    args: ShellCommandArgs<"stop-app">
+  @CommandHandler("stop")
+  async handleStopApp(
+    args: { appId: string }
   ): Promise<any> {
     const { appId } = args;
     await this.stopApp(appId);
     return { success: true };
   }
 
-  @CommandHandler("install-app")
-  private async handleInstallApp(
-    args: ShellCommandArgs<"install-app">
+  @CommandHandler("install")
+  async handleInstallApp(
+    args: { sourcePath: string }
   ): Promise<any> {
     const { sourcePath } = args;
     return await this.installApp(sourcePath);
   }
 
-  @CommandHandler("uninstall-app")
-  private async handleUninstallApp(
-    args: ShellCommandArgs<"uninstall-app">
+  @CommandHandler("uninstall")
+  async handleUninstallApp(
+    args: { appId: string }
   ): Promise<any> {
     const { appId } = args;
     await this.uninstallApp(appId);
     return { success: true };
   }
 
-  @CommandHandler("list-apps")
-  private async handleListApps(
-    args: ShellCommandArgs<"list-apps">
+  @CommandHandler("list")
+  async handleListApps(
+    args: Record<string, never>
   ): Promise<any> {
     // Serialize running apps to avoid cloning issues
     const runningApps = this.getRunningApps().map((instance) => ({
@@ -549,8 +516,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("update-view-bounds")
-  private async handleUpdateViewBounds(
-    args: ShellCommandArgs<"update-view-bounds">
+  async handleUpdateViewBounds(
+    args: { appId: string; bounds: { x: number; y: number; width: number; height: number } }
   ): Promise<any> {
     const { appId, bounds } = args;
     
@@ -573,8 +540,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("set-view-visibility")
-  private async handleSetViewVisibility(
-    args: ShellCommandArgs<"set-view-visibility">
+  async handleSetViewVisibility(
+    args: { appId: string; visible: boolean }
   ): Promise<any> {
     const { appId, visible } = args;
     const instance = this.getAppInstance(appId);
@@ -588,8 +555,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("focus-app")
-  private async handleFocusApp(
-    args: ShellCommandArgs<"focus-app">
+  async handleFocusApp(
+    args: { appId: string }
   ): Promise<any> {
     const { appId } = args;
     const instance = this.getAppInstance(appId);
@@ -601,8 +568,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("update-workspace-bounds")
-  private async handleUpdateWorkspaceBounds(
-    args: ShellCommandArgs<"update-workspace-bounds">
+  async handleUpdateWorkspaceBounds(
+    args: { bounds: { x: number; y: number; width: number; height: number } }
   ): Promise<any> {
     const { bounds } = args;
     this.viewManager.setWorkspaceBounds(bounds);
@@ -617,8 +584,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("toggle-view-mode")
-  private async handleToggleViewMode(
-    args: ShellCommandArgs<"toggle-view-mode">
+  async handleToggleViewMode(
+    args: { appId: string; mode?: "floating" | "tiled" }
   ): Promise<any> {
     const { appId, mode } = args;
     const instance = this.getAppInstance(appId);
@@ -630,8 +597,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("start-drag")
-  private async handleStartDrag(
-    args: ShellCommandArgs<"start-drag">
+  async handleStartDrag(
+    args: { appId: string; startX: number; startY: number }
   ): Promise<any> {
     const { appId, startX, startY } = args;
     const instance = this.getAppInstance(appId);
@@ -685,8 +652,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("end-drag")
-  private async handleEndDrag(
-    args: ShellCommandArgs<"end-drag">
+  async handleEndDrag(
+    args: { appId: string }
   ): Promise<any> {
     if (this.dragState) {
       this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
@@ -696,7 +663,7 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("global-mouseup")
-  private async handleGlobalMouseUp(): Promise<any> {
+  async handleGlobalMouseUp(): Promise<any> {
     // Cleanup any active drag or resize operations when mouse is released
     // This is called by the shell window which covers the entire screen
     if (this.dragState) {
@@ -713,8 +680,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("start-resize")
-  private async handleStartResize(
-    args: ShellCommandArgs<"start-resize">
+  async handleStartResize(
+    args: { appId: string; startX: number; startY: number }
   ): Promise<any> {
     const { appId, startX, startY } = args;
     const instance = this.getAppInstance(appId);
@@ -787,8 +754,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("end-resize")
-  private async handleEndResize(
-    args: ShellCommandArgs<"end-resize">
+  async handleEndResize(
+    args: { appId: string }
   ): Promise<any> {
     if (this.resizeState) {
       this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
@@ -798,8 +765,8 @@ export class AppManager extends EventEmitter {
   }
 
   @CommandHandler("get-window-size")
-  private async handleGetWindowSize(
-    args: ShellCommandArgs<"get-window-size">
+  async handleGetWindowSize(
+    args: Record<string, never>
   ): Promise<any> {
     // Get main window size from ipcBridge or eden instance
     const mainWindow = this.ipcBridge.getMainWindow();

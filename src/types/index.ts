@@ -225,6 +225,9 @@ export interface IPCMessage {
  * Shell Command Types
  *
  * Type-safe command definitions for shell operations
+ * 
+ * @deprecated Use CommandName, CommandArgs from "./commands" instead.
+ * These types are kept for backward compatibility during migration.
  */
 
 export interface ViewBounds {
@@ -234,6 +237,9 @@ export interface ViewBounds {
   height: number;
 }
 
+/**
+ * @deprecated Use CommandName from "./commands" instead
+ */
 export type ShellCommand =
   | {
       command: "launch-app";
@@ -334,11 +340,22 @@ export type ShellCommand =
       args: Record<string, never>;
     };
 
+/**
+ * @deprecated Use CommandName from "./commands" instead
+ */
 export type ShellCommandType = ShellCommand["command"];
+
+/**
+ * @deprecated Use CommandArgs from "./commands" instead
+ */
 export type ShellCommandArgs<T extends ShellCommandType> = Extract<
   ShellCommand,
   { command: T }
 >["args"];
+
+// Export new command types
+export type { CommandName, CommandArgs, CommandResult, CommandMap } from "./commands";
+
 
 /**
  * AppManager Event Types

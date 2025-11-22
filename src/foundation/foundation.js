@@ -26,7 +26,7 @@
 
         // Send to backend via eden API (provided by preload)
         if (window.edenAPI && window.edenAPI.shellCommand) {
-            window.edenAPI.shellCommand('update-workspace-bounds', { bounds })
+            window.edenAPI.shellCommand('app/update-workspace-bounds', { bounds })
                 .catch((error) => {
                     console.error('Failed to update workspace bounds:', error);
                 });
@@ -39,7 +39,7 @@
      */
     function handleGlobalMouseUp() {
         if (window.edenAPI && window.edenAPI.shellCommand) {
-            window.edenAPI.shellCommand('global-mouseup', {})
+            window.edenAPI.shellCommand('app/global-mouseup', {})
                 .catch((error) => {
                     console.error('Failed to send global-mouseup:', error);
                 });

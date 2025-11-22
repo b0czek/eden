@@ -64,7 +64,7 @@ export default function ShellOverlay() {
       setRunningApps(new Set<string>(info.runningApps || []));
 
       // Get list of installed apps
-      const appsData = await window.edenAPI.shellCommand("list-apps", {});
+      const appsData = await window.edenAPI.shellCommand("app/list", {});
 
       // AppManager returns { installed: AppManifest[], running: [...] }
       if (appsData) {
@@ -84,7 +84,7 @@ export default function ShellOverlay() {
   const requestResize = async (mode: "dock" | "fullscreen") => {
     try {
       // Get current window bounds
-      const windowSize = await window.edenAPI.shellCommand("get-window-size", {});
+      const windowSize = await window.edenAPI.shellCommand("app/get-window-size", {});
       console.log(windowSize);
       const bounds =
         mode === "fullscreen"
@@ -97,7 +97,7 @@ export default function ShellOverlay() {
             };
 
       // Use standard update-view-bounds API with appId
-      await window.edenAPI.shellCommand("update-view-bounds", {
+      await window.edenAPI.shellCommand("app/update-view-bounds", {
         appId: "eden.shell-overlay",
         bounds,
       });
@@ -112,14 +112,14 @@ export default function ShellOverlay() {
     if (running.has(appId)) {
       // App is running, focus/show it
       try {
-        await window.edenAPI.shellCommand("focus-app", { appId });
+        await window.edenAPI.shellCommand("app/focus-app", { appId });
       } catch (error) {
         console.error("Failed to focus app:", error);
       }
     } else {
       // App is not running, launch it
       try {
-        await window.edenAPI.shellCommand("launch-app", { appId });
+        await window.edenAPI.shellCommand("app/launch", { appId });
         // Add a small delay before refreshing to let the app start
         setTimeout(() => {
           loadSystemInfo();
@@ -137,19 +137,6 @@ export default function ShellOverlay() {
     // Resize overlay
     await requestResize(next ? "fullscreen" : "dock");
 
-    // Show/hide running apps when toggling the apps view
-    const running = runningApps();
-    for (const appId of running) {
-      try {
-        await window.edenAPI.shellCommand("set-view-visibility", {
-          appId,
-          visible: !next, // visible when apps view is hidden
-        });
-      } catch (error) {
-        console.error(`Failed to set visibility for ${appId}:`, error);
-      }
-    }
-
     // Refresh installed apps when opening the apps view
     if (next) {
       loadSystemInfo();
@@ -164,7 +151,7 @@ export default function ShellOverlay() {
       });
 
       if (filePath) {
-        await window.edenAPI.shellCommand("install-app", {
+        await window.edenAPI.shellCommand("app/install", {
           sourcePath: filePath,
         });
         // Refresh app list
@@ -177,7 +164,7 @@ export default function ShellOverlay() {
 
   const handleStopApp = async (appId: string) => {
     try {
-      await window.edenAPI.shellCommand("stop-app", { appId });
+      await window.edenAPI.shellCommand("app/stop", { appId });
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -191,7 +178,7 @@ export default function ShellOverlay() {
     try {
       // Confirm before uninstalling
       if (confirm(`Are you sure you want to uninstall this app?`)) {
-        await window.edenAPI.shellCommand("uninstall-app", { appId });
+        await window.edenAPI.shellCommand("app/uninstall", { appId });
         // Refresh app list
         await loadSystemInfo();
       }
@@ -227,7 +214,7 @@ export default function ShellOverlay() {
               };
 
         // Send update to reposition ourselves
-        window.edenAPI.shellCommand("update-view-bounds", {
+        window.edenAPI.shellCommand("app/update-view-bounds", {
           appId: "eden.shell-overlay",
           bounds: newBounds,
         }).catch((error) => {
