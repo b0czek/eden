@@ -6,14 +6,14 @@
  */
 
 export default {
-  source: ['src/design-system/tokens.json'],
-  
+  source: ['tokens.json'],
+
   platforms: {
     // Generate CSS custom properties
     css: {
       transformGroup: 'css',
       prefix: 'eden',
-      buildPath: 'src/design-system/',
+      buildPath: './',
       files: [
         {
           destination: 'tokens.css',
@@ -36,12 +36,12 @@ export default {
         },
       ],
     },
-    
+
     // Generate TypeScript/JavaScript module
     js: {
       transformGroup: 'js',
       prefix: 'eden',
-      buildPath: 'src/design-system/',
+      buildPath: './',
       files: [
         {
           destination: 'tokens.ts',
