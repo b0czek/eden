@@ -114,8 +114,10 @@ contextBridge.exposeInMainWorld('edenAPI', {
    * @returns {Promise} Command result
    */
   shellCommand: (command: string, args: any) => {
+    console.log('Executing shell command:', command, args);
     return ipcRenderer.invoke('shell-command', command, args);
   }
 });
 
 console.log('Universal app preload loaded');
+  

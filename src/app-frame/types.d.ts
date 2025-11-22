@@ -1,4 +1,4 @@
-export {};
+import { CommandName, CommandArgs, CommandResult } from '../types/commands';
 
 declare global {
   interface Window {
@@ -13,7 +13,7 @@ declare global {
     
     // Shell command API (set by app-preload.ts)
     edenAPI?: {
-      shellCommand: (command: string, args: any) => Promise<any>;
+      shellCommand: <T extends CommandName>(command: T, args: CommandArgs<T>) => Promise<CommandResult<T>>;
     };
     
     // Eden Frame API and internal state (set by frame-injector.ts)

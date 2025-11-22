@@ -9,12 +9,10 @@ import { getScreenCoords } from './utils';
 /**
  * Setup window dragging for floating windows
  * @param overlay - The title bar overlay element
- * @param appId - The app ID
  * @param currentBoundsRef - Reference object containing current bounds
  */
 export function setupWindowDragging(
     overlay: HTMLElement,
-    appId: string | null,
     currentBoundsRef: { current: { x: number; y: number; width: number; height: number; } | null }
 ): void {
     let isDragging = false;
@@ -27,6 +25,7 @@ export function setupWindowDragging(
 
     // Animation frame update function - throttles IPC to 60fps
     const updatePosition = () => {
+        const appId = window.appAPI?.getAppId();
         if (pendingBounds && window.edenAPI && appId) {
             window.edenAPI.shellCommand('app/update-view-bounds', {
                 appId,
@@ -80,6 +79,8 @@ export function setupWindowDragging(
         if (isTouch) {
             rafId = requestAnimationFrame(updatePosition);
         }
+
+        const appId = window.appAPI?.getAppId();
 
         // Bring window to front - but ONLY for mouse events
         // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
@@ -148,6 +149,8 @@ export function setupWindowDragging(
 
         // Remove mouseup listener since drag is done
         window.removeEventListener('mouseup', endDrag);
+
+        const appId = window.appAPI?.getAppId();
 
         // Cancel animation frame and send final position
         if (rafId) {

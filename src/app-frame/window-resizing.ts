@@ -20,9 +20,11 @@ interface BoundsRef {
 /**
  * Setup window resizing for floating windows
  */
+/**
+ * Setup window resizing for floating windows
+ */
 export function setupWindowResizing(
     windowConfig: NonNullable<Window['edenFrame']>['_internal']['config'],
-    appId: string | null,
     currentBoundsRef: BoundsRef
 ): void {
     // Create resize handle in bottom-right corner
@@ -52,6 +54,7 @@ export function setupWindowResizing(
 
     // Animation frame update function - throttles IPC to 60fps
     const updateResizePosition = () => {
+        const appId = window.appAPI?.getAppId();
         if (pendingBounds && window.edenAPI && appId) {
             window.edenAPI.shellCommand('app/update-view-bounds', {
                 appId,
@@ -99,6 +102,8 @@ export function setupWindowResizing(
         if (isTouch) {
             rafId = requestAnimationFrame(updateResizePosition);
         }
+
+        const appId = window.appAPI?.getAppId();
 
         // Bring window to front - but ONLY for mouse events
         // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
@@ -185,6 +190,8 @@ export function setupWindowResizing(
 
         // Remove mouseup listener since resize is done
         window.removeEventListener('mouseup', endResize);
+
+        const appId = window.appAPI?.getAppId();
 
         // Cancel animation frame and send final position
         if (rafId) {

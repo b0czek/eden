@@ -58,9 +58,9 @@ import { setupWindowResizing } from './window-resizing.js';
         });
 
         // Setup button handlers
-        setupCloseButton(appId);
-        setupMinimizeButton(appId);
-        setupToggleModeButton(appId);
+        setupCloseButton();
+        setupMinimizeButton();
+        setupToggleModeButton();
 
         // Setup floating window controls
         setupFloatingWindowControls();
@@ -126,12 +126,12 @@ import { setupWindowResizing } from './window-resizing.js';
 
         // Setup window dragging
         if (isMovable) {
-            setupWindowDragging(overlay, appId, currentBoundsRef);
+            setupWindowDragging(overlay, currentBoundsRef);
         }
 
         // Setup window resizing
         if (isResizable) {
-            setupWindowResizing(windowConfig, appId, currentBoundsRef);
+            setupWindowResizing(windowConfig, currentBoundsRef);
         }
     };
 

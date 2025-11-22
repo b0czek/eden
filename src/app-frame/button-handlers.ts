@@ -6,18 +6,21 @@
 
 /**
  * Setup close button handler
- * @param appId - The app ID
  */
-export function setupCloseButton(appId: string | null): void {
+export function setupCloseButton(): void {
     const closeBtn = document.getElementById('eden-close-btn');
     if (!closeBtn) return;
 
     closeBtn.addEventListener('click', () => {
         // Wait for edenAPI to be available
         const stopApp = () => {
+            const appId = window.appAPI?.getAppId();
+            console.log('[Eden Frame] Stopping app:', appId);
+            
             if (window.edenAPI && appId) {
                 window.edenAPI.shellCommand('app/stop', { appId }).catch(console.error);
             } else {
+                // Retry if API or appId not yet available
                 setTimeout(stopApp, 100);
             }
         };
@@ -27,14 +30,15 @@ export function setupCloseButton(appId: string | null): void {
 
 /**
  * Setup minimize button handler
- * @param appId - The app ID
  */
-export function setupMinimizeButton(appId: string | null): void {
+export function setupMinimizeButton(): void {
     const minBtn = document.getElementById('eden-minimize-btn');
     if (!minBtn) return;
 
     minBtn.addEventListener('click', () => {
         const minimize = () => {
+            const appId = window.appAPI?.getAppId();
+            
             if (window.edenAPI && appId) {
                 window.edenAPI.shellCommand('app/set-view-visibility', {
                     appId,
@@ -50,14 +54,15 @@ export function setupMinimizeButton(appId: string | null): void {
 
 /**
  * Setup toggle mode button handler (for apps that support both tiled and floating)
- * @param appId - The app ID
  */
-export function setupToggleModeButton(appId: string | null): void {
+export function setupToggleModeButton(): void {
     const toggleBtn = document.getElementById('eden-toggle-mode-btn');
     if (!toggleBtn) return;
 
     toggleBtn.addEventListener('click', () => {
         const toggleMode = () => {
+            const appId = window.appAPI?.getAppId();
+            
             if (window.edenAPI && appId) {
                 window.edenAPI.shellCommand('app/toggle-view-mode', {
                     appId
