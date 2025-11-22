@@ -9,16 +9,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Per-app channel names (received from main process)
-let appId = null;
-let appChannel = null;
-let appRequestChannel = null;
-const messageListeners = [];
+let appId: string | null = null;
+let appChannel: string | null = null;
+let appRequestChannel: string | null = null;
+const messageListeners: Array<(message: any) => void> = [];
 
 // Bounds update listeners (for keeping renderer in sync)
-const boundsListeners = [];
+const boundsListeners: Array<(bounds: any) => void> = [];
 
 // Wait for initialization from main process
-ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }) => {
+ipcRenderer.once('init-app-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
   appId = id;
   appChannel = channel;
   appRequestChannel = requestChannel;
@@ -26,7 +26,7 @@ ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }
   console.log(`App API initialized for ${appId} on channel ${channel}`);
   
   // Set up listener for incoming messages from backend
-  ipcRenderer.on(appChannel, (_event, message) => {
+  ipcRenderer.on(appChannel, (_event: any, message: any) => {
     // Notify all registered listeners
     messageListeners.forEach(callback => {
       try {
@@ -39,7 +39,7 @@ ipcRenderer.once('init-app-api', (_event, { appId: id, channel, requestChannel }
 });
 
 // Listen for bounds updates from main process
-ipcRenderer.on('bounds-updated', (_event, newBounds) => {
+ipcRenderer.on('bounds-updated', (_event: any, newBounds: any) => {
   boundsListeners.forEach(callback => {
     try {
       callback(newBounds);
@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld('appAPI', {
    * Send a message to this app's backend
    * @param {object} message - Message to send to backend
    */
-  sendMessage: (message) => {
+  sendMessage: (message: any) => {
     if (!appChannel) {
       throw new Error('App API not yet initialized');
     }
@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('appAPI', {
    * @param {object} message - Message to send to backend
    * @returns {Promise} Response from backend
    */
-  sendRequest: async (message) => {
+  sendRequest: async (message: any) => {
     if (!appRequestChannel) {
       throw new Error('App API not yet initialized');
     }
@@ -78,7 +78,7 @@ contextBridge.exposeInMainWorld('appAPI', {
    * Listen for messages from this app's backend
    * @param {function} callback - Called when backend sends a message
    */
-  onMessage: (callback) => {
+  onMessage: (callback: (message: any) => void) => {
     if (typeof callback !== 'function') {
       throw new Error('Callback must be a function');
     }
@@ -97,7 +97,7 @@ contextBridge.exposeInMainWorld('appAPI', {
    * Listen for bounds updates from the main process
    * @param {function} callback - Called when bounds are updated
    */
-  onBoundsUpdated: (callback) => {
+  onBoundsUpdated: (callback: (bounds: any) => void) => {
     if (typeof callback !== 'function') {
       throw new Error('Callback must be a function');
     }
@@ -113,7 +113,7 @@ contextBridge.exposeInMainWorld('edenAPI', {
    * @param {object} args - Command arguments
    * @returns {Promise} Command result
    */
-  shellCommand: (command, args) => {
+  shellCommand: (command: string, args: any) => {
     return ipcRenderer.invoke('shell-command', command, args);
   }
 });

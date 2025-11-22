@@ -6,7 +6,7 @@ import {
 } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
-import * as fs from "fs/promises";
+import { cachedFileReader } from "../utils/cachedFileReader";
 import { AppManifest, TilingConfig, WindowConfig } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
@@ -31,10 +31,6 @@ export class ViewManager extends EventEmitter {
     width: 800,
     height: 600,
   };
-
-  // Static cache for design system CSS (loaded once, reused for all views)
-  private static designSystemCSSCache: string | null = null;
-  private static designSystemCSSPath: string | null = null;
 
   constructor(tilingConfig?: TilingConfig) {
     super();
@@ -231,53 +227,18 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Clear the cached design system CSS
-   * Useful for development or when CSS is updated
-   */
-  public static clearDesignSystemCache(): void {
-    ViewManager.designSystemCSSCache = null;
-    console.log("Design system CSS cache cleared");
-  }
-
-  /**
    * Inject Eden Design System CSS into the view
    * Makes design tokens and utilities available to all apps
-   *
-   * Uses a static cache to avoid reading the CSS file multiple times.
-   * The CSS is loaded once on first injection, then reused for all subsequent views.
    */
   private async injectDesignSystemCSS(view: WebContentsView): Promise<void> {
     try {
-      // Initialize cache path if not set
-      if (!ViewManager.designSystemCSSPath) {
-        const designSystemPath = path.join(__dirname, "../../design-system");
-        ViewManager.designSystemCSSPath = path.join(
-          designSystemPath,
-          "eden.css"
-        );
-      }
+      const designSystemPath = path.join(__dirname, "../../design-system");
+      const cssPath = path.join(designSystemPath, "eden.css");
+      
+      const css = await cachedFileReader.readAsync(cssPath, "utf-8");
+      await view.webContents.insertCSS(css);
 
-      // Load CSS from cache or read from disk on first call
-      if (!ViewManager.designSystemCSSCache) {
-        console.log("Loading Eden Design System CSS from disk...");
-        ViewManager.designSystemCSSCache = await fs.readFile(
-          ViewManager.designSystemCSSPath,
-          "utf-8"
-        );
-        const sizeKB = (ViewManager.designSystemCSSCache.length / 1024).toFixed(
-          2
-        );
-        console.log(
-          `✓ Loaded Eden CSS: ${sizeKB} KB (cached for future views)`
-        );
-      }
-
-      // Inject the CSS
-      await view.webContents.insertCSS(ViewManager.designSystemCSSCache);
-
-      console.log(
-        "Successfully injected Eden Design System CSS into view (from cache)"
-      );
+      console.log("Successfully injected Eden Design System CSS into view");
     } catch (err) {
       console.error("Failed to inject design system CSS:", err);
       // Don't throw - app should still work without design system
@@ -295,19 +256,33 @@ export class ViewManager extends EventEmitter {
     bounds?: Bounds
   ): Promise<void> {
     try {
+      // Inject CSS first
+      const frameCSSPath = path.join(
+        __dirname,
+        "../../app-frame/frame.css"
+      );
+      const frameCSS = await cachedFileReader.readAsync(frameCSSPath, "utf-8");
+      await view.webContents.insertCSS(frameCSS);
+
+      // Inject bundled JavaScript
       const frameScriptPath = path.join(
         __dirname,
-        "../../eveshell/app-frame-inject.js"
+        "../../app-frame/frame-injector.js"
       );
-      const frameScript = await fs.readFile(frameScriptPath, "utf-8");
+      const frameScript = await cachedFileReader.readAsync(frameScriptPath, "utf-8");
 
-      // Inject the frame script with window mode, config, and initial bounds
+      // Inject the frame script with window config and initial state
       await view.webContents.executeJavaScript(`
-                window.__edenWindowMode = "${viewMode}";
-                window.__edenWindowConfig = ${JSON.stringify(
-                  windowConfig || {}
-                )};
-                window.__edenInitialBounds = ${JSON.stringify(bounds || {})};
+                // Initialize edenFrame structure before loading frame script
+                window.edenFrame = {
+                  setTitle: (title) => {}, // Will be overwritten by frame-injector
+                  _internal: {
+                    injected: false,
+                    config: ${JSON.stringify(windowConfig || {})},
+                    currentMode: "${viewMode}",
+                    bounds: ${JSON.stringify(bounds || { x: 0, y: 0, width: 0, height: 0 })}
+                  }
+                };
                 ${frameScript}
             `);
       console.log(
@@ -454,7 +429,7 @@ export class ViewManager extends EventEmitter {
   ): number {
     const preloadScript = path.join(
       __dirname,
-      "../../eveshell/app-preload.js"
+      "../../app-frame/app-preload.js"
     );
 
     const windowConfig = manifest.window;
