@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, dialog } from "electron";
 import { EventEmitter } from "events";
-import { WorkerManager } from "./WorkerManager";
+import { WorkerManager } from "../process-manager/WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCMessage } from "../../types";
 import { randomUUID } from "crypto";

@@ -1,11 +1,17 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { WorkerManager } from "./core/WorkerManager";
+import { WorkerManager } from "./process-manager/WorkerManager";
 import { ViewManager } from "./view-manager/ViewManager";
 import { IPCBridge } from "./core/IPCBridge";
-import { AppManager } from "./core/AppManager";
 import { CommandRegistry } from "./core/CommandRegistry";
 import { TilingConfig } from "../types";
+
+// New Managers and Handlers
+import { PackageManager } from "./package-manager/PackageManager";
+import { PackageHandler } from "./package-manager/PackageHandler";
+import { ProcessManager } from "./process-manager/ProcessManager";
+import { ProcessHandler } from "./process-manager/ProcessHandler";
+import { ViewHandler } from "./view-manager/ViewHandler";
 
 export interface EdenConfig {
   appsDirectory?: string;
@@ -25,10 +31,16 @@ export class Eden {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
-  private appManager: AppManager;
   private commandRegistry: CommandRegistry;
   private appsDirectory: string;
   private config: EdenConfig;
+
+  // New components
+  private packageManager: PackageManager;
+  private processManager: ProcessManager;
+  private packageHandler: PackageHandler;
+  private processHandler: ProcessHandler;
+  private viewHandler: ViewHandler;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -51,16 +63,27 @@ export class Eden {
     // Create IPC bridge with command registry
     this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager, this.commandRegistry);
     
-    // Create app manager
-    this.appManager = new AppManager(
+    // Initialize Package Manager
+    this.packageManager = new PackageManager(this.ipcBridge, this.appsDirectory);
+    this.packageHandler = new PackageHandler(this.packageManager);
+
+    // Initialize Process Manager
+    this.processManager = new ProcessManager(
       this.workerManager,
       this.viewManager,
       this.ipcBridge,
+      this.packageManager,
       this.appsDirectory
     );
-    
-    // Register app manager's commands with the registry
-    this.commandRegistry.registerManager(this.appManager);
+    this.processHandler = new ProcessHandler(this.processManager);
+
+    // Initialize View Handler
+    this.viewHandler = new ViewHandler(this.viewManager, this.ipcBridge);
+
+    // Register handlers with the registry
+    this.commandRegistry.registerManager(this.packageHandler);
+    this.commandRegistry.registerManager(this.processHandler);
+    this.commandRegistry.registerManager(this.viewHandler);
 
     this.setupAppEventHandlers();
   }
@@ -81,8 +104,8 @@ export class Eden {
   private async onReady(): Promise<void> {
     console.log("Eden starting...");
 
-    // Initialize app manager
-    await this.appManager.initialize();
+    // Initialize package manager
+    await this.packageManager.initialize();
 
     // Create main window
     this.createMainWindow();
@@ -219,7 +242,7 @@ export class Eden {
 
     try {
       // Shutdown all apps and wait for them to stop
-      await this.appManager.shutdown();
+      await this.processManager.shutdown();
 
       // Brief delay to ensure all cleanup completes
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -241,10 +264,17 @@ export class Eden {
   }
 
   /**
-   * Get the app manager instance
+   * Get the package manager instance
    */
-  public getAppManager(): AppManager {
-    return this.appManager;
+  public getPackageManager(): PackageManager {
+    return this.packageManager;
+  }
+
+  /**
+   * Get the process manager instance
+   */
+  public getProcessManager(): ProcessManager {
+    return this.processManager;
   }
 
   /**
