@@ -1,17 +1,13 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { WorkerManager } from "./process-manager/WorkerManager";
-import { ViewManager } from "./view-manager/ViewManager";
 import { IPCBridge } from "./core/IPCBridge";
 import { CommandRegistry } from "./core/CommandRegistry";
 import { TilingConfig } from "../types";
 
-// New Managers and Handlers
-import { PackageManager } from "./package-manager/PackageManager";
-import { PackageHandler } from "./package-manager/PackageHandler";
-import { ProcessManager } from "./process-manager/ProcessManager";
-import { ProcessHandler } from "./process-manager/ProcessHandler";
-import { ViewHandler } from "./view-manager/ViewHandler";
+// Managers and Handlers
+import { PackageManager, PackageHandler } from "./package-manager";
+import { ProcessManager, ProcessHandler, WorkerManager } from "./process-manager";
+import { ViewManager, ViewHandler } from "./view-manager";
 
 export interface EdenConfig {
   appsDirectory?: string;
