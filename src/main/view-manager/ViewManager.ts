@@ -217,7 +217,7 @@ export class ViewManager extends EventEmitter {
     const channel = `app-${appId}`;
     const requestChannel = `app-${appId}-request`;
 
-    view.webContents.send("init-app-api", {
+    view.webContents.send("app/init-api", {
       appId,
       channel,
       requestChannel,

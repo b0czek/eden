@@ -94,7 +94,7 @@ export class ViewHandler {
     
     // Notify all views (especially overlays) about workspace bounds change
     // Overlays can recalculate their desired position and send update-view-bounds
-    this.ipcBridge.systemBroadcast("workspace-bounds-changed", {
+    this.ipcBridge.systemBroadcast("app/workspace-bounds-changed", {
       bounds,
     });
     
@@ -175,7 +175,7 @@ export class ViewHandler {
       // Notify renderer of bounds update so it stays in sync
       const view = this.viewManager.getView(viewId);
       if (view) {
-        view.webContents.send("bounds-updated", newBounds);
+        view.webContents.send("app/bounds-updated", newBounds);
       }
     });
 
@@ -270,7 +270,7 @@ export class ViewHandler {
       // Notify renderer of bounds update so it stays in sync
       const view = this.viewManager.getView(viewId);
       if (view) {
-        view.webContents.send("bounds-updated", newBounds);
+        view.webContents.send("app/bounds-updated", newBounds);
       }
     });
 

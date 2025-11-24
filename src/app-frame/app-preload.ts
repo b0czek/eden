@@ -18,7 +18,7 @@ const messageListeners: Array<(message: any) => void> = [];
 const boundsListeners: Array<(bounds: any) => void> = [];
 
 // Wait for initialization from main process
-ipcRenderer.once('init-app-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
+ipcRenderer.once('app/init-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
   appId = id;
   appChannel = channel;
   appRequestChannel = requestChannel;
@@ -39,7 +39,7 @@ ipcRenderer.once('init-app-api', (_event: any, { appId: id, channel, requestChan
 });
 
 // Listen for bounds updates from main process
-ipcRenderer.on('bounds-updated', (_event: any, newBounds: any) => {
+ipcRenderer.on('app/bounds-updated', (_event: any, newBounds: any) => {
   boundsListeners.forEach(callback => {
     try {
       callback(newBounds);

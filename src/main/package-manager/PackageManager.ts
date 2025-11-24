@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
-import { AppManifest, AppManagerEventType, AppManagerEventData } from "../../types";
+import { AppManifest, EventName, EventData } from "../../types";
 import { IPCBridge } from "../core/IPCBridge";
 
 /**
@@ -24,9 +24,9 @@ export class PackageManager extends EventEmitter {
   /**
    * Type-safe event emitter
    */
-  private emitEvent<T extends AppManagerEventType>(
+  private emitEvent<T extends EventName>(
     event: T,
-    data: AppManagerEventData<T>
+    data: EventData<T>
   ): boolean {
     return this.emit(event, data);
   }
@@ -130,7 +130,7 @@ export class PackageManager extends EventEmitter {
     // Register app
     this.installedApps.set(manifest.id, manifest);
 
-    this.emitEvent("app-installed", { manifest });
+    this.emitEvent("package/installed", { manifest });
     this.ipcBridge.systemBroadcast("app-installed", { manifest });
 
     return manifest;
@@ -159,7 +159,7 @@ export class PackageManager extends EventEmitter {
     // Unregister
     this.installedApps.delete(appId);
 
-    this.emitEvent("app-uninstalled", { appId });
+    this.emitEvent("package/uninstalled", { appId });
     this.ipcBridge.systemBroadcast("app-uninstalled", { appId });
     
     return true;

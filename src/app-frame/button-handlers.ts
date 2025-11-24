@@ -18,7 +18,7 @@ export function setupCloseButton(): void {
             console.log('[Eden Frame] Stopping app:', appId);
             
             if (window.edenAPI && appId) {
-                window.edenAPI.shellCommand('app/stop', { appId }).catch(console.error);
+                window.edenAPI.shellCommand('process/stop', { appId }).catch(console.error);
             } else {
                 // Retry if API or appId not yet available
                 setTimeout(stopApp, 100);

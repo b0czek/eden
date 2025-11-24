@@ -5,7 +5,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../core/IPCBridge";
 import { PackageManager } from "../package-manager/PackageManager";
-import { AppInstance, AppManagerEventType, AppManagerEventData, AppManifest } from "../../types";
+import { AppInstance, EventName, EventData, AppManifest } from "../../types";
 
 /**
  * ProcessManager
@@ -41,9 +41,9 @@ export class ProcessManager extends EventEmitter {
   /**
    * Type-safe event emitter
    */
-  private emitEvent<T extends AppManagerEventType>(
+  private emitEvent<T extends EventName>(
     event: T,
-    data: AppManagerEventData<T>
+    data: EventData<T>
   ): boolean {
     return this.emit(event, data);
   }
@@ -78,7 +78,7 @@ export class ProcessManager extends EventEmitter {
         if (viewInfo) {
           const channel = `app-${appId}`;
           const requestChannel = `app-${appId}-request`;
-          viewInfo.view.webContents.send("set-app-channel", {
+          viewInfo.view.webContents.send("app/set-channel", {
             channel,
             requestChannel,
           });
@@ -140,8 +140,8 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.set(appId, instance);
       this.syncRunningAppsState();
 
-      this.emitEvent("app-launched", { instance });
-      this.ipcBridge.systemBroadcast("app-launched", {
+      this.emitEvent("process/launched", { instance });
+      this.ipcBridge.systemBroadcast("app/launched", {
         appId,
         instanceId,
       });
@@ -183,11 +183,11 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.emitEvent("app-stopped", { appId });
+      this.emitEvent("process/stopped", { appId });
 
       // Only broadcast if not shutting down
       if (!this.isShuttingDown) {
-        this.ipcBridge.systemBroadcast("app-stopped", { appId });
+        this.ipcBridge.systemBroadcast("app/stopped", { appId });
       }
     } catch (error) {
       console.error(`Failed to stop app ${appId}:`, error);
@@ -223,7 +223,7 @@ export class ProcessManager extends EventEmitter {
     const instance = this.runningApps.get(appId);
     if (instance) {
       instance.state = "error";
-      this.emitEvent("app-error", { appId, error });
+      this.emitEvent("process/error", { appId, error });
     }
   }
 
@@ -242,7 +242,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.emitEvent("app-exited", { appId, code });
+      this.emitEvent("process/exited", { appId, code });
     }
   }
 

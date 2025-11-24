@@ -176,8 +176,6 @@ function generateInterfaceCode(namespaceCommands: NamespaceCommands[]): string {
   lines.push(" * Run 'npm run codegen' to regenerate.");
   lines.push(" */");
   lines.push("");
-  lines.push("import { ViewBounds } from \"./index\";");
-  lines.push("");
 
   // Generate interface for each namespace
   namespaceCommands.forEach((ns, index) => {
@@ -196,6 +194,19 @@ function generateInterfaceCode(namespaceCommands: NamespaceCommands[]): string {
       lines.push("");
     }
   });
+
+  // Generate CommandMap
+  lines.push("");
+  lines.push("/**");
+  lines.push(" * Global command map - merge all command namespaces");
+  lines.push(" */");
+  
+  if (namespaceCommands.length > 0) {
+    const allInterfaces = namespaceCommands.map(ns => ns.interfaceName).join(", ");
+    lines.push(`export interface CommandMap extends ${allInterfaces} {}`);
+  } else {
+    lines.push("export interface CommandMap {}");
+  }
 
   return lines.join("\n") + "\n";
 }

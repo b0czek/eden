@@ -64,7 +64,7 @@ export default function ShellOverlay() {
       setRunningApps(new Set<string>(info.runningApps || []));
 
       // Get list of installed apps
-      const appsData = await window.edenAPI.shellCommand("app/list", {});
+      const appsData = await window.edenAPI.shellCommand("process/list", {});
 
       // AppManager returns { installed: AppManifest[], running: [...] }
       if (appsData) {
@@ -119,7 +119,7 @@ export default function ShellOverlay() {
     } else {
       // App is not running, launch it
       try {
-        await window.edenAPI.shellCommand("app/launch", { appId });
+        await window.edenAPI.shellCommand("process/launch", { appId });
         // Add a small delay before refreshing to let the app start
         setTimeout(() => {
           loadSystemInfo();
@@ -164,7 +164,7 @@ export default function ShellOverlay() {
 
   const handleStopApp = async (appId: string) => {
     try {
-      await window.edenAPI.shellCommand("app/stop", { appId });
+      await window.edenAPI.shellCommand("process/stop", { appId });
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -194,12 +194,12 @@ export default function ShellOverlay() {
     // Listen for overlay initialization message with viewId
     window.edenAPI.onSystemMessage((message) => {
 
-      if (message.type === "app-started" || message.type === "app-stopped") {
+      if (message.type === "app/launched" || message.type === "app/stopped") {
         loadSystemInfo();
       }
       
       // Listen for workspace bounds changes and recalculate position
-      if (message.type === "workspace-bounds-changed") {
+      if (message.type === "app/workspace-bounds-changed") {
         const { bounds } = message.payload;
         const mode = showAllApps() ? "fullscreen" : "dock";
         // Recalculate our desired bounds based on new workspace size

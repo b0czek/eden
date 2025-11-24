@@ -1,7 +1,7 @@
 import { CommandHandler, CommandNamespace } from "../core/CommandDecorators";
 import { ProcessManager } from "./ProcessManager";
 
-@CommandNamespace("app")
+@CommandNamespace("process")
 export class ProcessHandler {
   private processManager: ProcessManager;
 
