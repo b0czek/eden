@@ -2,7 +2,6 @@ import {
   BrowserWindow,
   Rectangle as Bounds,
   WebContentsView,
-  globalShortcut,
 } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
@@ -10,6 +9,7 @@ import { cachedFileReader } from "../utils/cachedFileReader";
 import { AppManifest, TilingConfig, WindowConfig } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
+import { DevToolsManager } from "./DevToolsManager";
 import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
 
 /**
@@ -25,6 +25,7 @@ export class ViewManager extends EventEmitter {
   private nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
   private tilingConfig: TilingConfig;
   private floatingWindows: FloatingWindowController;
+  private devToolsManager: DevToolsManager;
   private workspaceBounds: Bounds = {
     x: 0,
     y: 0,
@@ -43,6 +44,7 @@ export class ViewManager extends EventEmitter {
       () => this.workspaceBounds,
       () => this.views.values()
     );
+    this.devToolsManager = new DevToolsManager();
   }
 
   /**
@@ -50,41 +52,6 @@ export class ViewManager extends EventEmitter {
    */
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
-    // Register shortcut to open DevTools for focused view: Ctrl+Shift+D
-    try {
-      // Use accelerator consistent with Electron on Linux/Windows/macOS
-      const accelerator = "CommandOrControl+Shift+D";
-      // Avoid multiple registrations
-      if (!globalShortcut.isRegistered(accelerator)) {
-        globalShortcut.register(accelerator, () => {
-          const focusedView = this.findFocusedView();
-          if (focusedView) {
-            try {
-              focusedView.webContents.openDevTools();
-              console.log("Opened DevTools for focused view");
-            } catch (err) {
-              console.error("Failed to open DevTools for focused view:", err);
-            }
-          } else {
-            console.log("No focused view found to open DevTools");
-          }
-        });
-      }
-    } catch (err) {
-      console.error("Failed to register global shortcut for DevTools:", err);
-    }
-
-    // Cleanup when main window is closed/destroyed
-    window.on("closed", () => {
-      try {
-        const accelerator = "CommandOrControl+Shift+D";
-        if (globalShortcut.isRegistered(accelerator)) {
-          globalShortcut.unregister(accelerator);
-        }
-      } catch (err) {
-        console.error("Failed to unregister global shortcut:", err);
-      }
-    });
   }
 
   /**
@@ -336,6 +303,9 @@ export class ViewManager extends EventEmitter {
 
     const windowConfig = manifest.window;
 
+    // Register DevTools shortcut on this view
+    this.devToolsManager.registerShortcut(view);
+
     // Set bounds
     view.setBounds(viewBounds);
 
@@ -520,6 +490,9 @@ export class ViewManager extends EventEmitter {
     }
 
     try {
+      // Close DevTools if open
+      this.devToolsManager.closeDevToolsForView(viewInfo.view);
+
       // Check if view is already destroyed
       if (!viewInfo.view.webContents.isDestroyed()) {
         // Only try to remove if mainWindow still exists and view is not destroyed
