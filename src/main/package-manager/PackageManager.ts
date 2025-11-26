@@ -4,21 +4,29 @@ import * as path from "path";
 import AdmZip from "adm-zip";
 import { AppManifest, EventName, EventData } from "../../types";
 import { IPCBridge } from "../ipc/IPCBridge";
+import { injectable, inject } from "tsyringe";
+import { CommandRegistry } from "../ipc/CommandRegistry";
+import { PackageHandler } from "./PackageHandler";
 
-/**
- * PackageManager
- *
- * Handles app installation, uninstallation, and loading from disk.
- */
+@injectable()
 export class PackageManager extends EventEmitter {
   private ipcBridge: IPCBridge;
   private appsDirectory: string;
   private installedApps: Map<string, AppManifest> = new Map();
+  private packageHandler: PackageHandler;
 
-  constructor(ipcBridge: IPCBridge, appsDirectory: string) {
+  constructor(
+    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject("appsDirectory") appsDirectory: string,
+    @inject("CommandRegistry") commandRegistry: CommandRegistry
+  ) {
     super();
     this.ipcBridge = ipcBridge;
     this.appsDirectory = appsDirectory;
+    
+    // Create and register handler
+    this.packageHandler = new PackageHandler(this);
+    commandRegistry.registerManager(this.packageHandler);
   }
 
   /**

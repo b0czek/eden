@@ -7,11 +7,16 @@ import { IPCBridge } from "../ipc/IPCBridge";
 import { PackageManager } from "../package-manager/PackageManager";
 import { AppInstance, AppManifest, EventName, EventData } from "../../types";
 
+import { injectable, inject } from "tsyringe";
+import { CommandRegistry } from "../ipc/CommandRegistry";
+import { ProcessHandler } from "./ProcessHandler";
+
 /**
  * ProcessManager
  *
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
+@injectable()
 export class ProcessManager extends EventEmitter {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
@@ -19,13 +24,15 @@ export class ProcessManager extends EventEmitter {
   private packageManager: PackageManager;
   private runningApps: Map<string, AppInstance> = new Map();
   private appsDirectory: string;
+  private processHandler: ProcessHandler;
 
   constructor(
-    workerManager: WorkerManager,
-    viewManager: ViewManager,
-    ipcBridge: IPCBridge,
-    packageManager: PackageManager,
-    appsDirectory: string
+    @inject("WorkerManager") workerManager: WorkerManager,
+    @inject("ViewManager") viewManager: ViewManager,
+    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject("PackageManager") packageManager: PackageManager,
+    @inject("appsDirectory") appsDirectory: string,
+    @inject("CommandRegistry") commandRegistry: CommandRegistry
   ) {
     super();
     this.workerManager = workerManager;
@@ -35,6 +42,10 @@ export class ProcessManager extends EventEmitter {
     this.appsDirectory = appsDirectory;
 
     this.setupEventHandlers();
+
+    // Create and register handler
+    this.processHandler = new ProcessHandler(this);
+    commandRegistry.registerManager(this.processHandler);
   }
 
   /**

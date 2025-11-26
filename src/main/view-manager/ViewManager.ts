@@ -13,18 +13,22 @@ import { DevToolsManager } from "./DevToolsManager";
 import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
 
 
-/**
- * ViewManager
- *
- * Manages WebContentsView instances for app frontends.
- * Each app's frontend runs in its own isolated view.
- */
+import { injectable, inject } from "tsyringe";
+import { CommandRegistry } from "../ipc/CommandRegistry";
+import { ViewHandler } from "./ViewHandler";
+import { IPCBridge } from "../ipc/IPCBridge";
+
+@injectable()
 export class ViewManager extends EventEmitter {
   private views: Map<number, ViewInfo> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private nextViewId = 1;
   private nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
-  private tilingConfig: TilingConfig;
+  private tilingConfig: TilingConfig = {
+    mode: "none",
+    gap: 0,
+    padding: 0,
+  };
   private floatingWindows: FloatingWindowController;
   private devToolsManager: DevToolsManager;
   private workspaceBounds: Bounds = {
@@ -35,19 +39,29 @@ export class ViewManager extends EventEmitter {
   };
   // Event subscription registry: Map of eventName -> Set of viewIds
   private eventSubscriptions: Map<string, Set<number>> = new Map();
+  private viewHandler: ViewHandler;
 
-  constructor(tilingConfig?: TilingConfig) {
+  constructor(
+    @inject("CommandRegistry") commandRegistry: CommandRegistry,
+    @inject("IPCBridge") ipcBridge: IPCBridge
+  ) {
     super();
-    this.tilingConfig = tilingConfig || {
-      mode: "none",
-      gap: 0,
-      padding: 0,
-    };
     this.floatingWindows = new FloatingWindowController(
       () => this.workspaceBounds,
       () => this.views.values()
     );
     this.devToolsManager = new DevToolsManager();
+
+    // Create and register handler
+    this.viewHandler = new ViewHandler(this, ipcBridge);
+    commandRegistry.registerManager(this.viewHandler);
+  }
+
+  public setTilingConfig(config: TilingConfig): void {
+    this.tilingConfig = config;
+    if (this.tilingConfig.mode !== "none") {
+      this.recalculateTiledViews();
+    }
   }
 
   /**

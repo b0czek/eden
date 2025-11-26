@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { IPCBridge } from "./ipc/IPCBridge";
@@ -9,6 +10,7 @@ import { TilingConfig } from "../types";
 import { PackageManager, PackageHandler } from "./package-manager";
 import { ProcessManager, ProcessHandler, WorkerManager } from "./process-manager";
 import { ViewManager, ViewHandler } from "./view-manager";
+import { container } from "tsyringe";
 
 export interface EdenConfig {
   appsDirectory?: string;
@@ -35,9 +37,6 @@ export class Eden {
   // New components
   private packageManager: PackageManager;
   private processManager: ProcessManager;
-  private packageHandler: PackageHandler;
-  private processHandler: ProcessHandler;
-  private viewHandler: ViewHandler;
   private systemHandler: SystemHandler;
 
   constructor(config: EdenConfig = {}) {
@@ -53,39 +52,34 @@ export class Eden {
 
     // Initialize core managers
     this.workerManager = new WorkerManager();
-    this.viewManager = new ViewManager(config.tiling);
+    container.registerInstance("WorkerManager", this.workerManager);
+
+    this.viewManager = container.resolve(ViewManager);
+    this.viewManager.setTilingConfig(config.tiling || { mode: "none", gap: 0, padding: 0 });
+    container.registerInstance("ViewManager", this.viewManager);
     
     // Create command registry
     this.commandRegistry = new CommandRegistry();
+    container.registerInstance("CommandRegistry", this.commandRegistry);
     
     // Create IPC bridge with command registry
     this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager, this.commandRegistry);
+    container.registerInstance("IPCBridge", this.ipcBridge);
     
+    // Register appsDirectory for injection
+    container.registerInstance("appsDirectory", this.appsDirectory);
+
     // Initialize Package Manager
-    this.packageManager = new PackageManager(this.ipcBridge, this.appsDirectory);
-    this.packageHandler = new PackageHandler(this.packageManager);
+    this.packageManager = container.resolve(PackageManager);
+    container.registerInstance("PackageManager", this.packageManager);
 
     // Initialize Process Manager
-    this.processManager = new ProcessManager(
-      this.workerManager,
-      this.viewManager,
-      this.ipcBridge,
-      this.packageManager,
-      this.appsDirectory
-    );
-    this.processHandler = new ProcessHandler(this.processManager);
-
-    // Initialize View Handler
-    this.viewHandler = new ViewHandler(this.viewManager, this.ipcBridge);
+    this.processManager = container.resolve(ProcessManager);
+    container.registerInstance("ProcessManager", this.processManager);
 
     // Initialize System Handler
-    this.systemHandler = new SystemHandler(this.ipcBridge);
-
-    // Register handlers with the registry
-    this.commandRegistry.registerManager(this.packageHandler);
-    this.commandRegistry.registerManager(this.processHandler);
-    this.commandRegistry.registerManager(this.viewHandler);
-    this.commandRegistry.registerManager(this.systemHandler);
+    this.systemHandler = container.resolve(SystemHandler);
+    container.registerInstance("SystemHandler", this.systemHandler);
 
     this.setupAppEventHandlers();
   }
@@ -258,38 +252,5 @@ export class Eden {
     }
   }
 
-  /**
-   * Get the main window instance
-   */
-  public getMainWindow(): BrowserWindow | null {
-    return this.mainWindow;
-  }
 
-  /**
-   * Get the package manager instance
-   */
-  public getPackageManager(): PackageManager {
-    return this.packageManager;
-  }
-
-  /**
-   * Get the process manager instance
-   */
-  public getProcessManager(): ProcessManager {
-    return this.processManager;
-  }
-
-  /**
-   * Get the worker manager instance
-   */
-  public getWorkerManager(): WorkerManager {
-    return this.workerManager;
-  }
-
-  /**
-   * Get the view manager instance
-   */
-  public getViewManager(): ViewManager {
-    return this.viewManager;
-  }
 }

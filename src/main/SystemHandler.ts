@@ -1,12 +1,16 @@
 import { CommandHandler, CommandNamespace } from "./ipc/CommandDecorators";
 import { IPCBridge } from "./ipc/IPCBridge";
+import { injectable, inject } from "tsyringe";
+import { CommandRegistry } from "./ipc/CommandRegistry";
 
+@injectable()
 @CommandNamespace("system")
 export class SystemHandler {
-  private ipcBridge: IPCBridge;
-
-  constructor(ipcBridge: IPCBridge) {
-    this.ipcBridge = ipcBridge;
+  constructor(
+    @inject("IPCBridge") private ipcBridge: IPCBridge,
+    @inject("CommandRegistry") commandRegistry: CommandRegistry
+  ) {
+    commandRegistry.registerManager(this);
   }
 
   @CommandHandler("info")
