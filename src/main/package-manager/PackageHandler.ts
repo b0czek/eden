@@ -1,4 +1,4 @@
-import { CommandHandler, CommandNamespace } from "../core/CommandDecorators";
+import { CommandHandler, CommandNamespace } from "../ipc/CommandDecorators";
 import { PackageManager } from "./PackageManager";
 
 @CommandNamespace("package")

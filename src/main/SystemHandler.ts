@@ -1,5 +1,5 @@
-import { CommandHandler, CommandNamespace } from "./CommandDecorators";
-import { IPCBridge } from "./IPCBridge";
+import { CommandHandler, CommandNamespace } from "./ipc/CommandDecorators";
+import { IPCBridge } from "./ipc/IPCBridge";
 
 @CommandNamespace("system")
 export class SystemHandler {

@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
 import { AppManifest, EventName, EventData } from "../../types";
-import { IPCBridge } from "../core/IPCBridge";
+import { IPCBridge } from "../ipc/IPCBridge";
 
 /**
  * PackageManager

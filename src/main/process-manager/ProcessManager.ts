@@ -3,7 +3,7 @@ import * as path from "path";
 import { randomUUID } from "crypto";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCBridge } from "../core/IPCBridge";
+import { IPCBridge } from "../ipc/IPCBridge";
 import { PackageManager } from "../package-manager/PackageManager";
 import { AppInstance, AppManifest, EventName, EventData } from "../../types";
 

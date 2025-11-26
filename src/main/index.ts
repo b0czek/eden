@@ -4,7 +4,7 @@ export { Eden, EdenConfig } from "./Eden";
 // Re-export core managers for library usage
 export { PackageManager } from "./package-manager";
 export { ProcessManager, WorkerManager } from "./process-manager";
-export { IPCBridge } from "./core/IPCBridge";
+export { IPCBridge } from "./ipc/IPCBridge";
 
 // Window management exports
 export { ViewManager, LayoutCalculator, MouseTracker } from "./view-manager";

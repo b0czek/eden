@@ -1,6 +1,6 @@
-import { CommandHandler, CommandNamespace } from "../core/CommandDecorators";
+import { CommandHandler, CommandNamespace } from "../ipc/CommandDecorators";
 import { ViewManager } from "./ViewManager";
-import { IPCBridge } from "../core/IPCBridge";
+import { IPCBridge } from "../ipc/IPCBridge";
 import { MouseTracker } from "./MouseTracker";
 import { AppInstance } from "../../types";
 

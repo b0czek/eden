@@ -1,8 +1,8 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { IPCBridge } from "./core/IPCBridge";
-import { CommandRegistry } from "./core/CommandRegistry";
-import { SystemHandler } from "./core/SystemHandler";
+import { IPCBridge } from "./ipc/IPCBridge";
+import { CommandRegistry } from "./ipc/CommandRegistry";
+import { SystemHandler } from "./SystemHandler";
 import { TilingConfig } from "../types";
 
 // Managers and Handlers
