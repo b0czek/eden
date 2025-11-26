@@ -93,7 +93,7 @@ export class ViewHandler {
 
     this.viewManager.setWorkspaceBounds(bounds);
     
-    this.viewManager.emit("view/workspace-bounds-changed", {
+    this.ipcBridge.eventSubscribers.notify("view/workspace-bounds-changed", {
       bounds,
     });
 
@@ -161,6 +161,7 @@ export class ViewHandler {
       };
 
       this.viewManager.setViewBounds(viewId, newBounds);
+      this.ipcBridge.eventSubscribers.notifyView(viewId, "view/bounds-updated", newBounds);
 
     });
 
@@ -251,6 +252,7 @@ export class ViewHandler {
       };
 
       this.viewManager.setViewBounds(viewId, newBounds);
+      this.ipcBridge.eventSubscribers.notifyView(viewId, "view/bounds-updated", newBounds);
 
     });
 

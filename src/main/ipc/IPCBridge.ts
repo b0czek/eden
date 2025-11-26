@@ -6,6 +6,8 @@ import { IPCMessage, APP_EVENT_NAMES } from "../../types";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
 
+import { EventSubscriberManager } from "./EventSubscriberManager";
+
 /**
  * IPCBridge
  *
@@ -16,8 +18,9 @@ import { CommandRegistry } from "./CommandRegistry";
  */
 export class IPCBridge extends EventEmitter {
   private workerManager: WorkerManager;
-  private viewManager: ViewManager;
+  private viewManager!: ViewManager;
   private commandRegistry: CommandRegistry;
+  public eventSubscribers!: EventSubscriberManager;
   private mainWindow: BrowserWindow | null = null;
   private runningAppIds: Set<string> = new Set();
   private pendingResponses: Map<
@@ -46,14 +49,18 @@ export class IPCBridge extends EventEmitter {
     }
   > = new Map();
 
-  constructor(workerManager: WorkerManager, viewManager: ViewManager, commandRegistry: CommandRegistry) {
+  constructor(workerManager: WorkerManager, commandRegistry: CommandRegistry) {
     super();
     this.workerManager = workerManager;
-    this.viewManager = viewManager;
     this.commandRegistry = commandRegistry;
 
     this.setupIPCHandlers();
     this.setupWorkerMessageHandlers();
+  }
+
+  public setViewManager(viewManager: ViewManager): void {
+    this.viewManager = viewManager;
+    this.eventSubscribers = new EventSubscriberManager(viewManager);
   }
 
   /**
@@ -135,7 +142,7 @@ export class IPCBridge extends EventEmitter {
       const viewId = Array.from(this.viewManager.getActiveViews())
         .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
       
-      return this.viewManager.subscribeViewToEvent(viewId, eventName);
+      return this.eventSubscribers.subscribe(viewId, eventName);
     });
 
     ipcMain.handle("event/unsubscribe", async (event, eventName: string) => {
@@ -154,7 +161,7 @@ export class IPCBridge extends EventEmitter {
       const viewId = Array.from(this.viewManager.getActiveViews())
         .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
       
-      return this.viewManager.unsubscribeViewFromEvent(viewId, eventName);
+      return this.eventSubscribers.unsubscribe(viewId, eventName);
     });
 
     // File selection dialog for .edenite files

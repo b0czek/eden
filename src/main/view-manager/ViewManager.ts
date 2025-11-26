@@ -37,15 +37,15 @@ export class ViewManager extends EventEmitter {
     width: 800,
     height: 600,
   };
-  // Event subscription registry: Map of eventName -> Set of viewIds
-  private eventSubscriptions: Map<string, Set<number>> = new Map();
   private viewHandler: ViewHandler;
+  private ipcBridge: IPCBridge;
 
   constructor(
     @inject("CommandRegistry") commandRegistry: CommandRegistry,
     @inject("IPCBridge") ipcBridge: IPCBridge
   ) {
     super();
+    this.ipcBridge = ipcBridge;
     this.floatingWindows = new FloatingWindowController(
       () => this.workspaceBounds,
       () => this.views.values()
@@ -70,27 +70,6 @@ export class ViewManager extends EventEmitter {
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
   }
-
-  /**
-   * Find the focused WebContentsView (if any) among managed views.
-   */
-  private findFocusedView(): WebContentsView | undefined {
-    for (const info of this.views.values()) {
-      try {
-        if (
-          !info.view.webContents.isDestroyed() &&
-          info.view.webContents.isFocused()
-        ) {
-          return info.view;
-        }
-      } catch (err) {
-        // ignore checks that fail when webcontents is not available
-      }
-    }
-    return undefined;
-  }
-
-
 
   /**
    * Set workspace bounds (the area where views can be placed)
@@ -363,7 +342,7 @@ export class ViewManager extends EventEmitter {
       this.injectAppAPI(view, appId);
 
       // Emit to IPC subscribers (webcontents)
-      this.emitEventToSubscribers("view-loaded", { 
+      this.ipcBridge.eventSubscribers.notify("view-loaded", { 
         viewId, 
         appId, 
         overlay: viewType === "overlay" 
@@ -383,7 +362,7 @@ export class ViewManager extends EventEmitter {
           errorDescription,
         };
         // Emit to IPC subscribers (webcontents)
-        this.emitEventToSubscribers("view-load-failed", failData);
+        this.ipcBridge.eventSubscribers.notify("view-load-failed", failData);
         this.emit("view-load-failed", failData);
       }
     );
@@ -528,13 +507,7 @@ export class ViewManager extends EventEmitter {
 
 
       // Clean up all event subscriptions for this view
-      for (const [eventName, subscribers] of this.eventSubscriptions.entries()) {
-        subscribers.delete(viewId);
-        if (subscribers.size === 0) {
-          this.eventSubscriptions.delete(eventName);
-        }
-      }
-
+      this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
 
       // Remove from tracking map
       this.views.delete(viewId);
@@ -1002,76 +975,4 @@ export class ViewManager extends EventEmitter {
     }
   }
 
-  /**
-   * Subscribe a view to an event
-   */
-  public subscribeViewToEvent(viewId: number, eventName: string): boolean {
-    const viewInfo = this.views.get(viewId);
-    if (!viewInfo) {
-      console.warn(`Cannot subscribe: view ${viewId} not found`);
-      return false;
-    }
-
-    if (!this.eventSubscriptions.has(eventName)) {
-      this.eventSubscriptions.set(eventName, new Set());
-    }
-    
-    this.eventSubscriptions.get(eventName)!.add(viewId);
-    console.log(`View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`);
-    return true;
-  }
-
-  /**
-   * Unsubscribe a view from an event
-   */
-  public unsubscribeViewFromEvent(viewId: number, eventName: string): boolean {
-    const subscriptions = this.eventSubscriptions.get(eventName);
-    if (!subscriptions) {
-      return false;
-    }
-    
-    const result = subscriptions.delete(viewId);
-    if (subscriptions.size === 0) {
-      this.eventSubscriptions.delete(eventName);
-    }
-    
-    if (result) {
-      console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
-    }
-    return result;
-  }
-
-  /**
-   * Get all views subscribed to an event
-   */
-  public getSubscribedViews(eventName: string): number[] {
-    const subscriptions = this.eventSubscriptions.get(eventName);
-    return subscriptions ? Array.from(subscriptions) : [];
-  }
-
-  /**
-   * Send event only to subscribed views
-   * All views (apps and overlays) receive events via 'shell-message' channel
-   */
-  public emitEventToSubscribers(eventName: string, payload: any): void {
-    const subscribedViewIds = this.getSubscribedViews(eventName);
-    
-    if (subscribedViewIds.length === 0) {
-      console.log(`No subscribers for event: ${eventName}`);
-      return;
-    }
-
-    console.log(`Emitting ${eventName} to ${subscribedViewIds.length} subscribed view(s)`);
-    
-    for (const viewId of subscribedViewIds) {
-      const viewInfo = this.views.get(viewId);
-      if (!viewInfo) continue;
-
-      // All views use shell-message channel (unified messaging)
-      this.sendToView(viewId, 'shell-message', {
-        type: eventName,
-        payload,
-      });
-    }
-  }
 }

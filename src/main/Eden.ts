@@ -51,20 +51,26 @@ export class Eden {
       config.appsDirectory || path.join(app.getPath("userData"), "eden-apps");
 
     // Initialize core managers
+    // 1. Command Registry (required by others)
+    this.commandRegistry = new CommandRegistry();
+    container.registerInstance("CommandRegistry", this.commandRegistry);
+
+    // 2. Worker Manager
     this.workerManager = new WorkerManager();
     container.registerInstance("WorkerManager", this.workerManager);
 
+    // 3. IPC Bridge (depends on WorkerManager, CommandRegistry)
+    // Note: ViewManager is not passed yet, will be set later
+    this.ipcBridge = new IPCBridge(this.workerManager, this.commandRegistry);
+    container.registerInstance("IPCBridge", this.ipcBridge);
+
+    // 4. ViewManager (depends on CommandRegistry, IPCBridge)
     this.viewManager = container.resolve(ViewManager);
     this.viewManager.setTilingConfig(config.tiling || { mode: "none", gap: 0, padding: 0 });
     container.registerInstance("ViewManager", this.viewManager);
     
-    // Create command registry
-    this.commandRegistry = new CommandRegistry();
-    container.registerInstance("CommandRegistry", this.commandRegistry);
-    
-    // Create IPC bridge with command registry
-    this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager, this.commandRegistry);
-    container.registerInstance("IPCBridge", this.ipcBridge);
+    // 5. Break circular dependency: Set ViewManager on IPCBridge
+    this.ipcBridge.setViewManager(this.viewManager);
     
     // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);
