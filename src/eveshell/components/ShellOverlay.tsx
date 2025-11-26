@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
 
@@ -58,15 +58,12 @@ export default function ShellOverlay() {
 
   const loadSystemInfo = async () => {
     try {
-      const info = await window.edenAPI.getSystemInfo();
-      console.log("System info:", info);
+      const info = await window.edenAPI.shellCommand("system/info", {});
 
       setRunningApps(new Set<string>(info.runningApps || []));
 
-      // Get list of installed apps
       const appsData = await window.edenAPI.shellCommand("process/list", {});
 
-      // AppManager returns { installed: AppManifest[], running: [...] }
       if (appsData) {
         if (Array.isArray(appsData.installed)) {
           setInstalledApps(appsData.installed);
@@ -84,7 +81,7 @@ export default function ShellOverlay() {
   const requestResize = async (mode: "dock" | "fullscreen") => {
     try {
       // Get current window bounds
-      const windowSize = await window.edenAPI.shellCommand("app/get-window-size", {});
+      const windowSize = await window.edenAPI.shellCommand("system/window-size", {});
       console.log(windowSize);
       const bounds =
         mode === "fullscreen"
@@ -97,7 +94,7 @@ export default function ShellOverlay() {
             };
 
       // Use standard update-view-bounds API with appId
-      await window.edenAPI.shellCommand("app/update-view-bounds", {
+      await window.edenAPI.shellCommand("view/update-view-bounds", {
         appId: "eden.shell-overlay",
         bounds,
       });
@@ -112,7 +109,7 @@ export default function ShellOverlay() {
     if (running.has(appId)) {
       // App is running, focus/show it
       try {
-        await window.edenAPI.shellCommand("app/focus-app", { appId });
+        await window.edenAPI.shellCommand("view/focus-app", { appId });
       } catch (error) {
         console.error("Failed to focus app:", error);
       }
@@ -151,7 +148,7 @@ export default function ShellOverlay() {
       });
 
       if (filePath) {
-        await window.edenAPI.shellCommand("app/install", {
+        await window.edenAPI.shellCommand("package/install", {
           sourcePath: filePath,
         });
         // Refresh app list
@@ -178,7 +175,7 @@ export default function ShellOverlay() {
     try {
       // Confirm before uninstalling
       if (confirm(`Are you sure you want to uninstall this app?`)) {
-        await window.edenAPI.shellCommand("app/uninstall", { appId });
+        await window.edenAPI.shellCommand("package/uninstall", { appId });
         // Refresh app list
         await loadSystemInfo();
       }
@@ -187,40 +184,50 @@ export default function ShellOverlay() {
     }
   };
 
-  onMount(() => {
+  onMount(async () => {
     // Load initial system info
     loadSystemInfo();
 
-    // Listen for overlay initialization message with viewId
-    window.edenAPI.onSystemMessage((message) => {
+    // Event handlers
+    const handleAppLifecycle = () => loadSystemInfo();
+    
+    const handleBoundsChange = (data: { bounds: any }) => {
+      const { bounds } = data;
+      const mode = showAllApps() ? "fullscreen" : "dock";
+      // Recalculate our desired bounds based on new workspace size
+      const newBounds =
+        mode === "fullscreen"
+          ? { x: 0, y: 0, width: bounds.width, height: bounds.height }
+          : {
+              x: 0,
+              y: bounds.height,
+              width: bounds.width,
+              height: DOCK_HEIGHT,
+            };
 
-      if (message.type === "app/launched" || message.type === "app/stopped") {
-        loadSystemInfo();
-      }
-      
-      // Listen for workspace bounds changes and recalculate position
-      if (message.type === "app/workspace-bounds-changed") {
-        const { bounds } = message.payload;
-        const mode = showAllApps() ? "fullscreen" : "dock";
-        // Recalculate our desired bounds based on new workspace size
-        const newBounds =
-          mode === "fullscreen"
-            ? { x: 0, y: 0, width: bounds.width, height: bounds.height }
-            : {
-                x: 0,
-                y: bounds.height,
-                width: bounds.width,
-                height: DOCK_HEIGHT,
-              };
+      // Send update to reposition ourselves
+      window.edenAPI.shellCommand("view/update-view-bounds", {
+        appId: "eden.shell-overlay",
+        bounds: newBounds,
+      }).catch((error) => {
+        console.error("Failed to update overlay bounds:", error);
+      });
+    };
 
-        // Send update to reposition ourselves
-        window.edenAPI.shellCommand("app/update-view-bounds", {
-          appId: "eden.shell-overlay",
-          bounds: newBounds,
-        }).catch((error) => {
-          console.error("Failed to update overlay bounds:", error);
-        });
-      }
+    try {
+      // Subscribe to events
+      await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
+      await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
+      await window.edenAPI.subscribe("view/workspace-bounds-changed", handleBoundsChange);
+    } catch (error) {
+      console.error("Failed to subscribe to events:", error);
+    }
+
+    // Cleanup subscriptions
+    onCleanup(() => {
+      window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
+      window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
+      window.edenAPI.unsubscribe("view/workspace-bounds-changed", handleBoundsChange);
     });
   });
 

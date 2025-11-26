@@ -137,14 +137,14 @@ import { setupWindowResizing } from './window-resizing.js';
 
     // Listen for bounds updates from main process (during mouse drag/resize)
     // This keeps currentBounds in sync even when main process is controlling movement
-    if (window.appAPI && window.appAPI.onBoundsUpdated) {
-        window.appAPI.onBoundsUpdated((newBounds) => {
+    if (window.edenAPI && window.edenAPI.subscribe) {
+        window.edenAPI.subscribe('view/bounds-updated', (newBounds) => {
             currentBoundsRef.current = { ...newBounds };
             window.edenFrame!._internal.bounds = { ...newBounds };
         });
-        console.log('[Eden Frame] Registered bounds update listener');
+        console.log('[Eden Frame] Subscribed to view/bounds-updated');
     } else {
-        console.warn('[Eden Frame] appAPI.onBoundsUpdated not available');
+        console.warn('[Eden Frame] edenAPI.subscribe not available');
     }
 
     // Add global touch handler to diagnose issues

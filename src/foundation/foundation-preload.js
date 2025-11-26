@@ -10,12 +10,6 @@ contextBridge.exposeInMainWorld('edenAPI', {
         return ipcRenderer.invoke('shell-command', command, args);
     },
 
-    // System messages
-    onSystemMessage: (callback) => {
-        ipcRenderer.on('system-message', (_event, message) => {
-            callback(message);
-        });
-    },
 });
 
 console.log('Foundation preload script loaded');

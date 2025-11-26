@@ -12,6 +12,7 @@ import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
 import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
 
+
 /**
  * ViewManager
  *
@@ -32,6 +33,8 @@ export class ViewManager extends EventEmitter {
     width: 800,
     height: 600,
   };
+  // Event subscription registry: Map of eventName -> Set of viewIds
+  private eventSubscriptions: Map<string, Set<number>> = new Map();
 
   constructor(tilingConfig?: TilingConfig) {
     super();
@@ -72,6 +75,8 @@ export class ViewManager extends EventEmitter {
     }
     return undefined;
   }
+
+
 
   /**
    * Set workspace bounds (the area where views can be placed)
@@ -184,7 +189,7 @@ export class ViewManager extends EventEmitter {
     const channel = `app-${appId}`;
     const requestChannel = `app-${appId}-request`;
 
-    view.webContents.send("app/init-api", {
+    view.webContents.send("app-init-api", {
       appId,
       channel,
       requestChannel,
@@ -343,23 +348,29 @@ export class ViewManager extends EventEmitter {
       // Inject the app API after page load (always enabled)
       this.injectAppAPI(view, appId);
 
-      this.emit("view-loaded", { 
+      // Emit to IPC subscribers (webcontents)
+      this.emitEventToSubscribers("view-loaded", { 
         viewId, 
         appId, 
         overlay: viewType === "overlay" 
       });
+      
+      this.emit("view-loaded", { viewId, appId, overlay: viewType === "overlay" });
     });
 
     view.webContents.on(
       "did-fail-load",
       (_event: any, errorCode: any, errorDescription: any) => {
         console.error(`View load failed for ${appId}:`, errorDescription);
-        this.emit("view-load-failed", {
+        const failData = {
           viewId,
           appId,
           errorCode,
           errorDescription,
-        });
+        };
+        // Emit to IPC subscribers (webcontents)
+        this.emitEventToSubscribers("view-load-failed", failData);
+        this.emit("view-load-failed", failData);
       }
     );
 
@@ -500,6 +511,16 @@ export class ViewManager extends EventEmitter {
           this.mainWindow.contentView.removeChildView(viewInfo.view);
         }
       }
+
+
+      // Clean up all event subscriptions for this view
+      for (const [eventName, subscribers] of this.eventSubscriptions.entries()) {
+        subscribers.delete(viewId);
+        if (subscribers.size === 0) {
+          this.eventSubscriptions.delete(eventName);
+        }
+      }
+
 
       // Remove from tracking map
       this.views.delete(viewId);
@@ -964,6 +985,79 @@ export class ViewManager extends EventEmitter {
   removeAllViews(): void {
     for (const viewId of this.views.keys()) {
       this.removeView(viewId);
+    }
+  }
+
+  /**
+   * Subscribe a view to an event
+   */
+  public subscribeViewToEvent(viewId: number, eventName: string): boolean {
+    const viewInfo = this.views.get(viewId);
+    if (!viewInfo) {
+      console.warn(`Cannot subscribe: view ${viewId} not found`);
+      return false;
+    }
+
+    if (!this.eventSubscriptions.has(eventName)) {
+      this.eventSubscriptions.set(eventName, new Set());
+    }
+    
+    this.eventSubscriptions.get(eventName)!.add(viewId);
+    console.log(`View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`);
+    return true;
+  }
+
+  /**
+   * Unsubscribe a view from an event
+   */
+  public unsubscribeViewFromEvent(viewId: number, eventName: string): boolean {
+    const subscriptions = this.eventSubscriptions.get(eventName);
+    if (!subscriptions) {
+      return false;
+    }
+    
+    const result = subscriptions.delete(viewId);
+    if (subscriptions.size === 0) {
+      this.eventSubscriptions.delete(eventName);
+    }
+    
+    if (result) {
+      console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
+    }
+    return result;
+  }
+
+  /**
+   * Get all views subscribed to an event
+   */
+  public getSubscribedViews(eventName: string): number[] {
+    const subscriptions = this.eventSubscriptions.get(eventName);
+    return subscriptions ? Array.from(subscriptions) : [];
+  }
+
+  /**
+   * Send event only to subscribed views
+   * All views (apps and overlays) receive events via 'shell-message' channel
+   */
+  public emitEventToSubscribers(eventName: string, payload: any): void {
+    const subscribedViewIds = this.getSubscribedViews(eventName);
+    
+    if (subscribedViewIds.length === 0) {
+      console.log(`No subscribers for event: ${eventName}`);
+      return;
+    }
+
+    console.log(`Emitting ${eventName} to ${subscribedViewIds.length} subscribed view(s)`);
+    
+    for (const viewId of subscribedViewIds) {
+      const viewInfo = this.views.get(viewId);
+      if (!viewInfo) continue;
+
+      // All views use shell-message channel (unified messaging)
+      this.sendToView(viewId, 'shell-message', {
+        type: eventName,
+        payload,
+      });
     }
   }
 }

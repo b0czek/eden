@@ -74,7 +74,7 @@ export class CommandRegistry {
 
   /**
    * Execute a command by its full name
-   * @param fullCommand - The full command name (e.g., "app/launch")
+   * @param fullCommand - The full command name (e.g., "process/launch")
    * @param args - The command arguments
    * @returns The command result
    */

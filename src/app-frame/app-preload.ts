@@ -1,11 +1,3 @@
-/**
- * Universal App Preload
- * 
- * This preload is used by all apps and provides a safe API that only allows
- * communication with the app's own backend. The app cannot access other apps
- * or system resources directly - it must go through its backend.
- */
-
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Per-app channel names (received from main process)
@@ -14,39 +6,32 @@ let appChannel: string | null = null;
 let appRequestChannel: string | null = null;
 const messageListeners: Array<(message: any) => void> = [];
 
-// Bounds update listeners (for keeping renderer in sync)
-const boundsListeners: Array<(bounds: any) => void> = [];
+// Event subscription system
+const eventSubscriptions: Map<string, Set<Function>> = new Map();
 
 // Wait for initialization from main process
-ipcRenderer.once('app/init-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
+ipcRenderer.once('app-init-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
   appId = id;
   appChannel = channel;
   appRequestChannel = requestChannel;
   
   console.log(`App API initialized for ${appId} on channel ${channel}`);
-  
-  // Set up listener for incoming messages from backend
-  ipcRenderer.on(appChannel, (_event: any, message: any) => {
-    // Notify all registered listeners
-    messageListeners.forEach(callback => {
-      try {
-        callback(message);
-      } catch (err) {
-        console.error('Error in message listener:', err);
-      }
-    });
-  });
 });
 
-// Listen for bounds updates from main process
-ipcRenderer.on('app/bounds-updated', (_event: any, newBounds: any) => {
-  boundsListeners.forEach(callback => {
-    try {
-      callback(newBounds);
-    } catch (err) {
-      console.error('Error in bounds listener:', err);
-    }
-  });
+// Set up unified message listener for shell-message channel
+ipcRenderer.on('shell-message', (_event: any, message: any) => {
+  const { type, payload } = message;
+  const callbacks = eventSubscriptions.get(type);
+  
+  if (callbacks) {
+    callbacks.forEach(callback => {
+      try {
+        callback(payload);
+      } catch (err) {
+        console.error(`Error in event listener for ${type}:`, err);
+      }
+    });
+  }
 });
 
 // Expose safe API to the app
@@ -93,19 +78,10 @@ contextBridge.exposeInMainWorld('appAPI', {
     return appId;
   },
 
-  /**
-   * Listen for bounds updates from the main process
-   * @param {function} callback - Called when bounds are updated
-   */
-  onBoundsUpdated: (callback: (bounds: any) => void) => {
-    if (typeof callback !== 'function') {
-      throw new Error('Callback must be a function');
-    }
-    boundsListeners.push(callback);
-  }
+
 });
 
-// Also expose edenAPI for shell commands (needed by app frame)
+// Expose edenAPI for shell commands and event subscriptions
 contextBridge.exposeInMainWorld('edenAPI', {
   /**
    * Execute shell commands (e.g., stop-app, set-view-visibility)
@@ -116,6 +92,52 @@ contextBridge.exposeInMainWorld('edenAPI', {
   shellCommand: (command: string, args: any) => {
     console.log('Executing shell command:', command, args);
     return ipcRenderer.invoke('shell-command', command, args);
+  },
+
+  /**
+   * Subscribe to an event from the shell/system
+   * @param {string} eventName - Name of the event to subscribe to
+   * @param {function} callback - Called when event is emitted
+   */
+  subscribe: async (eventName: string, callback: Function) => {
+    if (typeof callback !== 'function') {
+      throw new Error('Callback must be a function');
+    }
+    
+    // Register with backend (tells backend to send this event to us)
+    await ipcRenderer.invoke('event/subscribe', eventName);
+    
+    // Register callback locally
+    if (!eventSubscriptions.has(eventName)) {
+      eventSubscriptions.set(eventName, new Set());
+    }
+    eventSubscriptions.get(eventName)!.add(callback);
+  },
+  
+  /**
+   * Unsubscribe from an event
+   * @param {string} eventName - Name of the event to unsubscribe from
+   * @param {function} callback - The callback to remove
+   */
+  unsubscribe: async (eventName: string, callback: Function) => {
+    const callbacks = eventSubscriptions.get(eventName);
+    if (callbacks) {
+      callbacks.delete(callback);
+      
+      // If no more callbacks, unregister from backend
+      if (callbacks.size === 0) {
+        eventSubscriptions.delete(eventName);
+        await ipcRenderer.invoke('event/unsubscribe', eventName);
+      }
+    }
+  },
+  
+  /**
+   * Check if an event is supported
+   * @param {string} eventName - Name of the event to check
+   */
+  isEventSupported: (eventName: string) => {
+    return ipcRenderer.invoke('events/check-existence', eventName);
   }
 });
 

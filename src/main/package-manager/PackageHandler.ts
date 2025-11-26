@@ -1,7 +1,7 @@
 import { CommandHandler, CommandNamespace } from "../core/CommandDecorators";
 import { PackageManager } from "./PackageManager";
 
-@CommandNamespace("app")
+@CommandNamespace("package")
 export class PackageHandler {
   private packageManager: PackageManager;
 

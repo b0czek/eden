@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from "electron";
 import { EventEmitter } from "events";
 import { WorkerManager } from "../process-manager/WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCMessage } from "../../types";
+import { IPCMessage, APP_EVENT_NAMES } from "../../types";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
 
@@ -13,7 +13,6 @@ import { CommandRegistry } from "./CommandRegistry";
  * - Main process
  * - Worker threads (app backends)
  * - WebContentsViews (app frontends)
- * - System shell
  */
 export class IPCBridge extends EventEmitter {
   private workerManager: WorkerManager;
@@ -109,9 +108,53 @@ export class IPCBridge extends EventEmitter {
       }
     );
 
-    // System info requests
-    ipcMain.handle("system-info", async () => {
-      return this.getSystemInfo();
+    // Event existence check
+    ipcMain.handle("events/check-existence", async (_event, eventName: string) => {
+      return APP_EVENT_NAMES.includes(eventName as any);
+    });
+
+    // Event subscription handlers
+    ipcMain.handle("event/subscribe", async (event, eventName: string) => {
+      const senderId = event.sender.id;
+      
+      // Validate event name
+      if (!APP_EVENT_NAMES.includes(eventName as any)) {
+        throw new Error(`Event '${eventName}' is not supported`);
+      }
+      
+      // Find view by sender
+      const viewInfo = Array.from(this.viewManager.getActiveViews())
+        .map((id) => this.viewManager.getViewInfo(id))
+        .find((info) => info?.view.webContents.id === senderId);
+      
+      if (!viewInfo) {
+        throw new Error("View not found");
+      }
+      
+      // Get the actual viewId from the view info (not webContents.id)
+      const viewId = Array.from(this.viewManager.getActiveViews())
+        .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
+      
+      return this.viewManager.subscribeViewToEvent(viewId, eventName);
+    });
+
+    ipcMain.handle("event/unsubscribe", async (event, eventName: string) => {
+      const senderId = event.sender.id;
+      
+      // Find view by sender
+      const viewInfo = Array.from(this.viewManager.getActiveViews())
+        .map((id) => this.viewManager.getViewInfo(id))
+        .find((info) => info?.view.webContents.id === senderId);
+      
+      if (!viewInfo) {
+        throw new Error("View not found");
+      }
+      
+      // Get the actual viewId from the view info (not webContents.id)
+      const viewId = Array.from(this.viewManager.getActiveViews())
+        .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
+      
+      return this.viewManager.unsubscribeViewFromEvent(viewId, eventName);
     });
 
     // File selection dialog for .edenite files
@@ -226,7 +269,7 @@ export class IPCBridge extends EventEmitter {
    */
   private routeMessage(
     message: IPCMessage,
-    sourceType: "worker" | "view" | "system",
+    sourceType: "worker" | "view",
     sourceId: string
   ): void {
     const { target, replyTo } = message;
@@ -255,10 +298,7 @@ export class IPCBridge extends EventEmitter {
     }
 
     // Route to target
-    if (target === "system" || target === "shell") {
-      // Send to shell/main window
-      this.sendToShell(message);
-    } else if (target === "backend" && sourceType === "view") {
+    if (target === "backend" && sourceType === "view") {
       // Frontend sending to its own backend - use the source app ID
       console.log(`Routing view message to backend: ${sourceId}`);
       this.sendToApp(sourceId, message);
@@ -317,7 +357,7 @@ export class IPCBridge extends EventEmitter {
    */
   private sendMessageWithResponse(
     message: IPCMessage,
-    sourceType: "worker" | "view" | "system",
+    sourceType: "worker" | "view",
     sourceAppId: string,
     timeoutMs: number = 5000
   ): Promise<any> {
@@ -362,22 +402,11 @@ export class IPCBridge extends EventEmitter {
     const viewIds = this.viewManager.getViewsByAppId(appId);
     console.log(`Sending to ${viewIds.length} views for ${appId}`);
     for (const viewId of viewIds) {
-      this.viewManager.sendToView(viewId, "app-message", message);
+      this.viewManager.sendToView(viewId, "shell-message", message);
     }
   }
 
-  /**
-   * Send message to shell overlay view
-   */
-  private sendToShell(message: IPCMessage): void {
-    // Find the shell overlay view (eden.shell-overlay)
-    const shellViewIds = this.viewManager.getViewsByAppId("eden.shell-overlay");
-    
-    if (shellViewIds.length > 0) {
-      // Send to shell overlay view
-      this.viewManager.sendToView(shellViewIds[0], "system-message", message);
-    } 
-  }
+
 
   /**
    * Handle shell commands (app management, etc.)
@@ -385,7 +414,6 @@ export class IPCBridge extends EventEmitter {
   private async handleShellCommand(command: string, args: any): Promise<any> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
-    console.log(`[IPCBridge] Executing shell command: ${command}`, args);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -396,88 +424,24 @@ export class IPCBridge extends EventEmitter {
 
       this.pendingCommands.set(commandId, { resolve, reject, timeout });
 
-      // Try to execute via CommandRegistry first (new system)
-      if (this.commandRegistry.has(command)) {
-        this.commandRegistry
-          .execute(command, args)
-          .then((result) => {
-            clearTimeout(timeout);
-            this.pendingCommands.delete(commandId);
-            resolve(result);
-          })
-          .catch((error) => {
-            console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`, error);
-            clearTimeout(timeout);
-            this.pendingCommands.delete(commandId);
-            reject(error);
-          });
-      } else {
-        // Fallback to old event-based system for backward compatibility
-        console.warn(`[IPCBridge] Command '${command}' not found in registry, emitting event`);
-        this.emit("shell-command", { command, args, commandId });
-      }
+      // Execute via CommandRegistry
+      this.commandRegistry
+        .execute(command, args)
+        .then((result) => {
+          clearTimeout(timeout);
+          this.pendingCommands.delete(commandId);
+          resolve(result);
+        })
+        .catch((error) => {
+          console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`, error);
+          clearTimeout(timeout);
+          this.pendingCommands.delete(commandId);
+          reject(error);
+        });
     });
   }
 
-  /**
-   * Respond to a shell command
-   */
-  respondToCommand(commandId: string, result: any, error?: any): void {
-    const pending = this.pendingCommands.get(commandId);
-    if (!pending) return;
 
-    clearTimeout(pending.timeout);
-    this.pendingCommands.delete(commandId);
-
-    if (error) {
-      pending.reject(error);
-    } else {
-      pending.resolve(result);
-    }
-  }
-
-  /**
-   * Broadcast message to all apps
-   */
-  broadcastToApps(message: IPCMessage): void {
-    if (this.runningAppIds.size === 0) {
-      return;
-    }
-
-    for (const appId of this.runningAppIds) {
-      this.sendToApp(appId, message);
-    }
-  }
-
-  /**
-   * Send system notification to all components
-   */
-  systemBroadcast(type: string, payload: any): void {
-    const message: IPCMessage = {
-      type,
-      source: "system",
-      target: "all",
-      payload,
-      messageId: randomUUID(),
-      timestamp: Date.now(),
-    };
-
-    this.sendToShell(message);
-  }
-
-  /**
-   * Get system information
-   */
-  private getSystemInfo(): any {
-    return {
-      platform: process.platform,
-      arch: process.arch,
-      nodeVersion: process.version,
-      electronVersion: process.versions.electron,
-      runningApps: Array.from(this.runningAppIds),
-      activeViews: this.viewManager.getActiveViews(),
-    };
-  }
 
   /**
    * Provide running-app updates from the AppManager
@@ -517,7 +481,9 @@ export class IPCBridge extends EventEmitter {
     ipcMain.removeAllListeners("app-message");
     ipcMain.removeHandler("app-message-request");
     ipcMain.removeHandler("shell-command");
-    ipcMain.removeHandler("system-info");
+    ipcMain.removeHandler("events/check-existence");
+    ipcMain.removeHandler("event/subscribe");
+    ipcMain.removeHandler("event/unsubscribe");
     ipcMain.removeHandler("select-directory");
     ipcMain.removeHandler("select-file");
   }

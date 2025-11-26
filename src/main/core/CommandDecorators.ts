@@ -5,15 +5,15 @@ import {
 
 /**
  * Class decorator to set the namespace for all command handlers in a manager
- * @param namespace - The namespace for this manager (e.g., "app", "view")
+ * @param namespace - The namespace for this manager (e.g., "process", "view")
  * 
  * @example
  * ```typescript
- * @CommandNamespace("app")
+ * @CommandNamespace("process")
  * class AppManager {
  *   @CommandHandler("launch")
  *   async handleLaunch(args: { appId: string }) {
- *     // This becomes "app/launch"
+ *     // This becomes "process/launch"
  *   }
  * }
  * ```
@@ -31,11 +31,11 @@ export function CommandNamespace(namespace: string) {
  * 
  * @example
  * ```typescript
- * @CommandNamespace("app")
+ * @CommandNamespace("process")
  * class AppManager {
  *   @CommandHandler("launch")
  *   async handleLaunch(args: { appId: string }) {
- *     // Registered as "app/launch"
+ *     // Registered as "process/launch"
  *   }
  * }
  * ```

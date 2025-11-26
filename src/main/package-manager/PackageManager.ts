@@ -31,6 +31,8 @@ export class PackageManager extends EventEmitter {
     return this.emit(event, data);
   }
 
+
+
   /**
    * Initialize the package manager
    */
@@ -131,7 +133,6 @@ export class PackageManager extends EventEmitter {
     this.installedApps.set(manifest.id, manifest);
 
     this.emitEvent("package/installed", { manifest });
-    this.ipcBridge.systemBroadcast("app-installed", { manifest });
 
     return manifest;
   }
@@ -160,7 +161,6 @@ export class PackageManager extends EventEmitter {
     this.installedApps.delete(appId);
 
     this.emitEvent("package/uninstalled", { appId });
-    this.ipcBridge.systemBroadcast("app-uninstalled", { appId });
     
     return true;
   }
@@ -199,4 +199,7 @@ export class PackageManager extends EventEmitter {
       );
     }
   }
+
+
+
 }

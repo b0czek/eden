@@ -40,7 +40,7 @@ export function setupMinimizeButton(): void {
             const appId = window.appAPI?.getAppId();
             
             if (window.edenAPI && appId) {
-                window.edenAPI.shellCommand('app/set-view-visibility', {
+                window.edenAPI.shellCommand('view/set-view-visibility', {
                     appId,
                     visible: false
                 }).catch(console.error);
@@ -64,7 +64,7 @@ export function setupToggleModeButton(): void {
             const appId = window.appAPI?.getAppId();
             
             if (window.edenAPI && appId) {
-                window.edenAPI.shellCommand('app/toggle-view-mode', {
+                window.edenAPI.shellCommand('view/toggle-view-mode', {
                     appId
                 }).then(() => {
                     console.log('[Eden Frame] View mode toggled');

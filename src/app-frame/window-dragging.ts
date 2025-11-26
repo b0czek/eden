@@ -27,7 +27,7 @@ export function setupWindowDragging(
     const updatePosition = () => {
         const appId = window.appAPI?.getAppId();
         if (pendingBounds && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/update-view-bounds', {
+            window.edenAPI.shellCommand('view/update-view-bounds', {
                 appId,
                 bounds: pendingBounds
             }).catch(console.error);
@@ -86,13 +86,13 @@ export function setupWindowDragging(
         // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
         // Touch users need to tap elsewhere to focus, then tap title bar to drag
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/focus-app', { appId }).catch(console.error);
+            window.edenAPI.shellCommand('view/focus-app', { appId }).catch(console.error);
         }
 
         // For mouse events, use global tracking in main process
         // For touch events, we'll handle updates in touchmove
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/start-drag', {
+            window.edenAPI.shellCommand('view/start-drag', {
                 appId,
                 startX: coords.x,
                 startY: coords.y
@@ -159,7 +159,7 @@ export function setupWindowDragging(
 
             // Send final pending bounds immediately
             if (pendingBounds && window.edenAPI && appId) {
-                window.edenAPI.shellCommand('app/update-view-bounds', {
+                window.edenAPI.shellCommand('view/update-view-bounds', {
                     appId,
                     bounds: pendingBounds
                 }).catch(console.error);
@@ -178,7 +178,7 @@ export function setupWindowDragging(
 
         // Stop global drag tracking in main process (for mouse events)
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/end-drag', { appId }).catch(console.error);
+            window.edenAPI.shellCommand('view/end-drag', { appId }).catch(console.error);
         }
     };
 

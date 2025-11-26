@@ -5,7 +5,6 @@ declare global {
     // App communication API (set by app-preload.ts)
     appAPI?: {
       getAppId: () => string | null;
-      onBoundsUpdated: (callback: (bounds: any) => void) => void;
       sendMessage: (message: any) => void;
       sendRequest: (message: any) => Promise<any>;
       onMessage: (callback: (message: any) => void) => void;
@@ -14,6 +13,28 @@ declare global {
     // Shell command API (set by app-preload.ts)
     edenAPI?: {
       shellCommand: <T extends CommandName>(command: T, args: CommandArgs<T>) => Promise<CommandResult<T>>;
+      /**
+       * Subscribe to a system event
+       * @param event - The event name
+       * @param callback - Callback function receiving typed event data
+       */
+      subscribe<T extends EventName>(
+        event: T,
+        callback: (data: EventData<T>) => void
+      ): Promise<void>;
+
+      /**
+       * Unsubscribe from a system event
+       */
+      unsubscribe<T extends EventName>(
+        event: T,
+        callback: (data: EventData<T>) => void
+      ): void;
+
+      /**
+       * Check if an event is supported by the system
+       */
+      isEventSupported(event: string): Promise<boolean>;
     };
     
     // Eden Frame API and internal state (set by frame-injector.ts)

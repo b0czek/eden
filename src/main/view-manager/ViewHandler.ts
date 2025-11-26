@@ -4,7 +4,7 @@ import { IPCBridge } from "../core/IPCBridge";
 import { MouseTracker } from "./MouseTracker";
 import { AppInstance } from "../../types";
 
-@CommandNamespace("app")
+@CommandNamespace("view")
 export class ViewHandler {
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
@@ -90,14 +90,14 @@ export class ViewHandler {
     args: { bounds: { x: number; y: number; width: number; height: number } }
   ): Promise<any> {
     const { bounds } = args;
+
     this.viewManager.setWorkspaceBounds(bounds);
     
-    // Notify all views (especially overlays) about workspace bounds change
-    // Overlays can recalculate their desired position and send update-view-bounds
-    this.ipcBridge.systemBroadcast("app/workspace-bounds-changed", {
+    this.viewManager.emit("view/workspace-bounds-changed", {
       bounds,
     });
-    
+
+
     return { success: true };
   }
 
@@ -106,23 +106,13 @@ export class ViewHandler {
     args: { appId: string; mode?: "floating" | "tiled" }
   ): Promise<any> {
     const { appId, mode } = args;
-    // Note: ViewManager doesn't expose setViewMode directly in the interface I saw?
-    // Let's check ViewManager.ts again.
-    // I don't see setViewMode in the ViewManager.ts snippet I read.
-    // I'll check if I missed it or if it was missing.
-    // AppManager had: this.viewManager.setViewMode(instance.viewId, mode);
-    // I'll assume it exists or I need to add it.
-    // I'll check ViewManager.ts again.
-    
+
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
       throw new Error(`App ${appId} is not running`);
     }
     
-    // Assuming setViewMode exists or I'll fix it later.
-    // I'll comment it out or implement it if missing.
-    // For now I'll assume it exists as AppManager was using it.
-    const success = (this.viewManager as any).setViewMode(viewIds[0], mode);
+    const success = this.viewManager.setViewMode(viewIds[0], mode);
     return { success };
   }
 
@@ -172,11 +162,6 @@ export class ViewHandler {
 
       this.viewManager.setViewBounds(viewId, newBounds);
 
-      // Notify renderer of bounds update so it stays in sync
-      const view = this.viewManager.getView(viewId);
-      if (view) {
-        view.webContents.send("app/bounds-updated", newBounds);
-      }
     });
 
     return { success: true };
@@ -267,11 +252,6 @@ export class ViewHandler {
 
       this.viewManager.setViewBounds(viewId, newBounds);
 
-      // Notify renderer of bounds update so it stays in sync
-      const view = this.viewManager.getView(viewId);
-      if (view) {
-        view.webContents.send("app/bounds-updated", newBounds);
-      }
     });
 
     return { success: true };
@@ -286,22 +266,5 @@ export class ViewHandler {
       this.resizeState = null;
     }
     return { success: true };
-  }
-
-  @CommandHandler("get-window-size")
-  async handleGetWindowSize(
-    args: Record<string, never>
-  ): Promise<any> {
-    // Get main window size from ipcBridge
-    const mainWindow = this.ipcBridge.getMainWindow();
-    if (!mainWindow) {
-      throw new Error("Main window not available");
-    }
-
-    const windowBounds = mainWindow.getBounds();
-    return {
-      width: windowBounds.width,
-      height: windowBounds.height,
-    };
   }
 }

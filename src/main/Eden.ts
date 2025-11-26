@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { IPCBridge } from "./core/IPCBridge";
 import { CommandRegistry } from "./core/CommandRegistry";
+import { SystemHandler } from "./core/SystemHandler";
 import { TilingConfig } from "../types";
 
 // Managers and Handlers
@@ -37,6 +38,7 @@ export class Eden {
   private packageHandler: PackageHandler;
   private processHandler: ProcessHandler;
   private viewHandler: ViewHandler;
+  private systemHandler: SystemHandler;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -76,10 +78,14 @@ export class Eden {
     // Initialize View Handler
     this.viewHandler = new ViewHandler(this.viewManager, this.ipcBridge);
 
+    // Initialize System Handler
+    this.systemHandler = new SystemHandler(this.ipcBridge);
+
     // Register handlers with the registry
     this.commandRegistry.registerManager(this.packageHandler);
     this.commandRegistry.registerManager(this.processHandler);
     this.commandRegistry.registerManager(this.viewHandler);
+    this.commandRegistry.registerManager(this.systemHandler);
 
     this.setupAppEventHandlers();
   }

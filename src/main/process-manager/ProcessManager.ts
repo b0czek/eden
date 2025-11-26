@@ -5,7 +5,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../core/IPCBridge";
 import { PackageManager } from "../package-manager/PackageManager";
-import { AppInstance, EventName, EventData, AppManifest } from "../../types";
+import { AppInstance, AppManifest, EventName, EventData } from "../../types";
 
 /**
  * ProcessManager
@@ -18,7 +18,6 @@ export class ProcessManager extends EventEmitter {
   private ipcBridge: IPCBridge;
   private packageManager: PackageManager;
   private runningApps: Map<string, AppInstance> = new Map();
-  private isShuttingDown: boolean = false;
   private appsDirectory: string;
 
   constructor(
@@ -47,6 +46,8 @@ export class ProcessManager extends EventEmitter {
   ): boolean {
     return this.emit(event, data);
   }
+
+
 
   /**
    * Setup event handlers
@@ -78,7 +79,7 @@ export class ProcessManager extends EventEmitter {
         if (viewInfo) {
           const channel = `app-${appId}`;
           const requestChannel = `app-${appId}-request`;
-          viewInfo.view.webContents.send("app/set-channel", {
+          viewInfo.view.webContents.send("app-set-channel", {
             channel,
             requestChannel,
           });
@@ -141,10 +142,6 @@ export class ProcessManager extends EventEmitter {
       this.syncRunningAppsState();
 
       this.emitEvent("process/launched", { instance });
-      this.ipcBridge.systemBroadcast("app/launched", {
-        appId,
-        instanceId,
-      });
 
       // Return serializable data only
       return {
@@ -185,10 +182,7 @@ export class ProcessManager extends EventEmitter {
 
       this.emitEvent("process/stopped", { appId });
 
-      // Only broadcast if not shutting down
-      if (!this.isShuttingDown) {
-        this.ipcBridge.systemBroadcast("app/stopped", { appId });
-      }
+
     } catch (error) {
       console.error(`Failed to stop app ${appId}:`, error);
       throw error;
@@ -250,7 +244,6 @@ export class ProcessManager extends EventEmitter {
    * Shutdown all apps
    */
   async shutdown(): Promise<void> {
-    this.isShuttingDown = true;
     const runningAppIds = Array.from(this.runningApps.keys());
 
     console.log(`Stopping ${runningAppIds.length} running app(s)...`);
@@ -286,4 +279,7 @@ export class ProcessManager extends EventEmitter {
       running: runningApps,
     };
   }
+
+
+
 }

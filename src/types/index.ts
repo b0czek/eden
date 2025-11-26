@@ -104,6 +104,8 @@ export interface ViewBounds {
 // Export new command types
 export type { CommandName, CommandArgs, CommandResult, CommandMap } from "./commands";
 
-
-
+// Export event types
 export * from "./events";
+
+// Export subscription types
+export * from "./subscriptions";

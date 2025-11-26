@@ -56,7 +56,7 @@ export function setupWindowResizing(
     const updateResizePosition = () => {
         const appId = window.appAPI?.getAppId();
         if (pendingBounds && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/update-view-bounds', {
+            window.edenAPI.shellCommand('view/update-view-bounds', {
                 appId,
                 bounds: pendingBounds
             }).catch(console.error);
@@ -109,13 +109,13 @@ export function setupWindowResizing(
         // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
         // Touch users need to tap elsewhere to focus, then tap resize handle
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/focus-app', { appId }).catch(console.error);
+            window.edenAPI.shellCommand('view/focus-app', { appId }).catch(console.error);
         }
 
         // For mouse events, use global tracking in main process
         // For touch events, we'll handle updates in touchmove
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/start-resize', {
+            window.edenAPI.shellCommand('view/start-resize', {
                 appId,
                 startX: coords.x,
                 startY: coords.y
@@ -200,7 +200,7 @@ export function setupWindowResizing(
 
             // Send final pending bounds immediately
             if (pendingBounds && window.edenAPI && appId) {
-                window.edenAPI.shellCommand('app/update-view-bounds', {
+                window.edenAPI.shellCommand('view/update-view-bounds', {
                     appId,
                     bounds: pendingBounds
                 }).catch(console.error);
@@ -219,7 +219,7 @@ export function setupWindowResizing(
 
         // Stop global resize tracking in main process (for mouse events)
         if (!isTouch && window.edenAPI && appId) {
-            window.edenAPI.shellCommand('app/end-resize', { appId }).catch(console.error);
+            window.edenAPI.shellCommand('view/end-resize', { appId }).catch(console.error);
         }
     };
 
