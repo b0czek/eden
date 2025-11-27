@@ -24,6 +24,7 @@ export class Eden {
   private ipcBridge: IPCBridge;
   private commandRegistry: CommandRegistry;
   private appsDirectory: string;
+  private userDirectory: string;
   private config: EdenConfig;
 
   // New components
@@ -42,6 +43,10 @@ export class Eden {
     // Set apps directory to user data + /eden-apps or custom path
     this.appsDirectory =
       config.appsDirectory || path.join(app.getPath("userData"), "eden-apps");
+
+    // Set user directory to user data + /eden-user or custom path
+    this.userDirectory =
+      config.userDirectory || path.join(app.getPath("userData"), "eden-user");
 
     // Initialize core managers
     // 1. Command Registry (required by others)
@@ -83,7 +88,7 @@ export class Eden {
     container.registerInstance("SystemHandler", this.systemHandler);
 
     // Initialize Filesystem Handler
-    this.filesystemHandler = new FilesystemHandler(this.appsDirectory);
+    this.filesystemHandler = new FilesystemHandler(this.userDirectory);
     container.registerInstance("FilesystemHandler", this.filesystemHandler);
     this.commandRegistry.registerManager(this.filesystemHandler);
 

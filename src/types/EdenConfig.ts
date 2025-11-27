@@ -24,6 +24,7 @@ export interface TilingConfig {
 
 export interface EdenConfig {
   appsDirectory?: string;
+  userDirectory?: string;
   window?: {
     width?: number;
     height?: number;
