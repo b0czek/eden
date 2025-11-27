@@ -156,7 +156,7 @@ function extractEventDeclarations(sourceFile: ts.SourceFile): EventInfo[] {
           currentNamespace = args[0].text;
         }
 
-        // Second argument is options object with events property
+        // OPTIONAL: Second argument is options object with events property
         if (args.length > 1 && ts.isObjectLiteralExpression(args[1])) {
           const eventsProperty = args[1].properties.find(
             (prop) => ts.isPropertyAssignment(prop) && 
@@ -167,6 +167,29 @@ function extractEventDeclarations(sourceFile: ts.SourceFile): EventInfo[] {
           if (eventsProperty && ts.isPropertyAssignment(eventsProperty)) {
             if (ts.isStringLiteral(eventsProperty.initializer)) {
               eventsInterfaceName = eventsProperty.initializer.text;
+            }
+          }
+        }
+      }
+
+      // Extract events interface from extends EdenEmitter<InterfaceName>
+      if (!eventsInterfaceName && node.heritageClauses) {
+        for (const clause of node.heritageClauses) {
+          if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+            for (const type of clause.types) {
+              // Check if extending EdenEmitter
+              if (ts.isExpressionWithTypeArguments(type)) {
+                const expr = type.expression;
+                if (ts.isIdentifier(expr) && expr.text === "EdenEmitter") {
+                  // Extract the generic type argument
+                  if (type.typeArguments && type.typeArguments.length > 0) {
+                    const typeArg = type.typeArguments[0];
+                    if (ts.isTypeReferenceNode(typeArg) && ts.isIdentifier(typeArg.typeName)) {
+                      eventsInterfaceName = typeArg.typeName.text;
+                    }
+                  }
+                }
+              }
             }
           }
         }

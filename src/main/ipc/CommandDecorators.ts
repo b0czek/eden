@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import {
   setManagerNamespace,
   addCommandHandler,
@@ -50,6 +51,7 @@ export interface EdenNamespaceOptions {
 export function EdenNamespace(namespace: string, options?: EdenNamespaceOptions) {
   return function <T extends { new (...args: any[]): {} }>(constructor: T) {
     setManagerNamespace(constructor, namespace);
+    Reflect.defineMetadata("eden:namespace", namespace, constructor);
     
     // Store events interface name if provided for codegen
     if (options?.events) {

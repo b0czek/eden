@@ -3,14 +3,13 @@ import * as path from "path";
 import { randomUUID } from "crypto";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCBridge } from "../ipc/IPCBridge";
+import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
 import { AppInstance, AppManifest, EventName, EventData } from "../../types";
 
 import { injectable, inject } from "tsyringe";
-import { CommandRegistry } from "../ipc/CommandRegistry";
+import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
-import { EdenNamespace } from "../ipc/CommandDecorators";
 
 /**
  * Events emitted by the ProcessManager
@@ -28,11 +27,10 @@ interface ProcessNamespaceEvents {
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
 @injectable()
-@EdenNamespace("process", { events: "ProcessNamespaceEvents" })
-export class ProcessManager extends EventEmitter {
+@EdenNamespace("process")
+export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
-  private ipcBridge: IPCBridge;
   private packageManager: PackageManager;
   private runningApps: Map<string, AppInstance> = new Map();
   private appsDirectory: string;
@@ -46,10 +44,9 @@ export class ProcessManager extends EventEmitter {
     @inject("appsDirectory") appsDirectory: string,
     @inject("CommandRegistry") commandRegistry: CommandRegistry
   ) {
-    super();
+    super(ipcBridge);
     this.workerManager = workerManager;
     this.viewManager = viewManager;
-    this.ipcBridge = ipcBridge;
     this.packageManager = packageManager;
     this.appsDirectory = appsDirectory;
 
@@ -58,16 +55,6 @@ export class ProcessManager extends EventEmitter {
     // Create and register handler
     this.processHandler = new ProcessHandler(this);
     commandRegistry.registerManager(this.processHandler);
-  }
-
-  /**
-   * Type-safe event emitter
-   */
-  private emitEvent<T extends EventName>(
-    event: T,
-    data: EventData<T>
-  ): boolean {
-    return this.emit(event, data);
   }
 
 
@@ -164,7 +151,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.set(appId, instance);
       this.syncRunningAppsState();
 
-      this.ipcBridge.eventSubscribers.notify("process/launched", { instance });
+      this.notify("launched", { instance });
 
       // Return serializable data only
       return {
@@ -203,8 +190,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.ipcBridge.eventSubscribers.notify("process/stopped", { appId });
-
+      this.notify("stopped", { appId });
 
     } catch (error) {
       console.error(`Failed to stop app ${appId}:`, error);
@@ -240,7 +226,7 @@ export class ProcessManager extends EventEmitter {
     const instance = this.runningApps.get(appId);
     if (instance) {
       instance.state = "error";
-      this.ipcBridge.eventSubscribers.notify("process/error", { appId, error });
+      this.notify("error", { appId, error });
     }
   }
 
@@ -259,7 +245,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.ipcBridge.eventSubscribers.notify("process/exited", { appId, code });
+      this.notify("exited", { appId, code });
     }
   }
 

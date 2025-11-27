@@ -1,5 +1,5 @@
 import { ViewBounds } from "../../types";
-import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace } from "../ipc";
 import { ProcessManager } from "./ProcessManager";
 
 @EdenNamespace("process")

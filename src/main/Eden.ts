@@ -1,8 +1,7 @@
 import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { IPCBridge } from "./ipc/IPCBridge";
-import { CommandRegistry } from "./ipc/CommandRegistry";
+import { IPCBridge, CommandRegistry } from "./ipc";
 import { SystemHandler } from "./SystemHandler";
 import { EdenConfig } from "../types";
 

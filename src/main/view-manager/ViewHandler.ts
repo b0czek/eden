@@ -1,6 +1,5 @@
-import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace, IPCBridge, EdenEmitter } from "../ipc";
 import { ViewManager } from "./ViewManager";
-import { IPCBridge } from "../ipc/IPCBridge";
 import { MouseTracker } from "./MouseTracker";
 import { AppInstance, ViewBounds } from "../../types";
 
@@ -12,10 +11,9 @@ interface ViewNamespaceEvents {
   "workspace-bounds-changed": { bounds: ViewBounds };
 }
 
-@EdenNamespace("view", { events: "ViewNamespaceEvents" })
-export class ViewHandler {
+@EdenNamespace("view")
+export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
   private viewManager: ViewManager;
-  private ipcBridge: IPCBridge;
   private mouseTracker: MouseTracker;
   
   // Global drag/resize tracking
@@ -43,8 +41,8 @@ export class ViewHandler {
     viewManager: ViewManager,
     ipcBridge: IPCBridge
   ) {
+    super(ipcBridge);
     this.viewManager = viewManager;
-    this.ipcBridge = ipcBridge;
     this.mouseTracker = new MouseTracker(8); // ~120fps
   }
 
@@ -101,7 +99,7 @@ export class ViewHandler {
 
     this.viewManager.setWorkspaceBounds(bounds);
     
-    this.ipcBridge.eventSubscribers.notify("view/workspace-bounds-changed", {
+    this.notify("workspace-bounds-changed", {
       bounds,
     });
 
@@ -169,7 +167,7 @@ export class ViewHandler {
       };
 
       this.viewManager.setViewBounds(viewId, newBounds);
-      this.ipcBridge.eventSubscribers.notifyView(viewId, "view/bounds-updated", newBounds);
+      this.notifySubscriber(viewId, "bounds-updated", newBounds);
 
     });
 
@@ -260,7 +258,7 @@ export class ViewHandler {
       };
 
       this.viewManager.setViewBounds(viewId, newBounds);
-      this.ipcBridge.eventSubscribers.notifyView(viewId, "view/bounds-updated", newBounds);
+      this.notifySubscriber(viewId, "bounds-updated", newBounds);
 
     });
 

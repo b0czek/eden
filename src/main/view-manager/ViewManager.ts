@@ -14,9 +14,8 @@ import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./typ
 
 
 import { injectable, inject } from "tsyringe";
-import { CommandRegistry } from "../ipc/CommandRegistry";
+import { CommandRegistry, IPCBridge } from "../ipc";
 import { ViewHandler } from "./ViewHandler";
-import { IPCBridge } from "../ipc/IPCBridge";
 
 @injectable()
 export class ViewManager extends EventEmitter {

@@ -1,13 +1,11 @@
-import { EventEmitter } from "events";
 import * as fs from "fs/promises";
 import * as path from "path";
 import AdmZip from "adm-zip";
-import { AppManifest, EventName, EventData } from "../../types";
-import { IPCBridge } from "../ipc/IPCBridge";
-import { injectable, inject } from "tsyringe";
-import { CommandRegistry } from "../ipc/CommandRegistry";
+import { AppManifest } from "../../types";
+import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
-import { EdenNamespace } from "../ipc/CommandDecorators";
+import { injectable, inject } from "tsyringe";
+
 
 /**
  * Events emitted by the PackageManager
@@ -18,9 +16,8 @@ interface PackageNamespaceEvents {
 }
 
 @injectable()
-@EdenNamespace("package", { events: "PackageNamespaceEvents" })
-export class PackageManager extends EventEmitter {
-  private ipcBridge: IPCBridge;
+@EdenNamespace("package")
+export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private appsDirectory: string;
   private installedApps: Map<string, AppManifest> = new Map();
   private packageHandler: PackageHandler;
@@ -30,25 +27,13 @@ export class PackageManager extends EventEmitter {
     @inject("appsDirectory") appsDirectory: string,
     @inject("CommandRegistry") commandRegistry: CommandRegistry
   ) {
-    super();
-    this.ipcBridge = ipcBridge;
+    super(ipcBridge);
     this.appsDirectory = appsDirectory;
     
     // Create and register handler
     this.packageHandler = new PackageHandler(this);
     commandRegistry.registerManager(this.packageHandler);
   }
-
-  /**
-   * Type-safe event emitter
-   */
-  private emitEvent<T extends EventName>(
-    event: T,
-    data: EventData<T>
-  ): boolean {
-    return this.emit(event, data);
-  }
-
 
 
   /**
@@ -150,7 +135,7 @@ export class PackageManager extends EventEmitter {
     // Register app
     this.installedApps.set(manifest.id, manifest);
 
-    this.ipcBridge.eventSubscribers.notify("package/installed", { manifest });
+    this.notify("installed", { manifest });
 
     return manifest;
   }
@@ -178,7 +163,7 @@ export class PackageManager extends EventEmitter {
     // Unregister
     this.installedApps.delete(appId);
 
-    this.ipcBridge.eventSubscribers.notify("package/uninstalled", { appId });
+    this.notify("uninstalled", { appId });
     
     return true;
   }

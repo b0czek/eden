@@ -1,4 +1,4 @@
-import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
 
 @EdenNamespace("package")

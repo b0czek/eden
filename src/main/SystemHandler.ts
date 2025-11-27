@@ -1,7 +1,5 @@
-import { EdenHandler, EdenNamespace } from "./ipc/CommandDecorators";
-import { IPCBridge } from "./ipc/IPCBridge";
+import { EdenHandler, EdenNamespace, IPCBridge, CommandRegistry } from "./ipc";
 import { injectable, inject } from "tsyringe";
-import { CommandRegistry } from "./ipc/CommandRegistry";
 
 @injectable()
 @EdenNamespace("system")
