@@ -78,7 +78,5 @@ export type { CommandName, CommandArgs, CommandResult, CommandMap } from "./comm
 // Export event types
 export * from "./events";
 
-// Export subscription types
-export * from "./subscriptions";
 
 
