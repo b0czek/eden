@@ -1,5 +1,6 @@
 // Re-export the Eden library
-export { Eden, EdenConfig } from "./Eden";
+export { Eden } from "./Eden";
+export { EdenConfig } from "../types";
 
 // Re-export core managers for library usage
 export { PackageManager } from "./package-manager";

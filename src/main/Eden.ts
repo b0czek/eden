@@ -4,7 +4,7 @@ import * as path from "path";
 import { IPCBridge } from "./ipc/IPCBridge";
 import { CommandRegistry } from "./ipc/CommandRegistry";
 import { SystemHandler } from "./SystemHandler";
-import { TilingConfig } from "../types";
+import { EdenConfig } from "../types";
 
 // Managers and Handlers
 import { PackageManager, PackageHandler } from "./package-manager";
@@ -12,17 +12,7 @@ import { ProcessManager, ProcessHandler, WorkerManager } from "./process-manager
 import { ViewManager, ViewHandler } from "./view-manager";
 import { container } from "tsyringe";
 
-export interface EdenConfig {
-  appsDirectory?: string;
-  window?: {
-    width?: number;
-    height?: number;
-    title?: string;
-    backgroundColor?: string;
-  };
-  tiling?: TilingConfig;
-  development?: boolean;
-}
+
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
@@ -55,6 +45,9 @@ export class Eden {
     this.commandRegistry = new CommandRegistry();
     container.registerInstance("CommandRegistry", this.commandRegistry);
 
+    // Register Config
+    container.registerInstance("EdenConfig", this.config);
+
     // 2. Worker Manager
     this.workerManager = new WorkerManager();
     container.registerInstance("WorkerManager", this.workerManager);
@@ -64,9 +57,8 @@ export class Eden {
     this.ipcBridge = new IPCBridge(this.workerManager, this.commandRegistry);
     container.registerInstance("IPCBridge", this.ipcBridge);
 
-    // 4. ViewManager (depends on CommandRegistry, IPCBridge)
+    // 4. ViewManager (depends on CommandRegistry, IPCBridge, EdenConfig)
     this.viewManager = container.resolve(ViewManager);
-    this.viewManager.setTilingConfig(config.tiling || { mode: "none", gap: 0, padding: 0 });
     container.registerInstance("ViewManager", this.viewManager);
     
     // 5. Break circular dependency: Set ViewManager on IPCBridge

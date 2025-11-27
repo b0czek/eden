@@ -6,7 +6,7 @@ import {
 import { EventEmitter } from "events";
 import * as path from "path";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { AppManifest, TilingConfig, WindowConfig } from "../../types";
+import { AppManifest, TilingConfig, WindowConfig, EdenConfig } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
@@ -42,10 +42,12 @@ export class ViewManager extends EventEmitter {
 
   constructor(
     @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("IPCBridge") ipcBridge: IPCBridge
+    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject("EdenConfig") config: EdenConfig
   ) {
     super();
     this.ipcBridge = ipcBridge;
+    this.tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
     this.floatingWindows = new FloatingWindowController(
       () => this.workspaceBounds,
       () => this.views.values()
@@ -57,12 +59,7 @@ export class ViewManager extends EventEmitter {
     commandRegistry.registerManager(this.viewHandler);
   }
 
-  public setTilingConfig(config: TilingConfig): void {
-    this.tilingConfig = config;
-    if (this.tilingConfig.mode !== "none") {
-      this.recalculateTiledViews();
-    }
-  }
+
 
   /**
    * Set the main window that will host the views
