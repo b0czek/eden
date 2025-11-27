@@ -140,7 +140,7 @@ export class PackageManager extends EventEmitter {
     // Register app
     this.installedApps.set(manifest.id, manifest);
 
-    this.emitEvent("package/installed", { manifest });
+    this.ipcBridge.eventSubscribers.notify("package/installed", { manifest });
 
     return manifest;
   }
@@ -168,7 +168,7 @@ export class PackageManager extends EventEmitter {
     // Unregister
     this.installedApps.delete(appId);
 
-    this.emitEvent("package/uninstalled", { appId });
+    this.ipcBridge.eventSubscribers.notify("package/uninstalled", { appId });
     
     return true;
   }

@@ -152,7 +152,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.set(appId, instance);
       this.syncRunningAppsState();
 
-      this.emitEvent("process/launched", { instance });
+      this.ipcBridge.eventSubscribers.notify("process/launched", { instance });
 
       // Return serializable data only
       return {
@@ -191,7 +191,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.emitEvent("process/stopped", { appId });
+      this.ipcBridge.eventSubscribers.notify("process/stopped", { appId });
 
 
     } catch (error) {
@@ -228,7 +228,7 @@ export class ProcessManager extends EventEmitter {
     const instance = this.runningApps.get(appId);
     if (instance) {
       instance.state = "error";
-      this.emitEvent("process/error", { appId, error });
+      this.ipcBridge.eventSubscribers.notify("process/error", { appId, error });
     }
   }
 
@@ -247,7 +247,7 @@ export class ProcessManager extends EventEmitter {
       this.runningApps.delete(appId);
       this.syncRunningAppsState();
 
-      this.emitEvent("process/exited", { appId, code });
+      this.ipcBridge.eventSubscribers.notify("process/exited", { appId, code });
     }
   }
 
