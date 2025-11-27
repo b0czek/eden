@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
 // Per-app channel names (received from main process)
 let appId: string | null = null;
@@ -10,21 +10,31 @@ const messageListeners: Array<(message: any) => void> = [];
 const eventSubscriptions: Map<string, Set<Function>> = new Map();
 
 // Wait for initialization from main process
-ipcRenderer.once('app-init-api', (_event: any, { appId: id, channel, requestChannel }: { appId: string; channel: string; requestChannel: string }) => {
-  appId = id;
-  appChannel = channel;
-  appRequestChannel = requestChannel;
-  
-  console.log(`App API initialized for ${appId} on channel ${channel}`);
-});
+ipcRenderer.once(
+  "app-init-api",
+  (
+    _event: any,
+    {
+      appId: id,
+      channel,
+      requestChannel,
+    }: { appId: string; channel: string; requestChannel: string }
+  ) => {
+    appId = id;
+    appChannel = channel;
+    appRequestChannel = requestChannel;
+
+    console.log(`App API initialized for ${appId} on channel ${channel}`);
+  }
+);
 
 // Set up unified message listener for shell-message channel
-ipcRenderer.on('shell-message', (_event: any, message: any) => {
+ipcRenderer.on("shell-message", (_event: any, message: any) => {
   const { type, payload } = message;
   const callbacks = eventSubscriptions.get(type);
-  
+
   if (callbacks) {
-    callbacks.forEach(callback => {
+    callbacks.forEach((callback) => {
       try {
         callback(payload);
       } catch (err) {
@@ -35,14 +45,14 @@ ipcRenderer.on('shell-message', (_event: any, message: any) => {
 });
 
 // Expose safe API to the app
-contextBridge.exposeInMainWorld('appAPI', {
+contextBridge.exposeInMainWorld("appAPI", {
   /**
    * Send a message to this app's backend
    * @param {object} message - Message to send to backend
    */
   sendMessage: (message: any) => {
     if (!appChannel) {
-      throw new Error('App API not yet initialized');
+      throw new Error("App API not yet initialized");
     }
     ipcRenderer.send(appChannel, message);
   },
@@ -54,7 +64,7 @@ contextBridge.exposeInMainWorld('appAPI', {
    */
   sendRequest: async (message: any) => {
     if (!appRequestChannel) {
-      throw new Error('App API not yet initialized');
+      throw new Error("App API not yet initialized");
     }
     return ipcRenderer.invoke(appRequestChannel, message);
   },
@@ -64,8 +74,8 @@ contextBridge.exposeInMainWorld('appAPI', {
    * @param {function} callback - Called when backend sends a message
    */
   onMessage: (callback: (message: any) => void) => {
-    if (typeof callback !== 'function') {
-      throw new Error('Callback must be a function');
+    if (typeof callback !== "function") {
+      throw new Error("Callback must be a function");
     }
     messageListeners.push(callback);
   },
@@ -77,12 +87,10 @@ contextBridge.exposeInMainWorld('appAPI', {
   getAppId: () => {
     return appId;
   },
-
-
 });
 
 // Expose edenAPI for shell commands and event subscriptions
-contextBridge.exposeInMainWorld('edenAPI', {
+contextBridge.exposeInMainWorld("edenAPI", {
   /**
    * Execute shell commands (e.g., stop-app, set-view-visibility)
    * @param {string} command - The command to execute
@@ -90,8 +98,8 @@ contextBridge.exposeInMainWorld('edenAPI', {
    * @returns {Promise} Command result
    */
   shellCommand: (command: string, args: any) => {
-    console.log('Executing shell command:', command, args);
-    return ipcRenderer.invoke('shell-command', command, args);
+    console.log("Executing shell command:", command, args);
+    return ipcRenderer.invoke("shell-command", command, args);
   },
 
   /**
@@ -100,20 +108,20 @@ contextBridge.exposeInMainWorld('edenAPI', {
    * @param {function} callback - Called when event is emitted
    */
   subscribe: async (eventName: string, callback: Function) => {
-    if (typeof callback !== 'function') {
-      throw new Error('Callback must be a function');
+    if (typeof callback !== "function") {
+      throw new Error("Callback must be a function");
     }
-    
+
     // Register with backend (tells backend to send this event to us)
-    await ipcRenderer.invoke('event/subscribe', eventName);
-    
+    await ipcRenderer.invoke("event-subscribe", eventName);
+
     // Register callback locally
     if (!eventSubscriptions.has(eventName)) {
       eventSubscriptions.set(eventName, new Set());
     }
     eventSubscriptions.get(eventName)!.add(callback);
   },
-  
+
   /**
    * Unsubscribe from an event
    * @param {string} eventName - Name of the event to unsubscribe from
@@ -123,23 +131,22 @@ contextBridge.exposeInMainWorld('edenAPI', {
     const callbacks = eventSubscriptions.get(eventName);
     if (callbacks) {
       callbacks.delete(callback);
-      
+
       // If no more callbacks, unregister from backend
       if (callbacks.size === 0) {
         eventSubscriptions.delete(eventName);
-        await ipcRenderer.invoke('event/unsubscribe', eventName);
+        await ipcRenderer.invoke("event-unsubscribe", eventName);
       }
     }
   },
-  
+
   /**
    * Check if an event is supported
    * @param {string} eventName - Name of the event to check
    */
   isEventSupported: (eventName: string) => {
-    return ipcRenderer.invoke('events/check-existence', eventName);
-  }
+    return ipcRenderer.invoke("event-exists", eventName);
+  },
 });
 
-console.log('Universal app preload loaded');
-  
+console.log("Universal app preload loaded");

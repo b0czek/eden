@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld("edenAPI", {
         }
 
         // Register with backend (tells backend to send this event to us)
-        await ipcRenderer.invoke('event/subscribe', eventName);
+        await ipcRenderer.invoke('event-subscribe', eventName);
 
         // Setup local listener infrastructure if needed
         if (!window._edenEventListeners) {
@@ -51,15 +51,14 @@ contextBridge.exposeInMainWorld("edenAPI", {
             // If no more listeners, unregister from backend
             if (listeners.size === 0) {
                 window._edenEventListeners.delete(eventName);
-                await ipcRenderer.invoke('event/unsubscribe', eventName);
+                await ipcRenderer.invoke('event-unsubscribe', eventName);
             }
         }
     },
 
-    isEventSupported: (eventName) => ipcRenderer.invoke("events/check-existence", eventName),
+    isEventSupported: (eventName) => ipcRenderer.invoke("event-exists", eventName),
 
     // File system
-    selectDirectory: () => ipcRenderer.invoke("select-directory"),
     selectFile: (options) => ipcRenderer.invoke("select-file", options),
 });
 

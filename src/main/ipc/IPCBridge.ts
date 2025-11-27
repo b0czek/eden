@@ -77,7 +77,6 @@ export class IPCBridge extends EventEmitter {
     return this.mainWindow;
   }
 
-
   /**
    * Setup IPC handlers for renderer processes
    */
@@ -116,68 +115,54 @@ export class IPCBridge extends EventEmitter {
     );
 
     // Event existence check
-    ipcMain.handle("events/check-existence", async (_event, eventName: string) => {
+    ipcMain.handle("event-exists", async (_event, eventName: string) => {
       return APP_EVENT_NAMES.includes(eventName as any);
     });
 
     // Event subscription handlers
-    ipcMain.handle("event/subscribe", async (event, eventName: string) => {
+    ipcMain.handle("event-subscribe", async (event, eventName: string) => {
       const senderId = event.sender.id;
-      
+
       // Validate event name
       if (!APP_EVENT_NAMES.includes(eventName as any)) {
         throw new Error(`Event '${eventName}' is not supported`);
       }
-      
+
       // Find view by sender
       const viewInfo = Array.from(this.viewManager.getActiveViews())
         .map((id) => this.viewManager.getViewInfo(id))
         .find((info) => info?.view.webContents.id === senderId);
-      
+
       if (!viewInfo) {
         throw new Error("View not found");
       }
-      
+
       // Get the actual viewId from the view info (not webContents.id)
-      const viewId = Array.from(this.viewManager.getActiveViews())
-        .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
-      
+      const viewId = Array.from(this.viewManager.getActiveViews()).find(
+        (id) => this.viewManager.getViewInfo(id) === viewInfo
+      )!;
+
       return this.eventSubscribers.subscribe(viewId, eventName);
     });
 
-    ipcMain.handle("event/unsubscribe", async (event, eventName: string) => {
+    ipcMain.handle("event-unsubscribe", async (event, eventName: string) => {
       const senderId = event.sender.id;
-      
+
       // Find view by sender
       const viewInfo = Array.from(this.viewManager.getActiveViews())
         .map((id) => this.viewManager.getViewInfo(id))
         .find((info) => info?.view.webContents.id === senderId);
-      
+
       if (!viewInfo) {
         throw new Error("View not found");
       }
-      
+
       // Get the actual viewId from the view info (not webContents.id)
-      const viewId = Array.from(this.viewManager.getActiveViews())
-        .find(id => this.viewManager.getViewInfo(id) === viewInfo)!;
-      
+      const viewId = Array.from(this.viewManager.getActiveViews()).find(
+        (id) => this.viewManager.getViewInfo(id) === viewInfo
+      )!;
+
       return this.eventSubscribers.unsubscribe(viewId, eventName);
-    });
-
-    // File selection dialog for .edenite files
-    ipcMain.handle("select-directory", async () => {
-      if (!this.mainWindow) return null;
-
-      const result = await dialog.showOpenDialog(this.mainWindow, {
-        properties: ["openFile"],
-        title: "Select .edenite App Package",
-        filters: [
-          { name: "Eden App Package", extensions: ["edenite"] },
-          { name: "All Files", extensions: ["*"] },
-        ],
-      });
-
-      return result.canceled ? null : result.filePaths[0];
     });
 
     // Generic file selection dialog
@@ -413,8 +398,6 @@ export class IPCBridge extends EventEmitter {
     }
   }
 
-
-
   /**
    * Handle shell commands (app management, etc.)
    */
@@ -424,7 +407,9 @@ export class IPCBridge extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) timed out after 10s`);
+        console.error(
+          `[IPCBridge] Command '${command}' (ID: ${commandId}) timed out after 10s`
+        );
         this.pendingCommands.delete(commandId);
         reject(new Error(`Command '${command}' timed out`));
       }, 10000);
@@ -440,15 +425,16 @@ export class IPCBridge extends EventEmitter {
           resolve(result);
         })
         .catch((error) => {
-          console.error(`[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`, error);
+          console.error(
+            `[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`,
+            error
+          );
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);
           reject(error);
         });
     });
   }
-
-
 
   /**
    * Provide running-app updates from the AppManager
@@ -488,10 +474,9 @@ export class IPCBridge extends EventEmitter {
     ipcMain.removeAllListeners("app-message");
     ipcMain.removeHandler("app-message-request");
     ipcMain.removeHandler("shell-command");
-    ipcMain.removeHandler("events/check-existence");
-    ipcMain.removeHandler("event/subscribe");
-    ipcMain.removeHandler("event/unsubscribe");
-    ipcMain.removeHandler("select-directory");
+    ipcMain.removeHandler("event-exists");
+    ipcMain.removeHandler("event-subscribe");
+    ipcMain.removeHandler("event-unsubscribe");
     ipcMain.removeHandler("select-file");
   }
 }
