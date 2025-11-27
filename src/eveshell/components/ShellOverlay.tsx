@@ -18,7 +18,7 @@ interface AppInfo {
 }
 
 // Constants
-const DOCK_HEIGHT = 80; // Should match --eden-layout-dock-height in pixels
+const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
 
 export default function ShellOverlay() {
   const [runningApps, setRunningApps] = createSignal<Set<string>>(new Set());

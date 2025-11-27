@@ -186,7 +186,7 @@ export class Eden {
 
     const eveshellPath = path.join(__dirname, "../eveshell");
     const windowBounds = this.mainWindow.getBounds();
-    const DOCK_HEIGHT = 80; // Should match CSS variable
+    const DOCK_HEIGHT = 72; // Should match CSS variable
 
     // Initial bounds: dock mode at bottom
     const initialBounds = {

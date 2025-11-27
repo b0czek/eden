@@ -34,7 +34,7 @@ body {
     background: transparent;
     /* Don't capture pointer events - let app views handle them */
     pointer-events: none;
-    /* Reserve space for dock at the bottom (80px = DOCK_HEIGHT) */
-    padding-bottom: 80px;
+    /* Reserve space for dock at the bottom (72px = DOCK_HEIGHT) */
+    padding-bottom: 72px;
     box-sizing: border-box;
 }
