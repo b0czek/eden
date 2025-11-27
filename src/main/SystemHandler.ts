@@ -1,5 +1,6 @@
 import { EdenHandler, EdenNamespace, IPCBridge, CommandRegistry } from "./ipc";
 import { injectable, inject } from "tsyringe";
+import { SystemInfo, WindowSize } from "../types";
 
 @injectable()
 @EdenNamespace("system")
@@ -11,8 +12,11 @@ export class SystemHandler {
     commandRegistry.registerManager(this);
   }
 
+  /**
+   * Get system information including platform, versions, and running apps.
+   */
   @EdenHandler("info")
-  async handleSystemInfo(): Promise<any> {
+  async handleSystemInfo(): Promise<SystemInfo> {
     return {
       platform: process.platform,
       arch: process.arch,
@@ -22,8 +26,11 @@ export class SystemHandler {
     };
   }
 
+  /**
+   * Get the current dimensions of the main window.
+   */
   @EdenHandler("window-size")
-  async handleGetWindowSize(): Promise<any> {
+  async handleGetWindowSize(): Promise<WindowSize> {
     const mainWindow = this.ipcBridge.getMainWindow();
     if (!mainWindow) {
       throw new Error("Main window not available");

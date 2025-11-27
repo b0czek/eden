@@ -24,6 +24,9 @@ export class FilesystemHandler {
     return resolved;
   }
 
+  /**
+   * Read the contents of a file.
+   */
   @EdenHandler("read")
   async handleReadFile(args: {
     path: string;
@@ -34,6 +37,9 @@ export class FilesystemHandler {
     return await fs.readFile(fullPath, encoding);
   }
 
+  /**
+   * Write content to a file, creating directories if needed.
+   */
   @EdenHandler("write")
   async handleWriteFile(args: {
     path: string;
@@ -49,6 +55,9 @@ export class FilesystemHandler {
     await fs.writeFile(fullPath, content, encoding);
   }
 
+  /**
+   * Check if a file or directory exists.
+   */
   @EdenHandler("exists")
   async handleExists(args: { path: string }): Promise<boolean> {
     const { path: targetPath } = args;
@@ -61,6 +70,9 @@ export class FilesystemHandler {
     }
   }
 
+  /**
+   * Create a directory and any necessary parent directories.
+   */
   @EdenHandler("mkdir")
   async handleMkdir(args: { path: string }): Promise<void> {
     const { path: targetPath } = args;
@@ -68,6 +80,9 @@ export class FilesystemHandler {
     await fs.mkdir(fullPath, { recursive: true });
   }
 
+  /**
+   * List contents of a directory.
+   */
   @EdenHandler("readdir")
   async handleReaddir(args: { path: string }): Promise<string[]> {
     const { path: targetPath } = args;
@@ -75,6 +90,9 @@ export class FilesystemHandler {
     return await fs.readdir(fullPath);
   }
 
+  /**
+   * Get file or directory statistics.
+   */
   @EdenHandler("stat")
   async handleStat(args: { path: string }): Promise<{
     isFile: boolean;

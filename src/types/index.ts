@@ -1,9 +1,8 @@
-import { AppManifest } from './AppManifest';
-
+import { AppManifest } from "./AppManifest";
 
 export * from "./EdenConfig";
 
-export * from './AppManifest';
+export * from "./AppManifest";
 
 /**
  * App Instance Interface
@@ -64,7 +63,6 @@ export interface IPCMessage {
   timestamp: number;
 }
 
-
 export interface ViewBounds {
   x: number;
   y: number;
@@ -73,10 +71,36 @@ export interface ViewBounds {
 }
 
 // Export new command types
-export type { CommandName, CommandArgs, CommandResult, CommandMap } from "./commands";
+export type {
+  CommandName,
+  CommandArgs,
+  CommandResult,
+  CommandMap,
+} from "./commands";
 
 // Export event types
 export * from "./events";
 
+export interface SystemInfo {
+  platform: NodeJS.Platform;
+  arch: string;
+  nodeVersion: string;
+  electronVersion: string;
+  runningApps: string[];
+}
 
+export interface WindowSize {
+  width: number;
+  height: number;
+}
 
+export interface LaunchResult {
+  success: boolean;
+  instanceId: string;
+  appId: string;
+}
+
+export interface AppStatus {
+  installed: AppManifest[];
+  running: Omit<AppInstance, "worker">[];
+}

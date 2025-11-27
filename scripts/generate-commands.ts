@@ -7,339 +7,40 @@
  * Usage: ts-node scripts/generate-commands.ts
  */
 
-import * as ts from "typescript";
-import * as fs from "fs";
+import { Project, SyntaxKind, ClassDeclaration, Node, JSDoc } from "ts-morph";
 import * as path from "path";
+import * as fs from "fs";
 
 interface CommandInfo {
   namespace: string;
   command: string;
   argsType: string;
   returnType: string;
+  docs: string[];
 }
 
 interface NamespaceCommands {
   namespace: string;
   interfaceName: string;
-  commands: Array<{ command: string; argsType: string; returnType: string }>;
+  commands: Array<{
+    command: string;
+    argsType: string;
+    returnType: string;
+    docs: string[];
+  }>;
 }
 
 interface EventInfo {
   namespace: string;
   eventName: string;
   payloadType: string;
+  docs: string[];
 }
 
 interface NamespaceEvents {
   namespace: string;
   interfaceName: string;
-  events: Array<{ eventName: string; payloadType: string }>;
-}
-
-/**
- * Extract command handlers from a TypeScript source file
- */
-function extractCommandHandlers(sourceFile: ts.SourceFile): CommandInfo[] {
-  const commands: CommandInfo[] = [];
-  let currentNamespace = "";
-
-  function visit(node: ts.Node) {
-    // Look for class declarations with @EdenNamespace decorator
-    if (ts.isClassDeclaration(node)) {
-      const namespaceDecorator = ts.getDecorators(node)?.find((dec) => {
-        if (ts.isCallExpression(dec.expression)) {
-          const expr = dec.expression;
-          if (ts.isIdentifier(expr.expression)) {
-            const decoratorName = expr.expression.text;
-            return decoratorName === "EdenNamespace";
-          }
-        }
-        return false;
-      });
-
-      if (
-        namespaceDecorator &&
-        ts.isCallExpression(namespaceDecorator.expression)
-      ) {
-        const args = namespaceDecorator.expression.arguments;
-        if (args.length > 0 && ts.isStringLiteral(args[0])) {
-          currentNamespace = args[0].text;
-        }
-      }
-
-      // Visit class members
-      node.members.forEach((member) => {
-        if (ts.isMethodDeclaration(member)) {
-          const decorators = ts.getDecorators(member);
-          const commandDecorator = decorators?.find((dec) => {
-            if (ts.isCallExpression(dec.expression)) {
-              const expr = dec.expression;
-              if (ts.isIdentifier(expr.expression)) {
-                const decoratorName = expr.expression.text;
-                return decoratorName === "EdenHandler";
-              }
-            }
-            return false;
-          });
-
-          if (
-            commandDecorator &&
-            ts.isCallExpression(commandDecorator.expression)
-          ) {
-            const args = commandDecorator.expression.arguments;
-            if (args.length > 0 && ts.isStringLiteral(args[0])) {
-              const commandName = args[0].text;
-
-              // Extract argument type from first parameter
-              let argsType = "Record<string, never>";
-              if (member.parameters.length > 0) {
-                const param = member.parameters[0];
-                if (param.type) {
-                  argsType = param.type.getText(sourceFile);
-                }
-              }
-
-              // Extract return type
-              let returnType = "any";
-              if (member.type) {
-                const typeText = member.type.getText(sourceFile);
-                // Extract T from Promise<T>
-                const match = typeText.match(/Promise<(.+)>/);
-                if (match) {
-                  returnType = match[1];
-                } else {
-                  returnType = typeText;
-                }
-              }
-
-              commands.push({
-                namespace: currentNamespace,
-                command: commandName,
-                argsType,
-                returnType,
-              });
-            }
-          }
-        }
-      });
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return commands;
-}
-
-/**
- * Extract event declarations from a TypeScript source file
- */
-function extractEventDeclarations(sourceFile: ts.SourceFile): EventInfo[] {
-  const events: EventInfo[] = [];
-
-  function visit(node: ts.Node) {
-    // Look for class declarations with @EdenNamespace decorator
-    if (ts.isClassDeclaration(node)) {
-      let currentNamespace = "";
-      let eventsInterfaceName: string | null = null;
-
-      // Find EdenNamespace decorator and extract namespace and events interface name
-      const namespaceDecorator = ts.getDecorators(node)?.find((dec) => {
-        if (ts.isCallExpression(dec.expression)) {
-          const expr = dec.expression;
-          if (
-            ts.isIdentifier(expr.expression) &&
-            expr.expression.text === "EdenNamespace"
-          ) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      if (
-        namespaceDecorator &&
-        ts.isCallExpression(namespaceDecorator.expression)
-      ) {
-        const args = namespaceDecorator.expression.arguments;
-
-        // First argument is the namespace
-        if (args.length > 0 && ts.isStringLiteral(args[0])) {
-          currentNamespace = args[0].text;
-        }
-
-        // OPTIONAL: Second argument is options object with events property
-        if (args.length > 1 && ts.isObjectLiteralExpression(args[1])) {
-          const eventsProperty = args[1].properties.find(
-            (prop) =>
-              ts.isPropertyAssignment(prop) &&
-              ts.isIdentifier(prop.name) &&
-              prop.name.text === "events"
-          );
-
-          if (eventsProperty && ts.isPropertyAssignment(eventsProperty)) {
-            if (ts.isStringLiteral(eventsProperty.initializer)) {
-              eventsInterfaceName = eventsProperty.initializer.text;
-            }
-          }
-        }
-      }
-
-      // Extract events interface from extends EdenEmitter<InterfaceName>
-      if (!eventsInterfaceName && node.heritageClauses) {
-        for (const clause of node.heritageClauses) {
-          if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-            for (const type of clause.types) {
-              // Check if extending EdenEmitter
-              if (ts.isExpressionWithTypeArguments(type)) {
-                const expr = type.expression;
-                if (ts.isIdentifier(expr) && expr.text === "EdenEmitter") {
-                  // Extract the generic type argument
-                  if (type.typeArguments && type.typeArguments.length > 0) {
-                    const typeArg = type.typeArguments[0];
-                    if (
-                      ts.isTypeReferenceNode(typeArg) &&
-                      ts.isIdentifier(typeArg.typeName)
-                    ) {
-                      eventsInterfaceName = typeArg.typeName.text;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // If we found an events interface name, find the interface definition
-      if (currentNamespace && eventsInterfaceName) {
-        // Look for the interface definition in the same file
-        const interfaceName = eventsInterfaceName;
-
-        function findInterface(n: ts.Node): void {
-          if (ts.isInterfaceDeclaration(n) && n.name.text === interfaceName) {
-            // Extract each property from the interface
-            n.members.forEach((member) => {
-              if (
-                ts.isPropertySignature(member) &&
-                ts.isStringLiteral(member.name)
-              ) {
-                const eventName = member.name.text;
-                let payloadType = "any";
-
-                if (member.type) {
-                  payloadType = member.type.getText(sourceFile);
-                }
-
-                events.push({
-                  namespace: currentNamespace,
-                  eventName,
-                  payloadType,
-                });
-              }
-            });
-          }
-          ts.forEachChild(n, findInterface);
-        }
-
-        findInterface(sourceFile);
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return events;
-}
-
-/**
- * Find all TypeScript files in a directory
- */
-function findTypeScriptFiles(dir: string, fileList: string[] = []): string[] {
-  const files = fs.readdirSync(dir);
-
-  files.forEach((file) => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-
-    if (
-      stat.isDirectory() &&
-      !file.startsWith(".") &&
-      file !== "node_modules"
-    ) {
-      findTypeScriptFiles(filePath, fileList);
-    } else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
-      fileList.push(filePath);
-    }
-  });
-
-  return fileList;
-}
-
-/**
- * Group commands by namespace
- */
-function groupByNamespace(commands: CommandInfo[]): NamespaceCommands[] {
-  const namespaceMap = new Map<string, NamespaceCommands>();
-
-  commands.forEach((cmd) => {
-    if (!namespaceMap.has(cmd.namespace)) {
-      // Convert namespace to PascalCase for interface name
-      const interfaceName =
-        cmd.namespace
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join("") + "Commands";
-
-      namespaceMap.set(cmd.namespace, {
-        namespace: cmd.namespace,
-        interfaceName,
-        commands: [],
-      });
-    }
-
-    const nsCommands = namespaceMap.get(cmd.namespace)!;
-    nsCommands.commands.push({
-      command: cmd.command,
-      argsType: cmd.argsType,
-      returnType: cmd.returnType,
-    });
-  });
-
-  return Array.from(namespaceMap.values());
-}
-
-/**
- * Group events by namespace
- */
-function groupEventsByNamespace(events: EventInfo[]): NamespaceEvents[] {
-  const namespaceMap = new Map<string, NamespaceEvents>();
-
-  events.forEach((evt) => {
-    if (!namespaceMap.has(evt.namespace)) {
-      // Convert namespace to PascalCase for interface name
-      const interfaceName =
-        evt.namespace
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join("") + "Events";
-
-      namespaceMap.set(evt.namespace, {
-        namespace: evt.namespace,
-        interfaceName,
-        events: [],
-      });
-    }
-
-    const nsEvents = namespaceMap.get(evt.namespace)!;
-    nsEvents.events.push({
-      eventName: evt.eventName,
-      payloadType: evt.payloadType,
-    });
-  });
-
-  return Array.from(namespaceMap.values());
+  events: Array<{ eventName: string; payloadType: string; docs: string[] }>;
 }
 
 /**
@@ -357,6 +58,16 @@ function replaceTypesWithInlineImports(
     }
     return match; // Keep as-is (built-in or local)
   });
+}
+
+/**
+ * Extract JSDoc comments from a node
+ */
+function extractDocs(node: Node): string[] {
+  if (Node.isJSDocable(node)) {
+    return node.getJsDocs().map((doc) => doc.getInnerText());
+  }
+  return [];
 }
 
 /**
@@ -388,6 +99,15 @@ function generateEventCode(
     lines.push(`export interface ${ns.interfaceName} {`);
 
     ns.events.forEach((evt) => {
+      // Add JSDoc if present
+      if (evt.docs.length > 0) {
+        lines.push("  /**");
+        evt.docs.forEach((doc) => {
+          lines.push(`   * ${doc.replace(/\n/g, "\n   * ")}`);
+        });
+        lines.push("   */");
+      }
+
       // Replace type references with inline imports
       const payloadType = replaceTypesWithInlineImports(
         evt.payloadType,
@@ -471,12 +191,29 @@ function generateInterfaceCode(
     lines.push(`export interface ${ns.interfaceName} {`);
 
     ns.commands.forEach((cmd) => {
+      // Add JSDoc if present
+      if (cmd.docs.length > 0) {
+        lines.push("  /**");
+        cmd.docs.forEach((doc) => {
+          lines.push(`   * ${doc.replace(/\n/g, "\n   * ")}`);
+        });
+        lines.push("   */");
+      }
+
       // Replace type references with inline imports
       const argsType = replaceTypesWithInlineImports(
         cmd.argsType,
         exportedTypes
       );
-      lines.push(`  "${ns.namespace}/${cmd.command}": ${argsType};`);
+      const returnType = replaceTypesWithInlineImports(
+        cmd.returnType,
+        exportedTypes
+      );
+
+      lines.push(`  "${ns.namespace}/${cmd.command}": {`);
+      lines.push(`    args: ${argsType};`);
+      lines.push(`    response: ${returnType};`);
+      lines.push(`  };`);
     });
 
     lines.push("}");
@@ -526,6 +263,175 @@ function generateInterfaceCode(
 }
 
 /**
+ * Extract command handlers from a class
+ */
+function extractCommandHandlers(
+  classDec: ClassDeclaration,
+  namespace: string
+): CommandInfo[] {
+  const commands: CommandInfo[] = [];
+
+  classDec.getMethods().forEach((method) => {
+    const commandDecorator = method.getDecorator("EdenHandler");
+    if (commandDecorator) {
+      const args = commandDecorator.getArguments();
+      if (args.length > 0 && Node.isStringLiteral(args[0])) {
+        const commandName = args[0].getLiteralText();
+
+        // Extract argument type from first parameter
+        let argsType = "Record<string, never>";
+        const params = method.getParameters();
+        if (params.length > 0) {
+          const param = params[0];
+          const typeNode = param.getTypeNode();
+          if (typeNode) {
+            argsType = typeNode.getText();
+          }
+        }
+
+        // Extract return type
+        let returnType = "any";
+        const returnTypeNode = method.getReturnTypeNode();
+        if (returnTypeNode) {
+          // Check if it's a Promise
+          const type = returnTypeNode.getType();
+          const symbol = type.getSymbol();
+          if (symbol && symbol.getName() === "Promise") {
+            const typeArgs = type.getTypeArguments();
+            if (typeArgs.length > 0) {
+              // Get the first type argument of the Promise
+              // We need the text representation of the type argument
+              // But getText() on the type object might return fully qualified names or aliases
+              // It's safer to try to get the type node from the return type node if possible
+              if (Node.isTypeReference(returnTypeNode)) {
+                const typeArgsNodes = returnTypeNode.getTypeArguments();
+                if (typeArgsNodes.length > 0) {
+                  returnType = typeArgsNodes[0].getText();
+                } else {
+                  returnType = "void"; // Promise<void> -> void (or any)
+                }
+              } else {
+                // Fallback to regex if AST navigation fails for some reason
+                const typeText = returnTypeNode.getText();
+                const match = typeText.match(/Promise<(.+)>/);
+                if (match) {
+                  returnType = match[1];
+                } else {
+                  returnType = typeText;
+                }
+              }
+            }
+          } else {
+            returnType = returnTypeNode.getText();
+          }
+        }
+
+        commands.push({
+          namespace,
+          command: commandName,
+          argsType,
+          returnType,
+          docs: extractDocs(method),
+        });
+      }
+    }
+  });
+
+  return commands;
+}
+
+/**
+ * Extract event declarations from a class
+ */
+function extractEventDeclarations(
+  classDec: ClassDeclaration,
+  namespace: string
+): EventInfo[] {
+  const events: EventInfo[] = [];
+  let eventsInterfaceName: string | null = null;
+
+  // Check decorator arguments for events interface
+  const namespaceDecorator = classDec.getDecorator("EdenNamespace");
+  if (namespaceDecorator) {
+    const args = namespaceDecorator.getArguments();
+    // Second argument is options object
+    if (args.length > 1 && Node.isObjectLiteralExpression(args[1])) {
+      const eventsProperty = args[1].getProperty("events");
+      if (eventsProperty && Node.isPropertyAssignment(eventsProperty)) {
+        const initializer = eventsProperty.getInitializer();
+        if (initializer && Node.isStringLiteral(initializer)) {
+          eventsInterfaceName = initializer.getLiteralText();
+        }
+      }
+    }
+  }
+
+  // Extract events interface from extends EdenEmitter<InterfaceName>
+  if (!eventsInterfaceName) {
+    const heritageClauses = classDec.getHeritageClauses();
+    for (const clause of heritageClauses) {
+      if (clause.getToken() === SyntaxKind.ExtendsKeyword) {
+        for (const type of clause.getTypeNodes()) {
+          const expression = type.getExpression();
+          if (
+            Node.isIdentifier(expression) &&
+            expression.getText() === "EdenEmitter"
+          ) {
+            const typeArgs = type.getTypeArguments();
+            if (typeArgs.length > 0) {
+              const typeArg = typeArgs[0];
+              if (Node.isTypeReference(typeArg)) {
+                eventsInterfaceName = typeArg.getTypeName().getText();
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // If we found an events interface name, find the interface definition
+  if (eventsInterfaceName) {
+    const sourceFile = classDec.getSourceFile();
+    const interfaceDec = sourceFile.getInterface(eventsInterfaceName);
+
+    if (interfaceDec) {
+      interfaceDec.getProperties().forEach((prop) => {
+        const nameNode = prop.getNameNode();
+        if (Node.isStringLiteral(nameNode) || Node.isIdentifier(nameNode)) {
+          const eventName = prop.getName();
+
+          let cleanEventName = eventName;
+          if (cleanEventName.startsWith('"') && cleanEventName.endsWith('"')) {
+            cleanEventName = cleanEventName.slice(1, -1);
+          } else if (
+            cleanEventName.startsWith("'") &&
+            cleanEventName.endsWith("'")
+          ) {
+            cleanEventName = cleanEventName.slice(1, -1);
+          }
+
+          let payloadType = "any";
+          const typeNode = prop.getTypeNode();
+          if (typeNode) {
+            payloadType = typeNode.getText();
+          }
+
+          events.push({
+            namespace,
+            eventName: cleanEventName,
+            payloadType,
+            docs: extractDocs(prop),
+          });
+        }
+      });
+    }
+  }
+
+  return events;
+}
+
+/**
  * Main execution function
  */
 export function generateCommands() {
@@ -535,72 +441,90 @@ export function generateCommands() {
   const srcDir = path.join(projectRoot, "src", "main");
   const typesDir = path.join(projectRoot, "src", "types");
 
-  // Find all TypeScript files
-  const tsFiles = findTypeScriptFiles(srcDir);
-
-  // Add src/types/index.ts to the program to analyze exports
-  const indexTsPath = path.join(typesDir, "index.ts");
-  if (fs.existsSync(indexTsPath)) {
-    tsFiles.push(indexTsPath);
-  }
-
-  console.log(`Found ${tsFiles.length} TypeScript files`);
-
-  // Create TypeScript program
-  const program = ts.createProgram(tsFiles, {
-    target: ts.ScriptTarget.ES2020,
-    module: ts.ModuleKind.CommonJS,
-    experimentalDecorators: true,
+  const project = new Project({
+    skipAddingFilesFromTsConfig: true,
   });
+
+  // Add source files
+  project.addSourceFilesAtPaths([
+    path.join(srcDir, "**/*.ts"),
+    path.join(typesDir, "index.ts"),
+  ]);
+
+  console.log(`Found ${project.getSourceFiles().length} TypeScript files`);
 
   // Get exported types from src/types/index.ts
   const exportedTypes = new Set<string>();
-  const checker = program.getTypeChecker();
-  const indexSourceFile = program.getSourceFile(indexTsPath);
-
-  if (indexSourceFile) {
-    const symbol = checker.getSymbolAtLocation(indexSourceFile);
-    if (symbol) {
-      const exports = checker.getExportsOfModule(symbol);
-      exports.forEach((exp) => exportedTypes.add(exp.name));
-      console.log(`Found ${exportedTypes.size} exported types from index.ts`);
-    }
+  const indexFile = project.getSourceFile(path.join(typesDir, "index.ts"));
+  if (indexFile) {
+    indexFile.getExportedDeclarations().forEach((_, name) => {
+      exportedTypes.add(name);
+    });
+    console.log(`Found ${exportedTypes.size} exported types from index.ts`);
   }
 
-  // Extract command handlers from all files
   const allCommands: CommandInfo[] = [];
   const allEvents: EventInfo[] = [];
 
-  tsFiles.forEach((file) => {
+  project.getSourceFiles().forEach((sourceFile) => {
     // Skip src/types/index.ts for command extraction
-    if (file === indexTsPath) return;
+    if (sourceFile.getFilePath() === indexFile?.getFilePath()) return;
 
-    const sourceFile = program.getSourceFile(file);
-    if (sourceFile) {
-      const commands = extractCommandHandlers(sourceFile);
-      const events = extractEventDeclarations(sourceFile);
+    sourceFile.getClasses().forEach((classDec) => {
+      const namespaceDecorator = classDec.getDecorator("EdenNamespace");
+      if (namespaceDecorator) {
+        const args = namespaceDecorator.getArguments();
+        if (args.length > 0 && Node.isStringLiteral(args[0])) {
+          const namespace = args[0].getLiteralText();
 
-      allCommands.push(...commands);
-      allEvents.push(...events);
+          const commands = extractCommandHandlers(classDec, namespace);
+          const events = extractEventDeclarations(classDec, namespace);
 
-      if (commands.length > 0) {
-        console.log(
-          `  ✓ ${path.relative(projectRoot, file)}: ${commands.length} commands`
-        );
+          allCommands.push(...commands);
+          allEvents.push(...events);
+
+          if (commands.length > 0) {
+            console.log(
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${commands.length} commands`
+            );
+          }
+          if (events.length > 0) {
+            console.log(
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${events.length} events`
+            );
+          }
+        }
       }
-      if (events.length > 0) {
-        console.log(
-          `  ✓ ${path.relative(projectRoot, file)}: ${events.length} events`
-        );
-      }
-    }
+    });
   });
 
   console.log(`\n📦 Found ${allCommands.length} total command handlers`);
   console.log(`📦 Found ${allEvents.length} total event declarations`);
 
   // Group by namespace
-  const namespaceCommands = groupByNamespace(allCommands);
+  const namespaceMap = new Map<string, NamespaceCommands>();
+  allCommands.forEach((cmd) => {
+    if (!namespaceMap.has(cmd.namespace)) {
+      const interfaceName =
+        cmd.namespace
+          .split("-")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join("") + "Commands";
+      namespaceMap.set(cmd.namespace, {
+        namespace: cmd.namespace,
+        interfaceName,
+        commands: [],
+      });
+    }
+    namespaceMap.get(cmd.namespace)!.commands.push({
+      command: cmd.command,
+      argsType: cmd.argsType,
+      returnType: cmd.returnType,
+      docs: cmd.docs,
+    });
+  });
+  const namespaceCommands = Array.from(namespaceMap.values());
+
   console.log(
     `📋 Grouped commands into ${namespaceCommands.length} namespaces:`
   );
@@ -608,7 +532,28 @@ export function generateCommands() {
     console.log(`  - ${ns.namespace}: ${ns.commands.length} commands`);
   });
 
-  const namespaceEvents = groupEventsByNamespace(allEvents);
+  const eventNamespaceMap = new Map<string, NamespaceEvents>();
+  allEvents.forEach((evt) => {
+    if (!eventNamespaceMap.has(evt.namespace)) {
+      const interfaceName =
+        evt.namespace
+          .split("-")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join("") + "Events";
+      eventNamespaceMap.set(evt.namespace, {
+        namespace: evt.namespace,
+        interfaceName,
+        events: [],
+      });
+    }
+    eventNamespaceMap.get(evt.namespace)!.events.push({
+      eventName: evt.eventName,
+      payloadType: evt.payloadType,
+      docs: evt.docs,
+    });
+  });
+  const namespaceEvents = Array.from(eventNamespaceMap.values());
+
   console.log(`📋 Grouped events into ${namespaceEvents.length} namespaces:`);
   namespaceEvents.forEach((ns) => {
     console.log(`  - ${ns.namespace}: ${ns.events.length} events`);
@@ -638,3 +583,5 @@ export function generateCommands() {
   fs.writeFileSync(eventsOutputPath, eventsCode);
   console.log(`✅ Generated ${path.relative(projectRoot, eventsOutputPath)}`);
 }
+
+generateCommands();

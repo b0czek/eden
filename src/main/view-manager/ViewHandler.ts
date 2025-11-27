@@ -15,7 +15,7 @@ interface ViewNamespaceEvents {
 export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
   private viewManager: ViewManager;
   private mouseTracker: MouseTracker;
-  
+
   // Global drag/resize tracking
   private dragState: {
     appId: string;
@@ -37,51 +37,57 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
   // Or we can ask ViewManager to find views by appId.
   // ViewManager has getViewsByAppId(appId).
 
-  constructor(
-    viewManager: ViewManager,
-    ipcBridge: IPCBridge
-  ) {
+  constructor(viewManager: ViewManager, ipcBridge: IPCBridge) {
     super(ipcBridge);
     this.viewManager = viewManager;
     this.mouseTracker = new MouseTracker(8); // ~120fps
   }
 
+  /**
+   * Update the bounds (position and size) of a specific view.
+   */
   @EdenHandler("update-view-bounds")
-  async handleUpdateViewBounds(
-    args: { appId: string; bounds: ViewBounds }
-  ): Promise<any> {
+  async handleUpdateViewBounds(args: {
+    appId: string;
+    bounds: ViewBounds;
+  }): Promise<{ success: boolean }> {
     const { appId, bounds } = args;
-    
+
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length > 0) {
       // Use the first view (typically there's only one per appId)
       const success = this.viewManager.setViewBounds(viewIds[0], bounds);
       return { success };
     }
-    
+
     throw new Error(`App or view ${appId} is not running`);
   }
 
+  /**
+   * Show or hide a specific view.
+   */
   @EdenHandler("set-view-visibility")
-  async handleSetViewVisibility(
-    args: { appId: string; visible: boolean }
-  ): Promise<any> {
+  async handleSetViewVisibility(args: {
+    appId: string;
+    visible: boolean;
+  }): Promise<{ success: boolean }> {
     const { appId, visible } = args;
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
       throw new Error(`App ${appId} is not running`);
     }
-    
+
     const success = visible
       ? this.viewManager.showView(viewIds[0])
       : this.viewManager.hideView(viewIds[0]);
     return { success };
   }
 
+  /**
+   * Bring an application's view to the front and focus it.
+   */
   @EdenHandler("focus-app")
-  async handleFocusApp(
-    args: { appId: string }
-  ): Promise<any> {
+  async handleFocusApp(args: { appId: string }): Promise<{ success: boolean }> {
     const { appId } = args;
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
@@ -91,41 +97,52 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
     return { success };
   }
 
+  /**
+   * Update the available workspace bounds (e.g. after taskbar resize).
+   */
   @EdenHandler("update-workspace-bounds")
-  async handleUpdateWorkspaceBounds(
-    args: { bounds: ViewBounds }
-  ): Promise<any> {
+  async handleUpdateWorkspaceBounds(args: {
+    bounds: ViewBounds;
+  }): Promise<{ success: boolean }> {
     const { bounds } = args;
 
     this.viewManager.setWorkspaceBounds(bounds);
-    
+
     this.notify("workspace-bounds-changed", {
       bounds,
     });
 
-
     return { success: true };
   }
 
+  /**
+   * Toggle between floating and tiled window modes.
+   */
   @EdenHandler("toggle-view-mode")
-  async handleToggleViewMode(
-    args: { appId: string; mode?: "floating" | "tiled" }
-  ): Promise<any> {
+  async handleToggleViewMode(args: {
+    appId: string;
+    mode?: "floating" | "tiled";
+  }): Promise<{ success: boolean }> {
     const { appId, mode } = args;
 
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
       throw new Error(`App ${appId} is not running`);
     }
-    
+
     const success = this.viewManager.setViewMode(viewIds[0], mode);
     return { success };
   }
 
+  /**
+   * Start dragging a window.
+   */
   @EdenHandler("start-drag")
-  async handleStartDrag(
-    args: { appId: string; startX: number; startY: number }
-  ): Promise<any> {
+  async handleStartDrag(args: {
+    appId: string;
+    startX: number;
+    startY: number;
+  }): Promise<{ success: boolean }> {
     const { appId, startX, startY } = args;
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
@@ -168,16 +185,16 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
 
       this.viewManager.setViewBounds(viewId, newBounds);
       this.notifySubscriber(viewId, "bounds-updated", newBounds);
-
     });
 
     return { success: true };
   }
 
+  /**
+   * End the current drag operation.
+   */
   @EdenHandler("end-drag")
-  async handleEndDrag(
-    args: { appId: string }
-  ): Promise<any> {
+  async handleEndDrag(args: { appId: string }): Promise<{ success: boolean }> {
     if (this.dragState) {
       this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
       this.dragState = null;
@@ -185,8 +202,11 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
     return { success: true };
   }
 
+  /**
+   * Handle global mouse up event to stop any active drag/resize operations.
+   */
   @EdenHandler("global-mouseup")
-  async handleGlobalMouseUp(): Promise<any> {
+  async handleGlobalMouseUp(): Promise<{ success: boolean }> {
     // Cleanup any active drag or resize operations when mouse is released
     if (this.dragState) {
       console.log("[ViewHandler] Global mouseup - cleaning up drag state");
@@ -201,10 +221,15 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
     return { success: true };
   }
 
+  /**
+   * Start resizing a window.
+   */
   @EdenHandler("start-resize")
-  async handleStartResize(
-    args: { appId: string; startX: number; startY: number }
-  ): Promise<any> {
+  async handleStartResize(args: {
+    appId: string;
+    startX: number;
+    startY: number;
+  }): Promise<{ success: boolean }> {
     const { appId, startX, startY } = args;
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length === 0) {
@@ -259,16 +284,18 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
 
       this.viewManager.setViewBounds(viewId, newBounds);
       this.notifySubscriber(viewId, "bounds-updated", newBounds);
-
     });
 
     return { success: true };
   }
 
+  /**
+   * End the current resize operation.
+   */
   @EdenHandler("end-resize")
-  async handleEndResize(
-    args: { appId: string }
-  ): Promise<any> {
+  async handleEndResize(args: {
+    appId: string;
+  }): Promise<{ success: boolean }> {
     if (this.resizeState) {
       this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
       this.resizeState = null;

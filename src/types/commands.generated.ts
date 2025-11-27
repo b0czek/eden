@@ -9,61 +9,234 @@
  * SystemCommands - Commands for the "system" namespace
  */
 export interface SystemCommands {
-  "system/info": Record<string, never>;
-  "system/window-size": Record<string, never>;
+  /**
+   * Get system information including platform, versions, and running apps.
+   */
+  "system/info": {
+    args: Record<string, never>;
+    response: import("./index").SystemInfo;
+  };
+  /**
+   * Get the current dimensions of the main window.
+   */
+  "system/window-size": {
+    args: Record<string, never>;
+    response: import("./index").WindowSize;
+  };
 }
 
 /**
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
+  /**
+   * Read the contents of a file.
+   */
   "fs/read": {
+    args: {
     path: string;
     encoding?: BufferEncoding;
   };
+    response: string;
+  };
+  /**
+   * Write content to a file, creating directories if needed.
+   */
   "fs/write": {
+    args: {
     path: string;
     content: string;
     encoding?: BufferEncoding;
   };
-  "fs/exists": { path: string };
-  "fs/mkdir": { path: string };
-  "fs/readdir": { path: string };
-  "fs/stat": { path: string };
+    response: void;
+  };
+  /**
+   * Check if a file or directory exists.
+   */
+  "fs/exists": {
+    args: { path: string };
+    response: boolean;
+  };
+  /**
+   * Create a directory and any necessary parent directories.
+   */
+  "fs/mkdir": {
+    args: { path: string };
+    response: void;
+  };
+  /**
+   * List contents of a directory.
+   */
+  "fs/readdir": {
+    args: { path: string };
+    response: string[];
+  };
+  /**
+   * Get file or directory statistics.
+   */
+  "fs/stat": {
+    args: { path: string };
+    response: {
+    isFile: boolean;
+    isDirectory: boolean;
+    size: number;
+    mtime: Date;
+  };
+  };
 }
 
 /**
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
-  "package/install": { sourcePath: string };
-  "package/uninstall": { appId: string };
-  "package/list-installed": Record<string, never>;
+  /**
+   * Install an application from a local path.
+   */
+  "package/install": {
+    args: { sourcePath: string };
+    response: import("./index").AppManifest;
+  };
+  /**
+   * Uninstall an application by its ID.
+   */
+  "package/uninstall": {
+    args: { appId: string };
+    response: boolean;
+  };
+  /**
+   * List all installed applications.
+   */
+  "package/list-installed": {
+    args: Record<string, never>;
+    response: import("./index").AppManifest[];
+  };
 }
 
 /**
  * ProcessCommands - Commands for the "process" namespace
  */
 export interface ProcessCommands {
-  "process/launch": { appId: string; bounds?: import("./index").ViewBounds };
-  "process/stop": { appId: string };
-  "process/list": Record<string, never>;
+  /**
+   * Launch an application instance.
+   */
+  "process/launch": {
+    args: {
+    appId: string;
+    bounds?: import("./index").ViewBounds;
+  };
+    response: import("./index").LaunchResult;
+  };
+  /**
+   * Stop a running application instance.
+   */
+  "process/stop": {
+    args: { appId: string };
+    response: { success: boolean };
+  };
+  /**
+   * List all running application processes.
+   */
+  "process/list": {
+    args: Record<string, never>;
+    response: import("./index").AppStatus;
+  };
 }
 
 /**
  * ViewCommands - Commands for the "view" namespace
  */
 export interface ViewCommands {
-  "view/update-view-bounds": { appId: string; bounds: import("./index").ViewBounds };
-  "view/set-view-visibility": { appId: string; visible: boolean };
-  "view/focus-app": { appId: string };
-  "view/update-workspace-bounds": { bounds: import("./index").ViewBounds };
-  "view/toggle-view-mode": { appId: string; mode?: "floating" | "tiled" };
-  "view/start-drag": { appId: string; startX: number; startY: number };
-  "view/end-drag": { appId: string };
-  "view/global-mouseup": Record<string, never>;
-  "view/start-resize": { appId: string; startX: number; startY: number };
-  "view/end-resize": { appId: string };
+  /**
+   * Update the bounds (position and size) of a specific view.
+   */
+  "view/update-view-bounds": {
+    args: {
+    appId: string;
+    bounds: import("./index").ViewBounds;
+  };
+    response: { success: boolean };
+  };
+  /**
+   * Show or hide a specific view.
+   */
+  "view/set-view-visibility": {
+    args: {
+    appId: string;
+    visible: boolean;
+  };
+    response: { success: boolean };
+  };
+  /**
+   * Bring an application's view to the front and focus it.
+   */
+  "view/focus-app": {
+    args: { appId: string };
+    response: { success: boolean };
+  };
+  /**
+   * Update the available workspace bounds (e.g. after taskbar resize).
+   */
+  "view/update-workspace-bounds": {
+    args: {
+    bounds: import("./index").ViewBounds;
+  };
+    response: { success: boolean };
+  };
+  /**
+   * Toggle between floating and tiled window modes.
+   */
+  "view/toggle-view-mode": {
+    args: {
+    appId: string;
+    mode?: "floating" | "tiled";
+  };
+    response: { success: boolean };
+  };
+  /**
+   * Start dragging a window.
+   */
+  "view/start-drag": {
+    args: {
+    appId: string;
+    startX: number;
+    startY: number;
+  };
+    response: { success: boolean };
+  };
+  /**
+   * End the current drag operation.
+   */
+  "view/end-drag": {
+    args: { appId: string };
+    response: { success: boolean };
+  };
+  /**
+   * Handle global mouse up event to stop any active drag/resize operations.
+   */
+  "view/global-mouseup": {
+    args: Record<string, never>;
+    response: { success: boolean };
+  };
+  /**
+   * Start resizing a window.
+   */
+  "view/start-resize": {
+    args: {
+    appId: string;
+    startX: number;
+    startY: number;
+  };
+    response: { success: boolean };
+  };
+  /**
+   * End the current resize operation.
+   */
+  "view/end-resize": {
+    args: {
+    appId: string;
+  };
+    response: { success: boolean };
+  };
 }
 
 /**

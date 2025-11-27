@@ -1,3 +1,4 @@
+import { AppManifest } from "../../types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
 
@@ -9,26 +10,31 @@ export class PackageHandler {
     this.packageManager = packageManager;
   }
 
+  /**
+   * Install an application from a local path.
+   */
   @EdenHandler("install")
-  async handleInstallApp(
-    args: { sourcePath: string }
-  ): Promise<any> {
+  async handleInstallApp(args: { sourcePath: string }): Promise<AppManifest> {
     const { sourcePath } = args;
     return await this.packageManager.installApp(sourcePath);
   }
 
+  /**
+   * Uninstall an application by its ID.
+   */
   @EdenHandler("uninstall")
-  async handleUninstallApp(
-    args: { appId: string }
-  ): Promise<any> {
+  async handleUninstallApp(args: { appId: string }): Promise<boolean> {
     const { appId } = args;
     return await this.packageManager.uninstallApp(appId);
   }
 
+  /**
+   * List all installed applications.
+   */
   @EdenHandler("list-installed")
   async handleListInstalledApps(
     args: Record<string, never>
-  ): Promise<any> {
+  ): Promise<AppManifest[]> {
     return this.packageManager.getInstalledApps();
   }
 }

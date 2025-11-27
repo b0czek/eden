@@ -5,7 +5,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
-import { AppInstance, AppManifest, EventName, EventData } from "../../types";
+import { AppInstance, AppStatus } from "../../types";
 
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
@@ -15,10 +15,10 @@ import { ProcessHandler } from "./ProcessHandler";
  * Events emitted by the ProcessManager
  */
 interface ProcessNamespaceEvents {
-  "launched": { instance: AppInstance };
-  "stopped": { appId: string };
-  "error": { appId: string; error: any };
-  "exited": { appId: string; code: number };
+  launched: { instance: AppInstance };
+  stopped: { appId: string };
+  error: { appId: string; error: any };
+  exited: { appId: string; code: number };
 }
 
 /**
@@ -56,8 +56,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     this.processHandler = new ProcessHandler(this);
     commandRegistry.registerManager(this.processHandler);
   }
-
-
 
   /**
    * Setup event handlers
@@ -191,7 +189,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       this.syncRunningAppsState();
 
       this.notify("stopped", { appId });
-
     } catch (error) {
       console.error(`Failed to stop app ${appId}:`, error);
       throw error;
@@ -272,23 +269,15 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   /**
    * Get status of all apps (installed and running)
    */
-  getAllAppsStatus(): { installed: AppManifest[]; running: any[] } {
-    const runningApps = this.getRunningApps().map((instance) => ({
-      appId: instance.manifest.id,
-      name: instance.manifest.name,
-      version: instance.manifest.version,
-      instanceId: instance.instanceId,
-      state: instance.state,
-      viewId: instance.viewId,
-      installedAt: instance.installedAt,
-      lastLaunched: instance.lastLaunched,
-    }));
+  getAllAppsStatus(): AppStatus {
+    const runningApps = this.getRunningApps().map((instance) => {
+      // Create a clean object without the worker property
+      const { worker, ...cleanInstance } = instance;
+      return cleanInstance;
+    });
     return {
       installed: this.packageManager.getInstalledApps(),
       running: runningApps,
     };
   }
-
-
-
 }
