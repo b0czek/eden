@@ -1,10 +1,18 @@
-import { CommandHandler, CommandNamespace } from "../ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
 import { ViewManager } from "./ViewManager";
 import { IPCBridge } from "../ipc/IPCBridge";
 import { MouseTracker } from "./MouseTracker";
-import { AppInstance } from "../../types";
+import { AppInstance, ViewBounds } from "../../types";
 
-@CommandNamespace("view")
+/**
+ * Events emitted by the ViewHandler
+ */
+interface ViewNamespaceEvents {
+  "bounds-updated": ViewBounds;
+  "workspace-bounds-changed": { bounds: ViewBounds };
+}
+
+@EdenNamespace("view", { events: "ViewNamespaceEvents" })
 export class ViewHandler {
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
@@ -15,14 +23,14 @@ export class ViewHandler {
     appId: string;
     startX: number;
     startY: number;
-    startBounds: { x: number; y: number; width: number; height: number };
+    startBounds: ViewBounds;
   } | null = null;
 
   private resizeState: {
     appId: string;
     startX: number;
     startY: number;
-    startBounds: { x: number; y: number; width: number; height: number };
+    startBounds: ViewBounds;
     currentWidth: number;
     currentHeight: number;
   } | null = null;
@@ -40,9 +48,9 @@ export class ViewHandler {
     this.mouseTracker = new MouseTracker(8); // ~120fps
   }
 
-  @CommandHandler("update-view-bounds")
+  @EdenHandler("update-view-bounds")
   async handleUpdateViewBounds(
-    args: { appId: string; bounds: { x: number; y: number; width: number; height: number } }
+    args: { appId: string; bounds: ViewBounds }
   ): Promise<any> {
     const { appId, bounds } = args;
     
@@ -56,7 +64,7 @@ export class ViewHandler {
     throw new Error(`App or view ${appId} is not running`);
   }
 
-  @CommandHandler("set-view-visibility")
+  @EdenHandler("set-view-visibility")
   async handleSetViewVisibility(
     args: { appId: string; visible: boolean }
   ): Promise<any> {
@@ -72,7 +80,7 @@ export class ViewHandler {
     return { success };
   }
 
-  @CommandHandler("focus-app")
+  @EdenHandler("focus-app")
   async handleFocusApp(
     args: { appId: string }
   ): Promise<any> {
@@ -85,9 +93,9 @@ export class ViewHandler {
     return { success };
   }
 
-  @CommandHandler("update-workspace-bounds")
+  @EdenHandler("update-workspace-bounds")
   async handleUpdateWorkspaceBounds(
-    args: { bounds: { x: number; y: number; width: number; height: number } }
+    args: { bounds: ViewBounds }
   ): Promise<any> {
     const { bounds } = args;
 
@@ -101,7 +109,7 @@ export class ViewHandler {
     return { success: true };
   }
 
-  @CommandHandler("toggle-view-mode")
+  @EdenHandler("toggle-view-mode")
   async handleToggleViewMode(
     args: { appId: string; mode?: "floating" | "tiled" }
   ): Promise<any> {
@@ -116,7 +124,7 @@ export class ViewHandler {
     return { success };
   }
 
-  @CommandHandler("start-drag")
+  @EdenHandler("start-drag")
   async handleStartDrag(
     args: { appId: string; startX: number; startY: number }
   ): Promise<any> {
@@ -168,7 +176,7 @@ export class ViewHandler {
     return { success: true };
   }
 
-  @CommandHandler("end-drag")
+  @EdenHandler("end-drag")
   async handleEndDrag(
     args: { appId: string }
   ): Promise<any> {
@@ -179,7 +187,7 @@ export class ViewHandler {
     return { success: true };
   }
 
-  @CommandHandler("global-mouseup")
+  @EdenHandler("global-mouseup")
   async handleGlobalMouseUp(): Promise<any> {
     // Cleanup any active drag or resize operations when mouse is released
     if (this.dragState) {
@@ -195,7 +203,7 @@ export class ViewHandler {
     return { success: true };
   }
 
-  @CommandHandler("start-resize")
+  @EdenHandler("start-resize")
   async handleStartResize(
     args: { appId: string; startX: number; startY: number }
   ): Promise<any> {
@@ -259,7 +267,7 @@ export class ViewHandler {
     return { success: true };
   }
 
-  @CommandHandler("end-resize")
+  @EdenHandler("end-resize")
   async handleEndResize(
     args: { appId: string }
   ): Promise<any> {

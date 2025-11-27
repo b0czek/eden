@@ -1,7 +1,8 @@
-import { CommandHandler, CommandNamespace } from "../ipc/CommandDecorators";
+import { ViewBounds } from "../../types";
+import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
 import { ProcessManager } from "./ProcessManager";
 
-@CommandNamespace("process")
+@EdenNamespace("process")
 export class ProcessHandler {
   private processManager: ProcessManager;
 
@@ -9,15 +10,15 @@ export class ProcessHandler {
     this.processManager = processManager;
   }
 
-  @CommandHandler("launch")
+  @EdenHandler("launch")
   async handleLaunchApp(
-    args: { appId: string; bounds?: { x: number; y: number; width: number; height: number } }
+    args: { appId: string; bounds?: ViewBounds }
   ): Promise<any> {
     const { appId, bounds } = args;
     return await this.processManager.launchApp(appId, bounds);
   }
 
-  @CommandHandler("stop")
+  @EdenHandler("stop")
   async handleStopApp(
     args: { appId: string }
   ): Promise<any> {
@@ -26,7 +27,7 @@ export class ProcessHandler {
     return { success: true };
   }
 
-  @CommandHandler("list")
+  @EdenHandler("list")
   async handleListApps(
     args: Record<string, never>
   ): Promise<any> {

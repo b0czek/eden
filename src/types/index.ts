@@ -64,14 +64,6 @@ export interface IPCMessage {
   timestamp: number;
 }
 
-/**
- * Shell Command Types
- *
- * Type-safe command definitions for shell operations
- * 
- * @deprecated Use CommandName, CommandArgs from "./commands" instead.
- * These types are kept for backward compatibility during migration.
- */
 
 export interface ViewBounds {
   x: number;

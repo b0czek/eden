@@ -1,10 +1,10 @@
-import { CommandHandler, CommandNamespace } from "./ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace } from "./ipc/CommandDecorators";
 import { IPCBridge } from "./ipc/IPCBridge";
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry } from "./ipc/CommandRegistry";
 
 @injectable()
-@CommandNamespace("system")
+@EdenNamespace("system")
 export class SystemHandler {
   constructor(
     @inject("IPCBridge") private ipcBridge: IPCBridge,
@@ -13,7 +13,7 @@ export class SystemHandler {
     commandRegistry.registerManager(this);
   }
 
-  @CommandHandler("info")
+  @EdenHandler("info")
   async handleSystemInfo(): Promise<any> {
     return {
       platform: process.platform,
@@ -24,7 +24,7 @@ export class SystemHandler {
     };
   }
 
-  @CommandHandler("window-size")
+  @EdenHandler("window-size")
   async handleGetWindowSize(): Promise<any> {
     const mainWindow = this.ipcBridge.getMainWindow();
     if (!mainWindow) {

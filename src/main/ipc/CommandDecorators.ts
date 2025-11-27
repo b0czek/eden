@@ -4,23 +4,58 @@ import {
 } from "./CommandRegistry";
 
 /**
- * Class decorator to set the namespace for all command handlers in a manager
+ * Options for the EdenNamespace decorator
+ */
+export interface EdenNamespaceOptions {
+  /**
+   * Optional event interface name for this namespace
+   * The interface should define events without the namespace prefix
+   * 
+   * @example
+   * ```typescript
+   * interface ProcessNamespaceEvents {
+   *   "launched": { instance: AppInstance };
+   *   "stopped": { appId: string };
+   * }
+   * 
+   * @EdenNamespace("process", { events: "ProcessNamespaceEvents" })
+   * class ProcessManager {
+   *   // ...
+   * }
+   * ```
+   */
+  events?: string;
+}
+
+/**
+ * Class decorator to set the namespace for all command handlers and events in a manager
  * @param namespace - The namespace for this manager (e.g., "process", "view")
+ * @param options - Optional configuration including event interface
  * 
  * @example
  * ```typescript
- * @CommandNamespace("process")
- * class AppManager {
- *   @CommandHandler("launch")
+ * interface ProcessEvents {
+ *   "launched": { appId: string };
+ * }
+ * 
+ * @EdenNamespace("process", { events: ProcessEvents })
+ * class ProcessManager {
+ *   @EdenHandler("launch")
  *   async handleLaunch(args: { appId: string }) {
  *     // This becomes "process/launch"
  *   }
  * }
  * ```
  */
-export function CommandNamespace(namespace: string) {
+export function EdenNamespace(namespace: string, options?: EdenNamespaceOptions) {
   return function <T extends { new (...args: any[]): {} }>(constructor: T) {
     setManagerNamespace(constructor, namespace);
+    
+    // Store events interface name if provided for codegen
+    if (options?.events) {
+      Reflect.defineMetadata("eden:events", options.events, constructor);
+    }
+    
     return constructor;
   };
 }
@@ -31,16 +66,16 @@ export function CommandNamespace(namespace: string) {
  * 
  * @example
  * ```typescript
- * @CommandNamespace("process")
- * class AppManager {
- *   @CommandHandler("launch")
+ * @EdenNamespace("process")
+ * class ProcessManager {
+ *   @EdenHandler("launch")
  *   async handleLaunch(args: { appId: string }) {
  *     // Registered as "process/launch"
  *   }
  * }
  * ```
  */
-export function CommandHandler(command: string) {
+export function EdenHandler(command: string) {
   return function (
     target: any,
     propertyKey: string,

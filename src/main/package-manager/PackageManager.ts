@@ -7,8 +7,18 @@ import { IPCBridge } from "../ipc/IPCBridge";
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry } from "../ipc/CommandRegistry";
 import { PackageHandler } from "./PackageHandler";
+import { EdenNamespace } from "../ipc/CommandDecorators";
+
+/**
+ * Events emitted by the PackageManager
+ */
+interface PackageNamespaceEvents {
+  "installed": { manifest: AppManifest };
+  "uninstalled": { appId: string };
+}
 
 @injectable()
+@EdenNamespace("package", { events: "PackageNamespaceEvents" })
 export class PackageManager extends EventEmitter {
   private ipcBridge: IPCBridge;
   private appsDirectory: string;

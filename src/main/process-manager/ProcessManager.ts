@@ -10,6 +10,17 @@ import { AppInstance, AppManifest, EventName, EventData } from "../../types";
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry } from "../ipc/CommandRegistry";
 import { ProcessHandler } from "./ProcessHandler";
+import { EdenNamespace } from "../ipc/CommandDecorators";
+
+/**
+ * Events emitted by the ProcessManager
+ */
+interface ProcessNamespaceEvents {
+  "launched": { instance: AppInstance };
+  "stopped": { appId: string };
+  "error": { appId: string; error: any };
+  "exited": { appId: string; code: number };
+}
 
 /**
  * ProcessManager
@@ -17,6 +28,7 @@ import { ProcessHandler } from "./ProcessHandler";
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
 @injectable()
+@EdenNamespace("process", { events: "ProcessNamespaceEvents" })
 export class ProcessManager extends EventEmitter {
   private workerManager: WorkerManager;
   private viewManager: ViewManager;

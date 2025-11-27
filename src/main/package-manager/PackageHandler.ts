@@ -1,7 +1,7 @@
-import { CommandHandler, CommandNamespace } from "../ipc/CommandDecorators";
+import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
 import { PackageManager } from "./PackageManager";
 
-@CommandNamespace("package")
+@EdenNamespace("package")
 export class PackageHandler {
   private packageManager: PackageManager;
 
@@ -9,7 +9,7 @@ export class PackageHandler {
     this.packageManager = packageManager;
   }
 
-  @CommandHandler("install")
+  @EdenHandler("install")
   async handleInstallApp(
     args: { sourcePath: string }
   ): Promise<any> {
@@ -17,7 +17,7 @@ export class PackageHandler {
     return await this.packageManager.installApp(sourcePath);
   }
 
-  @CommandHandler("uninstall")
+  @EdenHandler("uninstall")
   async handleUninstallApp(
     args: { appId: string }
   ): Promise<any> {
@@ -25,7 +25,7 @@ export class PackageHandler {
     return await this.packageManager.uninstallApp(appId);
   }
 
-  @CommandHandler("list-installed")
+  @EdenHandler("list-installed")
   async handleListInstalledApps(
     args: Record<string, never>
   ): Promise<any> {
