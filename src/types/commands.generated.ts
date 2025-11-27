@@ -17,8 +17,15 @@ export interface SystemCommands {
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
-  "fs/read": { path: string; encoding?: import("./index").BufferEncoding };
-  "fs/write": { path: string; content: string; encoding?: import("./index").BufferEncoding };
+  "fs/read": {
+    path: string;
+    encoding?: BufferEncoding;
+  };
+  "fs/write": {
+    path: string;
+    content: string;
+    encoding?: BufferEncoding;
+  };
   "fs/exists": { path: string };
   "fs/mkdir": { path: string };
   "fs/readdir": { path: string };
