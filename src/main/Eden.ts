@@ -1,31 +1,32 @@
+import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { WorkerManager } from "./core/WorkerManager";
-import { ViewManager } from "./window-manager/ViewManager";
-import { IPCBridge } from "./core/IPCBridge";
-import { AppManager } from "./core/AppManager";
-import { TilingConfig } from "../types";
+import { IPCBridge, CommandRegistry } from "./ipc";
+import { SystemHandler } from "./SystemHandler";
+import { EdenConfig } from "../types";
 
-export interface EdenConfig {
-  appsDirectory?: string;
-  window?: {
-    width?: number;
-    height?: number;
-    title?: string;
-    backgroundColor?: string;
-  };
-  tiling?: TilingConfig;
-  development?: boolean;
-}
+// Managers and Handlers
+import { PackageManager, PackageHandler } from "./package-manager";
+import { ProcessManager, ProcessHandler, WorkerManager } from "./process-manager";
+import { ViewManager, ViewHandler } from "./view-manager";
+import { container } from "tsyringe";
+
+
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
+  private shellOverlayViewId: number | null = null; // Track shell overlay view
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
-  private appManager: AppManager;
+  private commandRegistry: CommandRegistry;
   private appsDirectory: string;
   private config: EdenConfig;
+
+  // New components
+  private packageManager: PackageManager;
+  private processManager: ProcessManager;
+  private systemHandler: SystemHandler;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -39,15 +40,43 @@ export class Eden {
       config.appsDirectory || path.join(app.getPath("userData"), "eden-apps");
 
     // Initialize core managers
+    // 1. Command Registry (required by others)
+    this.commandRegistry = new CommandRegistry();
+    container.registerInstance("CommandRegistry", this.commandRegistry);
+
+    // Register Config
+    container.registerInstance("EdenConfig", this.config);
+
+    // 2. Worker Manager
     this.workerManager = new WorkerManager();
-    this.viewManager = new ViewManager(config.tiling);
-    this.ipcBridge = new IPCBridge(this.workerManager, this.viewManager);
-    this.appManager = new AppManager(
-      this.workerManager,
-      this.viewManager,
-      this.ipcBridge,
-      this.appsDirectory
-    );
+    container.registerInstance("WorkerManager", this.workerManager);
+
+    // 3. IPC Bridge (depends on WorkerManager, CommandRegistry)
+    // Note: ViewManager is not passed yet, will be set later
+    this.ipcBridge = new IPCBridge(this.workerManager, this.commandRegistry);
+    container.registerInstance("IPCBridge", this.ipcBridge);
+
+    // 4. ViewManager (depends on CommandRegistry, IPCBridge, EdenConfig)
+    this.viewManager = container.resolve(ViewManager);
+    container.registerInstance("ViewManager", this.viewManager);
+    
+    // 5. Break circular dependency: Set ViewManager on IPCBridge
+    this.ipcBridge.setViewManager(this.viewManager);
+    
+    // Register appsDirectory for injection
+    container.registerInstance("appsDirectory", this.appsDirectory);
+
+    // Initialize Package Manager
+    this.packageManager = container.resolve(PackageManager);
+    container.registerInstance("PackageManager", this.packageManager);
+
+    // Initialize Process Manager
+    this.processManager = container.resolve(ProcessManager);
+    container.registerInstance("ProcessManager", this.processManager);
+
+    // Initialize System Handler
+    this.systemHandler = container.resolve(SystemHandler);
+    container.registerInstance("SystemHandler", this.systemHandler);
 
     this.setupAppEventHandlers();
   }
@@ -68,8 +97,8 @@ export class Eden {
   private async onReady(): Promise<void> {
     console.log("Eden starting...");
 
-    // Initialize app manager
-    await this.appManager.initialize();
+    // Initialize package manager
+    await this.packageManager.initialize();
 
     // Create main window
     this.createMainWindow();
@@ -78,7 +107,7 @@ export class Eden {
   }
 
   /**
-   * Create the main Eden window (shell)
+   * Create the main Eden window with foundation layer
    */
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
@@ -91,7 +120,7 @@ export class Eden {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(__dirname, "../eveshell/eve-preload.js"),
+        preload: path.join(__dirname, "../foundation/foundation-preload.js"),
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
@@ -102,11 +131,16 @@ export class Eden {
     this.viewManager.setMainWindow(this.mainWindow);
     this.ipcBridge.setMainWindow(this.mainWindow);
 
-    // Load the shell UI
-    const shellPath = path.join(__dirname, "../eveshell/index.html");
-    this.mainWindow.loadFile(shellPath);
+    // Load the foundation layer (not eveshell!)
+    const foundationPath = path.join(__dirname, "../foundation/foundation.html");
+    this.mainWindow.loadFile(foundationPath);
 
-    // Show window when ready
+    // Create shell overlay as an overlay view after foundation loads
+    this.mainWindow.webContents.once("did-finish-load", () => {
+      this.createShellOverlay();
+    });
+
+    // Show window when foundation and overlay are ready
     this.mainWindow.once("ready-to-show", () => {
       this.mainWindow?.show();
     });
@@ -114,6 +148,7 @@ export class Eden {
     // Handle window close
     this.mainWindow.on("closed", () => {
       this.mainWindow = null;
+      this.shellOverlayViewId = null;
     });
 
     // Development: Open DevTools
@@ -121,6 +156,56 @@ export class Eden {
       this.mainWindow.webContents.openDevTools();
     }
   }
+
+  /**
+   * Create the shell overlay as an overlay view
+   */
+  private createShellOverlay(): void {
+    if (!this.mainWindow) {
+      console.error("Cannot create shell overlay: main window not available");
+      return;
+    }
+
+    // Create a minimal manifest for the shell overlay
+    const shellManifest = {
+      id: "eden.shell-overlay",
+      name: "Shell Overlay",
+      version: "1.0.0",
+      frontend: {
+        entry: "index.html",
+      },
+      window: {
+        mode: "floating" as const,
+        injections: {
+          css: true,
+          appFrame: false, // Shell doesn't need the app frame
+        },
+      },
+    };
+
+    const eveshellPath = path.join(__dirname, "../eveshell");
+    const windowBounds = this.mainWindow.getBounds();
+    const DOCK_HEIGHT = 72; // Should match CSS variable
+
+    // Initial bounds: dock mode at bottom
+    const initialBounds = {
+      x: 0,
+      y: windowBounds.height - DOCK_HEIGHT,
+      width: windowBounds.width,
+      height: DOCK_HEIGHT,
+    };
+
+    // Create overlay view
+    this.shellOverlayViewId = this.viewManager.createOverlayView(
+      "eden.shell-overlay",
+      shellManifest,
+      eveshellPath,
+      initialBounds
+    );
+
+    console.log(`Shell overlay created with viewId: ${this.shellOverlayViewId}`);
+  }
+
 
   /**
    * Handle all windows closed
@@ -150,7 +235,7 @@ export class Eden {
 
     try {
       // Shutdown all apps and wait for them to stop
-      await this.appManager.shutdown();
+      await this.processManager.shutdown();
 
       // Brief delay to ensure all cleanup completes
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -164,31 +249,5 @@ export class Eden {
     }
   }
 
-  /**
-   * Get the main window instance
-   */
-  public getMainWindow(): BrowserWindow | null {
-    return this.mainWindow;
-  }
 
-  /**
-   * Get the app manager instance
-   */
-  public getAppManager(): AppManager {
-    return this.appManager;
-  }
-
-  /**
-   * Get the worker manager instance
-   */
-  public getWorkerManager(): WorkerManager {
-    return this.workerManager;
-  }
-
-  /**
-   * Get the view manager instance
-   */
-  public getViewManager(): ViewManager {
-    return this.viewManager;
-  }
 }

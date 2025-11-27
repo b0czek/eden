@@ -6,8 +6,8 @@
 
 body {
   font-family: var(--eden-font-family-base);
-  /* Apply workspace gradient to the whole shell */
-  background: var(--eden-color-bg-primary);
+  /* Transparent background for overlay views */
+  background: transparent;
   color: var(--eden-color-text-primary);
   overflow: hidden;
   height: 100vh;
@@ -19,18 +19,27 @@ body {
   height: 100%;
 }
 
-.shell {
+/* Shell Overlay Container */
+.shell-overlay {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  width: 100%;
+  height: 100%;
+  transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.workspace {
-  flex: 1;
-  /* Make workspace transparent so body background is visible across shell */
-  background: transparent;
-  position: relative;
+/* Dock mode - compact bottom bar */
+.shell-overlay[data-mode="dock"] {
+  height: var(--eden-layout-dock-height);
+  max-height: var(--eden-layout-dock-height);
+  /* Safeguard against desync */
+  overflow: hidden;
+}
+
+/* Fullscreen mode - fill entire window */
+.shell-overlay[data-mode="fullscreen"] {
+  height: 100vh;
+  max-height: 100vh;
 }
 
 /* Dock Styles */
@@ -44,6 +53,23 @@ body {
   padding: var(--eden-space-sm);
   position: relative;
   overflow: visible;
+}
+
+/* One-time slide-in animation on initial load */
+.dock.dock-initial {
+  animation: dockSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes dockSlideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .dock::before {
@@ -70,7 +96,8 @@ body {
   align-items: center;
   justify-content: center;
   flex: 1;
-  z-index: 1; /* above frosted background */
+  z-index: 1;
+  /* above frosted background */
 }
 
 .dock-right {
@@ -105,11 +132,10 @@ body {
 
 .dock-right .separator {
   background: linear-gradient(to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
 }
 
 .app-icons {
@@ -151,22 +177,20 @@ body {
 
 .dock-left .separator {
   background: linear-gradient(to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
 }
 
 .separator {
   width: 1px;
   height: 32px;
   background: linear-gradient(to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
   margin: 0 var(--eden-space-xs);
 }
 
@@ -182,11 +206,11 @@ body {
   transition: all var(--eden-transition-base);
   position: relative;
   min-width: 44px;
-  
+
 }
 
 .app-icon:hover {
-  transform: none; /* JS steruje skalą przy efekcie dock magnify */
+  transform: none;
 }
 
 .app-icon:hover .icon-container {
@@ -297,6 +321,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -306,6 +331,7 @@ body {
   from {
     opacity: 1;
   }
+
   to {
     opacity: 0;
   }
@@ -320,6 +346,7 @@ body {
     opacity: 0;
     transform: translateY(24px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -331,6 +358,7 @@ body {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+
   to {
     opacity: 0;
     transform: translateY(28px) scale(0.96);
@@ -397,4 +425,3 @@ body {
   align-items: center;
   justify-content: center;
 }
-

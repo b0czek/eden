@@ -1,10 +1,11 @@
 // Re-export the Eden library
-export { Eden, EdenConfig } from "./Eden";
+export { Eden } from "./Eden";
+export { EdenConfig } from "../types";
 
 // Re-export core managers for library usage
-export { AppManager } from "./core/AppManager";
-export { WorkerManager } from "./core/WorkerManager";
-export { IPCBridge } from "./core/IPCBridge";
+export { PackageManager } from "./package-manager";
+export { ProcessManager, WorkerManager } from "./process-manager";
+export { IPCBridge } from "./ipc";
 
 // Window management exports
-export { ViewManager, LayoutCalculator, MouseTracker } from "./window-manager";
+export { ViewManager, LayoutCalculator, MouseTracker } from "./view-manager";

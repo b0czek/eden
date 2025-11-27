@@ -1,0 +1,40 @@
+/* Foundation Layer Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--eden-font-family-base);
+    /* Use Eden design system background - foundation is the lowest Z layer */
+    background: var(--eden-color-bg-primary);
+    color: var(--eden-color-text-primary);
+}
+
+#foundation-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#workspace {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    /* Transparent to allow views to show through */
+    background: transparent;
+    /* Don't capture pointer events - let app views handle them */
+    pointer-events: none;
+    /* Reserve space for dock at the bottom (72px = DOCK_HEIGHT) */
+    padding-bottom: 72px;
+    box-sizing: border-box;
+}
