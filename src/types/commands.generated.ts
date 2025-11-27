@@ -14,6 +14,18 @@ export interface SystemCommands {
 }
 
 /**
+ * FsCommands - Commands for the "fs" namespace
+ */
+export interface FsCommands {
+  "fs/read": { path: string; encoding?: import("./index").BufferEncoding };
+  "fs/write": { path: string; content: string; encoding?: import("./index").BufferEncoding };
+  "fs/exists": { path: string };
+  "fs/mkdir": { path: string };
+  "fs/readdir": { path: string };
+  "fs/stat": { path: string };
+}
+
+/**
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
@@ -50,7 +62,7 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}
 
 /**
  * Array of all available command names
@@ -58,6 +70,12 @@ export interface CommandMap extends SystemCommands, PackageCommands, ProcessComm
 export const COMMAND_NAMES = [
   "system/info",
   "system/window-size",
+  "fs/read",
+  "fs/write",
+  "fs/exists",
+  "fs/mkdir",
+  "fs/readdir",
+  "fs/stat",
   "package/install",
   "package/uninstall",
   "package/list-installed",

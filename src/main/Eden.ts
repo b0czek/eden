@@ -7,11 +7,14 @@ import { EdenConfig } from "../types";
 
 // Managers and Handlers
 import { PackageManager, PackageHandler } from "./package-manager";
-import { ProcessManager, ProcessHandler, WorkerManager } from "./process-manager";
+import {
+  ProcessManager,
+  ProcessHandler,
+  WorkerManager,
+} from "./process-manager";
 import { ViewManager, ViewHandler } from "./view-manager";
+import { FilesystemHandler } from "./filesystem";
 import { container } from "tsyringe";
-
-
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
@@ -27,6 +30,7 @@ export class Eden {
   private packageManager: PackageManager;
   private processManager: ProcessManager;
   private systemHandler: SystemHandler;
+  private filesystemHandler: FilesystemHandler;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -59,10 +63,10 @@ export class Eden {
     // 4. ViewManager (depends on CommandRegistry, IPCBridge, EdenConfig)
     this.viewManager = container.resolve(ViewManager);
     container.registerInstance("ViewManager", this.viewManager);
-    
+
     // 5. Break circular dependency: Set ViewManager on IPCBridge
     this.ipcBridge.setViewManager(this.viewManager);
-    
+
     // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);
 
@@ -77,6 +81,11 @@ export class Eden {
     // Initialize System Handler
     this.systemHandler = container.resolve(SystemHandler);
     container.registerInstance("SystemHandler", this.systemHandler);
+
+    // Initialize Filesystem Handler
+    this.filesystemHandler = new FilesystemHandler(this.appsDirectory);
+    container.registerInstance("FilesystemHandler", this.filesystemHandler);
+    this.commandRegistry.registerManager(this.filesystemHandler);
 
     this.setupAppEventHandlers();
   }
@@ -132,7 +141,10 @@ export class Eden {
     this.ipcBridge.setMainWindow(this.mainWindow);
 
     // Load the foundation layer (not eveshell!)
-    const foundationPath = path.join(__dirname, "../foundation/foundation.html");
+    const foundationPath = path.join(
+      __dirname,
+      "../foundation/foundation.html"
+    );
     this.mainWindow.loadFile(foundationPath);
 
     // Create shell overlay as an overlay view after foundation loads
@@ -203,9 +215,10 @@ export class Eden {
       initialBounds
     );
 
-    console.log(`Shell overlay created with viewId: ${this.shellOverlayViewId}`);
+    console.log(
+      `Shell overlay created with viewId: ${this.shellOverlayViewId}`
+    );
   }
-
 
   /**
    * Handle all windows closed
@@ -248,6 +261,4 @@ export class Eden {
       console.error("Error during shutdown:", error);
     }
   }
-
-
 }
