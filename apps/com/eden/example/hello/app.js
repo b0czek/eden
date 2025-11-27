@@ -81,7 +81,11 @@ class HelloApp {
   }
 
   async sayHello() {
-    const userMessage = prompt('What would you like to say?', 'Hello from frontend!');
+    const userMessage = await this.showInputDialog(
+      'Say Hello', 
+      'What would you like to say?', 
+      'Hello from frontend!'
+    );
     if (!userMessage) return;
 
     this.log(`Sending: "${userMessage}"`);
@@ -107,6 +111,72 @@ class HelloApp {
     } catch (error) {
       this.log(`Error: ${error.message}`);
     }
+  }
+
+  /**
+   * Show an input dialog modal (replaces native prompt)
+   * @param {string} title - Dialog title
+   * @param {string} placeholder - Input placeholder text
+   * @param {string} defaultValue - Default input value
+   * @returns {Promise<string|null>} - User's input or null if cancelled
+   */
+  showInputDialog(title, placeholder = 'Enter value...', defaultValue = '') {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('input-dialog');
+      const titleEl = document.getElementById('input-dialog-title');
+      const input = document.getElementById('input-dialog-input');
+      const closeBtn = document.getElementById('input-dialog-close');
+      const cancelBtn = document.getElementById('input-dialog-cancel');
+      const confirmBtn = document.getElementById('input-dialog-confirm');
+
+      // Set up the dialog
+      titleEl.textContent = title;
+      input.placeholder = placeholder;
+      input.value = defaultValue;
+      overlay.style.display = 'flex';
+
+      // Focus the input after a short delay to ensure modal is visible
+      setTimeout(() => input.focus(), 100);
+
+      const cleanup = (result) => {
+        overlay.style.display = 'none';
+        input.value = '';
+        resolve(result);
+      };
+
+      const handleConfirm = () => {
+        const value = input.value.trim();
+        cleanup(value || null);
+      };
+
+      const handleCancel = () => {
+        cleanup(null);
+      };
+
+      // Event listeners
+      confirmBtn.onclick = handleConfirm;
+      cancelBtn.onclick = handleCancel;
+      closeBtn.onclick = handleCancel;
+
+      // Handle Enter key to confirm
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          handleConfirm();
+          input.removeEventListener('keydown', handleKeyDown);
+        } else if (e.key === 'Escape') {
+          handleCancel();
+          input.removeEventListener('keydown', handleKeyDown);
+        }
+      };
+      input.addEventListener('keydown', handleKeyDown);
+
+      // Close on overlay click
+      overlay.onclick = (e) => {
+        if (e.target === overlay) {
+          handleCancel();
+        }
+      };
+    });
   }
 
   handleMessage(message) {
