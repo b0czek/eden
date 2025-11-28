@@ -1,6 +1,10 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 import AdmZip from "adm-zip";
+
+const execAsync = promisify(exec);
 
 export interface AppManifest {
   id: string;
@@ -8,6 +12,10 @@ export interface AppManifest {
   version: string;
   description?: string;
   author?: string;
+  build?: {
+    command: string;
+    cwd?: string;
+  };
   backend?: {
     entry: string;
     options?: any;
@@ -43,6 +51,54 @@ export interface BundleResult {
 export class GenesisBundler {
   private static isRemoteEntry(entry?: string): boolean {
     return !!entry && /^https?:\/\//i.test(entry);
+  }
+
+  /**
+   * Execute build command if defined in manifest
+   */
+  static async executeBuild(
+    appDirectory: string,
+    manifest: AppManifest,
+    verbose?: boolean
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!manifest.build?.command) {
+      return { success: true }; // No build command defined, skip
+    }
+
+    try {
+      const buildCwd = manifest.build.cwd
+        ? path.join(appDirectory, manifest.build.cwd)
+        : appDirectory;
+
+      if (verbose) {
+        console.log(`🔨 Running build command: ${manifest.build.command}`);
+        console.log(`   Working directory: ${buildCwd}`);
+      }
+
+      const { stdout, stderr } = await execAsync(manifest.build.command, {
+        cwd: buildCwd,
+        env: { ...process.env },
+      });
+
+      if (verbose && stdout) {
+        console.log(`   ${stdout.trim()}`);
+      }
+
+      if (stderr && verbose) {
+        console.log(`   ${stderr.trim()}`);
+      }
+
+      if (verbose) {
+        console.log("✓ Build completed successfully");
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `Build failed: ${error.message}`,
+      };
+    }
   }
 
   /**
@@ -178,7 +234,20 @@ export class GenesisBundler {
         console.log(`✓ Manifest valid: ${manifest.name} v${manifest.version}`);
       }
 
-      // Verify required files exist
+      // Execute build command if defined (before verifying files, as build may create them)
+      const buildResult = await this.executeBuild(
+        appDirectory,
+        manifest,
+        verbose
+      );
+      if (!buildResult.success) {
+        return {
+          success: false,
+          error: buildResult.error,
+        };
+      }
+
+      // Verify required files exist (after build)
       const fileCheck = await this.verifyFiles(appDirectory, manifest);
       if (!fileCheck.valid) {
         return {

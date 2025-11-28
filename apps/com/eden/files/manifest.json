@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "A file explorer for managing files and directories",
   "author": "Eden Team",
+  "build": {
+    "command": "npm run build"
+  },
   "frontend": {
     "entry": "dist/index.html"
   },
