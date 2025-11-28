@@ -229,10 +229,7 @@ export class Eden {
    * Handle all windows closed
    */
   private onWindowAllClosed(): void {
-    // On macOS, keep app running even when windows are closed
-    if (process.platform !== "darwin") {
-      app.quit();
-    }
+    app.quit();
   }
 
   /**
