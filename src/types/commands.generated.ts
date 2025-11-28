@@ -83,6 +83,14 @@ export interface FsCommands {
     mtime: Date;
   };
   };
+  /**
+   * Delete a file or directory.
+   * For directories, removes recursively.
+   */
+  "fs/delete": {
+    args: { path: string };
+    response: void;
+  };
 }
 
 /**
@@ -256,6 +264,7 @@ export const COMMAND_NAMES = [
   "fs/mkdir",
   "fs/readdir",
   "fs/stat",
+  "fs/delete",
   "package/install",
   "package/uninstall",
   "package/list-installed",

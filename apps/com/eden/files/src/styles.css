@@ -1,0 +1,287 @@
+/**
+ * File Explorer - Custom Styles
+ * Using Eden Design System as foundation
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-secondary);
+  color: var(--eden-color-text-on-dark);
+  overflow: hidden;
+}
+
+/* ===== Main Layout ===== */
+.file-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== Header with Breadcrumb and Navigation ===== */
+.explorer-header {
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  -webkit-backdrop-filter: var(--eden-glass-strong);
+  border-bottom: 1px solid var(--eden-color-border-light);
+  padding: var(--eden-space-md) var(--eden-space-lg);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-lg);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-xs);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breadcrumb-separator {
+  color: var(--eden-color-text-muted);
+  user-select: none;
+  padding: 0 var(--eden-space-xs);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  gap: var(--eden-space-sm);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ===== Main Content Area ===== */
+.explorer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--eden-space-lg);
+  background: var(--eden-color-bg-secondary);
+}
+
+/* ===== File List ===== */
+.file-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-sm);
+}
+
+.file-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--eden-space-lg);
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  border: 1px solid var(--eden-color-border-light);
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+  user-select: none;
+  position: relative;
+}
+
+.file-item:hover {
+  background: var(--eden-color-bg-glass-strong);
+  border-color: var(--eden-color-accent-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--eden-shadow-lg);
+}
+
+.file-item.selected {
+  background: var(--eden-color-surface-active);
+  border-color: var(--eden-color-accent-primary);
+  box-shadow: var(--eden-shadow-md);
+}
+
+.file-icon {
+  font-size: 48px;
+  margin-bottom: var(--eden-space-sm);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.file-name {
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.file-meta {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-muted);
+  margin-top: var(--eden-space-xs);
+  text-align: center;
+}
+
+.file-item-actions {
+  position: absolute;
+  top: var(--eden-space-sm);
+  right: var(--eden-space-sm);
+  display: none;
+  gap: var(--eden-space-xs);
+}
+
+.file-item:hover .file-item-actions {
+  display: flex;
+}
+
+.file-action-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+}
+
+/* ===== Status Bar ===== */
+.explorer-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--eden-space-sm) var(--eden-space-lg);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  -webkit-backdrop-filter: var(--eden-glass-strong);
+  border-top: 1px solid var(--eden-color-border-light);
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+
+.status-path {
+  font-family: var(--eden-font-mono);
+  color: var(--eden-color-accent-primary);
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-4xl);
+  text-align: center;
+  color: var(--eden-color-text-muted);
+  min-height: 300px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: var(--eden-space-lg);
+  opacity: 0.5;
+}
+
+.empty-message {
+  font-size: var(--eden-font-size-lg);
+  margin-bottom: var(--eden-space-sm);
+}
+
+.empty-hint {
+  font-size: var(--eden-font-size-sm);
+  opacity: 0.7;
+}
+
+/* ===== Loading State ===== */
+.loading-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-4xl);
+  font-size: var(--eden-font-size-lg);
+  color: var(--eden-color-text-secondary);
+}
+
+/* ===== Error State ===== */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-4xl);
+  text-align: center;
+  color: var(--eden-color-danger);
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: var(--eden-space-lg);
+}
+
+.error-title {
+  font-size: var(--eden-font-size-xl);
+  font-weight: var(--eden-font-weight-semibold);
+  margin-bottom: var(--eden-space-sm);
+}
+
+.error-details {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+
+/* ===== Animations ===== */
+.file-item {
+  animation: eden-fade-in 0.3s ease-out;
+}
+
+/* ===== Responsive Design ===== */
+@media (max-width: 768px) {
+  .file-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .header-content {
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb {
+    font-size: var(--eden-font-size-sm);
+  }
+}
+
+/* ===== Scrollbar Styling ===== */
+.explorer-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.explorer-content::-webkit-scrollbar-track {
+  background: var(--eden-color-bg-secondary);
+}
+
+.explorer-content::-webkit-scrollbar-thumb {
+  background: var(--eden-color-border-medium);
+  border-radius: 4px;
+}
+
+.explorer-content::-webkit-scrollbar-thumb:hover {
+  background: var(--eden-color-accent-primary);
+}

@@ -110,4 +110,25 @@ export class FilesystemHandler {
       mtime: stats.mtime,
     };
   }
+
+  /**
+   * Delete a file or directory.
+   * For directories, removes recursively.
+   */
+  @EdenHandler("delete")
+  async handleDelete(args: { path: string }): Promise<void> {
+    const { path: targetPath } = args;
+    const fullPath = this.resolvePath(targetPath);
+
+    // Check if it exists and get stats
+    const stats = await fs.stat(fullPath);
+
+    if (stats.isDirectory()) {
+      // Remove directory recursively
+      await fs.rm(fullPath, { recursive: true, force: true });
+    } else {
+      // Remove file
+      await fs.unlink(fullPath);
+    }
+  }
 }
