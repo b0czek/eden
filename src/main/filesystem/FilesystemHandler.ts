@@ -7,13 +7,16 @@ export class FilesystemHandler {
   private baseDir: string;
 
   constructor(baseDir: string) {
-    this.baseDir = baseDir;
+    // Normalize baseDir to an absolute path to ensure proper path resolution
+    this.baseDir = path.resolve(baseDir);
   }
 
   private resolvePath(targetPath: string): string {
     // Prevent directory traversal
     const safePath = path.normalize(targetPath).replace(/^(\.\.[\/\\])+/, "");
-    const resolved = path.join(this.baseDir, safePath);
+    // Remove leading slashes to ensure path.join works correctly
+    const relativePath = safePath.replace(/^[\/\\]+/, "");
+    const resolved = path.join(this.baseDir, relativePath);
 
     // Double check it's still inside baseDir
     if (!resolved.startsWith(this.baseDir)) {

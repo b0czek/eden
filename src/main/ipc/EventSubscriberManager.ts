@@ -21,7 +21,7 @@ export class EventSubscriberManager {
     if (!this.subscriptions.has(eventName)) {
       this.subscriptions.set(eventName, new Set());
     }
-    
+
     this.subscriptions.get(eventName)!.add(viewId);
     console.log(`View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`);
     return true;
@@ -35,12 +35,12 @@ export class EventSubscriberManager {
     if (!subscriptions) {
       return false;
     }
-    
+
     const result = subscriptions.delete(viewId);
     if (subscriptions.size === 0) {
       this.subscriptions.delete(eventName);
     }
-    
+
     if (result) {
       console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
     }
@@ -60,14 +60,11 @@ export class EventSubscriberManager {
    */
   public notify(eventName: string, payload: any): void {
     const subscribedViewIds = this.getSubscribedViews(eventName);
-    
+
     if (subscribedViewIds.length === 0) {
-      // console.log(`No subscribers for event: ${eventName}`);
       return;
     }
 
-    console.log(`Emitting ${eventName} to ${subscribedViewIds.length} subscribed view(s)`);
-    
     for (const viewId of subscribedViewIds) {
       this.viewManager.sendToView(viewId, 'shell-message', {
         type: eventName,
@@ -85,7 +82,6 @@ export class EventSubscriberManager {
       return false;
     }
 
-    // console.log(`Emitting ${eventName} to specific view ${viewId}`);
     return this.viewManager.sendToView(viewId, 'shell-message', {
       type: eventName,
       payload,
