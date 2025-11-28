@@ -6,7 +6,7 @@ import {
 import { EventEmitter } from "events";
 import * as path from "path";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { AppManifest, TilingConfig, WindowConfig, EdenConfig } from "../../types";
+import { AppManifest, TilingConfig, WindowConfig, EdenConfig, WindowSize } from "../../types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
@@ -36,6 +36,12 @@ export class ViewManager extends EventEmitter {
     width: 800,
     height: 600,
   };
+
+  private windowSize: WindowSize = {
+    width: 800,
+    height: 600,
+  };
+
   private viewHandler: ViewHandler;
   private ipcBridge: IPCBridge;
 
@@ -76,6 +82,14 @@ export class ViewManager extends EventEmitter {
     if (this.tilingConfig.mode !== "none") {
       this.recalculateTiledViews();
     }
+  }
+
+  setWindowSize(windowSize: WindowSize): void {
+    this.windowSize = windowSize;
+  }
+
+  getWindowSize(): WindowSize {
+    return this.windowSize;
   }
 
   /**
@@ -195,7 +209,7 @@ export class ViewManager extends EventEmitter {
     try {
       const designSystemPath = path.join(__dirname, "../../design-system");
       const cssPath = path.join(designSystemPath, "eden.css");
-      
+
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
@@ -275,7 +289,7 @@ export class ViewManager extends EventEmitter {
     if (!this.mainWindow) {
       throw new Error("Main window not set. Call setMainWindow first.");
     }
-    
+
     console.log(
       `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
     );
@@ -338,12 +352,12 @@ export class ViewManager extends EventEmitter {
       this.injectAppAPI(view, appId);
 
       // Emit to IPC subscribers (webcontents)
-      this.ipcBridge.eventSubscribers.notify("view-loaded", { 
-        viewId, 
-        appId, 
-        overlay: viewType === "overlay" 
+      this.ipcBridge.eventSubscribers.notify("view-loaded", {
+        viewId,
+        appId,
+        overlay: viewType === "overlay"
       });
-      
+
       this.emit("view-loaded", { viewId, appId, overlay: viewType === "overlay" });
     });
 
@@ -403,7 +417,7 @@ export class ViewManager extends EventEmitter {
     );
 
     const windowConfig = manifest.window;
-    
+
     // Determine view mode based on manifest
     const viewMode = this.determineViewMode(manifest);
 
@@ -460,7 +474,7 @@ export class ViewManager extends EventEmitter {
 
     // Overlays are always floating mode
     const viewMode: ViewMode = "floating";
-    
+
     // Overlays use their own z-index counter and provided bounds
     const zIndex = this.nextOverlayZIndex++;
     const viewBounds = bounds;
@@ -885,8 +899,8 @@ export class ViewManager extends EventEmitter {
           .executeJavaScript(
             `
                     window.postMessage({ type: 'view-mode-changed', mode: 'floating', bounds: ${JSON.stringify(
-                      floatingBounds
-                    )} }, '*');
+              floatingBounds
+            )} }, '*');
                 `
           )
           .catch((err) =>
@@ -918,8 +932,8 @@ export class ViewManager extends EventEmitter {
             .executeJavaScript(
               `
                         window.postMessage({ type: 'view-mode-changed', mode: 'tiled', bounds: ${JSON.stringify(
-                          tileBounds
-                        )} }, '*');
+                tileBounds
+              )} }, '*');
                     `
             )
             .catch((err) =>
@@ -941,8 +955,8 @@ export class ViewManager extends EventEmitter {
             .executeJavaScript(
               `
                         window.postMessage({ type: 'view-mode-changed', mode: 'tiled', bounds: ${JSON.stringify(
-                          bounds
-                        )} }, '*');
+                bounds
+              )} }, '*');
                     `
             )
             .catch((err) =>

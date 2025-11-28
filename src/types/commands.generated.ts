@@ -16,13 +16,6 @@ export interface SystemCommands {
     args: Record<string, never>;
     response: import("./index").SystemInfo;
   };
-  /**
-   * Get the current dimensions of the main window.
-   */
-  "system/window-size": {
-    args: Record<string, never>;
-    response: import("./index").WindowSize;
-  };
 }
 
 /**
@@ -184,9 +177,10 @@ export interface ViewCommands {
   /**
    * Update the available workspace bounds (e.g. after taskbar resize).
    */
-  "view/update-workspace-bounds": {
+  "view/update-global-bounds": {
     args: {
     bounds: import("./index").ViewBounds;
+    windowSize: import("./index").WindowSize;
   };
     response: { success: boolean };
   };
@@ -245,6 +239,13 @@ export interface ViewCommands {
   };
     response: { success: boolean };
   };
+  /**
+   * Get the current dimensions of the main window.
+   */
+  "view/window-size": {
+    args: Record<string, never>;
+    response: import("./index").WindowSize;
+  };
 }
 
 /**
@@ -257,7 +258,6 @@ export interface CommandMap extends SystemCommands, FsCommands, PackageCommands,
  */
 export const COMMAND_NAMES = [
   "system/info",
-  "system/window-size",
   "fs/read",
   "fs/write",
   "fs/exists",
@@ -274,11 +274,12 @@ export const COMMAND_NAMES = [
   "view/update-view-bounds",
   "view/set-view-visibility",
   "view/focus-app",
-  "view/update-workspace-bounds",
+  "view/update-global-bounds",
   "view/toggle-view-mode",
   "view/start-drag",
   "view/end-drag",
   "view/global-mouseup",
   "view/start-resize",
-  "view/end-resize"
+  "view/end-resize",
+  "view/window-size"
 ] as const;

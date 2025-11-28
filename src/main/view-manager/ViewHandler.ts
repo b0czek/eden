@@ -1,14 +1,14 @@
 import { EdenHandler, EdenNamespace, IPCBridge, EdenEmitter } from "../ipc";
 import { ViewManager } from "./ViewManager";
 import { MouseTracker } from "./MouseTracker";
-import { AppInstance, ViewBounds } from "../../types";
+import { AppInstance, ViewBounds, WindowSize } from "../../types";
 
 /**
  * Events emitted by the ViewHandler
  */
 interface ViewNamespaceEvents {
   "bounds-updated": ViewBounds;
-  "workspace-bounds-changed": { bounds: ViewBounds };
+  "global-bounds-changed": { workspaceBounds: ViewBounds; windowSize: WindowSize };
 }
 
 @EdenNamespace("view")
@@ -100,16 +100,20 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
   /**
    * Update the available workspace bounds (e.g. after taskbar resize).
    */
-  @EdenHandler("update-workspace-bounds")
+  @EdenHandler("update-global-bounds")
   async handleUpdateWorkspaceBounds(args: {
     bounds: ViewBounds;
+    windowSize: WindowSize;
   }): Promise<{ success: boolean }> {
-    const { bounds } = args;
+    const { bounds, windowSize } = args;
 
     this.viewManager.setWorkspaceBounds(bounds);
 
-    this.notify("workspace-bounds-changed", {
-      bounds,
+    this.viewManager.setWindowSize(windowSize);
+
+    this.notify("global-bounds-changed", {
+      workspaceBounds: bounds,
+      windowSize
     });
 
     return { success: true };
@@ -301,5 +305,14 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
       this.resizeState = null;
     }
     return { success: true };
+  }
+
+  /**
+   * Get the current dimensions of the main window.
+   */
+  @EdenHandler("window-size")
+  async handleGetWindowSize(): Promise<WindowSize> {
+    return this.viewManager.getWindowSize();
+
   }
 }

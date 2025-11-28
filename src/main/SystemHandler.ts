@@ -26,20 +26,5 @@ export class SystemHandler {
     };
   }
 
-  /**
-   * Get the current dimensions of the main window.
-   */
-  @EdenHandler("window-size")
-  async handleGetWindowSize(): Promise<WindowSize> {
-    const mainWindow = this.ipcBridge.getMainWindow();
-    if (!mainWindow) {
-      throw new Error("Main window not available");
-    }
 
-    const windowBounds = mainWindow.getBounds();
-    return {
-      width: windowBounds.width,
-      height: windowBounds.height,
-    };
-  }
 }

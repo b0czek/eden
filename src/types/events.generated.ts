@@ -28,7 +28,7 @@ export interface ProcessEvents {
  */
 export interface ViewEvents {
   "view/bounds-updated": import("./index").ViewBounds;
-  "view/workspace-bounds-changed": { bounds: import("./index").ViewBounds };
+  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize };
 }
 
 /**
@@ -47,5 +47,5 @@ export const APP_EVENT_NAMES = [
   "process/error",
   "process/exited",
   "view/bounds-updated",
-  "view/workspace-bounds-changed"
+  "view/global-bounds-changed"
 ] as const;
