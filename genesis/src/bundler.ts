@@ -34,6 +34,7 @@ export interface AppManifest {
 export interface BundleOptions {
   appDirectory: string;
   outputPath?: string;
+  extractToDirectory?: string; // If provided, copy files directly instead of zipping
   verbose?: boolean;
 }
 
@@ -199,10 +200,94 @@ export class GenesisBundler {
   }
 
   /**
-   * Bundle an app into .edenite format
+   * Extract app files directly to a directory (no zip)
+   */
+  private static async extractToDirectory(
+    appDirectory: string,
+    targetDir: string,
+    verbose?: boolean
+  ): Promise<void> {
+    const resolvedTarget = path.resolve(targetDir);
+
+    if (verbose) console.log(`📁 Copying files to: ${resolvedTarget}`);
+
+    // Ensure target directory exists
+    await fs.mkdir(resolvedTarget, { recursive: true });
+
+    // Copy all files from the app directory
+    const files = await fs.readdir(appDirectory, { recursive: true });
+
+    for (const file of files) {
+      const sourcePath = path.join(appDirectory, file as string);
+      const stat = await fs.stat(sourcePath);
+
+      if (stat.isFile()) {
+        const targetPath = path.join(resolvedTarget, file as string);
+        const targetFileDir = path.dirname(targetPath);
+
+        // Ensure subdirectory exists
+        await fs.mkdir(targetFileDir, { recursive: true });
+
+        // Copy file
+        await fs.copyFile(sourcePath, targetPath);
+
+        if (verbose) console.log(`  + ${file}`);
+      }
+    }
+
+    if (verbose) {
+      console.log(`✓ Files copied to: ${resolvedTarget}`);
+    }
+  }
+
+  /**
+   * Create a zip archive from app directory
+   */
+  private static async createZipArchive(
+    appDirectory: string,
+    manifest: AppManifest,
+    outputPath?: string,
+    verbose?: boolean
+  ): Promise<string> {
+    const zip = new AdmZip();
+
+    // Add all files from the app directory
+    const files = await fs.readdir(appDirectory, { recursive: true });
+
+    for (const file of files) {
+      const filePath = path.join(appDirectory, file as string);
+      const stat = await fs.stat(filePath);
+
+      if (stat.isFile()) {
+        const content = await fs.readFile(filePath);
+        zip.addFile(file as string, content);
+        if (verbose) console.log(`  + ${file}`);
+      }
+    }
+
+    // Determine output path
+    const finalOutputPath =
+      outputPath ||
+      path.join(process.cwd(), `${manifest.id}-${manifest.version}.edenite`);
+
+    // Write the .edenite file
+    await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
+    zip.writeZip(finalOutputPath);
+
+    if (verbose) {
+      console.log(`✓ Bundle created: ${finalOutputPath}`);
+      const stats = await fs.stat(finalOutputPath);
+      console.log(`  Size: ${(stats.size / 1024).toFixed(2)} KB`);
+    }
+
+    return finalOutputPath;
+  }
+
+  /**
+   * Bundle an app into .edenite format or extract to directory
    */
   static async bundle(options: BundleOptions): Promise<BundleResult> {
-    const { appDirectory, outputPath, verbose } = options;
+    const { appDirectory, outputPath, extractToDirectory, verbose } = options;
 
     try {
       if (verbose) console.log(`📦 Bundling app from: ${appDirectory}`);
@@ -258,37 +343,28 @@ export class GenesisBundler {
 
       if (verbose) console.log("✓ All required files present");
 
-      // Create zip archive
-      const zip = new AdmZip();
+      // If extractToDirectory is provided, copy files directly
+      if (extractToDirectory) {
+        await this.extractToDirectory(
+          appDirectory,
+          extractToDirectory,
+          verbose
+        );
 
-      // Add all files from the app directory
-      const files = await fs.readdir(appDirectory, { recursive: true });
-
-      for (const file of files) {
-        const filePath = path.join(appDirectory, file as string);
-        const stat = await fs.stat(filePath);
-
-        if (stat.isFile()) {
-          const content = await fs.readFile(filePath);
-          zip.addFile(file as string, content);
-          if (verbose) console.log(`  + ${file}`);
-        }
+        return {
+          success: true,
+          outputPath: path.resolve(extractToDirectory),
+          manifest,
+        };
       }
 
-      // Determine output path
-      const finalOutputPath =
-        outputPath ||
-        path.join(process.cwd(), `${manifest.id}-${manifest.version}.edenite`);
-
-      // Write the .edenite file
-      await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
-      zip.writeZip(finalOutputPath);
-
-      if (verbose) {
-        console.log(`✓ Bundle created: ${finalOutputPath}`);
-        const stats = await fs.stat(finalOutputPath);
-        console.log(`  Size: ${(stats.size / 1024).toFixed(2)} KB`);
-      }
+      // Otherwise, create zip archive
+      const finalOutputPath = await this.createZipArchive(
+        appDirectory,
+        manifest,
+        outputPath,
+        verbose
+      );
 
       return {
         success: true,
