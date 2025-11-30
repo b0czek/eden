@@ -113,26 +113,6 @@ export interface AppManifest {
   /** Window configuration */
   window?: WindowConfig;
 
-  /** Permissions requested by the app */
-  permissions?: {
-    /** File system access */
-    filesystem?: {
-      read?: string[]; // Array of paths/globs
-      write?: string[]; // Array of paths/globs
-    };
-
-    /** Network access */
-    network?: {
-      domains?: string[]; // Allowed domains
-    };
-
-    /** System access */
-    system?: {
-      clipboard?: boolean;
-      notifications?: boolean;
-    };
-  };
-
   /** App icon path (relative to app root) */
   icon?: string;
 }

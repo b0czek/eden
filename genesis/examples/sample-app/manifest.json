@@ -1,0 +1,11 @@
+{
+  "id": "com.example.hello",
+  "name": "Hello Eden",
+  "version": "1.0.0",
+  "description": "A simple Hello World app for Eden",
+  "author": "Eden Team",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "icon": "icon.png"
+}
