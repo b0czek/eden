@@ -5,6 +5,7 @@ src/
 
 # Tests
 *.test.ts
+*.test.js
 *.spec.ts
 __tests__/
 examples/

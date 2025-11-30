@@ -1,6 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import AdmZip from "adm-zip";
+import { GenesisBundler } from "@edenapp/genesis";
 import { AppManifest } from "../../types";
 import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
@@ -98,22 +98,21 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       throw new Error(
         "Invalid file format. Please select a .edenite file.\n" +
           "You can create .edenite files using the genesis bundler:\n" +
-          "  npm install -g @eden/genesis\n" +
+          "  npm install -g @edenapp/genesis\n" +
           "  genesis build <app-directory>"
       );
     }
 
-    // Extract the .edenite archive
-    const zip = new AdmZip(edenitePath);
-    const manifestEntry = zip.getEntry("manifest.json");
-
-    if (!manifestEntry) {
-      throw new Error("Invalid .edenite file: missing manifest.json");
+    // Get info from the archive first (validates format and reads manifest)
+    const info = await GenesisBundler.getInfo(edenitePath);
+    
+    if (!info.success || !info.manifest) {
+      throw new Error(
+        info.error || "Invalid .edenite file: could not read manifest"
+      );
     }
 
-    // Read and validate manifest
-    const manifestContent = zip.readAsText(manifestEntry);
-    const manifest: AppManifest = JSON.parse(manifestContent);
+    const manifest = info.manifest;
 
     // Validate manifest
     this.validateManifest(manifest);
@@ -126,11 +125,21 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
 
-    // Extract to apps directory
+    // Extract to apps directory using genesis
     const targetPath = path.join(this.appsDirectory, manifest.id);
-    await fs.mkdir(targetPath, { recursive: true });
+    
+    const result = await GenesisBundler.extract({
+      edenitePath,
+      outputDirectory: targetPath,
+      verbose: false,
+      verifyChecksum: true,
+    });
 
-    zip.extractAllTo(targetPath, true);
+    if (!result.success) {
+      throw new Error(
+        result.error || "Failed to extract .edenite file"
+      );
+    }
 
     // Register app
     this.installedApps.set(manifest.id, manifest);

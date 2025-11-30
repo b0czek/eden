@@ -1,10 +1,10 @@
 {
-  "name": "eden",
+  "name": "@edenapp/eden",
   "version": "0.1.0",
   "description": "A modular Electron desktop environment with extensible app support",
   "main": "dist/main/main.js",
   "author": "Eden Team",
-  "license": "MIT",
+  "license": "GPL-2.0",
   "scripts": {
     "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:shell && npm run build:main && npm run bundle:app-frame && npm run copy:eveshell-preload && npm run copy-assets",
     "build:main": "tsc",
@@ -21,7 +21,6 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.10.0",
     "electron": "^39.2.3",
     "esbuild": "^0.27.0",
@@ -35,7 +34,7 @@
     "vite-plugin-solid": "^2.11.10"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "@edenapp/genesis": "^0.2.0",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }
