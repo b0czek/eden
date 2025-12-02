@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 
 interface AppItem {
@@ -26,10 +26,28 @@ export default function AllApps(props: AllAppsProps) {
 		x: number;
 		y: number;
 	} | null>(null);
+	const [hotReloadApps, setHotReloadApps] = createSignal<Set<string>>(new Set());
 	const [longPressTimer, setLongPressTimer] = createSignal<number | null>(null);
 	const [isClosing, setIsClosing] = createSignal(false);
 	const EXIT_ANIMATION_MS = 280;
 	let exitTimer: number | undefined;
+
+	onMount(async () => {
+		// Load hot reload status for all apps
+		// TODO: Improve this
+		const hotReloadSet = new Set<string>();
+		for (const app of props.apps) {
+			try {
+				const result = await window.edenAPI.shellCommand("package/is-hot-reload-enabled", { appId: app.id });
+				if (result.enabled) {
+					hotReloadSet.add(app.id);
+				}
+			} catch (error) {
+				console.error(`Failed to check hot reload status for ${app.id}:`, error);
+			}
+		}
+		setHotReloadApps(hotReloadSet);
+	});
 
 	onCleanup(() => {
 		const timer = longPressTimer();
@@ -240,6 +258,28 @@ export default function AllApps(props: AllAppsProps) {
 									Stop App
 								</button>
 							</Show>
+							<button
+								class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-full"
+								style="justify-content: flex-start; width: 100%;"
+								onClick={async () => {
+									try {
+										const result = await window.edenAPI.shellCommand("package/toggle-hot-reload", { appId: menu().appId });
+										const newSet = new Set(hotReloadApps());
+										if (result.enabled) {
+											newSet.add(menu().appId);
+										} else {
+											newSet.delete(menu().appId);
+										}
+										setHotReloadApps(newSet);
+									} catch (error) {
+										console.error('Failed to toggle hot reload:', error);
+									}
+									setContextMenu(null);
+								}}
+							>
+								<span class="eden-icon">{hotReloadApps().has(menu().appId) ? '🔥' : '⚡'}</span>
+								{hotReloadApps().has(menu().appId) ? 'Disable' : 'Enable'} Hot Reload
+							</button>
 							<button
 								class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger"
 								style="justify-content: flex-start; width: 100%;"

@@ -22,11 +22,5 @@
     },
     "resizable": true,
     "movable": true
-  },
-  "permissions": {
-    "filesystem": {
-      "read": true,
-      "write": true
-    }
   }
 }

@@ -111,6 +111,20 @@ export interface PackageCommands {
     args: Record<string, never>;
     response: import("./index").AppManifest[];
   };
+  /**
+   * Toggle hot reload for an app
+   */
+  "package/toggle-hot-reload": {
+    args: { appId: string };
+    response: { enabled: boolean };
+  };
+  /**
+   * Check if hot reload is enabled for an app
+   */
+  "package/is-hot-reload-enabled": {
+    args: { appId: string };
+    response: { enabled: boolean };
+  };
 }
 
 /**
@@ -268,6 +282,8 @@ export const COMMAND_NAMES = [
   "package/install",
   "package/uninstall",
   "package/list-installed",
+  "package/toggle-hot-reload",
+  "package/is-hot-reload-enabled",
   "process/launch",
   "process/stop",
   "process/list",

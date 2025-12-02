@@ -1,0 +1,9 @@
+{
+  "prebuiltApps": [
+    "com.eden.files"
+  ],
+  "hotReload": {
+    "enabled": true,
+    "debounce": 300
+  }
+}

@@ -114,7 +114,12 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`App ${appId} is already running`);
     }
 
-    const installPath = path.join(this.appsDirectory, appId);
+    // Get the correct install path 
+    const installPath = this.packageManager.getAppPath(appId);
+    if (!installPath) {
+      throw new Error(`App path not found for ${appId}`);
+    }
+
     const instanceId = randomUUID();
 
     // Default bounds if not specified
@@ -279,5 +284,33 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       installed: this.packageManager.getInstalledApps(),
       running: runningApps,
     };
+  }
+
+  /**
+   * Reload a running app 
+   */
+  async reloadApp(appId: string): Promise<void> {
+    const instance = this.runningApps.get(appId);
+    if (!instance) {
+      console.log(`App ${appId} is not running, skipping reload`);
+      return;
+    }
+
+    // Save the current view bounds
+    const viewInfo = this.viewManager.getViewInfo(instance.viewId);
+    const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
+
+    console.log(`Reloading app ${appId}...`);
+
+    // Stop the app
+    await this.stopApp(appId);
+
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Relaunch with same bounds
+    await this.launchApp(appId, bounds);
+
+    console.log(`App ${appId} reloaded successfully`);
   }
 }

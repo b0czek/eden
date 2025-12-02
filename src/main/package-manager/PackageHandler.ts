@@ -1,6 +1,7 @@
 import { AppManifest } from "../../types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
+import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";
 
 @EdenNamespace("package")
 export class PackageHandler {
@@ -36,5 +37,24 @@ export class PackageHandler {
     args: Record<string, never>
   ): Promise<AppManifest[]> {
     return this.packageManager.getInstalledApps();
+  }
+
+  /**
+   * Toggle hot reload for an app
+   */
+  @EdenHandler("toggle-hot-reload")
+  async handleToggleHotReload(params: { appId: string }): Promise<{ enabled: boolean }> {
+    const enabled = await toggleHotReload(params.appId);
+    console.log(`Hot reload ${enabled ? 'enabled' : 'disabled'} for ${params.appId}`);
+    return { enabled };
+  }
+
+  /**
+   * Check if hot reload is enabled for an app
+   */
+  @EdenHandler("is-hot-reload-enabled")
+  async handleIsHotReloadEnabled(params: { appId: string }): Promise<{ enabled: boolean }> {
+    const enabled = await isHotReloadEnabled(params.appId);
+    return { enabled };
   }
 }

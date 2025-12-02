@@ -19,6 +19,7 @@ interface PackageNamespaceEvents {
 @EdenNamespace("package")
 export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private appsDirectory: string;
+  private prebuiltAppsDirectory: string;
   private installedApps: Map<string, AppManifest> = new Map();
   private packageHandler: PackageHandler;
 
@@ -29,6 +30,9 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;
+    
+    // Set prebuilt apps directory (relative to current file location)
+    this.prebuiltAppsDirectory = path.join(__dirname, "../../apps/prebuilt");
     
     // Create and register handler
     this.packageHandler = new PackageHandler(this);
@@ -43,12 +47,85 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Ensure apps directory exists
     await fs.mkdir(this.appsDirectory, { recursive: true });
 
+    // Load prebuilt apps first (system apps)
+    await this.loadPrebuiltApps();
+
     // Load installed apps
     await this.loadInstalledApps();
 
+    const prebuiltCount = Array.from(this.installedApps.values()).filter(app => app.isPrebuilt).length;
+    const installedCount = this.installedApps.size - prebuiltCount;
+
     console.log(
-      `PackageManager initialized. Found ${this.installedApps.size} installed apps.`
+      `PackageManager initialized. Found ${prebuiltCount} prebuilt apps and ${installedCount} installed apps.`
     );
+  }
+
+  /**
+   * Load prebuilt apps from dist/apps/prebuilt
+   */
+  private async loadPrebuiltApps(): Promise<void> {
+    try {
+      // Check if prebuilt directory exists
+      try {
+        await fs.access(this.prebuiltAppsDirectory);
+      } catch {
+        console.log("No prebuilt apps directory found, skipping...");
+        return;
+      }
+
+      const entries = await fs.readdir(this.prebuiltAppsDirectory, {
+        withFileTypes: true,
+      });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          try {
+            const manifestPath = path.join(
+              this.prebuiltAppsDirectory,
+              entry.name,
+              "manifest.json"
+            );
+            const manifestContent = await fs.readFile(manifestPath, "utf-8");
+            const manifest: AppManifest = JSON.parse(manifestContent);
+
+            // Mark as prebuilt
+            manifest.isPrebuilt = true;
+
+            // Check for dev manifest (dev server running)
+            // Look in source apps directory, not dist
+            const devManifestPath = path.join(
+              __dirname,
+              "../../../apps",  // Go up to project root, then into apps
+              ...entry.name.split('.'),
+              ".dev-manifest.json"
+            );
+            
+            try {
+              const devManifestContent = await fs.readFile(devManifestPath, "utf-8");
+              const devManifest = JSON.parse(devManifestContent);
+              
+              if (devManifest.devMode && devManifest.devUrl) {
+                // Override frontend entry with dev server URL
+                manifest.frontend.entry = devManifest.devUrl;
+                console.log(`Loaded prebuilt app: ${manifest.name} (dev mode: ${devManifest.devUrl})`);
+              } else {
+                console.log(`Loaded prebuilt app: ${manifest.name}`);
+              }
+            } catch {
+              // No dev manifest, use production build
+              console.log(`Loaded prebuilt app: ${manifest.name}`);
+            }
+
+            this.installedApps.set(manifest.id, manifest);
+          } catch (error) {
+            console.warn(`Failed to load prebuilt app from ${entry.name}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load prebuilt apps:", error);
+    }
   }
 
   /**
@@ -158,6 +235,13 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       return false;
     }
 
+    // Prevent uninstalling prebuilt apps
+    if (manifest.isPrebuilt) {
+      throw new Error(
+        `Cannot uninstall ${manifest.name}: this is a system app.`
+      );
+    }
+
     // Note: Stopping the app is the responsibility of ProcessManager.
     // The handler should coordinate this, or we assume it's stopped.
     // For safety, we might want to emit an event "request-app-stop" or similar?
@@ -210,6 +294,55 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
         "Invalid manifest: backend.entry must be specified when backend is defined"
       );
     }
+  }
+
+  /**
+   * Get the installation path for an app
+   */
+  getAppPath(appId: string): string | undefined {
+    const manifest = this.installedApps.get(appId);
+    if (!manifest) {
+      return undefined;
+    }
+
+    // Return the appropriate path based on whether it's prebuilt
+    if (manifest.isPrebuilt) {
+      return path.join(this.prebuiltAppsDirectory, appId);
+    } else {
+      return path.join(this.appsDirectory, appId);
+    }
+  }
+
+  /**
+   * Reload an app (for hot reload support)
+   * This will notify that the app has been updated
+   */
+  async reloadApp(appId: string): Promise<void> {
+    const manifest = this.installedApps.get(appId);
+    if (!manifest) {
+      throw new Error(`App ${appId} not found`);
+    }
+
+    // Reload the manifest from disk
+    const appPath = this.getAppPath(appId);
+    if (!appPath) {
+      throw new Error(`App path not found for ${appId}`);
+    }
+
+    const manifestPath = path.join(appPath, "manifest.json");
+    const manifestContent = await fs.readFile(manifestPath, "utf-8");
+    const updatedManifest: AppManifest = JSON.parse(manifestContent);
+
+    // Preserve prebuilt flag
+    if (manifest.isPrebuilt) {
+      updatedManifest.isPrebuilt = true;
+    }
+
+    // Update in-memory manifest
+    this.installedApps.set(appId, updatedManifest);
+
+    // Notify about the reload (ProcessManager should handle restarting)
+    this.notify("installed", { manifest: updatedManifest });
   }
 
 

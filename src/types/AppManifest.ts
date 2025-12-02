@@ -115,4 +115,14 @@ export interface AppManifest {
 
   /** App icon path (relative to app root) */
   icon?: string;
+
+  /** Build configuration (for prebuilt apps) */
+  build?: {
+    /** Command to build the app (e.g., "npm run build") */
+    command: string;
+  };
+
+  /** Internal flag indicating if this is a prebuilt system app */
+  isPrebuilt?: boolean;
 }
+

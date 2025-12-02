@@ -6,9 +6,10 @@
   "author": "Eden Team",
   "license": "GPL-2.0",
   "scripts": {
-    "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:shell && npm run build:main && npm run bundle:app-frame && npm run copy:eveshell-preload && npm run copy-assets",
+    "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:shell && npm run build:main && npm run bundle:app-frame && npm run copy:eveshell-preload && npm run copy-assets && npm run build:apps",
     "build:main": "tsc",
     "build:shell": "vite build --config src/eveshell/vite.config.mts",
+    "build:apps": "ts-node scripts/build-apps.ts",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
     "copy:eveshell-preload": "mkdir -p dist/eveshell && cp src/eveshell/eve-preload.js dist/eveshell/",
     "codegen": "ts-node scripts/run-codegen.ts",
@@ -16,12 +17,14 @@
     "css:build": "lightningcss --bundle --minify --targets '>= 0.25%' src/design-system/eden.css -o dist/design-system/eden.css",
     "tokens:build": "cd src/design-system && style-dictionary build --config style-dictionary.config.mjs",
     "tokens:watch": "cd src/design-system && style-dictionary build --watch --config style-dictionary.config.mjs",
-    "dev": "npm run build && electron .",
+    "dev:watch": "ts-node scripts/dev-watch.ts",
+    "dev": "npm run build && concurrently --kill-others \"npm run dev:watch\" \"sleep 3 && NODE_ENV=development electron .\"",
     "start": "electron .",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "concurrently": "^9.1.0",
     "electron": "^39.2.3",
     "esbuild": "^0.27.0",
     "lightningcss-cli": "^1.30.2",
