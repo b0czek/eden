@@ -167,5 +167,5 @@ console.log(info.checksum);
 
 ## License
 
-GPL-2.0
+MIT
 

@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/genesis",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Genesis - Package and bundle Eden applications into .edenite format.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,7 +30,7 @@
     "compression"
   ],
   "author": "Dariusz Majnert",
-  "license": "GPL-2.0",
+  "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },

@@ -4,7 +4,7 @@
   "description": "A modular Electron desktop environment with extensible app support",
   "main": "dist/main/main.js",
   "author": "Eden Team",
-  "license": "GPL-2.0",
+  "license": "MIT",
   "scripts": {
     "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:shell && npm run build:main && npm run bundle:app-frame && npm run copy:eveshell-preload && npm run copy-assets && npm run build:apps",
     "build:main": "tsc",
