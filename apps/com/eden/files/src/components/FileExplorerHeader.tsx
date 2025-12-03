@@ -66,13 +66,18 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
 
         <div class="toolbar-right">
           <button
-            class="eden-btn eden-btn-sm eden-btn-primary"
+            class="eden-btn eden-btn-sm eden-btn-icon"
             onClick={props.onNewFolder}
+            title="New Folder"
           >
-            New Folder
+            📁+
           </button>
-          <button class="eden-btn eden-btn-sm" onClick={props.onNewFile}>
-            New File
+          <button
+            class="eden-btn eden-btn-sm eden-btn-icon"
+            onClick={props.onNewFile}
+            title="New File"
+          >
+            📄+
           </button>
         </div>
       </div>
