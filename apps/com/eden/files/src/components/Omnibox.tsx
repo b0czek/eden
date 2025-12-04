@@ -1,5 +1,6 @@
 import { createSignal, createEffect, onCleanup, For, Show } from "solid-js";
 import type { Component } from "solid-js";
+import { getParentPath } from "../utils";
 
 interface Breadcrumb {
     name: string;
@@ -16,7 +17,7 @@ interface Suggestion {
 interface OmniboxProps {
     currentPath: string;
     breadcrumbs: Breadcrumb[];
-    onNavigate: (path: string) => void;
+    onNavigate: (path: string, selectedItem?: string) => void;
 }
 
 const Omnibox: Component<OmniboxProps> = (props) => {
@@ -37,90 +38,54 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         }
 
         setIsLoading(true);
-        const newSuggestions: Suggestion[] = [];
 
         try {
             // If it looks like a path (starts with /)
             if (value.startsWith("/")) {
                 const pathParts = value.split("/").filter((p) => p);
                 let basePath = "/";
+                let searchTerm = "";
 
                 if (pathParts.length > 0) {
                     basePath = "/" + pathParts.slice(0, -1).join("/");
                     if (basePath !== "/") basePath += "/";
+                    searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
                 }
 
-                const searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
+                const results = await (window as any).edenAPI.shellCommand("fs/search", {
+                    path: basePath === "//" ? "/" : basePath,
+                    pattern: searchTerm,
+                    limit: 10,
+                });
 
-                try {
-                    const items = await (window as any).edenAPI.shellCommand("fs/readdir", {
-                        path: basePath === "//" ? "/" : basePath,
-                    });
+                // Add icons on frontend based on type
+                const resultsWithIcons = results.map((r: any) => ({
+                    ...r,
+                    icon: r.type === "folder" ? "📁" : "📄",
+                }));
 
-                    for (const item of items) {
-                        if (searchTerm === "" || item.toLowerCase().includes(searchTerm)) {
-                            const itemPath = basePath + item;
-                            try {
-                                const stats = await (window as any).edenAPI.shellCommand("fs/stat", {
-                                    path: itemPath,
-                                });
-
-                                newSuggestions.push({
-                                    type: stats.isDirectory ? "folder" : "file",
-                                    name: item,
-                                    path: itemPath,
-                                    icon: stats.isDirectory ? "📁" : "📄",
-                                });
-
-                                if (newSuggestions.length >= 10) break;
-                            } catch (error) {
-                                // Skip items we can't stat
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error reading directory:", error);
-                }
+                setSuggestions(resultsWithIcons);
+                setSelectedIndex(0);
             } else {
                 // Search in current directory
-                const searchTerm = value.toLowerCase();
-                try {
-                    const items = await (window as any).edenAPI.shellCommand("fs/readdir", {
-                        path: props.currentPath,
-                    });
+                const results = await (window as any).edenAPI.shellCommand("fs/search", {
+                    path: props.currentPath,
+                    pattern: value.toLowerCase(),
+                    limit: 10,
+                });
 
-                    for (const item of items) {
-                        if (item.toLowerCase().includes(searchTerm)) {
-                            const itemPath =
-                                props.currentPath === "/"
-                                    ? "/" + item
-                                    : props.currentPath + "/" + item;
+                // Add icons on frontend based on type
+                const resultsWithIcons = results.map((r: any) => ({
+                    ...r,
+                    icon: r.type === "folder" ? "📁" : "📄",
+                }));
 
-                            try {
-                                const stats = await (window as any).edenAPI.shellCommand("fs/stat", {
-                                    path: itemPath,
-                                });
-
-                                newSuggestions.push({
-                                    type: stats.isDirectory ? "folder" : "file",
-                                    name: item,
-                                    path: itemPath,
-                                    icon: stats.isDirectory ? "📁" : "📄",
-                                });
-
-                                if (newSuggestions.length >= 10) break;
-                            } catch (error) {
-                                // Skip items we can't stat
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error searching:", error);
-                }
+                setSuggestions(resultsWithIcons);
+                setSelectedIndex(0);
             }
-
-            setSuggestions(newSuggestions);
-            setSelectedIndex(0);
+        } catch (error) {
+            console.error("Error searching:", error);
+            setSuggestions([]);
         } finally {
             setIsLoading(false);
         }
@@ -204,7 +169,14 @@ const Omnibox: Component<OmniboxProps> = (props) => {
     };
 
     const handleSuggestionClick = (suggestion: Suggestion) => {
-        props.onNavigate(suggestion.path);
+        if (suggestion.type === "file") {
+            // For files, navigate to parent directory and select the file
+            const parentPath = getParentPath(suggestion.path);
+            props.onNavigate(parentPath, suggestion.path);
+        } else {
+            // For folders, navigate to the folder itself
+            props.onNavigate(suggestion.path);
+        }
         setIsEditing(false);
         setSuggestions([]);
         setInputValue("");

@@ -1,4 +1,4 @@
-import { Show, For } from "solid-js";
+import { Show, For, createEffect } from "solid-js";
 import type { Component } from "solid-js";
 import type { FileItem } from "../types";
 import FileItemComponent from "./FileItem";
@@ -13,6 +13,18 @@ interface FileListProps {
 }
 
 const FileList: Component<FileListProps> = (props) => {
+  let fileRefs: Map<string, HTMLDivElement> = new Map();
+
+  createEffect(() => {
+    const selected = props.selectedItem;
+    if (selected) {
+      const element = fileRefs.get(selected);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  });
+
   return (
     <main class="explorer-content">
       <Show when={props.loading}>
@@ -34,6 +46,7 @@ const FileList: Component<FileListProps> = (props) => {
           <For each={props.items}>
             {(item) => (
               <FileItemComponent
+                ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
                 item={item}
                 isSelected={props.selectedItem === item.path}
                 onClick={props.onItemClick}

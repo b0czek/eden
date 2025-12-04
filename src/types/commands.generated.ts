@@ -77,6 +77,21 @@ export interface FsCommands {
   };
   };
   /**
+   * Search for files and directories using glob patterns.
+   */
+  "fs/search": {
+    args: {
+    path: string;
+    pattern: string;
+    limit?: number;
+  };
+    response: Array<{
+      name: string;
+      path: string;
+      type: "file" | "folder";
+    }>;
+  };
+  /**
    * Delete a file or directory.
    * For directories, removes recursively.
    */
@@ -278,6 +293,7 @@ export const COMMAND_NAMES = [
   "fs/mkdir",
   "fs/readdir",
   "fs/stat",
+  "fs/search",
   "fs/delete",
   "package/install",
   "package/uninstall",

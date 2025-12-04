@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import fg from "fast-glob";
 import { EdenHandler, EdenNamespace } from "../ipc";
 
 @EdenNamespace("fs")
@@ -112,6 +113,58 @@ export class FilesystemHandler {
       size: stats.size,
       mtime: stats.mtime,
     };
+  }
+
+  /**
+   * Search for files and directories using glob patterns.
+   */
+  @EdenHandler("search")
+  async handleSearch(args: {
+    path: string;
+    pattern: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      name: string;
+      path: string;
+      type: "file" | "folder";
+    }>
+  > {
+    const { path: basePath, pattern, limit = 10 } = args;
+    const fullPath = this.resolvePath(basePath);
+
+    // Create glob pattern
+    // If pattern is empty, match everything
+    const globPattern = pattern ? `**/*${pattern}*` : "**/*";
+
+    try {
+      const entries = await fg(globPattern, {
+        cwd: fullPath,
+        onlyFiles: false,
+        deep: 3, // Limit depth for performance
+        suppressErrors: true,
+        stats: true,
+      });
+
+      const results = [];
+      for (const entry of entries) {
+        if (results.length >= limit) break;
+
+        const entryPath = basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
+        const isDirectory = entry.stats?.isDirectory() ?? false;
+
+        results.push({
+          name: path.basename(entry.path),
+          path: entryPath,
+          type: (isDirectory ? "folder" : "file") as "file" | "folder",
+        });
+      }
+
+      return results;
+    } catch (error) {
+      console.error("Search error:", error);
+      return [];
+    }
   }
 
   /**

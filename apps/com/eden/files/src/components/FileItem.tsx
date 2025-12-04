@@ -3,6 +3,7 @@ import type { FileItem } from "../types";
 import { getFileIcon, formatFileSize } from "../utils";
 
 interface FileItemComponentProps {
+  ref?: (el: HTMLDivElement) => void;
   item: FileItem;
   isSelected: boolean;
   onClick: (item: FileItem) => void;
@@ -13,6 +14,7 @@ interface FileItemComponentProps {
 const FileItemComponent: Component<FileItemComponentProps> = (props) => {
   return (
     <div
+      ref={props.ref}
       class="file-item"
       classList={{ selected: props.isSelected }}
       onClick={() => props.onClick(props.item)}

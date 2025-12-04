@@ -107,7 +107,7 @@ const App: Component = () => {
     };
   });
 
-  const navigateTo = (path: string) => {
+  const navigateTo = (path: string, selectedItem?: string) => {
     const history = navigationHistory();
     const index = historyIndex();
 
@@ -120,6 +120,11 @@ const App: Component = () => {
     }
 
     loadDirectory(path);
+
+    // If a specific item should be selected, set it after navigation
+    if (selectedItem) {
+      setSelectedItem(selectedItem);
+    }
   };
 
   const goBack = () => {
