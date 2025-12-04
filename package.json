@@ -14,7 +14,7 @@
     "copy:eveshell-preload": "mkdir -p dist/eveshell && cp src/eveshell/eve-preload.js dist/eveshell/",
     "codegen": "ts-node scripts/run-codegen.ts",
     "copy-assets": "mkdir -p dist/foundation && cp src/foundation/* dist/foundation/",
-    "css:build": "lightningcss --bundle --minify --targets '>= 0.25%' src/design-system/eden.css -o dist/design-system/eden.css",
+    "css:build": "lightningcss --bundle --minify --targets 'chrome 132' src/design-system/eden.css -o dist/design-system/eden.css",
     "tokens:build": "cd src/design-system && style-dictionary build --config style-dictionary.config.mjs",
     "tokens:watch": "cd src/design-system && style-dictionary build --watch --config style-dictionary.config.mjs",
     "dev:watch": "ts-node scripts/dev-watch.ts",

@@ -21,7 +21,7 @@
             x: Math.round(rect.left),
             y: Math.round(rect.top),
             width: Math.round(rect.width),
-            height: Math.round(rect.height) - 80,
+            height: Math.round(rect.height) - 72,
         };
 
         // Get window size from body

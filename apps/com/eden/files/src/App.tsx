@@ -86,6 +86,27 @@ const App: Component = () => {
     loadDirectory(currentPath());
   });
 
+  // Handle mouse button 4/5 for back/forward navigation
+  createEffect(() => {
+    const handleMouseButton = (e: MouseEvent) => {
+      if (e.button === 3) {
+        // Mouse button 4 (back)
+        e.preventDefault();
+        goBack();
+      } else if (e.button === 4) {
+        // Mouse button 5 (forward)
+        e.preventDefault();
+        goForward();
+      }
+    };
+
+    document.addEventListener("mousedown", handleMouseButton);
+
+    return () => {
+      document.removeEventListener("mousedown", handleMouseButton);
+    };
+  });
+
   const navigateTo = (path: string) => {
     const history = navigationHistory();
     const index = historyIndex();
@@ -106,6 +127,15 @@ const App: Component = () => {
     if (index > 0) {
       setHistoryIndex(index - 1);
       loadDirectory(navigationHistory()[index - 1]);
+    }
+  };
+
+  const goForward = () => {
+    const history = navigationHistory();
+    const index = historyIndex();
+    if (index < history.length - 1) {
+      setHistoryIndex(index + 1);
+      loadDirectory(history[index + 1]);
     }
   };
 
@@ -202,7 +232,7 @@ const App: Component = () => {
     const path = currentPath();
     const parts = path.split("/").filter((p) => p);
 
-    const crumbs = [{ name: "Root", path: "/" }];
+    const crumbs = [{ name: "/", path: "/" }];
     let accumulatedPath = "";
 
     parts.forEach((part) => {
@@ -218,10 +248,11 @@ const App: Component = () => {
       <FileExplorerHeader
         currentPath={currentPath()}
         historyIndex={historyIndex()}
+        historyLength={navigationHistory().length}
         breadcrumbs={getBreadcrumbs()}
         onGoBack={goBack}
+        onGoForward={goForward}
         onGoUp={goUp}
-        onRefresh={refresh}
         onNavigate={navigateTo}
         onNewFolder={() => setShowNewFolderDialog(true)}
         onNewFile={() => setShowNewFileDialog(true)}

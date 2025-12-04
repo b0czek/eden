@@ -1,5 +1,6 @@
-import { For } from "solid-js";
+import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
+import Omnibox from "./Omnibox";
 
 interface Breadcrumb {
   name: string;
@@ -9,10 +10,11 @@ interface Breadcrumb {
 interface FileExplorerHeaderProps {
   currentPath: string;
   historyIndex: number;
+  historyLength: number;
   breadcrumbs: Breadcrumb[];
   onGoBack: () => void;
+  onGoForward: () => void;
   onGoUp: () => void;
-  onRefresh: () => void;
   onNavigate: (path: string) => void;
   onNewFolder: () => void;
   onNewFile: () => void;
@@ -33,36 +35,27 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-icon"
+            onClick={props.onGoForward}
+            disabled={props.historyIndex >= props.historyLength - 1}
+            title="Go forward"
+          >
+            →
+          </button>
+          <button
+            class="eden-btn eden-btn-sm eden-btn-icon"
             onClick={props.onGoUp}
             disabled={props.currentPath === "/"}
             title="Go up"
           >
             ↑
           </button>
-          <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
-            onClick={props.onRefresh}
-            title="Refresh"
-          >
-            ↻
-          </button>
         </div>
 
-        <div class="breadcrumb">
-          <For each={props.breadcrumbs}>
-            {(crumb, index) => (
-              <>
-                {index() > 0 && <span class="breadcrumb-separator">/</span>}
-                <button
-                  class="breadcrumb-item eden-btn eden-btn-ghost eden-btn-sm"
-                  onClick={() => props.onNavigate(crumb.path)}
-                >
-                  {crumb.name}
-                </button>
-              </>
-            )}
-          </For>
-        </div>
+        <Omnibox
+          currentPath={props.currentPath}
+          breadcrumbs={props.breadcrumbs}
+          onNavigate={props.onNavigate}
+        />
 
         <div class="toolbar-right">
           <button
