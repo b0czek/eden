@@ -8,25 +8,25 @@
   font-family: var(--eden-font-family-base);
   font-size: var(--eden-font-size-md);
   font-weight: var(--eden-font-weight-medium);
-  padding: var(--eden-space-md) var(--eden-space-lg);
+  padding: var(--eden-space-md);
   border-radius: var(--eden-radius-md);
   border: 1px solid var(--eden-color-border-light);
   cursor: pointer;
   transition: all var(--eden-transition-base);
-  
+
   /* Frosted glass effect */
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
   box-shadow: var(--eden-shadow-sm);
-  
+
   color: var(--eden-color-text-primary);
-  
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--eden-space-sm);
-  
+
   user-select: none;
   outline: none;
 }
@@ -128,38 +128,37 @@
 /* ===== Button Sizes ===== */
 .eden-btn-xs {
   font-size: var(--eden-font-size-xs);
-  padding: var(--eden-space-xs) var(--eden-space-sm);
+  padding: var(--eden-space-xs);
   border-radius: var(--eden-radius-xs);
 }
 
 .eden-btn-sm {
   font-size: var(--eden-font-size-sm);
-  padding: var(--eden-space-sm) var(--eden-space-md);
+  padding: var(--eden-space-sm);
   border-radius: var(--eden-radius-sm);
+}
+
+.eden-btn-md {
+  font-size: var(--eden-font-size-md);
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
 }
 
 .eden-btn-lg {
   font-size: var(--eden-font-size-lg);
-  padding: var(--eden-space-lg) var(--eden-space-xl);
+  padding: var(--eden-space-lg);
   border-radius: var(--eden-radius-lg);
 }
 
 .eden-btn-xl {
   font-size: var(--eden-font-size-xl);
-  padding: var(--eden-space-xl) var(--eden-space-2xl);
+  padding: var(--eden-space-xl);
   border-radius: var(--eden-radius-xl);
 }
 
 /* ===== Button Shapes ===== */
 .eden-btn-square {
   aspect-ratio: 1;
-  padding: var(--eden-space-md);
-}
-
-.eden-btn-icon {
-  aspect-ratio: 1;
-  padding: var(--eden-space-sm);
-  border-radius: var(--eden-radius-md);
 }
 
 .eden-btn-pill {
@@ -198,15 +197,15 @@
   width: 56px;
   height: 56px;
   border-radius: var(--eden-radius-round);
-  
+
   background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
   border: none;
   box-shadow: var(--eden-shadow-2xl);
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   cursor: pointer;
   transition: all var(--eden-transition-base);
   z-index: var(--eden-z-sticky);
@@ -220,4 +219,3 @@
 .eden-fab:active {
   transform: scale(1);
 }
-
