@@ -18,6 +18,7 @@ interface FileExplorerHeaderProps {
   onNavigate: (path: string) => void;
   onNewFolder: () => void;
   onNewFile: () => void;
+  onOpenDisplayOptions: () => void;
 }
 
 const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
@@ -26,7 +27,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
       <div class="header-content">
         <div class="toolbar-left">
           <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
+            class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoBack}
             disabled={props.historyIndex === 0}
             title="Go back"
@@ -34,7 +35,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             ←
           </button>
           <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
+            class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoForward}
             disabled={props.historyIndex >= props.historyLength - 1}
             title="Go forward"
@@ -42,7 +43,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             →
           </button>
           <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
+            class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
             disabled={props.currentPath === "/"}
             title="Go up"
@@ -59,18 +60,25 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
 
         <div class="toolbar-right">
           <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
+            class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFolder}
             title="New Folder"
           >
             📁+
           </button>
           <button
-            class="eden-btn eden-btn-sm eden-btn-icon"
+            class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFile}
             title="New File"
           >
             📄+
+          </button>
+          <button
+            class="eden-btn eden-btn-sm eden-btn-square"
+            onClick={props.onOpenDisplayOptions}
+            title="Display Options"
+          >
+            ⋯
           </button>
         </div>
       </div>

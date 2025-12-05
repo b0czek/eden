@@ -1,12 +1,14 @@
 import { Show, For, createEffect } from "solid-js";
 import type { Component } from "solid-js";
-import type { FileItem } from "../types";
+import type { FileItem, ViewStyle, ItemSize } from "../types";
 import FileItemComponent from "./FileItem";
 
 interface FileListProps {
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
+  viewStyle: ViewStyle;
+  itemSize: ItemSize;
   onItemClick: (item: FileItem) => void;
   onItemDoubleClick: (item: FileItem) => void;
   onItemDelete: (item: FileItem, e: MouseEvent) => void;
@@ -42,13 +44,15 @@ const FileList: Component<FileListProps> = (props) => {
       </Show>
 
       <Show when={!props.loading && props.items.length > 0}>
-        <div class="file-list">
+        <div class="file-list" classList={{ 'list-view': props.viewStyle === 'list' }}>
           <For each={props.items}>
             {(item) => (
               <FileItemComponent
                 ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
                 item={item}
                 isSelected={props.selectedItem === item.path}
+                viewStyle={props.viewStyle}
+                itemSize={props.itemSize}
                 onClick={props.onItemClick}
                 onDoubleClick={props.onItemDoubleClick}
                 onDelete={props.onItemDelete}

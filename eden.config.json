@@ -1,7 +1,8 @@
 {
   "prebuiltApps": [
     "com.eden.files",
-    "com.eden.example.calculator"
+    "com.eden.example.calculator",
+    "com.eden.example.showcase"
   ],
   "hotReload": {
     "enabled": true,

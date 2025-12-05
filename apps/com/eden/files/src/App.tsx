@@ -1,6 +1,6 @@
 import { createSignal, createEffect } from "solid-js";
 import type { Component } from "solid-js";
-import type { FileItem } from "./types";
+import type { FileItem, DisplayPreferences } from "./types";
 import { joinPath, getParentPath, isValidName } from "./utils";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
@@ -9,6 +9,7 @@ import CreateFolderDialog from "./dialogs/CreateFolderDialog";
 import CreateFileDialog from "./dialogs/CreateFileDialog";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 import ErrorDialog from "./dialogs/ErrorDialog";
+import DisplayOptionsModal from "./dialogs/DisplayOptionsModal";
 
 const App: Component = () => {
   const [currentPath, setCurrentPath] = createSignal("/");
@@ -25,8 +26,17 @@ const App: Component = () => {
   const [showNewFileDialog, setShowNewFileDialog] = createSignal(false);
   const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
   const [showErrorDialog, setShowErrorDialog] = createSignal(false);
+  const [showDisplayOptionsModal, setShowDisplayOptionsModal] = createSignal(false);
   const [errorMessage, setErrorMessage] = createSignal("");
   const [itemToDelete, setItemToDelete] = createSignal<FileItem | null>(null);
+
+  // Display preferences
+  const [displayPreferences, setDisplayPreferences] = createSignal<DisplayPreferences>({
+    viewStyle: 'grid',
+    itemSize: 'medium',
+    sortBy: 'name',
+    sortOrder: 'asc',
+  });
 
   const loadDirectory = async (path: string) => {
     try {
@@ -67,12 +77,7 @@ const App: Component = () => {
         })
       );
 
-      const sorted = itemsWithStats.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
+      const sorted = sortItems(itemsWithStats);
       setItems(sorted);
     } catch (error) {
       console.error("Error loading directory:", error);
@@ -153,6 +158,41 @@ const App: Component = () => {
 
   const refresh = () => {
     loadDirectory(currentPath());
+  };
+
+  const sortItems = (items: FileItem[]): FileItem[] => {
+    const prefs = displayPreferences();
+
+    return [...items].sort((a, b) => {
+      // Folders always come first
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+
+      // Then sort by selected criteria
+      let comparison = 0;
+      switch (prefs.sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'size':
+          comparison = a.size - b.size;
+          break;
+        case 'modified':
+          comparison = a.modified.getTime() - b.modified.getTime();
+          break;
+      }
+
+      return prefs.sortOrder === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const handlePreferencesChange = (newPreferences: DisplayPreferences) => {
+    setDisplayPreferences(newPreferences);
+    // Re-sort existing items with new preferences
+    const currentItems = items();
+    if (currentItems.length > 0) {
+      setItems(sortItems(currentItems));
+    }
   };
 
   const createFolder = async (name: string) => {
@@ -261,12 +301,15 @@ const App: Component = () => {
         onNavigate={navigateTo}
         onNewFolder={() => setShowNewFolderDialog(true)}
         onNewFile={() => setShowNewFileDialog(true)}
+        onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
       />
 
       <FileList
         loading={loading()}
         items={items()}
         selectedItem={selectedItem()}
+        viewStyle={displayPreferences().viewStyle}
+        itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
         onItemDoubleClick={handleItemDoubleClick}
         onItemDelete={handleDeleteClick}
@@ -297,6 +340,13 @@ const App: Component = () => {
         show={showErrorDialog()}
         onClose={() => setShowErrorDialog(false)}
         message={errorMessage()}
+      />
+
+      <DisplayOptionsModal
+        show={showDisplayOptionsModal()}
+        preferences={displayPreferences()}
+        onClose={() => setShowDisplayOptionsModal(false)}
+        onChange={handlePreferencesChange}
       />
     </div>
   );

@@ -386,6 +386,192 @@ body {
   animation: eden-fade-in 0.3s ease-out;
 }
 
+/* ===== Display Options Dropdown (Design System Overrides) ===== */
+.display-options-position {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: var(--eden-space-lg);
+}
+
+.display-options-popover {
+  margin-top: 60px;
+  margin-right: var(--eden-space-md);
+  width: 280px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  animation: eden-scale-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+}
+
+/* ===== List View Layout ===== */
+.file-list.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  grid-template-columns: none;
+}
+
+.file-item.list-view {
+  flex-direction: row;
+  align-items: center;
+  padding: var(--item-padding-list, var(--eden-space-md) var(--eden-space-lg));
+  border-radius: var(--eden-radius-md);
+  gap: var(--item-gap-list, var(--eden-space-lg));
+}
+
+.file-item.list-view .file-icon {
+  font-size: var(--icon-size-list, var(--eden-font-size-2xl));
+  margin-bottom: 0;
+  width: var(--icon-width-list, var(--eden-space-2xl));
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.file-item.list-view .file-name {
+  flex: 1;
+  min-width: 200px;
+  text-align: left;
+  word-break: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--name-size, var(--eden-font-size-sm));
+}
+
+.file-item.list-view .file-size {
+  width: var(--column-width, 100px);
+  text-align: right;
+  font-size: var(--meta-size, var(--eden-font-size-sm));
+  color: var(--eden-color-text-secondary);
+  flex-shrink: 0;
+}
+
+.file-item.list-view .file-modified {
+  width: calc(var(--column-width, 100px) * 1.5);
+  text-align: right;
+  font-size: var(--meta-size, var(--eden-font-size-sm));
+  color: var(--eden-color-text-muted);
+  flex-shrink: 0;
+}
+
+.file-item.list-view:hover {
+  transform: translateY(0);
+}
+
+/* ===== File Item Base with CSS Variables ===== */
+.file-item {
+  --item-padding: var(--eden-space-lg);
+  --item-gap: var(--eden-space-lg);
+  --icon-size: var(--eden-font-size-4xl);
+  --icon-width: var(--eden-space-2xl);
+  --icon-margin: var(--eden-space-sm);
+  --name-size: var(--eden-font-size-sm);
+  --meta-size: var(--eden-font-size-xs);
+  --column-width: 100px;
+
+  /* List view variants */
+  --item-padding-list: var(--eden-space-md) var(--eden-space-lg);
+  --item-gap-list: var(--eden-space-lg);
+  --icon-size-list: var(--eden-font-size-2xl);
+  --icon-width-list: var(--eden-space-2xl);
+}
+
+/* ===== Size Variations ===== */
+
+/* Tiny Size */
+.file-item.size-tiny {
+  --item-padding: var(--eden-space-xs) var(--eden-space-sm);
+  --icon-size: var(--eden-font-size-2xl);
+  --icon-margin: var(--eden-space-xs);
+  --name-size: var(--eden-font-size-sm);
+  --meta-size: var(--eden-font-size-xs);
+
+  --item-padding-list: var(--eden-space-xs) var(--eden-space-sm);
+  --item-gap-list: var(--eden-space-sm);
+  --icon-size-list: var(--eden-font-size-lg);
+  --icon-width-list: var(--eden-space-lg);
+}
+
+/* Small Size */
+.file-item.size-small {
+  --item-padding: var(--eden-space-sm) var(--eden-space-md);
+  --icon-size: var(--eden-font-size-3xl);
+  --icon-margin: var(--eden-space-xs);
+  --name-size: var(--eden-font-size-xs);
+  --meta-size: var(--eden-font-size-xs);
+
+  --item-padding-list: var(--eden-space-sm) var(--eden-space-md);
+  --item-gap-list: var(--eden-space-md);
+  --icon-size-list: var(--eden-font-size-xl);
+  --icon-width-list: var(--eden-space-lg);
+}
+
+/* Medium Size (default) */
+.file-item.size-medium {
+  --item-padding: var(--eden-space-lg);
+  --icon-size: var(--eden-font-size-4xl);
+  --icon-margin: var(--eden-space-sm);
+  --name-size: var(--eden-font-size-sm);
+  --meta-size: var(--eden-font-size-xs);
+
+  --item-padding-list: var(--eden-space-md) var(--eden-space-lg);
+  --item-gap-list: var(--eden-space-lg);
+  --icon-size-list: var(--eden-font-size-2xl);
+  --icon-width-list: var(--eden-space-2xl);
+}
+
+/* Large Size */
+.file-item.size-large {
+  --item-padding: var(--eden-space-xl);
+  --icon-size: var(--eden-layout-icon-size-lg);
+  --icon-margin: var(--eden-space-md);
+  --name-size: var(--eden-font-size-md);
+  --meta-size: var(--eden-font-size-sm);
+  --column-width: 120px;
+
+  --item-padding-list: var(--eden-space-lg) var(--eden-space-xl);
+  --item-gap-list: var(--eden-space-xl);
+  --icon-size-list: var(--eden-font-size-3xl);
+  --icon-width-list: var(--eden-space-xl);
+}
+
+/* Huge Size */
+.file-item.size-huge {
+  --item-padding: var(--eden-space-2xl);
+  --icon-size: var(--eden-layout-icon-size-xl);
+  --icon-margin: var(--eden-space-lg);
+  --name-size: var(--eden-font-size-lg);
+  --meta-size: var(--eden-font-size-md);
+  --column-width: 140px;
+
+  --item-padding-list: var(--eden-space-xl) var(--eden-space-2xl);
+  --item-gap-list: var(--eden-space-2xl);
+  --icon-size-list: var(--eden-space-xl);
+  --icon-width-list: var(--eden-space-3xl);
+}
+
+/* Apply CSS variables to elements */
+.file-item {
+  padding: var(--item-padding);
+}
+
+.file-item .file-icon {
+  font-size: var(--icon-size);
+  margin-bottom: var(--icon-margin);
+}
+
+.file-item .file-name {
+  font-size: var(--name-size);
+}
+
+.file-item .file-meta {
+  font-size: var(--meta-size);
+  margin-top: var(--eden-space-xs);
+}
+
+.file-item.size-huge .file-name {
+  font-weight: var(--eden-font-weight-semibold);
+}
+
 /* ===== Responsive Design ===== */
 @media (max-width: 768px) {
   .file-list {
@@ -398,5 +584,13 @@ body {
 
   .breadcrumb {
     font-size: var(--eden-font-size-sm);
+  }
+
+  .file-item.list-view .file-modified {
+    display: none;
+  }
+
+  .file-item.list-view .file-size {
+    width: 80px;
   }
 }

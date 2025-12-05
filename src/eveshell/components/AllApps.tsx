@@ -164,7 +164,7 @@ export default function AllApps(props: AllAppsProps) {
 						<h2 class="eden-modal-title">All Applications</h2>
 						<div style="display: flex; gap: var(--eden-space-sm);">
 							<button
-								class="eden-btn eden-btn-icon eden-btn-primary"
+								class="eden-btn eden-btn-square eden-btn-primary"
 								aria-label="Install App"
 								onClick={(e) => {
 									e.stopPropagation();
@@ -176,7 +176,7 @@ export default function AllApps(props: AllAppsProps) {
 								+
 							</button>
 							<button
-								class="eden-btn eden-btn-icon eden-btn-ghost"
+								class="eden-btn eden-btn-square eden-btn-ghost"
 								aria-label="Close"
 								onClick={(e) => {
 									e.stopPropagation();
