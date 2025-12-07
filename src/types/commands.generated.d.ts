@@ -14,7 +14,7 @@ export interface SystemCommands {
    */
   "system/info": {
     args: Record<string, never>;
-    response: import("./index").SystemInfo;
+    response: SystemInfo;
   };
 }
 
@@ -110,7 +110,7 @@ export interface PackageCommands {
    */
   "package/install": {
     args: { sourcePath: string };
-    response: import("./index").AppManifest;
+    response: AppManifest;
   };
   /**
    * Uninstall an application by its ID.
@@ -124,7 +124,7 @@ export interface PackageCommands {
    */
   "package/list-installed": {
     args: Record<string, never>;
-    response: import("./index").AppManifest[];
+    response: AppManifest[];
   };
   /**
    * Toggle hot reload for an app
@@ -152,9 +152,9 @@ export interface ProcessCommands {
   "process/launch": {
     args: {
     appId: string;
-    bounds?: import("./index").ViewBounds;
+    bounds?: ViewBounds;
   };
-    response: import("./index").LaunchResult;
+    response: LaunchResult;
   };
   /**
    * Stop a running application instance.
@@ -168,7 +168,7 @@ export interface ProcessCommands {
    */
   "process/list": {
     args: Record<string, never>;
-    response: import("./index").AppStatus;
+    response: AppStatus;
   };
 }
 
@@ -182,7 +182,7 @@ export interface ViewCommands {
   "view/update-view-bounds": {
     args: {
     appId: string;
-    bounds: import("./index").ViewBounds;
+    bounds: ViewBounds;
   };
     response: { success: boolean };
   };
@@ -208,8 +208,8 @@ export interface ViewCommands {
    */
   "view/update-global-bounds": {
     args: {
-    bounds: import("./index").ViewBounds;
-    windowSize: import("./index").WindowSize;
+    bounds: ViewBounds;
+    windowSize: WindowSize;
   };
     response: { success: boolean };
   };
@@ -273,7 +273,7 @@ export interface ViewCommands {
    */
   "view/window-size": {
     args: Record<string, never>;
-    response: import("./index").WindowSize;
+    response: WindowSize;
   };
 }
 

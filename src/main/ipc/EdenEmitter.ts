@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { IPCBridge } from "./IPCBridge";
-import { EventName } from "../../types";
+import { EventName } from "@edenapp/types";
 
 /**
  * Base class for managers that emit events within a specific namespace.

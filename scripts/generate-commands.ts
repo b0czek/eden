@@ -565,7 +565,7 @@ export function generateCommands() {
     projectRoot,
     "src",
     "types",
-    "commands.generated.ts"
+    "commands.generated.d.ts"
   );
   fs.writeFileSync(commandsOutputPath, commandsCode);
   console.log(
@@ -578,7 +578,7 @@ export function generateCommands() {
     projectRoot,
     "src",
     "types",
-    "events.generated.ts"
+    "events.generated.d.ts"
   );
   fs.writeFileSync(eventsOutputPath, eventsCode);
   console.log(`✅ Generated ${path.relative(projectRoot, eventsOutputPath)}`);

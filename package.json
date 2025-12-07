@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@edenapp/genesis": "^0.2.0",
+    "@edenapp/types": "file:src/types",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }

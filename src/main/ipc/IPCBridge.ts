@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from "electron";
 import { EventEmitter } from "events";
 import { WorkerManager } from "../process-manager/WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCMessage, APP_EVENT_NAMES } from "../../types";
+import { IPCMessage, APP_EVENT_NAMES } from "@edenapp/types";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
 

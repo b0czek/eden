@@ -6,8 +6,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
-import { AppInstance, AppStatus } from "../../types";
-
+import { AppInstance, AppStatus } from "@edenapp/types";
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";

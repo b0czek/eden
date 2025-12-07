@@ -1,4 +1,4 @@
-import { AppManifest } from "../../types";
+import { AppManifest } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
 import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";

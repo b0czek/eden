@@ -1,7 +1,7 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
-import { ViewBounds, WindowSize } from "../../types";
+import { ViewBounds, WindowSize } from "@edenapp/types";
 
 interface AppManifest {
   id: string;

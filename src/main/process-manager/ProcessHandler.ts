@@ -1,4 +1,4 @@
-import { AppStatus, LaunchResult, ViewBounds } from "../../types";
+import { AppStatus, LaunchResult, ViewBounds } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { ProcessManager } from "./ProcessManager";
 

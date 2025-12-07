@@ -130,13 +130,6 @@ An `.edenite` file is a Zstandard-compressed TAR archive with the following stru
 - **Compression**: Zstandard (zstd) compression with configurable levels (1-22)
 - **Integrity**: SHA256 checksum verification on extraction
 
-### Why Zstandard?
-
-- **Better Compression**: ~20-40% better compression than gzip
-- **Faster**: Significantly faster decompression than other algorithms
-- **Flexible**: Compression levels from 1 (fast) to 22 (maximum compression)
-- **Modern**: Industry standard used by Facebook, Linux kernel, and many others
-
 ## Programmatic API
 
 ```typescript

@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { GenesisBundler } from "@edenapp/genesis";
-import { AppManifest } from "../../types";
+import { AppManifest } from "@edenapp/types";
 import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
 import { injectable, inject } from "tsyringe";

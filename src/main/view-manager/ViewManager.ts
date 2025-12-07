@@ -6,7 +6,7 @@ import {
 import { EventEmitter } from "events";
 import * as path from "path";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { AppManifest, TilingConfig, WindowConfig, EdenConfig, WindowSize } from "../../types";
+import { AppManifest, TilingConfig, WindowConfig, EdenConfig, WindowSize } from "@edenapp/types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
