@@ -22,5 +22,8 @@
     },
     "resizable": true,
     "movable": true
-  }
+  },
+  "permissions": [
+    "fs/*"
+  ]
 }

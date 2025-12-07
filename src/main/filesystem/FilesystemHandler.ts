@@ -31,7 +31,7 @@ export class FilesystemHandler {
   /**
    * Read the contents of a file.
    */
-  @EdenHandler("read")
+  @EdenHandler("read", { permission: "read" })
   async handleReadFile(args: {
     path: string;
     encoding?: BufferEncoding;
@@ -44,7 +44,7 @@ export class FilesystemHandler {
   /**
    * Write content to a file, creating directories if needed.
    */
-  @EdenHandler("write")
+  @EdenHandler("write", { permission: "write" })
   async handleWriteFile(args: {
     path: string;
     content: string;
@@ -62,7 +62,7 @@ export class FilesystemHandler {
   /**
    * Check if a file or directory exists.
    */
-  @EdenHandler("exists")
+  @EdenHandler("exists", { permission: "read" })
   async handleExists(args: { path: string }): Promise<boolean> {
     const { path: targetPath } = args;
     try {
@@ -77,7 +77,7 @@ export class FilesystemHandler {
   /**
    * Create a directory and any necessary parent directories.
    */
-  @EdenHandler("mkdir")
+  @EdenHandler("mkdir", { permission: "write" })
   async handleMkdir(args: { path: string }): Promise<void> {
     const { path: targetPath } = args;
     const fullPath = this.resolvePath(targetPath);
@@ -87,7 +87,7 @@ export class FilesystemHandler {
   /**
    * List contents of a directory.
    */
-  @EdenHandler("readdir")
+  @EdenHandler("readdir", { permission: "read" })
   async handleReaddir(args: { path: string }): Promise<string[]> {
     const { path: targetPath } = args;
     const fullPath = this.resolvePath(targetPath);
@@ -97,7 +97,7 @@ export class FilesystemHandler {
   /**
    * Get file or directory statistics.
    */
-  @EdenHandler("stat")
+  @EdenHandler("stat", { permission: "read" })
   async handleStat(args: { path: string }): Promise<{
     isFile: boolean;
     isDirectory: boolean;
@@ -118,7 +118,7 @@ export class FilesystemHandler {
   /**
    * Search for files and directories using glob patterns.
    */
-  @EdenHandler("search")
+  @EdenHandler("search", { permission: "read" })
   async handleSearch(args: {
     path: string;
     pattern: string;
@@ -171,7 +171,7 @@ export class FilesystemHandler {
    * Delete a file or directory.
    * For directories, removes recursively.
    */
-  @EdenHandler("delete")
+  @EdenHandler("delete", { permission: "write" })
   async handleDelete(args: { path: string }): Promise<void> {
     const { path: targetPath } = args;
     const fullPath = this.resolvePath(targetPath);

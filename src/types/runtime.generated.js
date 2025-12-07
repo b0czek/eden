@@ -36,7 +36,7 @@ export const COMMAND_NAMES = [
   "view/start-resize",
   "view/end-resize",
   "view/window-size",
-] as const;
+];
 
 // Event names array
 export const APP_EVENT_NAMES = [
@@ -48,4 +48,4 @@ export const APP_EVENT_NAMES = [
   "process/exited",
   "view/bounds-updated",
   "view/global-bounds-changed",
-] as const;
+];
