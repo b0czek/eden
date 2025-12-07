@@ -2,7 +2,8 @@ import { ipcMain, BrowserWindow, dialog } from "electron";
 import { EventEmitter } from "events";
 import { WorkerManager } from "../process-manager/WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCMessage, APP_EVENT_NAMES } from "@edenapp/types";
+import { IPCMessage } from "@edenapp/types";
+import { APP_EVENT_NAMES } from "@edenapp/types/runtime.generated";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
 
@@ -110,7 +111,9 @@ export class IPCBridge extends EventEmitter {
     ipcMain.handle(
       "shell-command",
       async (event, command: string, args: any) => {
-        return this.handleShellCommand(command, args);
+        // Get appId from sender for permission checking
+        const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
+        return this.handleShellCommand(command, args, appId);
       }
     );
 
@@ -121,46 +124,24 @@ export class IPCBridge extends EventEmitter {
 
     // Event subscription handlers
     ipcMain.handle("event-subscribe", async (event, eventName: string) => {
-      const senderId = event.sender.id;
-
       // Validate event name
       if (!APP_EVENT_NAMES.includes(eventName as any)) {
         throw new Error(`Event '${eventName}' is not supported`);
       }
 
-      // Find view by sender
-      const viewInfo = Array.from(this.viewManager.getActiveViews())
-        .map((id) => this.viewManager.getViewInfo(id))
-        .find((info) => info?.view.webContents.id === senderId);
-
-      if (!viewInfo) {
+      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
+      if (viewId === undefined) {
         throw new Error("View not found");
       }
-
-      // Get the actual viewId from the view info (not webContents.id)
-      const viewId = Array.from(this.viewManager.getActiveViews()).find(
-        (id) => this.viewManager.getViewInfo(id) === viewInfo
-      )!;
 
       return this.eventSubscribers.subscribe(viewId, eventName);
     });
 
     ipcMain.handle("event-unsubscribe", async (event, eventName: string) => {
-      const senderId = event.sender.id;
-
-      // Find view by sender
-      const viewInfo = Array.from(this.viewManager.getActiveViews())
-        .map((id) => this.viewManager.getViewInfo(id))
-        .find((info) => info?.view.webContents.id === senderId);
-
-      if (!viewInfo) {
+      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
+      if (viewId === undefined) {
         throw new Error("View not found");
       }
-
-      // Get the actual viewId from the view info (not webContents.id)
-      const viewId = Array.from(this.viewManager.getActiveViews()).find(
-        (id) => this.viewManager.getViewInfo(id) === viewInfo
-      )!;
 
       return this.eventSubscribers.unsubscribe(viewId, eventName);
     });
@@ -401,7 +382,7 @@ export class IPCBridge extends EventEmitter {
   /**
    * Handle shell commands (app management, etc.)
    */
-  private async handleShellCommand(command: string, args: any): Promise<any> {
+  private async handleShellCommand(command: string, args: any, appId?: string): Promise<any> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
 
@@ -416,9 +397,9 @@ export class IPCBridge extends EventEmitter {
 
       this.pendingCommands.set(commandId, { resolve, reject, timeout });
 
-      // Execute via CommandRegistry
+      // Execute via CommandRegistry with appId for permission checking
       this.commandRegistry
-        .execute(command, args)
+        .execute(command, args, appId)
         .then((result) => {
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);

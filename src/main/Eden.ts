@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { IPCBridge, CommandRegistry } from "./ipc";
+import { IPCBridge, CommandRegistry, PermissionRegistry } from "./ipc";
 import { SystemHandler } from "./SystemHandler";
 import { EdenConfig } from "../types";
 
@@ -32,6 +32,7 @@ export class Eden {
   private processManager: ProcessManager;
   private systemHandler: SystemHandler;
   private filesystemHandler: FilesystemHandler;
+  private permissionRegistry: PermissionRegistry;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -48,6 +49,13 @@ export class Eden {
     // 1. Command Registry (required by others)
     this.commandRegistry = new CommandRegistry();
     container.registerInstance("CommandRegistry", this.commandRegistry);
+
+    // 2. Permission Registry
+    this.permissionRegistry = new PermissionRegistry();
+    container.registerInstance("PermissionRegistry", this.permissionRegistry);
+
+    // Wire permission registry to command registry
+    this.commandRegistry.setPermissionRegistry(this.permissionRegistry);
 
     // Register Config
     container.registerInstance("EdenConfig", this.config);
@@ -67,6 +75,9 @@ export class Eden {
 
     // 5. Break circular dependency: Set ViewManager on IPCBridge
     this.ipcBridge.setViewManager(this.viewManager);
+    
+    // Wire permission registry to event subscriber manager
+    this.ipcBridge.eventSubscribers.setPermissionRegistry(this.permissionRegistry);
 
     // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);

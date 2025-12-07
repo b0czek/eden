@@ -1,11 +1,22 @@
 import { ViewManager } from "../view-manager/ViewManager";
+import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
 
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private subscriptions: Map<string, Set<number>> = new Map();
+  private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
     this.viewManager = viewManager;
+  }
+
+
+
+  /**
+   * Set the permission registry for permission checking
+   */
+  setPermissionRegistry(registry: PermissionRegistry): void {
+    this.permissionRegistry = registry;
   }
 
   /**
@@ -16,6 +27,16 @@ export class EventSubscriberManager {
     if (!viewInfo) {
       console.warn(`Cannot subscribe: view ${viewId} not found`);
       return false;
+    }
+
+    // Check event permission if required
+    const requiredPermission = getEventPermission(eventName);
+    if (requiredPermission && this.permissionRegistry) {
+      if (!this.permissionRegistry.hasPermission(viewInfo.appId, requiredPermission)) {
+        throw new Error(
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+        );
+      }
     }
 
     if (!this.subscriptions.has(eventName)) {

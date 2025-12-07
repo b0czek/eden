@@ -6,31 +6,12 @@ import { promisify } from "util";
 import * as tar from "tar";
 import cliProgress from "cli-progress";
 import { DEFAULT_COMPRESSOR, type Compressor } from "./compression";
+import { AppManifest } from "@edenapp/types";
 
 const execAsync = promisify(exec);
 
 // Archive format version for forward compatibility
 const ARCHIVE_FORMAT_VERSION = 1;
-
-export interface AppManifest {
-  id: string;
-  name: string;
-  version: string;
-  description?: string;
-  author?: string;
-  build?: {
-    command: string;
-    cwd?: string;
-  };
-  backend?: {
-    entry: string;
-    options?: any;
-  };
-  frontend: {
-    entry: string;
-  };
-  icon?: string;
-}
 
 export interface BundleOptions {
   appDirectory: string;

@@ -2,7 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { GenesisBundler } from "@edenapp/genesis";
 import { AppManifest } from "@edenapp/types";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
+import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter, PermissionRegistry } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
 import { injectable, inject } from "tsyringe";
 
@@ -22,14 +22,17 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private prebuiltAppsDirectory: string;
   private installedApps: Map<string, AppManifest> = new Map();
   private packageHandler: PackageHandler;
+  private permissionRegistry: PermissionRegistry;
 
   constructor(
     @inject("IPCBridge") ipcBridge: IPCBridge,
     @inject("appsDirectory") appsDirectory: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject("CommandRegistry") commandRegistry: CommandRegistry,
+    @inject("PermissionRegistry") permissionRegistry: PermissionRegistry
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;
+    this.permissionRegistry = permissionRegistry;
     
     // Set prebuilt apps directory (relative to current file location)
     this.prebuiltAppsDirectory = path.join(__dirname, "../../apps/prebuilt");
@@ -118,6 +121,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
             }
 
             this.installedApps.set(manifest.id, manifest);
+            
+            // Register app permissions
+            if (manifest.permissions && manifest.permissions.length > 0) {
+              this.permissionRegistry.registerApp(manifest.id, manifest.permissions);
+            }
           } catch (error) {
             console.warn(`Failed to load prebuilt app from ${entry.name}:`, error);
           }
@@ -149,6 +157,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
             const manifest: AppManifest = JSON.parse(manifestContent);
 
             this.installedApps.set(manifest.id, manifest);
+            
+            // Register app permissions
+            if (manifest.permissions && manifest.permissions.length > 0) {
+              this.permissionRegistry.registerApp(manifest.id, manifest.permissions);
+            }
           } catch (error) {
             console.warn(`Failed to load app from ${entry.name}:`, error);
           }
@@ -218,8 +231,12 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
 
-    // Register app
+    // Register app and its permissions
     this.installedApps.set(manifest.id, manifest);
+    
+    if (manifest.permissions && manifest.permissions.length > 0) {
+      this.permissionRegistry.registerApp(manifest.id, manifest.permissions);
+    }
 
     this.notify("installed", { manifest });
 

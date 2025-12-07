@@ -77,7 +77,16 @@ export function EdenNamespace(namespace: string, options?: EdenNamespaceOptions)
  * }
  * ```
  */
-export function EdenHandler(command: string) {
+export interface EdenHandlerOptions {
+  /**
+   * Permission required to execute this handler.
+   * Specified without namespace prefix (e.g., "read" not "fs/read").
+   * The full permission will be "namespace/permission".
+   */
+  permission?: string;
+}
+
+export function EdenHandler(command: string, options?: EdenHandlerOptions) {
   return function (
     target: any,
     propertyKey: string,
@@ -85,6 +94,12 @@ export function EdenHandler(command: string) {
   ) {
     // Register this handler in metadata
     addCommandHandler(target.constructor, command, propertyKey);
+    
+    // Store permission metadata if provided
+    if (options?.permission) {
+      Reflect.defineMetadata("eden:handler:permission", options.permission, target, propertyKey);
+    }
+    
     return descriptor;
   };
 }

@@ -120,9 +120,17 @@ export interface AppManifest {
   build?: {
     /** Command to build the app (e.g., "npm run build") */
     command: string;
+    /** Working directory for build command (relative to app root) */
+    cwd?: string;
   };
 
   /** Internal flag indicating if this is a prebuilt system app */
   isPrebuilt?: boolean;
+
+  /** 
+   * Permissions requested by this app.
+   * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
+   */
+  permissions?: string[];
 }
 

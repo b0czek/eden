@@ -281,37 +281,3 @@ export interface ViewCommands {
  * Global command map - merge all command namespaces
  */
 export interface CommandMap extends SystemCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}
-
-/**
- * Array of all available command names
- */
-export const COMMAND_NAMES = [
-  "system/info",
-  "fs/read",
-  "fs/write",
-  "fs/exists",
-  "fs/mkdir",
-  "fs/readdir",
-  "fs/stat",
-  "fs/search",
-  "fs/delete",
-  "package/install",
-  "package/uninstall",
-  "package/list-installed",
-  "package/toggle-hot-reload",
-  "package/is-hot-reload-enabled",
-  "process/launch",
-  "process/stop",
-  "process/list",
-  "view/update-view-bounds",
-  "view/set-view-visibility",
-  "view/focus-app",
-  "view/update-global-bounds",
-  "view/toggle-view-mode",
-  "view/start-drag",
-  "view/end-drag",
-  "view/global-mouseup",
-  "view/start-resize",
-  "view/end-resize",
-  "view/window-size"
-] as const;

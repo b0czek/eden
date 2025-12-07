@@ -616,6 +616,31 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
+   * Get app ID from a webContents ID
+   * Useful for identifying which app sent an IPC message
+   */
+  getAppIdByWebContentsId(webContentsId: number): string | undefined {
+    for (const [, info] of this.views.entries()) {
+      if (info.view.webContents.id === webContentsId) {
+        return info.appId;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Get view ID from a webContents ID
+   */
+  getViewIdByWebContentsId(webContentsId: number): number | undefined {
+    for (const [viewId, info] of this.views.entries()) {
+      if (info.view.webContents.id === webContentsId) {
+        return viewId;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Get all views (as entries for iteration)
    */
   getAllViews(): [number, ViewInfo][] {
