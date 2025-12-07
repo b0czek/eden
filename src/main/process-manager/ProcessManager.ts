@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import * as path from "path";
 import { randomUUID } from "crypto";
+import { Worker } from "worker_threads";
 import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
@@ -33,6 +34,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private viewManager: ViewManager;
   private packageManager: PackageManager;
   private runningApps: Map<string, AppInstance> = new Map();
+  private workers: Map<string, Worker> = new Map(); // Worker threads mapped by appId
   private appsDirectory: string;
   private processHandler: ProcessHandler;
 
@@ -127,9 +129,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
     try {
       // Create worker for backend if one is defined
-      const worker = manifest.backend?.entry
-        ? await this.workerManager.createWorker(appId, manifest, installPath)
-        : null;
+      if (manifest.backend?.entry) {
+        const worker = await this.workerManager.createWorker(appId, manifest, installPath);
+        this.workers.set(appId, worker);
+      }
 
       // Create view for frontend
       const viewId = this.viewManager.createAppView(
@@ -144,7 +147,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         manifest,
         instanceId,
         installPath,
-        worker,
         viewId,
         state: "running",
         installedAt: new Date(),
@@ -181,6 +183,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       // Terminate worker if it exists
       if (this.workerManager.hasWorker(appId)) {
         await this.workerManager.terminateWorker(appId);
+        this.workers.delete(appId);
       }
 
       // Remove view
@@ -275,14 +278,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Get status of all apps (installed and running)
    */
   getAllAppsStatus(): AppStatus {
-    const runningApps = this.getRunningApps().map((instance) => {
-      // Create a clean object without the worker property
-      const { worker, ...cleanInstance } = instance;
-      return cleanInstance;
-    });
     return {
       installed: this.packageManager.getInstalledApps(),
-      running: runningApps,
+      running: this.getRunningApps(),
     };
   }
 

@@ -19,9 +19,6 @@ export interface AppInstance {
   /** Installation path on disk */
   installPath: string;
 
-  /** Worker thread handle (only present if backend exists) */
-  worker?: any | null; // Worker type from worker_threads
-
   /** WebContentsView ID */
   viewId: number;
 
@@ -82,7 +79,7 @@ export type {
 export * from "./events";
 
 export interface SystemInfo {
-  platform: NodeJS.Platform;
+  platform: string;
   arch: string;
   nodeVersion: string;
   electronVersion: string;
@@ -102,5 +99,5 @@ export interface LaunchResult {
 
 export interface AppStatus {
   installed: AppManifest[];
-  running: Omit<AppInstance, "worker">[];
+  running: AppInstance[];
 }
