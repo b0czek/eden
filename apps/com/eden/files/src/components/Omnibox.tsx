@@ -32,11 +32,6 @@ const Omnibox: Component<OmniboxProps> = (props) => {
 
     // Generate suggestions based on input
     const generateSuggestions = async (value: string) => {
-        if (!value || value.trim() === "") {
-            setSuggestions([]);
-            return;
-        }
-
         setIsLoading(true);
 
         try {
@@ -67,7 +62,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                 setSuggestions(resultsWithIcons);
                 setSelectedIndex(0);
             } else {
-                // Search in current directory
+                // Search in current directory (empty value shows all items)
                 const results = await window.edenAPI!.shellCommand("fs/search", {
                     path: props.currentPath,
                     pattern: value.toLowerCase(),
@@ -166,6 +161,8 @@ const Omnibox: Component<OmniboxProps> = (props) => {
 
     const handleOmniboxClick = () => {
         setIsEditing(true);
+        // Show suggestions immediately
+        generateSuggestions("");
     };
 
     const handleSuggestionClick = (suggestion: Suggestion) => {
