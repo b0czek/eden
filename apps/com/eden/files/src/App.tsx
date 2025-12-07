@@ -43,16 +43,15 @@ const App: Component = () => {
       setLoading(true);
       setCurrentPath(path);
 
-      const dirItems = await (window as any).edenAPI.shellCommand(
+      const dirItems = await window.edenAPI!.shellCommand(
         "fs/readdir",
         { path }
       );
-
       const itemsWithStats = await Promise.all(
         dirItems.map(async (name: string) => {
           const itemPath = joinPath(path, name);
           try {
-            const stats = await (window as any).edenAPI.shellCommand(
+            const stats = await window.edenAPI!.shellCommand(
               "fs/stat",
               { path: itemPath }
             );
@@ -205,7 +204,7 @@ const App: Component = () => {
     const folderPath = joinPath(currentPath(), trimmedName);
 
     try {
-      await (window as any).edenAPI.shellCommand("fs/mkdir", {
+      await window.edenAPI!.shellCommand("fs/mkdir", {
         path: folderPath,
       });
       setShowNewFolderDialog(false);
@@ -225,7 +224,7 @@ const App: Component = () => {
     const filePath = joinPath(currentPath(), trimmedName);
 
     try {
-      await (window as any).edenAPI.shellCommand("fs/write", {
+      await window.edenAPI!.shellCommand("fs/write", {
         path: filePath,
         content: "",
       });
@@ -241,7 +240,7 @@ const App: Component = () => {
     if (!item) return;
 
     try {
-      await (window as any).edenAPI.shellCommand("fs/delete", {
+      await window.edenAPI!.shellCommand("fs/delete", {
         path: item.path,
       });
       setShowDeleteDialog(false);
