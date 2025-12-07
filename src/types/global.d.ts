@@ -3,7 +3,7 @@
 import type { CommandName, CommandArgs, CommandResult } from "./commands";
 import type { EventName, EventData } from "./events";
 
-interface EdenAPI {
+export interface EdenAPI {
   /**
    * Execute a shell command with type-safe arguments
    * @param command - The command name (e.g., "process/launch")
@@ -47,9 +47,14 @@ interface EdenAPI {
   isEventSupported(event: string): Promise<boolean>;
 }
 
-interface Window {
-  /**
-   * Eden API instance available only in renderer processes
-   */
-  edenAPI?: EdenAPI;
+declare global {
+  interface Window {
+    /**
+     * Eden API instance available only in renderer processes
+     */
+    edenAPI?: EdenAPI;
+  }
 }
+
+// This export is important - it marks the file as a module
+export {};

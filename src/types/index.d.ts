@@ -4,6 +4,8 @@ export * from "./EdenConfig";
 
 export * from "./AppManifest";
 
+export * from "./global";
+
 /**
  * App Instance Interface
  *
