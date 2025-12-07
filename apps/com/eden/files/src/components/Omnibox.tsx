@@ -59,7 +59,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                 });
 
                 // Add icons on frontend based on type
-                const resultsWithIcons = results.map((r: any) => ({
+                const resultsWithIcons = results.map((r) => ({
                     ...r,
                     icon: r.type === "folder" ? "📁" : "📄",
                 }));
@@ -75,7 +75,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                 });
 
                 // Add icons on frontend based on type
-                const resultsWithIcons = results.map((r: any) => ({
+                const resultsWithIcons = results.map((r) => ({
                     ...r,
                     icon: r.type === "folder" ? "📁" : "📄",
                 }));
