@@ -177,11 +177,21 @@ export class ViewManager extends EventEmitter {
     return /^https?:\/\//i.test(entry);
   }
 
-  private shouldInject(
-    feature: "css" | "appFrame",
-    windowConfig?: WindowConfig
-  ): boolean {
-    return windowConfig?.injections?.[feature] !== false;
+  private shouldInjectAppFrame(windowConfig?: WindowConfig): boolean {
+    return windowConfig?.injections?.appFrame !== false;
+  }
+
+  /**
+   * Get the CSS injection mode from window config
+   * Returns "full" by default if not specified
+   */
+  private getCSSInjectionMode(windowConfig?: WindowConfig): "full" | "tokens" | "none" {
+    const cssOption = windowConfig?.injections?.css;
+    // Default to "full" if not specified
+    if (cssOption === undefined) {
+      return "full";
+    }
+    return cssOption;
   }
 
   /**
@@ -204,16 +214,23 @@ export class ViewManager extends EventEmitter {
   /**
    * Inject Eden Design System CSS into the view
    * Makes design tokens and utilities available to all apps
+   * @param view - The WebContentsView to inject CSS into
+   * @param mode - "full" for complete CSS or "tokens" for only CSS custom properties
    */
-  private async injectDesignSystemCSS(view: WebContentsView): Promise<void> {
+  private async injectDesignSystemCSS(
+    view: WebContentsView,
+    mode: "full" | "tokens"
+  ): Promise<void> {
     try {
       const designSystemPath = path.join(__dirname, "../../design-system");
-      const cssPath = path.join(designSystemPath, "eden.css");
+      // Select the appropriate CSS file based on mode
+      const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
+      const cssPath = path.join(designSystemPath, cssFileName);
 
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log("Successfully injected Eden Design System CSS into view");
+      console.log(`Successfully injected Eden Design System CSS (${mode}) into view`);
     } catch (err) {
       console.error("Failed to inject design system CSS:", err);
       // Don't throw - app should still work without design system
@@ -329,9 +346,10 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
-      // Inject the Eden Design System CSS first (if enabled)
-      if (this.shouldInject("css", windowConfig)) {
-        this.injectDesignSystemCSS(view).catch((err) => {
+      // Inject the Eden Design System CSS first (based on mode)
+      const cssMode = this.getCSSInjectionMode(windowConfig);
+      if (cssMode !== "none") {
+        this.injectDesignSystemCSS(view, cssMode).catch((err) => {
           console.error(
             `Failed to inject design system CSS for ${appId}:`,
             err
@@ -340,7 +358,7 @@ export class ViewManager extends EventEmitter {
       }
 
       // Inject the app frame script (only for app views, not overlays)
-      if (viewType === "app" && this.shouldInject("appFrame", windowConfig)) {
+      if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
         this.injectAppFrame(view, viewMode, windowConfig, viewBounds).catch(
           (err) => {
             console.error(`Failed to inject app frame for ${appId}:`, err);

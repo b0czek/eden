@@ -5,9 +5,22 @@
  */
 export type WindowMode = "floating" | "tiled" | "both";
 
+/**
+ * CSS injection mode for app views
+ * - "full": Inject complete CSS (tokens + utilities + components)
+ * - "tokens": Inject only CSS custom property definitions
+ * - "none": Don't inject any CSS
+ */
+export type CSSInjectionMode = "full" | "tokens" | "none";
+
 export interface WindowInjectionOptions {
-  /** Inject the Eden design system CSS into the view (default: true) */
-  css?: boolean;
+  /** 
+   * Control Eden design system CSS injection (default: "full")
+   * - "full": Complete CSS including tokens, utilities, and components
+   * - "tokens": Only CSS custom property definitions (variables)
+   * - "none": No CSS injection
+   */
+  css?: CSSInjectionMode;
 
   /** Inject the Eden app frame with title bar controls (default: true) */
   appFrame?: boolean;

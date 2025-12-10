@@ -201,7 +201,7 @@ export class Eden {
       window: {
         mode: "floating" as const,
         injections: {
-          css: true,
+          css: "full" as const,
           appFrame: false, // Shell doesn't need the app frame
         },
       },
