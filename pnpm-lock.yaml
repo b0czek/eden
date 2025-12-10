@@ -104,11 +104,7 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
-  src/types:
-    devDependencies:
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+  src/types: {}
 
 packages:
 
