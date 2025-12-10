@@ -68,6 +68,23 @@ export interface WindowConfig {
 }
 
 /**
+ * File handler configuration for apps that can open files
+ */
+export interface FileHandlerConfig {
+  /** Display name for this handler (e.g., "Text Documents") */
+  name: string;
+
+  /** File extensions this handler supports (without dot, e.g., ["txt", "md"]) */
+  extensions: string[];
+
+  /** MIME types this handler supports (optional) */
+  mimeTypes?: string[];
+
+  /** Icon for this handler (optional) */
+  icon?: string;
+}
+
+/**
  * App Manifest Interface
  *
  * Defines the structure of an Eden app package.
@@ -145,5 +162,11 @@ export interface AppManifest {
    * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
    */
   permissions?: string[];
+
+  /**
+   * File types this app can handle.
+   * Used for "open with" functionality and automatic handler detection.
+   */
+  fileHandlers?: FileHandlerConfig[];
 }
 

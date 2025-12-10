@@ -6,6 +6,13 @@
  */
 
 /**
+ * FileEvents - Events for the "file" namespace
+ */
+export interface FileEvents {
+  "file/opened": { path: string; isDirectory: boolean; appId: string };
+}
+
+/**
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
@@ -34,4 +41,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends PackageEvents, ProcessEvents, ViewEvents {}
+export interface AppEvents extends FileEvents, PackageEvents, ProcessEvents, ViewEvents {}

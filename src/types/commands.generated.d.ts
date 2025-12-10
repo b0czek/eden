@@ -19,6 +19,61 @@ export interface SystemCommands {
 }
 
 /**
+ * FileCommands - Commands for the "file" namespace
+ */
+export interface FileCommands {
+  /**
+   * Open a file with its default handler
+   */
+  "file/open": {
+    args: { path: string };
+    response: FileOpenResult;
+  };
+  /**
+   * Open a file with a specific app
+   */
+  "file/open-with": {
+    args: { path: string; appId: string };
+    response: FileOpenResult;
+  };
+  /**
+   * Get the default handler app for a file extension
+   */
+  "file/get-handler": {
+    args: { extension: string };
+    response: { appId: string | undefined };
+  };
+  /**
+   * Set user preference for a file extension's default handler
+   */
+  "file/set-default-handler": {
+    args: { extension: string; appId: string };
+    response: void;
+  };
+  /**
+   * Remove user preference for a file extension (revert to default)
+   */
+  "file/remove-default-handler": {
+    args: { extension: string };
+    response: void;
+  };
+  /**
+   * Get all apps that can handle a specific file extension
+   */
+  "file/get-supported-handlers": {
+    args: { extension: string };
+    response: FileHandlerInfo[];
+  };
+  /**
+   * Get all file type associations
+   */
+  "file/get-associations": {
+    args: Record<string, never>;
+    response: Record<string, { default: string | undefined; userOverride: string | undefined }>;
+  };
+}
+
+/**
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
@@ -280,4 +335,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, FileCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}

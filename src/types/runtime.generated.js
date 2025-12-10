@@ -9,6 +9,13 @@
 // Command names array
 export const COMMAND_NAMES = [
   "system/info",
+  "file/open",
+  "file/open-with",
+  "file/get-handler",
+  "file/set-default-handler",
+  "file/remove-default-handler",
+  "file/get-supported-handlers",
+  "file/get-associations",
   "fs/read",
   "fs/write",
   "fs/exists",
@@ -40,6 +47,7 @@ export const COMMAND_NAMES = [
 
 // Event names array
 export const APP_EVENT_NAMES = [
+  "file/opened",
   "package/installed",
   "package/uninstalled",
   "process/launched",
