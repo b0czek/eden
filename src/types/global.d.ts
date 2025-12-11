@@ -46,6 +46,33 @@ export interface EdenAPI {
    */
   isEventSupported(event: string): Promise<boolean>;
 }
+export interface EdenFrame {
+
+  // Public API
+  setTitle: (title: string) => void;
+  
+  // Internal state (used by frame system)
+  _internal: {
+    injected: boolean;
+    config: {
+      mode?: 'tiled' | 'floating' | 'both';
+      showTitle?: boolean;
+      defaultSize?: { width: number; height: number };
+      defaultPosition?: { x: number; y: number };
+      movable?: boolean;
+      resizable?: boolean;
+      minSize?: { width: number; height: number };
+      maxSize?: { width: number; height: number };
+    };
+    currentMode: 'tiled' | 'floating';
+    bounds: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  };
+}
 
 declare global {
   interface Window {
@@ -53,6 +80,7 @@ declare global {
      * Eden API instance available only in renderer processes
      */
     edenAPI?: EdenAPI;
+    edenFrame?: EdenFrame;
   }
 }
 
