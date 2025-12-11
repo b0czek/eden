@@ -13,7 +13,7 @@ import {
   WorkerManager,
 } from "./process-manager";
 import { ViewManager, ViewHandler } from "./view-manager";
-import { FilesystemHandler } from "./filesystem";
+import { FilesystemManager } from "./filesystem";
 import { FileOpenManager } from "./file-open";
 import { container } from "tsyringe";
 
@@ -32,7 +32,7 @@ export class Eden {
   private packageManager: PackageManager;
   private processManager: ProcessManager;
   private systemHandler: SystemHandler;
-  private filesystemHandler: FilesystemHandler;
+  private filesystemManager: FilesystemManager;
   private permissionRegistry: PermissionRegistry;
   private fileOpenManager: FileOpenManager;
 
@@ -96,15 +96,14 @@ export class Eden {
     this.systemHandler = container.resolve(SystemHandler);
     container.registerInstance("SystemHandler", this.systemHandler);
 
-    // Initialize Filesystem Handler
-    this.filesystemHandler = new FilesystemHandler(this.userDirectory);
-    container.registerInstance("FilesystemHandler", this.filesystemHandler);
-    this.commandRegistry.registerManager(this.filesystemHandler);
-
-    // Register userDirectory for FileOpenManager injection
+    // Register userDirectory for injection
     container.registerInstance("userDirectory", this.userDirectory);
 
-    // Initialize File Open Manager (handler is created internally)
+    // Initialize Filesystem Manager
+    this.filesystemManager = container.resolve(FilesystemManager);
+    container.registerInstance("FilesystemManager", this.filesystemManager);
+
+    // Initialize File Open Manager
     this.fileOpenManager = container.resolve(FileOpenManager);
     container.registerInstance("FileOpenManager", this.fileOpenManager);
 

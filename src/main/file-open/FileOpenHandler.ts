@@ -1,5 +1,6 @@
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { FileOpenManager, FileOpenResult, FileHandlerInfo } from "./FileOpenManager";
+import { FileOpenManager } from "./FileOpenManager";
+import type { FileOpenResult, FileHandlerInfo } from "@edenapp/types";
 
 /**
  * FileOpenHandler

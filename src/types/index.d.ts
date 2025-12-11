@@ -103,3 +103,41 @@ export interface AppStatus {
   installed: AppManifest[];
   running: AppInstance[];
 }
+
+/**
+ * Result of opening a file
+ */
+export interface FileOpenResult {
+  success: boolean;
+  appId?: string;
+  error?: string;
+}
+
+/**
+ * Information about a file handler
+ */
+export interface FileHandlerInfo {
+  appId: string;
+  appName: string;
+  handlerName?: string;
+  icon?: string;
+}
+
+/**
+ * File or directory statistics
+ */
+export interface FileStats {
+  isFile: boolean;
+  isDirectory: boolean;
+  size: number;
+  mtime: Date;
+}
+
+/**
+ * Search result for filesystem queries
+ */
+export interface SearchResult {
+  name: string;
+  path: string;
+  type: "file" | "folder";
+}

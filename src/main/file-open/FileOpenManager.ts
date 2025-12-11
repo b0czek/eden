@@ -4,27 +4,11 @@ import { injectable, inject } from "tsyringe";
 import { PackageManager } from "../package-manager";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
+import { FilesystemManager } from "../filesystem";
 import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { FileOpenHandler } from "./FileOpenHandler";
+import type { FileOpenResult, FileHandlerInfo } from "@edenapp/types";
 
-/**
- * Result of opening a file
- */
-export interface FileOpenResult {
-  success: boolean;
-  appId?: string;
-  error?: string;
-}
-
-/**
- * Information about a file handler
- */
-export interface FileHandlerInfo {
-  appId: string;
-  appName: string;
-  handlerName?: string;
-  icon?: string;
-}
 
 /**
  * Events emitted by the FileOpenManager
@@ -59,6 +43,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject("PackageManager") private packageManager: PackageManager,
     @inject("ProcessManager") private processManager: ProcessManager,
     @inject("ViewManager") private viewManager: ViewManager,
+    @inject("FilesystemManager") private fsManager: FilesystemManager,
     @inject("IPCBridge") ipcBridge: IPCBridge,
     @inject("CommandRegistry") commandRegistry: CommandRegistry
   ) {
@@ -88,10 +73,18 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     // Directories open in file manager
     this.defaultRegistry.set(FileOpenManager.DIRECTORY_KEY, "com.eden.files");
     
-    // Text files
-    const textExtensions = ["txt", "md", "json", "js", "ts", "jsx", "tsx", "css", "html", "xml", "yaml", "yml", "toml", "ini", "cfg", "conf", "log"];
+    // Text files - open in text editor
+    const textExtensions = [
+      "txt", "md", "markdown", "log",
+      "json", "xml", "yaml", "yml", "toml",
+      "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts",
+      "css", "scss", "sass", "less", "html", "htm",
+      "ini", "cfg", "conf", "env",
+      "py", "rs", "go", "java", "c", "cpp", "h", "hpp",
+      "sh", "bash", "zsh", "fish"
+    ];
     for (const ext of textExtensions) {
-      this.defaultRegistry.set(ext, "com.eden.files"); // Fallback to file manager for now
+      this.defaultRegistry.set(ext, "com.eden.editor");
     }
     
     // Image files
@@ -255,8 +248,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   async openFile(filePath: string): Promise<FileOpenResult> {
     try {
-      // Check if path exists and get stats
-      const fullPath = path.resolve(filePath);
+      // Resolve masked path to full filesystem path
+      const fullPath = this.fsManager.resolvePath(filePath);
       const stats = await fs.stat(fullPath);
       const isDirectory = stats.isDirectory();
       
@@ -288,7 +281,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Notify only the target app's views
       const viewIds = this.viewManager.getViewsByAppId(handlerAppId);
       for (const viewId of viewIds) {
-        this.notifySubscriber(viewId, "opened", { path: fullPath, isDirectory, appId: handlerAppId });
+        this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId: handlerAppId });
       }
       
       return {
@@ -308,7 +301,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   async openFileWith(filePath: string, appId: string): Promise<FileOpenResult> {
     try {
-      const fullPath = path.resolve(filePath);
+      // Resolve masked path to full filesystem path
+      const fullPath = this.fsManager.resolvePath(filePath);
       
       // Check if file exists and get stats
       const stats = await fs.stat(fullPath);
@@ -332,7 +326,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Notify only the target app's views
       const viewIds = this.viewManager.getViewsByAppId(appId);
       for (const viewId of viewIds) {
-        this.notifySubscriber(viewId, "opened", { path: fullPath, isDirectory, appId });
+        this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId });
       }
       
       return {
