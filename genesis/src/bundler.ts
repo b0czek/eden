@@ -219,6 +219,42 @@ export class GenesisBundler {
   }
 
   /**
+   * Check if a file path should be excluded from bundling
+   */
+  private static shouldExcludeFile(filePath: string): boolean {
+    const excludePatterns = [
+      // Dependencies
+      /^node_modules\//,
+      /^node_modules$/,
+      // Source files (we only want the built output)
+      /^src\//,
+      /^src$/,
+      // Config files
+      /^tsconfig\.json$/,
+      /^tsconfig\..+\.json$/,
+      /^vite\.config\..+$/,
+      /^\.eslintrc/,
+      /^\.prettierrc/,
+      /^\.gitignore$/,
+      /^\.git\//,
+      /^\.DS_Store$/,
+      // Lock files
+      /^package-lock\.json$/,
+      /^pnpm-lock\.yaml$/,
+      /^yarn\.lock$/,
+      // Build artifacts that shouldn't be included
+      /^\.vite\//,
+      /^\.cache\//,
+      // Test files
+      /^__tests__\//,
+      /\.test\.[jt]sx?$/,
+      /\.spec\.[jt]sx?$/,
+    ];
+
+    return excludePatterns.some(pattern => pattern.test(filePath));
+  }
+
+  /**
    * Extract app files directly to a directory (no compression)
    */
   private static async extractToDirectory(
@@ -233,15 +269,26 @@ export class GenesisBundler {
     // Ensure target directory exists
     await fs.mkdir(resolvedTarget, { recursive: true });
 
-    // Copy all files from the app directory
+    // Copy all files from the app directory (excluding development files)
     const files = await fs.readdir(appDirectory, { recursive: true });
 
+    let copiedCount = 0;
+    let skippedCount = 0;
+
     for (const file of files) {
-      const sourcePath = path.join(appDirectory, file as string);
+      const fileStr = file as string;
+      
+      // Skip excluded files
+      if (this.shouldExcludeFile(fileStr)) {
+        skippedCount++;
+        continue;
+      }
+
+      const sourcePath = path.join(appDirectory, fileStr);
       const stat = await fs.stat(sourcePath);
 
       if (stat.isFile()) {
-        const targetPath = path.join(resolvedTarget, file as string);
+        const targetPath = path.join(resolvedTarget, fileStr);
         const targetFileDir = path.dirname(targetPath);
 
         // Ensure subdirectory exists
@@ -249,13 +296,15 @@ export class GenesisBundler {
 
         // Copy file
         await fs.copyFile(sourcePath, targetPath);
+        copiedCount++;
 
-        if (verbose) console.log(`  + ${file}`);
+        if (verbose) console.log(`  + ${fileStr}`);
       }
     }
 
     if (verbose) {
       console.log(`✓ Files copied to: ${resolvedTarget}`);
+      console.log(`  Copied: ${copiedCount} files, Skipped: ${skippedCount} (dev files)`);
     }
   }
 
@@ -282,15 +331,20 @@ export class GenesisBundler {
 
     let progressBar: cliProgress.SingleBar | null = null;
     
-    // Get file list for progress tracking
+    // Get file list for progress tracking (excluding development files)
     const allFiles = await fs.readdir(appDirectory, { recursive: true });
     const fileList = [];
     
     for (const file of allFiles) {
-      const filePath = path.join(appDirectory, file as string);
+      const fileStr = file as string;
+      // Skip excluded files
+      if (this.shouldExcludeFile(fileStr)) {
+        continue;
+      }
+      const filePath = path.join(appDirectory, fileStr);
       const stat = await fs.stat(filePath);
       if (stat.isFile()) {
-        fileList.push(file as string);
+        fileList.push(fileStr);
       }
     }
 
