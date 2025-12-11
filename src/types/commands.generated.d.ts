@@ -124,12 +124,7 @@ export interface FsCommands {
    */
   "fs/stat": {
     args: { path: string };
-    response: {
-    isFile: boolean;
-    isDirectory: boolean;
-    size: number;
-    mtime: Date;
-  };
+    response: FileStats;
   };
   /**
    * Search for files and directories using glob patterns.
@@ -140,11 +135,7 @@ export interface FsCommands {
     pattern: string;
     limit?: number;
   };
-    response: Array<{
-      name: string;
-      path: string;
-      type: "file" | "folder";
-    }>;
+    response: SearchResult[];
   };
   /**
    * Delete a file or directory.

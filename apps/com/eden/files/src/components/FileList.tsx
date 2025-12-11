@@ -7,6 +7,7 @@ interface FileListProps {
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
+  scrollToSelected?: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
   onItemClick: (item: FileItem) => void;
@@ -18,12 +19,20 @@ const FileList: Component<FileListProps> = (props) => {
   let fileRefs: Map<string, HTMLDivElement> = new Map();
 
   createEffect(() => {
+    // Track items to re-run when list updates
+    const items = props.items;
+    const shouldScroll = props.scrollToSelected;
     const selected = props.selectedItem;
-    if (selected) {
-      const element = fileRefs.get(selected);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+    
+    // Only scroll when explicitly requested (e.g., when selecting from omnibox)
+    if (shouldScroll && selected && items.length > 0) {
+      // Wait for DOM to update with new refs
+      requestAnimationFrame(() => {
+        const element = fileRefs.get(selected);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      });
     }
   });
 

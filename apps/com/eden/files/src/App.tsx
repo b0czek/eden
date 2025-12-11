@@ -4,7 +4,6 @@ import type { FileItem, DisplayPreferences } from "./types";
 import { joinPath, getParentPath, isValidName } from "./utils";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
-import StatusBar from "./components/StatusBar";
 import CreateFolderDialog from "./dialogs/CreateFolderDialog";
 import CreateFileDialog from "./dialogs/CreateFileDialog";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
@@ -16,6 +15,7 @@ const App: Component = () => {
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
+  const [scrollToSelected, setScrollToSelected] = createSignal(false);
   const [navigationHistory, setNavigationHistory] = createSignal<string[]>([
     "/",
   ]);
@@ -125,8 +125,9 @@ const App: Component = () => {
 
     loadDirectory(path);
 
-    // If a specific item should be selected, set it after navigation
+    // If a specific item should be selected, set it after navigation and trigger scroll
     if (selectedItem) {
+      setScrollToSelected(true);
       setSelectedItem(selectedItem);
     }
   };
@@ -257,12 +258,23 @@ const App: Component = () => {
   };
 
   const handleItemClick = (item: FileItem) => {
+    setScrollToSelected(false); // Don't scroll when clicking directly
     setSelectedItem(item.path);
   };
 
-  const handleItemDoubleClick = (item: FileItem) => {
+  const handleItemDoubleClick = async (item: FileItem) => {
     if (item.isDirectory) {
       navigateTo(item.path);
+    } else {
+      // Open files with their registered handler
+      try {
+        let result = await window.edenAPI!.shellCommand("file/open", { path: item.path });
+        if(!result.success) {
+          showError("Failed to open file: " + result.error);
+        }
+      } catch (error) {
+        showError("Failed to open file: " + (error as Error).message);
+      }
     }
   };
 
@@ -307,14 +319,13 @@ const App: Component = () => {
         loading={loading()}
         items={items()}
         selectedItem={selectedItem()}
+        scrollToSelected={scrollToSelected()}
         viewStyle={displayPreferences().viewStyle}
         itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
         onItemDoubleClick={handleItemDoubleClick}
         onItemDelete={handleDeleteClick}
       />
-
-      <StatusBar currentPath={currentPath()} itemCount={items().length} />
 
       <CreateFolderDialog
         show={showNewFolderDialog()}
