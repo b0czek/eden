@@ -39,6 +39,9 @@ export class Eden {
   constructor(config: EdenConfig = {}) {
     this.config = config;
 
+    app.commandLine.appendSwitch("enable-features", "V8CodeCache");
+
+
     // Set apps directory to user data + /eden-apps or custom path
     this.appsDirectory =
       config.appsDirectory || path.join(app.getPath("userData"), "eden-apps");
