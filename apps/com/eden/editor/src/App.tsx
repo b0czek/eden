@@ -13,6 +13,7 @@ const App: Component = () => {
   const [activeTabId, setActiveTabId] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [editorReady, setEditorReady] = createSignal(false);
   
   let editor: IStandaloneCodeEditor | undefined;
 
@@ -82,7 +83,10 @@ const App: Component = () => {
       setTabs([...tabs(), newTab]);
       setActiveTabId(newTab.id);
       
-      await setEditorContentLazy(editor, fileContent, newTab.language);
+      // Only set content if editor is ready, otherwise onEditorReady will handle it
+      if (editorReady()) {
+        await setEditorContentLazy(editor, fileContent, newTab.language);
+      }
       window.edenFrame?.setTitle(newTab.name);
     } catch (err) {
       setError(`Failed to load file: ${(err as Error).message}`);
@@ -182,6 +186,14 @@ const App: Component = () => {
         <LazyMonacoEditor
           onContentChange={handleEditorContentChange}
           ref={(e: IStandaloneCodeEditor) => { editor = e; }}
+          onReady={() => {
+            setEditorReady(true);
+            // Set content for the active tab now that editor is ready
+            const active = activeTab();
+            if (active) {
+              setEditorContentLazy(editor, active.content, active.language);
+            }
+          }}
         />
       </Show>
     </div>
