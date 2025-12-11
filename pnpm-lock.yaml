@@ -71,8 +71,8 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2(monaco-editor@0.52.2)
       '@edenapp/types':
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: workspace:*
+        version: link:../../../../src/types
       solid-js:
         specifier: ^1.9.10
         version: 1.9.10
@@ -89,8 +89,8 @@ importers:
   apps/com/eden/files:
     devDependencies:
       '@edenapp/types':
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: workspace:*
+        version: link:../../../../src/types
       solid-js:
         specifier: ^1.9.10
         version: 1.9.10
@@ -337,9 +337,6 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
-
-  '@edenapp/types@0.1.2':
-    resolution: {integrity: sha512-YGQIz1j2/9VLyFw+r9IehbpWsOYoE8EVrufyoFg7VHb/pdg76hWSgvo4D1uHYyoYANPbOtxzeJCJ3iHaKzSPjQ==}
 
   '@electron/get@2.0.3':
     resolution: {integrity: sha512-Qkzpg2s9GnVV2I2BjRksUi43U5e6+zaQMcjoJy0C+C5oxaKl+fmckGDQFtRpZpZV0NQekuZZ+tGz7EA9TVnQtQ==}
@@ -2961,8 +2958,6 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
-
-  '@edenapp/types@0.1.2': {}
 
   '@electron/get@2.0.3':
     dependencies:
