@@ -1,9 +1,12 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import type { Component } from "solid-js";
-import * as monaco from "monaco-editor";
 
-import { TabBar, Toolbar, ErrorBanner, WelcomeScreen, MonacoEditor, setEditorContent, getEditorContent } from "./components";
+// Use lazy-loading components - Monaco is loaded on-demand, not at startup
+import { TabBar, Toolbar, ErrorBanner, WelcomeScreen, LazyMonacoEditor, setEditorContentLazy, getEditorContentLazy, preloadMonaco } from "./components";
 import { EditorTab, FileOpenedEvent, getLanguageFromPath, getFileName } from "./types";
+
+// Type for the editor instance (just the interface, not the actual module)
+type IStandaloneCodeEditor = import("monaco-editor").editor.IStandaloneCodeEditor;
 
 const App: Component = () => {
   const [tabs, setTabs] = createSignal<EditorTab[]>([]);
@@ -11,7 +14,7 @@ const App: Component = () => {
   const [isSaving, setIsSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   
-  let editor: monaco.editor.IStandaloneCodeEditor | undefined;
+  let editor: IStandaloneCodeEditor | undefined;
 
   // Get the currently active tab
   const activeTab = () => tabs().find(t => t.id === activeTabId());
@@ -19,6 +22,10 @@ const App: Component = () => {
   // Subscribe to file open events and set up keyboard shortcuts
   onMount(() => {
     console.log("Editor app mounted, subscribing to file/opened events");
+    
+    // Start loading Monaco in the background immediately
+    // This way it's ready by the time the user opens a file
+    preloadMonaco();
     
     window.edenAPI?.subscribe("file/opened", handleFileOpened as (data: unknown) => void);
 
@@ -75,16 +82,16 @@ const App: Component = () => {
       setTabs([...tabs(), newTab]);
       setActiveTabId(newTab.id);
       
-      setEditorContent(editor, fileContent, newTab.language);
+      await setEditorContentLazy(editor, fileContent, newTab.language);
       window.edenFrame?.setTitle(newTab.name);
     } catch (err) {
       setError(`Failed to load file: ${(err as Error).message}`);
     }
   };
 
-  const switchToTab = (tab: EditorTab) => {
+  const switchToTab = async (tab: EditorTab) => {
     setActiveTabId(tab.id);
-    setEditorContent(editor, tab.content, tab.language);
+    await setEditorContentLazy(editor, tab.content, tab.language);
     window.edenFrame?.setTitle(tab.name);
   };
 
@@ -113,7 +120,7 @@ const App: Component = () => {
       setIsSaving(true);
       setError(null);
 
-      const currentContent = getEditorContent(editor);
+      const currentContent = getEditorContentLazy(editor);
       
       await window.edenAPI!.shellCommand("fs/write", {
         path: active.path,
@@ -172,9 +179,9 @@ const App: Component = () => {
       </Show>
 
       <Show when={tabs().length > 0}>
-        <MonacoEditor
+        <LazyMonacoEditor
           onContentChange={handleEditorContentChange}
-          ref={(e) => { editor = e; }}
+          ref={(e: IStandaloneCodeEditor) => { editor = e; }}
         />
       </Show>
     </div>
