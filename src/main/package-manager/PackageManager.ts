@@ -362,6 +362,47 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     this.notify("installed", { manifest: updatedManifest });
   }
 
+  /**
+   * Get the app icon as a base64 data URL
+   */
+  async getAppIcon(appId: string): Promise<string | undefined> {
+    const manifest = this.installedApps.get(appId);
+    if (!manifest?.icon) {
+      return undefined;
+    }
 
+    const appPath = this.getAppPath(appId);
+    if (!appPath) {
+      return undefined;
+    }
+
+    const iconPath = path.join(appPath, manifest.icon);
+    
+    try {
+      const iconBuffer = await fs.readFile(iconPath);
+      const ext = path.extname(manifest.icon).toLowerCase();
+      const mimeType = this.getMimeType(ext);
+      return `data:${mimeType};base64,${iconBuffer.toString('base64')}`;
+    } catch (error) {
+      console.warn(`Failed to read icon for ${appId}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get MIME type for an image file extension
+   */
+  private getMimeType(ext: string): string {
+    const mimeTypes: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.svg': 'image/svg+xml',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.ico': 'image/x-icon',
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+  }
 
 }

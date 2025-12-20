@@ -186,6 +186,13 @@ export interface PackageCommands {
     args: { appId: string };
     response: { enabled: boolean };
   };
+  /**
+   * Get the icon for an installed application as a data URL.
+   */
+  "package/get-icon": {
+    args: { appId: string };
+    response: { icon: string | undefined };
+  };
 }
 
 /**

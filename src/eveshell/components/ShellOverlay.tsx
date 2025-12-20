@@ -1,22 +1,8 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
-import { ViewBounds, WindowSize } from "@edenapp/types";
-
-interface AppManifest {
-  id: string;
-  name: string;
-  version: string;
-  description?: string;
-  icon?: string;
-}
-
-interface AppInfo {
-  id: string;
-  name: string;
-  icon?: string;
-  isRunning: boolean;
-}
+import { ViewBounds, WindowSize, AppManifest } from "@edenapp/types";
+import { AppInfo } from "../types";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
@@ -51,7 +37,6 @@ export default function ShellOverlay() {
     const apps = installedApps().map((app) => ({
       id: app.id,
       name: app.name,
-      icon: app.icon,
       isRunning: running.has(app.id),
     }));
     return apps;
@@ -75,15 +60,18 @@ export default function ShellOverlay() {
   };
 
   // Helper function to calculate bounds based on mode and window size
-  const calculateBounds = (mode: "dock" | "fullscreen", windowSize: WindowSize) => {
+  const calculateBounds = (
+    mode: "dock" | "fullscreen",
+    windowSize: WindowSize
+  ) => {
     return mode === "fullscreen"
       ? { x: 0, y: 0, width: windowSize.width, height: windowSize.height }
       : {
-        x: 0,
-        y: windowSize.height - DOCK_HEIGHT,
-        width: windowSize.width,
-        height: DOCK_HEIGHT,
-      };
+          x: 0,
+          y: windowSize.height - DOCK_HEIGHT,
+          width: windowSize.width,
+          height: DOCK_HEIGHT,
+        };
   };
 
   // Helper function to update overlay bounds via API
@@ -197,7 +185,10 @@ export default function ShellOverlay() {
     // Event handlers
     const handleAppLifecycle = () => loadSystemInfo();
 
-    const handleBoundsChange = (data: { workspaceBounds: ViewBounds; windowSize: WindowSize }) => {
+    const handleBoundsChange = (data: {
+      workspaceBounds: ViewBounds;
+      windowSize: WindowSize;
+    }) => {
       const { windowSize } = data;
       const mode = showAllApps() ? "fullscreen" : "dock";
       const bounds = calculateBounds(mode, windowSize);

@@ -1,13 +1,7 @@
 import { For, Show, createSignal, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
-
-interface AppInfo {
-  id: string;
-  name: string;
-  icon?: string;
-  isRunning: boolean;
-}
+import { AppInfo } from "../types";
 
 interface DockProps {
   apps: AppInfo[];
@@ -86,7 +80,6 @@ export default function Dock(props: DockProps) {
               <AppIcon
                 appId={app.id}
                 appName={app.name}
-                icon={app.icon}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
               />

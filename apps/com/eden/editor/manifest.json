@@ -55,5 +55,6 @@
       "name": "Shell Scripts",
       "extensions": ["sh", "bash", "zsh", "fish"]
     }
-  ]
+  ],
+  "icon": "icon.png"
 }

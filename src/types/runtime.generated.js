@@ -29,6 +29,7 @@ export const COMMAND_NAMES = [
   "package/list-installed",
   "package/toggle-hot-reload",
   "package/is-hot-reload-enabled",
+  "package/get-icon",
   "process/launch",
   "process/stop",
   "process/list",

@@ -57,4 +57,14 @@ export class PackageHandler {
     const enabled = await isHotReloadEnabled(params.appId);
     return { enabled };
   }
+
+  /**
+   * Get the icon for an installed application as a data URL.
+   */
+  @EdenHandler("get-icon")
+  async handleGetAppIcon(args: { appId: string }): Promise<{ icon: string | undefined }> {
+    const { appId } = args;
+    const icon = await this.packageManager.getAppIcon(appId);
+    return { icon };
+  }
 }
