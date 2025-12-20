@@ -233,20 +233,15 @@ body {
   justify-content: center;
   border-radius: var(--eden-radius-sm);
   position: relative;
-  /* Make icon containers darker and flatter to match the shell */
-  background: var(--eden-color-surface-secondary);
-  box-shadow: var(--eden-shadow-sm);
-  transition: transform 0.16s ease-out, box-shadow var(--eden-transition-base), filter 0.2s ease;
-  backdrop-filter: blur(10px);
+  background: transparent;
+  box-shadow: none;
+  transition: transform 0.16s ease-out, filter 0.2s ease;
 }
 
-.app-icon:hover .icon-container {
-  box-shadow: var(--eden-shadow-md);
-}
 
 .icon-container img {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -308,108 +303,63 @@ body {
   letter-spacing: var(--eden-font-letter-spacing-tight);
 }
 
-/* Apps View Overlay (Replaced by Eden Components, keeping animations if needed or relying on Eden's) */
-/* Keeping animations as they might be used by classList toggling in component, but Eden modals have their own animations. */
-/* If AllApps.tsx uses .eden-modal-overlay, we can remove .apps-view-overlay styles unless we need to override something. */
-/* The component uses classList={{ closing: isClosing() }} which might rely on these animations. */
+/* ============================
+   All Apps - Minimal overrides
+   Uses eden-modal-*, eden-input, eden-btn from design system
+   ============================ */
 
-.eden-modal-overlay.closing {
-  animation: appsOverlayFadeOut 0.22s ease forwards;
+/* Override grid to fixed 4 columns */
+.eden-modal-body .eden-card-grid {
+  grid-template-columns: repeat(4, 1fr);
 }
 
-@keyframes appsOverlayFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+/* App tile in the grid - square with centered content */
+.all-apps-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  aspect-ratio: 1 / 1;
 }
 
-@keyframes appsOverlayFadeOut {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
+.all-apps-tile.running {
+  background: var(--eden-color-surface-active);
 }
 
-.eden-modal.closing {
-  animation: appsViewExit 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-@keyframes appsViewEnter {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes appsViewExit {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(28px) scale(0.96);
-  }
-}
-
-/* App Grid Item Overrides for Eden Card */
-.eden-card.eden-card-interactive:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: var(--eden-shadow-xl);
-}
-
-.eden-card.eden-card-interactive:active {
-  transform: scale(0.98);
-}
-
-.eden-card .app-icon {
+/* Override app-icon styles for grid view */
+.all-apps-tile .app-icon {
   min-width: auto;
   width: auto;
-  max-width: 156px;
 }
 
-/* Make the grid icon square and larger than dock */
-.eden-card .icon-container {
-  width: 88px;
-  height: 88px;
+.all-apps-tile .icon-container {
+  width: 64px;
+  height: 64px;
   border-radius: var(--eden-radius-lg);
 }
 
-.eden-card .icon-container img {
-  width: 64px;
-  height: 64px;
+.all-apps-tile .icon-container img {
+  width: 100%;
+  height: 100%;
 }
 
-.eden-card .app-name {
-  opacity: 1;
-  color: var(--eden-color-text-primary);
-  font-size: var(--eden-font-size-md);
-  font-weight: var(--eden-font-weight-semibold);
-  margin-top: var(--eden-space-sm);
-  max-width: 200px;
+.all-apps-tile .app-name {
   position: static;
   transform: none;
   left: auto;
   top: auto;
-}
-
-.eden-card.running {
-  background: var(--eden-color-surface-active);
-  border-color: var(--eden-color-accent-primary);
-  box-shadow: var(--eden-shadow-md);
+  opacity: 1;
+  margin-top: var(--eden-space-sm);
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Context Menu Icons */

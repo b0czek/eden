@@ -13,6 +13,7 @@ interface AllAppsProps {
 }
 
 export default function AllApps(props: AllAppsProps) {
+  const [searchQuery, setSearchQuery] = createSignal("");
   const [contextMenu, setContextMenu] = createSignal<{
     appId: string;
     appName: string;
@@ -27,10 +28,21 @@ export default function AllApps(props: AllAppsProps) {
   const [isClosing, setIsClosing] = createSignal(false);
   const EXIT_ANIMATION_MS = 280;
   let exitTimer: number | undefined;
+  let searchInputRef: HTMLInputElement | undefined;
+
+  const filteredApps = () => {
+    const query = searchQuery().toLowerCase().trim();
+    if (!query) return props.apps;
+    return props.apps.filter(
+      (app) =>
+        app.name.toLowerCase().includes(query) ||
+        app.id.toLowerCase().includes(query)
+    );
+  };
 
   onMount(async () => {
-    // Load hot reload status for all apps
-    // TODO: Improve this
+    searchInputRef?.focus();
+
     const hotReloadSet = new Set<string>();
     for (const app of props.apps) {
       try {
@@ -53,12 +65,8 @@ export default function AllApps(props: AllAppsProps) {
 
   onCleanup(() => {
     const timer = longPressTimer();
-    if (timer) {
-      clearTimeout(timer);
-    }
-    if (exitTimer) {
-      clearTimeout(exitTimer);
-    }
+    if (timer) clearTimeout(timer);
+    if (exitTimer) clearTimeout(exitTimer);
   });
 
   function clearLongPressTimer() {
@@ -85,12 +93,8 @@ export default function AllApps(props: AllAppsProps) {
   }
 
   async function handleTileClick(appId: string) {
-    // Close the view
-    if (!isClosing()) {
-      triggerClose();
-    }
+    if (!isClosing()) triggerClose();
 
-    // Reveal all running apps
     const running = props.runningApps;
     for (const runningAppId of running) {
       try {
@@ -103,7 +107,6 @@ export default function AllApps(props: AllAppsProps) {
       }
     }
 
-    // Launch or focus the selected app
     await props.onAppClick(appId);
   }
 
@@ -116,13 +119,7 @@ export default function AllApps(props: AllAppsProps) {
     if (isClosing()) return;
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({
-      appId,
-      appName,
-      isRunning,
-      x: e.clientX,
-      y: e.clientY,
-    });
+    setContextMenu({ appId, appName, isRunning, x: e.clientX, y: e.clientY });
   }
 
   function handleLongPressStart(
@@ -137,13 +134,7 @@ export default function AllApps(props: AllAppsProps) {
         "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
       const clientY =
         "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      setContextMenu({
-        appId,
-        appName,
-        isRunning,
-        x: clientX,
-        y: clientY,
-      });
+      setContextMenu({ appId, appName, isRunning, x: clientX, y: clientY });
     }, 500);
     setLongPressTimer(timer);
   }
@@ -152,89 +143,106 @@ export default function AllApps(props: AllAppsProps) {
     clearLongPressTimer();
   }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape") triggerClose();
+  }
+
   return (
     <>
+      {/* Main overlay - uses eden-modal-overlay but without blur */}
       <div
         class="eden-modal-overlay"
         classList={{ closing: isClosing() }}
+        style="background: rgba(0,0,0,0.4); backdrop-filter: none;"
         onClick={handleOverlayClick}
+        onKeyDown={handleKeyDown}
       >
+        {/* Floating island - uses eden-modal as base */}
         <div
           class="eden-modal eden-modal-lg"
           classList={{ closing: isClosing() }}
+          style="max-height: 70vh; background: var(--eden-color-surface-primary);"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Header with search and install */}
           <div class="eden-modal-header">
-            <h2 class="eden-modal-title">All Applications</h2>
-            <div style="display: flex; gap: var(--eden-space-sm);">
-              <button
-                class="eden-btn eden-btn-square eden-btn-primary"
-                aria-label="Install App"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isClosing()) {
-                    props.onInstall();
-                  }
-                }}
-              >
-                +
-              </button>
-              <button
-                class="eden-btn eden-btn-square eden-btn-ghost"
-                aria-label="Close"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  triggerClose();
-                }}
-              >
-                ✕
-              </button>
+            <div class="eden-flex eden-gap-sm" style="flex: 1;">
+              <input
+                ref={searchInputRef}
+                type="text"
+                class="eden-input"
+                placeholder="Search apps..."
+                value={searchQuery()}
+                onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              />
             </div>
+            <button
+              class="eden-btn eden-btn-primary eden-btn-square"
+              aria-label="Install App"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isClosing()) props.onInstall();
+              }}
+            >
+              +
+            </button>
           </div>
-          <div
-            class="eden-card-grid"
-            style="padding: var(--eden-space-lg); overflow-y: auto;"
-          >
-            <For each={props.apps}>
-              {(app) => (
+
+          {/* App grid - uses eden-modal-body for scrolling */}
+          <div class="eden-modal-body eden-scrollbar">
+            <div class="eden-card-grid" style="gap: var(--eden-space-lg);">
+              <For each={filteredApps()}>
+                {(app) => (
+                  <div
+                    class="all-apps-tile eden-interactive"
+                    classList={{ running: app.isRunning }}
+                    onClick={async () => {
+                      if (contextMenu() || isClosing()) return;
+                      await handleTileClick(app.id);
+                    }}
+                    onContextMenu={(e) =>
+                      handleContextMenu(e, app.id, app.name, app.isRunning)
+                    }
+                    onMouseDown={(e) => {
+                      if (e.button === 0) {
+                        handleLongPressStart(
+                          e,
+                          app.id,
+                          app.name,
+                          app.isRunning
+                        );
+                      }
+                    }}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onTouchStart={(e) =>
+                      handleLongPressStart(e, app.id, app.name, app.isRunning)
+                    }
+                    onTouchEnd={handleLongPressEnd}
+                    onTouchCancel={handleLongPressEnd}
+                  >
+                    <AppIcon
+                      appId={app.id}
+                      appName={app.name}
+                      isRunning={app.isRunning}
+                    />
+                  </div>
+                )}
+              </For>
+              <Show when={filteredApps().length === 0}>
                 <div
-                  class="eden-card eden-card-interactive"
-                  style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;"
-                  classList={{ running: app.isRunning }}
-                  onClick={async () => {
-                    if (contextMenu() || isClosing()) {
-                      return;
-                    }
-                    await handleTileClick(app.id);
-                  }}
-                  onContextMenu={(e) =>
-                    handleContextMenu(e, app.id, app.name, app.isRunning)
-                  }
-                  onMouseDown={(e) => {
-                    if (e.button === 0) {
-                      handleLongPressStart(e, app.id, app.name, app.isRunning);
-                    }
-                  }}
-                  onMouseUp={handleLongPressEnd}
-                  onMouseLeave={handleLongPressEnd}
-                  onTouchStart={(e) =>
-                    handleLongPressStart(e, app.id, app.name, app.isRunning)
-                  }
-                  onTouchEnd={handleLongPressEnd}
-                  onTouchCancel={handleLongPressEnd}
+                  class="eden-text-tertiary eden-text-md"
+                  style="grid-column: 1 / -1; text-align: center; padding: var(--eden-space-2xl);"
                 >
-                  <AppIcon
-                    appId={app.id}
-                    appName={app.name}
-                    isRunning={app.isRunning}
-                  />
+                  No apps found
                 </div>
-              )}
-            </For>
+              </Show>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Context menu */}
       <Show when={contextMenu()}>
         {(menu) => (
           <>
@@ -245,10 +253,7 @@ export default function AllApps(props: AllAppsProps) {
             />
             <div
               class="eden-popover"
-              style={{
-                left: `${menu().x}px`,
-                top: `${menu().y}px`,
-              }}
+              style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
             >
               <div
                 class="eden-popover-title"
@@ -258,7 +263,7 @@ export default function AllApps(props: AllAppsProps) {
               </div>
               <Show when={menu().isRunning}>
                 <button
-                  class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-full"
+                  class="eden-btn eden-btn-ghost eden-btn-sm"
                   style="justify-content: flex-start; width: 100%;"
                   onClick={async () => {
                     await props.onStopApp(menu().appId);
@@ -270,7 +275,7 @@ export default function AllApps(props: AllAppsProps) {
                 </button>
               </Show>
               <button
-                class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-full"
+                class="eden-btn eden-btn-ghost eden-btn-sm"
                 style="justify-content: flex-start; width: 100%;"
                 onClick={async () => {
                   try {

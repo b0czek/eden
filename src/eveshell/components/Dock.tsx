@@ -2,6 +2,7 @@ import { For, Show, createSignal, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
 import { AppInfo } from "../types";
+import appsViewIcon from "../assets/apps-grid-icon.svg";
 
 interface DockProps {
   apps: AppInfo[];
@@ -10,9 +11,6 @@ interface DockProps {
 }
 
 export default function Dock(props: DockProps) {
-  const appsViewIcon =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234a9eff'%3E%3Crect x='3' y='3' width='7' height='7' rx='1' fill='%234a9eff'/%3E%3Crect x='13' y='3' width='7' height='7' rx='1' fill='%234a9eff'/%3E%3Crect x='3' y='13' width='7' height='7' rx='1' fill='%234a9eff'/%3E%3Crect x='13' y='13' width='7' height='7' rx='1' fill='%234a9eff'/%3E%3C/svg%3E";
-
   let containerRef: HTMLDivElement | undefined;
   let dockRef: HTMLDivElement | undefined;
   const [isInitial, setIsInitial] = createSignal(true);
