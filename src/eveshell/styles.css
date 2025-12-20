@@ -42,6 +42,14 @@ body {
   max-height: 100vh;
 }
 
+/* Keep dock at bottom when in fullscreen mode */
+.shell-overlay[data-mode="fullscreen"] .dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
 /* Dock Styles */
 .dock {
   height: var(--eden-layout-dock-height);

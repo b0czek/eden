@@ -232,14 +232,7 @@ export default function ShellOverlay() {
       class="shell-overlay"
       data-mode={showAllApps() ? "fullscreen" : "dock"}
     >
-      <Show when={!showAllApps()}>
-        <Dock
-          apps={dockApps()}
-          onAppClick={handleAppClick}
-          onShowAllApps={handleShowAllApps}
-        />
-      </Show>
-
+      {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>
         <AllApps
           apps={allApps()}
@@ -251,6 +244,13 @@ export default function ShellOverlay() {
           onUninstallApp={handleUninstallApp}
         />
       </Show>
+
+      {/* Dock is always visible */}
+      <Dock
+        apps={dockApps()}
+        onAppClick={handleAppClick}
+        onShowAllApps={handleShowAllApps}
+      />
     </div>
   );
 }
