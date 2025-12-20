@@ -103,7 +103,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    */
   async launchApp(
     appId: string,
-    bounds?: { x: number; y: number; width: number; height: number }
+    bounds?: { x: number; y: number; width: number; height: number },
+    launchArgs?: string[]
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
     const manifest = this.packageManager.getAppManifest(appId);
     if (!manifest) {
@@ -138,7 +139,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         appId,
         manifest,
         installPath,
-        viewBounds
+        viewBounds,
+        launchArgs
       );
 
       // Create app instance

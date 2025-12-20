@@ -45,6 +45,12 @@ export interface EdenAPI {
    * Check if an event is supported by the system
    */
   isEventSupported(event: string): Promise<boolean>;
+
+  /**
+   * Get the launch arguments passed to this app.
+   * Fetches from main process - always returns current data.
+   */
+  getLaunchArgs(): Promise<string[]>;
 }
 export interface EdenFrame {
 

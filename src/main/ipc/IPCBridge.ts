@@ -158,6 +158,28 @@ export class IPCBridge extends EventEmitter {
 
       return result.canceled ? null : result.filePaths[0];
     });
+
+    // Get view data (launchArgs, channels, etc.) - called by preload to fetch all initialization data
+    ipcMain.handle("get-view-data", async (event) => {
+      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
+      if (viewId === undefined) {
+        return { launchArgs: [] };
+      }
+
+      const viewInfo = this.viewManager.getViewInfo(viewId);
+      if (!viewInfo) {
+        return { launchArgs: [] };
+      }
+
+      const appId = viewInfo.appId;
+      return {
+        launchArgs: viewInfo.launchArgs || [],
+        appId,
+        viewId,
+        channel: `app-${appId}`,
+        requestChannel: `app-${appId}-request`,
+      };
+    });
   }
 
   /**
@@ -459,5 +481,6 @@ export class IPCBridge extends EventEmitter {
     ipcMain.removeHandler("event-subscribe");
     ipcMain.removeHandler("event-unsubscribe");
     ipcMain.removeHandler("select-file");
+    ipcMain.removeHandler("get-view-data");
   }
 }

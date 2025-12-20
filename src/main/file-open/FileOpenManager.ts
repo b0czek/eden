@@ -275,13 +275,14 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Launch the app (or focus if already running)
       const instance = this.processManager.getAppInstance(handlerAppId);
       if (!instance) {
-        await this.processManager.launchApp(handlerAppId);
-      }
-      
-      // Notify only the target app's views
-      const viewIds = this.viewManager.getViewsByAppId(handlerAppId);
-      for (const viewId of viewIds) {
-        this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId: handlerAppId });
+        // App not running - launch with file path as launch argument
+        await this.processManager.launchApp(handlerAppId, undefined, [filePath]);
+      } else {
+        // App already running - notify via event (app is already subscribed)
+        const viewIds = this.viewManager.getViewsByAppId(handlerAppId);
+        for (const viewId of viewIds) {
+          this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId: handlerAppId });
+        }
       }
       
       return {
@@ -320,13 +321,14 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Launch the app (or focus if already running)
       const instance = this.processManager.getAppInstance(appId);
       if (!instance) {
-        await this.processManager.launchApp(appId);
-      }
-      
-      // Notify only the target app's views
-      const viewIds = this.viewManager.getViewsByAppId(appId);
-      for (const viewId of viewIds) {
-        this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId });
+        // App not running - launch with file path as launch argument
+        await this.processManager.launchApp(appId, undefined, [filePath]);
+      } else {
+        // App already running - notify via event (app is already subscribed)
+        const viewIds = this.viewManager.getViewsByAppId(appId);
+        for (const viewId of viewIds) {
+          this.notifySubscriber(viewId, "opened", { path: filePath, isDirectory, appId });
+        }
       }
       
       return {

@@ -196,19 +196,12 @@ export class ViewManager extends EventEmitter {
 
   /**
    * Inject app API into the view's webContents
-   * Sends the channel info so the universal preload can set up the API
+   * Sends an argless event - preload fetches data via get-view-data invoke
    */
-  private injectAppAPI(view: WebContentsView, appId: string): void {
-    const channel = `app-${appId}`;
-    const requestChannel = `app-${appId}-request`;
+  private injectAppAPI(view: WebContentsView, viewId: number, appId: string): void {
+    view.webContents.send("app-init-api");
 
-    view.webContents.send("app-init-api", {
-      appId,
-      channel,
-      requestChannel,
-    });
-
-    console.log(`Sent app API init for ${appId}`);
+    console.log(`Sent app API init for ${appId} (viewId: ${viewId})`);
   }
 
   /**
@@ -301,6 +294,7 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex,
       zIndex,
+      launchArgs,
     } = options;
 
     if (!this.mainWindow) {
@@ -367,7 +361,7 @@ export class ViewManager extends EventEmitter {
       }
 
       // Inject the app API after page load (always enabled)
-      this.injectAppAPI(view, appId);
+      this.injectAppAPI(view, viewId, appId);
 
       // Emit to IPC subscribers (webcontents)
       this.ipcBridge.eventSubscribers.notify("view-loaded", {
@@ -406,6 +400,7 @@ export class ViewManager extends EventEmitter {
       viewType,
       tileIndex,
       zIndex,
+      launchArgs,
     });
 
     // Recalculate all tiles if using tiling and this is a tiled view
@@ -427,7 +422,8 @@ export class ViewManager extends EventEmitter {
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    bounds: Bounds
+    bounds: Bounds,
+    launchArgs?: string[]
   ): number {
     const preloadScript = path.join(
       __dirname,
@@ -471,6 +467,7 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex,
       zIndex,
+      launchArgs,
     });
   }
 

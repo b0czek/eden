@@ -22,6 +22,7 @@ export interface ViewInfo {
   viewType: ViewType; // Type of view: app or overlay
   tileIndex?: number; // Only for tiled app views
   zIndex?: number; // For floating apps and all overlays
+  launchArgs?: string[]; // Arguments passed when launching this view
 }
 
 /**
@@ -37,4 +38,5 @@ export interface CreateViewOptions {
   viewBounds: Bounds;
   tileIndex?: number;
   zIndex?: number;
+  launchArgs?: string[];
 }

@@ -21,13 +21,23 @@ const App: Component = () => {
   const activeTab = () => tabs().find(t => t.id === activeTabId());
 
   // Subscribe to file open events and set up keyboard shortcuts
-  onMount(() => {
-    console.log("Editor app mounted, subscribing to file/opened events");
+  onMount(async () => {
+    console.log("Editor app mounted");
     
     // Start loading Monaco in the background immediately
     // This way it's ready by the time the user opens a file
     preloadMonaco();
     
+    // Check for launch arguments - if app was launched with a file path, open it
+    // getLaunchArgs() fetches from main process, so it always has current data
+    const launchArgs = await window.edenAPI?.getLaunchArgs() || [];
+    console.log("Launch args:", launchArgs);
+    if (launchArgs.length > 0) {
+      // Open the first argument as a file path
+      openFile(launchArgs[0]);
+    }
+    
+    // Subscribe to file open events for when app is already running
     window.edenAPI?.subscribe("file/opened", handleFileOpened as (data: unknown) => void);
 
     const handleKeyDown = (e: KeyboardEvent) => {
