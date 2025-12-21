@@ -14,7 +14,7 @@ export interface SystemCommands {
    */
   "system/info": {
     args: Record<string, never>;
-    response: SystemInfo;
+    response: import("./index").SystemInfo;
   };
 }
 
@@ -27,14 +27,14 @@ export interface FileCommands {
    */
   "file/open": {
     args: { path: string };
-    response: FileOpenResult;
+    response: import("./index").FileOpenResult;
   };
   /**
    * Open a file with a specific app
    */
   "file/open-with": {
     args: { path: string; appId: string };
-    response: FileOpenResult;
+    response: import("./index").FileOpenResult;
   };
   /**
    * Get the default handler app for a file extension
@@ -62,7 +62,7 @@ export interface FileCommands {
    */
   "file/get-supported-handlers": {
     args: { extension: string };
-    response: FileHandlerInfo[];
+    response: import("./index").FileHandlerInfo[];
   };
   /**
    * Get all file type associations
@@ -124,7 +124,7 @@ export interface FsCommands {
    */
   "fs/stat": {
     args: { path: string };
-    response: FileStats;
+    response: import("./index").FileStats;
   };
   /**
    * Search for files and directories using glob patterns.
@@ -135,7 +135,7 @@ export interface FsCommands {
     pattern: string;
     limit?: number;
   };
-    response: SearchResult[];
+    response: import("./index").SearchResult[];
   };
   /**
    * Delete a file or directory.
@@ -156,7 +156,7 @@ export interface PackageCommands {
    */
   "package/install": {
     args: { sourcePath: string };
-    response: AppManifest;
+    response: import("./index").AppManifest;
   };
   /**
    * Uninstall an application by its ID.
@@ -171,7 +171,7 @@ export interface PackageCommands {
    */
   "package/list": {
     args: { showHidden?: boolean };
-    response: AppManifest[];
+    response: import("./index").AppManifest[];
   };
   /**
    * Toggle hot reload for an app
@@ -212,9 +212,9 @@ export interface ProcessCommands {
   "process/launch": {
     args: {
     appId: string;
-    bounds?: ViewBounds;
+    bounds?: import("./index").ViewBounds;
   };
-    response: LaunchResult;
+    response: import("./index").LaunchResult;
   };
   /**
    * Stop a running application instance.
@@ -229,7 +229,7 @@ export interface ProcessCommands {
    */
   "process/list": {
     args: { showHidden?: boolean };
-    response: AppInstance[];
+    response: import("./index").AppInstance[];
   };
 }
 
@@ -243,7 +243,7 @@ export interface ViewCommands {
   "view/update-view-bounds": {
     args: {
     appId: string;
-    bounds: ViewBounds;
+    bounds: import("./index").ViewBounds;
   };
     response: { success: boolean };
   };
@@ -269,8 +269,8 @@ export interface ViewCommands {
    */
   "view/update-global-bounds": {
     args: {
-    bounds: ViewBounds;
-    windowSize: WindowSize;
+    bounds: import("./index").ViewBounds;
+    windowSize: import("./index").WindowSize;
   };
     response: { success: boolean };
   };
@@ -334,7 +334,7 @@ export interface ViewCommands {
    */
   "view/window-size": {
     args: Record<string, never>;
-    response: WindowSize;
+    response: import("./index").WindowSize;
   };
 }
 

@@ -16,7 +16,7 @@ export interface FileEvents {
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
-  "package/installed": { manifest: AppManifest };
+  "package/installed": { manifest: import("./index").AppManifest };
   "package/uninstalled": { appId: string };
 }
 
@@ -24,7 +24,7 @@ export interface PackageEvents {
  * ProcessEvents - Events for the "process" namespace
  */
 export interface ProcessEvents {
-  "process/launched": { instance: AppInstance };
+  "process/launched": { instance: import("./index").AppInstance };
   "process/stopped": { appId: string };
   "process/error": { appId: string; error: any };
   "process/exited": { appId: string; code: number };
@@ -34,8 +34,8 @@ export interface ProcessEvents {
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
-  "view/bounds-updated": ViewBounds;
-  "view/global-bounds-changed": { workspaceBounds: ViewBounds; windowSize: WindowSize };
+  "view/bounds-updated": import("./index").ViewBounds;
+  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize };
 }
 
 /**
