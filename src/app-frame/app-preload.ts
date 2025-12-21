@@ -9,24 +9,20 @@ const messageListeners: Array<(message: any) => void> = [];
 // Event subscription system
 const eventSubscriptions: Map<string, Set<Function>> = new Map();
 
-// Wait for initialization from main process
-ipcRenderer.once(
-  "app-init-api",
-  (
-    _event: any,
-    {
-      appId: id,
-      channel,
-      requestChannel,
-    }: { appId: string; channel: string; requestChannel: string }
-  ) => {
-    appId = id;
-    appChannel = channel;
-    appRequestChannel = requestChannel;
+// Wait for initialization trigger from main process
+// Fetch all data via get-view-data invoke
+ipcRenderer.once("app-init-api", async () => {
+  try {
+    const data = await ipcRenderer.invoke("get-view-data");
+    appId = data.appId;
+    appChannel = data.channel;
+    appRequestChannel = data.requestChannel;
 
-    console.log(`App API initialized for ${appId} on channel ${channel}`);
+    console.log(`App API initialized for ${appId} on channel ${appChannel}`);
+  } catch (err) {
+    console.error("Failed to initialize app API:", err);
   }
-);
+});
 
 // Set up unified message listener for shell-message channel
 ipcRenderer.on("shell-message", (_event: any, message: any) => {
@@ -146,6 +142,15 @@ contextBridge.exposeInMainWorld("edenAPI", {
    */
   isEventSupported: (eventName: string) => {
     return ipcRenderer.invoke("event-exists", eventName);
+  },
+
+  /**
+   * Get the launch arguments passed to this app.
+   * Fetches from main process - always returns current data.
+   * @returns {Promise<string[]>} The launch arguments array
+   */
+  getLaunchArgs: (): Promise<string[]> => {
+    return ipcRenderer.invoke("get-view-data").then((data: any) => data.launchArgs || []);
   },
 });
 

@@ -1,3 +1,6 @@
+import "reflect-metadata";
+import { PermissionRegistry } from "./PermissionRegistry";
+
 /**
  * CommandRegistry
  *
@@ -15,10 +18,20 @@ export interface CommandMetadata {
   command: string;
   handler: CommandHandler;
   target: any; // The instance that owns the handler
+  permission?: string; // Full permission: "namespace/action"
+  methodName: string; // Original method name for metadata lookup
 }
 
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
+  private permissionRegistry?: PermissionRegistry;
+
+  /**
+   * Set the permission registry for permission checking
+   */
+  setPermissionRegistry(registry: PermissionRegistry): void {
+    this.permissionRegistry = registry;
+  }
 
   /**
    * Register a command handler under a namespace
@@ -26,12 +39,14 @@ export class CommandRegistry {
    * @param command - The command name (e.g., "launch", "update-bounds")
    * @param handler - The handler function
    * @param target - The instance that owns the handler (for proper `this` binding)
+   * @param methodName - The original method name for metadata lookup
    */
   register(
     namespace: string,
     command: string,
     handler: CommandHandler,
-    target: any
+    target: any,
+    methodName?: string
   ): void {
     const fullCommand = `${namespace}/${command}`;
 
@@ -41,14 +56,30 @@ export class CommandRegistry {
       );
     }
 
+    // Look up permission from decorator metadata
+    let permission: string | undefined;
+    if (methodName && target) {
+      const handlerPermission = Reflect.getMetadata(
+        "eden:handler:permission",
+        target.constructor.prototype,
+        methodName
+      );
+      if (handlerPermission) {
+        permission = `${namespace}/${handlerPermission}`;
+      }
+    }
+
     this.handlers.set(fullCommand, {
       namespace,
       command,
       handler,
       target,
+      permission,
+      methodName: methodName || "",
     });
 
-    console.log(`Registered command handler: ${fullCommand}`);
+    const permStr = permission ? ` (requires: ${permission})` : "";
+    console.log(`Registered command handler: ${fullCommand}${permStr}`);
   }
 
   /**
@@ -67,7 +98,7 @@ export class CommandRegistry {
     for (const [command, methodName] of handlers.entries()) {
       const handler = manager[methodName];
       if (typeof handler === "function") {
-        this.register(namespace, command, handler.bind(manager), manager);
+        this.register(namespace, command, handler.bind(manager), manager, methodName);
       }
     }
   }
@@ -76,16 +107,27 @@ export class CommandRegistry {
    * Execute a command by its full name
    * @param fullCommand - The full command name (e.g., "process/launch")
    * @param args - The command arguments
+   * @param appId - Optional app ID for permission checking
    * @returns The command result
    */
   async execute<TResult = any>(
     fullCommand: string,
-    args: any
+    args: any,
+    appId?: string
   ): Promise<TResult> {
     const metadata = this.handlers.get(fullCommand);
 
     if (!metadata) {
       throw new Error(`Unknown command: ${fullCommand}`);
+    }
+
+    // Check permission if required
+    if (metadata.permission && appId && this.permissionRegistry) {
+      if (!this.permissionRegistry.hasPermission(appId, metadata.permission)) {
+        throw new Error(
+          `Permission denied: ${metadata.permission} required for ${fullCommand}`
+        );
+      }
     }
 
     try {

@@ -1,0 +1,9 @@
+packages:
+  - src/types
+  - genesis
+  - apps/**/*
+
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - lightningcss-cli

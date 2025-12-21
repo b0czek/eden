@@ -1,113 +1,96 @@
-import * as fs from "fs/promises";
-import * as path from "path";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import type { FilesystemManager } from "./FilesystemManager";
+import type { FileStats, SearchResult } from "@edenapp/types";
 
+/**
+ * FilesystemHandler - Thin IPC layer for filesystem operations.
+ * All business logic lives in FilesystemManager.
+ */
 @EdenNamespace("fs")
 export class FilesystemHandler {
-  private baseDir: string;
-
-  constructor(baseDir: string) {
-    this.baseDir = baseDir;
-  }
-
-  private resolvePath(targetPath: string): string {
-    // Prevent directory traversal
-    const safePath = path.normalize(targetPath).replace(/^(\.\.[\/\\])+/, "");
-    const resolved = path.join(this.baseDir, safePath);
-
-    // Double check it's still inside baseDir
-    if (!resolved.startsWith(this.baseDir)) {
-      throw new Error(
-        `Access denied: Path '${targetPath}' resolves to '${resolved}', which is outside of base directory '${this.baseDir}'`
-      );
-    }
-    return resolved;
-  }
+  constructor(private fsManager: FilesystemManager) {}
 
   /**
    * Read the contents of a file.
    */
-  @EdenHandler("read")
+  @EdenHandler("read", { permission: "read" })
   async handleReadFile(args: {
     path: string;
     encoding?: BufferEncoding;
   }): Promise<string> {
     const { path: targetPath, encoding = "utf-8" } = args;
-    const fullPath = this.resolvePath(targetPath);
-    return await fs.readFile(fullPath, encoding);
+    return await this.fsManager.readFile(targetPath, encoding);
   }
 
   /**
    * Write content to a file, creating directories if needed.
    */
-  @EdenHandler("write")
+  @EdenHandler("write", { permission: "write" })
   async handleWriteFile(args: {
     path: string;
     content: string;
     encoding?: BufferEncoding;
   }): Promise<void> {
     const { path: targetPath, content, encoding = "utf-8" } = args;
-    const fullPath = this.resolvePath(targetPath);
-
-    // Ensure directory exists
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-
-    await fs.writeFile(fullPath, content, encoding);
+    await this.fsManager.writeFile(targetPath, content, encoding);
   }
 
   /**
    * Check if a file or directory exists.
    */
-  @EdenHandler("exists")
+  @EdenHandler("exists", { permission: "read" })
   async handleExists(args: { path: string }): Promise<boolean> {
     const { path: targetPath } = args;
-    try {
-      const fullPath = this.resolvePath(targetPath);
-      await fs.access(fullPath);
-      return true;
-    } catch {
-      return false;
-    }
+    return await this.fsManager.exists(targetPath);
   }
 
   /**
    * Create a directory and any necessary parent directories.
    */
-  @EdenHandler("mkdir")
+  @EdenHandler("mkdir", { permission: "write" })
   async handleMkdir(args: { path: string }): Promise<void> {
     const { path: targetPath } = args;
-    const fullPath = this.resolvePath(targetPath);
-    await fs.mkdir(fullPath, { recursive: true });
+    await this.fsManager.mkdir(targetPath);
   }
 
   /**
    * List contents of a directory.
    */
-  @EdenHandler("readdir")
+  @EdenHandler("readdir", { permission: "read" })
   async handleReaddir(args: { path: string }): Promise<string[]> {
     const { path: targetPath } = args;
-    const fullPath = this.resolvePath(targetPath);
-    return await fs.readdir(fullPath);
+    return await this.fsManager.readdir(targetPath);
   }
 
   /**
    * Get file or directory statistics.
    */
-  @EdenHandler("stat")
-  async handleStat(args: { path: string }): Promise<{
-    isFile: boolean;
-    isDirectory: boolean;
-    size: number;
-    mtime: Date;
-  }> {
+  @EdenHandler("stat", { permission: "read" })
+  async handleStat(args: { path: string }): Promise<FileStats> {
     const { path: targetPath } = args;
-    const fullPath = this.resolvePath(targetPath);
-    const stats = await fs.stat(fullPath);
-    return {
-      isFile: stats.isFile(),
-      isDirectory: stats.isDirectory(),
-      size: stats.size,
-      mtime: stats.mtime,
-    };
+    return await this.fsManager.stat(targetPath);
+  }
+
+  /**
+   * Search for files and directories using glob patterns.
+   */
+  @EdenHandler("search", { permission: "read" })
+  async handleSearch(args: {
+    path: string;
+    pattern: string;
+    limit?: number;
+  }): Promise<SearchResult[]> {
+    const { path: basePath, pattern, limit = 10 } = args;
+    return await this.fsManager.search(basePath, pattern, limit);
+  }
+
+  /**
+   * Delete a file or directory.
+   * For directories, removes recursively.
+   */
+  @EdenHandler("delete", { permission: "write" })
+  async handleDelete(args: { path: string }): Promise<void> {
+    const { path: targetPath } = args;
+    await this.fsManager.delete(targetPath);
   }
 }

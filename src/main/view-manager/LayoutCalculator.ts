@@ -1,5 +1,5 @@
 import { Rectangle as Bounds } from "electron";
-import { TilingConfig, TilingMode } from "../../types";
+import { TilingConfig, TilingMode } from "@edenapp/types";
 
 /**
  * Grid dimensions for a layout

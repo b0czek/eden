@@ -1,5 +1,5 @@
 import { Rectangle as Bounds } from "electron";
-import { WindowConfig } from "../../types";
+import { WindowConfig } from "@edenapp/types";
 import { ViewInfo } from "./types";
 
 type ViewCollection = () => Iterable<ViewInfo>;

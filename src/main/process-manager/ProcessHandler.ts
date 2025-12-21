@@ -1,4 +1,4 @@
-import { AppStatus, LaunchResult, ViewBounds } from "../../types";
+import { AppInstance, LaunchResult, ViewBounds } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { ProcessManager } from "./ProcessManager";
 
@@ -34,9 +34,10 @@ export class ProcessHandler {
 
   /**
    * List all running application processes.
+   * @param showHidden - If true, includes overlay apps (hidden by default)
    */
   @EdenHandler("list")
-  async handleListApps(args: Record<string, never>): Promise<AppStatus> {
-    return this.processManager.getAllAppsStatus();
+  async handleListApps(args: { showHidden?: boolean }): Promise<AppInstance[]> {
+    return this.processManager.getRunningApps(args.showHidden);
   }
 }

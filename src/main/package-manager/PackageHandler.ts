@@ -1,6 +1,7 @@
-import { AppManifest } from "../../types";
+import { AppManifest } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
+import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";
 
 @EdenNamespace("package")
 export class PackageHandler {
@@ -30,11 +31,47 @@ export class PackageHandler {
 
   /**
    * List all installed applications.
+   * @param showHidden - If true, includes overlay apps (hidden by default)
    */
-  @EdenHandler("list-installed")
-  async handleListInstalledApps(
-    args: Record<string, never>
-  ): Promise<AppManifest[]> {
-    return this.packageManager.getInstalledApps();
+  @EdenHandler("list")
+  async handleListApps(args: { showHidden?: boolean }): Promise<AppManifest[]> {
+    return this.packageManager.getInstalledApps(args.showHidden);
+  }
+
+  /**
+   * Toggle hot reload for an app
+   */
+  @EdenHandler("toggle-hot-reload")
+  async handleToggleHotReload(params: {
+    appId: string;
+  }): Promise<{ enabled: boolean }> {
+    const enabled = await toggleHotReload(params.appId);
+    console.log(
+      `Hot reload ${enabled ? "enabled" : "disabled"} for ${params.appId}`
+    );
+    return { enabled };
+  }
+
+  /**
+   * Check if hot reload is enabled for an app
+   */
+  @EdenHandler("is-hot-reload-enabled")
+  async handleIsHotReloadEnabled(params: {
+    appId: string;
+  }): Promise<{ enabled: boolean }> {
+    const enabled = await isHotReloadEnabled(params.appId);
+    return { enabled };
+  }
+
+  /**
+   * Get the icon for an installed application as a data URL.
+   */
+  @EdenHandler("get-icon")
+  async handleGetAppIcon(args: {
+    appId: string;
+  }): Promise<{ icon: string | undefined }> {
+    const { appId } = args;
+    const icon = await this.packageManager.getAppIcon(appId);
+    return { icon };
   }
 }

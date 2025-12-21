@@ -1,30 +1,31 @@
 {
-  "name": "eden",
+  "name": "@edenapp/eden",
   "version": "0.1.0",
   "description": "A modular Electron desktop environment with extensible app support",
   "main": "dist/main/main.js",
   "author": "Eden Team",
   "license": "MIT",
   "scripts": {
-    "build": "npm run clean && npm run tokens:build && npm run css:build && npm run build:shell && npm run build:main && npm run bundle:app-frame && npm run copy:eveshell-preload && npm run copy-assets",
+    "build": "pnpm run clean && pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run copy-assets && pnpm run build:apps",
     "build:main": "tsc",
-    "build:shell": "vite build --config src/eveshell/vite.config.mts",
+    "build:apps": "ts-node scripts/build-apps.ts",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
-    "copy:eveshell-preload": "mkdir -p dist/eveshell && cp src/eveshell/eve-preload.js dist/eveshell/",
     "codegen": "ts-node scripts/run-codegen.ts",
     "copy-assets": "mkdir -p dist/foundation && cp src/foundation/* dist/foundation/",
-    "css:build": "lightningcss --bundle --minify --targets '>= 0.25%' src/design-system/eden.css -o dist/design-system/eden.css",
-    "tokens:build": "cd src/design-system && style-dictionary build --config style-dictionary.config.mjs",
-    "tokens:watch": "cd src/design-system && style-dictionary build --watch --config style-dictionary.config.mjs",
-    "dev": "npm run build && electron .",
+    "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' src/design-system/eden.css -o dist/design-system/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' src/design-system/tokens.css -o dist/design-system/eden-tokens.css",
+    "tokens:build": "cd src/design-system && npx style-dictionary build --config style-dictionary.config.mjs",
+    "tokens:watch": "cd src/design-system && npx style-dictionary build --watch --config style-dictionary.config.mjs",
+    "dev:watch": "ts-node scripts/dev-watch.ts",
+    "dev": "pnpm run build && concurrently --kill-others \"pnpm run dev:watch\" \"sleep 3 && NODE_ENV=development electron .\"",
     "start": "electron .",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.10.0",
+    "concurrently": "^9.1.0",
     "electron": "^39.2.3",
     "esbuild": "^0.27.0",
+    "fast-glob": "^3.3.3",
     "lightningcss-cli": "^1.30.2",
     "solid-js": "^1.9.10",
     "style-dictionary": "^5.1.1",
@@ -32,10 +33,11 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0",
     "vite": "^7.2.1",
-    "vite-plugin-solid": "^2.11.10"
+    "vite-plugin-solid": "^2.11.10",
+    "@edenapp/types": "workspace:*"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "@edenapp/genesis": "workspace:*",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }

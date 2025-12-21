@@ -1,17 +1,24 @@
-import {
-  BrowserWindow,
-  Rectangle as Bounds,
-  WebContentsView,
-} from "electron";
+import { BrowserWindow, Rectangle as Bounds, WebContentsView } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { AppManifest, TilingConfig, WindowConfig, EdenConfig } from "../../types";
+import {
+  AppManifest,
+  TilingConfig,
+  WindowConfig,
+  EdenConfig,
+  WindowSize,
+} from "@edenapp/types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
-import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
-
+import {
+  ViewInfo,
+  ViewMode,
+  ViewType,
+  Z_LAYERS,
+  CreateViewOptions,
+} from "./types";
 
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry, IPCBridge } from "../ipc";
@@ -36,6 +43,12 @@ export class ViewManager extends EventEmitter {
     width: 800,
     height: 600,
   };
+
+  private windowSize: WindowSize = {
+    width: 800,
+    height: 600,
+  };
+
   private viewHandler: ViewHandler;
   private ipcBridge: IPCBridge;
 
@@ -58,8 +71,6 @@ export class ViewManager extends EventEmitter {
     commandRegistry.registerManager(this.viewHandler);
   }
 
-
-
   /**
    * Set the main window that will host the views
    */
@@ -76,6 +87,14 @@ export class ViewManager extends EventEmitter {
     if (this.tilingConfig.mode !== "none") {
       this.recalculateTiledViews();
     }
+  }
+
+  setWindowSize(windowSize: WindowSize): void {
+    this.windowSize = windowSize;
+  }
+
+  getWindowSize(): WindowSize {
+    return this.windowSize;
   }
 
   /**
@@ -163,43 +182,61 @@ export class ViewManager extends EventEmitter {
     return /^https?:\/\//i.test(entry);
   }
 
-  private shouldInject(
-    feature: "css" | "appFrame",
+  private shouldInjectAppFrame(windowConfig?: WindowConfig): boolean {
+    return windowConfig?.injections?.appFrame !== false;
+  }
+
+  /**
+   * Get the CSS injection mode from window config
+   * Returns "full" by default if not specified
+   */
+  private getCSSInjectionMode(
     windowConfig?: WindowConfig
-  ): boolean {
-    return windowConfig?.injections?.[feature] !== false;
+  ): "full" | "tokens" | "none" {
+    const cssOption = windowConfig?.injections?.css;
+    // Default to "full" if not specified
+    if (cssOption === undefined) {
+      return "full";
+    }
+    return cssOption;
   }
 
   /**
    * Inject app API into the view's webContents
-   * Sends the channel info so the universal preload can set up the API
+   * Sends an argless event - preload fetches data via get-view-data invoke
    */
-  private injectAppAPI(view: WebContentsView, appId: string): void {
-    const channel = `app-${appId}`;
-    const requestChannel = `app-${appId}-request`;
+  private injectAppAPI(
+    view: WebContentsView,
+    viewId: number,
+    appId: string
+  ): void {
+    view.webContents.send("app-init-api");
 
-    view.webContents.send("app-init-api", {
-      appId,
-      channel,
-      requestChannel,
-    });
-
-    console.log(`Sent app API init for ${appId}`);
+    console.log(`Sent app API init for ${appId} (viewId: ${viewId})`);
   }
 
   /**
    * Inject Eden Design System CSS into the view
    * Makes design tokens and utilities available to all apps
+   * @param view - The WebContentsView to inject CSS into
+   * @param mode - "full" for complete CSS or "tokens" for only CSS custom properties
    */
-  private async injectDesignSystemCSS(view: WebContentsView): Promise<void> {
+  private async injectDesignSystemCSS(
+    view: WebContentsView,
+    mode: "full" | "tokens"
+  ): Promise<void> {
     try {
       const designSystemPath = path.join(__dirname, "../../design-system");
-      const cssPath = path.join(designSystemPath, "eden.css");
-      
+      // Select the appropriate CSS file based on mode
+      const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
+      const cssPath = path.join(designSystemPath, cssFileName);
+
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log("Successfully injected Eden Design System CSS into view");
+      console.log(
+        `Successfully injected Eden Design System CSS (${mode}) into view`
+      );
     } catch (err) {
       console.error("Failed to inject design system CSS:", err);
       // Don't throw - app should still work without design system
@@ -218,10 +255,7 @@ export class ViewManager extends EventEmitter {
   ): Promise<void> {
     try {
       // Inject CSS first
-      const frameCSSPath = path.join(
-        __dirname,
-        "../../app-frame/frame.css"
-      );
+      const frameCSSPath = path.join(__dirname, "../../app-frame/frame.css");
       const frameCSS = await cachedFileReader.readAsync(frameCSSPath, "utf-8");
       await view.webContents.insertCSS(frameCSS);
 
@@ -230,7 +264,10 @@ export class ViewManager extends EventEmitter {
         __dirname,
         "../../app-frame/frame-injector.js"
       );
-      const frameScript = await cachedFileReader.readAsync(frameScriptPath, "utf-8");
+      const frameScript = await cachedFileReader.readAsync(
+        frameScriptPath,
+        "utf-8"
+      );
 
       // Inject the frame script with window config and initial state
       await view.webContents.executeJavaScript(`
@@ -241,7 +278,9 @@ export class ViewManager extends EventEmitter {
                     injected: false,
                     config: ${JSON.stringify(windowConfig || {})},
                     currentMode: "${viewMode}",
-                    bounds: ${JSON.stringify(bounds || { x: 0, y: 0, width: 0, height: 0 })}
+                    bounds: ${JSON.stringify(
+                      bounds || { x: 0, y: 0, width: 0, height: 0 }
+                    )}
                   }
                 };
                 ${frameScript}
@@ -270,12 +309,13 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex,
       zIndex,
+      launchArgs,
     } = options;
 
     if (!this.mainWindow) {
       throw new Error("Main window not set. Call setMainWindow first.");
     }
-    
+
     console.log(
       `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
     );
@@ -315,9 +355,10 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
-      // Inject the Eden Design System CSS first (if enabled)
-      if (this.shouldInject("css", windowConfig)) {
-        this.injectDesignSystemCSS(view).catch((err) => {
+      // Inject the Eden Design System CSS first (based on mode)
+      const cssMode = this.getCSSInjectionMode(windowConfig);
+      if (cssMode !== "none") {
+        this.injectDesignSystemCSS(view, cssMode).catch((err) => {
           console.error(
             `Failed to inject design system CSS for ${appId}:`,
             err
@@ -326,7 +367,7 @@ export class ViewManager extends EventEmitter {
       }
 
       // Inject the app frame script (only for app views, not overlays)
-      if (viewType === "app" && this.shouldInject("appFrame", windowConfig)) {
+      if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
         this.injectAppFrame(view, viewMode, windowConfig, viewBounds).catch(
           (err) => {
             console.error(`Failed to inject app frame for ${appId}:`, err);
@@ -335,16 +376,20 @@ export class ViewManager extends EventEmitter {
       }
 
       // Inject the app API after page load (always enabled)
-      this.injectAppAPI(view, appId);
+      this.injectAppAPI(view, viewId, appId);
 
       // Emit to IPC subscribers (webcontents)
-      this.ipcBridge.eventSubscribers.notify("view-loaded", { 
-        viewId, 
-        appId, 
-        overlay: viewType === "overlay" 
+      this.ipcBridge.eventSubscribers.notify("view-loaded", {
+        viewId,
+        appId,
+        overlay: viewType === "overlay",
       });
-      
-      this.emit("view-loaded", { viewId, appId, overlay: viewType === "overlay" });
+
+      this.emit("view-loaded", {
+        viewId,
+        appId,
+        overlay: viewType === "overlay",
+      });
     });
 
     view.webContents.on(
@@ -374,6 +419,7 @@ export class ViewManager extends EventEmitter {
       viewType,
       tileIndex,
       zIndex,
+      launchArgs,
     });
 
     // Recalculate all tiles if using tiling and this is a tiled view
@@ -395,7 +441,8 @@ export class ViewManager extends EventEmitter {
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    bounds: Bounds
+    bounds: Bounds,
+    launchArgs?: string[]
   ): number {
     const preloadScript = path.join(
       __dirname,
@@ -403,7 +450,7 @@ export class ViewManager extends EventEmitter {
     );
 
     const windowConfig = manifest.window;
-    
+
     // Determine view mode based on manifest
     const viewMode = this.determineViewMode(manifest);
 
@@ -426,7 +473,10 @@ export class ViewManager extends EventEmitter {
         tileIndex = this.getNextTileIndex();
         viewBounds = this.calculateTileBounds(tileIndex);
       }
-      console.log(`Creating tiled app view for ${appId} with bounds:`, viewBounds);
+      console.log(
+        `Creating tiled app view for ${appId} with bounds:`,
+        viewBounds
+      );
     }
 
     return this.createView({
@@ -439,33 +489,42 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex,
       zIndex,
+      launchArgs,
     });
   }
 
   /**
    * Create an overlay view (e.g., shell overlay)
-   * Uses eve-preload that provides full edenAPI access
+   * Uses the same app-preload as regular apps
    * Overlays are always floating and use their own z-index counter
    */
   public createOverlayView(
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    bounds: Bounds
+    bounds?: Bounds,
+    launchArgs?: string[]
   ): number {
+    // Use the same preload as regular apps
     const preloadScript = path.join(
       __dirname,
-      "../../eveshell/eve-preload.js"
+      "../../app-frame/app-preload.js"
     );
 
     // Overlays are always floating mode
     const viewMode: ViewMode = "floating";
-    
+
     // Overlays use their own z-index counter and provided bounds
     const zIndex = this.nextOverlayZIndex++;
-    const viewBounds = bounds;
 
-    console.log(`Creating overlay view for ${appId} at Z=${zIndex}`);
+    // Calculate bounds if not provided
+    const viewBounds =
+      bounds || this.floatingWindows.calculateInitialBounds(manifest.window);
+
+    console.log(
+      `Creating overlay view for ${appId} at Z=${zIndex} with bounds:`,
+      viewBounds
+    );
 
     return this.createView({
       appId,
@@ -477,6 +536,7 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex: undefined,
       zIndex,
+      launchArgs,
     });
   }
 
@@ -500,7 +560,6 @@ export class ViewManager extends EventEmitter {
           this.mainWindow.contentView.removeChildView(viewInfo.view);
         }
       }
-
 
       // Clean up all event subscriptions for this view
       this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
@@ -538,7 +597,10 @@ export class ViewManager extends EventEmitter {
         viewInfo.bounds = bounds;
         return true;
       } catch (error) {
-        console.error(`Failed to set bounds for overlay view ${viewId}:`, error);
+        console.error(
+          `Failed to set bounds for overlay view ${viewId}:`,
+          error
+        );
         return false;
       }
     }
@@ -599,6 +661,31 @@ export class ViewManager extends EventEmitter {
       }
     }
     return viewIds;
+  }
+
+  /**
+   * Get app ID from a webContents ID
+   * Useful for identifying which app sent an IPC message
+   */
+  getAppIdByWebContentsId(webContentsId: number): string | undefined {
+    for (const [, info] of this.views.entries()) {
+      if (info.view.webContents.id === webContentsId) {
+        return info.appId;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Get view ID from a webContents ID
+   */
+  getViewIdByWebContentsId(webContentsId: number): number | undefined {
+    for (const [viewId, info] of this.views.entries()) {
+      if (info.view.webContents.id === webContentsId) {
+        return viewId;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -970,5 +1057,4 @@ export class ViewManager extends EventEmitter {
       this.removeView(viewId);
     }
   }
-
 }

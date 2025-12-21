@@ -1,0 +1,320 @@
+/**
+ * Text Editor - Styles
+ * Using Eden Design System components and tokens
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--eden-color-bg-secondary);
+  backdrop-filter: var(--eden-glass-medium);
+}
+
+/* ===== Main Layout ===== */
+.editor-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--eden-color-text-primary);
+  font-family: var(--eden-font-family-base);
+}
+
+/* ===== Tab Bar (VSCode-style) ===== */
+.editor-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--eden-color-border-light);
+  min-height: 36px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.editor-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-right: 1px solid var(--eden-color-border-light);
+  background: transparent;
+  color: var(--eden-color-text-secondary);
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+  white-space: nowrap;
+  max-width: 200px;
+  min-width: 100px;
+  border: none;
+  outline: none;
+  font-family: var(--eden-font-family-base);
+}
+
+.editor-tab:hover {
+  background: var(--eden-color-bg-glass-light);
+  color: var(--eden-color-text-primary);
+}
+
+.editor-tab.active {
+  background: var(--eden-color-bg-primary);
+  color: var(--eden-color-text-primary);
+  border-bottom: 2px solid var(--eden-color-accent-primary);
+}
+
+.editor-tab.modified::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--eden-color-warning);
+  flex-shrink: 0;
+}
+
+.tab-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--eden-radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-sm);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--eden-transition-base);
+}
+
+.editor-tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--eden-color-danger);
+  color: white;
+}
+
+/* ===== Toolbar ===== */
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--eden-space-xs) var(--eden-space-md);
+  background: var(--eden-color-bg-glass-light);
+  border-bottom: 1px solid var(--eden-color-border-light);
+}
+
+.toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+}
+
+.file-path {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-muted);
+  font-family: var(--eden-font-mono);
+}
+
+.file-language {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-secondary);
+  padding: var(--eden-space-xs) var(--eden-space-sm);
+  background: var(--eden-color-bg-glass-medium);
+  border-radius: var(--eden-radius-sm);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: var(--eden-space-sm);
+}
+
+/* ===== Error Banner ===== */
+.error-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  background: var(--eden-color-danger);
+  color: white;
+  font-size: var(--eden-font-size-sm);
+}
+
+.error-banner button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--eden-radius-xs);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-banner button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--eden-space-lg);
+  padding: var(--eden-space-4xl);
+  text-align: center;
+}
+
+.empty-state h2 {
+  font-size: var(--eden-font-size-xl);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.empty-state p {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  max-width: 300px;
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--eden-radius-xl);
+  background: var(--eden-color-bg-glass-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--eden-font-size-3xl);
+  color: var(--eden-color-text-muted);
+}
+
+/* ===== Editor Container ===== */
+.editor-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== Welcome Tab ===== */
+.welcome-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--eden-space-xl);
+  padding: var(--eden-space-4xl);
+}
+
+.welcome-content h1 {
+  font-size: var(--eden-font-size-2xl);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.welcome-content p {
+  font-size: var(--eden-font-size-md);
+  color: var(--eden-color-text-secondary);
+}
+
+.welcome-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+  margin-top: var(--eden-space-lg);
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+}
+
+.shortcut-key {
+  padding: var(--eden-space-xs) var(--eden-space-sm);
+  background: var(--eden-color-bg-glass-strong);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-sm);
+  font-family: var(--eden-font-mono);
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Monaco Lazy Loading ===== */
+.monaco-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--eden-space-md);
+  background: var(--eden-color-bg-primary);
+  color: var(--eden-color-text-secondary);
+  font-size: var(--eden-font-size-sm);
+  z-index: 10;
+}
+
+.monaco-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--eden-color-border-light);
+  border-top-color: var(--eden-color-accent-primary);
+  border-radius: 50%;
+  animation: monaco-spin 0.8s linear infinite;
+}
+
+@keyframes monaco-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.monaco-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--eden-color-bg-primary);
+  color: var(--eden-color-danger);
+  font-size: var(--eden-font-size-sm);
+  padding: var(--eden-space-lg);
+  text-align: center;
+}
+

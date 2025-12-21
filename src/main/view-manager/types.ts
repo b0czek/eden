@@ -1,5 +1,5 @@
 import { Rectangle as Bounds, WebContentsView } from "electron";
-import { AppManifest } from "../../types";
+import { AppManifest } from "@edenapp/types";
 
 export type ViewMode = "floating" | "tiled";
 export type ViewType = "app" | "overlay";
@@ -22,6 +22,7 @@ export interface ViewInfo {
   viewType: ViewType; // Type of view: app or overlay
   tileIndex?: number; // Only for tiled app views
   zIndex?: number; // For floating apps and all overlays
+  launchArgs?: string[]; // Arguments passed when launching this view
 }
 
 /**
@@ -37,4 +38,5 @@ export interface CreateViewOptions {
   viewBounds: Bounds;
   tileIndex?: number;
   zIndex?: number;
+  launchArgs?: string[];
 }

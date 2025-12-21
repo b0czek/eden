@@ -1,11 +1,22 @@
 import { ViewManager } from "../view-manager/ViewManager";
+import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
 
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private subscriptions: Map<string, Set<number>> = new Map();
+  private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
     this.viewManager = viewManager;
+  }
+
+
+
+  /**
+   * Set the permission registry for permission checking
+   */
+  setPermissionRegistry(registry: PermissionRegistry): void {
+    this.permissionRegistry = registry;
   }
 
   /**
@@ -18,10 +29,20 @@ export class EventSubscriberManager {
       return false;
     }
 
+    // Check event permission if required
+    const requiredPermission = getEventPermission(eventName);
+    if (requiredPermission && this.permissionRegistry) {
+      if (!this.permissionRegistry.hasPermission(viewInfo.appId, requiredPermission)) {
+        throw new Error(
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+        );
+      }
+    }
+
     if (!this.subscriptions.has(eventName)) {
       this.subscriptions.set(eventName, new Set());
     }
-    
+
     this.subscriptions.get(eventName)!.add(viewId);
     console.log(`View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`);
     return true;
@@ -35,12 +56,12 @@ export class EventSubscriberManager {
     if (!subscriptions) {
       return false;
     }
-    
+
     const result = subscriptions.delete(viewId);
     if (subscriptions.size === 0) {
       this.subscriptions.delete(eventName);
     }
-    
+
     if (result) {
       console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
     }
@@ -60,14 +81,11 @@ export class EventSubscriberManager {
    */
   public notify(eventName: string, payload: any): void {
     const subscribedViewIds = this.getSubscribedViews(eventName);
-    
+
     if (subscribedViewIds.length === 0) {
-      // console.log(`No subscribers for event: ${eventName}`);
       return;
     }
 
-    console.log(`Emitting ${eventName} to ${subscribedViewIds.length} subscribed view(s)`);
-    
     for (const viewId of subscribedViewIds) {
       this.viewManager.sendToView(viewId, 'shell-message', {
         type: eventName,
@@ -85,7 +103,6 @@ export class EventSubscriberManager {
       return false;
     }
 
-    // console.log(`Emitting ${eventName} to specific view ${viewId}`);
     return this.viewManager.sendToView(viewId, 'shell-message', {
       type: eventName,
       payload,

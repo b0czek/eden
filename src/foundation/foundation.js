@@ -1,4 +1,4 @@
-// Foundation Layer - Vanilla JavaScript
+// Foundation Layer
 // Handles workspace area reporting and global event handling
 
 (function () {
@@ -21,14 +21,20 @@
             x: Math.round(rect.left),
             y: Math.round(rect.top),
             width: Math.round(rect.width),
-            height: Math.round(rect.height) - 80,
+            height: Math.round(rect.height) - 72,
+        };
+
+        // Get window size from body
+        const windowSize = {
+            width: Math.round(document.body.clientWidth),
+            height: Math.round(document.body.clientHeight),
         };
 
         // Send to backend via eden API (provided by preload)
         if (window.edenAPI && window.edenAPI.shellCommand) {
-            window.edenAPI.shellCommand('view/update-workspace-bounds', { bounds })
+            window.edenAPI.shellCommand('view/update-global-bounds', { bounds, windowSize })
                 .catch((error) => {
-                    console.error('Failed to update workspace bounds:', error);
+                    console.error('Failed to update global bounds:', error);
                 });
         }
     }

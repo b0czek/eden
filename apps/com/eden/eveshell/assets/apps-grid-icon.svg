@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4a4a4a"/>
+      <stop offset="1" stop-color="#3a3a3a"/>
+    </linearGradient>
+  </defs>
+  <!-- Squircle background with gradient -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
+  <!-- Grid of 4 squares icon centered -->
+  <g transform="translate(16, 16)" fill="#e0e0e0">
+    <rect x="2" y="2" width="12" height="12" rx="2"/>
+    <rect x="18" y="2" width="12" height="12" rx="2"/>
+    <rect x="2" y="18" width="12" height="12" rx="2"/>
+    <rect x="18" y="18" width="12" height="12" rx="2"/>
+  </g>
+</svg>

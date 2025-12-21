@@ -1,0 +1,385 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  /* Transparent background for overlay views */
+  background: transparent;
+  color: var(--eden-color-text-primary);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* Shell Overlay Container */
+.shell-overlay {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dock mode - compact bottom bar */
+.shell-overlay[data-mode="dock"] {
+  height: var(--eden-layout-dock-height);
+  max-height: var(--eden-layout-dock-height);
+  /* Safeguard against desync */
+  overflow: hidden;
+}
+
+/* Fullscreen mode - fill entire window */
+.shell-overlay[data-mode="fullscreen"] {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+/* Keep dock at bottom when in fullscreen mode */
+.shell-overlay[data-mode="fullscreen"] .dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+/* Dock Styles */
+.dock {
+  height: var(--eden-layout-dock-height);
+  /* Make dock visually float with transparent, frosted background */
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--eden-space-sm);
+  position: relative;
+  overflow: visible;
+}
+
+/* One-time slide-in animation on initial load */
+.dock.dock-initial {
+  animation: dockSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes dockSlideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.dock::before {
+  /* Frosted panel behind dock content */
+  content: '';
+  position: absolute;
+  left: var(--eden-space-sm);
+  right: var(--eden-space-sm);
+  bottom: var(--eden-space-sm);
+  height: calc(var(--eden-layout-dock-height) - var(--eden-space-md));
+  border-radius: var(--eden-radius-xl);
+  background: var(--eden-color-bg-glass-medium);
+  backdrop-filter: var(--eden-glass-medium);
+  -webkit-backdrop-filter: var(--eden-glass-medium);
+  box-shadow: var(--eden-shadow-lg);
+  /* Avoid inset border which can produce hairline seams on some displays */
+  border: 1px solid var(--eden-color-border-light);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dock-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  z-index: 1;
+  /* above frosted background */
+}
+
+.dock-right {
+  position: absolute;
+  right: var(--eden-space-sm);
+  display: flex;
+  align-items: center;
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  z-index: 1;
+}
+
+.dock-right,
+.dock-right * {
+  color: var(--eden-color-text-primary);
+}
+
+.dock-right .clock .time {
+  color: var(--eden-color-text-primary);
+  font-size: var(--eden-font-size-lg);
+  line-height: var(--eden-font-line-height-tight);
+}
+
+.dock-right .clock .date {
+  color: var(--eden-color-text-secondary);
+}
+
+.dock-right .separator {
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
+}
+
+.app-icons {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
+  /* Subtle dark container so icons sit naturally on the background */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.app-icons.magnify .app-icon:hover {
+  transform: none;
+}
+
+.app-icons.magnify .icon-container {
+  transform-origin: bottom center;
+}
+
+.app-icons.magnify.magnify-active .icon-container {
+  filter: brightness(1.05);
+}
+
+.dock-left,
+.dock-left * {
+  color: var(--eden-color-text-primary);
+}
+
+.dock-left .app-name {
+  color: var(--eden-color-text-secondary);
+}
+
+.dock-left .separator {
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
+}
+
+.separator {
+  width: 1px;
+  height: 32px;
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
+  margin: 0 var(--eden-space-xs);
+}
+
+/* App Icon Styles */
+.app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0px;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: var(--eden-radius-sm);
+  transition: all var(--eden-transition-base);
+  position: relative;
+  min-width: 44px;
+
+}
+
+.app-icon:hover {
+  transform: none;
+}
+
+.app-icon:hover .icon-container {
+  filter: brightness(1.1);
+}
+
+.app-icon:active {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.app-icon.running {
+  background: var(--eden-color-bg-dark);
+}
+
+.icon-container {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--eden-radius-sm);
+  position: relative;
+  background: transparent;
+  box-shadow: none;
+  transition: transform 0.16s ease-out, filter 0.2s ease;
+}
+
+
+.icon-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.app-name {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
+  text-align: center;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--eden-font-weight-medium);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.app-icon:hover .app-name {
+  opacity: 1;
+}
+
+.running-indicator {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--eden-color-text-primary);
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+/* Clock Styles */
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  user-select: none;
+}
+
+.clock .time {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--eden-font-letter-spacing-normal);
+}
+
+.clock .date {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-secondary);
+  font-weight: var(--eden-font-weight-medium);
+  letter-spacing: var(--eden-font-letter-spacing-tight);
+}
+
+/* ============================
+   All Apps - Minimal overrides
+   Uses eden-modal-*, eden-input, eden-btn from design system
+   ============================ */
+
+/* Override grid to fixed 4 columns */
+.eden-modal-body .eden-card-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* App tile in the grid - square with centered content */
+.all-apps-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  aspect-ratio: 1 / 1;
+}
+
+.all-apps-tile.running {
+  background: var(--eden-color-surface-active);
+}
+
+/* Override app-icon styles for grid view */
+.all-apps-tile .app-icon {
+  min-width: auto;
+  width: auto;
+}
+
+.all-apps-tile .icon-container {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--eden-radius-lg);
+}
+
+.all-apps-tile .icon-container img {
+  width: 100%;
+  height: 100%;
+}
+
+.all-apps-tile .app-name {
+  position: static;
+  transform: none;
+  left: auto;
+  top: auto;
+  opacity: 1;
+  margin-top: var(--eden-space-sm);
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Context Menu Icons */
+.eden-icon {
+  font-size: var(--eden-font-size-lg);
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-family: var(--eden-font-family-base);
+  font-weight: var(--eden-font-weight-semibold);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

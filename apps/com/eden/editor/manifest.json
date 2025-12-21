@@ -1,0 +1,60 @@
+{
+  "id": "com.eden.editor",
+  "name": "Text Editor",
+  "version": "1.0.0",
+  "description": "A Monaco-based text editor for editing files",
+  "author": "Eden Team",
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 900,
+      "height": 700
+    },
+    "minSize": {
+      "width": 400,
+      "height": 300
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": [
+    "fs/*"
+  ],
+  "fileHandlers": [
+    {
+      "name": "Text Files",
+      "extensions": ["txt", "md", "markdown", "log"]
+    },
+    {
+      "name": "JavaScript",
+      "extensions": ["js", "jsx", "mjs", "cjs"]
+    },
+    {
+      "name": "TypeScript",
+      "extensions": ["ts", "tsx", "mts", "cts"]
+    },
+    {
+      "name": "Web Files",
+      "extensions": ["html", "htm", "css", "less"]
+    },
+    {
+      "name": "Data Files",
+      "extensions": ["json", "yaml", "yml", "toml"]
+    },
+    {
+      "name": "Config Files",
+      "extensions": ["ini", "cfg", "conf", "env"]
+    },
+    {
+      "name": "Shell Scripts",
+      "extensions": ["sh", "bash", "zsh", "fish"]
+    }
+  ],
+  "icon": "icon.png"
+}

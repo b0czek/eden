@@ -1,33 +1,54 @@
 {
-  "name": "@eden/genesis",
-  "version": "0.1.0",
-  "description": "Genesis - In the beginning... Package and bundle Eden applications into .edenite format.",
+  "name": "@edenapp/genesis",
+  "version": "0.2.1",
+  "description": "Genesis - Package and bundle Eden applications into .edenite format.",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "genesis": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "eden",
     "bundler",
     "packager",
     "edenite",
-    "genesis"
+    "genesis",
+    "zstd",
+    "zstandard",
+    "compression"
   ],
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "adm-zip": "^0.5.10",
+    "@edenapp/types": "workspace:*",
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
     "commander": "^11.1.0",
-    "chalk": "^4.1.2"
+    "tar": "^7.4.3",
+    "zstd-codec": "^0.1.5"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.5",
+    "@types/cli-progress": "^3.11.6",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.10.0",
+    "@types/tar": "^6.1.13",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.5",
     "typescript": "^5.3.0"
   }
 }

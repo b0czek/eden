@@ -1,7 +1,7 @@
 import { Worker } from "worker_threads";
 import { EventEmitter } from "events";
 import * as path from "path";
-import { AppManifest, IPCMessage } from "../../types";
+import { AppManifest, IPCMessage } from "@edenapp/types";
 
 /**
  * WorkerManager
