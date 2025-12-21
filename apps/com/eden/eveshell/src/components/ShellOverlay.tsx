@@ -1,58 +1,53 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
-import { ViewBounds, WindowSize, AppManifest } from "@edenapp/types";
+import {
+  ViewBounds,
+  WindowSize,
+  AppManifest,
+  AppInstance,
+} from "@edenapp/types";
 import { AppInfo } from "../types";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
 
 export default function ShellOverlay() {
-  const [runningApps, setRunningApps] = createSignal<Set<string>>(new Set());
+  const [runningApps, setRunningApps] = createSignal<AppInstance[]>([]);
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
 
-  // Combine installed and running apps for the dock
-  const dockApps = () => {
-    const running = runningApps();
-    const installed = installedApps();
-
-    // Show running apps in the dock
-    const apps: AppInfo[] = Array.from(running).map((appId) => {
-      const manifest = installed.find((app) => app.id === appId);
-      return {
-        id: appId,
-        name: manifest?.name || appId,
-        icon: manifest?.icon,
-        isRunning: true,
-      };
-    });
-
-    return apps;
+  // Running apps for the dock (use manifest embedded in AppInstance)
+  const dockApps = (): AppInfo[] => {
+    return runningApps().map((instance) => ({
+      id: instance.manifest.id,
+      name: instance.manifest.name,
+      isRunning: true,
+    }));
   };
 
-  // All apps for the apps view
-  const allApps = () => {
-    const running = runningApps();
-    const apps = installedApps().map((app) => ({
+  // All installed apps for the apps view
+  const allApps = (): AppInfo[] => {
+    const runningIds = new Set(runningApps().map((i) => i.manifest.id));
+    return installedApps().map((app) => ({
       id: app.id,
       name: app.name,
-      isRunning: running.has(app.id),
+      isRunning: runningIds.has(app.id),
     }));
-    return apps;
   };
 
   const loadSystemInfo = async () => {
     try {
-      const info = await window.edenAPI.shellCommand("system/info", {});
-      setRunningApps(new Set<string>(info.runningApps || []));
+      // Fetch installed apps from package manager
+      const installed = await window.edenAPI!.shellCommand("package/list", {});
+      if (Array.isArray(installed)) {
+        setInstalledApps(installed);
+      }
 
-      const appsData = await window.edenAPI.shellCommand("process/list", {});
-
-      if (appsData) {
-        if (Array.isArray(appsData.installed)) {
-          setInstalledApps(appsData.installed);
-        }
+      // Fetch running apps from process manager
+      const running = await window.edenAPI!.shellCommand("process/list", {});
+      if (Array.isArray(running)) {
+        setRunningApps(running);
       }
     } catch (error) {
       console.error("Failed to load system info:", error);
@@ -77,8 +72,8 @@ export default function ShellOverlay() {
   // Helper function to update overlay bounds via API
   const updateOverlayBounds = async (bounds: ViewBounds) => {
     try {
-      await window.edenAPI.shellCommand("view/update-view-bounds", {
-        appId: "eden.shell-overlay",
+      await window.edenAPI!.shellCommand("view/update-view-bounds", {
+        appId: "com.eden.eveshell",
         bounds,
       });
     } catch (error) {
@@ -89,7 +84,7 @@ export default function ShellOverlay() {
   const requestResize = async (mode: "dock" | "fullscreen") => {
     try {
       // Get current window bounds
-      const windowSize = await window.edenAPI.shellCommand(
+      const windowSize = await window.edenAPI!.shellCommand(
         "view/window-size",
         {}
       );
@@ -101,19 +96,19 @@ export default function ShellOverlay() {
   };
 
   const handleAppClick = async (appId: string) => {
-    const running = runningApps();
+    const isRunning = runningApps().some((app) => app.manifest.id === appId);
 
-    if (running.has(appId)) {
+    if (isRunning) {
       // App is running, focus/show it
       try {
-        await window.edenAPI.shellCommand("view/focus-app", { appId });
+        await window.edenAPI!.shellCommand("view/focus-app", { appId });
       } catch (error) {
         console.error("Failed to focus app:", error);
       }
     } else {
       // App is not running, launch it
       try {
-        await window.edenAPI.shellCommand("process/launch", { appId });
+        await window.edenAPI!.shellCommand("process/launch", { appId });
         // Add a small delay before refreshing to let the app start
         setTimeout(() => {
           loadSystemInfo();
@@ -137,28 +132,9 @@ export default function ShellOverlay() {
     }
   };
 
-  const handleInstallApp = async () => {
-    try {
-      const filePath = await window.edenAPI.selectFile({
-        title: "Select Eden App Package",
-        filters: [{ name: "Eden Package", extensions: ["edenite"] }],
-      });
-
-      if (filePath) {
-        await window.edenAPI.shellCommand("package/install", {
-          sourcePath: filePath,
-        });
-        // Refresh app list
-        await loadSystemInfo();
-      }
-    } catch (error) {
-      console.error("Failed to install app:", error);
-    }
-  };
-
   const handleStopApp = async (appId: string) => {
     try {
-      await window.edenAPI.shellCommand("process/stop", { appId });
+      await window.edenAPI!.shellCommand("process/stop", { appId });
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -172,7 +148,7 @@ export default function ShellOverlay() {
     try {
       // Confirm before uninstalling
       if (confirm(`Are you sure you want to uninstall this app?`)) {
-        await window.edenAPI.shellCommand("package/uninstall", { appId });
+        await window.edenAPI!.shellCommand("package/uninstall", { appId });
         // Refresh app list
         await loadSystemInfo();
       }
@@ -197,9 +173,9 @@ export default function ShellOverlay() {
 
     // Register cleanup synchronously (must happen before any async work)
     onCleanup(() => {
-      window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
-      window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
-      window.edenAPI.unsubscribe(
+      window.edenAPI!.unsubscribe("process/launched", handleAppLifecycle);
+      window.edenAPI!.unsubscribe("process/stopped", handleAppLifecycle);
+      window.edenAPI!.unsubscribe(
         "view/global-bounds-changed",
         handleBoundsChange
       );
@@ -215,9 +191,9 @@ export default function ShellOverlay() {
 
       try {
         // Subscribe to events
-        await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
-        await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
-        await window.edenAPI.subscribe(
+        await window.edenAPI!.subscribe("process/launched", handleAppLifecycle);
+        await window.edenAPI!.subscribe("process/stopped", handleAppLifecycle);
+        await window.edenAPI!.subscribe(
           "view/global-bounds-changed",
           handleBoundsChange
         );
@@ -236,9 +212,7 @@ export default function ShellOverlay() {
       <Show when={showAllApps()}>
         <AllApps
           apps={allApps()}
-          runningApps={runningApps()}
           onClose={handleShowAllApps}
-          onInstall={handleInstallApp}
           onAppClick={handleAppClick}
           onStopApp={handleStopApp}
           onUninstallApp={handleUninstallApp}

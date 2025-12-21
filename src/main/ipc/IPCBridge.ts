@@ -146,19 +146,6 @@ export class IPCBridge extends EventEmitter {
       return this.eventSubscribers.unsubscribe(viewId, eventName);
     });
 
-    // Generic file selection dialog
-    ipcMain.handle("select-file", async (_event, options: any) => {
-      if (!this.mainWindow) return null;
-
-      const result = await dialog.showOpenDialog(this.mainWindow, {
-        properties: ["openFile"],
-        title: options?.title || "Select File",
-        filters: options?.filters || [{ name: "All Files", extensions: ["*"] }],
-      });
-
-      return result.canceled ? null : result.filePaths[0];
-    });
-
     // Get view data (launchArgs, channels, etc.) - called by preload to fetch all initialization data
     ipcMain.handle("get-view-data", async (event) => {
       const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
@@ -404,7 +391,11 @@ export class IPCBridge extends EventEmitter {
   /**
    * Handle shell commands (app management, etc.)
    */
-  private async handleShellCommand(command: string, args: any, appId?: string): Promise<any> {
+  private async handleShellCommand(
+    command: string,
+    args: any,
+    appId?: string
+  ): Promise<any> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
 
@@ -480,7 +471,6 @@ export class IPCBridge extends EventEmitter {
     ipcMain.removeHandler("event-exists");
     ipcMain.removeHandler("event-subscribe");
     ipcMain.removeHandler("event-unsubscribe");
-    ipcMain.removeHandler("select-file");
     ipcMain.removeHandler("get-view-data");
   }
 }

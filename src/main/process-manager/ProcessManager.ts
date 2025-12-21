@@ -6,7 +6,7 @@ import { WorkerManager } from "./WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
-import { AppInstance, AppStatus } from "@edenapp/types";
+import { AppInstance } from "@edenapp/types";
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
@@ -116,7 +116,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`App ${appId} is already running`);
     }
 
-    // Get the correct install path 
+    // Get the correct install path
     const installPath = this.packageManager.getAppPath(appId);
     if (!installPath) {
       throw new Error(`App path not found for ${appId}`);
@@ -124,24 +124,36 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
     const instanceId = randomUUID();
 
-    // Default bounds if not specified
-    const viewBounds = bounds || { x: 0, y: 0, width: 800, height: 600 };
-
     try {
       // Create worker for backend if one is defined
       if (manifest.backend?.entry) {
-        const worker = await this.workerManager.createWorker(appId, manifest, installPath);
+        const worker = await this.workerManager.createWorker(
+          appId,
+          manifest,
+          installPath
+        );
         this.workers.set(appId, worker);
       }
 
       // Create view for frontend
-      const viewId = this.viewManager.createAppView(
-        appId,
-        manifest,
-        installPath,
-        viewBounds,
-        launchArgs
-      );
+      let viewId: number;
+      if (manifest.overlay) {
+        viewId = this.viewManager.createOverlayView(
+          appId,
+          manifest,
+          installPath,
+          bounds,
+          launchArgs
+        );
+      } else {
+        viewId = this.viewManager.createAppView(
+          appId,
+          manifest,
+          installPath,
+          bounds || { x: 0, y: 0, width: 800, height: 600 },
+          launchArgs
+        );
+      }
 
       // Create app instance
       const instance: AppInstance = {
@@ -206,9 +218,11 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
   /**
    * Get list of running apps
+   * @param showHidden - If true, includes overlay apps (hidden by default)
    */
-  getRunningApps(): AppInstance[] {
-    return Array.from(this.runningApps.values());
+  getRunningApps(showHidden: boolean = false): AppInstance[] {
+    const apps = Array.from(this.runningApps.values());
+    return showHidden ? apps : apps.filter((app) => !app.manifest.overlay);
   }
 
   /**
@@ -276,17 +290,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   }
 
   /**
-   * Get status of all apps (installed and running)
-   */
-  getAllAppsStatus(): AppStatus {
-    return {
-      installed: this.packageManager.getInstalledApps(),
-      running: this.getRunningApps(),
-    };
-  }
-
-  /**
-   * Reload a running app 
+   * Reload a running app
    */
   async reloadApp(appId: string): Promise<void> {
     const instance = this.runningApps.get(appId);
@@ -305,7 +309,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     await this.stopApp(appId);
 
     // Small delay to ensure cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Relaunch with same bounds
     await this.launchApp(appId, bounds);

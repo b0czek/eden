@@ -3,7 +3,7 @@ import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { IPCBridge, CommandRegistry, PermissionRegistry } from "./ipc";
 import { SystemHandler } from "./SystemHandler";
-import { EdenConfig } from "../types";
+import { EdenConfig, AppManifest } from "../types";
 
 // Managers and Handlers
 import { PackageManager, PackageHandler } from "./package-manager";
@@ -11,6 +11,7 @@ import {
   ProcessManager,
   ProcessHandler,
   WorkerManager,
+  AutostartManager,
 } from "./process-manager";
 import { ViewManager, ViewHandler } from "./view-manager";
 import { FilesystemManager } from "./filesystem";
@@ -19,7 +20,6 @@ import { container } from "tsyringe";
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
-  private shellOverlayViewId: number | null = null; // Track shell overlay view
   private workerManager: WorkerManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
@@ -35,12 +35,12 @@ export class Eden {
   private filesystemManager: FilesystemManager;
   private permissionRegistry: PermissionRegistry;
   private fileOpenManager: FileOpenManager;
+  private autostartManager: AutostartManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
 
     app.commandLine.appendSwitch("enable-features", "V8CodeCache");
-
 
     // Set apps directory to user data + /eden-apps or custom path
     this.appsDirectory =
@@ -80,9 +80,11 @@ export class Eden {
 
     // 5. Break circular dependency: Set ViewManager on IPCBridge
     this.ipcBridge.setViewManager(this.viewManager);
-    
+
     // Wire permission registry to event subscriber manager
-    this.ipcBridge.eventSubscribers.setPermissionRegistry(this.permissionRegistry);
+    this.ipcBridge.eventSubscribers.setPermissionRegistry(
+      this.permissionRegistry
+    );
 
     // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);
@@ -109,6 +111,10 @@ export class Eden {
     // Initialize File Open Manager
     this.fileOpenManager = container.resolve(FileOpenManager);
     container.registerInstance("FileOpenManager", this.fileOpenManager);
+
+    // Initialize Autostart Manager
+    this.autostartManager = container.resolve(AutostartManager);
+    container.registerInstance("AutostartManager", this.autostartManager);
 
     this.setupAppEventHandlers();
   }
@@ -173,9 +179,9 @@ export class Eden {
     );
     this.mainWindow.loadFile(foundationPath);
 
-    // Create shell overlay as an overlay view after foundation loads
+    // Launch autostart apps after foundation loads
     this.mainWindow.webContents.once("did-finish-load", () => {
-      this.createShellOverlay();
+      this.autostartManager.launchAll();
     });
 
     // Show window when foundation and overlay are ready
@@ -186,64 +192,12 @@ export class Eden {
     // Handle window close
     this.mainWindow.on("closed", () => {
       this.mainWindow = null;
-      this.shellOverlayViewId = null;
     });
 
     // Development: Open DevTools
     if (this.config.development || process.env.NODE_ENV === "development") {
       this.mainWindow.webContents.openDevTools();
     }
-  }
-
-  /**
-   * Create the shell overlay as an overlay view
-   */
-  private createShellOverlay(): void {
-    if (!this.mainWindow) {
-      console.error("Cannot create shell overlay: main window not available");
-      return;
-    }
-
-    // Create a minimal manifest for the shell overlay
-    const shellManifest = {
-      id: "eden.shell-overlay",
-      name: "Shell Overlay",
-      version: "1.0.0",
-      frontend: {
-        entry: "index.html",
-      },
-      window: {
-        mode: "floating" as const,
-        injections: {
-          css: "full" as const,
-          appFrame: false, // Shell doesn't need the app frame
-        },
-      },
-    };
-
-    const eveshellPath = path.join(__dirname, "../eveshell");
-    const windowBounds = this.mainWindow.getBounds();
-    const DOCK_HEIGHT = 72; // Should match CSS variable
-
-    // Initial bounds: dock mode at bottom
-    const initialBounds = {
-      x: 0,
-      y: windowBounds.height - DOCK_HEIGHT,
-      width: windowBounds.width,
-      height: DOCK_HEIGHT,
-    };
-
-    // Create overlay view
-    this.shellOverlayViewId = this.viewManager.createOverlayView(
-      "eden.shell-overlay",
-      shellManifest,
-      eveshellPath,
-      initialBounds
-    );
-
-    console.log(
-      `Shell overlay created with viewId: ${this.shellOverlayViewId}`
-    );
   }
 
   /**

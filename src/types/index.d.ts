@@ -99,11 +99,6 @@ export interface LaunchResult {
   appId: string;
 }
 
-export interface AppStatus {
-  installed: AppManifest[];
-  running: AppInstance[];
-}
-
 /**
  * Result of opening a file
  */

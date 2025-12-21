@@ -14,7 +14,7 @@ export type WindowMode = "floating" | "tiled" | "both";
 export type CSSInjectionMode = "full" | "tokens" | "none";
 
 export interface WindowInjectionOptions {
-  /** 
+  /**
    * Control Eden design system CSS injection (default: "full")
    * - "full": Complete CSS including tokens, utilities, and components
    * - "tokens": Only CSS custom property definitions (variables)
@@ -157,7 +157,7 @@ export interface AppManifest {
   /** Internal flag indicating if this is a prebuilt system app */
   isPrebuilt?: boolean;
 
-  /** 
+  /**
    * Permissions requested by this app.
    * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
    */
@@ -168,5 +168,10 @@ export interface AppManifest {
    * Used for "open with" functionality and automatic handler detection.
    */
   fileHandlers?: FileHandlerConfig[];
-}
 
+  /**
+   * Whether this app runs as a system overlay.
+   * Overlays are rendered above regular apps.
+   */
+  overlay?: boolean;
+}

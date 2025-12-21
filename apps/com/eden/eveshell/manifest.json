@@ -1,0 +1,27 @@
+{
+  "id": "com.eden.eveshell",
+  "name": "Shell for Eden",
+  "version": "1.0.0",
+  "overlay": true,
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 1200,
+      "height": 72
+    },
+    "defaultPosition": {
+      "x": 40,
+      "y": 700
+    },
+    "injections": {
+      "css": "full",
+      "appFrame": false
+    }
+  }
+}

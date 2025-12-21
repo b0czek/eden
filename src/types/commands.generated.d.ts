@@ -167,30 +167,37 @@ export interface PackageCommands {
   };
   /**
    * List all installed applications.
+   * @param showHidden - If true, includes overlay apps (hidden by default)
    */
-  "package/list-installed": {
-    args: Record<string, never>;
+  "package/list": {
+    args: { showHidden?: boolean };
     response: AppManifest[];
   };
   /**
    * Toggle hot reload for an app
    */
   "package/toggle-hot-reload": {
-    args: { appId: string };
+    args: {
+    appId: string;
+  };
     response: { enabled: boolean };
   };
   /**
    * Check if hot reload is enabled for an app
    */
   "package/is-hot-reload-enabled": {
-    args: { appId: string };
+    args: {
+    appId: string;
+  };
     response: { enabled: boolean };
   };
   /**
    * Get the icon for an installed application as a data URL.
    */
   "package/get-icon": {
-    args: { appId: string };
+    args: {
+    appId: string;
+  };
     response: { icon: string | undefined };
   };
 }
@@ -218,10 +225,11 @@ export interface ProcessCommands {
   };
   /**
    * List all running application processes.
+   * @param showHidden - If true, includes overlay apps (hidden by default)
    */
   "process/list": {
-    args: Record<string, never>;
-    response: AppStatus;
+    args: { showHidden?: boolean };
+    response: AppInstance[];
   };
 }
 

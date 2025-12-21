@@ -4,9 +4,7 @@ import { AppInfo } from "../types";
 
 interface AllAppsProps {
   apps: AppInfo[];
-  runningApps: Set<string>;
   onClose: () => void;
-  onInstall: () => void;
   onAppClick: (appId: string) => Promise<void> | void;
   onStopApp: (appId: string) => Promise<void> | void;
   onUninstallApp: (appId: string) => Promise<void> | void;
@@ -46,7 +44,7 @@ export default function AllApps(props: AllAppsProps) {
     const hotReloadSet = new Set<string>();
     for (const app of props.apps) {
       try {
-        const result = await window.edenAPI.shellCommand(
+        const result = await window.edenAPI!.shellCommand(
           "package/is-hot-reload-enabled",
           { appId: app.id }
         );
@@ -95,10 +93,13 @@ export default function AllApps(props: AllAppsProps) {
   async function handleTileClick(appId: string) {
     if (!isClosing()) triggerClose();
 
-    const running = props.runningApps;
-    for (const runningAppId of running) {
+    // Show all running apps when clicking a tile
+    const runningAppIds = props.apps
+      .filter((app) => app.isRunning)
+      .map((app) => app.id);
+    for (const runningAppId of runningAppIds) {
       try {
-        await window.edenAPI.shellCommand("view/set-view-visibility", {
+        await window.edenAPI!.shellCommand("view/set-view-visibility", {
           appId: runningAppId,
           visible: true,
         });
@@ -164,7 +165,7 @@ export default function AllApps(props: AllAppsProps) {
           style="max-height: 70vh; background: var(--eden-color-surface-primary);"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header with search and install */}
+          {/* Header with search */}
           <div class="eden-modal-header">
             <div class="eden-flex eden-gap-sm" style="flex: 1;">
               <input
@@ -176,16 +177,6 @@ export default function AllApps(props: AllAppsProps) {
                 onInput={(e) => setSearchQuery(e.currentTarget.value)}
               />
             </div>
-            <button
-              class="eden-btn eden-btn-primary eden-btn-square"
-              aria-label="Install App"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isClosing()) props.onInstall();
-              }}
-            >
-              +
-            </button>
           </div>
 
           {/* App grid - uses eden-modal-body for scrolling */}
@@ -279,7 +270,7 @@ export default function AllApps(props: AllAppsProps) {
                 style="justify-content: flex-start; width: 100%;"
                 onClick={async () => {
                   try {
-                    const result = await window.edenAPI.shellCommand(
+                    const result = await window.edenAPI!.shellCommand(
                       "package/toggle-hot-reload",
                       { appId: menu().appId }
                     );

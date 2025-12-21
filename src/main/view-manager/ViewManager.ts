@@ -1,17 +1,24 @@
-import {
-  BrowserWindow,
-  Rectangle as Bounds,
-  WebContentsView,
-} from "electron";
+import { BrowserWindow, Rectangle as Bounds, WebContentsView } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { AppManifest, TilingConfig, WindowConfig, EdenConfig, WindowSize } from "@edenapp/types";
+import {
+  AppManifest,
+  TilingConfig,
+  WindowConfig,
+  EdenConfig,
+  WindowSize,
+} from "@edenapp/types";
 import { LayoutCalculator } from "./LayoutCalculator";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
-import { ViewInfo, ViewMode, ViewType, Z_LAYERS, CreateViewOptions } from "./types";
-
+import {
+  ViewInfo,
+  ViewMode,
+  ViewType,
+  Z_LAYERS,
+  CreateViewOptions,
+} from "./types";
 
 import { injectable, inject } from "tsyringe";
 import { CommandRegistry, IPCBridge } from "../ipc";
@@ -63,8 +70,6 @@ export class ViewManager extends EventEmitter {
     this.viewHandler = new ViewHandler(this, ipcBridge);
     commandRegistry.registerManager(this.viewHandler);
   }
-
-
 
   /**
    * Set the main window that will host the views
@@ -185,7 +190,9 @@ export class ViewManager extends EventEmitter {
    * Get the CSS injection mode from window config
    * Returns "full" by default if not specified
    */
-  private getCSSInjectionMode(windowConfig?: WindowConfig): "full" | "tokens" | "none" {
+  private getCSSInjectionMode(
+    windowConfig?: WindowConfig
+  ): "full" | "tokens" | "none" {
     const cssOption = windowConfig?.injections?.css;
     // Default to "full" if not specified
     if (cssOption === undefined) {
@@ -198,7 +205,11 @@ export class ViewManager extends EventEmitter {
    * Inject app API into the view's webContents
    * Sends an argless event - preload fetches data via get-view-data invoke
    */
-  private injectAppAPI(view: WebContentsView, viewId: number, appId: string): void {
+  private injectAppAPI(
+    view: WebContentsView,
+    viewId: number,
+    appId: string
+  ): void {
     view.webContents.send("app-init-api");
 
     console.log(`Sent app API init for ${appId} (viewId: ${viewId})`);
@@ -223,7 +234,9 @@ export class ViewManager extends EventEmitter {
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log(`Successfully injected Eden Design System CSS (${mode}) into view`);
+      console.log(
+        `Successfully injected Eden Design System CSS (${mode}) into view`
+      );
     } catch (err) {
       console.error("Failed to inject design system CSS:", err);
       // Don't throw - app should still work without design system
@@ -242,10 +255,7 @@ export class ViewManager extends EventEmitter {
   ): Promise<void> {
     try {
       // Inject CSS first
-      const frameCSSPath = path.join(
-        __dirname,
-        "../../app-frame/frame.css"
-      );
+      const frameCSSPath = path.join(__dirname, "../../app-frame/frame.css");
       const frameCSS = await cachedFileReader.readAsync(frameCSSPath, "utf-8");
       await view.webContents.insertCSS(frameCSS);
 
@@ -254,7 +264,10 @@ export class ViewManager extends EventEmitter {
         __dirname,
         "../../app-frame/frame-injector.js"
       );
-      const frameScript = await cachedFileReader.readAsync(frameScriptPath, "utf-8");
+      const frameScript = await cachedFileReader.readAsync(
+        frameScriptPath,
+        "utf-8"
+      );
 
       // Inject the frame script with window config and initial state
       await view.webContents.executeJavaScript(`
@@ -265,7 +278,9 @@ export class ViewManager extends EventEmitter {
                     injected: false,
                     config: ${JSON.stringify(windowConfig || {})},
                     currentMode: "${viewMode}",
-                    bounds: ${JSON.stringify(bounds || { x: 0, y: 0, width: 0, height: 0 })}
+                    bounds: ${JSON.stringify(
+                      bounds || { x: 0, y: 0, width: 0, height: 0 }
+                    )}
                   }
                 };
                 ${frameScript}
@@ -367,10 +382,14 @@ export class ViewManager extends EventEmitter {
       this.ipcBridge.eventSubscribers.notify("view-loaded", {
         viewId,
         appId,
-        overlay: viewType === "overlay"
+        overlay: viewType === "overlay",
       });
 
-      this.emit("view-loaded", { viewId, appId, overlay: viewType === "overlay" });
+      this.emit("view-loaded", {
+        viewId,
+        appId,
+        overlay: viewType === "overlay",
+      });
     });
 
     view.webContents.on(
@@ -454,7 +473,10 @@ export class ViewManager extends EventEmitter {
         tileIndex = this.getNextTileIndex();
         viewBounds = this.calculateTileBounds(tileIndex);
       }
-      console.log(`Creating tiled app view for ${appId} with bounds:`, viewBounds);
+      console.log(
+        `Creating tiled app view for ${appId} with bounds:`,
+        viewBounds
+      );
     }
 
     return this.createView({
@@ -473,18 +495,20 @@ export class ViewManager extends EventEmitter {
 
   /**
    * Create an overlay view (e.g., shell overlay)
-   * Uses eve-preload that provides full edenAPI access
+   * Uses the same app-preload as regular apps
    * Overlays are always floating and use their own z-index counter
    */
   public createOverlayView(
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    bounds: Bounds
+    bounds?: Bounds,
+    launchArgs?: string[]
   ): number {
+    // Use the same preload as regular apps
     const preloadScript = path.join(
       __dirname,
-      "../../eveshell/eve-preload.js"
+      "../../app-frame/app-preload.js"
     );
 
     // Overlays are always floating mode
@@ -492,9 +516,15 @@ export class ViewManager extends EventEmitter {
 
     // Overlays use their own z-index counter and provided bounds
     const zIndex = this.nextOverlayZIndex++;
-    const viewBounds = bounds;
 
-    console.log(`Creating overlay view for ${appId} at Z=${zIndex}`);
+    // Calculate bounds if not provided
+    const viewBounds =
+      bounds || this.floatingWindows.calculateInitialBounds(manifest.window);
+
+    console.log(
+      `Creating overlay view for ${appId} at Z=${zIndex} with bounds:`,
+      viewBounds
+    );
 
     return this.createView({
       appId,
@@ -506,6 +536,7 @@ export class ViewManager extends EventEmitter {
       viewBounds,
       tileIndex: undefined,
       zIndex,
+      launchArgs,
     });
   }
 
@@ -529,7 +560,6 @@ export class ViewManager extends EventEmitter {
           this.mainWindow.contentView.removeChildView(viewInfo.view);
         }
       }
-
 
       // Clean up all event subscriptions for this view
       this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
@@ -567,7 +597,10 @@ export class ViewManager extends EventEmitter {
         viewInfo.bounds = bounds;
         return true;
       } catch (error) {
-        console.error(`Failed to set bounds for overlay view ${viewId}:`, error);
+        console.error(
+          `Failed to set bounds for overlay view ${viewId}:`,
+          error
+        );
         return false;
       }
     }
@@ -939,8 +972,8 @@ export class ViewManager extends EventEmitter {
           .executeJavaScript(
             `
                     window.postMessage({ type: 'view-mode-changed', mode: 'floating', bounds: ${JSON.stringify(
-              floatingBounds
-            )} }, '*');
+                      floatingBounds
+                    )} }, '*');
                 `
           )
           .catch((err) =>
@@ -972,8 +1005,8 @@ export class ViewManager extends EventEmitter {
             .executeJavaScript(
               `
                         window.postMessage({ type: 'view-mode-changed', mode: 'tiled', bounds: ${JSON.stringify(
-                tileBounds
-              )} }, '*');
+                          tileBounds
+                        )} }, '*');
                     `
             )
             .catch((err) =>
@@ -995,8 +1028,8 @@ export class ViewManager extends EventEmitter {
             .executeJavaScript(
               `
                         window.postMessage({ type: 'view-mode-changed', mode: 'tiled', bounds: ${JSON.stringify(
-                bounds
-              )} }, '*');
+                          bounds
+                        )} }, '*');
                     `
             )
             .catch((err) =>
@@ -1024,5 +1057,4 @@ export class ViewManager extends EventEmitter {
       this.removeView(viewId);
     }
   }
-
 }

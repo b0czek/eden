@@ -6,12 +6,10 @@
   "author": "Eden Team",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm run clean && pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:shell && pnpm run build:main && pnpm run bundle:app-frame && pnpm run copy:eveshell-preload && pnpm run copy-assets && pnpm run build:apps",
+    "build": "pnpm run clean && pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run copy-assets && pnpm run build:apps",
     "build:main": "tsc",
-    "build:shell": "vite build --config src/eveshell/vite.config.mts",
     "build:apps": "ts-node scripts/build-apps.ts",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
-    "copy:eveshell-preload": "mkdir -p dist/eveshell && cp src/eveshell/eve-preload.js dist/eveshell/",
     "codegen": "ts-node scripts/run-codegen.ts",
     "copy-assets": "mkdir -p dist/foundation && cp src/foundation/* dist/foundation/",
     "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' src/design-system/eden.css -o dist/design-system/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' src/design-system/tokens.css -o dist/design-system/eden-tokens.css",

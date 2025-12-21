@@ -1,6 +1,5 @@
 import { render } from "solid-js/web";
 import ShellOverlay from "./components/ShellOverlay";
-import "../design-system/eden.css";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -10,4 +9,3 @@ if (!root) {
 }
 
 render(() => <ShellOverlay />, root);
-

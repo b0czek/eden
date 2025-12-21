@@ -8,5 +8,6 @@ new Eden({
     gap: 8, // Gap between tiles in pixels
     padding: 8, // Padding around workspace in pixels
   },
-  userDirectory: "."
+  userDirectory: ".",
+  autostart: ["com.eden.eveshell"],
 });

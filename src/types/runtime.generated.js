@@ -26,7 +26,7 @@ export const COMMAND_NAMES = [
   "fs/delete",
   "package/install",
   "package/uninstall",
-  "package/list-installed",
+  "package/list",
   "package/toggle-hot-reload",
   "package/is-hot-reload-enabled",
   "package/get-icon",

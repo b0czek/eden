@@ -23,7 +23,8 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "@edenapp/types/global"
     ]
   },
   "include": [

@@ -11,7 +11,7 @@ export async function fetchAppIcon(appId: string): Promise<string | undefined> {
   }
 
   try {
-    const result = await window.edenAPI.shellCommand("package/get-icon", {
+    const result = await window.edenAPI!.shellCommand("package/get-icon", {
       appId,
     });
     iconCache.set(appId, result.icon);

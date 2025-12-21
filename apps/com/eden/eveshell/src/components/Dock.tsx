@@ -2,7 +2,7 @@ import { For, Show, createSignal, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
 import { AppInfo } from "../types";
-import appsViewIcon from "../assets/apps-grid-icon.svg";
+import appsViewIcon from "../../assets/apps-grid-icon.svg";
 
 interface DockProps {
   apps: AppInfo[];
