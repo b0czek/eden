@@ -6,7 +6,7 @@
   "author": "Eden Team",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm run clean && pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run copy-assets && pnpm run build:apps",
+    "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run copy-assets && pnpm run build:apps",
     "build:main": "tsc",
     "build:apps": "ts-node scripts/build-apps.ts",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
