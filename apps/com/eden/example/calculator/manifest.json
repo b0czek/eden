@@ -25,5 +25,6 @@
     "movable": true,
     "showTitle": false
   },
-  "permissions": {}
+  "permissions": {},
+  "icon": "icon.svg"
 }
