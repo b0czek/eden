@@ -4,11 +4,15 @@
       <stop stop-color="#7a7a7a"/>
       <stop offset="1" stop-color="#5a5a5a"/>
     </linearGradient>
+    <filter id="dropShadow" x="0" y="0" width="64" height="64" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
   </defs>
-  <!-- Squircle background with gradient -->
+  <!-- Squircle background with gradient and shadow -->
   <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
-  <!-- Document icon centered -->
-  <g transform="translate(16, 16)" stroke="#f0f0f0" stroke-width="1.5" fill="none">
+  
+  <!-- Document icon centered with thicker strokes -->
+  <g transform="translate(16, 16)" stroke="#f0f0f0" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18.67 2.67H8a2.67 2.67 0 0 0-2.67 2.66v21.34A2.67 2.67 0 0 0 8 29.33h16a2.67 2.67 0 0 0 2.67-2.66V10.67z"/>
     <polyline points="18.67 2.67 18.67 10.67 26.67 10.67"/>
     <line x1="21.33" y1="17.33" x2="10.67" y2="17.33"/>

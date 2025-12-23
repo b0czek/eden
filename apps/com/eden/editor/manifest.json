@@ -23,9 +23,7 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": [
-    "fs/*"
-  ],
+  "permissions": ["fs/*"],
   "fileHandlers": [
     {
       "name": "Text Files",
@@ -56,5 +54,5 @@
       "extensions": ["sh", "bash", "zsh", "fish"]
     }
   ],
-  "icon": "icon.png"
+  "icon": "icon.svg"
 }
