@@ -15,7 +15,7 @@ export type CSSInjectionMode = "full" | "tokens" | "none";
 
 export interface WindowInjectionOptions {
   /**
-   * Control Eden design system CSS injection (default: "full")
+   * Control Eden CSS injection (default: "full")
    * - "full": Complete CSS including tokens, utilities, and components
    * - "tokens": Only CSS custom property definitions (variables)
    * - "none": No CSS injection

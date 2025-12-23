@@ -15,7 +15,7 @@ body {
 
 body {
     font-family: var(--eden-font-family-base);
-    /* Use Eden design system background - foundation is the lowest Z layer */
+    /* Use Eden background - foundation is the lowest Z layer */
     background: var(--eden-color-bg-primary);
     color: var(--eden-color-text-primary);
 }

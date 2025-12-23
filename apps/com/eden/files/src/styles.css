@@ -1,6 +1,5 @@
 /**
  * File Explorer - Custom Styles
- * Using Eden Design System as foundation
  */
 
 * {
@@ -386,7 +385,7 @@ body {
   animation: eden-fade-in 0.3s ease-out;
 }
 
-/* ===== Display Options Dropdown (Design System Overrides) ===== */
+/* ===== Display Options Dropdown (Eden CSS Overrides) ===== */
 .display-options-position {
   align-items: flex-start;
   justify-content: flex-end;

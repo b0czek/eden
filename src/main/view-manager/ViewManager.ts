@@ -216,7 +216,7 @@ export class ViewManager extends EventEmitter {
   }
 
   /**
-   * Inject Eden Design System CSS into the view
+   * Inject Eden CSS into the view
    * Makes design tokens and utilities available to all apps
    * @param view - The WebContentsView to inject CSS into
    * @param mode - "full" for complete CSS or "tokens" for only CSS custom properties
@@ -226,20 +226,18 @@ export class ViewManager extends EventEmitter {
     mode: "full" | "tokens"
   ): Promise<void> {
     try {
-      const designSystemPath = path.join(__dirname, "../../design-system");
+      const edenCssPath = path.join(__dirname, "../../edencss");
       // Select the appropriate CSS file based on mode
       const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
-      const cssPath = path.join(designSystemPath, cssFileName);
+      const cssPath = path.join(edenCssPath, cssFileName);
 
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log(
-        `Successfully injected Eden Design System CSS (${mode}) into view`
-      );
+      console.log(`Successfully injected Eden CSS (${mode}) into view`);
     } catch (err) {
-      console.error("Failed to inject design system CSS:", err);
-      // Don't throw - app should still work without design system
+      console.error("Failed to inject Eden CSS:", err);
+      // Don't throw - app should still work without Eden CSS
     }
   }
 
@@ -355,14 +353,11 @@ export class ViewManager extends EventEmitter {
 
     // Set up view event handlers
     view.webContents.on("did-finish-load", () => {
-      // Inject the Eden Design System CSS first (based on mode)
+      // Inject the Eden CSS first (based on mode)
       const cssMode = this.getCSSInjectionMode(windowConfig);
       if (cssMode !== "none") {
         this.injectDesignSystemCSS(view, cssMode).catch((err) => {
-          console.error(
-            `Failed to inject design system CSS for ${appId}:`,
-            err
-          );
+          console.error(`Failed to inject Eden CSS for ${appId}:`, err);
         });
       }
 

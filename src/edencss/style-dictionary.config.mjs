@@ -22,11 +22,11 @@ export default {
             selector: ':root',
             outputReferences: true,
             fileHeader: () => [
-              'Eden Design System - Design Tokens',
+              'Eden CSS - Design Tokens',
               '',
               '⚠️  AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY',
               '',
-              'This file is generated from src/design-system/tokens.json',
+              'This file is generated from src/edencss/tokens.json',
               'Run `npm run tokens:build` to regenerate',
               '',
               'These CSS custom properties define the visual language of Eden.',
@@ -49,7 +49,7 @@ export default {
           options: {
             outputReferences: false,
             fileHeader: () => [
-              'Eden Design System - TypeScript/JavaScript API',
+              'Eden CSS - TypeScript/JavaScript API',
               '',
               '⚠️  AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY',
               '',
