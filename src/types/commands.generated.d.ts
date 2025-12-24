@@ -152,36 +152,16 @@ export interface FsCommands {
  */
 export interface NotificationCommands {
   /**
-   * Add a new notification.
+   * Push a new notification to subscribers.
    */
-  "notification/add": {
+  "notification/push": {
     args: {
     title: string;
     message: string;
     timeout?: number;
+    type?: import("./index").NotificationType;
   };
     response: import("./index").Notification;
-  };
-  /**
-   * Dismiss a notification by ID.
-   */
-  "notification/dismiss": {
-    args: { id: string };
-    response: { success: boolean };
-  };
-  /**
-   * Get all active notifications.
-   */
-  "notification/list": {
-    args: Record<string, never>;
-    response: { notifications: import("./index").Notification[] };
-  };
-  /**
-   * Clear all notifications.
-   */
-  "notification/clear": {
-    args: Record<string, never>;
-    response: { success: boolean };
   };
 }
 

@@ -137,6 +137,10 @@ export interface SearchResult {
   type: "file" | "folder";
 }
 
+/**
+ * Notification type/variant for styling
+ */
+export type NotificationType = "info" | "success" | "warning" | "danger";
 
 /**
  * Notification data structure
@@ -145,6 +149,9 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  timeout: number;
+  /** Timeout in ms. If 0 or omitted, notification persists until dismissed. */
+  timeout?: number;
   createdAt: number;
+  /** Notification type for styling (default: info) */
+  type?: NotificationType;
 }
