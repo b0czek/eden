@@ -13,6 +13,14 @@ export interface FileEvents {
 }
 
 /**
+ * NotificationEvents - Events for the "notification" namespace
+ */
+export interface NotificationEvents {
+  "notification/added": { notification: import("./index").Notification };
+  "notification/removed": { id: string };
+}
+
+/**
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
@@ -41,4 +49,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends FileEvents, PackageEvents, ProcessEvents, ViewEvents {}
+export interface AppEvents extends FileEvents, NotificationEvents, PackageEvents, ProcessEvents, ViewEvents {}

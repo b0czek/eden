@@ -1,0 +1,28 @@
+{
+  "id": "com.eden.toaster",
+  "name": "Toast Notifications",
+  "version": "1.0.0",
+  "overlay": true,
+  "autostart": true,
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 0,
+      "height": 0
+    },
+    "defaultPosition": {
+      "x": 0,
+      "y": 0
+    },
+    "injections": {
+      "css": "full",
+      "appFrame": false
+    }
+  }
+}

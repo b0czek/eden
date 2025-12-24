@@ -148,6 +148,44 @@ export interface FsCommands {
 }
 
 /**
+ * NotificationCommands - Commands for the "notification" namespace
+ */
+export interface NotificationCommands {
+  /**
+   * Add a new notification.
+   */
+  "notification/add": {
+    args: {
+    title: string;
+    message: string;
+    timeout?: number;
+  };
+    response: import("./index").Notification;
+  };
+  /**
+   * Dismiss a notification by ID.
+   */
+  "notification/dismiss": {
+    args: { id: string };
+    response: { success: boolean };
+  };
+  /**
+   * Get all active notifications.
+   */
+  "notification/list": {
+    args: Record<string, never>;
+    response: { notifications: import("./index").Notification[] };
+  };
+  /**
+   * Clear all notifications.
+   */
+  "notification/clear": {
+    args: Record<string, never>;
+    response: { success: boolean };
+  };
+}
+
+/**
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
@@ -341,4 +379,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, FileCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}

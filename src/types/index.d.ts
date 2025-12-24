@@ -136,3 +136,15 @@ export interface SearchResult {
   path: string;
   type: "file" | "folder";
 }
+
+
+/**
+ * Notification data structure
+ */
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  timeout: number;
+  createdAt: number;
+}
