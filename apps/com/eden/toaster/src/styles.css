@@ -1,0 +1,159 @@
+/* Eden Toaster Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font-family: var(--eden-font-family-base);
+  overflow: hidden;
+}
+
+#toast-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-md);
+  width: 100%;
+}
+
+.toast {
+  min-width: 320px;
+  max-width: 320px;
+  max-height: 400px; /* Clip very long messages */
+  padding: var(--eden-space-lg) var(--eden-space-lg);
+  padding-bottom: calc(
+    var(--eden-space-lg) + var(--eden-space-sm) + 4px
+  ); /* Extra space for progress bar */
+  overflow: hidden;
+
+  /* Override eden-card-glass large shadow due to restricted view's size */
+  box-shadow: var(--eden-shadow-xs);
+}
+
+.toast-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin-bottom: var(--eden-space-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-message {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+  line-height: var(--eden-font-line-height-normal);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  /* Clamp to ~15 lines with ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 15;
+  line-clamp: 15;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-xl);
+  cursor: pointer;
+  padding: var(--eden-space-xs);
+  border-radius: var(--eden-radius-sm);
+  transition: color var(--eden-transition-fast),
+    background var(--eden-transition-fast);
+}
+
+.toast-dismiss:hover {
+  color: var(--eden-color-text-primary);
+  background: var(--eden-color-bg-glass-light);
+}
+
+/* Progress container - positioned at bottom */
+.toast-progress-container {
+  position: absolute;
+  bottom: var(--eden-space-sm);
+  left: var(--eden-space-md);
+  right: var(--eden-space-md);
+}
+
+/* Override eden-progress sizing for toast */
+.toast-progress-container .eden-progress {
+  height: 4px;
+  border: none;
+  background: var(--eden-color-bg-glass-light);
+}
+
+/* Decaying progress bar animation */
+.toast-progress-container .eden-progress-bar {
+  animation: toast-decay linear forwards;
+}
+
+@keyframes toast-decay {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Ensure toast has relative positioning for progress bar */
+.toast {
+  position: relative;
+}
+
+/* ===== Notification Type Variants ===== */
+
+/* Success */
+.toast-success .eden-progress-bar {
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-success),
+    var(--eden-color-success-hover)
+  );
+  box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
+}
+
+/* Warning */
+.toast-warning .eden-progress-bar {
+  background: var(--eden-color-warning);
+  box-shadow: 0 0 10px rgba(255, 217, 61, 0.5);
+}
+
+/* Danger */
+.toast-danger .eden-progress-bar {
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-danger),
+    var(--eden-color-danger-hover)
+  );
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
+}
+
+/* ===== Dismiss All Button ===== */
+.dismiss-all-btn {
+  margin-bottom: var(--eden-space-sm);
+  width: 100%;
+  font-size: var(--eden-font-size-sm);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+}

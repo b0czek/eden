@@ -148,6 +148,24 @@ export interface FsCommands {
 }
 
 /**
+ * NotificationCommands - Commands for the "notification" namespace
+ */
+export interface NotificationCommands {
+  /**
+   * Push a new notification to subscribers.
+   */
+  "notification/push": {
+    args: {
+    title: string;
+    message: string;
+    timeout?: number;
+    type?: import("./index").NotificationType;
+  };
+    response: import("./index").Notification;
+  };
+}
+
+/**
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
@@ -341,4 +359,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, FileCommands, FsCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}

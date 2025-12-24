@@ -24,6 +24,7 @@ export const COMMAND_NAMES = [
   "fs/stat",
   "fs/search",
   "fs/delete",
+  "notification/push",
   "package/install",
   "package/uninstall",
   "package/list",
@@ -49,6 +50,8 @@ export const COMMAND_NAMES = [
 // Event names array
 export const APP_EVENT_NAMES = [
   "file/opened",
+  "notification/added",
+  "notification/removed",
   "package/installed",
   "package/uninstalled",
   "process/launched",

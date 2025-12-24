@@ -1,6 +1,7 @@
 {
   "prebuiltApps": [
     "com.eden.eveshell",
+    "com.eden.toaster",
     "com.eden.files",
     "com.eden.editor",
     "com.eden.example.calculator",

@@ -16,6 +16,7 @@ import {
 import { ViewManager, ViewHandler } from "./view-manager";
 import { FilesystemManager } from "./filesystem";
 import { FileOpenManager } from "./file-open";
+import { NotificationManager } from "./notification";
 import { container } from "tsyringe";
 
 export class Eden {
@@ -36,6 +37,7 @@ export class Eden {
   private permissionRegistry: PermissionRegistry;
   private fileOpenManager: FileOpenManager;
   private autostartManager: AutostartManager;
+  private notificationManager: NotificationManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -115,6 +117,10 @@ export class Eden {
     // Initialize Autostart Manager
     this.autostartManager = container.resolve(AutostartManager);
     container.registerInstance("AutostartManager", this.autostartManager);
+
+    // Initialize Notification Manager
+    this.notificationManager = container.resolve(NotificationManager);
+    container.registerInstance("NotificationManager", this.notificationManager);
 
     this.setupAppEventHandlers();
   }
