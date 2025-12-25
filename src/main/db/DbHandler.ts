@@ -23,7 +23,7 @@ export class DbHandler {
   async handleGet(args: {
     key: string;
     _callerAppId: string;
-  }): Promise<{ value: any | undefined }> {
+  }): Promise<{ value: string | undefined }> {
     const { key } = args;
     const value = await this.dbManager.get(args._callerAppId, key);
     return { value };
@@ -35,7 +35,7 @@ export class DbHandler {
   @EdenHandler("set", { permission: "rw" })
   async handleSet(args: {
     key: string;
-    value: any;
+    value: string;
     _callerAppId: string;
   }): Promise<{ success: boolean }> {
     const { key, value } = args;
@@ -102,7 +102,7 @@ export class DbHandler {
   async handleGetSuperuser(args: {
     appId: string;
     key: string;
-  }): Promise<{ value: any | undefined }> {
+  }): Promise<{ value: string | undefined }> {
     const { appId, key } = args;
     const value = await this.dbManager.get(appId, key);
     return { value };
@@ -115,7 +115,7 @@ export class DbHandler {
   async handleSetSuperuser(args: {
     appId: string;
     key: string;
-    value: any;
+    value: string;
   }): Promise<{ success: boolean }> {
     const { appId, key, value } = args;
     await this.dbManager.set(appId, key, value);

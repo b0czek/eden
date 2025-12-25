@@ -65,15 +65,29 @@ export class DbManager {
   /**
    * Get a value from storage for an app
    */
-  async get(appId: string, key: string): Promise<any | undefined> {
+  async get(appId: string, key: string): Promise<string | undefined> {
     const namespacedKey = this.getNamespacedKey(appId, key);
-    return await this.keyv.get(namespacedKey);
+    const value = await this.keyv.get(namespacedKey);
+    // Runtime check: ensure we always return string or undefined
+    if (value !== undefined && typeof value !== "string") {
+      console.warn(
+        `[DbManager] Non-string value found for key ${key}, converting to string`
+      );
+      return String(value);
+    }
+    return value;
   }
 
   /**
    * Set a value in storage for an app
    */
-  async set(appId: string, key: string, value: any): Promise<void> {
+  async set(appId: string, key: string, value: string): Promise<void> {
+    // Runtime check: ensure value is a string
+    if (typeof value !== "string") {
+      throw new Error(
+        `[DbManager] Value must be a string, got ${typeof value}`
+      );
+    }
     const namespacedKey = this.getNamespacedKey(appId, key);
     await this.keyv.set(namespacedKey, value);
   }

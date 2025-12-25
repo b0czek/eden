@@ -43,7 +43,7 @@ const App: Component = () => {
     try {
       const result = await window.edenAPI!.shellCommand('db/get', { key: 'display-preferences' });
       if (result.value) {
-        setDisplayPreferences(result.value);
+        setDisplayPreferences(JSON.parse(result.value));
       }
     } catch (error) {
       console.error('Failed to load display preferences:', error);
@@ -210,7 +210,7 @@ const App: Component = () => {
     try {
       await window.edenAPI!.shellCommand('db/set', { 
         key: 'display-preferences', 
-        value: newPreferences 
+        value: JSON.stringify(newPreferences) 
       });
     } catch (error) {
       console.error('Failed to save display preferences:', error);

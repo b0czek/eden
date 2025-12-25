@@ -28,7 +28,7 @@ export interface DbCommands {
   "db/get": {
     args: {
     key: string };
-    response: { value: any | undefined };
+    response: { value: string | undefined };
   };
   /**
    * Set a value in database (scoped to caller's app)
@@ -36,7 +36,7 @@ export interface DbCommands {
   "db/set": {
     args: {
     key: string;
-    value: any };
+    value: string };
     response: { success: boolean };
   };
   /**
@@ -76,7 +76,7 @@ export interface DbCommands {
     args: {
     appId: string;
     key: string };
-    response: { value: any | undefined };
+    response: { value: string | undefined };
   };
   /**
    * Set a value in any app's namespace (superuser only)
@@ -85,7 +85,7 @@ export interface DbCommands {
     args: {
     appId: string;
     key: string;
-    value: any };
+    value: string };
     response: { success: boolean };
   };
   /**
