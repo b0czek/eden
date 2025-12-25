@@ -43,7 +43,18 @@ export interface ProcessEvents {
  */
 export interface ViewEvents {
   "view/bounds-updated": import("./index").ViewBounds;
-  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize };
+  "view/global-bounds-changed": {
+    workspaceBounds: import("./index").ViewBounds;
+    windowSize: import("./index").WindowSize;
+  };
+  "view/view-loaded": { viewId: number; appId: string; overlay: boolean };
+  "view/view-load-failed": {
+    viewId: number;
+    appId: string;
+    errorCode: number;
+    errorDescription: string;
+  };
+  "view/mode-changed": { mode: "floating" | "tiled"; bounds: import("./index").ViewBounds };
 }
 
 /**

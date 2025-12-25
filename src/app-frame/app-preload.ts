@@ -150,7 +150,9 @@ contextBridge.exposeInMainWorld("edenAPI", {
    * @returns {Promise<string[]>} The launch arguments array
    */
   getLaunchArgs: (): Promise<string[]> => {
-    return ipcRenderer.invoke("get-view-data").then((data: any) => data.launchArgs || []);
+    return ipcRenderer
+      .invoke("get-view-data")
+      .then((data: any) => data.launchArgs || []);
   },
 });
 

@@ -1,16 +1,17 @@
 import { ViewManager } from "../view-manager/ViewManager";
 import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
+import { EventName, EventData } from "@edenapp/types";
 
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private subscriptions: Map<string, Set<number>> = new Map();
+  private internalSubscriptions: Map<string, Set<(payload: any) => void>> =
+    new Map();
   private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
     this.viewManager = viewManager;
   }
-
-
 
   /**
    * Set the permission registry for permission checking
@@ -32,7 +33,12 @@ export class EventSubscriberManager {
     // Check event permission if required
     const requiredPermission = getEventPermission(eventName);
     if (requiredPermission && this.permissionRegistry) {
-      if (!this.permissionRegistry.hasPermission(viewInfo.appId, requiredPermission)) {
+      if (
+        !this.permissionRegistry.hasPermission(
+          viewInfo.appId,
+          requiredPermission
+        )
+      ) {
         throw new Error(
           `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
         );
@@ -44,8 +50,27 @@ export class EventSubscriberManager {
     }
 
     this.subscriptions.get(eventName)!.add(viewId);
-    console.log(`View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`);
+    console.log(
+      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`
+    );
     return true;
+  }
+
+  /**
+   * Subscribe an internal callback (for managers) to an event
+   * Unlike view subscriptions, these are in-process callbacks
+   */
+  public subscribeInternal<T extends EventName>(
+    event: T,
+    callback: (data: EventData<T>) => void
+  ): void {
+    if (!this.internalSubscriptions.has(event)) {
+      this.internalSubscriptions.set(event, new Set());
+    }
+    this.internalSubscriptions
+      .get(event)!
+      .add(callback as (payload: any) => void);
+    console.log(`Internal subscriber added for event: ${event}`);
   }
 
   /**
@@ -77,17 +102,28 @@ export class EventSubscriberManager {
   }
 
   /**
-   * Send event only to subscribed views
+   * Send event only to subscribed views and internal callbacks
    */
   public notify(eventName: string, payload: any): void {
-    const subscribedViewIds = this.getSubscribedViews(eventName);
-
-    if (subscribedViewIds.length === 0) {
-      return;
+    // Notify internal subscribers first
+    const internalCallbacks = this.internalSubscriptions.get(eventName);
+    if (internalCallbacks) {
+      for (const callback of internalCallbacks) {
+        try {
+          callback(payload);
+        } catch (error) {
+          console.error(
+            `Error in internal subscriber for ${eventName}:`,
+            error
+          );
+        }
+      }
     }
 
+    // Notify view subscribers
+    const subscribedViewIds = this.getSubscribedViews(eventName);
     for (const viewId of subscribedViewIds) {
-      this.viewManager.sendToView(viewId, 'shell-message', {
+      this.viewManager.sendToView(viewId, "shell-message", {
         type: eventName,
         payload,
       });
@@ -103,7 +139,7 @@ export class EventSubscriberManager {
       return false;
     }
 
-    return this.viewManager.sendToView(viewId, 'shell-message', {
+    return this.viewManager.sendToView(viewId, "shell-message", {
       type: eventName,
       payload,
     });

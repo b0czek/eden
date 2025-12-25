@@ -75,9 +75,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     // Register per-app channels when a view loads
-    this.viewManager.on(
-      "view-loaded",
-      ({ viewId, appId }: { viewId: number; appId: string }) => {
+    // Subscribe via ipcBridge since ViewManager emits via EdenEmitter
+    this.ipcBridge.eventSubscribers.subscribeInternal(
+      "view/view-loaded",
+      ({ viewId, appId }) => {
         console.log(`View loaded for app ${appId}, registering channels...`);
 
         // Register the per-app IPC channels
@@ -136,24 +137,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       }
 
       // Create view for frontend
-      let viewId: number;
-      if (manifest.overlay) {
-        viewId = this.viewManager.createOverlayView(
-          appId,
-          manifest,
-          installPath,
-          bounds,
-          launchArgs
-        );
-      } else {
-        viewId = this.viewManager.createAppView(
-          appId,
-          manifest,
-          installPath,
-          bounds || { x: 0, y: 0, width: 800, height: 600 },
-          launchArgs
-        );
-      }
+      const viewId = this.viewManager.createView(
+        appId,
+        manifest,
+        installPath,
+        bounds,
+        launchArgs
+      );
 
       // Create app instance
       const instance: AppInstance = {

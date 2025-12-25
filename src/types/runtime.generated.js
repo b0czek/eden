@@ -60,4 +60,7 @@ export const APP_EVENT_NAMES = [
   "process/exited",
   "view/bounds-updated",
   "view/global-bounds-changed",
+  "view/view-loaded",
+  "view/view-load-failed",
+  "view/mode-changed",
 ];

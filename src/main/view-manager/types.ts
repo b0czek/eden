@@ -13,6 +13,7 @@ export const Z_LAYERS = {
 } as const;
 
 export interface ViewInfo {
+  id: number;
   view: WebContentsView;
   appId: string;
   manifest: AppManifest;
@@ -23,20 +24,4 @@ export interface ViewInfo {
   tileIndex?: number; // Only for tiled app views
   zIndex?: number; // For floating apps and all overlays
   launchArgs?: string[]; // Arguments passed when launching this view
-}
-
-/**
- * Options for creating a view
- */
-export interface CreateViewOptions {
-  appId: string;
-  manifest: AppManifest;
-  installPath: string;
-  preloadScript: string;
-  viewType: ViewType;
-  viewMode: ViewMode;
-  viewBounds: Bounds;
-  tileIndex?: number;
-  zIndex?: number;
-  launchArgs?: string[];
 }

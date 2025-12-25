@@ -35,14 +35,14 @@ export class FloatingWindowController {
     const width = windowConfig?.minSize?.width
       ? Math.max(defaultWidth, windowConfig.minSize.width)
       : windowConfig?.maxSize?.width
-        ? Math.min(defaultWidth, windowConfig.maxSize.width)
-        : defaultWidth;
+      ? Math.min(defaultWidth, windowConfig.maxSize.width)
+      : defaultWidth;
 
     const height = windowConfig?.minSize?.height
       ? Math.max(defaultHeight, windowConfig.minSize.height)
       : windowConfig?.maxSize?.height
-        ? Math.min(defaultHeight, windowConfig.maxSize.height)
-        : defaultHeight;
+      ? Math.min(defaultHeight, windowConfig.maxSize.height)
+      : defaultHeight;
 
     let x: number;
     let y: number;

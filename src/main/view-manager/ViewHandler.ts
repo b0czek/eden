@@ -6,13 +6,16 @@ import { AppInstance, ViewBounds, WindowSize } from "@edenapp/types";
 /**
  * Events emitted by the ViewHandler
  */
-interface ViewNamespaceEvents {
+interface ViewHandlerEvents {
   "bounds-updated": ViewBounds;
-  "global-bounds-changed": { workspaceBounds: ViewBounds; windowSize: WindowSize };
+  "global-bounds-changed": {
+    workspaceBounds: ViewBounds;
+    windowSize: WindowSize;
+  };
 }
 
 @EdenNamespace("view")
-export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
+export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   private viewManager: ViewManager;
   private mouseTracker: MouseTracker;
 
@@ -56,8 +59,8 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
     const viewIds = this.viewManager.getViewsByAppId(appId);
     if (viewIds.length > 0) {
       // Use the first view (typically there's only one per appId)
-      const success = this.viewManager.setViewBounds(viewIds[0], bounds);
-      return { success };
+      this.viewManager.setViewBounds(viewIds[0], bounds);
+      return { success: true };
     }
 
     throw new Error(`App or view ${appId} is not running`);
@@ -77,10 +80,12 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
       throw new Error(`App ${appId} is not running`);
     }
 
-    const success = visible
-      ? this.viewManager.showView(viewIds[0])
-      : this.viewManager.hideView(viewIds[0]);
-    return { success };
+    if (visible) {
+      this.viewManager.showView(viewIds[0]);
+    } else {
+      this.viewManager.hideView(viewIds[0]);
+    }
+    return { success: true };
   }
 
   /**
@@ -93,8 +98,8 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
     if (viewIds.length === 0) {
       throw new Error(`App ${appId} is not running`);
     }
-    const success = this.viewManager.bringToFront(viewIds[0]);
-    return { success };
+    this.viewManager.showView(viewIds[0]);
+    return { success: true };
   }
 
   /**
@@ -113,7 +118,7 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
 
     this.notify("global-bounds-changed", {
       workspaceBounds: bounds,
-      windowSize
+      windowSize,
     });
 
     return { success: true };
@@ -134,8 +139,8 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
       throw new Error(`App ${appId} is not running`);
     }
 
-    const success = this.viewManager.setViewMode(viewIds[0], mode);
-    return { success };
+    this.viewManager.setViewMode(viewIds[0], mode);
+    return { success: true };
   }
 
   /**
@@ -313,6 +318,5 @@ export class ViewHandler extends EdenEmitter<ViewNamespaceEvents> {
   @EdenHandler("window-size")
   async handleGetWindowSize(): Promise<WindowSize> {
     return this.viewManager.getWindowSize();
-
   }
 }

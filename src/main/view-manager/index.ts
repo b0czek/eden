@@ -3,5 +3,8 @@ export { LayoutCalculator } from "./LayoutCalculator";
 export { MouseTracker } from "./MouseTracker";
 export { FloatingWindowController } from "./FloatingWindowController";
 export { DevToolsManager } from "./DevToolsManager";
+export { TilingManager } from "./TilingManager";
+export { ViewCreator } from "./ViewCreator";
+export { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
 export type { ViewInfo, ViewMode } from "./types";
 export { ViewHandler } from "./ViewHandler";
