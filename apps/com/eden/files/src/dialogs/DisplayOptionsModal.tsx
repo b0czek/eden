@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import type { Component } from "solid-js";
 import type { DisplayPreferences, ViewStyle, ItemSize, SortBy, SortOrder } from "../types";
+import { FaSolidGrip, FaSolidList, FaSolidArrowUp, FaSolidArrowDown } from "solid-icons/fa";
 
 interface DisplayOptionsModalProps {
     show: boolean;
@@ -55,14 +56,14 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                                     classList={{ 'eden-btn-primary': props.preferences.viewStyle === 'grid' }}
                                     onClick={() => updatePreference('viewStyle', 'grid')}
                                 >
-                                    ⊞ Grid
+                                    <FaSolidGrip /> Grid
                                 </button>
                                 <button
                                     class="eden-btn eden-btn-md"
                                     classList={{ 'eden-btn-primary': props.preferences.viewStyle === 'list' }}
                                     onClick={() => updatePreference('viewStyle', 'list')}
                                 >
-                                    ☰ List
+                                    <FaSolidList /> List
                                 </button>
                             </div>
                         </div>
@@ -107,7 +108,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                                     onClick={() => updatePreference('sortOrder', props.preferences.sortOrder === 'asc' ? 'desc' : 'asc')}
                                     title={props.preferences.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
                                 >
-                                    {props.preferences.sortOrder === 'asc' ? '↑' : '↓'}
+                                    {props.preferences.sortOrder === 'asc' ? <FaSolidArrowUp /> : <FaSolidArrowDown />}
                                 </button>
                             </div>
                         </div>

@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
 import Omnibox from "./Omnibox";
+import { FaSolidArrowLeft, FaSolidArrowRight, FaSolidArrowUp, FaSolidFolderPlus, FaSolidFileMedical, FaSolidEllipsis } from "solid-icons/fa";
 
 interface Breadcrumb {
   name: string;
@@ -32,7 +33,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             disabled={props.historyIndex === 0}
             title="Go back"
           >
-            ←
+            <FaSolidArrowLeft />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
@@ -40,7 +41,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             disabled={props.historyIndex >= props.historyLength - 1}
             title="Go forward"
           >
-            →
+            <FaSolidArrowRight />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
@@ -48,7 +49,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             disabled={props.currentPath === "/"}
             title="Go up"
           >
-            ↑
+            <FaSolidArrowUp />
           </button>
         </div>
 
@@ -64,21 +65,21 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             onClick={props.onNewFolder}
             title="New Folder"
           >
-            📁+
+            <FaSolidFolderPlus />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFile}
             title="New File"
           >
-            📄+
+            <FaSolidFileMedical />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onOpenDisplayOptions}
             title="Display Options"
           >
-            ⋯
+            <FaSolidEllipsis />
           </button>
         </div>
       </div>

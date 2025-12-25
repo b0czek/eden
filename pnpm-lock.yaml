@@ -68,6 +68,10 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25))
 
   apps/com/eden/debug/db-explorer:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -129,6 +133,10 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
 
   apps/com/eden/files:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -2858,6 +2866,11 @@ packages:
   socks@2.8.7:
     resolution: {integrity: sha512-HLpt+uLy/pxB+bum/9DzAgiKS8CX1EvbWxI4zlmgGCExImLdiad2iCwXT5Z4c9c3Eq8rP2318mPW2c+QbtjK8A==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
+
+  solid-icons@1.1.0:
+    resolution: {integrity: sha512-IesTfr/F1ElVwH2E1110s2RPXH4pujKfSs+koT8rwuTAdleO5s26lNSpqJV7D1+QHooJj18mcOiz2PIKs0ic+A==}
+    peerDependencies:
+      solid-js: '*'
 
   solid-js@1.9.10:
     resolution: {integrity: sha512-Coz956cos/EPDlhs6+jsdTxKuJDPT7B5SVIWgABwROyxjY7Xbr8wkzD68Et+NxnV7DLJ3nJdAC2r9InuV/4Jew==}
@@ -6170,6 +6183,10 @@ snapshots:
       ip-address: 10.1.0
       smart-buffer: 4.2.0
     optional: true
+
+  solid-icons@1.1.0(solid-js@1.9.10):
+    dependencies:
+      solid-js: 1.9.10
 
   solid-js@1.9.10:
     dependencies:
