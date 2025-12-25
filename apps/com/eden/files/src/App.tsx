@@ -1,4 +1,4 @@
-import { createSignal, createEffect } from "solid-js";
+import { createSignal, createEffect, onMount } from "solid-js";
 import type { Component } from "solid-js";
 import type { FileItem, DisplayPreferences } from "./types";
 import { joinPath, getParentPath, isValidName } from "./utils";
@@ -36,6 +36,18 @@ const App: Component = () => {
     itemSize: 'medium',
     sortBy: 'name',
     sortOrder: 'asc',
+  });
+
+  // Load preferences from database on mount
+  onMount(async () => {
+    try {
+      const result = await window.edenAPI!.shellCommand('db/get', { key: 'display-preferences' });
+      if (result.value) {
+        setDisplayPreferences(result.value);
+      }
+    } catch (error) {
+      console.error('Failed to load display preferences:', error);
+    }
   });
 
   const loadDirectory = async (path: string) => {
@@ -186,12 +198,22 @@ const App: Component = () => {
     });
   };
 
-  const handlePreferencesChange = (newPreferences: DisplayPreferences) => {
+  const handlePreferencesChange = async (newPreferences: DisplayPreferences) => {
     setDisplayPreferences(newPreferences);
     // Re-sort existing items with new preferences
     const currentItems = items();
     if (currentItems.length > 0) {
       setItems(sortItems(currentItems));
+    }
+    
+    // Persist preferences to database
+    try {
+      await window.edenAPI!.shellCommand('db/set', { 
+        key: 'display-preferences', 
+        value: newPreferences 
+      });
+    } catch (error) {
+      console.error('Failed to save display preferences:', error);
     }
   };
 

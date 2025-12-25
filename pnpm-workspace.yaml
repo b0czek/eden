@@ -7,3 +7,4 @@ onlyBuiltDependencies:
   - electron
   - esbuild
   - lightningcss-cli
+  - sqlite3

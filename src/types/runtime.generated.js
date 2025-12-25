@@ -9,6 +9,18 @@
 // Command names array
 export const COMMAND_NAMES = [
   "system/info",
+  "db/get",
+  "db/set",
+  "db/delete",
+  "db/has",
+  "db/clear",
+  "db/list",
+  "db/get/su",
+  "db/set/su",
+  "db/delete/su",
+  "db/has/su",
+  "db/clear/su",
+  "db/list/su",
   "file/open",
   "file/open-with",
   "file/get-handler",

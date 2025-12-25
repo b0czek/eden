@@ -51,9 +51,7 @@ export class CommandRegistry {
     const fullCommand = `${namespace}/${command}`;
 
     if (this.handlers.has(fullCommand)) {
-      console.warn(
-        `Command handler for "${fullCommand}" is being overwritten`
-      );
+      console.warn(`Command handler for "${fullCommand}" is being overwritten`);
     }
 
     // Look up permission from decorator metadata
@@ -98,7 +96,13 @@ export class CommandRegistry {
     for (const [command, methodName] of handlers.entries()) {
       const handler = manager[methodName];
       if (typeof handler === "function") {
-        this.register(namespace, command, handler.bind(manager), manager, methodName);
+        this.register(
+          namespace,
+          command,
+          handler.bind(manager),
+          manager,
+          methodName
+        );
       }
     }
   }
@@ -131,7 +135,9 @@ export class CommandRegistry {
     }
 
     try {
-      return await metadata.handler.call(metadata.target, args);
+      // Inject caller's appId into args if provided (for handlers that need caller context)
+      const argsWithAppId = appId ? { ...args, _callerAppId: appId } : args;
+      return await metadata.handler.call(metadata.target, argsWithAppId);
     } catch (error) {
       console.error(`Error executing command ${fullCommand}:`, error);
       throw error;

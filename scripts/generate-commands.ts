@@ -310,7 +310,15 @@ function extractCommandHandlers(
           const param = params[0];
           const typeNode = param.getTypeNode();
           if (typeNode) {
-            argsType = typeNode.getText();
+            let rawType = typeNode.getText();
+
+            // Filter out properties starting with underscore (like _callerAppId)
+            // This handles simple object literal types like { key: string; _callerAppId: string }
+            argsType = rawType
+              .replace(/[;,]\s*_\w+\s*:\s*[^;,}]+/g, "")
+              .replace(/{\s*_\w+\s*:\s*[^;,}]+\s*[;,]?\s*/g, "{ ")
+              .replace(/[;,]\s*}/g, " }")
+              .trim();
           }
         }
 

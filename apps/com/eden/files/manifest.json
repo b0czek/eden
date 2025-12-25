@@ -23,6 +23,6 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["fs/*"],
+  "permissions": ["fs/*", "db/rw"],
   "icon": "icon.svg"
 }

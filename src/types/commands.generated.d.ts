@@ -19,6 +19,112 @@ export interface SystemCommands {
 }
 
 /**
+ * DbCommands - Commands for the "db" namespace
+ */
+export interface DbCommands {
+  /**
+   * Get a value from database (scoped to caller's app)
+   */
+  "db/get": {
+    args: {
+    key: string };
+    response: { value: any | undefined };
+  };
+  /**
+   * Set a value in database (scoped to caller's app)
+   */
+  "db/set": {
+    args: {
+    key: string;
+    value: any };
+    response: { success: boolean };
+  };
+  /**
+   * Delete a key from database (scoped to caller's app)
+   */
+  "db/delete": {
+    args: {
+    key: string };
+    response: { success: boolean };
+  };
+  /**
+   * Check if a key exists (scoped to caller's app)
+   */
+  "db/has": {
+    args: {
+    key: string };
+    response: { exists: boolean };
+  };
+  /**
+   * Clear all keys (scoped to caller's app)
+   */
+  "db/clear": {
+    args: { };
+    response: { success: boolean };
+  };
+  /**
+   * List all keys (scoped to caller's app)
+   */
+  "db/list": {
+    args: { };
+    response: { keys: string[] };
+  };
+  /**
+   * Get a value from any app's namespace (superuser only)
+   */
+  "db/get/su": {
+    args: {
+    appId: string;
+    key: string };
+    response: { value: any | undefined };
+  };
+  /**
+   * Set a value in any app's namespace (superuser only)
+   */
+  "db/set/su": {
+    args: {
+    appId: string;
+    key: string;
+    value: any };
+    response: { success: boolean };
+  };
+  /**
+   * Delete a key from any app's namespace (superuser only)
+   */
+  "db/delete/su": {
+    args: {
+    appId: string;
+    key: string };
+    response: { success: boolean };
+  };
+  /**
+   * Check if a key exists in any app's namespace (superuser only)
+   */
+  "db/has/su": {
+    args: {
+    appId: string;
+    key: string };
+    response: { exists: boolean };
+  };
+  /**
+   * Clear all keys in any app's namespace (superuser only)
+   */
+  "db/clear/su": {
+    args: {
+    appId: string };
+    response: { success: boolean };
+  };
+  /**
+   * List all keys in any app's namespace (superuser only)
+   */
+  "db/list/su": {
+    args: {
+    appId: string };
+    response: { keys: string[] };
+  };
+}
+
+/**
  * FileCommands - Commands for the "file" namespace
  */
 export interface FileCommands {
@@ -83,8 +189,7 @@ export interface FsCommands {
   "fs/read": {
     args: {
     path: string;
-    encoding?: BufferEncoding;
-  };
+    encoding?: BufferEncoding };
     response: string;
   };
   /**
@@ -94,8 +199,7 @@ export interface FsCommands {
     args: {
     path: string;
     content: string;
-    encoding?: BufferEncoding;
-  };
+    encoding?: BufferEncoding };
     response: void;
   };
   /**
@@ -133,8 +237,7 @@ export interface FsCommands {
     args: {
     path: string;
     pattern: string;
-    limit?: number;
-  };
+    limit?: number };
     response: import("./index").SearchResult[];
   };
   /**
@@ -159,8 +262,7 @@ export interface NotificationCommands {
     title: string;
     message: string;
     timeout?: number;
-    type?: import("./index").NotificationType;
-  };
+    type?: import("./index").NotificationType };
     response: import("./index").Notification;
   };
 }
@@ -196,8 +298,7 @@ export interface PackageCommands {
    */
   "package/toggle-hot-reload": {
     args: {
-    appId: string;
-  };
+    appId: string };
     response: { enabled: boolean };
   };
   /**
@@ -205,8 +306,7 @@ export interface PackageCommands {
    */
   "package/is-hot-reload-enabled": {
     args: {
-    appId: string;
-  };
+    appId: string };
     response: { enabled: boolean };
   };
   /**
@@ -214,8 +314,7 @@ export interface PackageCommands {
    */
   "package/get-icon": {
     args: {
-    appId: string;
-  };
+    appId: string };
     response: { icon: string | undefined };
   };
 }
@@ -230,8 +329,7 @@ export interface ProcessCommands {
   "process/launch": {
     args: {
     appId: string;
-    bounds?: import("./index").ViewBounds;
-  };
+    bounds?: import("./index").ViewBounds };
     response: import("./index").LaunchResult;
   };
   /**
@@ -261,8 +359,7 @@ export interface ViewCommands {
   "view/update-view-bounds": {
     args: {
     appId: string;
-    bounds: import("./index").ViewBounds;
-  };
+    bounds: import("./index").ViewBounds };
     response: { success: boolean };
   };
   /**
@@ -271,8 +368,7 @@ export interface ViewCommands {
   "view/set-view-visibility": {
     args: {
     appId: string;
-    visible: boolean;
-  };
+    visible: boolean };
     response: { success: boolean };
   };
   /**
@@ -288,8 +384,7 @@ export interface ViewCommands {
   "view/update-global-bounds": {
     args: {
     bounds: import("./index").ViewBounds;
-    windowSize: import("./index").WindowSize;
-  };
+    windowSize: import("./index").WindowSize };
     response: { success: boolean };
   };
   /**
@@ -298,8 +393,7 @@ export interface ViewCommands {
   "view/toggle-view-mode": {
     args: {
     appId: string;
-    mode?: "floating" | "tiled";
-  };
+    mode?: "floating" | "tiled" };
     response: { success: boolean };
   };
   /**
@@ -309,8 +403,7 @@ export interface ViewCommands {
     args: {
     appId: string;
     startX: number;
-    startY: number;
-  };
+    startY: number };
     response: { success: boolean };
   };
   /**
@@ -334,8 +427,7 @@ export interface ViewCommands {
     args: {
     appId: string;
     startX: number;
-    startY: number;
-  };
+    startY: number };
     response: { success: boolean };
   };
   /**
@@ -343,8 +435,7 @@ export interface ViewCommands {
    */
   "view/end-resize": {
     args: {
-    appId: string;
-  };
+    appId: string };
     response: { success: boolean };
   };
   /**
@@ -359,4 +450,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, DbCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}
