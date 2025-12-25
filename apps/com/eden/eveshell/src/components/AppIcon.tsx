@@ -23,7 +23,7 @@ export default function AppIcon(props: AppIconProps) {
   return (
     <div class="app-icon" onClick={props.onClick} title={props.appName}>
       <div class="icon-container">
-        <img src={iconSrc()} alt={props.appName} />
+        <img src={iconSrc()} alt={props.appName} draggable={false} />
         <Show when={props.isRunning}>
           <div class="running-indicator"></div>
         </Show>
