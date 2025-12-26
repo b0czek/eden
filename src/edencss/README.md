@@ -155,6 +155,36 @@ Variants: `eden-card-glass`, `eden-card-elevated`, `eden-card-interactive`
 </ul>
 ```
 
+### Sidebar
+
+```html
+<aside class="eden-sidebar">
+  <div class="eden-sidebar-section">
+    <div class="eden-sidebar-section-title">Section</div>
+    <div class="eden-sidebar-items">
+      <div class="eden-sidebar-item">
+        <div class="eden-sidebar-item-icon">📁</div>
+        <span class="eden-sidebar-item-text">Item</span>
+      </div>
+      <div class="eden-sidebar-item eden-sidebar-item-selected">
+        <div class="eden-sidebar-item-icon">⚙️</div>
+        <span class="eden-sidebar-item-text">Selected</span>
+      </div>
+    </div>
+  </div>
+  <div class="eden-sidebar-divider"></div>
+  <div class="eden-sidebar-section eden-sidebar-section-scrollable">
+    <div class="eden-sidebar-items eden-sidebar-items-scrollable">
+      <!-- scrollable items -->
+    </div>
+  </div>
+</aside>
+```
+
+Sizes: `eden-sidebar-compact`, `eden-sidebar-wide`  
+States: `eden-sidebar-item-selected`, `eden-sidebar-item-disabled`  
+Extras: `eden-sidebar-header`, `eden-sidebar-footer`, `eden-sidebar-search`
+
 ### Tabs
 
 ```html
