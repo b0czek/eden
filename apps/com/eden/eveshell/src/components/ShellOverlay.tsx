@@ -1,6 +1,7 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
+import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
 import {
   ViewBounds,
   WindowSize,
@@ -12,18 +13,95 @@ import { AppInfo } from "../types";
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
 
+// Database key for persisting pinned dock apps
+const PINNED_DOCK_APPS_KEY = "pinned-dock-apps";
+
 export default function ShellOverlay() {
   const [runningApps, setRunningApps] = createSignal<AppInstance[]>([]);
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
+  const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
+  const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
 
-  // Running apps for the dock (use manifest embedded in AppInstance)
-  const dockApps = (): AppInfo[] => {
-    return runningApps().map((instance) => ({
-      id: instance.manifest.id,
-      name: instance.manifest.name,
-      isRunning: true,
-    }));
+  // Load pinned apps from database
+  const loadPinnedApps = async () => {
+    try {
+      const result = await window.edenAPI!.shellCommand("db/get", {
+        key: PINNED_DOCK_APPS_KEY,
+      });
+      if (result.value) {
+        const parsed = JSON.parse(result.value);
+        if (Array.isArray(parsed)) {
+          setPinnedDockApps(parsed);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load pinned dock apps:", error);
+    }
+  };
+
+  // Save pinned apps to database
+  const savePinnedApps = async (appIds: string[]) => {
+    try {
+      await window.edenAPI!.shellCommand("db/set", {
+        key: PINNED_DOCK_APPS_KEY,
+        value: JSON.stringify(appIds),
+      });
+    } catch (error) {
+      console.error("Failed to save pinned dock apps:", error);
+    }
+  };
+
+  // Add an app to the dock (pin it)
+  const handleAddToDock = async (appId: string) => {
+    const current = pinnedDockApps();
+    if (!current.includes(appId)) {
+      const updated = [...current, appId];
+      setPinnedDockApps(updated);
+      await savePinnedApps(updated);
+    }
+  };
+
+  // Remove an app from the dock (unpin it)
+  const handleRemoveFromDock = async (appId: string) => {
+    const current = pinnedDockApps();
+    const updated = current.filter((id) => id !== appId);
+    setPinnedDockApps(updated);
+    await savePinnedApps(updated);
+  };
+
+  // Check if an app is pinned to the dock
+  const isAppPinned = (appId: string): boolean => {
+    return pinnedDockApps().includes(appId);
+  };
+
+  // Running apps that are NOT pinned (for the left section of dock)
+  const dockRunningApps = (): AppInfo[] => {
+    return runningApps()
+      .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
+      .map((instance) => ({
+        id: instance.manifest.id,
+        name: instance.manifest.name,
+        isRunning: true,
+      }));
+  };
+
+  // Pinned apps with their running status (for the right section of dock)
+  const dockPinnedApps = (): AppInfo[] => {
+    const runningIds = new Set(runningApps().map((i) => i.manifest.id));
+    const installed = installedApps();
+
+    return pinnedDockApps()
+      .map((appId) => {
+        const manifest = installed.find((m) => m.id === appId);
+        if (!manifest) return null;
+        return {
+          id: appId,
+          name: manifest.name,
+          isRunning: runningIds.has(appId),
+        };
+      })
+      .filter((app): app is AppInfo => app !== null);
   };
 
   // All installed apps for the apps view
@@ -157,6 +235,20 @@ export default function ShellOverlay() {
     }
   };
 
+  // Handle context menu from dock - resize to fullscreen so menu fits
+  const handleDockContextMenu = async (menu: ContextMenuData) => {
+    await requestResize("fullscreen");
+    setDockContextMenu(menu);
+  };
+
+  // Close dock context menu and resize back to dock
+  const handleCloseDockContextMenu = async () => {
+    setDockContextMenu(null);
+    if (!showAllApps()) {
+      await requestResize("dock");
+    }
+  };
+
   onMount(() => {
     // Event handlers
     const handleAppLifecycle = () => loadSystemInfo();
@@ -183,8 +275,9 @@ export default function ShellOverlay() {
 
     // Async initialization
     (async () => {
-      // Load initial system info
+      // Load initial system info and pinned apps
       loadSystemInfo();
+      loadPinnedApps();
 
       // Set initial overlay size
       await requestResize("dock");
@@ -206,7 +299,7 @@ export default function ShellOverlay() {
   return (
     <div
       class="shell-overlay"
-      data-mode={showAllApps() ? "fullscreen" : "dock"}
+      data-mode={showAllApps() || dockContextMenu() ? "fullscreen" : "dock"}
     >
       {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>
@@ -216,15 +309,35 @@ export default function ShellOverlay() {
           onAppClick={handleAppClick}
           onStopApp={handleStopApp}
           onUninstallApp={handleUninstallApp}
+          isAppPinned={isAppPinned}
+          onAddToDock={handleAddToDock}
+          onRemoveFromDock={handleRemoveFromDock}
         />
       </Show>
 
       {/* Dock is always visible */}
       <Dock
-        apps={dockApps()}
+        runningApps={dockRunningApps()}
+        pinnedApps={dockPinnedApps()}
         onAppClick={handleAppClick}
         onShowAllApps={handleShowAllApps}
+        onContextMenu={handleDockContextMenu}
       />
+
+      {/* Context menu for dock apps */}
+      <Show when={dockContextMenu()}>
+        {(menu) => (
+          <AppContextMenu
+            menu={menu()}
+            isAppPinned={isAppPinned}
+            onStopApp={handleStopApp}
+            onAddToDock={handleAddToDock}
+            onRemoveFromDock={handleRemoveFromDock}
+            onUninstallApp={handleUninstallApp}
+            onClose={handleCloseDockContextMenu}
+          />
+        )}
+      </Show>
     </div>
   );
 }
