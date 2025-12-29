@@ -350,6 +350,104 @@ export interface ProcessCommands {
 }
 
 /**
+ * SettingsCommands - Commands for the "settings" namespace
+ */
+export interface SettingsCommands {
+  /**
+   * Get a setting value (scoped to caller's app)
+   */
+  "settings/get": {
+    args: {
+    key: string };
+    response: { value: string | undefined };
+  };
+  /**
+   * Set a setting value (scoped to caller's app)
+   */
+  "settings/set": {
+    args: {
+    key: string;
+    value: string };
+    response: { success: boolean };
+  };
+  /**
+   * List all settings keys (scoped to caller's app)
+   */
+  "settings/list": {
+    args: { };
+    response: { keys: string[] };
+  };
+  /**
+   * Get all settings with values (scoped to caller's app)
+   */
+  "settings/get-all": {
+    args: { };
+    response: { settings: Record<string, string> };
+  };
+  /**
+   * Reset a setting to default (scoped to caller's app)
+   */
+  "settings/reset": {
+    args: {
+    key: string;
+    schema?: import("./index").SettingsCategory[] };
+    response: { success: boolean };
+  };
+  /**
+   * Get a setting from any app's namespace (superuser only)
+   */
+  "settings/get/su": {
+    args: {
+    appId: string;
+    key: string };
+    response: { value: string | undefined };
+  };
+  /**
+   * Set a setting in any app's namespace (superuser only)
+   */
+  "settings/set/su": {
+    args: {
+    appId: string;
+    key: string;
+    value: string };
+    response: { success: boolean };
+  };
+  /**
+   * List all settings in any app's namespace (superuser only)
+   */
+  "settings/list/su": {
+    args: {
+    appId: string };
+    response: { keys: string[] };
+  };
+  /**
+   * Get all settings with values for any app (superuser only)
+   */
+  "settings/get-all/su": {
+    args: {
+    appId: string };
+    response: { settings: Record<string, string> };
+  };
+  /**
+   * Reset a setting for any app (superuser only)
+   */
+  "settings/reset/su": {
+    args: {
+    appId: string;
+    key: string;
+    schema?: import("./index").SettingsCategory[] };
+    response: { success: boolean };
+  };
+  /**
+   * Get the Eden settings schema
+   */
+  "settings/schema": {
+    args: Record<string, never>;
+    response: { schema: import("./index").SettingsCategory[] };
+  };
+}
+
+/**
  * ViewCommands - Commands for the "view" namespace
  */
 export interface ViewCommands {
@@ -450,4 +548,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, DbCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, DbCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}

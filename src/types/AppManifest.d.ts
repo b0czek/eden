@@ -85,6 +85,72 @@ export interface FileHandlerConfig {
 }
 
 /**
+ * Supported setting input types
+ */
+export type SettingType =
+  | "text"
+  | "number"
+  | "checkbox"
+  | "radio"
+  | "select"
+  | "toggle"
+  | "textarea"
+  | "color"
+  | "range";
+
+/**
+ * Option for radio/select settings
+ */
+export interface SettingOption {
+  /** Value stored when this option is selected */
+  value: string;
+  /** Display label for this option */
+  label: string;
+  /** Optional description for this option */
+  description?: string;
+}
+
+/**
+ * Individual setting definition
+ */
+export interface SettingDefinition {
+  /** Unique key for this setting */
+  key: string;
+  /** Display label */
+  label: string;
+  /** Description shown as help text */
+  description?: string;
+  /** Input type */
+  type: SettingType;
+  /** Default value (as string, will be parsed based on type) */
+  defaultValue?: string;
+  /** Options for radio/select types */
+  options?: SettingOption[];
+  /** Placeholder for text/textarea */
+  placeholder?: string;
+  /** Min value for number/range */
+  min?: number;
+  /** Max value for number/range */
+  max?: number;
+  /** Step for number/range */
+  step?: number;
+}
+
+/**
+ * Settings category (group of related settings)
+ */
+export interface SettingsCategory {
+  /** Category ID */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Category icon (optional) */
+  icon?: string;
+  /** Settings in this category */
+  settings: SettingDefinition[];
+}
+
+/**
  * App Manifest Interface
  *
  * Defines the structure of an Eden app package.
@@ -174,4 +240,10 @@ export interface AppManifest {
    * Overlays are rendered above regular apps.
    */
   overlay?: boolean;
+
+  /**
+   * App settings configuration.
+   * Defines settings categories and individual settings that can be configured.
+   */
+  settings?: SettingsCategory[];
 }

@@ -18,6 +18,7 @@ import { FilesystemManager } from "./filesystem";
 import { FileOpenManager } from "./file-open";
 import { NotificationManager } from "./notification";
 import { DbManager } from "./db";
+import { SettingsManager } from "./settings";
 import { container } from "tsyringe";
 
 export class Eden {
@@ -40,6 +41,7 @@ export class Eden {
   private autostartManager: AutostartManager;
   private notificationManager: NotificationManager;
   private dbManager: DbManager;
+  private settingsManager: SettingsManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -127,6 +129,10 @@ export class Eden {
     // Initialize DB Manager
     this.dbManager = container.resolve(DbManager);
     container.registerInstance("DbManager", this.dbManager);
+
+    // Initialize Settings Manager
+    this.settingsManager = container.resolve(SettingsManager);
+    container.registerInstance("SettingsManager", this.settingsManager);
 
     this.setupAppEventHandlers();
   }

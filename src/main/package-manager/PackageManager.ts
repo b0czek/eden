@@ -227,6 +227,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Validate manifest
     this.validateManifest(manifest);
 
+    // Check for reserved app IDs
+    if (manifest.id === "com.eden") {
+      throw new Error(
+        `App ID "${manifest.id}" is reserved for Eden system use.\n` +
+          `Please choose a different app ID.`
+      );
+    }
+
     // Check if already installed
     if (this.installedApps.has(manifest.id)) {
       throw new Error(

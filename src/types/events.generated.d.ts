@@ -39,6 +39,13 @@ export interface ProcessEvents {
 }
 
 /**
+ * SettingsEvents - Events for the "settings" namespace
+ */
+export interface SettingsEvents {
+  "settings/changed": { appId: string; key: string; value: string };
+}
+
+/**
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
@@ -60,4 +67,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends FileEvents, NotificationEvents, PackageEvents, ProcessEvents, ViewEvents {}
+export interface AppEvents extends FileEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}

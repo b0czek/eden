@@ -40,7 +40,7 @@
   font-size: var(--eden-font-size-lg);
   font-weight: var(--eden-font-weight-semibold);
   color: var(--eden-color-text-primary);
-  margin: 0;
+  margin: 0 0 var(--eden-space-sm) 0;
 }
 
 .eden-sidebar-header-subtitle {

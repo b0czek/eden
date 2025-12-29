@@ -154,7 +154,7 @@
 }
 
 .eden-checkbox:checked::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 5px;
   top: 2px;
@@ -199,7 +199,7 @@
 }
 
 .eden-radio:checked::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 50%;
   top: 50%;
@@ -234,7 +234,7 @@
 }
 
 .eden-toggle::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 2px;
   top: 2px;
@@ -334,4 +334,91 @@
 .eden-form-error {
   font-size: var(--eden-font-size-sm);
   color: var(--eden-color-danger);
+}
+
+/* ===== Range with Value ===== */
+.eden-range {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  min-width: 200px;
+}
+
+.eden-range input[type="range"],
+.eden-range-input {
+  flex: 1;
+  height: 4px;
+  background: var(--eden-color-bg-glass-medium);
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.eden-range input[type="range"]::-webkit-slider-thumb,
+.eden-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--eden-color-accent-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--eden-transition-base);
+}
+
+.eden-range input[type="range"]::-webkit-slider-thumb:hover,
+.eden-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.eden-range-value {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  min-width: 40px;
+  text-align: right;
+  font-family: var(--eden-font-mono);
+}
+
+/* ===== Radio Group ===== */
+.eden-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.eden-radio-group-horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.eden-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  cursor: pointer;
+}
+
+.eden-radio-option-label {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== Checkbox Group ===== */
+.eden-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.eden-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  cursor: pointer;
+}
+
+.eden-checkbox-option-label {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
 }
