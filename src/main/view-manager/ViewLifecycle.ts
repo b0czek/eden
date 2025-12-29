@@ -108,6 +108,7 @@ export class ViewLifecycle {
         transparent,
         backgroundThrottling,
         scrollBounce: false,
+        spellcheck: false,
       },
     });
   }
