@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog } from "electron";
+import { ipcMain, BrowserWindow } from "electron";
 import { EventEmitter } from "events";
 import { WorkerManager } from "../process-manager/WorkerManager";
 import { ViewManager } from "../view-manager/ViewManager";
@@ -6,7 +6,6 @@ import { IPCMessage } from "@edenapp/types";
 import { APP_EVENT_NAMES } from "@edenapp/types/runtime.generated";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
-
 import { EventSubscriberManager } from "./EventSubscriberManager";
 
 /**
@@ -111,9 +110,14 @@ export class IPCBridge extends EventEmitter {
     ipcMain.handle(
       "shell-command",
       async (event, command: string, args: any) => {
-        // Get appId from sender for permission checking
+        // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
-        return this.handleShellCommand(command, args, appId);
+        const argsWithContext = {
+          ...args,
+          _callerAppId: appId,
+          _callerWebContentsId: event.sender.id,
+        };
+        return this.handleShellCommand(command, argsWithContext, appId);
       }
     );
 

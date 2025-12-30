@@ -1,3 +1,5 @@
+import type { ServiceDeclaration } from "./channels";
+
 /**
  * Window Mode Configuration
  *
@@ -182,4 +184,11 @@ export interface AppManifest {
    * Overlays are rendered above regular apps.
    */
   overlay?: boolean;
+
+  /**
+   * Services this app exposes for other apps to connect to.
+   * Declaring services here documents the app's API and enables
+   * optional access control via allowedClients.
+   */
+  services?: ServiceDeclaration[];
 }

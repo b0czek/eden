@@ -156,4 +156,287 @@ contextBridge.exposeInMainWorld("edenAPI", {
   },
 });
 
+// ===================================================================
+// AppBus - App-to-App Communication System
+// ===================================================================
+
+// Service handlers registered by this app
+const registeredServices: Map<string, (method: string, args: any) => any> =
+  new Map();
+
+// Connected channels (client-side: connections to other apps' services)
+const connectedPorts: Map<string, MessagePort> = new Map();
+
+// Pending requests waiting for responses
+const pendingRequests: Map<
+  string,
+  { resolve: (value: any) => void; reject: (reason: any) => void }
+> = new Map();
+
+// Handle incoming MessagePorts for peer-to-peer channels
+ipcRenderer.on("appbus-port", (event: any, data: any) => {
+  const [port] = event.ports as MessagePort[];
+  if (!port) {
+    console.error("[AppBus] Received appbus-port event without port");
+    return;
+  }
+
+  const { connectionId, role, serviceName, targetAppId, sourceAppId } = data;
+
+  if (role === "service") {
+    // We're the service provider - set up message handler
+    console.log(
+      `[AppBus] Received connection from ${sourceAppId} for service ${serviceName}`
+    );
+
+    port.onmessage = (msgEvent: MessageEvent) => {
+      const { type, method, payload, messageId } = msgEvent.data;
+
+      const handler = registeredServices.get(serviceName);
+      if (!handler) {
+        port.postMessage({
+          type: "response",
+          messageId,
+          error: `Service "${serviceName}" handler not found`,
+        });
+        return;
+      }
+
+      if (type === "request") {
+        // Handle request (expects response)
+        try {
+          const result = handler(method, payload);
+          // Handle both sync and async handlers
+          Promise.resolve(result)
+            .then((response) => {
+              port.postMessage({
+                type: "response",
+                messageId,
+                payload: response,
+              });
+            })
+            .catch((err) => {
+              port.postMessage({
+                type: "response",
+                messageId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            });
+        } catch (err) {
+          port.postMessage({
+            type: "response",
+            messageId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else if (type === "message") {
+        // Fire-and-forget message
+        try {
+          handler(method, payload);
+        } catch (err) {
+          console.error(
+            `[AppBus] Error handling message for ${serviceName}:`,
+            err
+          );
+        }
+      }
+    };
+
+    port.start();
+  } else if (role === "client") {
+    // We're the client - store the port for sending messages
+    console.log(`[AppBus] Connected to ${targetAppId}/${serviceName}`);
+    connectedPorts.set(connectionId, port);
+
+    // Set up response handler
+    port.onmessage = (msgEvent: MessageEvent) => {
+      const { type, messageId, payload, error } = msgEvent.data;
+
+      if (type === "response" && messageId) {
+        const pending = pendingRequests.get(messageId);
+        if (pending) {
+          pendingRequests.delete(messageId);
+          if (error) {
+            pending.reject(new Error(error));
+          } else {
+            pending.resolve(payload);
+          }
+        }
+      }
+    };
+
+    port.start();
+  }
+});
+
+// Generate unique message IDs
+let messageIdCounter = 0;
+function generateMessageId(): string {
+  return `msg-${Date.now()}-${++messageIdCounter}`;
+}
+
+// Expose appBus API for app-to-app communication
+contextBridge.exposeInMainWorld("appBus", {
+  /**
+   * Register a service that other apps can connect to
+   * @param {string} serviceName - Name of the service
+   * @param {Function} handler - Function to handle incoming method calls (method, args) => result
+   * @param {object} options - Optional: description, allowedClients, methods
+   */
+  exposeService: async (
+    serviceName: string,
+    handler: (method: string, args: any) => any,
+    options?: {
+      description?: string;
+      allowedClients?: string[];
+      methods?: string[];
+    }
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (typeof handler !== "function") {
+      throw new Error("Handler must be a function");
+    }
+
+    // Register locally
+    registeredServices.set(serviceName, handler);
+
+    // Register with main process
+    const result = await ipcRenderer.invoke(
+      "shell-command",
+      "appbus/register",
+      {
+        serviceName,
+        methods: options?.methods || [],
+        description: options?.description,
+        allowedClients: options?.allowedClients,
+      }
+    );
+
+    if (!result.success) {
+      registeredServices.delete(serviceName);
+    }
+
+    return result;
+  },
+
+  /**
+   * Unregister a service
+   * @param {string} serviceName - Name of the service to unregister
+   */
+  unexposeService: async (
+    serviceName: string
+  ): Promise<{ success: boolean }> => {
+    registeredServices.delete(serviceName);
+    return ipcRenderer.invoke("shell-command", "appbus/unregister", {
+      serviceName,
+    });
+  },
+
+  /**
+   * Connect to another app's service
+   * @param {string} targetAppId - App ID of the target app
+   * @param {string} serviceName - Name of the service to connect to
+   * @returns {Promise} Connection object with send, request, and close methods
+   */
+  connect: async (
+    targetAppId: string,
+    serviceName: string
+  ): Promise<
+    | {
+        send: (method: string, args?: any) => void;
+        request: (method: string, args?: any) => Promise<any>;
+        close: () => void;
+      }
+    | { error: string }
+  > => {
+    // Request connection through shell command (will trigger MessagePort transfer)
+    const result = await ipcRenderer.invoke("shell-command", "appbus/connect", {
+      targetAppId,
+      serviceName,
+    });
+
+    if (!result.success) {
+      return { error: result.error || "Connection failed" };
+    }
+
+    const { connectionId } = result;
+
+    // Wait a bit for the port to be received
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const port = connectedPorts.get(connectionId);
+    if (!port) {
+      return { error: "MessagePort not received" };
+    }
+
+    return {
+      /**
+       * Send a fire-and-forget message
+       */
+      send: (method: string, args?: any) => {
+        port.postMessage({ type: "message", method, payload: args });
+      },
+
+      /**
+       * Send a request and wait for response
+       */
+      request: (method: string, args?: any): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          const messageId = generateMessageId();
+          pendingRequests.set(messageId, { resolve, reject });
+
+          // Timeout after 30 seconds
+          setTimeout(() => {
+            if (pendingRequests.has(messageId)) {
+              pendingRequests.delete(messageId);
+              reject(new Error("Request timeout"));
+            }
+          }, 30000);
+
+          port.postMessage({
+            type: "request",
+            method,
+            payload: args,
+            messageId,
+          });
+        });
+      },
+
+      /**
+       * Close the connection
+       */
+      close: () => {
+        connectedPorts.delete(connectionId);
+        port.close();
+      },
+    };
+  },
+
+  /**
+   * List all available services
+   * @returns {Promise} Array of service info objects
+   */
+  listServices: async (): Promise<{
+    services: Array<{
+      appId: string;
+      serviceName: string;
+      methods: string[];
+      description?: string;
+    }>;
+  }> => {
+    return ipcRenderer.invoke("shell-command", "appbus/list", {});
+  },
+
+  /**
+   * List services exposed by a specific app
+   * @param {string} appId - App ID to query
+   */
+  listServicesByApp: async (
+    appId: string
+  ): Promise<{
+    services: Array<{ appId: string; serviceName: string; methods: string[] }>;
+  }> => {
+    return ipcRenderer.invoke("shell-command", "appbus/list-by-app", { appId });
+  },
+});
+
 console.log("Universal app preload loaded");

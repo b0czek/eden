@@ -80,6 +80,9 @@ export type {
 // Export event types
 export * from "./events";
 
+// Export channel/appbus types
+export * from "./channels";
+
 export interface SystemInfo {
   platform: string;
   arch: string;

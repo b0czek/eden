@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { IPCBridge, CommandRegistry, PermissionRegistry } from "./ipc";
+import { AppChannelManager } from "./appbus";
 import { SystemHandler } from "./SystemHandler";
 import { EdenConfig, AppManifest } from "../types";
 
@@ -40,6 +41,7 @@ export class Eden {
   private autostartManager: AutostartManager;
   private notificationManager: NotificationManager;
   private dbManager: DbManager;
+  private appChannelManager: AppChannelManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -89,6 +91,10 @@ export class Eden {
     this.ipcBridge.eventSubscribers.setPermissionRegistry(
       this.permissionRegistry
     );
+
+    // Initialize AppBus (peer-to-peer channel system)
+    this.appChannelManager = container.resolve(AppChannelManager);
+    container.registerInstance("AppChannelManager", this.appChannelManager);
 
     // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);

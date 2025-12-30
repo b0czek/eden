@@ -135,9 +135,7 @@ export class CommandRegistry {
     }
 
     try {
-      // Inject caller's appId into args if provided (for handlers that need caller context)
-      const argsWithAppId = appId ? { ...args, _callerAppId: appId } : args;
-      return await metadata.handler.call(metadata.target, argsWithAppId);
+      return await metadata.handler.call(metadata.target, args);
     } catch (error) {
       console.error(`Error executing command ${fullCommand}:`, error);
       throw error;
