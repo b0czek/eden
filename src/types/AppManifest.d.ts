@@ -127,6 +127,14 @@ export interface AppManifest {
     /** Path to the frontend HTML entry file */
     entry: string;
 
+    /**
+     * Allow remote URLs to be embedded in iframes.
+     * When true, strips X-Frame-Options and CSP frame-ancestors headers
+     * that would otherwise prevent embedding.
+     * Only applies to remote (http/https) frontend entries.
+     */
+    allowEmbedding?: boolean;
+
     /** WebContentsView options */
     options?: {
       /** Enable Node.js integration in the view (default: false) */

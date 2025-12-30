@@ -1,0 +1,23 @@
+{
+  "id": "com.eden.webbrowser",
+  "name": "Web Browser",
+  "version": "1.0.0",
+  "description": "Eden web browser",
+  "icon": "icon.svg",
+  "frontend": {
+    "entry": "index.html",
+    "allowEmbedding": true,
+    "options": {
+      "nodeIntegration": false,
+      "contextIsolation": true
+    }
+  },
+  "window": {
+    "mode": "both",
+    "injections": {
+      "css": "full",
+      "appFrame": true
+    },
+    "showTitle": true
+  }
+}

@@ -52,6 +52,26 @@ export class ViewCreator {
   }
 
   /**
+   * Callback that strips X-Frame-Options and CSP headers from responses.
+   */
+  private static embeddingHeadersFilter(
+    details: Electron.OnHeadersReceivedListenerDetails,
+    callback: (response: Electron.HeadersReceivedResponse) => void
+  ): void {
+    const responseHeaders = { ...details.responseHeaders };
+    for (const key of Object.keys(responseHeaders)) {
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey === "x-frame-options" ||
+        lowerKey === "content-security-policy"
+      ) {
+        delete responseHeaders[key];
+      }
+    }
+    callback({ responseHeaders });
+  }
+
+  /**
    * Inject app API into the view's webContents
    * Sends an argless event - preload fetches data via get-view-data invoke
    */
@@ -296,6 +316,14 @@ export class ViewCreator {
 
     // Set bounds
     view.setBounds(viewBounds);
+
+    // Strip embedding headers if enabled
+    if (manifest.frontend.allowEmbedding) {
+      view.webContents.session.webRequest.onHeadersReceived(
+        { urls: ["*://*/*"] },
+        ViewCreator.embeddingHeadersFilter
+      );
+    }
 
     // Load the frontend HTML or remote URL
     if (this.isRemoteEntry(frontendEntry)) {
