@@ -6,6 +6,10 @@ export * from "./AppManifest";
 
 export * from "./global";
 
+export * from "./worker";
+
+export * from "./ipc";
+
 /**
  * App Instance Interface
  *

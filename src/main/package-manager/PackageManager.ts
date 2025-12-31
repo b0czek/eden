@@ -117,7 +117,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               );
               const devManifest = JSON.parse(devManifestContent);
 
-              if (devManifest.devMode && devManifest.devUrl) {
+              if (
+                devManifest.devMode &&
+                devManifest.devUrl &&
+                manifest.frontend
+              ) {
                 // Override frontend entry with dev server URL
                 manifest.frontend.entry = devManifest.devUrl;
                 console.log(
@@ -322,8 +326,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
 
-    if (!manifest.frontend?.entry) {
-      throw new Error("Invalid manifest: missing frontend.entry");
+    // At least one of frontend or backend must be defined
+    if (!manifest.frontend?.entry && !manifest.backend?.entry) {
+      throw new Error(
+        "Invalid manifest: must have at least frontend.entry or backend.entry"
+      );
     }
 
     if (manifest.backend && !manifest.backend.entry) {

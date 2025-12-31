@@ -281,7 +281,9 @@ export class ViewCreator {
     const windowConfig = manifest.window;
     const isOverlay = !!manifest.overlay;
     const viewType: ViewType = isOverlay ? "overlay" : "app";
-    const frontendEntry = manifest.frontend.entry;
+    // Note: createView is only called when manifest.frontend exists
+    // (ProcessManager validates this before calling)
+    const frontendEntry = manifest.frontend!.entry;
 
     // Determine view mode
     const viewMode: ViewMode = isOverlay
@@ -318,7 +320,7 @@ export class ViewCreator {
     view.setBounds(viewBounds);
 
     // Strip embedding headers if enabled
-    if (manifest.frontend.allowEmbedding) {
+    if (manifest.frontend?.allowEmbedding) {
       view.webContents.session.webRequest.onHeadersReceived(
         { urls: ["*://*/*"] },
         ViewCreator.embeddingHeadersFilter

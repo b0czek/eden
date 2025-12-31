@@ -124,8 +124,12 @@ export interface AppManifest {
     };
   };
 
-  /** Frontend configuration */
-  frontend: {
+  /**
+   * Frontend configuration.
+   * Optional - omit for backend-only apps (daemons).
+   * At least one of `frontend` or `backend` must be defined.
+   */
+  frontend?: {
     /** Path to the frontend HTML entry file */
     entry: string;
 

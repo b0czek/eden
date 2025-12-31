@@ -112,6 +112,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`App ${appId} is not installed`);
     }
 
+    // Validate manifest has at least frontend or backend
+    if (!manifest.frontend?.entry && !manifest.backend?.entry) {
+      throw new Error(
+        `App ${appId} must have at least a frontend or backend entry`
+      );
+    }
+
     // Check if already running
     if (this.runningApps.has(appId)) {
       throw new Error(`App ${appId} is already running`);
@@ -136,21 +143,24 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         this.workers.set(appId, worker);
       }
 
-      // Create view for frontend
-      const viewId = this.viewManager.createView(
-        appId,
-        manifest,
-        installPath,
-        bounds,
-        launchArgs
-      );
+      // Create view for frontend only if frontend is defined
+      let viewId: number | undefined;
+      if (manifest.frontend?.entry) {
+        viewId = this.viewManager.createView(
+          appId,
+          manifest,
+          installPath,
+          bounds,
+          launchArgs
+        );
+      }
 
       // Create app instance
       const instance: AppInstance = {
         manifest,
         instanceId,
         installPath,
-        viewId,
+        viewId: viewId ?? -1, // -1 indicates no view (backend-only)
         state: "running",
         installedAt: new Date(),
         lastLaunched: new Date(),
@@ -189,8 +199,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         this.workers.delete(appId);
       }
 
-      // Remove view
-      this.viewManager.removeView(instance.viewId);
+      // Remove view (only if frontend exists, viewId !== -1)
+      if (instance.viewId !== -1) {
+        this.viewManager.removeView(instance.viewId);
+      }
 
       // Unregister per-app IPC channels
       this.ipcBridge.unregisterAppChannels(appId);
@@ -246,8 +258,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private handleAppExit(appId: string, code: number): void {
     const instance = this.runningApps.get(appId);
     if (instance) {
-      // Clean up view
-      this.viewManager.removeView(instance.viewId);
+      // Clean up view (only if frontend exists, viewId !== -1)
+      if (instance.viewId !== -1) {
+        this.viewManager.removeView(instance.viewId);
+      }
 
       // Unregister per-app IPC channels
       this.ipcBridge.unregisterAppChannels(appId);

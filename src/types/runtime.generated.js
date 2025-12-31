@@ -9,6 +9,11 @@
 // Command names array
 export const COMMAND_NAMES = [
   "system/info",
+  "appbus/register",
+  "appbus/unregister",
+  "appbus/list",
+  "appbus/list-by-app",
+  "appbus/connect",
   "db/get",
   "db/set",
   "db/delete",

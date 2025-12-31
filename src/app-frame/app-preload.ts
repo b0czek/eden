@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+import { contextBridge, ipcRenderer } from "electron";
 
 // Per-app channel names (received from main process)
 let appId: string | null = null;
