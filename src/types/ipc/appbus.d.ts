@@ -7,12 +7,25 @@
 
 /**
  * AppBus connection returned by connect()
+ * Also used for frontend<->backend communication (appAPI)
  */
 export interface AppBusConnection {
   /** Send a fire-and-forget message */
   send: (method: string, args?: any) => void;
+  /** Listen for send() messages for a specific method */
+  on: (method: string, callback: (args: any) => void) => void;
+  /** Remove a listener for a specific method */
+  off: (method: string, callback: (args: any) => void) => void;
+
   /** Send a request and wait for response */
   request: (method: string, args?: any) => Promise<any>;
+  /** Register a handler for request() calls for a specific method */
+  handle: (method: string, handler: (args: any) => any | Promise<any>) => void;
+  /** Remove the handler for a specific method */
+  removeHandler: (method: string) => void;
+
+  /** Check if the connection is active */
+  isConnected: () => boolean;
   /** Close the connection */
   close: () => void;
 }

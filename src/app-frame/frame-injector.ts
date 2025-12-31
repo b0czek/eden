@@ -31,6 +31,7 @@ import { setupWindowResizing } from "./window-resizing.js";
         /* will be set later */
       },
       _internal: {
+        appId: "",
         injected: false,
         config: {},
         currentMode: "tiled",
@@ -60,16 +61,12 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Setup handlers after overlay is injected
   const setupHandlers = (): void => {
-    // Wait for appAPI to be available
-    waitForAPI("appAPI", (api) => {
-      appId = api.getAppId();
-
-      if (appId) {
-        // Extract a readable name from the app ID
-        appName = getAppName(appId);
-        setTitle(appName);
-      }
-    });
+    // Get appId from injected config
+    if (window.edenFrame && window.edenFrame._internal.appId) {
+      appId = window.edenFrame._internal.appId;
+      appName = getAppName(appId);
+      setTitle(appName);
+    }
 
     // Setup button handlers
     setupCloseButton();

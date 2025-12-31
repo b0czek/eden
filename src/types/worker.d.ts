@@ -1,8 +1,11 @@
 /**
  * Worker Global Type Definitions
+ *
+ * Type definitions for the global `worker` object available in utility processes.
+ * This mirrors the frontend's `window.edenAPI` and `window.appBus` pattern.
  */
 
-import type { EdenAPI, AppBusAPI } from "./ipc";
+import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 
 /**
  * Worker global - backend runtime namespace
@@ -11,11 +14,12 @@ import type { EdenAPI, AppBusAPI } from "./ipc";
 export interface WorkerGlobal {
   edenAPI: EdenAPI;
   appBus: AppBusAPI;
+  appAPI: AppBusConnection;
 }
 
 /**
- * Backend worker globals
- * These are set by backend-runtime.ts for worker threads
+ * Backend globals (utility process)
+ * These are set by backend-runtime.ts for utility processes
  */
 declare global {
   /**

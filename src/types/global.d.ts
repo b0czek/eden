@@ -1,6 +1,6 @@
 // Ambient declarations for renderer globals
 
-import type { EdenAPI, AppBusAPI } from "./ipc";
+import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 
 export interface EdenFrame {
   // Public API
@@ -8,6 +8,7 @@ export interface EdenFrame {
 
   // Internal state (used by frame system)
   _internal: {
+    appId: string;
     injected: boolean;
     config: {
       mode?: "tiled" | "floating" | "both";
@@ -40,6 +41,12 @@ declare global {
      * AppBus instance for app-to-app communication
      */
     appBus?: AppBusAPI;
+
+    /**
+     * AppAPI for frontend<->backend communication
+     * Same interface as AppBusConnection
+     */
+    appAPI?: AppBusConnection;
 
     edenFrame?: EdenFrame;
   }

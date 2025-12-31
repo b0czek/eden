@@ -127,12 +127,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       launchArgs
     );
 
-    // Notify listeners that the view has been loaded
-    this.notify("view-loaded", {
-      viewId: viewInfo.id,
-      appId,
-      overlay: viewInfo.viewType === "overlay",
-    });
+    const viewId = viewInfo.id;
+
+    // Store view info
+    this.views.set(viewId, viewInfo);
 
     // Electron event listener for view load failure
     viewInfo.view.webContents.on(
@@ -151,10 +149,12 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       }
     );
 
-    const viewId = viewInfo.id;
-
-    // Store view info
-    this.views.set(viewId, viewInfo);
+    // Notify listeners that the view has been loaded
+    this.notify("view-loaded", {
+      viewId: viewInfo.id,
+      appId,
+      overlay: viewInfo.viewType === "overlay",
+    });
 
     // Recalculate all tiles if using tiling and this is a tiled view
     if (viewInfo.mode === "tiled" && this.tilingManager.isEnabled()) {
