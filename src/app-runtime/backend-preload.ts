@@ -12,19 +12,11 @@
  * - EDEN_MANIFEST: JSON-stringified app manifest
  */
 
-import type {
-  EdenAPI,
-  AppBusAPI,
-  AppBusConnection,
-  ServiceInfo,
-  ServiceConnectCallback,
-} from "@edenapp/types/ipc";
+import type { EdenAPI, AppBusAPI, AppBusConnection } from "@edenapp/types";
 
 import type { WorkerGlobal } from "@edenapp/types/worker";
 
 import {
-  type PendingRequest,
-  type IPCPort,
   createMessageIdGenerator,
   handleAppBusPort as handlePortSetup,
   createPortConnection,

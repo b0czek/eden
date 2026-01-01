@@ -5,18 +5,6 @@
  */
 
 /**
- * Information about a registered service
- */
-export interface ServiceInfo {
-  /** App that exposes this service */
-  appId: string;
-  /** Service name (unique per app) */
-  serviceName: string;
-  /** Human-readable description */
-  description?: string;
-}
-
-/**
  * Service declaration in app manifest
  */
 export interface ServiceDeclaration {

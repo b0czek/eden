@@ -12,7 +12,9 @@
 export interface IPCPort {
   postMessage(message: any): void;
   on(event: "message", listener: (event: { data: any }) => void): void;
+  on(event: "close", listener: () => void): void;
   off(event: "message", listener: (event: { data: any }) => void): void;
+  off(event: "close", listener: () => void): void;
   start(): void;
   close(): void;
 }
@@ -21,26 +23,40 @@ export interface IPCPort {
  * Wrap a DOM MessagePort to conform to IPCPort interface
  */
 export function wrapDOMPort(port: MessagePort): IPCPort {
-  const listeners = new Map<
+  const messageListeners = new Map<
     (event: { data: any }) => void,
     (event: MessageEvent) => void
   >();
+  const closeListeners = new Set<() => void>();
 
   return {
     postMessage: (message: any) => port.postMessage(message),
-    on: (event: "message", listener: (event: { data: any }) => void) => {
-      // Create a wrapper that extracts data from MessageEvent
-      const wrapper = (e: MessageEvent) => listener({ data: e.data });
-      listeners.set(listener, wrapper);
-      port.addEventListener("message", wrapper);
-    },
-    off: (event: "message", listener: (event: { data: any }) => void) => {
-      const wrapper = listeners.get(listener);
-      if (wrapper) {
-        port.removeEventListener("message", wrapper);
-        listeners.delete(listener);
+
+    on: ((event: string, listener: any) => {
+      if (event === "message") {
+        // Create a wrapper that extracts data from MessageEvent
+        const wrapper = (e: MessageEvent) => listener({ data: e.data });
+        messageListeners.set(listener, wrapper);
+        port.addEventListener("message", wrapper);
+      } else if (event === "close") {
+        closeListeners.add(listener);
+        port.addEventListener("close", listener);
       }
-    },
+    }) as IPCPort["on"],
+
+    off: ((event: string, listener: any) => {
+      if (event === "message") {
+        const wrapper = messageListeners.get(listener);
+        if (wrapper) {
+          port.removeEventListener("message", wrapper);
+          messageListeners.delete(listener);
+        }
+      } else if (event === "close") {
+        closeListeners.delete(listener);
+        port.removeEventListener("close", listener);
+      }
+    }) as IPCPort["off"],
+
     start: () => port.start(),
     close: () => port.close(),
   };

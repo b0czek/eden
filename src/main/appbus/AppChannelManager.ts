@@ -4,7 +4,7 @@ import type {
   RegisteredService,
   ServiceInfo,
   ConnectResult,
-} from "@edenapp/types/channels";
+} from "@edenapp/types";
 import { CommandRegistry } from "../ipc";
 import { AppChannelHandler } from "./AppChannelHandler";
 import { BackendManager } from "../process-manager/BackendManager";

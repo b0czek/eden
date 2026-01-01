@@ -209,6 +209,27 @@ export function createPortConnection(
       messageListeners.get(method)!.add(callback);
     },
 
+    once: (method: string, callback: (args: any) => void) => {
+      if (typeof callback !== "function") {
+        throw new Error("Callback must be a function");
+      }
+      const wrapper = (args: any) => {
+        // Remove before calling to prevent issues if callback throws
+        const listeners = messageListeners.get(method);
+        if (listeners) {
+          listeners.delete(wrapper);
+          if (listeners.size === 0) {
+            messageListeners.delete(method);
+          }
+        }
+        callback(args);
+      };
+      if (!messageListeners.has(method)) {
+        messageListeners.set(method, new Set());
+      }
+      messageListeners.get(method)!.add(wrapper);
+    },
+
     off: (method: string, callback: (args: any) => void) => {
       const listeners = messageListeners.get(method);
       if (listeners) {
@@ -273,6 +294,10 @@ export function createPortConnection(
     // Connection management
     isConnected: () => {
       return portStore.has(connectionId);
+    },
+
+    onClose: (callback: () => void) => {
+      port.on("close", callback);
     },
 
     close: () => {

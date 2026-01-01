@@ -4,8 +4,7 @@ import type {
   AppBusConnection,
   ServiceInfo,
   ServiceConnectCallback,
-  ClientInfo,
-} from "@edenapp/types/ipc";
+} from "@edenapp/types";
 import type { PendingRequest, IPCPort, AppBusState } from "./port-channel";
 import { createPortConnection } from "./port-channel";
 

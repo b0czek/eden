@@ -1,6 +1,6 @@
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { AppChannelManager } from "./AppChannelManager";
-import type { ServiceInfo, ConnectResult } from "@edenapp/types/channels";
+import type { ServiceInfo, ConnectResult } from "@edenapp/types";
 
 /**
  * AppChannelHandler
