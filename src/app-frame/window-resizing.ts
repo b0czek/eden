@@ -55,7 +55,7 @@ export function setupWindowResizing(
   // Animation frame update function - throttles IPC to 60fps
   const updateResizePosition = () => {
     const appId = window.edenFrame?._internal.appId;
-    if (pendingBounds && window.edenAPI && appId) {
+    if (pendingBounds && appId) {
       window.edenAPI
         .shellCommand("view/update-view-bounds", {
           appId,
@@ -115,7 +115,7 @@ export function setupWindowResizing(
     // Bring window to front - but ONLY for mouse events
     // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
     // Touch users need to tap elsewhere to focus, then tap resize handle
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/focus-app", { appId })
         .catch(console.error);
@@ -123,7 +123,7 @@ export function setupWindowResizing(
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/start-resize", {
           appId,
@@ -226,7 +226,7 @@ export function setupWindowResizing(
       rafId = null;
 
       // Send final pending bounds immediately
-      if (pendingBounds && window.edenAPI && appId) {
+      if (pendingBounds && appId) {
         window.edenAPI
           .shellCommand("view/update-view-bounds", {
             appId,
@@ -250,7 +250,7 @@ export function setupWindowResizing(
     }
 
     // Stop global resize tracking in main process (for mouse events)
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-resize", { appId })
         .catch(console.error);

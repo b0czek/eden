@@ -38,7 +38,7 @@ export function setupWindowDragging(
   // Animation frame update function - throttles IPC to 60fps
   const updatePosition = () => {
     const appId = window.edenFrame?._internal.appId;
-    if (pendingBounds && window.edenAPI && appId) {
+    if (pendingBounds && appId) {
       window.edenAPI
         .shellCommand("view/update-view-bounds", {
           appId,
@@ -107,7 +107,7 @@ export function setupWindowDragging(
     // Bring window to front - but ONLY for mouse events
     // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
     // Touch users need to tap elsewhere to focus, then tap title bar to drag
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/focus-app", { appId })
         .catch(console.error);
@@ -115,7 +115,7 @@ export function setupWindowDragging(
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/start-drag", {
           appId,
@@ -191,7 +191,7 @@ export function setupWindowDragging(
       rafId = null;
 
       // Send final pending bounds immediately
-      if (pendingBounds && window.edenAPI && appId) {
+      if (pendingBounds && appId) {
         window.edenAPI
           .shellCommand("view/update-view-bounds", {
             appId,
@@ -215,7 +215,7 @@ export function setupWindowDragging(
     }
 
     // Stop global drag tracking in main process (for mouse events)
-    if (!isTouch && window.edenAPI && appId) {
+    if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-drag", { appId })
         .catch(console.error);

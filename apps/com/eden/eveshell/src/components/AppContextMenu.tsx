@@ -27,7 +27,7 @@ export default function AppContextMenu(props: AppContextMenuProps) {
   onMount(async () => {
     // Check hot reload status for this app
     try {
-      const result = await window.edenAPI!.shellCommand(
+      const result = await window.edenAPI.shellCommand(
         "package/is-hot-reload-enabled",
         { appId: props.menu.appId }
       );
@@ -41,7 +41,7 @@ export default function AppContextMenu(props: AppContextMenuProps) {
 
   const handleToggleHotReload = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand(
+      const result = await window.edenAPI.shellCommand(
         "package/toggle-hot-reload",
         { appId: props.menu.appId }
       );

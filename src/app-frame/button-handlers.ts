@@ -17,7 +17,7 @@ export function setupCloseButton(): void {
       const appId = window.edenFrame?._internal.appId;
       console.log("[Eden Frame] Stopping app:", appId);
 
-      if (window.edenAPI && appId) {
+      if (appId) {
         window.edenAPI
           .shellCommand("process/stop", { appId })
           .catch(console.error);
@@ -41,7 +41,7 @@ export function setupMinimizeButton(): void {
     const minimize = () => {
       const appId = window.edenFrame?._internal.appId;
 
-      if (window.edenAPI && appId) {
+      if (appId) {
         window.edenAPI
           .shellCommand("view/set-view-visibility", {
             appId,
@@ -67,7 +67,7 @@ export function setupToggleModeButton(): void {
     const toggleMode = () => {
       const appId = window.edenFrame?._internal.appId;
 
-      if (window.edenAPI && appId) {
+      if (appId) {
         window.edenAPI
           .shellCommand("view/toggle-view-mode", {
             appId,
