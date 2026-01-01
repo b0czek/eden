@@ -4,7 +4,7 @@ class HelloApp {
   constructor() {
     this.statusDiv = document.getElementById('status');
     this.setupEventListeners();
-    this.setupMessageListener();
+    this.setupMessageListeners();
     this.log('App initialized');
   }
 
@@ -22,33 +22,25 @@ class HelloApp {
     });
   }
 
-  setupMessageListener() {
-    if (window.appAPI) {
-      window.appAPI.onMessage((message) => {
-        this.handleMessage(message);
-      });
-    }
+  setupMessageListeners() {
+    const appAPI = window.getAppAPI();
+
+    // Listen for fire-and-forget messages from backend
+    appAPI.on('backend-ready', (payload) => {
+      this.log(`✓ ${payload.message}`);
+    });
+
+    appAPI.on('heartbeat', (payload) => {
+      console.log('Heartbeat from backend:', payload);
+    });
   }
 
   async pingBackend() {
     this.log('Sending ping to backend...');
     
     try {
-      const message = {
-        type: 'ping',
-        source: 'frontend',
-        target: 'backend',
-        payload: {},
-        messageId: this.generateId(),
-        timestamp: Date.now(),
-      };
-
-      if (window.appAPI) {
-        const response = await window.appAPI.sendRequest(message);
-        this.log(`Pong received! Message count: ${response.messageCount}`);
-      } else {
-        this.log('Error: appAPI not available');
-      }
+      const response = await window.getAppAPI().request('ping', {});
+      this.log(`Pong received! Message count: ${response.messageCount}`);
     } catch (error) {
       this.log(`Error: ${error.message}`);
     }
@@ -58,23 +50,10 @@ class HelloApp {
     this.log('Requesting backend status...');
     
     try {
-      const message = {
-        type: 'get-status',
-        source: 'frontend',
-        target: 'backend',
-        payload: {},
-        messageId: this.generateId(),
-        timestamp: Date.now(),
-      };
-
-      if (window.appAPI) {
-        const response = await window.appAPI.sendRequest(message);
-        this.log(`Status: ${response.status}`);
-        this.log(`Uptime: ${response.uptime.toFixed(2)}s`);
-        this.log(`Messages: ${response.messageCount}`);
-      } else {
-        this.log('Error: appAPI not available');
-      }
+      const response = await window.getAppAPI().request('get-status', {});
+      this.log(`Status: ${response.status}`);
+      this.log(`Uptime: ${response.uptime.toFixed(2)}s`);
+      this.log(`Messages: ${response.messageCount}`);
     } catch (error) {
       this.log(`Error: ${error.message}`);
     }
@@ -91,23 +70,8 @@ class HelloApp {
     this.log(`Sending: "${userMessage}"`);
     
     try {
-      const message = {
-        type: 'hello',
-        source: 'frontend',
-        target: 'backend',
-        payload: {
-          message: userMessage,
-        },
-        messageId: this.generateId(),
-        timestamp: Date.now(),
-      };
-
-      if (window.appAPI) {
-        const response = await window.appAPI.sendRequest(message);
-        this.log(`Backend says: ${response.message}`);
-      } else {
-        this.log('Error: appAPI not available');
-      }
+      const response = await window.getAppAPI().request('hello', { message: userMessage });
+      this.log(`Backend says: ${response.message}`);
     } catch (error) {
       this.log(`Error: ${error.message}`);
     }
@@ -179,22 +143,6 @@ class HelloApp {
     });
   }
 
-  handleMessage(message) {
-    console.log('Received message:', message);
-
-    switch (message.type) {
-      case 'backend-ready':
-        this.log('✓ Backend is ready!');
-        break;
-      case 'heartbeat':
-        // Silent - just log to console
-        console.log('Heartbeat from backend');
-        break;
-      default:
-        this.log(`Message: ${message.type}`);
-    }
-  }
-
   log(text) {
     const p = document.createElement('p');
     p.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
@@ -208,10 +156,6 @@ class HelloApp {
         this.statusDiv.removeChild(this.statusDiv.firstChild);
       }
     }
-  }
-
-  generateId() {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }
 
