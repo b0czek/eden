@@ -99,31 +99,41 @@ export class BackendManager extends EventEmitter {
       this.emit("backend-exit", { appId, code });
     });
 
-    // Wait for the backend to signal it's ready
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(
-          new Error(`Backend ${appId} startup timed out after 10 seconds`)
-        );
-      }, 10000);
-
-      const onMessage = (msg: any) => {
-        if (msg.type === "backend-ready") {
-          clearTimeout(timeout);
-          backend.removeListener("message", onMessage);
-          resolve();
-        } else if (msg.type === "backend-error") {
-          clearTimeout(timeout);
-          backend.removeListener("message", onMessage);
-          reject(new Error(msg.error));
-        }
-      };
-
-      backend.on("message", onMessage);
-    });
-
+    // Register backend early so it can receive responses to shell commands
+    // during initialization (before backend-ready is sent)
     this.backends.set(appId, backend);
     this.backendData.set(appId, { manifest, installPath });
+
+    // Wait for the backend to signal it's ready
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new Error(`Backend ${appId} startup timed out after 10 seconds`)
+          );
+        }, 10000);
+
+        const onMessage = (msg: any) => {
+          if (msg.type === "backend-ready") {
+            clearTimeout(timeout);
+            backend.removeListener("message", onMessage);
+            resolve();
+          } else if (msg.type === "backend-error") {
+            clearTimeout(timeout);
+            backend.removeListener("message", onMessage);
+            reject(new Error(msg.error));
+          }
+        };
+
+        backend.on("message", onMessage);
+      });
+    } catch (error) {
+      // Clean up on failure
+      this.backends.delete(appId);
+      this.backendData.delete(appId);
+      this.backendPorts.delete(appId);
+      throw error;
+    }
 
     console.log(
       `Backend started for app ${appId}${
