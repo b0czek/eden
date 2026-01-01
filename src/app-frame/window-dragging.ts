@@ -7,9 +7,17 @@
 import { getScreenCoords } from "./utils";
 
 /**
- * Setup window dragging for floating windows
- * @param overlay - The title bar overlay element
- * @param currentBoundsRef - Reference object containing current bounds
+ * Enable dragging of a floating window using a title-bar overlay.
+ *
+ * Registers mouse and touch handlers on the provided overlay to move the window,
+ * updates `currentBoundsRef` during a drag, and sends final and throttled bounds
+ * updates to the host via the Eden API. Mouse drags use main-process global
+ * tracking; touch drags are handled in-client with updates throttled to 60fps.
+ *
+ * @param overlay - The title-bar overlay element that initiates drags when pressed
+ * @param currentBoundsRef - Mutable reference whose `current` is the window bounds
+ *                           (`{ x, y, width, height } | null`) and is updated as the
+ *                           window is dragged
  */
 export function setupWindowDragging(
   overlay: HTMLElement,

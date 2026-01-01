@@ -19,6 +19,15 @@ if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir, { recursive: true });
 }
 
+/**
+ * Type-checks the app-runtime TypeScript sources and bundles the runtime preload scripts into the distribution directory.
+ *
+ * Runs the TypeScript compiler with no emit to verify types, then uses esbuild to bundle
+ * src/app-runtime/app-preload.ts -> dist/app-runtime/app-preload.js and
+ * src/app-runtime/backend-preload.ts -> dist/app-runtime/backend-preload.js with CommonJS targeting Node 16.
+ *
+ * On type-check failure or any bundling error, the process exits with code 1.
+ */
 async function bundle() {
     try {
         console.log('🔍 Type-checking app-runtime TypeScript files...');

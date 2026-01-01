@@ -43,7 +43,11 @@ const pendingQueue: Notification[] = [];
 let windowSize: WindowSize | null = null;
 
 /**
- * Get current window size from Eden API
+ * Retrieve the current application window size via the Eden API.
+ *
+ * If the API call fails, logs the error and returns a default size of { width: 1280, height: 800 }.
+ *
+ * @returns The window size with `width` and `height`; returns the default `{ width: 1280, height: 800 }` on failure.
  */
 async function fetchWindowSize(): Promise<WindowSize> {
   try {
@@ -137,7 +141,11 @@ function calculateBounds(): ViewBounds {
 }
 
 /**
- * Update overlay bounds via Eden API
+ * Send the current toast overlay bounds to the Eden view manager.
+ *
+ * Computes the overlay bounds and requests the Eden API to update the view bounds for the toaster app.
+ *
+ * Errors from the API call are caught and logged to the console.
  */
 async function updateOverlayBounds(): Promise<void> {
   const bounds = calculateBounds();
@@ -440,7 +448,7 @@ function handleToastAdded(data: { notification: Notification }): void {
 }
 
 /**
- * Initialize the toaster
+ * Initialize and start the toaster: fetch the initial window size, subscribe to notification and window-size events, and set the initial overlay bounds.
  */
 async function init(): Promise<void> {
   console.log("Eden Toaster initializing...");

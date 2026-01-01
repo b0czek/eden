@@ -2,7 +2,10 @@
 const iconCache = new Map<string, string | undefined>();
 
 /**
- * Fetch an app icon as a base64 data URL
+ * Retrieves the base64 data URL for an app's icon, using an internal cache when available.
+ *
+ * @param appId - The application identifier (package id) whose icon to fetch.
+ * @returns The icon as a base64 data URL, or `undefined` if the icon could not be retrieved.
  */
 export async function fetchAppIcon(appId: string): Promise<string | undefined> {
   // Check cache first

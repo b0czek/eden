@@ -21,6 +21,19 @@ interface AppContextMenuProps {
   onClose: () => void;
 }
 
+/**
+ * Render a context menu for an app, providing controls to stop the app, toggle hot reload, add/remove the app from the dock, and uninstall the app.
+ *
+ * @param props - Properties for the context menu including the target app information and action handlers:
+ *   - menu.appId: the app's identifier
+ *   - menu.appName: the app's display name
+ *   - menu.isRunning: whether the app is currently running
+ *   - optional menu.left/right/top/bottom: position offsets in pixels for the popover
+ *   - isAppPinned(appId): returns whether the app is pinned to the dock
+ *   - onStopApp(appId), onAddToDock(appId), onRemoveFromDock(appId), onUninstallApp(appId): action handlers
+ *   - onClose(): closes the context menu
+ * @returns The JSX for the app context menu popover and its overlay.
+ */
 export default function AppContextMenu(props: AppContextMenuProps) {
   const [hotReloadEnabled, setHotReloadEnabled] = createSignal(false);
 

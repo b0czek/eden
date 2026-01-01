@@ -5,9 +5,15 @@
  */
 
 /**
- * Get screen coordinates from mouse or touch event
- * @param e - The event
- * @returns Screen coordinates
+ * Derives screen-space X/Y coordinates from a MouseEvent or TouchEvent.
+ *
+ * For touch events, attempts available touch screen coordinates, then computes
+ * coordinates from client positions using the frame bounds, and finally falls
+ * back to window screen offsets. If no usable coordinates are available,
+ * returns `{ x: 0, y: 0 }`.
+ *
+ * @param e - The mouse or touch event to derive coordinates from
+ * @returns The screen-space coordinates as an object with `x` and `y` properties
  */
 export function getScreenCoords(e: MouseEvent | TouchEvent): {
   x: number;

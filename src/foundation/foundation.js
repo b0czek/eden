@@ -13,7 +13,9 @@
     }
 
     /**
-     * Report workspace bounds to the backend
+     * Send the workspace bounding rectangle and current window size to the backend.
+     *
+     * The reported bounds contain x, y, width, and height; the height is reduced by 72 pixels.
      */
     function reportWorkspaceBounds() {
         const rect = workspace.getBoundingClientRect();
@@ -38,8 +40,9 @@
     }
 
     /**
-     * Handle global mouseup events
-     * Cleanup for any active drag/resize operations happening in app views
+     * Notify the backend of a global mouse-up to end any active drag or resize interactions.
+     *
+     * Sends the 'view/global-mouseup' shell command to the backend; any error from the call is logged to the console.
      */
     function handleGlobalMouseUp() {
         window.edenAPI.shellCommand('view/global-mouseup', {})

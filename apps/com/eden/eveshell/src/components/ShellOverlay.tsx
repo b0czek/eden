@@ -16,6 +16,13 @@ const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
 // Database key for persisting pinned dock apps
 const PINNED_DOCK_APPS_KEY = "pinned-dock-apps";
 
+/**
+ * Renders the shell overlay that manages the dock, the All Apps view, and dock context menu, plus the related state and host-API interactions.
+ *
+ * The component maintains installed and running app lists, pinned dock apps, overlay sizing, and handlers for launching, stopping, pinning, uninstalling apps, and context-menu interactions. It also subscribes to lifecycle and bounds-change events and persists pinned apps via the host API.
+ *
+ * @returns The SolidJS component tree for the shell overlay, including the Dock, conditional AllApps view, and conditional AppContextMenu
+ */
 export default function ShellOverlay() {
   const [runningApps, setRunningApps] = createSignal<AppInstance[]>([]);
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);

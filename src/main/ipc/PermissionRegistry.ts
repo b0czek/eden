@@ -102,7 +102,10 @@ export class PermissionRegistry {
 const EVENT_PERMISSIONS: Map<string, string> = new Map();
 
 /**
- * Register an event's required permission
+ * Register or update the permission required to subscribe to a specific event.
+ *
+ * @param eventName - The name of the event to register the permission for
+ * @param permission - The permission string required to subscribe to the event
  */
 export function registerEventPermission(
   eventName: string,

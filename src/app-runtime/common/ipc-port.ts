@@ -20,7 +20,16 @@ export interface IPCPort {
 }
 
 /**
- * Wrap a DOM MessagePort to conform to IPCPort interface
+ * Adapts a DOM MessagePort to the IPCPort shape used by the application.
+ *
+ * The returned object forwards posted messages to the underlying MessagePort and
+ * exposes `on`/`off` for `"message"` and `"close"`, `start`, and `close` methods.
+ * Message listeners receive an object of the form `{ data }` (extracted from the
+ * MessageEvent). Registered `"close"` listeners are invoked when the adapter's
+ * `close()` is called.
+ *
+ * @param port - The DOM MessagePort to wrap
+ * @returns An IPCPort that proxies messages and lifecycle events to the provided port
  */
 export function wrapDOMPort(port: MessagePort): IPCPort {
   const messageListeners = new Map<
@@ -72,8 +81,10 @@ export function wrapDOMPort(port: MessagePort): IPCPort {
 }
 
 /**
- * Wrap an Electron MessagePortMain to conform to IPCPort interface
- * (MessagePortMain already uses the EventEmitter pattern)
+ * Adapts an Electron MessagePortMain to the IPCPort interface.
+ *
+ * @param port - Electron MessagePortMain to adapt
+ * @returns The provided port presented as an `IPCPort`
  */
 export function wrapElectronPort(port: Electron.MessagePortMain): IPCPort {
   return port as unknown as IPCPort;

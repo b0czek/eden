@@ -80,14 +80,22 @@ let commandIdCounter = 0;
 const appBusState = createAppBusState("backend-appbus");
 
 /**
- * Generate unique command ID
+ * Create a unique command identifier for tracking shell requests.
+ *
+ * @returns A unique command ID string composed of the app ID, the current timestamp, and an incrementing counter
  */
 function generateCommandId(): string {
   return `cmd-${appId}-${Date.now()}-${++commandIdCounter}`;
 }
 
 /**
- * Send a shell command to main process and wait for response
+ * Send a shell command to the main process and await the response.
+ *
+ * @param command - The shell command to execute.
+ * @param args - Arguments passed to the command; the object will be augmented with a `_callerAppId` property identifying this app.
+ * @returns The value returned by the main process for the command.
+ *
+ * The returned promise rejects if the command times out (after 30 seconds) or if the main process responds with an error.
  */
 async function shellCommand(command: string, args: any): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -204,7 +212,13 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
 });
 
 /**
- * Set up frontend port using createPortConnection
+ * Establishes the frontend AppBus connection using the provided Electron message port.
+ *
+ * Wraps the raw Electron MessagePortMain and creates a port-backed AppBus connection
+ * stored in `frontendConnection`, identified as "__frontend__" and configured with
+ * a backend-to-frontend message ID generator.
+ *
+ * @param port - The Electron message port received from the main process for frontend communication
  */
 function setupFrontendPort(port: Electron.MessagePortMain): void {
   const wrappedPort = wrapElectronPort(port);
@@ -220,7 +234,12 @@ function setupFrontendPort(port: Electron.MessagePortMain): void {
 }
 
 /**
- * Handle AppBus port connections (using shared utility)
+ * Establishes an AppBus connection for an incoming Electron MessagePortMain.
+ *
+ * Wraps the provided Electron port and performs AppBus port setup using the backend's AppBus state.
+ *
+ * @param port - The incoming Electron MessagePortMain that carries AppBus messages
+ * @param data - Connection setup payload (e.g., connection id and metadata) sent alongside the port
  */
 function handleAppBusPort(port: Electron.MessagePortMain, data: any): void {
   // Wrap Electron MessagePortMain to IPCPort interface
@@ -230,7 +249,10 @@ function handleAppBusPort(port: Electron.MessagePortMain, data: any): void {
 }
 
 /**
- * Load and execute the actual backend entry point
+ * Load and execute the configured backend entry module for this app.
+ *
+ * On successful import, posts a `{ type: "backend-ready" }` message to the parent port.
+ * If the import throws, posts a `{ type: "backend-error", error: string }` message with the error message and exits the process with code 1.
  */
 async function loadBackendEntry(): Promise<void> {
   try {
@@ -251,7 +273,11 @@ async function loadBackendEntry(): Promise<void> {
 }
 
 /**
- * Wait for frontend port (if app has frontend) then load backend
+ * Initialize the backend runtime by waiting for a frontend port if the app has a frontend, then load the backend entry.
+ *
+ * If the app has a frontend, waits for an "init-port" message, assigns and initializes the frontend port (sets `frontendPort` and calls `setupFrontendPort`). Afterwards, loads the configured backend entry module.
+ *
+ * @returns `void` when frontend port handling (if required) and backend entry loading are complete.
  */
 async function initializeBackend(): Promise<void> {
   if (hasFrontend) {
@@ -278,8 +304,10 @@ async function initializeBackend(): Promise<void> {
 }
 
 /**
- * Get AppAPI connection
- * Throws if app has no frontend
+ * Retrieve the established AppBus connection for the frontend.
+ *
+ * @returns The active `AppBusConnection` used to communicate with the frontend.
+ * @throws If no frontend connection is established (the app has no frontend or the frontend port has not been received).
  */
 function getAppAPI(): AppBusConnection {
   if (!frontendConnection) {

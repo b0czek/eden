@@ -21,7 +21,13 @@ interface BoundsRef {
  * Setup window resizing for floating windows
  */
 /**
- * Setup window resizing for floating windows
+ * Initialize and manage a bottom-right resize handle that enables interactive resizing of a floating window.
+ *
+ * Registers mouse and touch handlers, enforces min/max size from `windowConfig`, updates `currentBoundsRef`
+ * during the interaction, and sends final bounds updates to the hosting frame when the resize completes.
+ *
+ * @param windowConfig - Window configuration used to enforce `minSize` and `maxSize` constraints during resizing
+ * @param currentBoundsRef - Mutable reference whose `current` bounds are updated live as the window is resized
  */
 export function setupWindowResizing(
   windowConfig: NonNullable<Window["edenFrame"]>["_internal"]["config"],

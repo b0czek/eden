@@ -17,6 +17,11 @@ if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir, { recursive: true });
 }
 
+/**
+ * Run TypeScript type-checking, bundle the app-frame entry point, and copy the frame CSS into the distribution directory.
+ *
+ * Performs TypeScript type checking using the project's app-frame tsconfig; bundles src/app-frame/frame-injector.ts to dist/app-frame/frame-injector.js with browser-targeted settings and sourcemap; copies src/app-frame/frame.css to dist/app-frame/frame.css if present. On any failure the process exits with code 1.
+ */
 async function bundle() {
     try {
         console.log('🔍 Type-checking TypeScript files...');

@@ -86,7 +86,10 @@ worker.appBus.exposeService('chat-relay', (connection, { appId: clientAppId }) =
   description: 'Chat relay service for hub-mediated messaging'
 });
 
-// Helper: Get list of connected clients
+/**
+ * Get a list of connected clients with their client IDs and nicknames.
+ * @returns {Array<{clientId: string, nickname: string}>} An array of client descriptors containing `clientId` and `nickname`.
+ */
 function getClientList() {
   return Array.from(clients.entries()).map(([id, info]) => ({
     clientId: id,
@@ -94,7 +97,12 @@ function getClientList() {
   }));
 }
 
-// Helper: Broadcast to all connected clients
+/**
+ * Send an event with payload to every currently connected client.
+ * Errors encountered while sending to individual clients are caught and logged; delivery to other clients continues.
+ * @param {string} eventName - The event name to emit to clients.
+ * @param {*} data - The payload to send with the event.
+ */
 function broadcast(eventName, data) {
   clients.forEach(({ connection }, clientId) => {
     try {
@@ -105,7 +113,14 @@ function broadcast(eventName, data) {
   });
 }
 
-// Helper: Broadcast to all except one client
+/**
+ * Send an event to every connected client except the specified client.
+ * 
+ * Attempts to deliver the given event and payload to all clients in the internal map except `excludeClientId`; delivery failures for individual clients are logged.
+ * @param {string} excludeClientId - Client ID to exclude from delivery.
+ * @param {string} eventName - Name of the event to send.
+ * @param {*} data - Payload to send with the event.
+ */
 function broadcastToOthers(excludeClientId, eventName, data) {
   clients.forEach(({ connection }, clientId) => {
     if (clientId !== excludeClientId) {

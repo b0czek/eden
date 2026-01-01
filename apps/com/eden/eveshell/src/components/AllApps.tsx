@@ -14,6 +14,16 @@ interface AllAppsProps {
   onRemoveFromDock: (appId: string) => Promise<void> | void;
 }
 
+/**
+ * Renders the All Apps overlay: a searchable grid of app tiles with click, context-menu,
+ * and long-press interactions, plus a coordinated close animation.
+ *
+ * @param props - Props object containing the app list and interaction callbacks:
+ *   - apps: array of AppInfo to display
+ *   - callbacks: onClose, onAppClick, onStopApp, onUninstallApp, onAddToDock, onRemoveFromDock
+ *   - isAppPinned: predicate to check whether an app is pinned
+ * @returns The SolidJS component element that displays the All Apps overlay and contextual menu
+ */
 export default function AllApps(props: AllAppsProps) {
   const [searchQuery, setSearchQuery] = createSignal("");
   const [contextMenu, setContextMenu] = createSignal<ContextMenuData | null>(null);

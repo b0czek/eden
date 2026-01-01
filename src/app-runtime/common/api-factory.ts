@@ -24,7 +24,12 @@ export interface AppBusConfig {
 }
 
 /**
- * Create the EdenAPI object
+ * Create an EdenAPI client that exposes shell command execution and managed event subscriptions backed by the provided transport.
+ *
+ * @param transport - Transport used to execute shell commands and coordinate event registration with the backend
+ * @param eventSubscriptions - Mutable map used to track local event callbacks keyed by event name
+ * @param options.getLaunchArgs - Optional function that returns process launch arguments; if omitted, an empty array is used
+ * @returns An `EdenAPI` object with methods to execute shell commands, subscribe and unsubscribe from named events (synchronizing registrations with the backend), check whether an event is supported, and retrieve launch arguments
  */
 export function createEdenAPI(
   transport: ShellTransport,
@@ -78,8 +83,11 @@ export function createEdenAPI(
 }
 
 /**
- * Create the AppBusAPI object
- */
+ * Constructs an AppBusAPI for exposing services, accepting connections, and connecting to remote services.
+ *
+ * @param config - Configuration including the shell transport used to communicate with the main process and an optional `isBackend` flag.
+ * @param state - Shared AppBus state containing registered service callbacks, connected MessagePorts, pending request map, and a message ID generator.
+ * @returns An AppBusAPI object with methods to expose and unexpose services, initiate connections (returns an `AppBusConnection` on success or `{ error: string }` on failure), and list available services. */
 export function createAppBusAPI(
   config: AppBusConfig,
   state: AppBusState

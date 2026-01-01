@@ -39,7 +39,10 @@ export interface ClientPortOptions {
 }
 
 /**
- * Message ID generator factory
+ * Creates a message ID generator function that produces unique IDs using an optional prefix.
+ *
+ * @param prefix - Optional prefix to prepend to each generated message ID
+ * @returns A unique message ID string that includes the provided `prefix`
  */
 export function createMessageIdGenerator(prefix: string = "msg"): () => string {
   let counter = 0;
@@ -57,7 +60,10 @@ export interface AppBusState {
 }
 
 /**
- * Create AppBus state for an app
+ * Create a new AppBusState with empty registries and a message ID generator.
+ *
+ * @param prefix - Optional prefix used by the message ID generator (defaults to "appbus")
+ * @returns The initialized AppBusState containing empty `registeredServices`, `connectedPorts`, `pendingRequests`, and a `messageIdGenerator`
  */
 export function createAppBusState(prefix: string = "appbus"): AppBusState {
   return {
@@ -69,9 +75,11 @@ export function createAppBusState(prefix: string = "appbus"): AppBusState {
 }
 
 /**
- * Set up a MessagePort as a client (sends requests, receives responses)
+ * Registers a MessagePort as a client endpoint, wires response handling for outstanding requests, and starts the port.
  *
- * @param options Configuration for the client port
+ * Stores the provided port in `portStore` under `connectionId`, listens for incoming messages of type `"response"` to resolve or reject matching entries in `pendingRequests`, and starts the port.
+ *
+ * @param options - Configuration containing the `port` to register, the `connectionId` key, the `portStore` map where the port will be stored, and the `pendingRequests` map whose entries are resolved or rejected when responses arrive
  */
 export function setupClientPort(options: ClientPortOptions): void {
   const { port, connectionId, portStore, pendingRequests } = options;
@@ -100,14 +108,17 @@ export function setupClientPort(options: ClientPortOptions): void {
 }
 
 /**
- * Create a connection object for a port (Electron IPC style)
+ * Create a bidirectional AppBusConnection wrapper around an IPCPort.
  *
- * @param port The IPCPort to wrap
- * @param connectionId The connection ID
- * @param portStore The Map storing ports
- * @param pendingRequests The Map tracking pending requests for outgoing requests
- * @param generateMessageId Function to generate unique message IDs
- * @returns Connection object with send/on/off, request/handle/removeHandler, and close methods
+ * The returned connection supports fire-and-forget messaging, request/response flows with timeouts,
+ * per-method event listeners, request handlers, and connection lifecycle management.
+ *
+ * @param port - The IPCPort to wrap and listen to for incoming messages
+ * @param connectionId - Identifier used to register this port in `portStore`
+ * @param portStore - Map that tracks active ports by connection ID; this function will add/remove the port
+ * @param pendingRequests - Map used to track outstanding requests keyed by message ID; responses resolve/reject entries here
+ * @param generateMessageId - Function that produces unique message IDs for outgoing requests
+ * @returns An AppBusConnection exposing `send`, `on`, `once`, `off`, `request`, `handle`, `removeHandler`, `isConnected`, `onClose`, and `close` methods
  */
 export function createPortConnection(
   port: IPCPort,
@@ -313,12 +324,21 @@ export function createPortConnection(
 }
 
 /**
- * Handle an incoming AppBus port (can be service or client role)
+ * Bind a received IPC port into the AppBus as either a service-side or client-side connection.
  *
- * @param port The MessagePort received
- * @param data Connection metadata
- * @param state AppBus state (services, ports, pending requests)
- * @param logPrefix Prefix for log messages
+ * If `data.role` is `"service"`, looks up the registered service callback for `data.serviceName` and, if present,
+ * creates an AppBus connection for the incoming client and invokes the callback with the connection and client info.
+ * If `data.role` is `"client"`, prepares and registers the port for client-side request/response usage.
+ *
+ * @param port - The IPCPort to attach
+ * @param data - Connection metadata:
+ *   - `connectionId` — unique identifier for this connection
+ *   - `role` — `"service"` when a remote client connects to a local service, `"client"` when connecting to a remote service
+ *   - `serviceName` — name of the service being connected
+ *   - `targetAppId` — optional target application id (for client role)
+ *   - `sourceAppId` — optional source application id (for service role)
+ * @param state - AppBus state containing registered services, connected ports, pending requests, and a message ID generator
+ * @param logPrefix - Optional prefix used for log messages
  */
 export function handleAppBusPort(
   port: IPCPort,
@@ -379,11 +399,10 @@ export function handleAppBusPort(
   }
 }
 /**
- * Handle a port being closed from the other side
- * Triggered by a notification from the main process
+ * Remove and close the connected port identified by `connectionId` from the given AppBus state.
  *
- * @param state AppBus state
- * @param connectionId The ID of the closed connection
+ * @param state - The AppBus state containing connected ports
+ * @param connectionId - The identifier of the closed connection to remove
  */
 export function handlePortClosed(
   state: AppBusState,
