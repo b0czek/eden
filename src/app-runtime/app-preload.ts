@@ -99,18 +99,6 @@ ipcRenderer.on("shell-message", (_event: any, message: any) => {
   }
 });
 
-// Helper to create connection-guarded methods
-const requireConnection = <T extends (...args: any[]) => any>(
-  fn: (conn: AppBusConnection) => T
-): T => {
-  return ((...args: any[]) => {
-    if (!backendConnection) {
-      throw new Error("Backend not connected");
-    }
-    return fn(backendConnection)(...args);
-  }) as T;
-};
-
 // Expose safe API to the app
 contextBridge.exposeInMainWorld("getAppAPI", () => {
   if (!backendConnection) {

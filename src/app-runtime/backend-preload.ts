@@ -38,7 +38,6 @@ import {
 // Get app info from environment
 const appId = process.env.EDEN_APP_ID!;
 const backendEntry = process.env.EDEN_BACKEND_ENTRY!;
-const installPath = process.env.EDEN_INSTALL_PATH!;
 const manifest = JSON.parse(process.env.EDEN_MANIFEST || "{}");
 
 // Extract launch args
@@ -295,17 +294,12 @@ function getAppAPI(): AppBusConnection {
 /**
  * Set up the global worker object
  */
-const workerObject: {
-  edenAPI: typeof edenAPI;
-  appBus: typeof appBus;
-  getAppAPI: () => AppBusConnection;
-} =
-  // For apps with frontend, appAPI will be set in initializeBackend after port is received
-  (((globalThis as any).worker as WorkerGlobal) = {
-    edenAPI,
-    appBus,
-    getAppAPI,
-  });
+// For apps with frontend, appAPI will be set in initializeBackend after port is received
+((globalThis as any).worker as WorkerGlobal) = {
+  edenAPI,
+  appBus,
+  getAppAPI,
+};
 
 // Start initialization
 initializeBackend();
