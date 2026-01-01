@@ -14,12 +14,12 @@ import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 export interface WorkerGlobal {
   edenAPI: EdenAPI;
   appBus: AppBusAPI;
-  appAPI: AppBusConnection;
+  getAppAPI: () => AppBusConnection;
 }
 
 /**
  * Backend globals (utility process)
- * These are set by backend-runtime.ts for utility processes
+ * These are set by backend-preload.ts for utility processes
  */
 declare global {
   /**

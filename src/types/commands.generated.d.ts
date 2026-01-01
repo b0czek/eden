@@ -29,7 +29,6 @@ export interface AppbusCommands {
   "appbus/register": {
     args: {
     serviceName: string;
-    methods: string[];
     description?: string;
     allowedClients?: string[] };
     response: { success: boolean; error?: string };
@@ -306,6 +305,30 @@ export interface FsCommands {
 }
 
 /**
+ * EventCommands - Commands for the "event" namespace
+ */
+export interface EventCommands {
+  "event/subscribe": {
+    args: {
+    eventName: string;
+    _callerWebContentsId?: number;
+    _callerAppId?: string };
+    response: void;
+  };
+  "event/unsubscribe": {
+    args: {
+    eventName: string;
+    _callerWebContentsId?: number;
+    _callerAppId?: string };
+    response: void;
+  };
+  "event/exists": {
+    args: { eventName: string };
+    response: boolean;
+  };
+}
+
+/**
  * NotificationCommands - Commands for the "notification" namespace
  */
 export interface NotificationCommands {
@@ -505,4 +528,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, DbCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, DbCommands, FileCommands, FsCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, ViewCommands {}

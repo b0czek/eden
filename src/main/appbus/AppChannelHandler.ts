@@ -24,7 +24,6 @@ export class AppChannelHandler {
   @EdenHandler("register", { permission: "expose" })
   async handleRegister(args: {
     serviceName: string;
-    methods: string[];
     description?: string;
     allowedClients?: string[];
     _callerAppId: string;
@@ -34,7 +33,6 @@ export class AppChannelHandler {
       this.channelManager.registerService(
         args._callerAppId,
         args.serviceName,
-        args.methods,
         args._callerWebContentsId,
         {
           description: args.description,

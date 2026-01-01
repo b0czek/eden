@@ -31,9 +31,19 @@ export interface AppBusConnection {
 }
 
 /**
- * Service handler function type
+ * Information about a connecting client
  */
-export type ServiceHandler = (method: string, args: any) => any | Promise<any>;
+export interface ClientInfo {
+  appId: string;
+}
+
+/**
+ * Callback invoked when a client connects to a service
+ */
+export type ServiceConnectCallback = (
+  connection: AppBusConnection,
+  clientInfo: ClientInfo
+) => void;
 
 /**
  * Service registration options
@@ -41,7 +51,6 @@ export type ServiceHandler = (method: string, args: any) => any | Promise<any>;
 export interface ServiceOptions {
   description?: string;
   allowedClients?: string[];
-  methods?: string[];
 }
 
 /**
@@ -50,7 +59,6 @@ export interface ServiceOptions {
 export interface ServiceInfo {
   appId: string;
   serviceName: string;
-  methods: string[];
   description?: string;
 }
 
@@ -59,14 +67,15 @@ export interface ServiceInfo {
  */
 export interface AppBusAPI {
   /**
-   * Register a service that other apps can connect to
+   * Register a service that other apps can connect to.
+   * When a client connects, onConnect is called with their AppBusConnection.
    * @param serviceName - Name of the service
-   * @param handler - Function to handle incoming method calls
+   * @param onConnect - Callback invoked for each connecting client with their bidirectional connection
    * @param options - Optional configuration
    */
   exposeService(
     serviceName: string,
-    handler: ServiceHandler,
+    onConnect: ServiceConnectCallback,
     options?: ServiceOptions
   ): Promise<{ success: boolean; error?: string }>;
 

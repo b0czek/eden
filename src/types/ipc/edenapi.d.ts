@@ -56,7 +56,6 @@ export interface EdenAPI {
 
   /**
    * Get the launch arguments passed to this app.
-   * Fetches from main process - always returns current data.
    */
-  getLaunchArgs(): Promise<string[]>;
+  getLaunchArgs(): string[];
 }

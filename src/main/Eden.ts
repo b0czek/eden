@@ -11,7 +11,7 @@ import { PackageManager, PackageHandler } from "./package-manager";
 import {
   ProcessManager,
   ProcessHandler,
-  WorkerManager,
+  BackendManager,
   AutostartManager,
 } from "./process-manager";
 import { ViewManager, ViewHandler } from "./view-manager";
@@ -23,7 +23,7 @@ import { container } from "tsyringe";
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
-  private workerManager: WorkerManager;
+  private backendManager: BackendManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
   private commandRegistry: CommandRegistry;
@@ -71,13 +71,13 @@ export class Eden {
     // Register Config
     container.registerInstance("EdenConfig", this.config);
 
-    // 2. Worker Manager
-    this.workerManager = new WorkerManager();
-    container.registerInstance("WorkerManager", this.workerManager);
+    // 2. Backend Manager
+    this.backendManager = new BackendManager();
+    container.registerInstance("BackendManager", this.backendManager);
 
-    // 3. IPC Bridge (depends on WorkerManager, CommandRegistry)
+    // 3. IPC Bridge (depends on BackendManager, CommandRegistry)
     // Note: ViewManager is not passed yet, will be set later
-    this.ipcBridge = new IPCBridge(this.workerManager, this.commandRegistry);
+    this.ipcBridge = new IPCBridge(this.backendManager, this.commandRegistry);
     container.registerInstance("IPCBridge", this.ipcBridge);
 
     // 4. ViewManager (depends on CommandRegistry, IPCBridge, EdenConfig)
@@ -91,6 +91,8 @@ export class Eden {
     this.ipcBridge.eventSubscribers.setPermissionRegistry(
       this.permissionRegistry
     );
+
+    // TODO: Auto-Registration with tsyringe
 
     // Initialize AppBus (peer-to-peer channel system)
     this.appChannelManager = container.resolve(AppChannelManager);

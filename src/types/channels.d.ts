@@ -12,8 +12,6 @@ export interface ServiceInfo {
   appId: string;
   /** Service name (unique per app) */
   serviceName: string;
-  /** Methods this service exposes */
-  methods: string[];
   /** Human-readable description */
   description?: string;
 }
@@ -26,8 +24,6 @@ export interface ServiceDeclaration {
   name: string;
   /** Human-readable description */
   description?: string;
-  /** Methods this service exposes */
-  methods: string[];
   /** Optional: Restrict which apps can connect (if omitted, open to all) */
   allowedClients?: string[];
 }
@@ -48,9 +44,7 @@ export interface ConnectResult {
 export interface RegisteredService {
   appId: string;
   serviceName: string;
-  methods: string[];
   description?: string;
-  allowedClients?: string[];
   allowedClients?: string[];
   webContentsId?: number;
   providerType: "frontend" | "backend";

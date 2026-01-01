@@ -35,18 +35,18 @@ declare global {
     /**
      * Eden API instance available in renderer processes
      */
-    edenAPI?: EdenAPI;
+    edenAPI: EdenAPI;
 
     /**
      * AppBus instance for app-to-app communication
      */
-    appBus?: AppBusAPI;
+    appBus: AppBusAPI;
 
     /**
-     * AppAPI for frontend<->backend communication
-     * Same interface as AppBusConnection
+     * Get AppAPI for frontend<->backend communication
+     * Throws if connection is not available
      */
-    appAPI?: AppBusConnection;
+    getAppAPI: () => AppBusConnection;
 
     edenFrame?: EdenFrame;
   }

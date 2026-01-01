@@ -7,6 +7,7 @@ import type {
 } from "@edenapp/types/channels";
 import { CommandRegistry } from "../ipc";
 import { AppChannelHandler } from "./AppChannelHandler";
+import { BackendManager } from "../process-manager/BackendManager";
 
 /**
  * AppChannelManager
@@ -28,9 +29,14 @@ export class AppChannelManager {
 
   /** IPC handler for appbus/* commands */
   private handler: AppChannelHandler;
+  private backendManager: BackendManager;
 
-  constructor(@inject("CommandRegistry") commandRegistry: CommandRegistry) {
+  constructor(
+    @inject("CommandRegistry") commandRegistry: CommandRegistry,
+    @inject("BackendManager") backendManager: BackendManager
+  ) {
     this.handler = new AppChannelHandler(this);
+    this.backendManager = backendManager;
     commandRegistry.registerManager(this.handler);
   }
 
@@ -47,7 +53,6 @@ export class AppChannelManager {
   registerService(
     appId: string,
     serviceName: string,
-    methods: string[],
     webContentsId: number,
     options?: { description?: string; allowedClients?: string[] }
   ): void {
@@ -59,20 +64,23 @@ export class AppChannelManager {
       );
     }
 
+    // Determine if provider is frontend or backend
+    // If webContentsId is -1 or invalid, assume backend
+    const providerType =
+      webContentsId && webContentsId > 0 ? "frontend" : "backend";
+
     const service: RegisteredService = {
       appId,
       serviceName,
-      methods,
-      webContentsId,
+      webContentsId: providerType === "frontend" ? webContentsId : undefined,
+      providerType,
       description: options?.description,
       allowedClients: options?.allowedClients,
     };
 
     this.services.set(key, service);
     console.log(
-      `[AppChannelManager] Registered service "${serviceName}" from app "${appId}" with methods: ${methods.join(
-        ", "
-      )}`
+      `[AppChannelManager] Registered service "${serviceName}" from app "${appId}"`
     );
   }
 
@@ -163,17 +171,37 @@ export class AppChannelManager {
     }
 
     // Get webContents for both requester and target
-    const requesterWebContents = webContents.fromId(requesterWebContentsId);
-    const targetWebContents = webContents.fromId(service.webContentsId);
+    const requesterWebContents = requesterWebContentsId
+      ? webContents.fromId(requesterWebContentsId)
+      : undefined;
+    const targetWebContents = service.webContentsId
+      ? webContents.fromId(service.webContentsId)
+      : undefined;
 
-    if (!requesterWebContents) {
-      return { success: false, error: "Requester view not found" };
+    // Validate requester (must be frontend or backend)
+    const isRequesterBackend =
+      !requesterWebContents && this.backendManager.hasBackend(requesterAppId);
+
+    if (!requesterWebContents && !isRequesterBackend) {
+      return { success: false, error: "Requester process not found" };
     }
 
-    if (!targetWebContents) {
+    // Validate target (must be frontend or backend)
+    const isTargetBackend =
+      service.providerType === "backend" &&
+      this.backendManager.hasBackend(targetAppId);
+
+    if (service.providerType === "frontend" && !targetWebContents) {
       return {
         success: false,
-        error: `Target app "${targetAppId}" is not running`,
+        error: `Target app "${targetAppId}" frontend is not running`,
+      };
+    }
+
+    if (service.providerType === "backend" && !isTargetBackend) {
+      return {
+        success: false,
+        error: `Target app "${targetAppId}" backend is not running`,
       };
     }
 
@@ -188,29 +216,59 @@ export class AppChannelManager {
       `[AppChannelManager] Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`
     );
 
-    // Transfer port1 to requester (the one who initiated the connection)
-    requesterWebContents.postMessage(
-      "appbus-port",
-      {
-        connectionId,
-        targetAppId,
-        serviceName,
-        role: "client",
-      },
-      [port1]
-    );
+    // Transfer port1 to requester
+    if (requesterWebContents) {
+      requesterWebContents.postMessage(
+        "appbus-port",
+        {
+          connectionId,
+          targetAppId,
+          serviceName,
+          role: "client",
+        },
+        [port1]
+      );
+    } else {
+      // Requester is backend
+      this.backendManager.sendPortToBackend(
+        requesterAppId,
+        {
+          type: "appbus-port",
+          connectionId,
+          targetAppId,
+          serviceName,
+          role: "client",
+        },
+        [port1]
+      );
+    }
 
-    // Transfer port2 to target (the service provider)
-    targetWebContents.postMessage(
-      "appbus-port",
-      {
-        connectionId,
-        sourceAppId: requesterAppId,
-        serviceName,
-        role: "service",
-      },
-      [port2]
-    );
+    // Transfer port2 to target
+    if (targetWebContents) {
+      targetWebContents.postMessage(
+        "appbus-port",
+        {
+          connectionId,
+          sourceAppId: requesterAppId,
+          serviceName,
+          role: "service",
+        },
+        [port2]
+      );
+    } else {
+      // Target is backend
+      this.backendManager.sendPortToBackend(
+        targetAppId,
+        {
+          type: "appbus-port",
+          connectionId,
+          sourceAppId: requesterAppId,
+          serviceName,
+          role: "service",
+        },
+        [port2]
+      );
+    }
 
     return { success: true, connectionId };
   }
@@ -243,7 +301,6 @@ export class AppChannelManager {
     return Array.from(this.services.values()).map((service) => ({
       appId: service.appId,
       serviceName: service.serviceName,
-      methods: service.methods,
       description: service.description,
     }));
   }
