@@ -1,5 +1,5 @@
 import { MessageChannelMain, webContents } from "electron";
-import { inject, injectable } from "tsyringe";
+import { inject, injectable, singleton, delay } from "tsyringe";
 import type {
   RegisteredService,
   ServiceInfo,
@@ -16,6 +16,7 @@ import { BackendManager } from "../process-manager/BackendManager";
  * Uses Electron's MessageChannelMain for direct communication
  * that bypasses the main process after initial setup.
  */
+@singleton()
 @injectable()
 export class AppChannelManager {
   /** Map of "appId:serviceName" -> RegisteredService */
@@ -37,8 +38,8 @@ export class AppChannelManager {
   private backendManager: BackendManager;
 
   constructor(
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("BackendManager") backendManager: BackendManager
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(delay(() => BackendManager)) backendManager: BackendManager
   ) {
     this.handler = new AppChannelHandler(this);
     this.backendManager = backendManager;

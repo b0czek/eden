@@ -1,16 +1,17 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import fg from "fast-glob";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { FilesystemHandler } from "./FilesystemHandler";
 import type { FileStats, SearchResult } from "@edenapp/types";
 
 /**
  * FilesystemManager
- * 
+ *
  * Manages filesystem operations and path resolution.
  */
+@singleton()
 @injectable()
 export class FilesystemManager {
   private baseDir: string;
@@ -18,11 +19,11 @@ export class FilesystemManager {
 
   constructor(
     @inject("userDirectory") baseDir: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry
   ) {
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
-    
+
     // Create and register handler
     this.handler = new FilesystemHandler(this);
     commandRegistry.registerManager(this.handler);
@@ -37,7 +38,7 @@ export class FilesystemManager {
 
   /**
    * Resolve a masked path (as seen by apps) to an absolute filesystem path.
-   * 
+   *
    * @param targetPath - The masked path (e.g., "/file.json" or "/Documents/notes.txt")
    * @returns The resolved absolute path (e.g., "/home/user/.eden/file.json")
    * @throws Error if the path attempts to escape the base directory
@@ -60,14 +61,14 @@ export class FilesystemManager {
 
   /**
    * Convert an absolute filesystem path back to a masked path (as seen by apps).
-   * 
+   *
    * @param absolutePath - The absolute filesystem path
    * @returns The masked path relative to the base directory
    * @throws Error if the path is outside the base directory
    */
   toMaskedPath(absolutePath: string): string {
     const normalizedAbsolute = path.resolve(absolutePath);
-    
+
     if (!normalizedAbsolute.startsWith(this.baseDir)) {
       throw new Error(
         `Path '${absolutePath}' is outside of base directory '${this.baseDir}'`
@@ -98,7 +99,10 @@ export class FilesystemManager {
   /**
    * Read the contents of a file.
    */
-  async readFile(targetPath: string, encoding: BufferEncoding = "utf-8"): Promise<string> {
+  async readFile(
+    targetPath: string,
+    encoding: BufferEncoding = "utf-8"
+  ): Promise<string> {
     const fullPath = this.resolvePath(targetPath);
     return await fs.readFile(fullPath, encoding);
   }
@@ -106,7 +110,11 @@ export class FilesystemManager {
   /**
    * Write content to a file, creating directories if needed.
    */
-  async writeFile(targetPath: string, content: string, encoding: BufferEncoding = "utf-8"): Promise<void> {
+  async writeFile(
+    targetPath: string,
+    content: string,
+    encoding: BufferEncoding = "utf-8"
+  ): Promise<void> {
     const fullPath = this.resolvePath(targetPath);
     // Ensure directory exists
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
@@ -159,7 +167,11 @@ export class FilesystemManager {
   /**
    * Search for files and directories using glob patterns.
    */
-  async search(basePath: string, pattern: string, limit: number = 10): Promise<SearchResult[]> {
+  async search(
+    basePath: string,
+    pattern: string,
+    limit: number = 10
+  ): Promise<SearchResult[]> {
     const fullPath = this.resolvePath(basePath);
 
     // Create glob pattern
@@ -179,7 +191,8 @@ export class FilesystemManager {
       for (const entry of entries) {
         if (results.length >= limit) break;
 
-        const entryPath = basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
+        const entryPath =
+          basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
         const isDirectory = entry.stats?.isDirectory() ?? false;
 
         results.push({

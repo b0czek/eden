@@ -1,20 +1,19 @@
 import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
-import { IPCBridge, CommandRegistry, PermissionRegistry } from "./ipc";
+import { IPCBridge, CommandRegistry } from "./ipc";
 import { AppChannelManager } from "./appbus";
 import { SystemHandler } from "./SystemHandler";
-import { EdenConfig, AppManifest } from "../types";
+import { EdenConfig } from "../types";
 
 // Managers and Handlers
-import { PackageManager, PackageHandler } from "./package-manager";
+import { PackageManager } from "./package-manager";
 import {
   ProcessManager,
-  ProcessHandler,
   BackendManager,
   AutostartManager,
 } from "./process-manager";
-import { ViewManager, ViewHandler } from "./view-manager";
+import { ViewManager } from "./view-manager";
 import { FilesystemManager } from "./filesystem";
 import { FileOpenManager } from "./file-open";
 import { NotificationManager } from "./notification";
@@ -23,10 +22,8 @@ import { container } from "tsyringe";
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
-  private backendManager: BackendManager;
   private viewManager: ViewManager;
   private ipcBridge: IPCBridge;
-  private commandRegistry: CommandRegistry;
   private appsDirectory: string;
   private userDirectory: string;
   private config: EdenConfig;
@@ -34,14 +31,8 @@ export class Eden {
   // New components
   private packageManager: PackageManager;
   private processManager: ProcessManager;
-  private systemHandler: SystemHandler;
-  private filesystemManager: FilesystemManager;
-  private permissionRegistry: PermissionRegistry;
   private fileOpenManager: FileOpenManager;
   private autostartManager: AutostartManager;
-  private notificationManager: NotificationManager;
-  private dbManager: DbManager;
-  private appChannelManager: AppChannelManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -56,85 +47,30 @@ export class Eden {
     this.userDirectory =
       config.userDirectory || path.join(app.getPath("userData"), "eden-user");
 
-    // Initialize core managers
-    // 1. Command Registry (required by others)
-    this.commandRegistry = new CommandRegistry();
-    container.registerInstance("CommandRegistry", this.commandRegistry);
-
-    // 2. Permission Registry
-    this.permissionRegistry = new PermissionRegistry();
-    container.registerInstance("PermissionRegistry", this.permissionRegistry);
-
-    // Wire permission registry to command registry
-    this.commandRegistry.setPermissionRegistry(this.permissionRegistry);
-
-    // Register Config
+    // 1. Fundamental registries and config
     container.registerInstance("EdenConfig", this.config);
-
-    // 2. Backend Manager
-    this.backendManager = new BackendManager();
-    container.registerInstance("BackendManager", this.backendManager);
-
-    // 3. IPC Bridge (depends on BackendManager, CommandRegistry)
-    // Note: ViewManager is not passed yet, will be set later
-    this.ipcBridge = new IPCBridge(this.backendManager, this.commandRegistry);
-    container.registerInstance("IPCBridge", this.ipcBridge);
-
-    // 4. ViewManager (depends on CommandRegistry, IPCBridge, EdenConfig)
-    this.viewManager = container.resolve(ViewManager);
-    container.registerInstance("ViewManager", this.viewManager);
-
-    // 5. Break circular dependency: Set ViewManager on IPCBridge
-    this.ipcBridge.setViewManager(this.viewManager);
-
-    // Wire permission registry to event subscriber manager
-    this.ipcBridge.eventSubscribers.setPermissionRegistry(
-      this.permissionRegistry
-    );
-
-    // TODO: Auto-Registration with tsyringe
-
-    // Initialize AppBus (peer-to-peer channel system)
-    this.appChannelManager = container.resolve(AppChannelManager);
-    container.registerInstance("AppChannelManager", this.appChannelManager);
-
-    // Register appsDirectory for injection
     container.registerInstance("appsDirectory", this.appsDirectory);
-
-    // Initialize Package Manager
-    this.packageManager = container.resolve(PackageManager);
-    container.registerInstance("PackageManager", this.packageManager);
-
-    // Initialize Process Manager
-    this.processManager = container.resolve(ProcessManager);
-    container.registerInstance("ProcessManager", this.processManager);
-
-    // Initialize System Handler
-    this.systemHandler = container.resolve(SystemHandler);
-    container.registerInstance("SystemHandler", this.systemHandler);
-
-    // Register userDirectory for injection
     container.registerInstance("userDirectory", this.userDirectory);
 
-    // Initialize Filesystem Manager
-    this.filesystemManager = container.resolve(FilesystemManager);
-    container.registerInstance("FilesystemManager", this.filesystemManager);
+    container.resolve(CommandRegistry);
 
-    // Initialize File Open Manager
+    // 2. Main communication bridge
+    container.resolve(BackendManager);
+    this.ipcBridge = container.resolve(IPCBridge);
+
+    // 3. UI and Application layer
+    this.viewManager = container.resolve(ViewManager);
+
+    // 4. Feature managers
+    container.resolve(AppChannelManager);
+    this.packageManager = container.resolve(PackageManager);
+    this.processManager = container.resolve(ProcessManager);
+    container.resolve(SystemHandler);
+    container.resolve(FilesystemManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
-    container.registerInstance("FileOpenManager", this.fileOpenManager);
-
-    // Initialize Autostart Manager
     this.autostartManager = container.resolve(AutostartManager);
-    container.registerInstance("AutostartManager", this.autostartManager);
-
-    // Initialize Notification Manager
-    this.notificationManager = container.resolve(NotificationManager);
-    container.registerInstance("NotificationManager", this.notificationManager);
-
-    // Initialize DB Manager
-    this.dbManager = container.resolve(DbManager);
-    container.registerInstance("DbManager", this.dbManager);
+    container.resolve(NotificationManager);
+    container.resolve(DbManager);
 
     this.setupAppEventHandlers();
   }

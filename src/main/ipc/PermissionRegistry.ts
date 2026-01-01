@@ -8,6 +8,10 @@
  * - "*" matches all permissions
  */
 
+import { singleton, injectable } from "tsyringe";
+
+@singleton()
+@injectable()
 export class PermissionRegistry {
   private appPermissions: Map<string, Set<string>> = new Map();
 
@@ -16,7 +20,9 @@ export class PermissionRegistry {
    */
   registerApp(appId: string, permissions: string[]): void {
     this.appPermissions.set(appId, new Set(permissions));
-    console.log(`[PermissionRegistry] Registered ${permissions.length} permissions for ${appId}`);
+    console.log(
+      `[PermissionRegistry] Registered ${permissions.length} permissions for ${appId}`
+    );
   }
 
   /**
@@ -90,7 +96,7 @@ export class PermissionRegistry {
 
 /**
  * Event Permission Registry
- * 
+ *
  * Stores which permissions are required to subscribe to specific events.
  */
 const EVENT_PERMISSIONS: Map<string, string> = new Map();
@@ -98,7 +104,10 @@ const EVENT_PERMISSIONS: Map<string, string> = new Map();
 /**
  * Register an event's required permission
  */
-export function registerEventPermission(eventName: string, permission: string): void {
+export function registerEventPermission(
+  eventName: string,
+  permission: string
+): void {
   EVENT_PERMISSIONS.set(eventName, permission);
 }
 

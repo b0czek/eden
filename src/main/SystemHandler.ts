@@ -1,13 +1,14 @@
 import { EdenHandler, EdenNamespace, IPCBridge, CommandRegistry } from "./ipc";
-import { injectable, inject } from "tsyringe";
-import { SystemInfo, WindowSize } from "../types";
+import { injectable, inject, singleton } from "tsyringe";
+import { SystemInfo } from "../types";
 
+@singleton()
 @injectable()
 @EdenNamespace("system")
 export class SystemHandler {
   constructor(
-    @inject("IPCBridge") private ipcBridge: IPCBridge,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject(IPCBridge) private ipcBridge: IPCBridge,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry
   ) {
     commandRegistry.registerManager(this);
   }
@@ -25,6 +26,4 @@ export class SystemHandler {
       runningApps: this.ipcBridge.getRunningAppIds(),
     };
   }
-
-
 }

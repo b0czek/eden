@@ -8,7 +8,7 @@ import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import { AppInstance } from "@edenapp/types";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
 
@@ -27,6 +27,7 @@ interface ProcessNamespaceEvents {
  *
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
+@singleton()
 @injectable()
 @EdenNamespace("process")
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
@@ -39,13 +40,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private processHandler: ProcessHandler;
 
   constructor(
-    @inject("BackendManager") backendManager: BackendManager,
-    @inject("ViewManager") viewManager: ViewManager,
-    @inject("IPCBridge") ipcBridge: IPCBridge,
-    @inject("PackageManager") packageManager: PackageManager,
-    @inject("AppChannelManager") appChannelManager: AppChannelManager,
+    @inject(BackendManager) backendManager: BackendManager,
+    @inject(ViewManager) viewManager: ViewManager,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(PackageManager) packageManager: PackageManager,
+    @inject(AppChannelManager) appChannelManager: AppChannelManager,
     @inject("appsDirectory") appsDirectory: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry
   ) {
     super(ipcBridge);
     this.backendManager = backendManager;

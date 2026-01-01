@@ -1,7 +1,8 @@
 import { utilityProcess, MessageChannelMain, UtilityProcess } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
-import { AppManifest, IPCMessage } from "@edenapp/types";
+import { AppManifest } from "@edenapp/types";
+import { singleton, injectable } from "tsyringe";
 
 /**
  * BackendManager
@@ -11,6 +12,8 @@ import { AppManifest, IPCMessage } from "@edenapp/types";
  * Uses Electron's utilityProcess for better main process integration
  * and MessageChannelMain for direct frontend<->backend communication.
  */
+@singleton()
+@injectable()
 export class BackendManager extends EventEmitter {
   private backends: Map<string, UtilityProcess> = new Map();
   private backendData: Map<

@@ -12,7 +12,7 @@ import { ViewCreator } from "./ViewCreator";
 import { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
 import { ViewInfo, ViewMode } from "./types";
 
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton, delay } from "tsyringe";
 import { CommandRegistry, IPCBridge, EdenEmitter, EdenNamespace } from "../ipc";
 import { ViewHandler } from "./ViewHandler";
 
@@ -35,6 +35,7 @@ interface ViewManagerEvents {
  *
  * Central orchestrator for view management in Eden.
  */
+@singleton()
 @injectable()
 @EdenNamespace("view")
 export class ViewManager extends EdenEmitter<ViewManagerEvents> {
@@ -51,8 +52,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   private viewHandler: ViewHandler;
 
   constructor(
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject("EdenConfig") config: EdenConfig
   ) {
     super(ipcBridge);

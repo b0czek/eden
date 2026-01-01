@@ -10,7 +10,7 @@ import {
   PermissionRegistry,
 } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 
 /**
  * Events emitted by the PackageManager
@@ -20,6 +20,7 @@ interface PackageNamespaceEvents {
   uninstalled: { appId: string };
 }
 
+@singleton()
 @injectable()
 @EdenNamespace("package")
 export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
@@ -30,10 +31,10 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private permissionRegistry: PermissionRegistry;
 
   constructor(
-    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject("appsDirectory") appsDirectory: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("PermissionRegistry") permissionRegistry: PermissionRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;

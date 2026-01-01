@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { injectable, singleton, inject } from "tsyringe";
 import { PermissionRegistry } from "./PermissionRegistry";
 
 /**
@@ -22,16 +23,14 @@ export interface CommandMetadata {
   methodName: string; // Original method name for metadata lookup
 }
 
+@singleton()
+@injectable()
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
-  private permissionRegistry?: PermissionRegistry;
 
-  /**
-   * Set the permission registry for permission checking
-   */
-  setPermissionRegistry(registry: PermissionRegistry): void {
-    this.permissionRegistry = registry;
-  }
+  constructor(
+    @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry
+  ) {}
 
   /**
    * Register a command handler under a namespace

@@ -5,6 +5,8 @@ import { ViewManager } from "../view-manager/ViewManager";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
 import { EventSubscriberManager } from "./EventSubscriberManager";
+import { PermissionRegistry } from "./PermissionRegistry";
+import { injectable, inject, singleton, delay } from "tsyringe";
 
 import { EventHandler } from "./EventHandler";
 
@@ -16,12 +18,11 @@ import { EventHandler } from "./EventHandler";
  * - Utility processes (app backends)
  * - WebContentsViews (app frontends)
  */
+@singleton()
+@injectable()
 export class IPCBridge extends EventEmitter {
-  private backendManager: BackendManager;
-  private viewManager!: ViewManager;
-  private commandRegistry: CommandRegistry;
-  public eventSubscribers!: EventSubscriberManager;
-  private eventHandler!: EventHandler;
+  public eventSubscribers: EventSubscriberManager;
+  private eventHandler: EventHandler;
   private mainWindow: BrowserWindow | null = null;
   private runningAppIds: Set<string> = new Set();
   private pendingCommands: Map<
@@ -34,25 +35,24 @@ export class IPCBridge extends EventEmitter {
   > = new Map();
 
   constructor(
-    backendManager: BackendManager,
-    commandRegistry: CommandRegistry
+    @inject(BackendManager) private backendManager: BackendManager,
+    @inject(CommandRegistry) private commandRegistry: CommandRegistry,
+    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
+    @inject(delay(() => ViewManager)) private viewManager: ViewManager
   ) {
     super();
-    this.backendManager = backendManager;
-    this.commandRegistry = commandRegistry;
 
-    this.setupIPCHandlers();
-    this.setupBackendMessageHandlers();
-  }
-
-  public setViewManager(viewManager: ViewManager): void {
-    this.viewManager = viewManager;
+    // Initialize event subscriber manager
     this.eventSubscribers = new EventSubscriberManager(viewManager);
     this.eventSubscribers.setBackendManager(this.backendManager);
+    this.eventSubscribers.setPermissionRegistry(permissionRegistry);
 
     // Initialize and register EventHandler
     this.eventHandler = new EventHandler(this.eventSubscribers, viewManager);
     this.commandRegistry.registerManager(this.eventHandler);
+
+    this.setupIPCHandlers();
+    this.setupBackendMessageHandlers();
   }
 
   /**
