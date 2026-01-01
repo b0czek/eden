@@ -1,12 +1,15 @@
 import { WebContentsView } from "electron";
+import { injectable, singleton } from "tsyringe";
 
 /**
  * DevToolsManager
- * 
+ *
  * Manages DevTools for WebContentsViews, including:
  * - Keyboard shortcut registration (Ctrl+Shift+D)
  * - Automatic cleanup when views are destroyed
  */
+@singleton()
+@injectable()
 export class DevToolsManager {
   private viewsWithDevTools: Set<number> = new Set();
 
@@ -27,7 +30,7 @@ export class DevToolsManager {
         event.preventDefault();
         try {
           const webContentsId = view.webContents.id;
-          
+
           if (view.webContents.isDevToolsOpened()) {
             view.webContents.closeDevTools();
             this.viewsWithDevTools.delete(webContentsId);
@@ -50,12 +53,17 @@ export class DevToolsManager {
   closeDevToolsForView(view: WebContentsView): void {
     try {
       const webContentsId = view.webContents.id;
-      
-      if (!view.webContents.isDestroyed() && view.webContents.isDevToolsOpened()) {
+
+      if (
+        !view.webContents.isDestroyed() &&
+        view.webContents.isDevToolsOpened()
+      ) {
         view.webContents.closeDevTools();
-        console.log(`Closed DevTools for view (webContents ID: ${webContentsId})`);
+        console.log(
+          `Closed DevTools for view (webContents ID: ${webContentsId})`
+        );
       }
-      
+
       this.viewsWithDevTools.delete(webContentsId);
     } catch (err) {
       // Ignore errors during cleanup

@@ -10,7 +10,7 @@ import {
   PermissionRegistry,
 } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 
 /**
  * Events emitted by the PackageManager
@@ -20,6 +20,7 @@ interface PackageNamespaceEvents {
   uninstalled: { appId: string };
 }
 
+@singleton()
 @injectable()
 @EdenNamespace("package")
 export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
@@ -30,10 +31,10 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private permissionRegistry: PermissionRegistry;
 
   constructor(
-    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject("appsDirectory") appsDirectory: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("PermissionRegistry") permissionRegistry: PermissionRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;
@@ -117,7 +118,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               );
               const devManifest = JSON.parse(devManifestContent);
 
-              if (devManifest.devMode && devManifest.devUrl) {
+              if (
+                devManifest.devMode &&
+                devManifest.devUrl &&
+                manifest.frontend
+              ) {
                 // Override frontend entry with dev server URL
                 manifest.frontend.entry = devManifest.devUrl;
                 console.log(
@@ -298,11 +303,13 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   /**
    * Get list of installed apps
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
    */
   getInstalledApps(showHidden: boolean = false): AppManifest[] {
     const apps = Array.from(this.installedApps.values());
-    return showHidden ? apps : apps.filter((app) => !app.overlay);
+    return showHidden
+      ? apps
+      : apps.filter((app) => !app.overlay && !!app.frontend?.entry);
   }
 
   /**
@@ -322,8 +329,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
 
-    if (!manifest.frontend?.entry) {
-      throw new Error("Invalid manifest: missing frontend.entry");
+    // At least one of frontend or backend must be defined
+    if (!manifest.frontend?.entry && !manifest.backend?.entry) {
+      throw new Error(
+        "Invalid manifest: must have at least frontend.entry or backend.entry"
+      );
     }
 
     if (manifest.backend && !manifest.backend.entry) {

@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { injectable, singleton, inject } from "tsyringe";
 import { PermissionRegistry } from "./PermissionRegistry";
 
 /**
@@ -22,16 +23,14 @@ export interface CommandMetadata {
   methodName: string; // Original method name for metadata lookup
 }
 
+@singleton()
+@injectable()
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
-  private permissionRegistry?: PermissionRegistry;
 
-  /**
-   * Set the permission registry for permission checking
-   */
-  setPermissionRegistry(registry: PermissionRegistry): void {
-    this.permissionRegistry = registry;
-  }
+  constructor(
+    @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry
+  ) {}
 
   /**
    * Register a command handler under a namespace
@@ -135,9 +134,7 @@ export class CommandRegistry {
     }
 
     try {
-      // Inject caller's appId into args if provided (for handlers that need caller context)
-      const argsWithAppId = appId ? { ...args, _callerAppId: appId } : args;
-      return await metadata.handler.call(metadata.target, argsWithAppId);
+      return await metadata.handler.call(metadata.target, args);
     } catch (error) {
       console.error(`Error executing command ${fullCommand}:`, error);
       throw error;

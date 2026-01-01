@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AppBus Client A</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="eden-bg-base">
+  <div class="app-container eden-flex-col eden-gap-md eden-p-md">
+    <header class="eden-card eden-p-sm eden-flex eden-justify-between eden-items-center">
+      <h1 class="eden-text-lg">🔵 Client A</h1>
+      <span id="hub-status" class="eden-badge eden-badge-danger">Disconnected</span>
+    </header>
+
+    <!-- Hub Chat Section -->
+    <section class="eden-card eden-flex-col eden-gap-sm chat-section">
+      <div class="eden-flex eden-items-center eden-gap-sm">
+        <h2 class="eden-text-md">Hub Chat</h2>
+        <span id="hub-clients-count" class="eden-badge eden-badge-info">0</span>
+      </div>
+      <div id="hub-chat" class="chat-messages eden-glass-light eden-p-sm"></div>
+      <div class="eden-flex eden-gap-sm">
+        <input type="text" id="hub-message" class="eden-input" placeholder="Message to Hub chat..." />
+        <button id="hub-send-btn" class="eden-btn eden-btn-primary">Send</button>
+      </div>
+    </section>
+
+    <!-- Direct Chat Section (with Isolated app) -->
+    <section class="eden-card eden-card-elevated eden-flex-col eden-gap-sm chat-section direct-chat">
+      <div class="eden-flex eden-items-center eden-gap-sm">
+        <h2 class="eden-text-md">Direct Chat</h2>
+        <span id="direct-status" class="eden-badge">Waiting</span>
+      </div>
+      <div id="direct-chat" class="chat-messages eden-glass-light eden-p-sm"></div>
+      <div class="eden-flex eden-gap-sm">
+        <input type="text" id="direct-message" class="eden-input" placeholder="Message to Isolated app..." />
+        <button id="direct-send-btn" class="eden-btn eden-btn-secondary">Send</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

@@ -31,12 +31,10 @@
         };
 
         // Send to backend via eden API (provided by preload)
-        if (window.edenAPI && window.edenAPI.shellCommand) {
-            window.edenAPI.shellCommand('view/update-global-bounds', { bounds, windowSize })
-                .catch((error) => {
-                    console.error('Failed to update global bounds:', error);
-                });
-        }
+        window.edenAPI.shellCommand('view/update-global-bounds', { bounds, windowSize })
+            .catch((error) => {
+                console.error('Failed to update global bounds:', error);
+            });
     }
 
     /**
@@ -44,12 +42,10 @@
      * Cleanup for any active drag/resize operations happening in app views
      */
     function handleGlobalMouseUp() {
-        if (window.edenAPI && window.edenAPI.shellCommand) {
-            window.edenAPI.shellCommand('view/global-mouseup', {})
-                .catch((error) => {
-                    console.error('Failed to send global-mouseup:', error);
-                });
-        }
+        window.edenAPI.shellCommand('view/global-mouseup', {})
+            .catch((error) => {
+                console.error('Failed to send global-mouseup:', error);
+            });
     }
 
     // Initial workspace bounds report

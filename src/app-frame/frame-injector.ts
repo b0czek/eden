@@ -5,7 +5,6 @@
  * This script is injected into every app to add a title bar with controls.
  */
 
-import { waitForAPI } from "./utils.js";
 import {
   createOverlay,
   injectOverlay,
@@ -31,6 +30,7 @@ import { setupWindowResizing } from "./window-resizing.js";
         /* will be set later */
       },
       _internal: {
+        appId: "",
         injected: false,
         config: {},
         currentMode: "tiled",
@@ -60,16 +60,12 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Setup handlers after overlay is injected
   const setupHandlers = (): void => {
-    // Wait for appAPI to be available
-    waitForAPI("appAPI", (api) => {
-      appId = api.getAppId();
-
-      if (appId) {
-        // Extract a readable name from the app ID
-        appName = getAppName(appId);
-        setTitle(appName);
-      }
-    });
+    // Get appId from injected config
+    if (window.edenFrame && window.edenFrame._internal.appId) {
+      appId = window.edenFrame._internal.appId;
+      appName = getAppName(appId);
+      setTitle(appName);
+    }
 
     // Setup button handlers
     setupCloseButton();
@@ -79,32 +75,29 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Setup floating window controls
     setupFloatingWindowControls();
 
-    // Subscribe to mode change events via proper Event API
-    waitForAPI("edenAPI", (edenAPI) => {
-      edenAPI.subscribe(
-        "view/mode-changed",
-        (data: { mode: "tiled" | "floating"; bounds: any }) => {
-          const { mode, bounds } = data;
-          console.log(
-            "[Eden Frame] View mode changed to:",
-            mode,
-            "with bounds:",
-            bounds
-          );
+    window.edenAPI.subscribe(
+      "view/mode-changed",
+      (data: { mode: "tiled" | "floating"; bounds: any }) => {
+        const { mode, bounds } = data;
+        console.log(
+          "[Eden Frame] View mode changed to:",
+          mode,
+          "with bounds:",
+          bounds
+        );
 
-          // Update window mode and bounds
-          window.edenFrame!._internal.currentMode = mode;
-          if (bounds && bounds.x !== undefined) {
-            window.edenFrame!._internal.bounds = bounds;
-            currentBoundsRef.current = { ...bounds };
-          }
-
-          // Re-setup controls for new mode
-          setupFloatingWindowControls();
+        // Update window mode and bounds
+        window.edenFrame!._internal.currentMode = mode;
+        if (bounds && bounds.x !== undefined) {
+          window.edenFrame!._internal.bounds = bounds;
+          currentBoundsRef.current = { ...bounds };
         }
-      );
-      console.log("[Eden Frame] Subscribed to view/mode-changed");
-    });
+
+        // Re-setup controls for new mode
+        setupFloatingWindowControls();
+      }
+    );
+    console.log("[Eden Frame] Subscribed to view/mode-changed");
   };
 
   const setupFloatingWindowControls = (): void => {
@@ -173,15 +166,11 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Listen for bounds updates from main process (during mouse drag/resize)
   // This keeps currentBounds in sync even when main process is controlling movement
-  if (window.edenAPI && window.edenAPI.subscribe) {
-    window.edenAPI.subscribe("view/bounds-updated", (newBounds) => {
-      currentBoundsRef.current = { ...newBounds };
-      window.edenFrame!._internal.bounds = { ...newBounds };
-    });
-    console.log("[Eden Frame] Subscribed to view/bounds-updated");
-  } else {
-    console.warn("[Eden Frame] edenAPI.subscribe not available");
-  }
+  window.edenAPI.subscribe("view/bounds-updated", (newBounds) => {
+    currentBoundsRef.current = { ...newBounds };
+    window.edenFrame!._internal.bounds = { ...newBounds };
+  });
+  console.log("[Eden Frame] Subscribed to view/bounds-updated");
 
   // Add global touch handler to diagnose issues
   document.addEventListener(

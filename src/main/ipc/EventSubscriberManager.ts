@@ -1,16 +1,26 @@
 import { ViewManager } from "../view-manager/ViewManager";
+import { BackendManager } from "../process-manager/BackendManager";
 import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
 import { EventName, EventData } from "@edenapp/types";
 
 export class EventSubscriberManager {
   private viewManager: ViewManager;
+  private backendManager?: BackendManager;
   private subscriptions: Map<string, Set<number>> = new Map();
+  private backendSubscriptions: Map<string, Set<string>> = new Map();
   private internalSubscriptions: Map<string, Set<(payload: any) => void>> =
     new Map();
   private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
     this.viewManager = viewManager;
+  }
+
+  /**
+   * Set the backend manager for backend notifications
+   */
+  setBackendManager(backendManager: BackendManager): void {
+    this.backendManager = backendManager;
   }
 
   /**
@@ -57,6 +67,29 @@ export class EventSubscriberManager {
   }
 
   /**
+   * Subscribe a backend to an event
+   */
+  public subscribeBackend(appId: string, eventName: string): boolean {
+    // Check event permission if required
+    const requiredPermission = getEventPermission(eventName);
+    if (requiredPermission && this.permissionRegistry) {
+      if (!this.permissionRegistry.hasPermission(appId, requiredPermission)) {
+        throw new Error(
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+        );
+      }
+    }
+
+    if (!this.backendSubscriptions.has(eventName)) {
+      this.backendSubscriptions.set(eventName, new Set());
+    }
+
+    this.backendSubscriptions.get(eventName)!.add(appId);
+    console.log(`Backend (${appId}) subscribed to event: ${eventName}`);
+    return true;
+  }
+
+  /**
    * Subscribe an internal callback (for managers) to an event
    * Unlike view subscriptions, these are in-process callbacks
    */
@@ -94,6 +127,26 @@ export class EventSubscriberManager {
   }
 
   /**
+   * Unsubscribe a backend from an event
+   */
+  public unsubscribeBackend(appId: string, eventName: string): boolean {
+    const subscriptions = this.backendSubscriptions.get(eventName);
+    if (!subscriptions) {
+      return false;
+    }
+
+    const result = subscriptions.delete(appId);
+    if (subscriptions.size === 0) {
+      this.backendSubscriptions.delete(eventName);
+    }
+
+    if (result) {
+      console.log(`Backend (${appId}) unsubscribed from event: ${eventName}`);
+    }
+    return result;
+  }
+
+  /**
    * Get all views subscribed to an event
    */
   public getSubscribedViews(eventName: string): number[] {
@@ -102,7 +155,15 @@ export class EventSubscriberManager {
   }
 
   /**
-   * Send event only to subscribed views and internal callbacks
+   * Get all backends subscribed to an event
+   */
+  public getSubscribedBackends(eventName: string): string[] {
+    const subscriptions = this.backendSubscriptions.get(eventName);
+    return subscriptions ? Array.from(subscriptions) : [];
+  }
+
+  /**
+   * Send event only to subscribed views, backends, and internal callbacks
    */
   public notify(eventName: string, payload: any): void {
     // Notify internal subscribers first
@@ -127,6 +188,18 @@ export class EventSubscriberManager {
         type: eventName,
         payload,
       });
+    }
+
+    // Notify backend subscribers
+    if (this.backendManager) {
+      const subscribedBackends = this.getSubscribedBackends(eventName);
+      for (const appId of subscribedBackends) {
+        this.backendManager.sendMessage(appId, {
+          type: "shell-event",
+          eventName,
+          payload,
+        });
+      }
     }
   }
 
@@ -153,6 +226,22 @@ export class EventSubscriberManager {
       if (subscribers.delete(viewId)) {
         if (subscribers.size === 0) {
           this.subscriptions.delete(eventName);
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove all subscriptions for a backend
+   */
+  public removeBackendSubscriptions(appId: string): void {
+    for (const [
+      eventName,
+      subscribers,
+    ] of this.backendSubscriptions.entries()) {
+      if (subscribers.delete(appId)) {
+        if (subscribers.size === 0) {
+          this.backendSubscriptions.delete(eventName);
         }
       }
     }

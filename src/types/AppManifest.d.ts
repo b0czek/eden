@@ -1,3 +1,5 @@
+import type { ServiceDeclaration } from "./channels";
+
 /**
  * Window Mode Configuration
  *
@@ -122,8 +124,12 @@ export interface AppManifest {
     };
   };
 
-  /** Frontend configuration */
-  frontend: {
+  /**
+   * Frontend configuration.
+   * Optional - omit for backend-only apps (daemons).
+   * At least one of `frontend` or `backend` must be defined.
+   */
+  frontend?: {
     /** Path to the frontend HTML entry file */
     entry: string;
 
@@ -182,4 +188,11 @@ export interface AppManifest {
    * Overlays are rendered above regular apps.
    */
   overlay?: boolean;
+
+  /**
+   * Services this app exposes for other apps to connect to.
+   * Declaring services here documents the app's API and enables
+   * optional access control via allowedClients.
+   */
+  services?: ServiceDeclaration[];
 }

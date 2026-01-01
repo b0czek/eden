@@ -26,7 +26,7 @@ export default function ShellOverlay() {
   // Load pinned apps from database
   const loadPinnedApps = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("db/get", {
+      const result = await window.edenAPI.shellCommand("db/get", {
         key: PINNED_DOCK_APPS_KEY,
       });
       if (result.value) {
@@ -43,7 +43,7 @@ export default function ShellOverlay() {
   // Save pinned apps to database
   const savePinnedApps = async (appIds: string[]) => {
     try {
-      await window.edenAPI!.shellCommand("db/set", {
+      await window.edenAPI.shellCommand("db/set", {
         key: PINNED_DOCK_APPS_KEY,
         value: JSON.stringify(appIds),
       });
@@ -117,13 +117,13 @@ export default function ShellOverlay() {
   const loadSystemInfo = async () => {
     try {
       // Fetch installed apps from package manager
-      const installed = await window.edenAPI!.shellCommand("package/list", {});
+      const installed = await window.edenAPI.shellCommand("package/list", {});
       if (Array.isArray(installed)) {
         setInstalledApps(installed);
       }
 
       // Fetch running apps from process manager
-      const running = await window.edenAPI!.shellCommand("process/list", {});
+      const running = await window.edenAPI.shellCommand("process/list", {});
       if (Array.isArray(running)) {
         setRunningApps(running);
       }
@@ -150,7 +150,7 @@ export default function ShellOverlay() {
   // Helper function to update overlay bounds via API
   const updateOverlayBounds = async (bounds: ViewBounds) => {
     try {
-      await window.edenAPI!.shellCommand("view/update-view-bounds", {
+      await window.edenAPI.shellCommand("view/update-view-bounds", {
         appId: "com.eden.eveshell",
         bounds,
       });
@@ -162,7 +162,7 @@ export default function ShellOverlay() {
   const requestResize = async (mode: "dock" | "fullscreen") => {
     try {
       // Get current window bounds
-      const windowSize = await window.edenAPI!.shellCommand(
+      const windowSize = await window.edenAPI.shellCommand(
         "view/window-size",
         {}
       );
@@ -179,14 +179,14 @@ export default function ShellOverlay() {
     if (isRunning) {
       // App is running, focus/show it
       try {
-        await window.edenAPI!.shellCommand("view/focus-app", { appId });
+        await window.edenAPI.shellCommand("view/focus-app", { appId });
       } catch (error) {
         console.error("Failed to focus app:", error);
       }
     } else {
       // App is not running, launch it
       try {
-        await window.edenAPI!.shellCommand("process/launch", { appId });
+        await window.edenAPI.shellCommand("process/launch", { appId });
         // Add a small delay before refreshing to let the app start
         setTimeout(() => {
           loadSystemInfo();
@@ -212,7 +212,7 @@ export default function ShellOverlay() {
 
   const handleStopApp = async (appId: string) => {
     try {
-      await window.edenAPI!.shellCommand("process/stop", { appId });
+      await window.edenAPI.shellCommand("process/stop", { appId });
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -226,7 +226,7 @@ export default function ShellOverlay() {
     try {
       // Confirm before uninstalling
       if (confirm(`Are you sure you want to uninstall this app?`)) {
-        await window.edenAPI!.shellCommand("package/uninstall", { appId });
+        await window.edenAPI.shellCommand("package/uninstall", { appId });
         // Refresh app list
         await loadSystemInfo();
       }
@@ -265,9 +265,9 @@ export default function ShellOverlay() {
 
     // Register cleanup synchronously (must happen before any async work)
     onCleanup(() => {
-      window.edenAPI!.unsubscribe("process/launched", handleAppLifecycle);
-      window.edenAPI!.unsubscribe("process/stopped", handleAppLifecycle);
-      window.edenAPI!.unsubscribe(
+      window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
+      window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
+      window.edenAPI.unsubscribe(
         "view/global-bounds-changed",
         handleBoundsChange
       );
@@ -284,9 +284,9 @@ export default function ShellOverlay() {
 
       try {
         // Subscribe to events
-        await window.edenAPI!.subscribe("process/launched", handleAppLifecycle);
-        await window.edenAPI!.subscribe("process/stopped", handleAppLifecycle);
-        await window.edenAPI!.subscribe(
+        await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
+        await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
+        await window.edenAPI.subscribe(
           "view/global-bounds-changed",
           handleBoundsChange
         );

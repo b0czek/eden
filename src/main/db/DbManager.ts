@@ -1,7 +1,7 @@
 import Keyv from "keyv";
 import KeyvSqlite from "@keyv/sqlite";
 import * as path from "path";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { DbHandler } from "./DbHandler";
 
@@ -11,13 +11,14 @@ import { DbHandler } from "./DbHandler";
  * Provides namespace-isolated storage using SQLite backend via Keyv.
  * Each app gets its own namespace, preventing cross-app data access.
  */
+@singleton()
 @injectable()
 export class DbManager {
   private keyv: Keyv;
   private handler: DbHandler;
 
   constructor(
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string
   ) {
     // Initialize Keyv with SQLite backend

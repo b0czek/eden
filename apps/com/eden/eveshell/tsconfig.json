@@ -32,7 +32,6 @@
     "./**/*.tsx"
   ],
   "exclude": [
-    "node_modules",
-    "app-preload.js"
+    "node_modules"
   ]
 }

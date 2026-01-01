@@ -11,6 +11,9 @@
         "lib": [
             "dom",
             "esnext"
+        ],
+        "types": [
+            "@edenapp/types/global"
         ]
     },
     "include": [

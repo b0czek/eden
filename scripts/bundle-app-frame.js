@@ -51,22 +51,6 @@ async function bundle() {
 
         console.log('✅ frame-injector.js bundled successfully');
 
-        // Bundle app-preload.ts (preload script for Electron)
-        await esbuild.build({
-            entryPoints: [path.join(srcDir, 'app-preload.ts')],
-            bundle: true,
-            outfile: path.join(distDir, 'app-preload.js'),
-            format: 'cjs', // CommonJS for Electron preload scripts
-            target: 'node16',
-            platform: 'node',
-            external: ['electron'], // Don't bundle electron
-            minify: true,
-            sourcemap: true,
-            logLevel: 'info',
-        });
-
-        console.log('✅ app-preload.js bundled successfully');
-
         // Copy CSS file
         const cssSource = path.join(srcDir, 'frame.css');
         const cssDest = path.join(distDir, 'frame.css');

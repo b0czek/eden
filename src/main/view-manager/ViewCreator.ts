@@ -72,30 +72,6 @@ export class ViewCreator {
   }
 
   /**
-   * Inject app API into the view's webContents
-   * Sends an argless event - preload fetches data via get-view-data invoke
-   */
-  injectAppAPI(view: WebContentsView, viewId: number, appId: string): boolean {
-    if (view.webContents.isDestroyed()) {
-      console.error(
-        `[ViewCreator] Cannot inject API - webContents destroyed for ${appId}`
-      );
-      return false;
-    }
-
-    try {
-      view.webContents.send("app-init-api");
-      console.log(
-        `[ViewCreator] Sent app API init for ${appId} (viewId: ${viewId})`
-      );
-      return true;
-    } catch (error) {
-      console.error(`[ViewCreator] Failed to inject API for ${appId}:`, error);
-      return false;
-    }
-  }
-
-  /**
    * Inject Eden CSS into the view
    * Makes design tokens and utilities available to all apps
    * @param view - The WebContentsView to inject CSS into
@@ -132,6 +108,7 @@ export class ViewCreator {
    */
   async injectAppFrame(
     view: WebContentsView,
+    appId: string,
     viewMode: ViewMode,
     windowConfig?: WindowConfig,
     bounds?: Bounds
@@ -166,6 +143,7 @@ export class ViewCreator {
       const configScript = `
         window.edenFrame = {
           _internal: {
+            appId: "${appId}",
             injected: false,
             config: ${JSON.stringify(windowConfig || {})},
             currentMode: "${viewMode}",
@@ -281,7 +259,9 @@ export class ViewCreator {
     const windowConfig = manifest.window;
     const isOverlay = !!manifest.overlay;
     const viewType: ViewType = isOverlay ? "overlay" : "app";
-    const frontendEntry = manifest.frontend.entry;
+    // Note: createView is only called when manifest.frontend exists
+    // (ProcessManager validates this before calling)
+    const frontendEntry = manifest.frontend!.entry;
 
     // Determine view mode
     const viewMode: ViewMode = isOverlay
@@ -302,10 +282,16 @@ export class ViewCreator {
     const viewId = this.nextViewId++;
     const preloadScript = path.join(
       this.basePath,
-      "../../app-frame/app-preload.js"
+      "../../app-runtime/app-preload.js"
     );
 
-    const view = ViewLifecycle.createView({ preloadScript });
+    const view = ViewLifecycle.createView({
+      preloadScript,
+      additionalArguments: [
+        `--app-id=${appId}`,
+        `--launch-args=${JSON.stringify(launchArgs || [])}`,
+      ],
+    });
 
     console.log(
       `[ViewCreator] Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
@@ -318,7 +304,7 @@ export class ViewCreator {
     view.setBounds(viewBounds);
 
     // Strip embedding headers if enabled
-    if (manifest.frontend.allowEmbedding) {
+    if (manifest.frontend?.allowEmbedding) {
       view.webContents.session.webRequest.onHeadersReceived(
         { urls: ["*://*/*"] },
         ViewCreator.embeddingHeadersFilter
@@ -351,18 +337,19 @@ export class ViewCreator {
 
       // Inject the app frame script (only for app views, not overlays)
       if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
-        this.injectAppFrame(view, viewMode, windowConfig, viewBounds).catch(
-          (err) => {
-            console.error(
-              `[ViewCreator] Failed to inject app frame for ${appId}:`,
-              err
-            );
-          }
-        );
+        this.injectAppFrame(
+          view,
+          appId,
+          viewMode,
+          windowConfig,
+          viewBounds
+        ).catch((err) => {
+          console.error(
+            `[ViewCreator] Failed to inject app frame for ${appId}:`,
+            err
+          );
+        });
       }
-
-      // Inject the app API after page load (always enabled)
-      this.injectAppAPI(view, viewId, appId);
     });
 
     // Return view info

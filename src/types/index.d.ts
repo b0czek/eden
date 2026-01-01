@@ -6,6 +6,10 @@ export * from "./AppManifest";
 
 export * from "./global";
 
+export * from "./worker";
+
+export * from "./ipc";
+
 /**
  * App Instance Interface
  *
@@ -79,6 +83,9 @@ export type {
 
 // Export event types
 export * from "./events";
+
+// Export channel/appbus types
+export * from "./channels";
 
 export interface SystemInfo {
   platform: string;
