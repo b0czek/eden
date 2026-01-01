@@ -20,14 +20,24 @@ program
   .option("-o, --output <path>", "Output path for .edenite file")
   .option("-v, --verbose", "Verbose output", false)
   .option("-d, --dry-run", "Validate without creating files", false)
-  .option("-c, --compression <level>", "Zstd compression level (1-22, default: 11)", "11")
+  .option(
+    "-c, --compression <level>",
+    "Zstd compression level (1-22, default: 11)",
+    "11"
+  )
   .action(async (appDirectory: string, options: any) => {
     console.log(chalk.bold.blue("\n🌱 Genesis - Creating life...\n"));
 
     const compressionLevel = parseInt(options.compression, 10);
-    if (isNaN(compressionLevel) || compressionLevel < 1 || compressionLevel > 22) {
+    if (
+      isNaN(compressionLevel) ||
+      compressionLevel < 1 ||
+      compressionLevel > 22
+    ) {
       console.log(chalk.red("\n❌ Invalid compression level"));
-      console.log(chalk.gray("   Compression level must be between 1 and 22\n"));
+      console.log(
+        chalk.gray("   Compression level must be between 1 and 22\n")
+      );
       process.exit(1);
     }
 
@@ -92,7 +102,9 @@ program
         chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
       );
       console.log(
-        chalk.gray(`  Frontend:    ${result.manifest.frontend.entry}\n`)
+        chalk.gray(
+          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`
+        )
       );
 
       // Verify files
@@ -144,7 +156,7 @@ program
         chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
       );
       console.log(
-        chalk.gray(`  Frontend:    ${result.manifest.frontend.entry}`)
+        chalk.gray(`  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`)
       );
       if (result.checksum) {
         console.log(chalk.gray(`  SHA256:      ${result.checksum}`));
@@ -166,30 +178,32 @@ program
   .argument("<output-directory>", "Directory to extract to")
   .option("-v, --verbose", "Verbose output", false)
   .option("--no-verify", "Skip checksum verification")
-  .action(async (edeniteFile: string, outputDirectory: string, options: any) => {
-    console.log(chalk.bold.blue("\n📂 Extracting .edenite file...\n"));
+  .action(
+    async (edeniteFile: string, outputDirectory: string, options: any) => {
+      console.log(chalk.bold.blue("\n📂 Extracting .edenite file...\n"));
 
-    const result = await GenesisBundler.extract({
-      edenitePath: path.resolve(edeniteFile),
-      outputDirectory: path.resolve(outputDirectory),
-      verbose: options.verbose,
-      verifyChecksum: options.verify !== false,
-    });
+      const result = await GenesisBundler.extract({
+        edenitePath: path.resolve(edeniteFile),
+        outputDirectory: path.resolve(outputDirectory),
+        verbose: options.verbose,
+        verifyChecksum: options.verify !== false,
+      });
 
-    if (result.success) {
-      console.log(chalk.green("\n✨ Success! Archive extracted"));
-      if (result.manifest) {
-        console.log(
-          chalk.gray(`   ${result.manifest.name} v${result.manifest.version}`)
-        );
+      if (result.success) {
+        console.log(chalk.green("\n✨ Success! Archive extracted"));
+        if (result.manifest) {
+          console.log(
+            chalk.gray(`   ${result.manifest.name} v${result.manifest.version}`)
+          );
+        }
+        console.log(chalk.gray(`   → ${path.resolve(outputDirectory)}\n`));
+        process.exit(0);
+      } else {
+        console.log(chalk.red("\n❌ Extraction failed"));
+        console.log(chalk.gray(`   ${result.error}\n`));
+        process.exit(1);
       }
-      console.log(chalk.gray(`   → ${path.resolve(outputDirectory)}\n`));
-      process.exit(0);
-    } else {
-      console.log(chalk.red("\n❌ Extraction failed"));
-      console.log(chalk.gray(`   ${result.error}\n`));
-      process.exit(1);
     }
-  });
+  );
 
 program.parse();

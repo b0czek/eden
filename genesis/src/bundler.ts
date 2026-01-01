@@ -150,16 +150,20 @@ export class GenesisBundler {
         errors.push("Missing required field: backend.entry");
       }
 
-      // Frontend validation
-      if (!manifest.frontend) {
-        errors.push("Missing required field: frontend");
-      } else if (!manifest.frontend.entry) {
+      // Frontend validation (optional, but entry required if frontend exists)
+      if (manifest.frontend && !manifest.frontend.entry) {
         errors.push("Missing required field: frontend.entry");
       } else if (
+        manifest.frontend &&
         !this.isRemoteEntry(manifest.frontend.entry) &&
         manifest.frontend.entry.startsWith("http")
       ) {
         errors.push("Invalid frontend.entry URL");
+      }
+
+      // Must have at least frontend or backend
+      if (!manifest.frontend && !manifest.backend) {
+        errors.push("App must have at least a frontend or backend entry");
       }
 
       return {
@@ -192,8 +196,11 @@ export class GenesisBundler {
       }
     }
 
-    // Check frontend entry unless it references a remote URL
-    if (!this.isRemoteEntry(manifest.frontend.entry)) {
+    // Check frontend entry if defined and not a remote URL
+    if (
+      manifest.frontend?.entry &&
+      !this.isRemoteEntry(manifest.frontend.entry)
+    ) {
       const frontendPath = path.join(appDirectory, manifest.frontend.entry);
       try {
         await fs.access(frontendPath);
@@ -251,7 +258,7 @@ export class GenesisBundler {
       /\.spec\.[jt]sx?$/,
     ];
 
-    return excludePatterns.some(pattern => pattern.test(filePath));
+    return excludePatterns.some((pattern) => pattern.test(filePath));
   }
 
   /**
@@ -277,7 +284,7 @@ export class GenesisBundler {
 
     for (const file of files) {
       const fileStr = file as string;
-      
+
       // Skip excluded files
       if (this.shouldExcludeFile(fileStr)) {
         skippedCount++;
@@ -304,7 +311,9 @@ export class GenesisBundler {
 
     if (verbose) {
       console.log(`✓ Files copied to: ${resolvedTarget}`);
-      console.log(`  Copied: ${copiedCount} files, Skipped: ${skippedCount} (dev files)`);
+      console.log(
+        `  Copied: ${copiedCount} files, Skipped: ${skippedCount} (dev files)`
+      );
     }
   }
 
@@ -330,11 +339,11 @@ export class GenesisBundler {
     if (verbose) console.log("📦 Creating TAR archive...");
 
     let progressBar: cliProgress.SingleBar | null = null;
-    
+
     // Get file list for progress tracking (excluding development files)
     const allFiles = await fs.readdir(appDirectory, { recursive: true });
     const fileList = [];
-    
+
     for (const file of allFiles) {
       const fileStr = file as string;
       // Skip excluded files
@@ -350,10 +359,10 @@ export class GenesisBundler {
 
     if (verbose && fileList.length > 50) {
       progressBar = new cliProgress.SingleBar({
-        format: '  Progress |{bar}| {percentage}% | {value}/{total} files',
-        barCompleteChar: '\u2588',
-        barIncompleteChar: '\u2591',
-        hideCursor: true
+        format: "  Progress |{bar}| {percentage}% | {value}/{total} files",
+        barCompleteChar: "\u2588",
+        barIncompleteChar: "\u2591",
+        hideCursor: true,
       });
       progressBar.start(fileList.length, 0);
     }
@@ -429,8 +438,15 @@ export class GenesisBundler {
     if (verbose) {
       console.log(`✓ Archive created: ${finalOutputPath}`);
       console.log(`  Original size: ${(tarData.length / 1024).toFixed(2)} KB`);
-      console.log(`  Compressed size: ${(finalData.length / 1024).toFixed(2)} KB`);
-      console.log(`  Compression ratio: ${((1 - finalData.length / tarData.length) * 100).toFixed(1)}%`);
+      console.log(
+        `  Compressed size: ${(finalData.length / 1024).toFixed(2)} KB`
+      );
+      console.log(
+        `  Compression ratio: ${(
+          (1 - finalData.length / tarData.length) *
+          100
+        ).toFixed(1)}%`
+      );
       console.log(`  SHA256: ${checksum}`);
     }
 
@@ -457,7 +473,7 @@ export class GenesisBundler {
     try {
       // Initialize compressor
       await this.initCompressor();
-      
+
       if (verbose) console.log(`📦 Bundling app from: ${appDirectory}`);
 
       // Check if directory exists
@@ -564,7 +580,12 @@ export class GenesisBundler {
    */
   static async getInfo(
     edenitePath: string
-  ): Promise<{ success: boolean; manifest?: AppManifest; error?: string; checksum?: string }> {
+  ): Promise<{
+    success: boolean;
+    manifest?: AppManifest;
+    error?: string;
+    checksum?: string;
+  }> {
     try {
       await this.initCompressor();
 
@@ -601,7 +622,12 @@ export class GenesisBundler {
     error?: string;
     manifest?: AppManifest;
   }> {
-    const { edenitePath, outputDirectory, verbose, verifyChecksum = true } = options;
+    const {
+      edenitePath,
+      outputDirectory,
+      verbose,
+      verifyChecksum = true,
+    } = options;
 
     try {
       await this.initCompressor();
@@ -650,10 +676,7 @@ export class GenesisBundler {
       );
 
       // Write to temporary tar file
-      const tempTarPath = path.join(
-        outputDirectory,
-        `temp-${Date.now()}.tar`
-      );
+      const tempTarPath = path.join(outputDirectory, `temp-${Date.now()}.tar`);
       await fs.mkdir(outputDirectory, { recursive: true });
       await fs.writeFile(tempTarPath, decompressedBuffer);
 
