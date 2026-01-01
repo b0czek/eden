@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AppBus Isolated</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="eden-bg-base">
+  <div class="app-container eden-flex-col eden-gap-md eden-p-md">
+    <header class="eden-card eden-p-sm eden-flex eden-justify-between eden-items-center">
+      <h1 class="eden-text-lg">🟡 Isolated</h1>
+      <span id="connection-status" class="eden-badge eden-badge-danger">Disconnected</span>
+    </header>
+
+    <!-- Direct Chat with Client A -->
+    <section class="eden-card eden-card-elevated eden-flex-col eden-gap-sm chat-section direct-chat">
+      <div>
+        <h2 class="eden-text-md">Direct Chat with Client A</h2>
+        <p class="eden-text-sm eden-text-secondary">This chat bypasses the Hub entirely</p>
+      </div>
+      <div id="chat" class="chat-messages eden-glass-light eden-p-sm"></div>
+      <div class="eden-flex eden-gap-sm">
+        <input type="text" id="message" class="eden-input" placeholder="Message to Client A..." />
+        <button id="send-btn" class="eden-btn eden-btn-warning">Send</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
