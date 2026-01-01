@@ -160,15 +160,7 @@ const hasFrontend = !!manifest.frontend?.entry;
 parentPort.on("message", (event: Electron.MessageEvent) => {
   const message = event.data;
 
-  if (message.type === "init-port") {
-    // Receive the MessagePort for frontend communication
-    const [port] = event.ports;
-    if (port) {
-      frontendPort = port;
-      setupFrontendPort(port);
-      console.log(`[Backend ${appId}] Frontend port initialized`);
-    }
-  } else if (message.type === "shell-command-response") {
+  if (message.type === "shell-command-response") {
     // Response to a shell command we sent
     const pending = pendingCommands.get(message.commandId);
     if (pending) {
