@@ -28,6 +28,14 @@ export interface PendingRequest {
 }
 
 /**
+ * Pending port arrival tracking
+ */
+export interface PendingPortArrival {
+  resolve: (port: IPCPort) => void;
+  reject: (reason: Error) => void;
+}
+
+/**
  * Options for setting up a client port
  */
 export interface ClientPortOptions {
@@ -35,6 +43,7 @@ export interface ClientPortOptions {
   connectionId: string;
   portStore: Map<string, IPCPort>;
   pendingRequests: Map<string, PendingRequest>;
+  pendingPortArrivals?: Map<string, PendingPortArrival>;
   logPrefix?: string;
 }
 
@@ -53,6 +62,7 @@ export interface AppBusState {
   registeredServices: Map<string, ServiceConnectCallback>;
   connectedPorts: Map<string, IPCPort>;
   pendingRequests: Map<string, PendingRequest>;
+  pendingPortArrivals: Map<string, PendingPortArrival>;
   messageIdGenerator: () => string;
 }
 
@@ -64,8 +74,51 @@ export function createAppBusState(prefix: string = "appbus"): AppBusState {
     registeredServices: new Map(),
     connectedPorts: new Map(),
     pendingRequests: new Map(),
+    pendingPortArrivals: new Map(),
     messageIdGenerator: createMessageIdGenerator(prefix),
   };
+}
+
+/**
+ * Wait for a port to arrive for a given connection ID
+ *
+ * @param connectionId The connection ID to wait for
+ * @param state AppBus state containing connectedPorts and pendingPortArrivals
+ * @param timeoutMs Timeout in milliseconds (default: 5000)
+ * @returns Promise that resolves with the port or rejects on timeout
+ */
+export function waitForPort(
+  connectionId: string,
+  state: AppBusState,
+  timeoutMs: number = 5000
+): Promise<IPCPort> {
+  // Check if port is already available
+  const existing = state.connectedPorts.get(connectionId);
+  if (existing) {
+    return Promise.resolve(existing);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      state.pendingPortArrivals.delete(connectionId);
+      reject(
+        new Error(
+          `Port for connection ${connectionId} not received within ${timeoutMs}ms`
+        )
+      );
+    }, timeoutMs);
+
+    state.pendingPortArrivals.set(connectionId, {
+      resolve: (port: IPCPort) => {
+        clearTimeout(timeout);
+        resolve(port);
+      },
+      reject: (reason: Error) => {
+        clearTimeout(timeout);
+        reject(reason);
+      },
+    });
+  });
 }
 
 /**
@@ -74,10 +127,25 @@ export function createAppBusState(prefix: string = "appbus"): AppBusState {
  * @param options Configuration for the client port
  */
 export function setupClientPort(options: ClientPortOptions): void {
-  const { port, connectionId, portStore, pendingRequests } = options;
+  const {
+    port,
+    connectionId,
+    portStore,
+    pendingRequests,
+    pendingPortArrivals,
+  } = options;
 
   // Store the port for later use
   portStore.set(connectionId, port);
+
+  // Resolve any pending port arrivals waiting for this connection
+  if (pendingPortArrivals) {
+    const pending = pendingPortArrivals.get(connectionId);
+    if (pending) {
+      pendingPortArrivals.delete(connectionId);
+      pending.resolve(port);
+    }
+  }
 
   // Set up response handler
   port.on("message", (event) => {
@@ -375,6 +443,7 @@ export function handleAppBusPort(
       connectionId,
       portStore: state.connectedPorts,
       pendingRequests: state.pendingRequests,
+      pendingPortArrivals: state.pendingPortArrivals,
     });
   }
 }

@@ -6,7 +6,7 @@ import type {
   ServiceConnectCallback,
 } from "@edenapp/types";
 import type { PendingRequest, IPCPort, AppBusState } from "./port-channel";
-import { createPortConnection } from "./port-channel";
+import { createPortConnection, waitForPort } from "./port-channel";
 
 /**
  * Interface for sending shell commands to the main process
@@ -150,13 +150,15 @@ export function createAppBusAPI(
 
       const { connectionId } = result;
 
-      // Wait a bit for the port to be received
-      // This relies on the port handler being set up separately and populating connectedPorts
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Increased to 100ms to match backend-preload, app-preload had 50ms
-
-      const port = connectedPorts.get(connectionId);
-      if (!port) {
-        return { error: "MessagePort not received" };
+      // Wait for the port to be received via handleAppBusPort
+      let port: IPCPort;
+      try {
+        port = await waitForPort(connectionId, state, 5000);
+      } catch (err) {
+        return {
+          error:
+            err instanceof Error ? err.message : "MessagePort not received",
+        };
       }
 
       // Use shared utility to create connection object
