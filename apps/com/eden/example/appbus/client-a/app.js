@@ -60,6 +60,14 @@ class ClientAApp {
       this.hubStatus.textContent = 'Connected';
       this.hubStatus.className = 'eden-badge eden-badge-success';
 
+      // Handle hub disconnect
+      this.hubConnection.onClose(() => {
+        this.addHubMessage('Hub connection closed', 'system');
+        this.hubStatus.textContent = 'Disconnected';
+        this.hubStatus.className = 'eden-badge eden-badge-danger';
+        this.hubConnection = null;
+      });
+
       // Listen for incoming messages from Hub
       this.hubConnection.on('chat-message', (data) => {
         const isOwn = data.from === CLIENT_ID;
@@ -148,6 +156,16 @@ class ClientAApp {
           this.directStatus.textContent = 'Connected';
           this.directStatus.className = 'eden-badge eden-badge-success';
           
+          // Handle connection close
+          connection.onClose(() => {
+            this.addDirectMessage(`${appId} disconnected`, 'system');
+            this.directConnections.delete(appId);
+            if (this.directConnections.size === 0) {
+              this.directStatus.textContent = 'Waiting';
+              this.directStatus.className = 'eden-badge eden-badge-info';
+            }
+          });
+
           // Handle incoming messages from Isolated
           connection.on('message', (data) => {
             this.addDirectMessage(`Isolated: ${data.text}`, 'other');

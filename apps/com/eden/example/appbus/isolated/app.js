@@ -46,6 +46,15 @@ class IsolatedApp {
       this.connectionStatus.className = 'eden-badge eden-badge-success';
       this.sendBtn.disabled = false;
 
+      // Handle connection close
+      this.connection.onClose(() => {
+        this.addMessage('Connection to Client A closed', 'system');
+        this.connectionStatus.textContent = 'Disconnected';
+        this.connectionStatus.className = 'eden-badge eden-badge-danger';
+        this.connection = null;
+        this.sendBtn.disabled = true;
+      });
+
       // Test connection with ping
       try {
         const pingResult = await this.connection.request('ping', {});

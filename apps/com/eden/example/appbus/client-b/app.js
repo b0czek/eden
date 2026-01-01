@@ -44,6 +44,14 @@ class ClientBApp {
       this.hubStatus.textContent = 'Connected';
       this.hubStatus.className = 'eden-badge eden-badge-success';
 
+      // Handle hub disconnect
+      this.hubConnection.onClose(() => {
+        this.addMessage('Hub connection closed', 'system');
+        this.hubStatus.textContent = 'Disconnected';
+        this.hubStatus.className = 'eden-badge eden-badge-danger';
+        this.hubConnection = null;
+      });
+
       // Listen for incoming messages
       this.hubConnection.on('chat-message', (data) => {
         const isOwn = data.from === CLIENT_ID;

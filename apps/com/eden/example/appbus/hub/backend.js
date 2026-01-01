@@ -15,6 +15,19 @@ worker.appBus.exposeService('chat-relay', (connection, { appId: clientAppId }) =
   // Store the connection (nickname will be set on join)
   clients.set(clientAppId, { connection, nickname: clientAppId });
 
+  // Handle client disconnect
+  connection.onClose(() => {
+    const client = clients.get(clientAppId);
+    if (client) {
+      console.log(`[Hub] Client disconnected: ${client.nickname} (${clientAppId})`);
+      clients.delete(clientAppId);
+      broadcastToOthers(clientAppId, 'client-left', { 
+        clientId: clientAppId, 
+        nickname: client.nickname 
+      });
+    }
+  });
+
   // Handle join request
   connection.handle('join', ({ clientId, nickname }) => {
     clients.set(clientAppId, { connection, nickname });
