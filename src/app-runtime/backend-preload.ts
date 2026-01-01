@@ -22,6 +22,7 @@ import {
   createPortConnection,
   createAppBusState,
   wrapElectronPort,
+  handlePortClosed,
 } from "./common/port-channel";
 
 import {
@@ -193,6 +194,9 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
     if (port) {
       handleAppBusPort(port, message);
     }
+  } else if (message.type === "appbus-port-closed") {
+    // AppBus connection closed
+    handlePortClosed(appBusState, message.connectionId);
   } else if (message.type === "shutdown") {
     // Graceful shutdown request
     console.log(`[Backend ${appId}] Shutdown requested`);

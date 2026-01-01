@@ -123,6 +123,9 @@ export function createPortConnection(
   const requestHandlers: Map<string, (args: any) => any | Promise<any>> =
     new Map();
 
+  // Store the port for later use (cleanup, connectivity checks)
+  portStore.set(connectionId, port);
+
   // Set up incoming message handler
   port.on("message", (event) => {
     const { type, method, payload, messageId } = event.data;
@@ -373,5 +376,22 @@ export function handleAppBusPort(
       portStore: state.connectedPorts,
       pendingRequests: state.pendingRequests,
     });
+  }
+}
+/**
+ * Handle a port being closed from the other side
+ * Triggered by a notification from the main process
+ *
+ * @param state AppBus state
+ * @param connectionId The ID of the closed connection
+ */
+export function handlePortClosed(
+  state: AppBusState,
+  connectionId: string
+): void {
+  const port = state.connectedPorts.get(connectionId);
+  if (port) {
+    port.close();
+    state.connectedPorts.delete(connectionId);
   }
 }

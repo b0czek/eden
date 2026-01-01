@@ -24,7 +24,12 @@ export class AppChannelManager {
   /** Active connections for cleanup tracking */
   private connections: Map<
     string,
-    { port1: Electron.MessagePortMain; port2: Electron.MessagePortMain }
+    {
+      requesterAppId: string;
+      requesterWebContentsId?: number;
+      targetAppId: string;
+      targetWebContentsId?: number;
+    }
   > = new Map();
 
   /** IPC handler for appbus/* commands */
@@ -118,6 +123,9 @@ export class AppChannelManager {
       );
     }
 
+    // Also close all active connections for this app
+    this.closeConnectionsForApp(appId);
+
     return count;
   }
 
@@ -209,8 +217,12 @@ export class AppChannelManager {
     const { port1, port2 } = new MessageChannelMain();
     const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${Date.now()}`;
 
-    // Store for cleanup
-    this.connections.set(connectionId, { port1, port2 });
+    this.connections.set(connectionId, {
+      requesterAppId,
+      requesterWebContentsId: requesterWebContentsId || undefined,
+      targetAppId,
+      targetWebContentsId: service.webContentsId,
+    });
 
     console.log(
       `[AppChannelManager] Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`
@@ -282,16 +294,68 @@ export class AppChannelManager {
       return false;
     }
 
-    try {
-      connection.port1.close();
-      connection.port2.close();
-    } catch (e) {
-      // Ports may already be closed
-    }
-
     this.connections.delete(connectionId);
     console.log(`[AppChannelManager] Closed connection: ${connectionId}`);
     return true;
+  }
+
+  /**
+   * Close all connections for a specific app (called when app/backend stops)
+   */
+  closeConnectionsForApp(appId: string): void {
+    const connectionsToClose: string[] = [];
+
+    for (const [connectionId, conn] of this.connections) {
+      if (conn.requesterAppId === appId || conn.targetAppId === appId) {
+        connectionsToClose.push(connectionId);
+
+        // Notify the OTHER side
+        if (conn.requesterAppId === appId) {
+          // Requester closed, notify target
+          this.notifyPortClosed(
+            conn.targetAppId,
+            conn.targetWebContentsId,
+            connectionId
+          );
+        } else {
+          // Target closed, notify requester
+          this.notifyPortClosed(
+            conn.requesterAppId,
+            conn.requesterWebContentsId,
+            connectionId
+          );
+        }
+      }
+    }
+
+    for (const connectionId of connectionsToClose) {
+      this.closeConnection(connectionId);
+    }
+  }
+
+  /**
+   * Helper to notify a process that a port was closed
+   */
+  private notifyPortClosed(
+    appId: string,
+    webContentsId: number | undefined,
+    connectionId: string
+  ): void {
+    console.log(
+      `[AppChannelManager] Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`
+    );
+    if (webContentsId) {
+      const wc = webContents.fromId(webContentsId);
+      if (wc && !wc.isDestroyed()) {
+        wc.send("appbus-port-closed", { connectionId });
+      }
+    } else {
+      // It's a backend
+      this.backendManager.sendMessage(appId, {
+        type: "appbus-port-closed",
+        connectionId,
+      });
+    }
   }
 
   /**

@@ -40,7 +40,6 @@ export function wrapDOMPort(port: MessagePort): IPCPort {
         port.addEventListener("message", wrapper);
       } else if (event === "close") {
         closeListeners.add(listener);
-        port.addEventListener("close", listener);
       }
     }) as IPCPort["on"],
 
@@ -53,12 +52,22 @@ export function wrapDOMPort(port: MessagePort): IPCPort {
         }
       } else if (event === "close") {
         closeListeners.delete(listener);
-        port.removeEventListener("close", listener);
       }
     }) as IPCPort["off"],
 
     start: () => port.start(),
-    close: () => port.close(),
+    close: () => {
+      port.close();
+      // Manually trigger close listeners as DOM MessagePort doesn't emit 'close'
+      closeListeners.forEach((listener) => {
+        try {
+          listener();
+        } catch (e) {
+          console.error("[IPCPort] Error in close listener:", e);
+        }
+      });
+      closeListeners.clear();
+    },
   };
 }
 

@@ -11,6 +11,7 @@ import {
   createPortConnection,
   createAppBusState,
   wrapDOMPort,
+  handlePortClosed,
 } from "./common/port-channel";
 import {
   createEdenAPI,
@@ -159,6 +160,14 @@ ipcRenderer.on("appbus-port", (event: any, data: any) => {
 
   handleAppBusPort(wrappedPort, data, appBusState, "[AppBus]");
 });
+
+// Handle port closed notification
+ipcRenderer.on(
+  "appbus-port-closed",
+  (_event: any, data: { connectionId: string }) => {
+    handlePortClosed(appBusState, data.connectionId);
+  }
+);
 
 // Expose appBus API for app-to-app communication
 contextBridge.exposeInMainWorld(
