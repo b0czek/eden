@@ -227,11 +227,15 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
   /**
    * Get list of running apps
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
    */
   getRunningApps(showHidden: boolean = false): AppInstance[] {
     const apps = Array.from(this.runningApps.values());
-    return showHidden ? apps : apps.filter((app) => !app.manifest.overlay);
+    return showHidden
+      ? apps
+      : apps.filter(
+          (app) => !app.manifest.overlay && !!app.manifest.frontend?.entry
+        );
   }
 
   /**

@@ -303,11 +303,13 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   /**
    * Get list of installed apps
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
    */
   getInstalledApps(showHidden: boolean = false): AppManifest[] {
     const apps = Array.from(this.installedApps.values());
-    return showHidden ? apps : apps.filter((app) => !app.overlay);
+    return showHidden
+      ? apps
+      : apps.filter((app) => !app.overlay && !!app.frontend?.entry);
   }
 
   /**
