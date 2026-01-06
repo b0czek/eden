@@ -1,37 +1,30 @@
-import { ipcMain, BrowserWindow, dialog } from "electron";
+import { ipcMain, BrowserWindow } from "electron";
 import { EventEmitter } from "events";
-import { WorkerManager } from "../process-manager/WorkerManager";
+import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { IPCMessage } from "@edenapp/types";
-import { APP_EVENT_NAMES } from "@edenapp/types/runtime.generated";
 import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
-
 import { EventSubscriberManager } from "./EventSubscriberManager";
+import { PermissionRegistry } from "./PermissionRegistry";
+import { injectable, inject, singleton, delay } from "tsyringe";
+
+import { EventHandler } from "./EventHandler";
 
 /**
  * IPCBridge
  *
  * Central communication hub for IPC messages between:
  * - Main process
- * - Worker threads (app backends)
+ * - Utility processes (app backends)
  * - WebContentsViews (app frontends)
  */
+@singleton()
+@injectable()
 export class IPCBridge extends EventEmitter {
-  private workerManager: WorkerManager;
-  private viewManager!: ViewManager;
-  private commandRegistry: CommandRegistry;
-  public eventSubscribers!: EventSubscriberManager;
+  public eventSubscribers: EventSubscriberManager;
+  private eventHandler: EventHandler;
   private mainWindow: BrowserWindow | null = null;
   private runningAppIds: Set<string> = new Set();
-  private pendingResponses: Map<
-    string,
-    {
-      resolve: (value: any) => void;
-      reject: (reason: any) => void;
-      timeout: NodeJS.Timeout;
-    }
-  > = new Map();
   private pendingCommands: Map<
     string,
     {
@@ -40,28 +33,26 @@ export class IPCBridge extends EventEmitter {
       timeout: NodeJS.Timeout;
     }
   > = new Map();
-  private appChannelHandlers: Map<
-    string,
-    {
-      channel: string;
-      requestChannel: string;
-      messageHandler: (...args: any[]) => void;
-      requestHandler: (...args: any[]) => any;
-    }
-  > = new Map();
 
-  constructor(workerManager: WorkerManager, commandRegistry: CommandRegistry) {
+  constructor(
+    @inject(BackendManager) private backendManager: BackendManager,
+    @inject(CommandRegistry) private commandRegistry: CommandRegistry,
+    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
+    @inject(delay(() => ViewManager)) private viewManager: ViewManager
+  ) {
     super();
-    this.workerManager = workerManager;
-    this.commandRegistry = commandRegistry;
+
+    // Initialize event subscriber manager
+    this.eventSubscribers = new EventSubscriberManager(viewManager);
+    this.eventSubscribers.setBackendManager(this.backendManager);
+    this.eventSubscribers.setPermissionRegistry(permissionRegistry);
+
+    // Initialize and register EventHandler
+    this.eventHandler = new EventHandler(this.eventSubscribers, viewManager);
+    this.commandRegistry.registerManager(this.eventHandler);
 
     this.setupIPCHandlers();
-    this.setupWorkerMessageHandlers();
-  }
-
-  public setViewManager(viewManager: ViewManager): void {
-    this.viewManager = viewManager;
-    this.eventSubscribers = new EventSubscriberManager(viewManager);
+    this.setupBackendMessageHandlers();
   }
 
   /**
@@ -82,310 +73,76 @@ export class IPCBridge extends EventEmitter {
    * Setup IPC handlers for renderer processes
    */
   private setupIPCHandlers(): void {
-    // Handle messages from app frontends
-    ipcMain.on("app-message", (event, message: IPCMessage) => {
-      console.log(
-        "IPC received app-message:",
-        message.type,
-        "from sender:",
-        event.sender.id
-      );
-      this.handleAppMessage(message, event.sender.id);
-    });
-
-    // Handle message requests with responses
-    ipcMain.handle(
-      "app-message-request",
-      async (event, message: IPCMessage) => {
-        console.log(
-          "IPC received app-message-request:",
-          message.type,
-          "from sender:",
-          event.sender.id
-        );
-        return this.handleAppMessageRequest(message, event.sender.id);
-      }
-    );
-
     // Handle shell commands
     ipcMain.handle(
       "shell-command",
       async (event, command: string, args: any) => {
-        // Get appId from sender for permission checking
+        // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
-        return this.handleShellCommand(command, args, appId);
-      }
-    );
-
-    // Event existence check
-    ipcMain.handle("event-exists", async (_event, eventName: string) => {
-      return APP_EVENT_NAMES.includes(eventName as any);
-    });
-
-    // Event subscription handlers
-    ipcMain.handle("event-subscribe", async (event, eventName: string) => {
-      // Validate event name
-      if (!APP_EVENT_NAMES.includes(eventName as any)) {
-        throw new Error(`Event '${eventName}' is not supported`);
-      }
-
-      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
-      if (viewId === undefined) {
-        throw new Error("View not found");
-      }
-
-      return this.eventSubscribers.subscribe(viewId, eventName);
-    });
-
-    ipcMain.handle("event-unsubscribe", async (event, eventName: string) => {
-      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
-      if (viewId === undefined) {
-        throw new Error("View not found");
-      }
-
-      return this.eventSubscribers.unsubscribe(viewId, eventName);
-    });
-
-    // Get view data (launchArgs, channels, etc.) - called by preload to fetch all initialization data
-    ipcMain.handle("get-view-data", async (event) => {
-      const viewId = this.viewManager.getViewIdByWebContentsId(event.sender.id);
-      if (viewId === undefined) {
-        return { launchArgs: [] };
-      }
-
-      const viewInfo = this.viewManager.getViewInfo(viewId);
-      if (!viewInfo) {
-        return { launchArgs: [] };
-      }
-
-      const appId = viewInfo.appId;
-      return {
-        launchArgs: viewInfo.launchArgs || [],
-        appId,
-        viewId,
-        channel: `app-${appId}`,
-        requestChannel: `app-${appId}-request`,
-      };
-    });
-  }
-
-  /**
-   * Register per-app IPC channels
-   */
-  registerAppChannels(appId: string): void {
-    if (this.appChannelHandlers.has(appId)) return;
-
-    const channel = `app-${appId}`;
-    const requestChannel = `app-${appId}-request`;
-
-    const messageHandler = (event: any, message: IPCMessage) => {
-      console.log(
-        `IPC received ${channel}:`,
-        message.type,
-        "from sender:",
-        event.sender.id
-      );
-      this.handleAppMessage(message, event.sender.id);
-    };
-
-    const requestHandler = async (event: any, message: IPCMessage) => {
-      console.log(
-        `IPC received ${requestChannel}:`,
-        message.type,
-        "from sender:",
-        event.sender.id
-      );
-      return this.handleAppMessageRequest(message, event.sender.id);
-    };
-
-    ipcMain.on(channel, messageHandler);
-    ipcMain.handle(requestChannel, requestHandler);
-
-    this.appChannelHandlers.set(appId, {
-      channel,
-      requestChannel,
-      messageHandler,
-      requestHandler,
-    });
-
-    console.log(`Registered IPC channels for app ${appId}`);
-  }
-
-  /**
-   * Unregister per-app IPC channels
-   */
-  unregisterAppChannels(appId: string): void {
-    const info = this.appChannelHandlers.get(appId);
-    if (!info) return;
-
-    try {
-      ipcMain.removeListener(info.channel, info.messageHandler);
-      ipcMain.removeHandler(info.requestChannel);
-      this.appChannelHandlers.delete(appId);
-      console.log(`Unregistered IPC channels for app ${appId}`);
-    } catch (err) {
-      console.warn(`Error unregistering channels for ${appId}:`, err);
-    }
-  }
-
-  /**
-   * Setup handlers for worker thread messages
-   */
-  private setupWorkerMessageHandlers(): void {
-    this.workerManager.on(
-      "worker-message",
-      ({ appId, message }: { appId: string; message: IPCMessage }) => {
-        console.log(
-          `Worker message from ${appId}:`,
-          message.type,
-          "replyTo:",
-          message.replyTo
-        );
-        this.routeMessage(message, "worker", appId);
+        const argsWithContext = {
+          ...args,
+          _callerAppId: appId,
+          _callerWebContentsId: event.sender.id,
+        };
+        return this.handleShellCommand(command, argsWithContext, appId);
       }
     );
   }
 
   /**
-   * Route a message to its destination
+   * Setup handlers for backend utility process messages
    */
-  private routeMessage(
-    message: IPCMessage,
-    sourceType: "worker" | "view",
-    sourceId: string
+  private setupBackendMessageHandlers(): void {
+    this.backendManager.on(
+      "backend-message",
+      async ({ appId, message }: { appId: string; message: any }) => {
+        // Handle different message types from backend
+        if (message.type === "shell-command") {
+          // Backend requesting a shell command execution
+          try {
+            // Inject caller context for backend commands
+            const argsWithContext = {
+              ...message.args,
+              _callerAppId: appId,
+            };
+
+            const result = await this.handleShellCommand(
+              message.command,
+              argsWithContext,
+              appId
+            );
+            // Send response back to backend
+            this.sendBackendResponse(appId, message.commandId, result);
+          } catch (error) {
+            this.backendManager.sendMessage(appId, {
+              type: "shell-command-response",
+              commandId: message.commandId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        } else {
+          console.warn(
+            `Unknown backend message type from ${appId}:`,
+            message.type
+          );
+        }
+      }
+    );
+  }
+
+  /**
+   * Helper to send response to backend
+   */
+  private sendBackendResponse(
+    appId: string,
+    commandId: string,
+    result: any
   ): void {
-    const { target, replyTo } = message;
-
-    // IMPORTANT: Check if this is a reply to a pending request FIRST
-    // This must happen before any other routing
-    if (replyTo) {
-      console.log(
-        `Checking for pending response with replyTo: ${replyTo}, has it: ${this.pendingResponses.has(
-          replyTo
-        )}`
-      );
-      console.log(
-        `Pending responses:`,
-        Array.from(this.pendingResponses.keys())
-      );
-
-      if (this.pendingResponses.has(replyTo)) {
-        console.log(`Found pending response for ${replyTo}, resolving...`);
-        const pending = this.pendingResponses.get(replyTo)!;
-        clearTimeout(pending.timeout);
-        this.pendingResponses.delete(replyTo);
-        pending.resolve(message.payload);
-        return;
-      }
-    }
-
-    // Route to target
-    if (target === "backend" && sourceType === "view") {
-      // Frontend sending to its own backend - use the source app ID
-      console.log(`Routing view message to backend: ${sourceId}`);
-      this.sendToApp(sourceId, message);
-    } else if (target === "frontend" && sourceType === "worker") {
-      // Backend sending to its own frontend - use the source app ID
-      console.log(`Routing worker message to frontend: ${sourceId}`);
-      this.sendToApp(sourceId, message);
-    } else {
-      // Send to specific app by ID
-      this.sendToApp(target, message);
-    }
-  }
-
-  /**
-   * Handle message from app frontend
-   */
-  private handleAppMessage(message: IPCMessage, senderId: number): void {
-    console.log("handleAppMessage - finding view for sender:", senderId);
-    // Find which app this view belongs to
-    const viewInfo = Array.from(this.viewManager.getActiveViews())
-      .map((id) => this.viewManager.getViewInfo(id))
-      .find((info) => info?.view.webContents.id === senderId);
-
-    if (viewInfo) {
-      console.log("Found view, routing to app:", viewInfo.appId);
-      this.routeMessage(message, "view", viewInfo.appId);
-    } else {
-      console.log("View not found for sender:", senderId);
-    }
-  }
-
-  /**
-   * Handle message request from app frontend (expects response)
-   */
-  private async handleAppMessageRequest(
-    message: IPCMessage,
-    senderId: number
-  ): Promise<any> {
-    console.log("handleAppMessageRequest - finding view for sender:", senderId);
-    const viewInfo = Array.from(this.viewManager.getActiveViews())
-      .map((id) => this.viewManager.getViewInfo(id))
-      .find((info) => info?.view.webContents.id === senderId);
-
-    if (!viewInfo) {
-      console.log("View not found for sender:", senderId);
-      console.log("Active views:", this.viewManager.getActiveViews());
-      throw new Error("View not found");
-    }
-
-    console.log("Found view, sending request to app:", viewInfo.appId);
-    return this.sendMessageWithResponse(message, "view", viewInfo.appId);
-  }
-
-  /**
-   * Send message and wait for response
-   */
-  private sendMessageWithResponse(
-    message: IPCMessage,
-    sourceType: "worker" | "view",
-    sourceAppId: string,
-    timeoutMs: number = 5000
-  ): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const messageId = message.messageId || randomUUID();
-      message.messageId = messageId;
-
-      console.log(
-        `Storing pending response with messageId: ${messageId} for app: ${sourceAppId}`
-      );
-
-      const timeout = setTimeout(() => {
-        console.log(`Message timeout for messageId: ${messageId}`);
-        this.pendingResponses.delete(messageId);
-        reject(new Error("Message timeout"));
-      }, timeoutMs);
-
-      this.pendingResponses.set(messageId, { resolve, reject, timeout });
-
-      // Route the message
-      this.routeMessage(message, sourceType, sourceAppId);
+    this.backendManager.sendMessage(appId, {
+      type: "shell-command-response",
+      commandId,
+      result,
     });
-  }
-
-  /**
-   * Send message to app (worker and/or view)
-   */
-  private sendToApp(appId: string, message: IPCMessage): void {
-    console.log(
-      `sendToApp called for ${appId}, message type: ${message.type}, messageId: ${message.messageId}`
-    );
-
-    // Send to worker backend
-    if (this.workerManager.hasWorker(appId)) {
-      console.log(`Sending to worker ${appId}`);
-      this.workerManager.sendMessage(appId, message);
-    } else {
-      console.log(`No worker found for ${appId}`);
-    }
-
-    // Send to app's views
-    const viewIds = this.viewManager.getViewsByAppId(appId);
-    console.log(`Sending to ${viewIds.length} views for ${appId}`);
-    for (const viewId of viewIds) {
-      this.viewManager.sendToView(viewId, "shell-message", message);
-    }
   }
 
   /**
@@ -445,32 +202,7 @@ export class IPCBridge extends EventEmitter {
    * Cleanup
    */
   destroy(): void {
-    // Clear pending responses
-    for (const pending of this.pendingResponses.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error("Bridge destroyed"));
-    }
-    this.pendingResponses.clear();
-
-    // Clear pending commands
-    for (const pending of this.pendingCommands.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error("Bridge destroyed"));
-    }
-    this.pendingCommands.clear();
-
-    // Remove per-app IPC handlers
-    for (const appId of this.appChannelHandlers.keys()) {
-      this.unregisterAppChannels(appId);
-    }
-
     // Remove global IPC handlers
-    ipcMain.removeAllListeners("app-message");
-    ipcMain.removeHandler("app-message-request");
     ipcMain.removeHandler("shell-command");
-    ipcMain.removeHandler("event-exists");
-    ipcMain.removeHandler("event-subscribe");
-    ipcMain.removeHandler("event-unsubscribe");
-    ipcMain.removeHandler("get-view-data");
   }
 }

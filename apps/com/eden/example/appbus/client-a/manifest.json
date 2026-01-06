@@ -1,0 +1,27 @@
+{
+  "id": "com.eden.example.appbus.client-a",
+  "name": "AppBus Client A",
+  "version": "1.0.0",
+  "description": "Frontend app that connects to Hub and exposes direct-chat service for Isolated app",
+  "author": "Eden Team",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 450,
+      "height": 600
+    },
+    "minSize": {
+      "width": 350,
+      "height": 400
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": [
+    "appbus/expose",
+    "appbus/connect"
+  ]
+}

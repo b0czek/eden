@@ -4,11 +4,14 @@
   "version": "1.0.0",
   "description": "A simple example app demonstrating Eden app structure",
   "author": "Eden Team",
+  "build": {
+    "command": "cd frontend && pnpm run build && cd ../backend && pnpm run build"
+  },
   "backend": {
-    "entry": "backend.js"
+    "entry": "backend/dist/backend.js"
   },
   "frontend": {
-    "entry": "index.html"
+    "entry": "frontend/dist/index.html"
   },
   "window": {
     "mode": "both",

@@ -12,7 +12,7 @@ import { ViewCreator } from "./ViewCreator";
 import { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
 import { ViewInfo, ViewMode } from "./types";
 
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton, delay } from "tsyringe";
 import { CommandRegistry, IPCBridge, EdenEmitter, EdenNamespace } from "../ipc";
 import { ViewHandler } from "./ViewHandler";
 
@@ -35,6 +35,7 @@ interface ViewManagerEvents {
  *
  * Central orchestrator for view management in Eden.
  */
+@singleton()
 @injectable()
 @EdenNamespace("view")
 export class ViewManager extends EdenEmitter<ViewManagerEvents> {
@@ -51,8 +52,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   private viewHandler: ViewHandler;
 
   constructor(
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
-    @inject("IPCBridge") ipcBridge: IPCBridge,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject("EdenConfig") config: EdenConfig
   ) {
     super(ipcBridge);
@@ -127,12 +128,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       launchArgs
     );
 
-    // Notify listeners that the view has been loaded
-    this.notify("view-loaded", {
-      viewId: viewInfo.id,
-      appId,
-      overlay: viewInfo.viewType === "overlay",
-    });
+    const viewId = viewInfo.id;
+
+    // Store view info
+    this.views.set(viewId, viewInfo);
 
     // Electron event listener for view load failure
     viewInfo.view.webContents.on(
@@ -151,10 +150,12 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       }
     );
 
-    const viewId = viewInfo.id;
-
-    // Store view info
-    this.views.set(viewId, viewInfo);
+    // Notify listeners that the view has been loaded
+    this.notify("view-loaded", {
+      viewId: viewInfo.id,
+      appId,
+      overlay: viewInfo.viewType === "overlay",
+    });
 
     // Recalculate all tiles if using tiling and this is a tiled view
     if (viewInfo.mode === "tiled" && this.tilingManager.isEnabled()) {

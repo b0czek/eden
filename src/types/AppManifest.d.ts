@@ -1,3 +1,5 @@
+import type { ServiceDeclaration } from "./channels";
+
 /**
  * Window Mode Configuration
  *
@@ -188,10 +190,22 @@ export interface AppManifest {
     };
   };
 
-  /** Frontend configuration */
-  frontend: {
+  /**
+   * Frontend configuration.
+   * Optional - omit for backend-only apps (daemons).
+   * At least one of `frontend` or `backend` must be defined.
+   */
+  frontend?: {
     /** Path to the frontend HTML entry file */
     entry: string;
+
+    /**
+     * Allow remote URLs to be embedded in iframes.
+     * When true, strips X-Frame-Options and CSP frame-ancestors headers
+     * that would otherwise prevent embedding.
+     * Only applies to remote (http/https) frontend entries.
+     */
+    allowEmbedding?: boolean;
 
     /** WebContentsView options */
     options?: {
@@ -240,6 +254,13 @@ export interface AppManifest {
    * Overlays are rendered above regular apps.
    */
   overlay?: boolean;
+
+  /**
+   * Services this app exposes for other apps to connect to.
+   * Declaring services here documents the app's API and enables
+   * optional access control via allowedClients.
+   */
+  services?: ServiceDeclaration[];
 
   /**
    * App settings configuration.

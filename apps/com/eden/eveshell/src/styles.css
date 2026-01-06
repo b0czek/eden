@@ -82,7 +82,7 @@ body {
 
 .dock::before {
   /* Frosted panel behind dock content */
-  content: '';
+  content: "";
   position: absolute;
   left: var(--eden-space-sm);
   right: var(--eden-space-sm);
@@ -139,11 +139,13 @@ body {
 }
 
 .dock-right .separator {
-  background: linear-gradient(to bottom,
-      transparent,
-      var(--eden-color-border-medium) 20%,
-      var(--eden-color-border-medium) 80%,
-      transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
+    transparent
+  );
 }
 
 .app-icons {
@@ -184,21 +186,25 @@ body {
 }
 
 .dock-left .separator {
-  background: linear-gradient(to bottom,
-      transparent,
-      var(--eden-color-border-medium) 20%,
-      var(--eden-color-border-medium) 80%,
-      transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
+    transparent
+  );
 }
 
 .separator {
   width: 1px;
   height: 32px;
-  background: linear-gradient(to bottom,
-      transparent,
-      var(--eden-color-border-medium) 20%,
-      var(--eden-color-border-medium) 80%,
-      transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
+    transparent
+  );
   margin: 0 var(--eden-space-xs);
 }
 
@@ -214,7 +220,6 @@ body {
   transition: all var(--eden-transition-base);
   position: relative;
   min-width: 44px;
-
 }
 
 .app-icon:hover {
@@ -245,7 +250,6 @@ body {
   box-shadow: none;
   transition: transform 0.16s ease-out, filter 0.2s ease;
 }
-
 
 .icon-container img {
   width: 100%;
@@ -382,4 +386,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ============================
+   App Context Menu
+   ============================ */
+
+.context-menu-overlay {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.context-menu-title {
+  border-bottom: 1px solid var(--eden-color-border-light);
+  padding-bottom: var(--eden-space-xs);
+  margin-bottom: var(--eden-space-xs);
+}
+
+.context-menu-btn {
+  justify-content: flex-start;
+  width: 100%;
 }

@@ -1,16 +1,16 @@
-import { BrowserWindow } from "electron";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 import { EdenConfig } from "../../types";
 import { ProcessManager } from "./ProcessManager";
 
 /**
  * AutostartManager handles launching applications when Eden starts
  */
+@singleton()
 @injectable()
 export class AutostartManager {
   constructor(
     @inject("EdenConfig") private config: EdenConfig,
-    @inject("ProcessManager") private processManager: ProcessManager
+    @inject(ProcessManager) private processManager: ProcessManager
   ) {}
 
   /**

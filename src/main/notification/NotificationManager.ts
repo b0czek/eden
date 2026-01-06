@@ -1,7 +1,7 @@
 import { Notification, NotificationType } from "@edenapp/types";
 import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { NotificationHandler } from "./NotificationHandler";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 
 /**
  * Events emitted by the NotificationManager
@@ -11,6 +11,7 @@ interface NotificationNamespaceEvents {
   removed: { id: string };
 }
 
+@singleton()
 @injectable()
 @EdenNamespace("notification")
 export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents> {
@@ -18,8 +19,8 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
   private idCounter: number = 0;
 
   constructor(
-    @inject("IPCBridge") ipcBridge: IPCBridge,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry
   ) {
     super(ipcBridge);
 

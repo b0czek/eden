@@ -2,12 +2,15 @@ import { For, Show, createSignal, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
 import { AppInfo } from "../types";
+import { ContextMenuData } from "./AppContextMenu";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
 
 interface DockProps {
-  apps: AppInfo[];
+  runningApps: AppInfo[];  // Running apps that are NOT pinned
+  pinnedApps: AppInfo[];   // Pinned apps (may or may not be running)
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
+  onContextMenu: (menu: ContextMenuData) => void;
 }
 
 export default function Dock(props: DockProps) {
@@ -73,19 +76,61 @@ export default function Dock(props: DockProps) {
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
-          <For each={props.apps}>
+          {/* Running apps (not pinned) */}
+          <For each={props.runningApps}>
             {(app) => (
               <AppIcon
                 appId={app.id}
                 appName={app.name}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  props.onContextMenu({
+                    appId: app.id,
+                    appName: app.name,
+                    isRunning: app.isRunning,
+                    left: e.clientX,
+                    bottom: 72,
+                  });
+                }}
               />
             )}
           </For>
-          <Show when={props.apps.some((app) => app.isRunning)}>
+          
+          {/* Separator between running and pinned */}
+          <Show when={props.runningApps.length > 0 && props.pinnedApps.length > 0}>
             <div class="separator"></div>
           </Show>
+          
+          {/* Pinned apps */}
+          <For each={props.pinnedApps}>
+            {(app) => (
+              <AppIcon
+                appId={app.id}
+                appName={app.name}
+                isRunning={app.isRunning}
+                onClick={() => props.onAppClick(app.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  console.log(e.clientX, e.clientY);
+                  props.onContextMenu({
+                    appId: app.id,
+                    appName: app.name,
+                    isRunning: app.isRunning,
+                    left: e.clientX,
+                    bottom: 72,
+                  });
+                }}
+              />
+            )}
+          </For>
+          
+          {/* Separator before All Apps button */}
+          <Show when={props.runningApps.length > 0 || props.pinnedApps.length > 0}>
+            <div class="separator"></div>
+          </Show>
+          
           <AppIcon
             appId="apps-view"
             appName="All Apps"

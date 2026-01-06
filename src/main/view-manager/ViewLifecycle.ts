@@ -80,6 +80,7 @@ export interface ViewCreationOptions {
   preloadScript: string;
   transparent?: boolean;
   backgroundThrottling?: boolean;
+  additionalArguments?: string[];
 }
 
 /**
@@ -97,6 +98,7 @@ export class ViewLifecycle {
       preloadScript,
       transparent = true,
       backgroundThrottling = false,
+      additionalArguments = [],
     } = options;
 
     return new WebContentsView({
@@ -108,6 +110,8 @@ export class ViewLifecycle {
         transparent,
         backgroundThrottling,
         scrollBounce: false,
+        spellcheck: false,
+        additionalArguments,
       },
     });
   }

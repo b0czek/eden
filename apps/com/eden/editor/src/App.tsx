@@ -29,8 +29,7 @@ const App: Component = () => {
     preloadMonaco();
     
     // Check for launch arguments - if app was launched with a file path, open it
-    // getLaunchArgs() fetches from main process, so it always has current data
-    const launchArgs = await window.edenAPI?.getLaunchArgs() || [];
+    const launchArgs = window.edenAPI.getLaunchArgs();
     console.log("Launch args:", launchArgs);
     if (launchArgs.length > 0) {
       // Open the first argument as a file path
@@ -38,7 +37,7 @@ const App: Component = () => {
     }
     
     // Subscribe to file open events for when app is already running
-    window.edenAPI?.subscribe("file/opened", handleFileOpened as (data: unknown) => void);
+    window.edenAPI.subscribe("file/opened", handleFileOpened as (data: unknown) => void);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -55,7 +54,7 @@ const App: Component = () => {
 
     onCleanup(() => {
       document.removeEventListener("keydown", handleKeyDown);
-      window.edenAPI?.unsubscribe("file/opened", handleFileOpened as (data: unknown) => void);
+      window.edenAPI.unsubscribe("file/opened", handleFileOpened as (data: unknown) => void);
     });
   });
 
@@ -78,7 +77,7 @@ const App: Component = () => {
     try {
       setError(null);
       
-      const fileContent = await window.edenAPI!.shellCommand("fs/read", { path });
+      const fileContent = await window.edenAPI.shellCommand("fs/read", { path });
       
       const newTab: EditorTab = {
         id: `tab-${Date.now()}`,
@@ -136,7 +135,7 @@ const App: Component = () => {
 
       const currentContent = getEditorContentLazy(editor);
       
-      await window.edenAPI!.shellCommand("fs/write", {
+      await window.edenAPI.shellCommand("fs/write", {
         path: active.path,
         content: currentContent,
       });

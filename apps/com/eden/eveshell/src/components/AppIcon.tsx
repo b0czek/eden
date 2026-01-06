@@ -9,6 +9,7 @@ interface AppIconProps {
   icon?: string;
   isRunning?: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: MouseEvent) => void;
 }
 
 export default function AppIcon(props: AppIconProps) {
@@ -21,7 +22,12 @@ export default function AppIcon(props: AppIconProps) {
   const iconSrc = () => props.icon || fetchedIcon() || defaultIcon;
 
   return (
-    <div class="app-icon" onClick={props.onClick} title={props.appName}>
+    <div 
+      class="app-icon" 
+      onClick={props.onClick} 
+      onContextMenu={props.onContextMenu}
+      title={props.appName}
+    >
       <div class="icon-container">
         <img src={iconSrc()} alt={props.appName} draggable={false} />
         <Show when={props.isRunning}>

@@ -1,5 +1,6 @@
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
+import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
 import { AppInfo } from "../types";
 
 interface AllAppsProps {
@@ -8,20 +9,14 @@ interface AllAppsProps {
   onAppClick: (appId: string) => Promise<void> | void;
   onStopApp: (appId: string) => Promise<void> | void;
   onUninstallApp: (appId: string) => Promise<void> | void;
+  isAppPinned: (appId: string) => boolean;
+  onAddToDock: (appId: string) => Promise<void> | void;
+  onRemoveFromDock: (appId: string) => Promise<void> | void;
 }
 
 export default function AllApps(props: AllAppsProps) {
   const [searchQuery, setSearchQuery] = createSignal("");
-  const [contextMenu, setContextMenu] = createSignal<{
-    appId: string;
-    appName: string;
-    isRunning: boolean;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [hotReloadApps, setHotReloadApps] = createSignal<Set<string>>(
-    new Set()
-  );
+  const [contextMenu, setContextMenu] = createSignal<ContextMenuData | null>(null);
   const [longPressTimer, setLongPressTimer] = createSignal<number | null>(null);
   const [isClosing, setIsClosing] = createSignal(false);
   const EXIT_ANIMATION_MS = 280;
@@ -38,27 +33,8 @@ export default function AllApps(props: AllAppsProps) {
     );
   };
 
-  onMount(async () => {
+  onMount(() => {
     searchInputRef?.focus();
-
-    const hotReloadSet = new Set<string>();
-    for (const app of props.apps) {
-      try {
-        const result = await window.edenAPI!.shellCommand(
-          "package/is-hot-reload-enabled",
-          { appId: app.id }
-        );
-        if (result.enabled) {
-          hotReloadSet.add(app.id);
-        }
-      } catch (error) {
-        console.error(
-          `Failed to check hot reload status for ${app.id}:`,
-          error
-        );
-      }
-    }
-    setHotReloadApps(hotReloadSet);
   });
 
   onCleanup(() => {
@@ -99,7 +75,7 @@ export default function AllApps(props: AllAppsProps) {
       .map((app) => app.id);
     for (const runningAppId of runningAppIds) {
       try {
-        await window.edenAPI!.shellCommand("view/set-view-visibility", {
+        await window.edenAPI.shellCommand("view/set-view-visibility", {
           appId: runningAppId,
           visible: true,
         });
@@ -120,7 +96,7 @@ export default function AllApps(props: AllAppsProps) {
     if (isClosing()) return;
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ appId, appName, isRunning, x: e.clientX, y: e.clientY });
+    setContextMenu({ appId, appName, isRunning, left: e.clientX, top: e.clientY });
   }
 
   function handleLongPressStart(
@@ -135,7 +111,7 @@ export default function AllApps(props: AllAppsProps) {
         "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
       const clientY =
         "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      setContextMenu({ appId, appName, isRunning, x: clientX, y: clientY });
+      setContextMenu({ appId, appName, isRunning, left: clientX, top: clientY });
     }, 500);
     setLongPressTimer(timer);
   }
@@ -236,76 +212,15 @@ export default function AllApps(props: AllAppsProps) {
       {/* Context menu */}
       <Show when={contextMenu()}>
         {(menu) => (
-          <>
-            <div
-              class="eden-modal-overlay"
-              style="background: transparent; backdrop-filter: none;"
-              onClick={() => setContextMenu(null)}
-            />
-            <div
-              class="eden-popover"
-              style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
-            >
-              <div
-                class="eden-popover-title"
-                style="border-bottom: 1px solid var(--eden-color-border-light); padding-bottom: var(--eden-space-xs); margin-bottom: var(--eden-space-xs);"
-              >
-                {menu().appName}
-              </div>
-              <Show when={menu().isRunning}>
-                <button
-                  class="eden-btn eden-btn-ghost eden-btn-sm"
-                  style="justify-content: flex-start; width: 100%;"
-                  onClick={async () => {
-                    await props.onStopApp(menu().appId);
-                    setContextMenu(null);
-                  }}
-                >
-                  <span class="eden-icon">■</span>
-                  Stop App
-                </button>
-              </Show>
-              <button
-                class="eden-btn eden-btn-ghost eden-btn-sm"
-                style="justify-content: flex-start; width: 100%;"
-                onClick={async () => {
-                  try {
-                    const result = await window.edenAPI!.shellCommand(
-                      "package/toggle-hot-reload",
-                      { appId: menu().appId }
-                    );
-                    const newSet = new Set(hotReloadApps());
-                    if (result.enabled) {
-                      newSet.add(menu().appId);
-                    } else {
-                      newSet.delete(menu().appId);
-                    }
-                    setHotReloadApps(newSet);
-                  } catch (error) {
-                    console.error("Failed to toggle hot reload:", error);
-                  }
-                  setContextMenu(null);
-                }}
-              >
-                <span class="eden-icon">
-                  {hotReloadApps().has(menu().appId) ? "🔥" : "⚡"}
-                </span>
-                {hotReloadApps().has(menu().appId) ? "Disable" : "Enable"} Hot
-                Reload
-              </button>
-              <button
-                class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger"
-                style="justify-content: flex-start; width: 100%;"
-                onClick={async () => {
-                  await props.onUninstallApp(menu().appId);
-                  setContextMenu(null);
-                }}
-              >
-                <span class="eden-icon">×</span>
-                Uninstall
-              </button>
-            </div>
-          </>
+          <AppContextMenu
+            menu={menu()}
+            isAppPinned={props.isAppPinned}
+            onStopApp={props.onStopApp}
+            onAddToDock={props.onAddToDock}
+            onRemoveFromDock={props.onRemoveFromDock}
+            onUninstallApp={props.onUninstallApp}
+            onClose={() => setContextMenu(null)}
+          />
         )}
       </Show>
     </>

@@ -2,12 +2,13 @@ import { EventEmitter } from "events";
 import * as path from "path";
 import { randomUUID } from "crypto";
 import { Worker } from "worker_threads";
-import { WorkerManager } from "./WorkerManager";
+import { BackendManager } from "./BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
+import { AppChannelManager } from "../appbus/AppChannelManager";
 import { AppInstance } from "@edenapp/types";
-import { injectable, inject } from "tsyringe";
+import { injectable, inject, singleton } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
 
@@ -26,29 +27,32 @@ interface ProcessNamespaceEvents {
  *
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
+@singleton()
 @injectable()
 @EdenNamespace("process")
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
-  private workerManager: WorkerManager;
+  private backendManager: BackendManager;
   private viewManager: ViewManager;
   private packageManager: PackageManager;
+  private appChannelManager: AppChannelManager;
   private runningApps: Map<string, AppInstance> = new Map();
-  private workers: Map<string, Worker> = new Map(); // Worker threads mapped by appId
   private appsDirectory: string;
   private processHandler: ProcessHandler;
 
   constructor(
-    @inject("WorkerManager") workerManager: WorkerManager,
-    @inject("ViewManager") viewManager: ViewManager,
-    @inject("IPCBridge") ipcBridge: IPCBridge,
-    @inject("PackageManager") packageManager: PackageManager,
+    @inject(BackendManager) backendManager: BackendManager,
+    @inject(ViewManager) viewManager: ViewManager,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(PackageManager) packageManager: PackageManager,
+    @inject(AppChannelManager) appChannelManager: AppChannelManager,
     @inject("appsDirectory") appsDirectory: string,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry
   ) {
     super(ipcBridge);
-    this.workerManager = workerManager;
+    this.backendManager = backendManager;
     this.viewManager = viewManager;
     this.packageManager = packageManager;
+    this.appChannelManager = appChannelManager;
     this.appsDirectory = appsDirectory;
 
     this.setupEventHandlers();
@@ -62,38 +66,42 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Setup event handlers
    */
   private setupEventHandlers(): void {
-    // Handle worker errors
-    this.workerManager.on("worker-error", ({ appId, error }) => {
-      console.error(`Worker error for app ${appId}:`, error);
+    // Handle backend errors
+    this.backendManager.on("backend-error", ({ appId, error }) => {
+      console.error(`Backend error for app ${appId}:`, error);
       this.handleAppError(appId, error);
     });
 
-    // Handle worker exits
-    this.workerManager.on("worker-exit", ({ appId, code }) => {
-      console.log(`Worker exited for app ${appId} with code ${code}`);
+    // Handle backend exits
+    this.backendManager.on("backend-exit", ({ appId, code }) => {
+      console.log(`Backend exited for app ${appId} with code ${code}`);
       this.handleAppExit(appId, code);
     });
 
-    // Register per-app channels when a view loads
+    // Transfer backend port to frontend when view loads
     // Subscribe via ipcBridge since ViewManager emits via EdenEmitter
     this.ipcBridge.eventSubscribers.subscribeInternal(
       "view/view-loaded",
       ({ viewId, appId }) => {
-        console.log(`View loaded for app ${appId}, registering channels...`);
+        console.log(`View loaded for app ${appId}`);
 
-        // Register the per-app IPC channels
-        this.ipcBridge.registerAppChannels(appId);
-
-        // Send channel info to the view's preload
-        const viewInfo = this.viewManager.getViewInfo(viewId);
-        if (viewInfo) {
-          const channel = `app-${appId}`;
-          const requestChannel = `app-${appId}-request`;
-          viewInfo.view.webContents.send("app-set-channel", {
-            channel,
-            requestChannel,
-          });
-          console.log(`Sent channel info to view ${viewId}: ${channel}`);
+        // If app has a backend, transfer the port to the frontend
+        const backendPort = this.backendManager.getFrontendPort(appId);
+        if (backendPort) {
+          const viewInfo = this.viewManager.getViewInfo(viewId);
+          if (viewInfo) {
+            console.log(
+              `Transferring backend port to view ${viewId} for app ${appId}`
+            );
+            viewInfo.view.webContents.postMessage("backend-port", {}, [
+              backendPort,
+            ]);
+            // Port has been transferred
+          }
+        } else {
+          console.log(
+            `No backend port for app ${appId} (may be frontend-only)`
+          );
         }
       }
     );
@@ -112,6 +120,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`App ${appId} is not installed`);
     }
 
+    // Validate manifest has at least frontend or backend
+    if (!manifest.frontend?.entry && !manifest.backend?.entry) {
+      throw new Error(
+        `App ${appId} must have at least a frontend or backend entry`
+      );
+    }
+
     // Check if already running
     if (this.runningApps.has(appId)) {
       throw new Error(`App ${appId} is already running`);
@@ -126,31 +141,34 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     const instanceId = randomUUID();
 
     try {
-      // Create worker for backend if one is defined
+      // Create backend utility process if one is defined
       if (manifest.backend?.entry) {
-        const worker = await this.workerManager.createWorker(
+        await this.backendManager.createBackend(
           appId,
           manifest,
-          installPath
+          installPath,
+          launchArgs
         );
-        this.workers.set(appId, worker);
       }
 
-      // Create view for frontend
-      const viewId = this.viewManager.createView(
-        appId,
-        manifest,
-        installPath,
-        bounds,
-        launchArgs
-      );
+      // Create view for frontend only if frontend is defined
+      let viewId: number | undefined;
+      if (manifest.frontend?.entry) {
+        viewId = this.viewManager.createView(
+          appId,
+          manifest,
+          installPath,
+          bounds,
+          launchArgs
+        );
+      }
 
       // Create app instance
       const instance: AppInstance = {
         manifest,
         instanceId,
         installPath,
-        viewId,
+        viewId: viewId ?? -1, // -1 indicates no view (backend-only)
         state: "running",
         installedAt: new Date(),
         lastLaunched: new Date(),
@@ -183,17 +201,18 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     try {
-      // Terminate worker if it exists
-      if (this.workerManager.hasWorker(appId)) {
-        await this.workerManager.terminateWorker(appId);
-        this.workers.delete(appId);
+      // Unregister all services exposed by this app
+      this.appChannelManager.unregisterAllServices(appId);
+
+      // Remove view first (before backend termination to avoid race)
+      if (instance.viewId !== -1) {
+        this.viewManager.removeView(instance.viewId);
       }
 
-      // Remove view
-      this.viewManager.removeView(instance.viewId);
-
-      // Unregister per-app IPC channels
-      this.ipcBridge.unregisterAppChannels(appId);
+      // Terminate backend after view is removed
+      if (this.backendManager.hasBackend(appId)) {
+        await this.backendManager.terminateBackend(appId);
+      }
 
       // Remove from running apps
       this.runningApps.delete(appId);
@@ -208,11 +227,15 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
   /**
    * Get list of running apps
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
    */
   getRunningApps(showHidden: boolean = false): AppInstance[] {
     const apps = Array.from(this.runningApps.values());
-    return showHidden ? apps : apps.filter((app) => !app.manifest.overlay);
+    return showHidden
+      ? apps
+      : apps.filter(
+          (app) => !app.manifest.overlay && !!app.manifest.frontend?.entry
+        );
   }
 
   /**
@@ -241,22 +264,32 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   }
 
   /**
-   * Handle app exit
+   * Handle app exit (called when backend crashes or exits unexpectedly)
+   * Note: If stopApp() was called, the instance is already removed so this is a no-op
    */
   private handleAppExit(appId: string, code: number): void {
     const instance = this.runningApps.get(appId);
-    if (instance) {
-      // Clean up view
-      this.viewManager.removeView(instance.viewId);
-
-      // Unregister per-app IPC channels
-      this.ipcBridge.unregisterAppChannels(appId);
-
-      this.runningApps.delete(appId);
-      this.syncRunningAppsState();
-
-      this.notify("exited", { appId, code });
+    if (!instance) {
+      // App was already cleaned up by stopApp(), nothing to do
+      return;
     }
+
+    // Unregister all services exposed by this app
+    this.appChannelManager.unregisterAllServices(appId);
+
+    // Clean up view (only if frontend exists, viewId !== -1)
+    if (instance.viewId !== -1) {
+      try {
+        this.viewManager.removeView(instance.viewId);
+      } catch (e) {
+        // View may already be removed
+      }
+    }
+
+    this.runningApps.delete(appId);
+    this.syncRunningAppsState();
+
+    this.notify("exited", { appId, code });
   }
 
   /**

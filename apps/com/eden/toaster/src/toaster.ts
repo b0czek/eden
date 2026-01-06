@@ -47,7 +47,7 @@ let windowSize: WindowSize | null = null;
  */
 async function fetchWindowSize(): Promise<WindowSize> {
   try {
-    const size = await window.edenAPI!.shellCommand("view/window-size", {});
+    const size = await window.edenAPI.shellCommand("view/window-size", {});
     windowSize = size;
     return size;
   } catch (err) {
@@ -142,7 +142,7 @@ function calculateBounds(): ViewBounds {
 async function updateOverlayBounds(): Promise<void> {
   const bounds = calculateBounds();
   try {
-    await window.edenAPI!.shellCommand("view/update-view-bounds", {
+    await window.edenAPI.shellCommand("view/update-view-bounds", {
       appId: "com.eden.toaster",
       bounds,
     });
@@ -449,10 +449,10 @@ async function init(): Promise<void> {
   await fetchWindowSize();
 
   // Subscribe to notification events
-  window.edenAPI!.subscribe("notification/added", handleToastAdded);
+  window.edenAPI.subscribe("notification/added", handleToastAdded);
 
   // Subscribe to window size changes
-  window.edenAPI!.subscribe(
+  window.edenAPI.subscribe(
     "view/global-bounds-changed",
     (data: { windowSize: WindowSize }) => {
       windowSize = data.windowSize;

@@ -47,7 +47,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                     searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
                 }
 
-                const results = await window.edenAPI!.shellCommand("fs/search", {
+                const results = await window.edenAPI.shellCommand("fs/search", {
                     path: basePath === "//" ? "/" : basePath,
                     pattern: searchTerm,
                     limit: 10,
@@ -63,7 +63,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                 setSelectedIndex(0);
             } else {
                 // Search in current directory (empty value shows all items)
-                const results = await window.edenAPI!.shellCommand("fs/search", {
+                const results = await window.edenAPI.shellCommand("fs/search", {
                     path: props.currentPath,
                     pattern: value.toLowerCase(),
                     limit: 10,

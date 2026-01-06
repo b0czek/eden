@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Browser</title>
+  <style>
+    .eden-framed {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--eden-color-bg-glass-medium);
+      backdrop-filter: var(--eden-glass-light);
+    }
+
+    .browser-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .address-bar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 var(--eden-space-sm);
+      gap: var(--eden-space-sm);
+
+      border-bottom: 1px solid var(--eden-color-border-light);
+    }
+
+    .address-input {
+      flex: 1;
+    }
+
+    .nav-btn {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: var(--eden-radius-sm);
+      background: transparent;
+      color: var(--eden-color-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all var(--eden-transition-fast);
+    }
+
+    .nav-btn:hover {
+      background: var(--eden-color-surface-hover);
+      color: var(--eden-color-text-primary);
+    }
+
+    .browser-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="browser-container">
+    <div class="address-bar">
+      <button class="nav-btn" id="back" title="Back">←</button>
+      <button class="nav-btn" id="forward" title="Forward">→</button>
+      <button class="nav-btn" id="reload" title="Reload">⟳</button>
+      <input type="text" class="eden-input eden-input-sm address-input" id="url" placeholder="Enter URL..." value="https://www.google.com">
+      <button class="nav-btn" id="go" title="Go">↵</button>
+    </div>
+    <iframe class="browser-frame" id="frame" src="https://www.google.com" allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; payment; picture-in-picture" allowfullscreen></iframe>
+  </div>
+
+  <script>
+    const frame = document.getElementById('frame');
+    const urlInput = document.getElementById('url');
+    const backBtn = document.getElementById('back');
+    const forwardBtn = document.getElementById('forward');
+
+    // Track history ourselves since cross-origin iframes block history access
+    const history = ['https://www.google.com'];
+    let historyIndex = 0;
+
+    function updateButtons() {
+      backBtn.disabled = historyIndex <= 0;
+      forwardBtn.disabled = historyIndex >= history.length - 1;
+      backBtn.style.opacity = backBtn.disabled ? '0.3' : '1';
+      forwardBtn.style.opacity = forwardBtn.disabled ? '0.3' : '1';
+    }
+
+    function loadUrl(url, addToHistory = true) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
+      if (addToHistory) {
+        // Remove any forward history when navigating to a new page
+        history.splice(historyIndex + 1);
+        history.push(url);
+        historyIndex = history.length - 1;
+      }
+      
+      frame.src = url;
+      urlInput.value = url;
+      updateButtons();
+    }
+
+
+    // TODO: nothing here works
+    
+    document.getElementById('go').addEventListener('click', () => loadUrl(urlInput.value));
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadUrl(urlInput.value);
+    });
+
+    backBtn.addEventListener('click', () => {
+      if (historyIndex > 0) {
+        historyIndex--;
+        loadUrl(history[historyIndex], false);
+      }
+    });
+
+    forwardBtn.addEventListener('click', () => {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        loadUrl(history[historyIndex], false);
+      }
+    });
+
+    document.getElementById('reload').addEventListener('click', () => {
+      frame.src = frame.src;
+    });
+
+    updateButtons();
+  </script>
+</body>
+</html>

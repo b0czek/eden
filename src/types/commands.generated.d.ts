@@ -19,6 +19,60 @@ export interface SystemCommands {
 }
 
 /**
+ * AppbusCommands - Commands for the "appbus" namespace
+ */
+export interface AppbusCommands {
+  /**
+   * Register a service that this app exposes
+   * Requires "appbus/expose" permission
+   */
+  "appbus/register": {
+    args: {
+    serviceName: string;
+    description?: string;
+    allowedClients?: string[] };
+    response: { success: boolean; error?: string };
+  };
+  /**
+   * Unregister a service
+   * Requires "appbus/expose" permission
+   */
+  "appbus/unregister": {
+    args: {
+    serviceName: string };
+    response: { success: boolean };
+  };
+  /**
+   * List all available services
+   * No permission required
+   */
+  "appbus/list": {
+    args: Record<string, never>;
+    response: { services: import("./index").ServiceInfo[] };
+  };
+  /**
+   * List services by app ID
+   * No permission required
+   */
+  "appbus/list-by-app": {
+    args: {
+    appId: string };
+    response: { services: import("./index").ServiceInfo[] };
+  };
+  /**
+   * Connect to another app's service
+   * Creates MessageChannel and transfers ports directly to both apps
+   * Requires "appbus/connect" permission
+   */
+  "appbus/connect": {
+    args: {
+    targetAppId: string;
+    serviceName: string };
+    response: import("./index").ConnectResult;
+  };
+}
+
+/**
  * DbCommands - Commands for the "db" namespace
  */
 export interface DbCommands {
@@ -247,6 +301,30 @@ export interface FsCommands {
   "fs/delete": {
     args: { path: string };
     response: void;
+  };
+}
+
+/**
+ * EventCommands - Commands for the "event" namespace
+ */
+export interface EventCommands {
+  "event/subscribe": {
+    args: {
+    eventName: string;
+    _callerWebContentsId?: number;
+    _callerAppId?: string };
+    response: void;
+  };
+  "event/unsubscribe": {
+    args: {
+    eventName: string;
+    _callerWebContentsId?: number;
+    _callerAppId?: string };
+    response: void;
+  };
+  "event/exists": {
+    args: { eventName: string };
+    response: boolean;
   };
 }
 
@@ -548,4 +626,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, DbCommands, FileCommands, FsCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, DbCommands, FileCommands, FsCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}
