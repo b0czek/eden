@@ -4,6 +4,7 @@ import path from "path";
 
 export default defineConfig({
   plugins: [solidPlugin()],
+  base: "./",
   server: {
     port: 3004,
     strictPort: true,

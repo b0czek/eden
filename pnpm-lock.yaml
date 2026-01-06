@@ -67,28 +67,6 @@ importers:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25))
 
-  apps/com/eden/debug/db-explorer:
-    dependencies:
-      solid-icons:
-        specifier: ^1.1.0
-        version: 1.1.0(solid-js@1.9.10)
-    devDependencies:
-      '@edenapp/types':
-        specifier: workspace:*
-        version: link:../../../../../src/types
-      solid-js:
-        specifier: ^1.9.10
-        version: 1.9.10
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
-      vite:
-        specifier: ^7.2.4
-        version: 7.2.6(@types/node@22.19.1)
-      vite-plugin-solid:
-        specifier: ^2.11.10
-        version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
-
   apps/com/eden/editor:
     dependencies:
       monaco-editor:
@@ -115,6 +93,10 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
 
   apps/com/eden/eveshell:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -131,6 +113,30 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
+
+  apps/com/eden/example/hello/backend:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../../src/types
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
+      typescript:
+        specifier: ^5.3.0
+        version: 5.6.3
+
+  apps/com/eden/example/hello/frontend:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../../src/types
+      typescript:
+        specifier: ^5.3.0
+        version: 5.6.3
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@22.19.1)
 
   apps/com/eden/files:
     dependencies:
@@ -154,6 +160,28 @@ importers:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
 
+  apps/com/eden/settings:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
+      solid-js:
+        specifier: ^1.9.3
+        version: 1.9.10
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../src/types
+      typescript:
+        specifier: ~5.6.2
+        version: 5.6.3
+      vite:
+        specifier: ^6.0.3
+        version: 6.4.1(@types/node@22.19.1)
+      vite-plugin-solid:
+        specifier: ^2.11.0
+        version: 2.11.10(solid-js@1.9.10)(vite@6.4.1(@types/node@22.19.1))
+
   apps/com/eden/toaster:
     devDependencies:
       '@edenapp/types':
@@ -162,6 +190,12 @@ importers:
       vite:
         specifier: ^5.4.14
         version: 5.4.21(@types/node@22.19.1)
+
+  apps/com/eden/webbrowser:
+    devDependencies:
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@22.19.1)
 
   genesis:
     dependencies:
@@ -3093,6 +3127,11 @@ packages:
     resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
     engines: {node: '>=16'}
 
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -3181,6 +3220,46 @@ packages:
       sugarss:
         optional: true
       terser:
+        optional: true
+
+  vite@6.4.1:
+    resolution: {integrity: sha512-+Oxm7q9hDoLMyJOYfUYBuHQo+dkAloi33apOPP56pzj+vsdJDzr+j1NISE5pyaAuKL4A3UD34qd0lx5+kfKp2g==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    hasBin: true
+    peerDependencies:
+      '@types/node': ^18.0.0 || ^20.0.0 || >=22.0.0
+      jiti: '>=1.21.0'
+      less: '*'
+      lightningcss: ^1.21.0
+      sass: '*'
+      sass-embedded: '*'
+      stylus: '*'
+      sugarss: '*'
+      terser: ^5.16.0
+      tsx: ^4.8.1
+      yaml: ^2.4.2
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      jiti:
+        optional: true
+      less:
+        optional: true
+      lightningcss:
+        optional: true
+      sass:
+        optional: true
+      sass-embedded:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      terser:
+        optional: true
+      tsx:
+        optional: true
+      yaml:
         optional: true
 
   vite@7.2.6:
@@ -6436,6 +6515,8 @@ snapshots:
 
   type-fest@4.41.0: {}
 
+  typescript@5.6.3: {}
+
   typescript@5.9.3: {}
 
   uglify-js@3.19.3:
@@ -6488,6 +6569,19 @@ snapshots:
       '@types/istanbul-lib-coverage': 2.0.6
       convert-source-map: 2.0.0
 
+  vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@6.4.1(@types/node@22.19.1)):
+    dependencies:
+      '@babel/core': 7.28.5
+      '@types/babel__core': 7.20.5
+      babel-preset-solid: 1.9.10(@babel/core@7.28.5)(solid-js@1.9.10)
+      merge-anything: 5.1.7
+      solid-js: 1.9.10
+      solid-refresh: 0.6.3(solid-js@1.9.10)
+      vite: 6.4.1(@types/node@22.19.1)
+      vitefu: 1.1.1(vite@6.4.1(@types/node@22.19.1))
+    transitivePeerDependencies:
+      - supports-color
+
   vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25)):
     dependencies:
       '@babel/core': 7.28.5
@@ -6523,6 +6617,18 @@ snapshots:
       '@types/node': 22.19.1
       fsevents: 2.3.3
 
+  vite@6.4.1(@types/node@22.19.1):
+    dependencies:
+      esbuild: 0.25.12
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.6
+      rollup: 4.53.3
+      tinyglobby: 0.2.15
+    optionalDependencies:
+      '@types/node': 22.19.1
+      fsevents: 2.3.3
+
   vite@7.2.6(@types/node@20.19.25):
     dependencies:
       esbuild: 0.25.12
@@ -6546,6 +6652,10 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.19.1
       fsevents: 2.3.3
+
+  vitefu@1.1.1(vite@6.4.1(@types/node@22.19.1)):
+    optionalDependencies:
+      vite: 6.4.1(@types/node@22.19.1)
 
   vitefu@1.1.1(vite@7.2.6(@types/node@20.19.25)):
     optionalDependencies:

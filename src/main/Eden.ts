@@ -34,7 +34,6 @@ export class Eden {
   private processManager: ProcessManager;
   private fileOpenManager: FileOpenManager;
   private autostartManager: AutostartManager;
-  private settingsManager: SettingsManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -74,9 +73,7 @@ export class Eden {
     container.resolve(NotificationManager);
     container.resolve(DbManager);
 
-    // Initialize Settings Manager
-    this.settingsManager = container.resolve(SettingsManager);
-    container.registerInstance("SettingsManager", this.settingsManager);
+    container.resolve(SettingsManager);
 
     this.setupAppEventHandlers();
   }
@@ -155,11 +152,6 @@ export class Eden {
     this.mainWindow.on("closed", () => {
       this.mainWindow = null;
     });
-
-    // Development: Open DevTools
-    if (this.config.development || process.env.NODE_ENV === "development") {
-      this.mainWindow.webContents.openDevTools();
-    }
   }
 
   /**

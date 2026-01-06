@@ -5,7 +5,8 @@
     "com.eden.files",
     "com.eden.editor",
     "com.eden.example.calculator",
-    "com.eden.example.showcase"
+    "com.eden.example.showcase",
+    "com.eden.settings"
   ],
   "hotReload": {
     "enabled": true,

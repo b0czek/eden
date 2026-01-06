@@ -1,7 +1,7 @@
 import Keyv from "keyv";
 import KeyvSqlite from "@keyv/sqlite";
 import * as path from "path";
-import { injectable, inject } from "tsyringe";
+import { singleton, inject } from "tsyringe";
 import { SettingsCategory } from "@edenapp/types";
 import { CommandRegistry, IPCBridge, EdenNamespace, EdenEmitter } from "../ipc";
 import { SettingsHandler, EDEN_SETTINGS_APP_ID } from "./SettingsHandler";
@@ -23,15 +23,15 @@ interface SettingsNamespaceEvents {
  *
  * Eden system settings use appId "com.eden" which is reserved.
  */
-@injectable()
+@singleton()
 @EdenNamespace("settings")
 export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   private keyv: Keyv;
   private handler: SettingsHandler;
 
   constructor(
-    @inject("IPCBridge") ipcBridge: IPCBridge,
-    @inject("CommandRegistry") commandRegistry: CommandRegistry,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string
   ) {
     super(ipcBridge);
