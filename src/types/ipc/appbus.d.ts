@@ -109,7 +109,7 @@ export interface AppBusConnection<
   TSend extends MessageSchema = MessageSchema,
   TReceive extends MessageSchema = MessageSchema,
   TRequest extends RequestSchema = RequestSchema,
-  THandle extends RequestSchema = RequestSchema
+  THandle extends RequestSchema = RequestSchema,
 > {
   /** Send a fire-and-forget message */
   send<K extends keyof TSend>(method: K, args?: TSend[K]): void;
