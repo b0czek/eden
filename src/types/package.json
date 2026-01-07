@@ -1,12 +1,13 @@
 {
   "name": "@edenapp/types",
-  "version": "0.1.2",
+  "version": "0.2.1",
   "description": "TypeScript type definitions for the Eden platform",
   "types": "index.d.ts",
   "author": "Dariusz Majnert",
   "license": "MIT",
   "files": [
     "*.d.ts",
+    "ipc/",
     "README.md"
   ],
   "keywords": [
