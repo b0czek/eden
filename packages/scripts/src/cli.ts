@@ -6,7 +6,7 @@
  */
 
 import { Command } from "commander";
-import { buildApps } from "./build-apps";
+import { buildApps, buildSdkApps } from "./build-apps";
 import { copyAssets } from "./copy-assets";
 import { devWatch } from "./dev-watch";
 
@@ -32,6 +32,25 @@ program
         force: options.force || false,
         configPath: options.config,
         sdkPath: options.sdkPath,
+      });
+    } catch (error) {
+      console.error("Build failed:", error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("build-sdk")
+  .description("Build all apps in a directory for SDK packaging")
+  .requiredOption("-i, --input <path>", "Source apps directory")
+  .requiredOption("-o, --output <path>", "Output directory for prebuilt apps")
+  .option("-f, --force", "Force rebuild all apps")
+  .action(async (options) => {
+    try {
+      await buildSdkApps({
+        appsDir: options.input,
+        outputDir: options.output,
+        force: options.force || false,
       });
     } catch (error) {
       console.error("Build failed:", error);

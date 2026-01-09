@@ -59,14 +59,14 @@ export async function loadConfig(configPath: string): Promise<EdenConfig> {
 }
 
 /**
- * Resolve the path to the SDK's builtin apps directory
+ * Resolve the path to the SDK's prebuilt apps directory
  */
 export async function resolveSdkAppsPath(
   sdkPath?: string
 ): Promise<string | null> {
   // If explicit path provided, use it
   if (sdkPath) {
-    const appsPath = path.join(sdkPath, "apps");
+    const appsPath = path.join(sdkPath, "dist", "apps", "prebuilt");
     try {
       await fs.access(appsPath);
       return appsPath;
@@ -79,7 +79,7 @@ export async function resolveSdkAppsPath(
   try {
     const sdkPackagePath = require.resolve("@edenapp/sdk/package.json");
     const sdkDir = path.dirname(sdkPackagePath);
-    const appsPath = path.join(sdkDir, "apps");
+    const appsPath = path.join(sdkDir, "dist", "apps", "prebuilt");
     try {
       await fs.access(appsPath);
       return appsPath;

@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/scripts",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Build tools and CLI for Eden projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,8 +23,8 @@
   "author": "Dariusz Majnert",
   "license": "MIT",
   "dependencies": {
-    "@edenapp/genesis": "workspace:*",
-    "@edenapp/types": "workspace:*",
+    "@edenapp/genesis": "^0.2.2",
+    "@edenapp/types": "^0.2.1",
     "commander": "^11.1.0"
   },
   "devDependencies": {

@@ -113,19 +113,18 @@ async function resolveAppDirectory(
     case "builtin": {
       if (!sdkAppsPath) {
         console.error(
-          `❌ Cannot find SDK apps directory for builtin app: ${appSource.id}`
+          `❌ Cannot find SDK prebuilt apps directory for: ${appSource.id}`
         );
         return null;
       }
-      // Convert app ID to directory path (e.g., com.eden.files -> com/eden/files)
-      const parts = appSource.id.split(".");
-      const appPath = path.join(sdkAppsPath, ...parts);
+      // Prebuilt apps are stored by app ID directly (e.g., dist/apps/prebuilt/com.eden.files)
+      const appPath = path.join(sdkAppsPath, appSource.id);
       try {
         await fs.access(appPath);
         return appPath;
       } catch {
         console.error(
-          `❌ Builtin app not found: ${appSource.id} (looked in ${appPath})`
+          `❌ Prebuilt app not found: ${appSource.id} (looked in ${appPath})`
         );
         return null;
       }
@@ -174,6 +173,25 @@ async function resolveAppDirectory(
   }
 }
 
+/**
+ * Recursively copy a directory
+ */
+async function copyDir(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
+    }
+  }
+}
+
 async function buildApp(
   appSource: AppSource,
   appDir: string,
@@ -194,7 +212,40 @@ async function buildApp(
     return true;
   }
 
-  // Use Genesis bundler in extractToDirectory mode
+  // For builtin apps, just copy the prebuilt files (they're already built in the SDK)
+  if (appSource.source === "builtin") {
+    try {
+      // Remove existing target directory if it exists
+      try {
+        await fs.rm(targetDir, { recursive: true });
+      } catch {
+        // Directory doesn't exist, that's fine
+      }
+
+      // Copy prebuilt app
+      await copyDir(appDir, targetDir);
+
+      // Update cache
+      cache[appSource.id] = {
+        lastBuilt: Date.now(),
+        sourceHash: "",
+      };
+
+      // Read manifest for logging
+      const manifestPath = path.join(targetDir, "manifest.json");
+      const manifestContent = await fs.readFile(manifestPath, "utf-8");
+      const manifest = JSON.parse(manifestContent);
+
+      console.log(`✅ Copied prebuilt ${manifest.name} (${appSource.id})`);
+      return true;
+    } catch (error: any) {
+      console.error(`❌ Failed to copy ${appSource.id}:`);
+      console.error(`   ${error.message}`);
+      return false;
+    }
+  }
+
+  // For local/npm apps, use Genesis bundler
   const result = await GenesisBundler.bundle({
     appDirectory: appDir,
     extractToDirectory: targetDir,
@@ -315,4 +366,129 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
     process.exit(1);
   }
   console.log("🎉 All apps built successfully!");
+}
+
+/**
+ * Options for building SDK apps
+ */
+export interface BuildSdkAppsOptions {
+  /** Source directory containing apps (e.g., packages/sdk/apps) */
+  appsDir: string;
+  /** Output directory for prebuilt apps (e.g., packages/sdk/dist/apps/prebuilt) */
+  outputDir: string;
+  /** Force rebuild all apps */
+  force?: boolean;
+}
+
+/**
+ * Find all app directories containing manifest.json
+ */
+async function findAllApps(dir: string): Promise<string[]> {
+  const apps: string[] = [];
+
+  async function scan(currentDir: string) {
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        entry.name !== "node_modules" &&
+        entry.name !== "dist"
+      ) {
+        const subPath = path.join(currentDir, entry.name);
+        const manifestPath = path.join(subPath, "manifest.json");
+
+        try {
+          await fs.access(manifestPath);
+          apps.push(subPath);
+        } catch {
+          // No manifest, scan subdirectories
+          await scan(subPath);
+        }
+      }
+    }
+  }
+
+  await scan(dir);
+  return apps;
+}
+
+/**
+ * Build all apps found in a directory (for SDK packaging)
+ *
+ * This is used when building the SDK itself to prebuild all builtin apps.
+ */
+export async function buildSdkApps(
+  options: BuildSdkAppsOptions
+): Promise<void> {
+  const { appsDir, outputDir, force = false } = options;
+
+  console.log("🔨 Building SDK apps...\n");
+
+  // Find all apps
+  const appPaths = await findAllApps(appsDir);
+
+  if (appPaths.length === 0) {
+    console.log(`ℹ️  No apps found in ${appsDir}`);
+    return;
+  }
+
+  console.log(`Found ${appPaths.length} apps to build:`);
+  for (const appPath of appPaths) {
+    const manifestContent = await fs.readFile(
+      path.join(appPath, "manifest.json"),
+      "utf-8"
+    );
+    const manifest = JSON.parse(manifestContent);
+    console.log(`  - ${manifest.id}`);
+  }
+
+  // Clear and create output directory
+  try {
+    await fs.rm(outputDir, { recursive: true });
+  } catch {
+    // Directory doesn't exist
+  }
+  await fs.mkdir(outputDir, { recursive: true });
+
+  // Build each app using Genesis
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const appPath of appPaths) {
+    const manifestContent = await fs.readFile(
+      path.join(appPath, "manifest.json"),
+      "utf-8"
+    );
+    const manifest = JSON.parse(manifestContent);
+    const targetDir = path.join(outputDir, manifest.id);
+
+    console.log(`\n📦 Building ${manifest.id}...`);
+
+    const result = await GenesisBundler.bundle({
+      appDirectory: appPath,
+      extractToDirectory: targetDir,
+      verbose: false,
+    });
+
+    if (result.success) {
+      console.log(`   ✅ Built successfully`);
+      successCount++;
+    } else {
+      console.log(`   ❌ Build failed: ${result.error}`);
+      failCount++;
+    }
+  }
+
+  // Summary
+  console.log("\n" + "=".repeat(50));
+  console.log(
+    `📊 Build complete: ${successCount} succeeded, ${failCount} failed`
+  );
+
+  if (failCount > 0) {
+    process.exit(1);
+  }
+
+  console.log("🎉 All SDK apps prebuilt successfully!");
 }
