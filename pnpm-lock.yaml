@@ -67,28 +67,6 @@ importers:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25))
 
-  apps/com/eden/debug/db-explorer:
-    dependencies:
-      solid-icons:
-        specifier: ^1.1.0
-        version: 1.1.0(solid-js@1.9.10)
-    devDependencies:
-      '@edenapp/types':
-        specifier: workspace:*
-        version: link:../../../../../src/types
-      solid-js:
-        specifier: ^1.9.10
-        version: 1.9.10
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
-      vite:
-        specifier: ^7.2.4
-        version: 7.2.6(@types/node@22.19.1)
-      vite-plugin-solid:
-        specifier: ^2.11.10
-        version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
-
   apps/com/eden/editor:
     dependencies:
       monaco-editor:
@@ -115,6 +93,10 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
 
   apps/com/eden/eveshell:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -131,6 +113,30 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
+
+  apps/com/eden/example/hello/backend:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../../src/types
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  apps/com/eden/example/hello/frontend:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../../src/types
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@22.19.1)
 
   apps/com/eden/files:
     dependencies:
@@ -163,11 +169,17 @@ importers:
         specifier: ^5.4.14
         version: 5.4.21(@types/node@22.19.1)
 
+  apps/com/eden/webbrowser:
+    devDependencies:
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@22.19.1)
+
   genesis:
     dependencies:
       '@edenapp/types':
-        specifier: workspace:*
-        version: link:../src/types
+        specifier: ^0.2.1
+        version: 0.2.1
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
@@ -396,6 +408,9 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@edenapp/types@0.2.1':
+    resolution: {integrity: sha512-+Obv2KpPWedk1BP1lwlEHwpRBkgX7/HIWDjY3nxN7SneNjZXPHsEizu77/jboYlOhPiSmUF4tRHRaxUmT4TQ/g==}
 
   '@electron/get@2.0.3':
     resolution: {integrity: sha512-Qkzpg2s9GnVV2I2BjRksUi43U5e6+zaQMcjoJy0C+C5oxaKl+fmckGDQFtRpZpZV0NQekuZZ+tGz7EA9TVnQtQ==}
@@ -3526,6 +3541,8 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@edenapp/types@0.2.1': {}
 
   '@electron/get@2.0.3':
     dependencies:
