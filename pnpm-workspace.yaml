@@ -1,6 +1,6 @@
 packages:
   - src/types
-  - genesis
+  - packages/genesis
   - apps/**/*
 
 onlyBuiltDependencies:

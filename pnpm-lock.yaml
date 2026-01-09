@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@edenapp/genesis':
         specifier: workspace:*
-        version: link:genesis
+        version: link:packages/genesis
       '@keyv/sqlite':
         specifier: ^4.0.6
         version: 4.0.6(keyv@5.5.5)
@@ -175,7 +175,7 @@ importers:
         specifier: ^7.2.4
         version: 7.2.6(@types/node@22.19.1)
 
-  genesis:
+  packages/genesis:
     dependencies:
       '@edenapp/types':
         specifier: ^0.2.1
