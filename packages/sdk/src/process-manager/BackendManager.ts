@@ -2,7 +2,7 @@ import { utilityProcess, MessageChannelMain, UtilityProcess } from "electron";
 import { EventEmitter } from "events";
 import * as path from "path";
 import { AppManifest } from "@edenapp/types";
-import { singleton, injectable } from "tsyringe";
+import { singleton, injectable, inject } from "tsyringe";
 
 /**
  * BackendManager
@@ -20,12 +20,18 @@ export class BackendManager extends EventEmitter {
     string,
     { manifest: AppManifest; installPath: string }
   > = new Map();
+  private distPath: string;
 
   /**
    * MessagePort pairs for frontend<->backend communication
    * The BackendManager holds references to the main-process side of ports
    */
   private backendPorts: Map<string, Electron.MessagePortMain> = new Map();
+
+  constructor(@inject("distPath") distPath: string) {
+    super();
+    this.distPath = distPath;
+  }
 
   /**
    * Create and start a utility process for an app backend
@@ -51,8 +57,8 @@ export class BackendManager extends EventEmitter {
 
     // Path to the backend runtime that wraps the actual backend
     const runtimePath = path.join(
-      __dirname,
-      "../../app-runtime/backend-preload.js"
+      this.distPath,
+      "app-runtime/backend-preload.js"
     );
 
     // Create utility process with the runtime as entry point
