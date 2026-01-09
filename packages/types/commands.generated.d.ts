@@ -243,7 +243,7 @@ export interface FsCommands {
   "fs/read": {
     args: {
     path: string;
-    encoding?: BufferEncoding };
+    encoding?: string };
     response: string;
   };
   /**
@@ -253,7 +253,7 @@ export interface FsCommands {
     args: {
     path: string;
     content: string;
-    encoding?: BufferEncoding };
+    encoding?: string };
     response: void;
   };
   /**

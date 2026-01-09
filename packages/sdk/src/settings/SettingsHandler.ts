@@ -1,4 +1,4 @@
-import { SettingsCategory } from "@edenapp/types";
+import { SettingsCategory } from "@edenapp/types/AppManifest";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SettingsManager } from "./SettingsManager";
 

@@ -16,10 +16,13 @@ export class FilesystemHandler {
   @EdenHandler("read", { permission: "read" })
   async handleReadFile(args: {
     path: string;
-    encoding?: BufferEncoding;
+    encoding?: string;
   }): Promise<string> {
     const { path: targetPath, encoding = "utf-8" } = args;
-    return await this.fsManager.readFile(targetPath, encoding);
+    return await this.fsManager.readFile(
+      targetPath,
+      encoding as BufferEncoding
+    );
   }
 
   /**
@@ -29,10 +32,14 @@ export class FilesystemHandler {
   async handleWriteFile(args: {
     path: string;
     content: string;
-    encoding?: BufferEncoding;
+    encoding?: string;
   }): Promise<void> {
     const { path: targetPath, content, encoding = "utf-8" } = args;
-    await this.fsManager.writeFile(targetPath, content, encoding);
+    await this.fsManager.writeFile(
+      targetPath,
+      content,
+      encoding as BufferEncoding
+    );
   }
 
   /**

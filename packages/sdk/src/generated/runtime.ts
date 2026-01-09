@@ -7,7 +7,7 @@
  */
 
 // Command names array
-export const COMMAND_NAMES = [
+export const COMMAND_NAMES: readonly string[] = [
   "system/info",
   "appbus/register",
   "appbus/unregister",
@@ -76,10 +76,10 @@ export const COMMAND_NAMES = [
   "view/start-resize",
   "view/end-resize",
   "view/window-size",
-];
+] as const;
 
 // Event names array
-export const APP_EVENT_NAMES = [
+export const APP_EVENT_NAMES: readonly string[] = [
   "file/opened",
   "notification/added",
   "notification/removed",
@@ -95,4 +95,4 @@ export const APP_EVENT_NAMES = [
   "view/view-loaded",
   "view/view-load-failed",
   "view/mode-changed",
-];
+] as const;
