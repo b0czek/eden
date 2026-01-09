@@ -54,7 +54,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   constructor(
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
-    @inject("EdenConfig") config: EdenConfig
+    @inject("EdenConfig") config: EdenConfig,
+    @inject("distPath") distPath: string
   ) {
     super(ipcBridge);
 
@@ -68,8 +69,9 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       () => this.views.values()
     );
 
+    // Use consumer's dist path for runtime assets
     this.viewCreator = new ViewCreator(
-      __dirname,
+      distPath,
       this.tilingManager,
       this.floatingWindows,
       this.devToolsManager

@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AppBusConnection,
   ServiceConnectCallback,
-} from "../types/ipc/appbus";
+} from "@edenapp/types/ipc/appbus";
 import {
   type PendingRequest,
   type IPCPort,

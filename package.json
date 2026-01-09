@@ -1,47 +1,17 @@
 {
-  "name": "@edenapp/eden",
+  "name": "eden-project",
   "version": "0.1.0",
-  "description": "A modular Electron desktop environment with extensible app support",
-  "main": "dist/main/main.js",
-  "author": "Eden Team",
-  "license": "MIT",
+  "private": true,
+  "description": "Eden Desktop Environment - Example project using @edenapp/sdk",
+  "main": "dist/main.js",
   "scripts": {
-    "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run copy-assets && pnpm run build:apps",
-    "build:main": "tsc",
-    "build:apps": "ts-node scripts/build-apps.ts",
-    "bundle:app-frame": "node scripts/bundle-app-frame.js",
-    "bundle:app-runtime": "node scripts/bundle-app-runtime.js",
-    "codegen": "ts-node scripts/run-codegen.ts",
-    "copy-assets": "mkdir -p dist/foundation && cp src/foundation/* dist/foundation/",
-    "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' src/edencss/eden.css -o dist/edencss/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' src/edencss/tokens.css -o dist/edencss/eden-tokens.css",
-    "tokens:build": "cd src/edencss && npx style-dictionary build --config style-dictionary.config.mjs",
-    "tokens:watch": "cd src/edencss && npx style-dictionary build --watch --config style-dictionary.config.mjs",
-    "dev:watch": "ts-node scripts/dev-watch.ts",
-    "dev": "pnpm run build && concurrently --kill-others \"pnpm run dev:watch\" \"sleep 3 && NODE_ENV=development electron .\"",
-    "start": "electron .",
-    "clean": "rm -rf dist"
+    "sdk:build": "cd packages/sdk && pnpm run build",
+    "scripts:build": "cd packages/scripts && pnpm run build",
+    "genesis:build": "cd genesis && pnpm run build",
+    "clean": "rm -rf dist packages/*/dist genesis/dist",
+    "dev:example": "cd packages/example && pnpm dev"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "concurrently": "^9.1.0",
-    "electron": "^39.2.3",
-    "esbuild": "^0.27.0",
-    "fast-glob": "^3.3.3",
-    "lightningcss-cli": "^1.30.2",
-    "solid-js": "^1.9.10",
-    "style-dictionary": "^5.1.1",
-    "ts-morph": "^27.0.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.0",
-    "vite": "^7.2.1",
-    "vite-plugin-solid": "^2.11.10",
-    "@edenapp/types": "workspace:*"
-  },
-  "dependencies": {
-    "@edenapp/genesis": "workspace:*",
-    "@keyv/sqlite": "^4.0.6",
-    "keyv": "^5.1.0",
-    "reflect-metadata": "^0.2.2",
-    "tsyringe": "^4.10.0"
+    "typescript": "^5.3.0"
   }
 }

@@ -87,7 +87,7 @@ export class ViewCreator {
     }
 
     try {
-      const edenCssPath = path.join(this.basePath, "../../edencss");
+      const edenCssPath = path.join(this.basePath, "edencss");
       const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
       const cssPath = path.join(edenCssPath, cssFileName);
 
@@ -122,17 +122,14 @@ export class ViewCreator {
 
     try {
       // Inject CSS first
-      const frameCSSPath = path.join(
-        this.basePath,
-        "../../app-frame/frame.css"
-      );
+      const frameCSSPath = path.join(this.basePath, "app-frame/frame.css");
       const frameCSS = await cachedFileReader.readAsync(frameCSSPath, "utf-8");
       await view.webContents.insertCSS(frameCSS);
 
       // Inject bundled JavaScript
       const frameScriptPath = path.join(
         this.basePath,
-        "../../app-frame/frame-injector.js"
+        "app-frame/frame-injector.js"
       );
       const frameScript = await cachedFileReader.readAsync(
         frameScriptPath,
@@ -282,7 +279,7 @@ export class ViewCreator {
     const viewId = this.nextViewId++;
     const preloadScript = path.join(
       this.basePath,
-      "../../app-runtime/app-preload.js"
+      "app-runtime/app-preload.js"
     );
 
     const view = ViewLifecycle.createView({

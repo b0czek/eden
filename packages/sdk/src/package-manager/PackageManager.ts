@@ -33,15 +33,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject("appsDirectory") appsDirectory: string,
+    @inject("distPath") distPath: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(PermissionRegistry) permissionRegistry: PermissionRegistry
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;
+    this.prebuiltAppsDirectory = path.join(distPath, "apps", "prebuilt");
     this.permissionRegistry = permissionRegistry;
-
-    // Set prebuilt apps directory (relative to current file location)
-    this.prebuiltAppsDirectory = path.join(__dirname, "../../apps/prebuilt");
 
     // Create and register handler
     this.packageHandler = new PackageHandler(this);

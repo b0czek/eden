@@ -471,8 +471,10 @@ export function generateCommands() {
   console.log("🔍 Scanning for @EdenHandler and @EdenNamespace decorators...");
 
   const projectRoot = path.resolve(__dirname, "..");
-  const srcDir = path.join(projectRoot, "src", "main");
-  const typesDir = path.join(projectRoot, "src", "types");
+  const srcDir = path.join(projectRoot, "src");
+  // Types are in the packages/types directory at workspace root
+  const workspaceRoot = path.resolve(projectRoot, "../..");
+  const typesDir = path.join(workspaceRoot, "packages", "types");
 
   const project = new Project({
     skipAddingFilesFromTsConfig: true,
@@ -598,12 +600,7 @@ export function generateCommands() {
 
   // Generate commands code
   const commandsCode = generateInterfaceCode(namespaceCommands, exportedTypes);
-  const commandsOutputPath = path.join(
-    projectRoot,
-    "src",
-    "types",
-    "commands.generated.d.ts"
-  );
+  const commandsOutputPath = path.join(typesDir, "commands.generated.d.ts");
   fs.writeFileSync(commandsOutputPath, commandsCode);
   console.log(
     `\n✅ Generated ${path.relative(projectRoot, commandsOutputPath)}`
@@ -611,35 +608,20 @@ export function generateCommands() {
 
   // Generate events code
   const eventsCode = generateEventCode(namespaceEvents, exportedTypes);
-  const eventsOutputPath = path.join(
-    projectRoot,
-    "src",
-    "types",
-    "events.generated.d.ts"
-  );
+  const eventsOutputPath = path.join(typesDir, "events.generated.d.ts");
   fs.writeFileSync(eventsOutputPath, eventsCode);
   console.log(`✅ Generated ${path.relative(projectRoot, eventsOutputPath)}`);
 
   // Generate runtime JS + d.ts pair
   const runtimeJSCode = generateRuntimeJS(namespaceCommands, namespaceEvents);
-  const runtimeJSOutputPath = path.join(
-    projectRoot,
-    "src",
-    "types",
-    "runtime.generated.js"
-  );
+  const runtimeJSOutputPath = path.join(typesDir, "runtime.generated.js");
   fs.writeFileSync(runtimeJSOutputPath, runtimeJSCode);
   console.log(
     `✅ Generated ${path.relative(projectRoot, runtimeJSOutputPath)}`
   );
 
   const runtimeDTSCode = generateRuntimeDTS();
-  const runtimeDTSOutputPath = path.join(
-    projectRoot,
-    "src",
-    "types",
-    "runtime.generated.d.ts"
-  );
+  const runtimeDTSOutputPath = path.join(typesDir, "runtime.generated.d.ts");
   fs.writeFileSync(runtimeDTSOutputPath, runtimeDTSCode);
   console.log(
     `✅ Generated ${path.relative(projectRoot, runtimeDTSOutputPath)}`

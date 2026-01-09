@@ -17,7 +17,7 @@ import type { IPCPort } from "./ipc-port";
 import type {
   AppBusConnection,
   ServiceConnectCallback,
-} from "../../types/ipc/appbus";
+} from "@edenapp/types/ipc/appbus";
 
 /**
  * Pending request tracking

@@ -1,7 +1,7 @@
 packages:
-  - src/types
+  - packages/*
   - genesis
-  - apps/**/*
+  - packages/sdk/apps/**/*
 
 onlyBuiltDependencies:
   - electron

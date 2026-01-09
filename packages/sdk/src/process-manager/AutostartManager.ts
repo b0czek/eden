@@ -1,5 +1,5 @@
 import { injectable, inject, singleton } from "tsyringe";
-import { EdenConfig } from "../../types";
+import { EdenConfig } from "@edenapp/types";
 import { ProcessManager } from "./ProcessManager";
 
 /**

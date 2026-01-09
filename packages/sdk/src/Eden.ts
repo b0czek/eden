@@ -4,7 +4,7 @@ import * as path from "path";
 import { IPCBridge, CommandRegistry } from "./ipc";
 import { AppChannelManager } from "./appbus";
 import { SystemHandler } from "./SystemHandler";
-import { EdenConfig } from "../types";
+import { EdenConfig } from "@edenapp/types";
 
 // Managers and Handlers
 import { PackageManager } from "./package-manager";
@@ -48,9 +48,13 @@ export class Eden {
     this.userDirectory =
       config.userDirectory || path.join(app.getPath("userData"), "eden-user");
 
+    // Set dist path for runtime assets (preloads, css, apps, etc.) - consumer's dist
+    const distPath = path.join(process.cwd(), "dist");
+
     // 1. Fundamental registries and config
     container.registerInstance("EdenConfig", this.config);
     container.registerInstance("appsDirectory", this.appsDirectory);
+    container.registerInstance("distPath", distPath);
     container.registerInstance("userDirectory", this.userDirectory);
 
     container.resolve(CommandRegistry);
@@ -111,6 +115,7 @@ export class Eden {
    */
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
+    const distPath = path.join(process.cwd(), "dist");
 
     this.mainWindow = new BrowserWindow({
       width: windowConfig.width || 1280,
@@ -120,7 +125,7 @@ export class Eden {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(__dirname, "../foundation/foundation-preload.js"),
+        preload: path.join(distPath, "foundation/foundation-preload.js"),
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
@@ -132,10 +137,7 @@ export class Eden {
     this.ipcBridge.setMainWindow(this.mainWindow);
 
     // Load the foundation layer (not eveshell!)
-    const foundationPath = path.join(
-      __dirname,
-      "../foundation/foundation.html"
-    );
+    const foundationPath = path.join(distPath, "foundation/foundation.html");
     this.mainWindow.loadFile(foundationPath);
 
     // Launch autostart apps after foundation loads
