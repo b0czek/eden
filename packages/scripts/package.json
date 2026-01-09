@@ -20,7 +20,7 @@
     "build-tools",
     "cli"
   ],
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "license": "MIT",
   "dependencies": {
     "@edenapp/genesis": "workspace:*",

@@ -3,7 +3,7 @@
   "name": "Text Editor",
   "version": "1.0.0",
   "description": "A Monaco-based text editor for editing files",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "build": {
     "command": "npm run build"
   },

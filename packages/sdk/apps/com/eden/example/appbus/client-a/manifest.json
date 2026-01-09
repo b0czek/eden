@@ -3,7 +3,7 @@
   "name": "AppBus Client A",
   "version": "1.0.0",
   "description": "Frontend app that connects to Hub and exposes direct-chat service for Isolated app",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "frontend": {
     "entry": "index.html"
   },

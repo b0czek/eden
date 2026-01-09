@@ -9,7 +9,7 @@
     "scripts:build": "cd packages/scripts && pnpm run build",
     "genesis:build": "cd genesis && pnpm run build",
     "clean": "rm -rf dist packages/*/dist genesis/dist",
-    "dev:example": "cd packages/example && pnpm dev"
+    "dev": "cd packages/example && pnpm dev"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

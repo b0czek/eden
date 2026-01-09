@@ -3,7 +3,7 @@
   "name": "AppBus Client B",
   "version": "1.0.0",
   "description": "Frontend app that connects to Hub for mediated chat",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "frontend": {
     "entry": "index.html"
   },

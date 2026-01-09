@@ -3,7 +3,7 @@
   "name": "Settings",
   "version": "1.0.0",
   "description": "System and application settings",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "build": {
     "command": "npm run build"
   },

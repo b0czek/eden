@@ -3,7 +3,7 @@
   "name": "Design Showcase",
   "version": "1.0.0",
   "description": "A showcase of Eden's frosted glass design system components",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "frontend": {
     "entry": "index.html"
   },

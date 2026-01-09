@@ -3,7 +3,7 @@
   "name": "Hello World",
   "version": "1.0.0",
   "description": "A simple example app demonstrating Eden app structure",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "build": {
     "command": "cd frontend && pnpm run build && cd ../backend && pnpm run build"
   },

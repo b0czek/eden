@@ -3,7 +3,7 @@
   "name": "AppBus Isolated",
   "version": "1.0.0",
   "description": "Frontend app that only talks directly to Client A (not through Hub)",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "frontend": {
     "entry": "index.html"
   },

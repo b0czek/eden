@@ -3,7 +3,7 @@
   "name": "Files",
   "version": "1.0.0",
   "description": "A file explorer for managing files and directories",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "build": {
     "command": "npm run build"
   },

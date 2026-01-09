@@ -3,7 +3,7 @@
   "name": "Calculator",
   "version": "1.0.0",
   "description": "A simple calculator app",
-  "author": "Eden Team",
+  "author": "Dariusz Majnert",
   "frontend": {
     "entry": "index.html"
   },
