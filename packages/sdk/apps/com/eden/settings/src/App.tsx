@@ -5,10 +5,11 @@ import type { AppManifest, SettingsCategory } from "@edenapp/types";
 import { FiSettings, FiCode, FiPackage } from "solid-icons/fi";
 import { VsSettings, VsSymbolColor, VsPulse } from "solid-icons/vs";
 import SettingInput from "./components/SettingInput";
+import AppsTab from "./components/AppsTab";
 import "./App.css";
 
 interface SelectedItem {
-  type: "eden" | "app";
+  type: "eden" | "app" | "apps-management";
   id: string;
   label: string;
 }
@@ -202,6 +203,20 @@ const App: Component = () => {
 
         <div class="eden-sidebar-divider" />
 
+        <div class="eden-sidebar-section">
+           <div class="eden-sidebar-items">
+             <div 
+               class={`eden-sidebar-item ${selectedItem()?.type === "apps-management" ? "eden-sidebar-item-selected" : ""}`}
+               onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: "Apps" })}
+             >
+                <div class="eden-sidebar-item-icon"><FiPackage /></div>
+                <span class="eden-sidebar-item-text">Installed Apps</span>
+             </div>
+           </div>
+        </div>
+
+        <div class="eden-sidebar-divider" />
+
         <div class="eden-sidebar-section eden-sidebar-section-scrollable">
           <div class="eden-sidebar-section-title">Applications</div>
           <div class="eden-sidebar-items eden-sidebar-items-scrollable">
@@ -259,36 +274,45 @@ const App: Component = () => {
                   <Show when={item().type === "app"}>
                     <p class="content-description">{apps().find(a => a.id === item().id)?.description}</p>
                   </Show>
+                  <Show when={item().type === "apps-management"}>
+                    <p class="content-description">Manage installed and system applications</p>
+                  </Show>
                 </header>
 
-                <div class="settings-list">
-                  <For each={currentSettings()}>
-                    {(category) => (
-                      <>
-                        <Show when={currentSettings().length > 1}>
-                          <h3 class="category-header">{category.name}</h3>
-                        </Show>
-                        <For each={category.settings}>
-                          {(setting) => (
-                            <div class="setting-item">
-                              <div class="setting-info">
-                                <h4 class="setting-label">{setting.label}</h4>
-                                <Show when={setting.description}>
-                                  <p class="setting-description">{setting.description}</p>
-                                </Show>
+                <Show when={item().type === "apps-management"}>
+                   <AppsTab />
+                </Show>
+
+                <Show when={item().type !== "apps-management"}>
+                  <div class="settings-list">
+                    <For each={currentSettings()}>
+                      {(category) => (
+                        <>
+                          <Show when={currentSettings().length > 1}>
+                            <h3 class="category-header">{category.name}</h3>
+                          </Show>
+                          <For each={category.settings}>
+                            {(setting) => (
+                              <div class="setting-item">
+                                <div class="setting-info">
+                                  <h4 class="setting-label">{setting.label}</h4>
+                                  <Show when={setting.description}>
+                                    <p class="setting-description">{setting.description}</p>
+                                  </Show>
+                                </div>
+                                <SettingInput
+                                  setting={setting}
+                                  value={settingValues[setting.key] ?? setting.defaultValue ?? ""}
+                                  onChange={(value) => handleSettingChange(setting.key, value)}
+                                />
                               </div>
-                              <SettingInput
-                                setting={setting}
-                                value={settingValues[setting.key] ?? setting.defaultValue ?? ""}
-                                onChange={(value) => handleSettingChange(setting.key, value)}
-                              />
-                            </div>
-                          )}
-                        </For>
-                      </>
-                    )}
-                  </For>
-                </div>
+                            )}
+                          </For>
+                        </>
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </>
             )}
           </Show>
