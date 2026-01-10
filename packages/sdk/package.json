@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/sdk",
-  "version": "0.1.5",
+  "version": "0.4.1",
   "description": "Eden Desktop Environment SDK - Build Electron-based desktop environments with modular app support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,7 +47,7 @@
     "@edenapp/scripts": "workspace:*",
     "@types/node": "^20.10.0",
     "esbuild": "^0.27.0",
-    "lightningcss-cli": "^1.30.2" ,
+    "lightningcss-cli": "^1.30.2",
     "style-dictionary": "^5.1.1",
     "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2",

@@ -11,15 +11,12 @@ importers:
       '@changesets/cli':
         specifier: ^2.29.8
         version: 2.29.8(@types/node@22.19.1)
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
 
   genesis:
     dependencies:
       '@edenapp/types':
-        specifier: ^0.3.2
-        version: 0.3.2
+        specifier: workspace:*
+        version: link:../packages/types
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
@@ -555,9 +552,6 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
-
-  '@edenapp/types@0.3.2':
-    resolution: {integrity: sha512-PZylDdugsqTG3uStHl+bYQe5sMIh+2O7XFn4CFOlrE/5QvufN0lBTeSaRouJRmYlRaGoNWrcXBr0ZAzBseOBLA==}
 
   '@electron/get@2.0.3':
     resolution: {integrity: sha512-Qkzpg2s9GnVV2I2BjRksUi43U5e6+zaQMcjoJy0C+C5oxaKl+fmckGDQFtRpZpZV0NQekuZZ+tGz7EA9TVnQtQ==}
@@ -4014,8 +4008,6 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
-
-  '@edenapp/types@0.3.2': {}
 
   '@electron/get@2.0.3':
     dependencies:
