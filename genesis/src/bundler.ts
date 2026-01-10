@@ -228,7 +228,27 @@ export class GenesisBundler {
   /**
    * Check if a file path should be excluded from bundling
    */
-  private static shouldExcludeFile(filePath: string): boolean {
+  private static shouldExcludeFile(
+    filePath: string,
+    manifest?: AppManifest
+  ): boolean {
+    // Check if this path is explicitly included via manifest
+    if (manifest?.include) {
+      for (const includePath of manifest.include) {
+        // Normalize paths for comparison
+        const normalizedInclude = includePath.replace(/\\/g, "/");
+        const normalizedFile = filePath.replace(/\\/g, "/");
+
+        // Check if the file path starts with or equals the include path
+        if (
+          normalizedFile === normalizedInclude ||
+          normalizedFile.startsWith(normalizedInclude + "/")
+        ) {
+          return false; // Don't exclude - explicitly included
+        }
+      }
+    }
+
     const excludePatterns = [
       // Dependencies
       /^node_modules\//,
@@ -267,6 +287,7 @@ export class GenesisBundler {
   private static async extractToDirectory(
     appDirectory: string,
     targetDir: string,
+    manifest?: AppManifest,
     verbose?: boolean
   ): Promise<void> {
     const resolvedTarget = path.resolve(targetDir);
@@ -286,7 +307,7 @@ export class GenesisBundler {
       const fileStr = file as string;
 
       // Skip excluded files
-      if (this.shouldExcludeFile(fileStr)) {
+      if (this.shouldExcludeFile(fileStr, manifest)) {
         skippedCount++;
         continue;
       }
@@ -347,7 +368,7 @@ export class GenesisBundler {
     for (const file of allFiles) {
       const fileStr = file as string;
       // Skip excluded files
-      if (this.shouldExcludeFile(fileStr)) {
+      if (this.shouldExcludeFile(fileStr, manifest)) {
         continue;
       }
       const filePath = path.join(appDirectory, fileStr);
@@ -541,6 +562,7 @@ export class GenesisBundler {
         await this.extractToDirectory(
           appDirectory,
           extractToDirectory,
+          manifest,
           verbose
         );
 
@@ -578,9 +600,7 @@ export class GenesisBundler {
   /**
    * Extract info from an .edenite file
    */
-  static async getInfo(
-    edenitePath: string
-  ): Promise<{
+  static async getInfo(edenitePath: string): Promise<{
     success: boolean;
     manifest?: AppManifest;
     error?: string;
