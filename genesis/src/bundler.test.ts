@@ -54,9 +54,9 @@ describe("GenesisBundler", () => {
     it("should verify files exist for sample app", async () => {
       const manifestPath = path.join(sampleAppPath, "manifest.json");
       const validation = await GenesisBundler.validateManifest(manifestPath);
-      
+
       expect(validation.valid).toBe(true);
-      
+
       const result = await GenesisBundler.verifyFiles(
         sampleAppPath,
         validation.manifest!
@@ -131,6 +131,52 @@ describe("GenesisBundler", () => {
       const size22 = (await fs.stat(outputPath22)).size;
       expect(size22).toBeLessThan(size1);
     }, 30000);
+
+    it("should bundle files specified in include directive", async () => {
+      // 1. Setup temp app directory
+      const tempAppPath = path.join(tempDir, "app-with-include");
+      await fs.cp(sampleAppPath, tempAppPath, { recursive: true });
+
+      // 2. Add an extra file to include
+      const extraFilePath = path.join(tempAppPath, "extra-data.txt");
+      await fs.writeFile(extraFilePath, "This file should be included");
+
+      // 3. Update manifest to include it
+      const manifestPath = path.join(tempAppPath, "manifest.json");
+      const manifestContent = JSON.parse(
+        await fs.readFile(manifestPath, "utf-8")
+      );
+      manifestContent.include = ["extra-data.txt"];
+      await fs.writeFile(manifestPath, JSON.stringify(manifestContent));
+
+      // 4. Bundle
+      const outputPath = path.join(tempDir, "include-test.edenite");
+      const result = await GenesisBundler.bundle({
+        appDirectory: tempAppPath,
+        outputPath,
+        verbose: false,
+      });
+
+      expect(result.success).toBe(true);
+
+      // 5. Extract and verify
+      const extractPath = path.join(tempDir, "extracted-include");
+      await GenesisBundler.extract({
+        edenitePath: outputPath,
+        outputDirectory: extractPath,
+        verbose: false,
+      });
+
+      const extractedExtraFile = path.join(extractPath, "extra-data.txt");
+      const exists = await fs
+        .access(extractedExtraFile)
+        .then(() => true)
+        .catch(() => false);
+
+      expect(exists).toBe(true);
+      const content = await fs.readFile(extractedExtraFile, "utf-8");
+      expect(content).toBe("This file should be included");
+    });
   });
 
   describe("getInfo", () => {

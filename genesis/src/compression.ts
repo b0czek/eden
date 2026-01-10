@@ -3,6 +3,17 @@
  * Makes it easy to switch between different compression libraries
  */
 
+import * as fs from "fs";
+import * as crypto from "crypto";
+
+/**
+ * Result of streaming compression
+ */
+export interface StreamCompressionResult {
+  compressedData: Buffer;
+  checksum: string;
+}
+
 /**
  * Common interface for compression implementations
  */
@@ -13,12 +24,17 @@ export interface Compressor {
   initialize(): Promise<void>;
 
   /**
-   * Compress data
-   * @param data - Data to compress
+   * Compress a file using streaming to avoid loading entire file into memory
+   * @param inputPath - Path to the file to compress
+   * @param outputPath - Path to write the compressed data to
    * @param level - Compression level (1-22 for zstd)
-   * @returns Compressed data
+   * @returns Checksum of the compressed data
    */
-  compress(data: Buffer, level: number): Promise<Buffer>;
+  compressFileStreaming(
+    inputPath: string,
+    outputPath: string,
+    level: number
+  ): Promise<{ checksum: string }>;
 
   /**
    * Decompress data
@@ -41,7 +57,7 @@ export class ZstdCodecCompressor implements Compressor {
     if (this.zstd) return;
 
     // Dynamic import to avoid loading until needed
-    const { ZstdCodec } = await import('zstd-codec');
+    const { ZstdCodec } = await import("zstd-codec");
 
     return new Promise((resolve) => {
       ZstdCodec.run((zstd: any) => {
@@ -51,27 +67,81 @@ export class ZstdCodecCompressor implements Compressor {
     });
   }
 
-  async compress(data: Buffer, level: number): Promise<Buffer> {
+  async compressFileStreaming(
+    inputPath: string,
+    outputPath: string,
+    level: number
+  ): Promise<{ checksum: string }> {
     if (!this.zstd) {
-      throw new Error('Compressor not initialized. Call initialize() first.');
+      throw new Error("Compressor not initialized. Call initialize() first.");
     }
 
-    const simple = new this.zstd.Simple();
-    const compressed = simple.compress(new Uint8Array(data), level);
-    return Buffer.from(compressed);
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash("sha256");
+      const simple = new this.zstd.Simple();
+      const readStream = fs.createReadStream(inputPath, {
+        highWaterMark: 64 * 1024, // 64KB chunks
+      });
+
+      const writeStream = fs.createWriteStream(outputPath);
+
+      readStream.on("data", (chunk: string | Buffer) => {
+        try {
+          const chunkBuffer = Buffer.isBuffer(chunk)
+            ? chunk
+            : Buffer.from(chunk);
+          const inputArray = new Uint8Array(chunkBuffer);
+
+          // Compress chunk
+          const compressedChunk = simple.compress(inputArray, level);
+
+          if (compressedChunk && compressedChunk.length > 0) {
+            // Write compressed chunk to file
+            const bufferToWrite = Buffer.from(compressedChunk);
+            writeStream.write(bufferToWrite);
+
+            // Update checksum
+            hash.update(bufferToWrite);
+          }
+        } catch (err) {
+          readStream.destroy();
+          writeStream.end();
+          reject(err);
+        }
+      });
+
+      readStream.on("end", () => {
+        writeStream.end();
+      });
+
+      writeStream.on("finish", () => {
+        const checksum = hash.digest("hex");
+        resolve({ checksum });
+      });
+
+      readStream.on("error", (err) => {
+        writeStream.end();
+        reject(err);
+      });
+
+      writeStream.on("error", (err) => {
+        readStream.destroy();
+        reject(err);
+      });
+    });
   }
 
   async decompress(data: Buffer): Promise<Buffer> {
     if (!this.zstd) {
-      throw new Error('Compressor not initialized. Call initialize() first.');
+      throw new Error("Compressor not initialized. Call initialize() first.");
     }
 
-    const simple = new this.zstd.Simple();
-    const decompressed = simple.decompress(new Uint8Array(data));
+    // Use decompressChunks to handle potential concatenated frames
+    const streaming = new this.zstd.Streaming();
+    const decompressed = streaming.decompressChunks([new Uint8Array(data)]);
     return Buffer.from(decompressed);
   }
 }
-
 
 /**
  * Default compressor implementation

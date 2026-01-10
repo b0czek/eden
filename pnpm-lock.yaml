@@ -58,8 +58,8 @@ importers:
   packages/example:
     dependencies:
       '@edenapp/scripts':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: workspace:*
+        version: link:../scripts
       '@edenapp/sdk':
         specifier: workspace:*
         version: link:../sdk
@@ -478,10 +478,6 @@ packages:
   '@edenapp/genesis@0.2.2':
     resolution: {integrity: sha512-IKGwR6dB/xcfk4SN/Aa1fcO59jmIBR7o6g1QBJlGE82EuxlptOkIu7ieBf73S4VFwmvyluRyao0v7Rt0LFd6EA==}
     engines: {node: '>=18.0.0'}
-    hasBin: true
-
-  '@edenapp/scripts@0.1.1':
-    resolution: {integrity: sha512-4+h5Z0rEtHLaC9TR7XuoJLajUlOdTn0xduZQ5aaCGlD0jM6yAqI+qSbPoxq3Cxv9lYrsDYVkyjFB+fKFnpFm9w==}
     hasBin: true
 
   '@edenapp/types@0.2.1':
@@ -3673,12 +3669,6 @@ snapshots:
       commander: 11.1.0
       tar: 7.5.2
       zstd-codec: 0.1.5
-
-  '@edenapp/scripts@0.1.1':
-    dependencies:
-      '@edenapp/genesis': 0.2.2
-      '@edenapp/types': 0.2.1
-      commander: 11.1.0
 
   '@edenapp/types@0.2.1': {}
 
