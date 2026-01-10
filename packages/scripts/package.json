@@ -23,8 +23,8 @@
   "author": "Dariusz Majnert",
   "license": "MIT",
   "dependencies": {
-    "@edenapp/genesis": "^0.2.2",
-    "@edenapp/types": "^0.2.1",
+    "@edenapp/genesis": "workspace:*",
+    "@edenapp/types": "workspace:*",
     "commander": "^11.1.0"
   },
   "devDependencies": {

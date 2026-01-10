@@ -1,5 +1,5 @@
 {
-  "name": "eden-example",
+  "name": "@edenapp/example",
   "version": "0.1.0",
   "private": true,
   "description": "Eden Desktop Environment - Example Consumer Project",
