@@ -1,0 +1,30 @@
+{
+  "id": "com.eden.installer",
+  "name": "Package Installer",
+  "version": "1.0.0",
+  "description": "Install Eden packages",
+  "build": {
+    "command": "npm run build"
+  },
+  "icon": "icon.svg",
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "window",
+    "defaultSize": {
+      "width": 600,
+      "height": 500
+    },
+    "resizable": false,
+    "movable": true,
+    "injections": {
+      "css": "full"
+    }
+  },
+  "permissions": [
+    "package/*",
+    "fs/read"
+  ],
+  "hidden": true
+}

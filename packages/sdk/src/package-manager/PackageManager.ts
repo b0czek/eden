@@ -11,6 +11,7 @@ import {
 } from "../ipc";
 import { PackageHandler } from "./PackageHandler";
 import { injectable, inject, singleton } from "tsyringe";
+import { FilesystemManager } from "../filesystem";
 
 /**
  * Events emitted by the PackageManager
@@ -29,18 +30,21 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private installedApps: Map<string, AppManifest> = new Map();
   private packageHandler: PackageHandler;
   private permissionRegistry: PermissionRegistry;
+  private readonly filesystemManager: FilesystemManager;
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject("appsDirectory") appsDirectory: string,
     @inject("distPath") distPath: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry
+    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
+    @inject(FilesystemManager) filesystemManager: FilesystemManager
   ) {
     super(ipcBridge);
     this.appsDirectory = appsDirectory;
     this.prebuiltAppsDirectory = path.join(distPath, "apps", "prebuilt");
     this.permissionRegistry = permissionRegistry;
+    this.filesystemManager = filesystemManager;
 
     // Create and register handler
     this.packageHandler = new PackageHandler(this);
@@ -197,9 +201,28 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   }
 
   /**
+   * Get info about a package file without installing it
+   */
+  async getPackageInfo(
+    virtualPath: string
+  ): Promise<{ success: boolean; manifest?: AppManifest; error?: string }> {
+    try {
+      const resolvedPath = this.filesystemManager.resolvePath(virtualPath);
+      return await GenesisBundler.getInfo(resolvedPath);
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  /**
    * Install an app from a .edenite file
    */
-  async installApp(edenitePath: string): Promise<AppManifest> {
+  async installApp(virtualPath: string): Promise<AppManifest> {
+    const edenitePath = this.filesystemManager.resolvePath(virtualPath);
+
     // Check if file exists
     try {
       await fs.access(edenitePath);
@@ -316,7 +339,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     const apps = Array.from(this.installedApps.values());
     return showHidden
       ? apps
-      : apps.filter((app) => !app.overlay && !!app.frontend?.entry);
+      : apps.filter(
+          (app) =>
+            (app.hidden !== undefined ? !app.hidden : !app.overlay) &&
+            !!app.frontend?.entry
+        );
   }
 
   /**

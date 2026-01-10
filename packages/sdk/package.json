@@ -35,8 +35,8 @@
     "electron": ">=39.0.0"
   },
   "dependencies": {
-    "@edenapp/genesis": "^0.2.2",
-    "@edenapp/types": "^0.3.2",
+    "@edenapp/genesis": "^0.4.0",
+    "@edenapp/types": "^0.3.3",
     "@keyv/sqlite": "^4.0.6",
     "fast-glob": "^3.3.3",
     "keyv": "^5.1.0",

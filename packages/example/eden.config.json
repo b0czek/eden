@@ -6,7 +6,8 @@
     { "id": "com.eden.editor", "source": "builtin" },
     { "id": "com.eden.example.calculator", "source": "builtin" },
     { "id": "com.eden.example.showcase", "source": "builtin" },
-    { "id": "com.eden.settings", "source": "builtin" }
+    { "id": "com.eden.settings", "source": "builtin" },
+    { "id": "com.eden.installer", "source": "builtin"}
   ],
   "hotReload": {
     "enabled": true,

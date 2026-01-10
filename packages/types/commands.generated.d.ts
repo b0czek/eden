@@ -395,6 +395,14 @@ export interface PackageCommands {
     appId: string };
     response: { icon: string | undefined };
   };
+  /**
+   * Get info about a package file without installing it
+   */
+  "package/get-info": {
+    args: {
+    path: string };
+    response: { success: boolean; manifest?: import("./index").AppManifest; error?: string };
+  };
 }
 
 /**

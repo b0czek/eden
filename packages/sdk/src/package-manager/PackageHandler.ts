@@ -17,6 +17,7 @@ export class PackageHandler {
   @EdenHandler("install")
   async handleInstallApp(args: { sourcePath: string }): Promise<AppManifest> {
     const { sourcePath } = args;
+    console.log(`[PackageHandler] Installing from path: ${sourcePath}`);
     return await this.packageManager.installApp(sourcePath);
   }
 
@@ -73,5 +74,16 @@ export class PackageHandler {
     const { appId } = args;
     const icon = await this.packageManager.getAppIcon(appId);
     return { icon };
+  }
+
+  /**
+   * Get info about a package file without installing it
+   */
+  @EdenHandler("get-info")
+  async handleGetPackageInfo(args: {
+    path: string;
+  }): Promise<{ success: boolean; manifest?: AppManifest; error?: string }> {
+    const { path } = args;
+    return await this.packageManager.getPackageInfo(path);
   }
 }

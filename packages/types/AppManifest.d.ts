@@ -256,6 +256,12 @@ export interface AppManifest {
   overlay?: boolean;
 
   /**
+   * Whether this app is hidden from the app launcher/dock.
+   * Hidden apps are not shown in listed apps unless explicitly requested.
+   */
+  hidden?: boolean;
+
+  /**
    * Services this app exposes for other apps to connect to.
    * Declaring services here documents the app's API and enables
    * optional access control via allowedClients.

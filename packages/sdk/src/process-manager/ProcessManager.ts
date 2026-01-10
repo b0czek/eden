@@ -234,7 +234,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     return showHidden
       ? apps
       : apps.filter(
-          (app) => !app.manifest.overlay && !!app.manifest.frontend?.entry
+          (app) =>
+            (app.manifest.hidden !== undefined
+              ? !app.manifest.hidden
+              : !app.manifest.overlay) && !!app.manifest.frontend?.entry
         );
   }
 

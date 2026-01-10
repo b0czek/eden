@@ -137,7 +137,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     }
 
     // Eden packages
-    this.defaultRegistry.set("edenite", "com.eden.files"); // Could be a package installer
+    this.defaultRegistry.set("edenite", "com.eden.installer");
   }
 
   /**

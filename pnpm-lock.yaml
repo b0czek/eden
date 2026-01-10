@@ -15,8 +15,8 @@ importers:
   genesis:
     dependencies:
       '@edenapp/types':
-        specifier: workspace:*
-        version: link:../packages/types
+        specifier: ^0.3.2
+        version: 0.3.2
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
@@ -105,11 +105,11 @@ importers:
   packages/sdk:
     dependencies:
       '@edenapp/genesis':
-        specifier: ^0.2.2
-        version: 0.2.2
+        specifier: ^0.4.0
+        version: 0.4.0
       '@edenapp/types':
-        specifier: ^0.3.2
-        version: 0.3.2
+        specifier: ^0.3.3
+        version: 0.3.3
       '@keyv/sqlite':
         specifier: ^4.0.6
         version: 4.0.6(keyv@5.5.5)
@@ -246,6 +246,25 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
+
+  packages/sdk/apps/com/eden/installer:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
+      solid-js:
+        specifier: ^1.8.1
+        version: 1.9.10
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:^
+        version: link:../../../../../types
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@22.19.1)
+      vite-plugin-solid:
+        specifier: ^2.8.0
+        version: 2.11.10(solid-js@1.9.10)(vite@5.4.21(@types/node@22.19.1))
 
   packages/sdk/apps/com/eden/settings:
     dependencies:
@@ -480,11 +499,19 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
+  '@edenapp/genesis@0.4.0':
+    resolution: {integrity: sha512-Doa9IXIVRNdCDFwA7g5SCwIUeP3JYjF/JM7MN213hxcGYur6FHsPfhThnJG/URrQl5USWi6yyE4eMrY8lmeacw==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+
   '@edenapp/types@0.2.1':
     resolution: {integrity: sha512-+Obv2KpPWedk1BP1lwlEHwpRBkgX7/HIWDjY3nxN7SneNjZXPHsEizu77/jboYlOhPiSmUF4tRHRaxUmT4TQ/g==}
 
   '@edenapp/types@0.3.2':
     resolution: {integrity: sha512-PZylDdugsqTG3uStHl+bYQe5sMIh+2O7XFn4CFOlrE/5QvufN0lBTeSaRouJRmYlRaGoNWrcXBr0ZAzBseOBLA==}
+
+  '@edenapp/types@0.3.3':
+    resolution: {integrity: sha512-MUZOXsObPsvTF1NsEZpdX+I7Fo9d+2kWGcUcRVX6wfwKgg441YYy5nfvOYNqSRvLPKpygnmO71gsmYQ492pHJA==}
 
   '@electron/get@2.0.3':
     resolution: {integrity: sha512-Qkzpg2s9GnVV2I2BjRksUi43U5e6+zaQMcjoJy0C+C5oxaKl+fmckGDQFtRpZpZV0NQekuZZ+tGz7EA9TVnQtQ==}
@@ -3670,9 +3697,20 @@ snapshots:
       tar: 7.5.2
       zstd-codec: 0.1.5
 
+  '@edenapp/genesis@0.4.0':
+    dependencies:
+      '@edenapp/types': 0.3.3
+      chalk: 4.1.2
+      cli-progress: 3.12.0
+      commander: 11.1.0
+      tar: 7.5.2
+      zstd-codec: 0.1.5
+
   '@edenapp/types@0.2.1': {}
 
   '@edenapp/types@0.3.2': {}
+
+  '@edenapp/types@0.3.3': {}
 
   '@electron/get@2.0.3':
     dependencies:
@@ -6655,6 +6693,19 @@ snapshots:
       '@types/istanbul-lib-coverage': 2.0.6
       convert-source-map: 2.0.0
 
+  vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@5.4.21(@types/node@22.19.1)):
+    dependencies:
+      '@babel/core': 7.28.5
+      '@types/babel__core': 7.20.5
+      babel-preset-solid: 1.9.10(@babel/core@7.28.5)(solid-js@1.9.10)
+      merge-anything: 5.1.7
+      solid-js: 1.9.10
+      solid-refresh: 0.6.3(solid-js@1.9.10)
+      vite: 5.4.21(@types/node@22.19.1)
+      vitefu: 1.1.1(vite@5.4.21(@types/node@22.19.1))
+    transitivePeerDependencies:
+      - supports-color
+
   vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@6.4.1(@types/node@22.19.1)):
     dependencies:
       '@babel/core': 7.28.5
@@ -6713,6 +6764,10 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.19.1
       fsevents: 2.3.3
+
+  vitefu@1.1.1(vite@5.4.21(@types/node@22.19.1)):
+    optionalDependencies:
+      vite: 5.4.21(@types/node@22.19.1)
 
   vitefu@1.1.1(vite@6.4.1(@types/node@22.19.1)):
     optionalDependencies:
