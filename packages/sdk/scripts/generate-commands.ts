@@ -601,5 +601,3 @@ export function generateCommands() {
     `✅ Generated ${path.relative(projectRoot, runtimeTSOutputPath)}`
   );
 }
-
-generateCommands();
