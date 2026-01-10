@@ -1,0 +1,24 @@
+{
+  "id": "com.eden.example.showcase",
+  "name": "Design Showcase",
+  "version": "1.0.0",
+  "description": "A showcase of Eden's frosted glass design system components",
+  "author": "Dariusz Majnert",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 800,
+      "height": 600
+    },
+    "minSize": {
+      "width": 800,
+      "height": 600
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": {}
+}

@@ -1,0 +1,78 @@
+/* Custom layout styles that cannot be handled by utility classes */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-secondary);
+  color: var(--eden-color-text-on-dark);
+  user-select: none;
+}
+
+.installer-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.installer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--eden-space-xl);
+  overflow-y: auto;
+  position: relative;
+}
+
+.success-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: eden-fade-in 0.3s ease-out;
+}
+
+/* Helpers not in edencss utilities yet */
+.eden-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eden-flex-start {
+  display: flex;
+  align-items: flex-start;
+}
+
+.eden-flex-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.eden-gap-md {
+  gap: var(--eden-space-md);
+}
+
+.eden-border-danger {
+  border-color: var(--eden-color-danger);
+}
+
+.eden-bg-danger-transparent {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.eden-blur-sm {
+  filter: blur(4px);
+}

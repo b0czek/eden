@@ -1,0 +1,16 @@
+{
+  "apps": [
+    { "id": "com.eden.eveshell", "source": "builtin" },
+    { "id": "com.eden.toaster", "source": "builtin" },
+    { "id": "com.eden.files", "source": "builtin" },
+    { "id": "com.eden.editor", "source": "builtin" },
+    { "id": "com.eden.example.calculator", "source": "builtin" },
+    { "id": "com.eden.example.showcase", "source": "builtin" },
+    { "id": "com.eden.settings", "source": "builtin" },
+    { "id": "com.eden.installer", "source": "builtin"}
+  ],
+  "hotReload": {
+    "enabled": true,
+    "debounce": 300
+  }
+}

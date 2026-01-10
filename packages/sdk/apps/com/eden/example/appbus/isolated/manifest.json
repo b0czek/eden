@@ -1,0 +1,27 @@
+{
+  "id": "com.eden.example.appbus.isolated",
+  "name": "AppBus Isolated",
+  "version": "1.0.0",
+  "description": "Frontend app that only talks directly to Client A (not through Hub)",
+  "author": "Dariusz Majnert",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 380,
+      "height": 450
+    },
+    "minSize": {
+      "width": 280,
+      "height": 320
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": [
+    "appbus/connect",
+    "appbus/expose"
+  ]
+}

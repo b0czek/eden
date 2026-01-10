@@ -1,0 +1,18 @@
+{
+  "name": "com.eden.installer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "solid-js": "^1.8.1",
+    "solid-icons": "^1.1.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "vite-plugin-solid": "^2.8.0",
+    "@edenapp/types": "workspace:^"
+  }
+}

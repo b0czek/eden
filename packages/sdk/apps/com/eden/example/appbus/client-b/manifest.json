@@ -1,0 +1,27 @@
+{
+  "id": "com.eden.example.appbus.client-b",
+  "name": "AppBus Client B",
+  "version": "1.0.0",
+  "description": "Frontend app that connects to Hub for mediated chat",
+  "author": "Dariusz Majnert",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 400,
+      "height": 500
+    },
+    "minSize": {
+      "width": 300,
+      "height": 350
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": [
+    "appbus/connect",
+    "appbus/expose"
+  ]
+}

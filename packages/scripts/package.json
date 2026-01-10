@@ -1,0 +1,35 @@
+{
+  "name": "@edenapp/scripts",
+  "version": "0.4.1",
+  "description": "Build tools and CLI for Eden projects",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "eden-build": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "eden",
+    "build-tools",
+    "cli"
+  ],
+  "author": "Dariusz Majnert",
+  "license": "MIT",
+  "dependencies": {
+    "@edenapp/genesis": "workspace:*",
+    "@edenapp/types": "workspace:*",
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "com.eden.example.hello",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "A simple example app demonstrating Eden app structure",
+  "author": "Dariusz Majnert",
+  "build": {
+    "command": "cd frontend && pnpm run build && cd ../backend && pnpm run build"
+  },
+  "backend": {
+    "entry": "backend/dist/backend.js"
+  },
+  "frontend": {
+    "entry": "frontend/dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 600,
+      "height": 400
+    },
+    "minSize": {
+      "width": 400,
+      "height": 300
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": {
+    "system": {
+      "notifications": true
+    }
+  }
+}

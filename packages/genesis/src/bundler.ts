@@ -1,4 +1,5 @@
 import * as fs from "fs/promises";
+import { createReadStream, createWriteStream } from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { exec } from "child_process";
@@ -228,7 +229,27 @@ export class GenesisBundler {
   /**
    * Check if a file path should be excluded from bundling
    */
-  private static shouldExcludeFile(filePath: string): boolean {
+  private static shouldExcludeFile(
+    filePath: string,
+    manifest?: AppManifest
+  ): boolean {
+    // Check if this path is explicitly included via manifest
+    if (manifest?.include) {
+      for (const includePath of manifest.include) {
+        // Normalize paths for comparison
+        const normalizedInclude = includePath.replace(/\\/g, "/");
+        const normalizedFile = filePath.replace(/\\/g, "/");
+
+        // Check if the file path starts with or equals the include path
+        if (
+          normalizedFile === normalizedInclude ||
+          normalizedFile.startsWith(normalizedInclude + "/")
+        ) {
+          return false; // Don't exclude - explicitly included
+        }
+      }
+    }
+
     const excludePatterns = [
       // Dependencies
       /^node_modules\//,
@@ -267,6 +288,7 @@ export class GenesisBundler {
   private static async extractToDirectory(
     appDirectory: string,
     targetDir: string,
+    manifest?: AppManifest,
     verbose?: boolean
   ): Promise<void> {
     const resolvedTarget = path.resolve(targetDir);
@@ -286,7 +308,7 @@ export class GenesisBundler {
       const fileStr = file as string;
 
       // Skip excluded files
-      if (this.shouldExcludeFile(fileStr)) {
+      if (this.shouldExcludeFile(fileStr, manifest)) {
         skippedCount++;
         continue;
       }
@@ -347,7 +369,7 @@ export class GenesisBundler {
     for (const file of allFiles) {
       const fileStr = file as string;
       // Skip excluded files
-      if (this.shouldExcludeFile(fileStr)) {
+      if (this.shouldExcludeFile(fileStr, manifest)) {
         continue;
       }
       const filePath = path.join(appDirectory, fileStr);
@@ -395,17 +417,15 @@ export class GenesisBundler {
 
     if (verbose) console.log("🗜️  Compressing with Zstandard...");
 
-    // Read the tar file
-    const tarData = await fs.readFile(tempTarPath);
+    // Create temporary file for compressed output
+    const tempCompressedPath = `${tempTarPath}.zst`;
 
-    // Compress with configured compressor
-    const compressedBuffer = await this.compressor.compress(
-      tarData,
+    // Compress with configured compressor using streaming to disk
+    const { checksum } = await this.compressor.compressFileStreaming(
+      tempTarPath,
+      tempCompressedPath,
       compressionLevel
     );
-
-    // Calculate checksum of compressed data
-    const checksum = this.calculateChecksum(compressedBuffer);
 
     // Create metadata
     const metadata: ArchiveMetadata = {
@@ -416,34 +436,50 @@ export class GenesisBundler {
     };
 
     // Combine metadata + compressed data
-    // Format: [4 bytes metadata length][metadata JSON][compressed tar]
+    // Format: [4 bytes metadata length][metadata JSON][compressed stream]
     const metadataJson = JSON.stringify(metadata);
     const metadataBuffer = Buffer.from(metadataJson, "utf-8");
     const metadataLength = Buffer.alloc(4);
     metadataLength.writeUInt32BE(metadataBuffer.length, 0);
 
-    const finalData = Buffer.concat([
-      metadataLength,
-      metadataBuffer,
-      compressedBuffer,
-    ]);
+    const finalWriteStream = createWriteStream(finalOutputPath);
 
-    // Write final .edenite file
-    await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
-    await fs.writeFile(finalOutputPath, finalData);
+    // Write metadata length and buffer
+    finalWriteStream.write(metadataLength);
+    finalWriteStream.write(metadataBuffer);
 
-    // Clean up temp tar file
+    // Stream compressed content to final file
+    const compressedReadStream = createReadStream(tempCompressedPath);
+
+    await new Promise<void>((resolve, reject) => {
+      compressedReadStream.pipe(finalWriteStream);
+      compressedReadStream.on("error", reject);
+      finalWriteStream.on("error", reject);
+      finalWriteStream.on("finish", resolve);
+    });
+
+    // Get stats for logging
+    const tarStats = await fs.stat(tempTarPath);
+    const finalStats = await fs.stat(finalOutputPath);
+
+    // Clean up temp files
     await fs.unlink(tempTarPath);
+    await fs.unlink(tempCompressedPath);
 
     if (verbose) {
+      const originalSize = tarStats.size;
+      const finalSize = finalStats.size;
+      const metadataSize = metadataLength.length + metadataBuffer.length;
+      const compressedSize = finalSize - metadataSize; // Approximate
+
       console.log(`✓ Archive created: ${finalOutputPath}`);
-      console.log(`  Original size: ${(tarData.length / 1024).toFixed(2)} KB`);
+      console.log(`  Original size: ${(originalSize / 1024).toFixed(2)} KB`);
       console.log(
-        `  Compressed size: ${(finalData.length / 1024).toFixed(2)} KB`
+        `  Compressed size: ${(compressedSize / 1024).toFixed(2)} KB`
       );
       console.log(
         `  Compression ratio: ${(
-          (1 - finalData.length / tarData.length) *
+          (1 - compressedSize / originalSize) *
           100
         ).toFixed(1)}%`
       );
@@ -453,7 +489,7 @@ export class GenesisBundler {
     return {
       path: finalOutputPath,
       checksum,
-      size: finalData.length,
+      size: finalStats.size,
     };
   }
 
@@ -541,6 +577,7 @@ export class GenesisBundler {
         await this.extractToDirectory(
           appDirectory,
           extractToDirectory,
+          manifest,
           verbose
         );
 
@@ -578,9 +615,7 @@ export class GenesisBundler {
   /**
    * Extract info from an .edenite file
    */
-  static async getInfo(
-    edenitePath: string
-  ): Promise<{
+  static async getInfo(edenitePath: string): Promise<{
     success: boolean;
     manifest?: AppManifest;
     error?: string;

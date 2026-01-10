@@ -1,0 +1,28 @@
+{
+  "id": "com.eden.settings",
+  "name": "Settings",
+  "version": "1.0.0",
+  "description": "System and application settings",
+  "author": "Dariusz Majnert",
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 800,
+      "height": 600
+    },
+    "minSize": {
+      "width": 600,
+      "height": 400
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": ["settings/superuser"],
+  "icon": "icon.svg"
+}

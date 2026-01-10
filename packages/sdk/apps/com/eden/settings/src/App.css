@@ -1,0 +1,221 @@
+/**
+ * Settings App - Custom Styles
+ * Uses edencss sidebar component
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-secondary);
+  color: var(--eden-color-text-on-dark);
+  overflow: hidden;
+}
+
+/* ===== Main Layout ===== */
+.settings-app {
+  display: flex;
+  height: calc(100vh - var(--eden-frame-header-height, 40px));
+  width: 100vw;
+  padding: var(--eden-space-lg);
+  gap: var(--eden-space-lg);
+  background: var(--eden-color-bg-secondary);
+  box-sizing: border-box;
+}
+
+/* ===== Main Content ===== */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-lg);
+  overflow: visible;
+  min-width: 0;
+}
+
+.content-header {
+  padding: var(--eden-space-lg);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-xl);
+  box-shadow: var(--eden-shadow-lg);
+}
+
+.content-title {
+  font-size: var(--eden-font-size-lg);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.content-description {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  margin-top: var(--eden-space-xs);
+}
+
+/* ===== Settings List ===== */
+.settings-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-md);
+  padding-right: var(--eden-space-xs);
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eden-space-lg);
+  padding: var(--eden-space-lg);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-xl);
+  transition: all var(--eden-transition-base);
+}
+
+.setting-item:hover {
+  border-color: var(--eden-color-border-hover);
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-label {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.setting-description {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  margin-top: var(--eden-space-xs);
+}
+
+.setting-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--eden-color-text-muted);
+  text-align: center;
+  padding: var(--eden-space-4xl);
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: var(--eden-space-lg);
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: var(--eden-font-size-lg);
+  font-weight: var(--eden-font-weight-semibold);
+}
+
+/* ===== Loading State ===== */
+.loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-lg);
+  gap: var(--eden-space-sm);
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== Category Header ===== */
+.category-header {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-secondary);
+  margin-bottom: var(--eden-space-sm);
+}
+
+/* ===== Animations ===== */
+.setting-item {
+  animation: eden-fade-in 0.2s ease-out;
+}
+
+/* ===== Apps Tab ===== */
+
+.app-item-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-surface-tertiary);
+  color: var(--eden-color-text-tertiary);
+  overflow: hidden;
+  box-shadow: var(--eden-shadow-inner);
+}
+
+.app-item-icon-no-bg {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-item-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-item-name {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin-bottom: 2px;
+}
+
+.app-item-meta {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-tertiary);
+  font-family: var(--eden-font-family-mono);
+  margin-bottom: 4px;
+}
+
+.app-item-desc {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

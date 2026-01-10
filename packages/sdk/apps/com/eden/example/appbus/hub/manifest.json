@@ -1,0 +1,17 @@
+{
+  "id": "com.eden.example.appbus.hub",
+  "name": "AppBus Chat Hub",
+  "version": "1.0.0",
+  "description": "Backend-only mediator that routes chat messages between connected apps",
+  "author": "Dariusz Majnert",
+  "backend": {
+    "entry": "backend.js"
+  },
+  "window": {
+    "mode": "none"
+  },
+  "permissions": [
+    "appbus/expose",
+    "appbus/connect"
+  ]
+}

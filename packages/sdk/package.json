@@ -1,0 +1,56 @@
+{
+  "name": "@edenapp/sdk",
+  "version": "0.4.1",
+  "description": "Eden Desktop Environment SDK - Build Electron-based desktop environments with modular app support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "edencss",
+    "foundation",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets",
+    "build:apps": "eden-build build-sdk -i apps -o dist/apps/prebuilt",
+    "build:main": "tsc",
+    "bundle:app-frame": "node scripts/bundle-app-frame.js",
+    "bundle:app-runtime": "node scripts/bundle-app-runtime.js",
+    "codegen": "ts-node scripts/run-codegen.ts",
+    "copy-assets": "mkdir -p dist/foundation && cp foundation/* dist/foundation/",
+    "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' edencss/eden.css -o dist/edencss/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' edencss/tokens.css -o dist/edencss/eden-tokens.css",
+    "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "eden",
+    "electron",
+    "desktop-environment",
+    "sdk",
+    "window-manager"
+  ],
+  "author": "Dariusz Majnert",
+  "license": "MIT",
+  "peerDependencies": {
+    "electron": ">=39.0.0"
+  },
+  "dependencies": {
+    "@edenapp/genesis": "workspace:*",
+    "@edenapp/types": "workspace:*",
+    "@keyv/sqlite": "^4.0.6",
+    "fast-glob": "^3.3.3",
+    "keyv": "^5.1.0",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
+  },
+  "devDependencies": {
+    "@edenapp/scripts": "workspace:*",
+    "@types/node": "^20.10.0",
+    "esbuild": "^0.27.0",
+    "lightningcss-cli": "^1.30.2",
+    "style-dictionary": "^5.1.1",
+    "ts-morph": "^27.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

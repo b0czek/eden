@@ -1,0 +1,28 @@
+{
+  "name": "@edenapp/example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eden Desktop Environment - Example Consumer Project",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "pnpm run copy-assets && pnpm run build:apps && pnpm run build:main",
+    "copy-assets": "eden-build copy-assets",
+    "build:apps": "eden-build apps",
+    "build:main": "tsc",
+    "dev": "pnpm run build && concurrently --kill-others \"pnpm run dev:watch\" \"sleep 3 && NODE_ENV=development electron .\"",
+    "dev:watch": "eden-build watch",
+    "start": "electron .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@edenapp/sdk": "workspace:*",
+    "@edenapp/scripts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^9.1.0",
+    "electron": "^39.2.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}
