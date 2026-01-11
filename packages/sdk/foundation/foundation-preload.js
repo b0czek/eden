@@ -3,7 +3,20 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
-console.log('Foundation preload script initializing...');
+// Check for title argument
+const titleArg = process.argv.find(arg => arg.startsWith('--window-title='));
+if (titleArg) {
+    const title = titleArg.split('=')[1];
+    if (title) {
+        // Set immediately
+        try { document.title = title; } catch(e) {}
+        
+        // Also ensure it sticks after DOM load
+        window.addEventListener('DOMContentLoaded', () => {
+             document.title = title;
+        });
+    }
+}
 
 // Event subscription system
 const eventSubscriptions = new Map();

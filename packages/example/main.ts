@@ -10,4 +10,7 @@ new Eden({
   },
   userDirectory: ".",
   autostart: ["com.eden.eveshell", "com.eden.toaster"],
+  window: {
+    title: "Eden SDK Example"
+  }
 });

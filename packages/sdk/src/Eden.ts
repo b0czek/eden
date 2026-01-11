@@ -131,6 +131,7 @@ export class Eden {
         contextIsolation: true,
         sandbox: false,
         preload: path.join(distPath, "foundation/foundation-preload.js"),
+        additionalArguments: [`--window-title=${windowConfig.title || "Eden"}`],
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
