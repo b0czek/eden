@@ -1,16 +1,11 @@
 /* Custom layout styles that cannot be handled by utility classes */
 
-html,
-body,
 #root {
   height: 100%;
-  margin: 0;
-  overflow: hidden;
 }
 
 body {
   font-family: var(--eden-font-family-base);
-  background: var(--eden-color-bg-secondary);
   color: var(--eden-color-text-on-dark);
   user-select: none;
 }

@@ -24,11 +24,11 @@ body {
 .toast {
   min-width: 320px;
   max-width: 320px;
-  max-height: 400px; /* Clip very long messages */
+  max-height: 400px;
+  /* Clip very long messages */
   padding: var(--eden-space-lg) var(--eden-space-lg);
-  padding-bottom: calc(
-    var(--eden-space-lg) + var(--eden-space-sm) + 4px
-  ); /* Extra space for progress bar */
+  padding-bottom: calc(var(--eden-space-lg) + var(--eden-space-sm) + 4px);
+  /* Extra space for progress bar */
   overflow: hidden;
 
   /* Override eden-card-glass large shadow due to restricted view's size */
@@ -112,6 +112,7 @@ body {
   from {
     width: 100%;
   }
+
   to {
     width: 0%;
   }
@@ -126,11 +127,9 @@ body {
 
 /* Success */
 .toast-success .eden-progress-bar {
-  background: linear-gradient(
-    90deg,
-    var(--eden-color-success),
-    var(--eden-color-success-hover)
-  );
+  background: linear-gradient(90deg,
+      var(--eden-color-success),
+      var(--eden-color-success-hover));
   box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
 }
 
@@ -142,11 +141,9 @@ body {
 
 /* Danger */
 .toast-danger .eden-progress-bar {
-  background: linear-gradient(
-    90deg,
-    var(--eden-color-danger),
-    var(--eden-color-danger-hover)
-  );
+  background: linear-gradient(90deg,
+      var(--eden-color-danger),
+      var(--eden-color-danger-hover));
   box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
 }
 

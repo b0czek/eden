@@ -1,9 +1,3 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: var(--eden-font-family-base);
   /* Transparent background for overlay views */
@@ -139,13 +133,11 @@ body {
 }
 
 .dock-right .separator {
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
 }
 
 .app-icons {
@@ -186,25 +178,21 @@ body {
 }
 
 .dock-left .separator {
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
 }
 
 .separator {
   width: 1px;
   height: 32px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--eden-color-border-medium) 20%,
+      var(--eden-color-border-medium) 80%,
+      transparent);
   margin: 0 var(--eden-space-xs);
 }
 

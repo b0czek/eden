@@ -3,23 +3,53 @@
 /* Squircle container styling */
 html {
     background: transparent !important;
+    height: 100%;
+    /* Ensure shadows aren't clipped by html bounds if we want them, 
+       but for a frameless window filling the view, we typically clip. 
+       However, if we want shadows, we need margin. 
+       Assuming view fills window exactly, we just want content clipped. */
     overflow: hidden;
+    border-radius: 20px;
+    /* Force clip-path to cleanly cut background pixels in Electron views */
+    clip-path: inset(0 round 20px);
+    /* Composite layer promotion to help with anti-aliasing of rounded corners */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+    box-sizing: border-box;
 }
 
-html,
 body {
-    border-radius: 20px;
-    clip-path: inset(0 round 20px);
     margin: 0;
     padding: 0;
     height: 100%;
+    width: 100%;
+    border-radius: 20px;
+
+    /* Inner border to help definition against dark backgrounds */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+    overflow: hidden;
+    /* Apps should handle scrolling internally */
+    box-sizing: border-box;
+
+    /* Ensure body background is transparent to prevent canvas propagation */
+    background-color: transparent !important;
 }
 
-body {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
-        inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-    overflow-y: auto;
-    overflow-x: hidden;
+
+/* Paint background on a layer that DOES NOT propagate to canvas, allowing clip-path to work */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--app-bg, var(--eden-color-bg-secondary));
+    backdrop-filter: var(--app-glass, none);
+    z-index: -1;
+    pointer-events: none;
 }
 
 #eden-app-frame-overlay#eden-app-frame-overlay {

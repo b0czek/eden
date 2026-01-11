@@ -1,30 +1,32 @@
-/**
+/*
  * Settings App - Custom Styles
  * Uses edencss sidebar component
  */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
 body {
   font-family: var(--eden-font-family-base);
-  background: var(--eden-color-bg-secondary);
   color: var(--eden-color-text-on-dark);
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
 /* ===== Main Layout ===== */
 .settings-app {
   display: flex;
-  height: calc(100vh - var(--eden-frame-header-height, 40px));
-  width: 100vw;
+  height: 100%;
+  /* Fill the root container */
+  width: 100%;
   padding: var(--eden-space-lg);
   gap: var(--eden-space-lg);
-  background: var(--eden-color-bg-secondary);
   box-sizing: border-box;
+  overflow: hidden;
+  /* Contain children */
 }
 
 /* ===== Main Content ===== */

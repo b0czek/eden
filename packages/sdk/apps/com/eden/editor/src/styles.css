@@ -1,22 +1,12 @@
-/**
+/*
  * Text Editor - Styles
  */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
-html, body, #root {
+#root {
   height: 100%;
   width: 100%;
   overflow: hidden;
-}
-
-body {
-  background: var(--eden-color-bg-secondary);
-  backdrop-filter: var(--eden-glass-medium);
 }
 
 /* ===== Main Layout ===== */
@@ -316,4 +306,3 @@ body {
   padding: var(--eden-space-lg);
   text-align: center;
 }
-
