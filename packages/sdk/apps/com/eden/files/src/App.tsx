@@ -2,6 +2,7 @@ import { createSignal, createEffect, onMount } from "solid-js";
 import type { Component } from "solid-js";
 import type { FileItem, DisplayPreferences } from "./types";
 import { joinPath, getParentPath, isValidName } from "./utils";
+import { ITEM_SIZES } from "./constants";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
 import CreateFolderDialog from "./dialogs/CreateFolderDialog";
@@ -100,6 +101,38 @@ const App: Component = () => {
 
   createEffect(() => {
     loadDirectory(currentPath());
+  });
+
+  // Handle keyboard shortcuts (Zoom only - Navigation moved to FileList)
+  createEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if input is focused (e.g. Omnibox or dialogs)
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+
+      const prefs = displayPreferences();
+      const sizes = ITEM_SIZES;
+
+      // Zoom Controls (Ctrl/Cmd + +/-)
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === '-')) {
+        e.preventDefault();
+        const currentIndex = sizes.indexOf(prefs.itemSize);
+        let newIndex = currentIndex;
+
+        if (e.key === '=' || e.key === '+') {
+          newIndex = Math.min(currentIndex + 1, sizes.length - 1);
+        } else if (e.key === '-') {
+          newIndex = Math.max(currentIndex - 1, 0);
+        }
+
+        if (newIndex !== currentIndex) {
+          handlePreferencesChange({ ...prefs, itemSize: sizes[newIndex] });
+        }
+        return;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   });
 
   // Handle mouse button 4/5 for back/forward navigation
@@ -205,12 +238,12 @@ const App: Component = () => {
     if (currentItems.length > 0) {
       setItems(sortItems(currentItems));
     }
-    
+
     // Persist preferences to database
     try {
-      await window.edenAPI.shellCommand('db/set', { 
-        key: 'display-preferences', 
-        value: JSON.stringify(newPreferences) 
+      await window.edenAPI.shellCommand('db/set', {
+        key: 'display-preferences',
+        value: JSON.stringify(newPreferences)
       });
     } catch (error) {
       console.error('Failed to save display preferences:', error);
@@ -291,7 +324,7 @@ const App: Component = () => {
       // Open files with their registered handler
       try {
         let result = await window.edenAPI.shellCommand("file/open", { path: item.path });
-        if(!result.success) {
+        if (!result.success) {
           showError("Failed to open file: " + result.error);
         }
       } catch (error) {
@@ -347,6 +380,7 @@ const App: Component = () => {
         onItemClick={handleItemClick}
         onItemDoubleClick={handleItemDoubleClick}
         onItemDelete={handleDeleteClick}
+        onBack={goBack}
       />
 
       <CreateFolderDialog

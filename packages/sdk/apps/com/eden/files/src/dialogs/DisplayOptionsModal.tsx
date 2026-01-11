@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import type { Component } from "solid-js";
 import type { DisplayPreferences, ViewStyle, ItemSize, SortBy, SortOrder } from "../types";
+import { ITEM_SIZES } from "../constants";
 import { FaSolidGrip, FaSolidList, FaSolidArrowUp, FaSolidArrowDown } from "solid-icons/fa";
 
 interface DisplayOptionsModalProps {
@@ -22,13 +23,11 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
     };
 
     const getSizeValue = () => {
-        const sizes: Record<ItemSize, number> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4 };
-        return sizes[props.preferences.itemSize];
+        return ITEM_SIZES.indexOf(props.preferences.itemSize);
     };
 
     const handleSizeChange = (value: number) => {
-        const sizes: ItemSize[] = ['tiny', 'small', 'medium', 'large', 'huge'];
-        updatePreference('itemSize', sizes[value]);
+        updatePreference('itemSize', ITEM_SIZES[value]);
     };
 
     return (
