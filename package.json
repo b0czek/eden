@@ -6,7 +6,7 @@
   "scripts": {
     "sdk:build": "cd packages/sdk && pnpm run build",
     "scripts:build": "cd packages/scripts && pnpm run build",
-    "genesis:build": "cd genesis && pnpm run build",
+    "genesis:build": "cd packages/genesis && pnpm run build",
     "clean": "rm -rf dist packages/*/dist genesis/dist",
     "dev": "cd packages/example && pnpm dev",
     "changeset": "changeset",

@@ -1,0 +1,34 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#404040"/>
+      <stop offset="1" stop-color="#202020"/>
+    </linearGradient>
+    <filter id="dropShadow" x="0" y="0" width="64" height="64" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle background with gradient -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
+
+  <!-- Package box -->
+  <g transform="translate(32, 20)">
+    <!-- Box top (lid) -->
+    <path d="M-12 8 L0 2 L12 8 L0 14 Z" fill="#ffffff"/>
+
+    <!-- Box left side -->
+    <path d="M-12 8 L-12 24 L0 30 L0 14 Z" fill="#e0e0e0"/>
+
+    <!-- Box right side -->
+    <path d="M12 8 L12 24 L0 30 L0 14 Z" fill="#c0c0c0"/>
+
+    <!-- Download arrow above box -->
+    <g transform="translate(0, -8)">
+      <!-- Arrow head -->
+      <path d="M0 16 L-7 8 L-2.5 8 L-2.5 10 L2.5 10 L2.5 8 L7 8 Z" fill="#4a9eff"/>
+      <!-- Arrow shaft -->
+      <rect x="-2.5" y="0" width="5" height="10" fill="#4a9eff"/>
+    </g>
+  </g>
+</svg>
