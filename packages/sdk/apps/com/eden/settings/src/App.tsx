@@ -2,10 +2,11 @@ import { createSignal, createEffect, onMount, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import type { Component } from "solid-js";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
-import { FiSettings, FiCode, FiPackage } from "solid-icons/fi";
+import { FiSettings, FiCode, FiPackage, FiImage } from "solid-icons/fi";
 import { VsSettings, VsSymbolColor, VsPulse } from "solid-icons/vs";
 import SettingInput from "./components/SettingInput";
 import AppsTab from "./components/AppsTab";
+import AppearanceTab from "./components/AppearanceTab";
 import "./App.css";
 
 interface SelectedItem {
@@ -13,6 +14,7 @@ interface SelectedItem {
   id: string;
   label: string;
 }
+
 
 const App: Component = () => {
   const [apps, setApps] = createSignal<AppManifest[]>([]);
@@ -40,7 +42,7 @@ const App: Component = () => {
   const loadApps = async () => {
     try {
       const result = await window.edenAPI!.shellCommand("package/list", { showHidden: true });
-      const appsWithSettings = result.filter((app: AppManifest) => 
+      const appsWithSettings = result.filter((app: AppManifest) =>
         app.settings && app.settings.length > 0
       );
       setApps(appsWithSettings);
@@ -149,6 +151,8 @@ const App: Component = () => {
     }
   };
 
+
+
   const handleSelectEdenCategory = (category: SettingsCategory) => {
     setSelectedItem({
       type: "eden",
@@ -173,6 +177,8 @@ const App: Component = () => {
         return <VsPulse />;
       case "code":
         return <FiCode />;
+      case "image":
+        return <FiImage />;
       default:
         return <FiSettings />;
     }
@@ -204,15 +210,15 @@ const App: Component = () => {
         <div class="eden-sidebar-divider" />
 
         <div class="eden-sidebar-section">
-           <div class="eden-sidebar-items">
-             <div 
-               class={`eden-sidebar-item ${selectedItem()?.type === "apps-management" ? "eden-sidebar-item-selected" : ""}`}
-               onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: "Apps" })}
-             >
-                <div class="eden-sidebar-item-icon"><FiPackage /></div>
-                <span class="eden-sidebar-item-text">Installed Apps</span>
-             </div>
-           </div>
+          <div class="eden-sidebar-items">
+            <div
+              class={`eden-sidebar-item ${selectedItem()?.type === "apps-management" ? "eden-sidebar-item-selected" : ""}`}
+              onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: "Apps" })}
+            >
+              <div class="eden-sidebar-item-icon"><FiPackage /></div>
+              <span class="eden-sidebar-item-text">Installed Apps</span>
+            </div>
+          </div>
         </div>
 
         <div class="eden-sidebar-divider" />
@@ -280,10 +286,14 @@ const App: Component = () => {
                 </header>
 
                 <Show when={item().type === "apps-management"}>
-                   <AppsTab />
+                  <AppsTab />
                 </Show>
 
-                <Show when={item().type !== "apps-management"}>
+                <Show when={item().id === "appearance"}>
+                  <AppearanceTab />
+                </Show>
+
+                <Show when={item().type !== "apps-management" && item().id !== "appearance"}>
                   <div class="settings-list">
                     <For each={currentSettings()}>
                       {(category) => (
@@ -302,7 +312,7 @@ const App: Component = () => {
                                 </div>
                                 <SettingInput
                                   setting={setting}
-                                  value={settingValues[setting.key] ?? setting.defaultValue ?? ""}
+                                  value={(settingValues[setting.key] as string) ?? setting.defaultValue ?? ""}
                                   onChange={(value) => handleSettingChange(setting.key, value)}
                                 />
                               </div>

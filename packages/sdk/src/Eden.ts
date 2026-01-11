@@ -19,6 +19,7 @@ import { FileOpenManager } from "./file-open";
 import { NotificationManager } from "./notification";
 import { DbManager } from "./db";
 import { SettingsManager } from "./settings";
+import { AppearanceManager } from "./appearance/AppearanceManager";
 import { container } from "tsyringe";
 
 export class Eden {
@@ -78,6 +79,7 @@ export class Eden {
     container.resolve(DbManager);
 
     container.resolve(SettingsManager);
+    container.resolve(AppearanceManager);
 
     this.setupAppEventHandlers();
   }
@@ -100,6 +102,9 @@ export class Eden {
 
     // Initialize package manager
     await this.packageManager.initialize();
+
+    // Initialize Appearance Manager (load saved wallpaper)
+    await container.resolve(AppearanceManager).initialize();
 
     // Initialize file open manager (load user preferences)
     await this.fileOpenManager.initialize();

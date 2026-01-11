@@ -14,6 +14,9 @@ export const COMMAND_NAMES: readonly string[] = [
   "appbus/list",
   "appbus/list-by-app",
   "appbus/connect",
+  "appearance/set-wallpaper",
+  "appearance/get-wallpaper",
+  "appearance/get-presets",
   "db/get",
   "db/set",
   "db/delete",
@@ -81,6 +84,7 @@ export const COMMAND_NAMES: readonly string[] = [
 
 // Event names array
 export const APP_EVENT_NAMES: readonly string[] = [
+  "appearance/wallpaper-changed",
   "file/opened",
   "notification/added",
   "notification/removed",

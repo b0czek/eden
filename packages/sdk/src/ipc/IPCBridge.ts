@@ -79,10 +79,13 @@ export class IPCBridge extends EventEmitter {
       async (event, command: string, args: any) => {
         // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
+        const isFoundation = this.mainWindow?.webContents.id === event.sender.id;
+
         const argsWithContext = {
           ...args,
           _callerAppId: appId,
           _callerWebContentsId: event.sender.id,
+          _isFoundation: isFoundation,
         };
         return this.handleShellCommand(command, argsWithContext, appId);
       }

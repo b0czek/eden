@@ -435,6 +435,22 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   }
 
   /**
+   * Send message to the main window (foundation layer)
+   */
+  sendToMainWindow(channel: string, ...args: any[]): boolean {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      try {
+        this.mainWindow.webContents.send(channel, ...args);
+        return true;
+      } catch (error) {
+        console.error(`[ViewManager] Failed to send to main window:`, error);
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Get all active view IDs
    */
   getActiveViews(): number[] {

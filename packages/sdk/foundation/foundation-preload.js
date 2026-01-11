@@ -1,15 +1,64 @@
 // Foundation Preload Script
 // Provides safe IPC communication for the foundation layer
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
+
+console.log('Foundation preload script initializing...');
+
+// Event subscription system
+const eventSubscriptions = new Map();
+
+// Set up unified message listener for shell-message channel
+ipcRenderer.on("shell-message", (_event, message) => {
+    const { type, payload } = message;
+    const callbacks = eventSubscriptions.get(type);
+
+    if (callbacks) {
+        callbacks.forEach((callback) => {
+            try {
+                callback(payload);
+            } catch (err) {
+                console.error(`Error in event listener for ${type}:`, err);
+            }
+        });
+    }
+});
 
 // Expose a safe edenAPI to the foundation renderer
-contextBridge.exposeInMainWorld('edenAPI', {
+contextBridge.exposeInMainWorld("edenAPI", {
     // Shell commands
     shellCommand: (command, args) => {
-        return ipcRenderer.invoke('shell-command', command, args);
+        return ipcRenderer.invoke("shell-command", command, args);
     },
 
+    // Event subscription
+    subscribe: async (eventName, callback) => {
+        if (typeof callback !== "function") {
+            throw new Error("Callback must be a function");
+        }
+
+        // Register with backend
+        await ipcRenderer.invoke("shell-command", "event/subscribe", { eventName });
+
+        // Register callback locally
+        if (!eventSubscriptions.has(eventName)) {
+            eventSubscriptions.set(eventName, new Set());
+        }
+        eventSubscriptions.get(eventName).add(callback);
+    },
+
+    unsubscribe: async (eventName, callback) => {
+        const callbacks = eventSubscriptions.get(eventName);
+        if (callbacks) {
+            callbacks.delete(callback);
+
+            // If no more callbacks, unregister from backend
+            if (callbacks.size === 0) {
+                eventSubscriptions.delete(eventName);
+                await ipcRenderer.invoke("shell-command", "event/unsubscribe", { eventName });
+            }
+        }
+    }
 });
 
 console.log('Foundation preload script loaded');

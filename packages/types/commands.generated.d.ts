@@ -73,6 +73,24 @@ export interface AppbusCommands {
 }
 
 /**
+ * AppearanceCommands - Commands for the "appearance" namespace
+ */
+export interface AppearanceCommands {
+  "appearance/set-wallpaper": {
+    args: { wallpaper: import("./index").WallpaperConfig };
+    response: void;
+  };
+  "appearance/get-wallpaper": {
+    args: Record<string, never>;
+    response: { wallpaper: import("./index").WallpaperPreset };
+  };
+  "appearance/get-presets": {
+    args: Record<string, never>;
+    response: { solid: import("./index").WallpaperPreset[], gradients: import("./index").WallpaperPreset[] };
+  };
+}
+
+/**
  * DbCommands - Commands for the "db" namespace
  */
 export interface DbCommands {
@@ -310,16 +328,12 @@ export interface FsCommands {
 export interface EventCommands {
   "event/subscribe": {
     args: {
-    eventName: string;
-    _callerWebContentsId?: number;
-    _callerAppId?: string };
+    eventName: string };
     response: void;
   };
   "event/unsubscribe": {
     args: {
-    eventName: string;
-    _callerWebContentsId?: number;
-    _callerAppId?: string };
+    eventName: string };
     response: void;
   };
   "event/exists": {
@@ -634,4 +648,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, DbCommands, FileCommands, FsCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}

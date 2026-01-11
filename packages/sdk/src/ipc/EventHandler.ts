@@ -21,14 +21,17 @@ export class EventHandler {
     eventName: string;
     _callerWebContentsId?: number;
     _callerAppId?: string;
+    _isFoundation?: boolean;
   }): void {
-    const { eventName, _callerWebContentsId, _callerAppId } = args;
+    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } = args;
 
     if (!APP_EVENT_NAMES.includes(eventName as any)) {
       throw new Error(`Event '${eventName}' is not supported`);
     }
 
-    if (_callerWebContentsId !== undefined) {
+    if (_isFoundation) {
+      this.subscriberManager.subscribeFoundation(eventName);
+    } else if (_callerWebContentsId !== undefined) {
       // Request from a view
       const viewId =
         this.viewManager.getViewIdByWebContentsId(_callerWebContentsId);
@@ -49,10 +52,13 @@ export class EventHandler {
     eventName: string;
     _callerWebContentsId?: number;
     _callerAppId?: string;
+    _isFoundation?: boolean;
   }): void {
-    const { eventName, _callerWebContentsId, _callerAppId } = args;
+    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } = args;
 
-    if (_callerWebContentsId !== undefined) {
+    if (_isFoundation) {
+      this.subscriberManager.unsubscribeFoundation(eventName);
+    } else if (_callerWebContentsId !== undefined) {
       // Request from a view
       const viewId =
         this.viewManager.getViewIdByWebContentsId(_callerWebContentsId);

@@ -162,3 +162,16 @@ export interface Notification {
   /** Notification type for styling (default: info) */
   type?: NotificationType;
 }
+
+
+export interface WallpaperPreset {
+  id: string;
+  name: string;
+  type: "color" | "gradient" | "custom";
+  value: string;
+}
+
+export type WallpaperConfig =
+  | { type: "preset"; id: string }
+  | { type: "custom"; value: string };
+

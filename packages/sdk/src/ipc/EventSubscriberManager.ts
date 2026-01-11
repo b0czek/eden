@@ -8,6 +8,7 @@ export class EventSubscriberManager {
   private backendManager?: BackendManager;
   private subscriptions: Map<string, Set<number>> = new Map();
   private backendSubscriptions: Map<string, Set<string>> = new Map();
+  private foundationSubscriptions: Map<string, boolean> = new Map();
   private internalSubscriptions: Map<string, Set<(payload: any) => void>> =
     new Map();
   private permissionRegistry?: PermissionRegistry;
@@ -63,6 +64,17 @@ export class EventSubscriberManager {
     console.log(
       `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`
     );
+    return true;
+  }
+
+  /**
+   * Subscribe foundation to an event
+   */
+  public subscribeFoundation(eventName: string): boolean {
+    if (!this.foundationSubscriptions.has(eventName)) {
+      this.foundationSubscriptions.set(eventName, true);
+      console.log(`Foundation subscribed to event: ${eventName}`);
+    }
     return true;
   }
 
@@ -127,6 +139,18 @@ export class EventSubscriberManager {
   }
 
   /**
+   * Unsubscribe foundation from an event
+   */
+  public unsubscribeFoundation(eventName: string): boolean {
+    if (this.foundationSubscriptions.has(eventName)) {
+      this.foundationSubscriptions.delete(eventName);
+      console.log(`Foundation unsubscribed from event: ${eventName}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Unsubscribe a backend from an event
    */
   public unsubscribeBackend(appId: string, eventName: string): boolean {
@@ -179,6 +203,14 @@ export class EventSubscriberManager {
           );
         }
       }
+    }
+
+    // Notify foundation if subscribed
+    if (this.foundationSubscriptions.has(eventName)) {
+      this.viewManager.sendToMainWindow("shell-message", {
+        type: eventName,
+        payload
+      });
     }
 
     // Notify view subscribers

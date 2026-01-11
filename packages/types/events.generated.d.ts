@@ -6,6 +6,13 @@
  */
 
 /**
+ * AppearanceEvents - Events for the "appearance" namespace
+ */
+export interface AppearanceEvents {
+  "appearance/wallpaper-changed": import("./index").WallpaperPreset;
+}
+
+/**
  * FileEvents - Events for the "file" namespace
  */
 export interface FileEvents {
@@ -67,4 +74,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends FileEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, FileEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}

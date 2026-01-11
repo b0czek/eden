@@ -11,10 +11,8 @@
  * This provides programmatic access to design tokens for TypeScript/JavaScript code.
  */
 
-export const EdenColorBgPrimary =
-  "linear-gradient(135deg, #060b1a 0%, #111b33 45%, #1d2e57 100%)";
-export const EdenColorBgSecondary =
-  "linear-gradient(135deg, #1d2e57 0%, #354b86 50%, #6797f5 100%)";
+export const EdenColorBgPrimary = "#151518";
+export const EdenColorBgSecondary = "#252529";
 export const EdenColorBgGlassLight = "rgba(255, 255, 255, 0.04)";
 export const EdenColorBgGlassMedium = "rgba(255, 255, 255, 0.08)";
 export const EdenColorBgGlassStrong = "rgba(18, 24, 42, 0.55)";

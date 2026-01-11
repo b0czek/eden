@@ -11,8 +11,8 @@
  */
 
 :root {
-  --eden-color-bg-primary: linear-gradient(135deg, #060b1a 0%, #111b33 45%, #1d2e57 100%);
-  --eden-color-bg-secondary: linear-gradient(135deg, #1d2e57 0%, #354b86 50%, #6797f5 100%);
+  --eden-color-bg-primary: #151518;
+  --eden-color-bg-secondary: #252529;
   --eden-color-bg-glass-light: rgba(255, 255, 255, 0.04);
   --eden-color-bg-glass-medium: rgba(255, 255, 255, 0.08);
   --eden-color-bg-glass-strong: rgba(18, 24, 42, 0.55);

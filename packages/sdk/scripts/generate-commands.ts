@@ -292,8 +292,8 @@ function extractCommandHandlers(
             // Filter out properties starting with underscore (like _callerAppId)
             // This handles simple object literal types like { key: string; _callerAppId: string }
             argsType = rawType
-              .replace(/[;,]\s*_\w+\s*:\s*[^;,}]+/g, "")
-              .replace(/{\s*_\w+\s*:\s*[^;,}]+\s*[;,]?\s*/g, "{ ")
+              .replace(/[;,]\s*_\w+\??\s*:\s*[^;,}]+/g, "")
+              .replace(/{\s*_\w+\??\s*:\s*[^;,}]+\s*[;,]?\s*/g, "{ ")
               .replace(/[;,]\s*}/g, " }")
               .trim();
           }
@@ -497,15 +497,13 @@ export function generateCommands() {
 
           if (commands.length > 0) {
             console.log(
-              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${
-                commands.length
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${commands.length
               } commands`
             );
           }
           if (events.length > 0) {
             console.log(
-              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${
-                events.length
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${events.length
               } events`
             );
           }
