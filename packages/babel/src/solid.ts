@@ -90,5 +90,6 @@ export function setupI18n<T extends Record<string, any> = Record<string, void>>(
   });
 }
 
-// Re-export types for convenience
+// Re-export types and common utilities
 export type { InferTranslations } from "./types.js";
+export { getLocalizedAppName } from "./index.js";

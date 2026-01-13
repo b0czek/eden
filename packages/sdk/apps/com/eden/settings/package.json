@@ -13,6 +13,7 @@
     "solid-icons": "^1.1.0"
   },
   "devDependencies": {
+    "@edenapp/babel": "workspace:*",
     "@edenapp/types": "workspace:*",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",

@@ -1,4 +1,5 @@
 import i18next, { i18n, InitOptions } from "i18next";
+import type { AppManifest } from "@edenapp/types";
 
 export interface EdenI18nConfig {
   debug?: boolean;
@@ -48,5 +49,23 @@ export async function loadCommonTranslations(instance: i18n, locale: string) {
     } catch (e) {
         console.error("Failed to load common translations", e);
     }
+}
+
+/**
+ * Get the localized name of an app manifest.
+ * Handles both simple string names and locale-specific name objects.
+ * 
+ * @param manifest - The app manifest or object with a name property
+ * @param currentLocale - The current locale (defaults to "en" if not provided)
+ * @returns The localized app name
+ */
+export function getLocalizedAppName(
+    manifest: { name: AppManifest["name"] },
+    currentLocale: string = "en"
+): string {
+    if (typeof manifest.name === "string") {
+        return manifest.name;
+    }
+    return manifest.name[currentLocale] || manifest.name["en"] || Object.values(manifest.name)[0];
 }
 

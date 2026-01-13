@@ -1,6 +1,9 @@
 {
   "id": "com.eden.settings",
-  "name": "Settings",
+  "name": {
+    "en": "Settings",
+    "pl": "Ustawienia"
+  },
   "version": "1.0.0",
   "description": "System and application settings",
   "author": "Dariusz Majnert",

@@ -2,6 +2,7 @@ import { createSignal, onMount, For, Show } from "solid-js";
 import type { Component } from "solid-js";
 import type { AppManifest } from "@edenapp/types";
 import { FiTrash2, FiPackage, FiCpu } from "solid-icons/fi";
+import { t, locale, getLocalizedAppName } from "../i18n";
 
 const AppsTab: Component = () => {
   const [apps, setApps] = createSignal<AppManifest[]>([]);
@@ -41,7 +42,7 @@ const AppsTab: Component = () => {
 
   const handleUninstall = async (appId: string, event: MouseEvent) => {
     event.stopPropagation();
-    if (!confirm("Are you sure you want to uninstall this app? This action cannot be undone.")) return;
+    if (!confirm(t("settings.apps.uninstallConfirm"))) return;
     
     try {
       setUninstalling(appId);
@@ -62,15 +63,20 @@ const AppsTab: Component = () => {
     <div class="eden-flex-col eden-gap-lg" style={{ flex: 1, "min-height": 0 }}>
 
       <div class="settings-list">
-        <Show when={!loading()} fallback={<div class="loading">Loading apps...</div>}>
+        <Show when={!loading()} fallback={<div class="loading">{t("common.loading")}</div>}>
           
           {/* User Installed Apps */}
           <div class="eden-flex-between eden-py-sm">
-             <h3 class="eden-text-lg eden-font-bold">Installed Applications</h3>
+             <h3 class="eden-text-lg eden-font-bold">{t("settings.apps.installedApps")}</h3>
              <span class="eden-badge">{installedApps().length}</span>
           </div>
           
-          <Show when={installedApps().length > 0} fallback={<div class="eden-card eden-card-sm eden-text-center eden-text-muted eden-p-lg eden-m-md">No user verified apps installed</div>}>
+          <Show when={installedApps().length > 0} fallback={
+            <div class="empty-state">
+              <div class="empty-state-icon">📦</div>
+              <div class="empty-state-text">{t("settings.apps.noUserApps")}</div>
+            </div>
+          }>
             <div class="eden-flex-col eden-gap-md">
               <For each={installedApps()}>
                 {(app) => (
@@ -78,12 +84,12 @@ const AppsTab: Component = () => {
                     <div class="eden-flex eden-items-center eden-gap-lg" style={{ flex: 1 }}>
                       <div class={appIcons()[app.id] ? "app-item-icon app-item-icon-no-bg" : "app-item-icon"}>
                          <Show when={appIcons()[app.id]} fallback={<FiPackage size={24} />}>
-                            <img src={appIcons()[app.id]} alt={app.name} />
+                            <img src={appIcons()[app.id]} alt={getLocalizedAppName(app, locale())} />
                          </Show>
                       </div>
                       <div class="setting-info">
-                        <h4 class="setting-label">{app.name} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
-                        <p class="setting-description">{app.description || "No description provided"}</p>
+                        <h4 class="setting-label">{getLocalizedAppName(app, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
+                        <p class="setting-description">{app.description || t("settings.apps.noDescription")}</p>
                         <div class="eden-text-xs eden-text-tertiary eden-mt-xs eden-font-mono">{app.id}</div>
                       </div>
                     </div>
@@ -92,7 +98,7 @@ const AppsTab: Component = () => {
                         class="eden-btn eden-btn-danger eden-btn-md"
                         disabled={uninstalling() === app.id}
                         onClick={(e) => handleUninstall(app.id, e)}
-                        title="Uninstall Application"
+                        title={t("settings.apps.uninstallApp")}
                       >
                          <Show when={uninstalling() === app.id} fallback={<FiTrash2 />}>
                            ...
@@ -107,7 +113,7 @@ const AppsTab: Component = () => {
 
           {/* System Apps */}
           <div class="eden-flex-between eden-py-sm eden-mt-xl">
-             <h3 class="eden-text-lg eden-font-bold">System Applications</h3>
+             <h3 class="eden-text-lg eden-font-bold">{t("settings.apps.systemApps")}</h3>
              <span class="eden-badge">{builtinApps().length}</span>
           </div>
 
@@ -118,17 +124,17 @@ const AppsTab: Component = () => {
                   <div class="eden-flex eden-items-center eden-gap-lg" style={{ flex: 1 }}>
                       <div class={appIcons()[app.id] ? "app-item-icon app-item-icon-no-bg" : "app-item-icon"}>
                          <Show when={appIcons()[app.id]} fallback={<FiCpu size={24} />}>
-                            <img src={appIcons()[app.id]} alt={app.name} />
+                            <img src={appIcons()[app.id]} alt={getLocalizedAppName(app, locale())} />
                          </Show>
                       </div>
                     <div class="setting-info">
-                      <h4 class="setting-label">{app.name} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
-                      <p class="setting-description">{app.description || "System Component"}</p>
+                      <h4 class="setting-label">{getLocalizedAppName(app, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
+                      <p class="setting-description">{app.description || t("settings.apps.systemComponent")}</p>
                       <div class="eden-text-xs eden-text-tertiary eden-mt-xs eden-font-mono">{app.id}</div>
                     </div>
                   </div>
                   <div class="setting-control">
-                    <span class="eden-badge eden-badge-info">Built-in</span>
+                    <span class="eden-badge eden-badge-info">{t("settings.apps.builtin")}</span>
                   </div>
                 </div>
               )}

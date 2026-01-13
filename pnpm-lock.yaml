@@ -300,6 +300,9 @@ importers:
         specifier: ^1.9.3
         version: 1.9.10
     devDependencies:
+      '@edenapp/babel':
+        specifier: workspace:*
+        version: link:../../../../../babel
       '@edenapp/types':
         specifier: workspace:*
         version: link:../../../../../types

@@ -9,7 +9,7 @@ import {
   AppInstance,
 } from "@edenapp/types";
 import { AppInfo } from "../types";
-import { t, initLocale, locale } from "../i18n";
+import { t, initLocale, locale, getLocalizedAppName } from "../i18n";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
@@ -23,14 +23,6 @@ export default function ShellOverlay() {
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
-
-  const getLocalizedName = (manifest: AppManifest) => {
-    if (typeof manifest.name === "string") {
-      return manifest.name;
-    }
-    const current = locale();
-    return manifest.name[current] || manifest.name["en"] || Object.values(manifest.name)[0];
-  };
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -90,7 +82,7 @@ export default function ShellOverlay() {
       .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
       .map((instance) => ({
         id: instance.manifest.id,
-        name: getLocalizedName(instance.manifest),
+        name: getLocalizedAppName(instance.manifest, locale()),
         isRunning: true,
       }));
   };
@@ -106,7 +98,7 @@ export default function ShellOverlay() {
         if (!manifest) return null;
         return {
           id: appId,
-          name: getLocalizedName(manifest),
+          name: getLocalizedAppName(manifest, locale()),
           isRunning: runningIds.has(appId),
         };
       })
@@ -118,7 +110,7 @@ export default function ShellOverlay() {
     const runningIds = new Set(runningApps().map((i) => i.manifest.id));
     return installedApps().map((app) => ({
       id: app.id,
-      name: getLocalizedName(app),
+      name: getLocalizedAppName(app, locale()),
       isRunning: runningIds.has(app.id),
     }));
   };

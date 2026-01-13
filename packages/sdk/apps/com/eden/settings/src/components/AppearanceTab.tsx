@@ -2,6 +2,7 @@
 import { Component, For, createSignal, onMount } from "solid-js";
 
 import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
+import { t } from "../i18n";
 
 const WallpaperGrid: Component<{
     options: WallpaperPreset[],
@@ -76,16 +77,16 @@ const AppearanceTab: Component = () => {
     return (
         <div class="settings-list">
             <div class="settings-section">
-                <h2 class="settings-section-title">Wallpaper</h2>
+                <h2 class="settings-section-title">{t("settings.appearance.wallpaper")}</h2>
 
-                <h3 class="category-header">Solid Colors</h3>
+                <h3 class="category-header">{t("settings.appearance.solidColors")}</h3>
                 <WallpaperGrid
                     options={solidPresets()}
                     onSelect={handleSelect}
                     activeId={activeId()}
                 />
 
-                <h3 class="category-header">Gradients</h3>
+                <h3 class="category-header">{t("settings.appearance.gradients")}</h3>
                 <WallpaperGrid
                     options={gradientPresets()}
                     onSelect={handleSelect}

@@ -7,6 +7,7 @@ import { VsSettings, VsSymbolColor, VsPulse } from "solid-icons/vs";
 import SettingInput from "./components/SettingInput";
 import AppsTab from "./components/AppsTab";
 import AppearanceTab from "./components/AppearanceTab";
+import { t, initLocale, locale, getLocalizedAppName } from "./i18n";
 import "./App.css";
 
 interface SelectedItem {
@@ -26,6 +27,7 @@ const App: Component = () => {
   const [loading, setLoading] = createSignal(true);
 
   onMount(async () => {
+    await initLocale();
     await Promise.all([loadEdenSchema(), loadApps()]);
     setLoading(false);
   });
@@ -165,7 +167,7 @@ const App: Component = () => {
     setSelectedItem({
       type: "app",
       id: app.id,
-      label: app.name,
+      label: getLocalizedAppName(app, locale()),
     });
   };
 
@@ -189,7 +191,7 @@ const App: Component = () => {
       {/* Sidebar - using edencss sidebar component */}
       <aside class="eden-sidebar">
         <div class="eden-sidebar-section">
-          <div class="eden-sidebar-section-title">Eden</div>
+          <div class="eden-sidebar-section-title">{t("settings.sidebar.eden")}</div>
           <div class="eden-sidebar-items">
             <For each={edenSchema()}>
               {(category) => (
@@ -213,10 +215,10 @@ const App: Component = () => {
           <div class="eden-sidebar-items">
             <div
               class={`eden-sidebar-item ${selectedItem()?.type === "apps-management" ? "eden-sidebar-item-selected" : ""}`}
-              onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: "Apps" })}
+              onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: t("settings.sidebar.installedApps") })}
             >
               <div class="eden-sidebar-item-icon"><FiPackage /></div>
-              <span class="eden-sidebar-item-text">Installed Apps</span>
+              <span class="eden-sidebar-item-text">{t("settings.sidebar.installedApps")}</span>
             </div>
           </div>
         </div>
@@ -224,14 +226,14 @@ const App: Component = () => {
         <div class="eden-sidebar-divider" />
 
         <div class="eden-sidebar-section eden-sidebar-section-scrollable">
-          <div class="eden-sidebar-section-title">Applications</div>
+          <div class="eden-sidebar-section-title">{t("settings.sidebar.applications")}</div>
           <div class="eden-sidebar-items eden-sidebar-items-scrollable">
             <Show
               when={apps().length > 0}
               fallback={
                 <div class="eden-sidebar-item eden-sidebar-item-disabled">
                   <div class="eden-sidebar-item-icon"><FiPackage /></div>
-                  <span class="eden-sidebar-item-text">No apps with settings</span>
+                  <span class="eden-sidebar-item-text">{t("settings.sidebar.noAppsWithSettings")}</span>
                 </div>
               }
             >
@@ -249,7 +251,7 @@ const App: Component = () => {
                         <img src={appIcons()[app.id]} alt="" />
                       </Show>
                     </div>
-                    <span class="eden-sidebar-item-text">{app.name}</span>
+                    <span class="eden-sidebar-item-text">{getLocalizedAppName(app, locale())}</span>
                   </div>
                 )}
               </For>
@@ -262,14 +264,14 @@ const App: Component = () => {
       <main class="main-content">
         <Show
           when={!loading()}
-          fallback={<div class="loading"><span class="loading-spinner">⟳</span> Loading...</div>}
+          fallback={<div class="loading"><span class="loading-spinner">⟳</span> {t("common.loading")}</div>}
         >
           <Show
             when={selectedItem()}
             fallback={
               <div class="empty-state">
                 <div class="empty-state-icon"><VsSettings /></div>
-                <div class="empty-state-text">Select a category from the sidebar</div>
+                <div class="empty-state-text">{t("settings.selectCategory")}</div>
               </div>
             }
           >
@@ -281,7 +283,7 @@ const App: Component = () => {
                     <p class="content-description">{apps().find(a => a.id === item().id)?.description}</p>
                   </Show>
                   <Show when={item().type === "apps-management"}>
-                    <p class="content-description">Manage installed and system applications</p>
+                    <p class="content-description">{t("settings.appsManagementDescription")}</p>
                   </Show>
                 </header>
 
