@@ -1,6 +1,9 @@
 {
   "id": "com.eden.webbrowser",
-  "name": "Web Browser",
+  "name": {
+    "en": "Web Browser",
+    "pl": "Przeglądarka"
+  },
   "version": "1.0.0",
   "description": "Eden web browser",
   "icon": "icon.svg",

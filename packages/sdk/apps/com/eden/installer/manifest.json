@@ -1,6 +1,9 @@
 {
   "id": "com.eden.installer",
-  "name": "Package Installer",
+  "name": {
+    "en": "Package Installer",
+    "pl": "Instalator pakietów"
+  },
   "version": "1.0.0",
   "description": "Install Eden packages",
   "build": {

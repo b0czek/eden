@@ -107,9 +107,9 @@ export interface SettingOption {
   /** Value stored when this option is selected */
   value: string;
   /** Display label for this option */
-  label: string;
+  label: string | Record<string, string>;
   /** Optional description for this option */
-  description?: string;
+  description?: string | Record<string, string>;
 }
 
 /**
@@ -119,9 +119,9 @@ export interface SettingDefinition {
   /** Unique key for this setting */
   key: string;
   /** Display label */
-  label: string;
+  label: string | Record<string, string>;
   /** Description shown as help text */
-  description?: string;
+  description?: string | Record<string, string>;
   /** Input type */
   type: SettingType;
   /** Default value (as string, will be parsed based on type) */
@@ -145,7 +145,7 @@ export interface SettingsCategory {
   /** Category ID */
   id: string;
   /** Display name */
-  name: string;
+  name: string | Record<string, string>;
   /** Category icon (optional) */
   icon?: string;
   /** Settings in this category */

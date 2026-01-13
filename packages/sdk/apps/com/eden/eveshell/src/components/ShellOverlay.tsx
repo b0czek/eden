@@ -9,7 +9,7 @@ import {
   AppInstance,
 } from "@edenapp/types";
 import { AppInfo } from "../types";
-import { t, initLocale, locale, getLocalizedAppName } from "../i18n";
+import { t, initLocale, locale, getLocalizedValue } from "../i18n";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
@@ -82,7 +82,7 @@ export default function ShellOverlay() {
       .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
       .map((instance) => ({
         id: instance.manifest.id,
-        name: getLocalizedAppName(instance.manifest, locale()),
+        name: getLocalizedValue(instance.manifest.name, locale()),
         isRunning: true,
       }));
   };
@@ -98,7 +98,7 @@ export default function ShellOverlay() {
         if (!manifest) return null;
         return {
           id: appId,
-          name: getLocalizedAppName(manifest, locale()),
+          name: getLocalizedValue(manifest.name, locale()),
           isRunning: runningIds.has(appId),
         };
       })
@@ -110,7 +110,7 @@ export default function ShellOverlay() {
     const runningIds = new Set(runningApps().map((i) => i.manifest.id));
     return installedApps().map((app) => ({
       id: app.id,
-      name: getLocalizedAppName(app, locale()),
+      name: getLocalizedValue(app.name, locale()),
       isRunning: runningIds.has(app.id),
     }));
   };

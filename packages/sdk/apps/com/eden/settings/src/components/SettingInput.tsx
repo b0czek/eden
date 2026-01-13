@@ -1,5 +1,6 @@
 import { Component, Show, For } from "solid-js";
 import type { SettingDefinition } from "@edenapp/types";
+import { getLocalizedValue, locale } from "../i18n";
 
 interface SettingInputProps {
   setting: SettingDefinition;
@@ -45,7 +46,7 @@ const SettingInput: Component<SettingInputProps> = (props) => {
         <select class="eden-select" value={props.value} onChange={handleInput} style={{ "min-width": "160px" }}>
           <For each={props.setting.options}>
             {(option) => (
-              <option value={option.value}>{option.label}</option>
+              <option value={option.value}>{getLocalizedValue(option.label, locale())}</option>
             )}
           </For>
         </select>
@@ -65,7 +66,7 @@ const SettingInput: Component<SettingInputProps> = (props) => {
                   checked={props.value === option.value}
                   onChange={handleInput}
                 />
-                <span class="eden-radio-option-label">{option.label}</span>
+                <span class="eden-radio-option-label">{getLocalizedValue(option.label, locale())}</span>
               </label>
             )}
           </For>

@@ -7,7 +7,7 @@ import { VsSettings, VsSymbolColor, VsPulse } from "solid-icons/vs";
 import SettingInput from "./components/SettingInput";
 import AppsTab from "./components/AppsTab";
 import AppearanceTab from "./components/AppearanceTab";
-import { t, initLocale, locale, getLocalizedAppName } from "./i18n";
+import { t, initLocale, locale, getLocalizedValue } from "./i18n";
 import "./App.css";
 
 interface SelectedItem {
@@ -159,7 +159,7 @@ const App: Component = () => {
     setSelectedItem({
       type: "eden",
       id: category.id,
-      label: category.name,
+      label: getLocalizedValue(category.name, locale()),
     });
   };
 
@@ -167,7 +167,7 @@ const App: Component = () => {
     setSelectedItem({
       type: "app",
       id: app.id,
-      label: getLocalizedAppName(app, locale()),
+      label: getLocalizedValue(app.name, locale()),
     });
   };
 
@@ -202,7 +202,7 @@ const App: Component = () => {
                   <div class="eden-sidebar-item-icon">
                     {getCategoryIcon(category.icon)}
                   </div>
-                  <span class="eden-sidebar-item-text">{category.name}</span>
+                  <span class="eden-sidebar-item-text">{getLocalizedValue(category.name, locale())}</span>
                 </div>
               )}
             </For>
@@ -251,7 +251,7 @@ const App: Component = () => {
                         <img src={appIcons()[app.id]} alt="" />
                       </Show>
                     </div>
-                    <span class="eden-sidebar-item-text">{getLocalizedAppName(app, locale())}</span>
+                    <span class="eden-sidebar-item-text">{getLocalizedValue(app.name, locale())}</span>
                   </div>
                 )}
               </For>
@@ -301,15 +301,15 @@ const App: Component = () => {
                       {(category) => (
                         <>
                           <Show when={currentSettings().length > 1}>
-                            <h3 class="category-header">{category.name}</h3>
+                            <h3 class="category-header">{getLocalizedValue(category.name, locale())}</h3>
                           </Show>
                           <For each={category.settings}>
                             {(setting) => (
                               <div class="setting-item">
                                 <div class="setting-info">
-                                  <h4 class="setting-label">{setting.label}</h4>
+                                  <h4 class="setting-label">{getLocalizedValue(setting.label, locale())}</h4>
                                   <Show when={setting.description}>
-                                    <p class="setting-description">{setting.description}</p>
+                                    <p class="setting-description">{getLocalizedValue(setting.description, locale())}</p>
                                   </Show>
                                 </div>
                                 <SettingInput

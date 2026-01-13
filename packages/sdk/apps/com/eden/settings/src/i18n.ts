@@ -15,4 +15,4 @@ export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({
   resources,
 });
 
-export { getLocalizedAppName } from "@edenapp/babel/solid";
+export { getLocalizedValue } from "@edenapp/babel/solid";

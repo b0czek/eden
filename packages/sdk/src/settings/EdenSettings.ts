@@ -9,14 +9,23 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
 
     {
         id: "general",
-        name: "General",
+        name: {
+            en: "General",
+            pl: "Ogólne",
+        },
         icon: "settings",
         settings: [
             {
                 key: "general.locale",
-                label: "Language",
+                label: {
+                    en: "Language",
+                    pl: "Język",
+                },
                 type: "select",
-                description: "System language",
+                description: {
+                    en: "System language",
+                    pl: "Język systemu",
+                },
                 options: [
                     { label: "English", value: "en" },
                     { label: "Polski", value: "pl" },
@@ -27,14 +36,23 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
     },
     {
         id: "appearance",
-        name: "Appearance",
+        name: {
+            en: "Appearance",
+            pl: "Wygląd",
+        },
         icon: "image",
         settings: [
             {
                 key: "appearance.wallpaper",
-                label: "Wallpaper",
+                label: {
+                    en: "Wallpaper",
+                    pl: "Tapeta",
+                },
                 type: "text",
-                description: "Background wallpaper CSS value",
+                description: {
+                    en: "Choose your desktop background",
+                    pl: "Wybierz tło pulpitu",
+                },
                 defaultValue: '{"type":"preset","id":"eden-default"}',
             },
         ],

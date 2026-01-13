@@ -2,7 +2,7 @@ import { createSignal, onMount, For, Show } from "solid-js";
 import type { Component } from "solid-js";
 import type { AppManifest } from "@edenapp/types";
 import { FiTrash2, FiPackage, FiCpu } from "solid-icons/fi";
-import { t, locale, getLocalizedAppName } from "../i18n";
+import { t, locale, getLocalizedValue } from "../i18n";
 
 const AppsTab: Component = () => {
   const [apps, setApps] = createSignal<AppManifest[]>([]);
@@ -84,11 +84,11 @@ const AppsTab: Component = () => {
                     <div class="eden-flex eden-items-center eden-gap-lg" style={{ flex: 1 }}>
                       <div class={appIcons()[app.id] ? "app-item-icon app-item-icon-no-bg" : "app-item-icon"}>
                          <Show when={appIcons()[app.id]} fallback={<FiPackage size={24} />}>
-                            <img src={appIcons()[app.id]} alt={getLocalizedAppName(app, locale())} />
+                            <img src={appIcons()[app.id]} alt={getLocalizedValue(app.name, locale())} />
                          </Show>
                       </div>
                       <div class="setting-info">
-                        <h4 class="setting-label">{getLocalizedAppName(app, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
+                        <h4 class="setting-label">{getLocalizedValue(app.name, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
                         <p class="setting-description">{app.description || t("settings.apps.noDescription")}</p>
                         <div class="eden-text-xs eden-text-tertiary eden-mt-xs eden-font-mono">{app.id}</div>
                       </div>
@@ -124,11 +124,11 @@ const AppsTab: Component = () => {
                   <div class="eden-flex eden-items-center eden-gap-lg" style={{ flex: 1 }}>
                       <div class={appIcons()[app.id] ? "app-item-icon app-item-icon-no-bg" : "app-item-icon"}>
                          <Show when={appIcons()[app.id]} fallback={<FiCpu size={24} />}>
-                            <img src={appIcons()[app.id]} alt={getLocalizedAppName(app, locale())} />
+                            <img src={appIcons()[app.id]} alt={getLocalizedValue(app.name, locale())} />
                          </Show>
                       </div>
                     <div class="setting-info">
-                      <h4 class="setting-label">{getLocalizedAppName(app, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
+                      <h4 class="setting-label">{getLocalizedValue(app.name, locale())} <span class="eden-text-xs eden-text-tertiary eden-ml-sm">v{app.version}</span></h4>
                       <p class="setting-description">{app.description || t("settings.apps.systemComponent")}</p>
                       <div class="eden-text-xs eden-text-tertiary eden-mt-xs eden-font-mono">{app.id}</div>
                     </div>
