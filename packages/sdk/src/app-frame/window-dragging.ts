@@ -104,14 +104,9 @@ export function setupWindowDragging(
 
     const appId = window.edenFrame?._internal.appId;
 
-    // Bring window to front - but ONLY for mouse events
-    // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
-    // Touch users need to tap elsewhere to focus, then tap title bar to drag
-    if (!isTouch && appId) {
-      window.edenAPI
-        .shellCommand("view/focus-app", { appId })
-        .catch(console.error);
-    }
+    // NOTE: We do NOT call focus-app here anymore.
+    // On macOS (and Linux touch), calling focus-app during drag start causes view reordering
+    // which cancels the drag/touch event. Instead, we bring the window to front after drag ends.
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
@@ -218,6 +213,12 @@ export function setupWindowDragging(
     if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-drag", { appId })
+        .catch(console.error);
+    }
+
+    if (appId) {
+      window.edenAPI
+        .shellCommand("view/focus-app", { appId })
         .catch(console.error);
     }
   };

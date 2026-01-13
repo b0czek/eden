@@ -112,14 +112,9 @@ export function setupWindowResizing(
 
     const appId = window.edenFrame?._internal.appId;
 
-    // Bring window to front - but ONLY for mouse events
-    // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
-    // Touch users need to tap elsewhere to focus, then tap resize handle
-    if (!isTouch && appId) {
-      window.edenAPI
-        .shellCommand("view/focus-app", { appId })
-        .catch(console.error);
-    }
+    // NOTE: We do NOT call focus-app here anymore.
+    // On macOS (and Linux touch), calling focus-app during resize start causes view reordering
+    // which cancels the resize/touch event. Instead, we bring the window to front after resize ends.
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
@@ -253,6 +248,12 @@ export function setupWindowResizing(
     if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-resize", { appId })
+        .catch(console.error);
+    }
+
+    if (appId) {
+      window.edenAPI
+        .shellCommand("view/focus-app", { appId })
         .catch(console.error);
     }
   };
