@@ -170,6 +170,28 @@ importers:
         specifier: ^5.3.0
         version: 5.6.3
 
+  packages/sdk/apps/com/eden/calculator:
+    dependencies:
+      '@edenapp/babel':
+        specifier: workspace:*
+        version: link:../../../../../babel
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../types
+      solid-js:
+        specifier: ^1.9.10
+        version: 1.9.10
+      typescript:
+        specifier: ^5.3.0
+        version: 5.6.3
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@22.19.1)
+      vite-plugin-solid:
+        specifier: ^2.11.10
+        version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@22.19.1))
+
   packages/sdk/apps/com/eden/editor:
     dependencies:
       monaco-editor:
