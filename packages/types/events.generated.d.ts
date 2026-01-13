@@ -20,6 +20,13 @@ export interface FileEvents {
 }
 
 /**
+ * I18nEvents - Events for the "i18n" namespace
+ */
+export interface I18nEvents {
+  "i18n/locale-changed": { locale: string };
+}
+
+/**
  * NotificationEvents - Events for the "notification" namespace
  */
 export interface NotificationEvents {
@@ -74,4 +81,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, FileEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}

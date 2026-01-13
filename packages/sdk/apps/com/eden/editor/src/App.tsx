@@ -120,7 +120,7 @@ const App: Component = () => {
       } else {
         setActiveTabId(null);
         if (editor) editor.setValue("");
-        window.edenFrame?.setTitle("Text Editor");
+        window.edenFrame!.resetTitle();
       }
     }
   };

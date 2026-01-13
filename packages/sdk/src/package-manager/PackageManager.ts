@@ -129,14 +129,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
                 // Override frontend entry with dev server URL
                 manifest.frontend.entry = devManifest.devUrl;
                 console.log(
-                  `Loaded prebuilt app: ${manifest.name} (dev mode: ${devManifest.devUrl})`
+                  `Loaded prebuilt app: ${manifest.id} (dev mode: ${devManifest.devUrl})`
                 );
               } else {
-                console.log(`Loaded prebuilt app: ${manifest.name}`);
+                console.log(`Loaded prebuilt app: ${manifest.id}`);
               }
             } catch {
               // No dev manifest, use production build
-              console.log(`Loaded prebuilt app: ${manifest.name}`);
+              console.log(`Loaded prebuilt app: ${manifest.id}`);
             }
 
             this.installedApps.set(manifest.id, manifest);
@@ -308,7 +308,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Prevent uninstalling prebuilt apps
     if (manifest.isPrebuilt) {
       throw new Error(
-        `Cannot uninstall ${manifest.name}: this is a system app.`
+        `Cannot uninstall ${manifest.id}: this is a system app.`
       );
     }
 

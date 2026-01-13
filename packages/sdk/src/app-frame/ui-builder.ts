@@ -100,12 +100,16 @@ export function setTitle(title: string): void {
 
 /**
  * Extract a readable name from app ID
- * @param appId - The app ID (e.g., 'com.example.myapp')
- * @returns Readable name (e.g., 'Myapp')
+ * @param name - The app name (string or localized object)
+ * @param locale - The locale to use (default 'en')
+ * @returns Readable name
  */
-export function getAppName(appId: string): string {
-    const parts = appId.split('.');
-    const name = parts[parts.length - 1] || appId;
-    // Capitalize first letter
-    return name.charAt(0).toUpperCase() + name.slice(1);
+export function getAppName(name: string | Record<string, string>, locale: string = 'en'): string {
+    if (typeof name === 'string') {
+        const parts = name.split('.');
+        const readable = parts[parts.length - 1] || name;
+        return readable.charAt(0).toUpperCase() + readable.slice(1);
+    }
+    
+    return name[locale] || name['en'] || Object.values(name)[0] || 'App';
 }

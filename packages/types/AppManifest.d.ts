@@ -162,8 +162,11 @@ export interface AppManifest {
   /** Unique identifier for the app (e.g., "com.example.myapp") */
   id: string;
 
-  /** Human-readable name */
-  name: string;
+  /**
+   * Human-readable name.
+   * Can be a simple string or a map of locales to names (e.g. { "en": "Files", "pl": "Pliki" })
+   */
+  name: string | Record<string, string>;
 
   /** Version string (semver recommended) */
   version: string;

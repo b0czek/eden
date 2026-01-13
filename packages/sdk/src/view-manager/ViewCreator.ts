@@ -109,6 +109,7 @@ export class ViewCreator {
   async injectAppFrame(
     view: WebContentsView,
     appId: string,
+    manifestName: string | Record<string, string>,
     viewMode: ViewMode,
     windowConfig?: WindowConfig,
     bounds?: Bounds
@@ -141,6 +142,7 @@ export class ViewCreator {
         window.edenFrame = {
           _internal: {
             appId: "${appId}",
+            appName: ${JSON.stringify(manifestName)},
             injected: false,
             config: ${JSON.stringify(windowConfig || {})},
             currentMode: "${viewMode}",
@@ -332,15 +334,15 @@ export class ViewCreator {
         });
       }
 
-      // Inject the app frame script (only for app views, not overlays)
-      if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
-        this.injectAppFrame(
-          view,
-          appId,
-          viewMode,
-          windowConfig,
-          viewBounds
-        ).catch((err) => {
+        if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
+          this.injectAppFrame(
+            view,
+            appId,
+            manifest.name,
+            viewMode,
+            windowConfig,
+            viewBounds
+          ).catch((err) => {
           console.error(
             `[ViewCreator] Failed to inject app frame for ${appId}:`,
             err

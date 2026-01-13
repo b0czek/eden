@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Component } from "solid-js";
 import Modal from "../components/Modal";
 import type { FileItem } from "../types";
@@ -14,20 +15,20 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
     <Modal
       show={props.show}
       onClose={props.onClose}
-      title="Confirm Delete"
+      title={t("common.delete")}
       size="sm"
       footer={
         <>
           <button class="eden-btn" onClick={props.onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button class="eden-btn eden-btn-danger" onClick={props.onConfirm}>
-            Delete
+             {t("common.delete")}
           </button>
         </>
       }
     >
-      <p>Are you sure you want to delete "{props.item?.name}"?</p>
+      <p>{t("common.deleteConfirmation", { name: props.item?.name || "" })}</p>
     </Modal>
   );
 };

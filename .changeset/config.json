@@ -3,7 +3,7 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [
-    ["@edenapp/sdk", "@edenapp/scripts", "@edenapp/types", "@edenapp/genesis"]
+    ["@edenapp/sdk", "@edenapp/scripts", "@edenapp/types", "@edenapp/genesis", "@edenapp/babel"]
   ],
   "linked": [],
   "access": "public",

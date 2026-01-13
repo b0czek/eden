@@ -1,5 +1,6 @@
 import { Show, createSignal, onMount } from "solid-js";
 import { FaSolidStop, FaSolidFire, FaSolidBolt, FaSolidThumbtack, FaSolidPlus, FaSolidTrash } from "solid-icons/fa";
+import { t } from "../i18n";
 
 export interface ContextMenuData {
   appId: string;
@@ -95,7 +96,7 @@ export default function AppContextMenu(props: AppContextMenuProps) {
             onClick={handleStopApp}
           >
             <FaSolidStop />
-            Stop App
+            {t("shell.stopApp")}
           </button>
         </Show>
         <button
@@ -103,21 +104,21 @@ export default function AppContextMenu(props: AppContextMenuProps) {
           onClick={handleToggleHotReload}
         >
           {hotReloadEnabled() ? <FaSolidFire /> : <FaSolidBolt />}
-          {hotReloadEnabled() ? "Disable" : "Enable"} Hot Reload
+          {hotReloadEnabled() ? t("shell.disableHotReload") : t("shell.enableHotReload")}
         </button>
         <button
           class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
           onClick={handleToggleDock}
         >
           {props.isAppPinned(props.menu.appId) ? <FaSolidThumbtack /> : <FaSolidPlus />}
-          {props.isAppPinned(props.menu.appId) ? "Remove from Dock" : "Add to Dock"}
+          {props.isAppPinned(props.menu.appId) ? t("shell.removeFromDock") : t("shell.addToDock")}
         </button>
         <button
           class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger context-menu-btn"
           onClick={handleUninstall}
         >
           <FaSolidTrash />
-          Uninstall
+          {t("shell.uninstall")}
         </button>
       </div>
     </>

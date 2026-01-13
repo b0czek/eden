@@ -1,4 +1,5 @@
 import { createSignal, createEffect, onMount } from "solid-js";
+import { initLocale } from "./i18n";
 import type { Component } from "solid-js";
 import type { FileItem, DisplayPreferences } from "./types";
 import { joinPath, getParentPath, isValidName } from "./utils";
@@ -41,6 +42,7 @@ const App: Component = () => {
 
   // Load preferences from database on mount
   onMount(async () => {
+    initLocale(); // Initialize locale
     try {
       const result = await window.edenAPI.shellCommand('db/get', { key: 'display-preferences' });
       if (result.value) {

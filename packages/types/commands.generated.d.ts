@@ -323,6 +323,20 @@ export interface FsCommands {
 }
 
 /**
+ * I18nCommands - Commands for the "i18n" namespace
+ */
+export interface I18nCommands {
+  "i18n/get-locale": {
+    args: Record<string, never>;
+    response: { locale: string };
+  };
+  "i18n/get-common": {
+    args: { locale: string };
+    response: { translations: Record<string, any> };
+  };
+}
+
+/**
  * EventCommands - Commands for the "event" namespace
  */
 export interface EventCommands {
@@ -648,4 +662,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}

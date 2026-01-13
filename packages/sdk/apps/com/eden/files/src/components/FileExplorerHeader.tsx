@@ -3,6 +3,8 @@ import type { Component } from "solid-js";
 import Omnibox from "./Omnibox";
 import { FaSolidArrowLeft, FaSolidArrowRight, FaSolidArrowUp, FaSolidFolderPlus, FaSolidFileMedical, FaSolidEllipsis } from "solid-icons/fa";
 
+import { t } from "../i18n";
+
 interface Breadcrumb {
   name: string;
   path: string;
@@ -31,7 +33,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoBack}
             disabled={props.historyIndex === 0}
-            title="Go back"
+            title={t("files.goBack")}
           >
             <FaSolidArrowLeft />
           </button>
@@ -39,7 +41,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoForward}
             disabled={props.historyIndex >= props.historyLength - 1}
-            title="Go forward"
+            title={t("files.goForward")}
           >
             <FaSolidArrowRight />
           </button>
@@ -47,7 +49,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
             disabled={props.currentPath === "/"}
-            title="Go up"
+            title={t("files.goUp")}
           >
             <FaSolidArrowUp />
           </button>
@@ -63,21 +65,21 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFolder}
-            title="New Folder"
+            title={t("files.newFolder")}
           >
             <FaSolidFolderPlus />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFile}
-            title="New File"
+            title={t("files.newFile")}
           >
             <FaSolidFileMedical />
           </button>
           <button
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onOpenDisplayOptions}
-            title="Display Options"
+            title={t("common.settings")}
           >
             <FaSolidEllipsis />
           </button>

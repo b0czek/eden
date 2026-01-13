@@ -29,8 +29,12 @@ import { setupWindowResizing } from "./window-resizing.js";
       setTitle: (title: string) => {
         /* will be set later */
       },
+      resetTitle: () => {
+        /* will be set later */
+      },
       _internal: {
         appId: "",
+        appName: "" as string | Record<string, string>,
         injected: false,
         config: {},
         currentMode: "tiled",
@@ -63,8 +67,47 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Get appId from injected config
     if (window.edenFrame && window.edenFrame._internal.appId) {
       appId = window.edenFrame._internal.appId;
-      appName = getAppName(appId);
-      setTitle(appName);
+      const rawName = window.edenFrame._internal.appName;
+      
+      // Async fetch locale
+      window.edenAPI.shellCommand('i18n/get-locale', {})
+        .then((response: { locale: string }) => {
+             const locale = response?.locale;
+             const currentLocale = locale || 'en';
+             appName = getAppName(rawName, currentLocale);
+             setTitle(appName);
+             
+             // Update resetTitle to use this locale
+             if (window.edenFrame) {
+                 window.edenFrame.setTitle = (title: string) => setTitle(title);
+                 (window.edenFrame as any).resetTitle = () => setTitle(appName);
+             }
+        })
+        .catch(() => {
+             appName = getAppName(rawName, 'en');
+             setTitle(appName);
+             if (window.edenFrame) {
+                 window.edenFrame.setTitle = (title: string) => setTitle(title);
+                 (window.edenFrame as any).resetTitle = () => setTitle(appName);
+             }
+        });
+        
+       // Set initial title (english fallback) to avoid empty title while fetching
+       setTitle(getAppName(rawName, 'en'));
+
+       // Subscribe to locale changes for live updates
+       window.edenAPI.subscribe('i18n/locale-changed', (data: { locale: string }) => {
+           const newLocale = data.locale;
+           const currentName = getAppName(rawName, newLocale);
+           
+           // Update title
+           setTitle(currentName);
+           
+           // Update resetTitle to use the new locale
+           if (window.edenFrame) {
+             (window.edenFrame as any).resetTitle = () => setTitle(currentName);
+           }
+       });
     }
 
     // Setup button handlers
@@ -199,5 +242,15 @@ import { setupWindowResizing } from "./window-resizing.js";
   // Expose API for apps to update the title
   window.edenFrame.setTitle = (title: string) => {
     setTitle(title);
+  };
+  
+  // Expose resetTitle immediately (using English/default name initially)
+  // This will be updated to use the correct locale once fetched
+  window.edenFrame.resetTitle = () => {
+    // If locale hasn't loaded yet, getAppName will use 'en' fallback
+    if (window.edenFrame) {
+        const currentName = getAppName(window.edenFrame._internal.appName || window.edenFrame._internal.appId, 'en');
+        setTitle(currentName);
+    }
   };
 })();

@@ -3,6 +3,8 @@ import type { Component } from "solid-js";
 import type { FileItem, ViewStyle, ItemSize } from "../types";
 import FileItemComponent from "./FileItem";
 
+import { t } from "../i18n";
+
 interface FileListProps {
   loading: boolean;
   items: FileItem[];
@@ -135,15 +137,15 @@ const FileList: Component<FileListProps> = (props) => {
   return (
     <main class="explorer-content">
       <Show when={props.loading}>
-        <div class="loading-message">Loading...</div>
+        <div class="loading-message">{t("common.loading")}</div>
       </Show>
 
       <Show when={!props.loading && props.items.length === 0}>
         <div class="empty-state">
           <div class="empty-icon">📂</div>
-          <div class="empty-message">This folder is empty</div>
+          <div class="empty-message">{t("files.empty")}</div>
           <div class="empty-hint">
-            Create a new file or folder to get started
+            {t("files.emptyHint")}
           </div>
         </div>
       </Show>

@@ -44,6 +44,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "fs/stat",
   "fs/search",
   "fs/delete",
+  "i18n/get-locale",
+  "i18n/get-common",
   "event/subscribe",
   "event/unsubscribe",
   "event/exists",
@@ -86,6 +88,7 @@ export const COMMAND_NAMES: readonly string[] = [
 export const APP_EVENT_NAMES: readonly string[] = [
   "appearance/wallpaper-changed",
   "file/opened",
+  "i18n/locale-changed",
   "notification/added",
   "notification/removed",
   "package/installed",

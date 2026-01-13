@@ -5,10 +5,12 @@ import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 export interface EdenFrame {
   // Public API
   setTitle: (title: string) => void;
+  resetTitle: () => void;
 
   // Internal state (used by frame system)
   _internal: {
     appId: string;
+    appName: string | Record<string, string>;
     injected: boolean;
     config: {
       mode?: "tiled" | "floating" | "both";

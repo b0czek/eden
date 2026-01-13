@@ -4,6 +4,7 @@ import * as path from "path";
 import { IPCBridge, CommandRegistry } from "./ipc";
 import { AppChannelManager } from "./appbus";
 import { SystemHandler } from "./SystemHandler";
+import { I18nManager } from "./i18n/I18nManager";
 import { EdenConfig } from "@edenapp/types";
 
 // Managers and Handlers
@@ -72,6 +73,7 @@ export class Eden {
     this.packageManager = container.resolve(PackageManager);
     this.processManager = container.resolve(ProcessManager);
     container.resolve(SystemHandler);
+    container.resolve(I18nManager);
     container.resolve(FilesystemManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
     this.autostartManager = container.resolve(AutostartManager);

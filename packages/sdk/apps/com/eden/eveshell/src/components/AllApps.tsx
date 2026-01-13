@@ -2,6 +2,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
 import { AppInfo } from "../types";
+import { t } from "../i18n";
 
 interface AllAppsProps {
   apps: AppInfo[];
@@ -148,7 +149,7 @@ export default function AllApps(props: AllAppsProps) {
                 ref={searchInputRef}
                 type="text"
                 class="eden-input"
-                placeholder="Search apps..."
+                placeholder={t("shell.searchApps")}
                 value={searchQuery()}
                 onInput={(e) => setSearchQuery(e.currentTarget.value)}
               />
@@ -201,7 +202,7 @@ export default function AllApps(props: AllAppsProps) {
                   class="eden-text-tertiary eden-text-md"
                   style="grid-column: 1 / -1; text-align: center; padding: var(--eden-space-2xl);"
                 >
-                  No apps found
+                  {t("shell.noAppsFound")}
                 </div>
               </Show>
             </div>

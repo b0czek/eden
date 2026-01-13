@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 
 interface ErrorDialogProps {
   show: boolean;
@@ -12,11 +13,11 @@ const ErrorDialog: Component<ErrorDialogProps> = (props) => {
     <Modal
       show={props.show}
       onClose={props.onClose}
-      title="Error"
+      title={t("common.error")}
       size="sm"
       footer={
         <button class="eden-btn eden-btn-primary" onClick={props.onClose}>
-          OK
+          {t("common.ok")}
         </button>
       }
     >

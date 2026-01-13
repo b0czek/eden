@@ -4,6 +4,7 @@ import Clock from "./Clock";
 import { AppInfo } from "../types";
 import { ContextMenuData } from "./AppContextMenu";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
+import { t } from "../i18n";
 
 interface DockProps {
   runningApps: AppInfo[];  // Running apps that are NOT pinned
@@ -133,7 +134,7 @@ export default function Dock(props: DockProps) {
           
           <AppIcon
             appId="apps-view"
-            appName="All Apps"
+            appName={t("shell.allApps")}
             icon={appsViewIcon}
             onClick={props.onShowAllApps}
           />

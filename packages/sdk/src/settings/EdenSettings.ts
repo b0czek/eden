@@ -8,6 +8,24 @@ import { SettingsCategory } from "@edenapp/types";
 export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
 
     {
+        id: "general",
+        name: "General",
+        icon: "settings",
+        settings: [
+            {
+                key: "general.locale",
+                label: "Language",
+                type: "select",
+                description: "System language",
+                options: [
+                    { label: "English", value: "en" },
+                    { label: "Polski", value: "pl" },
+                ],
+                defaultValue: "en",
+            },
+        ],
+    },
+    {
         id: "appearance",
         name: "Appearance",
         icon: "image",

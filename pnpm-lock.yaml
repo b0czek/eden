@@ -12,6 +12,22 @@ importers:
         specifier: ^2.29.8
         version: 2.29.8(@types/node@22.19.1)
 
+  packages/babel:
+    dependencies:
+      i18next:
+        specifier: ^23.7.11
+        version: 23.16.8
+      solid-js:
+        specifier: ^1.9.0
+        version: 1.9.10
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../types
+      typescript:
+        specifier: ^5.3.0
+        version: 5.6.3
+
   packages/example:
     dependencies:
       '@edenapp/scripts':
@@ -185,6 +201,9 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(solid-js@1.9.10)
     devDependencies:
+      '@edenapp/babel':
+        specifier: workspace:*
+        version: link:../../../../../babel
       '@edenapp/types':
         specifier: workspace:*
         version: link:../../../../../types
@@ -227,6 +246,9 @@ importers:
 
   packages/sdk/apps/com/eden/files:
     dependencies:
+      '@edenapp/babel':
+        specifier: workspace:*
+        version: link:../../../../../babel
       solid-icons:
         specifier: ^1.1.0
         version: 1.1.0(solid-js@1.9.10)
@@ -2157,6 +2179,9 @@ packages:
   hyperdyperid@1.2.0:
     resolution: {integrity: sha512-Y93lCzHYgGWdrJ66yIktxiaGULYc6oGiABxhcO5AufBeOyoIdZF7bIfLaOrbM0iGIOXQQgxxRrFEnb+Y6w1n4A==}
     engines: {node: '>=10.18'}
+
+  i18next@23.16.8:
+    resolution: {integrity: sha512-06r/TitrM88Mg5FdUXAKL96dJMzgqLE5dv3ryBAra4KCwD9mJ4ndOTS95ZuymIGoE+2hzfdaMak2X11/es7ZWg==}
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -5614,6 +5639,10 @@ snapshots:
     optional: true
 
   hyperdyperid@1.2.0: {}
+
+  i18next@23.16.8:
+    dependencies:
+      '@babel/runtime': 7.28.4
 
   iconv-lite@0.6.3:
     dependencies:

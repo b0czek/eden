@@ -225,6 +225,16 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   }
 
   /**
+   * Helper to resolve localized app name to string
+   */
+  private getAppName(name: string | Record<string, string>): string {
+    if (typeof name === "string") {
+      return name;
+    }
+    return name["en"] || Object.values(name)[0] || "Unknown App";
+  }
+
+  /**
    * Get all apps that can handle a specific extension
    */
   getSupportedHandlers(extension: string): FileHandlerInfo[] {
@@ -240,7 +250,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
           if (handler.extensions.map((e) => e.toLowerCase()).includes(ext)) {
             handlers.push({
               appId: app.id,
-              appName: app.name,
+              appName: this.getAppName(app.name),
               handlerName: handler.name,
               icon: handler.icon || app.icon,
             });
@@ -256,7 +266,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       if (app) {
         handlers.push({
           appId: app.id,
-          appName: app.name,
+          appName: this.getAppName(app.name),
         });
       }
     }
