@@ -1,6 +1,9 @@
 {
   "id": "com.eden.editor",
-  "name": "Text Editor",
+  "name": {
+    "en": "Text Editor",
+    "pl": "Edytor Tekstu"
+  },
   "version": "1.0.0",
   "description": "A Monaco-based text editor for editing files",
   "author": "Dariusz Majnert",

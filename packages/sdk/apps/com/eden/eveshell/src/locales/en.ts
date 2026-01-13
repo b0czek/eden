@@ -11,4 +11,4 @@ export const en = {
     uninstall: "Uninstall",
     uninstallConfirm: "Are you sure you want to uninstall this app?",
   }
-};
+} as const;

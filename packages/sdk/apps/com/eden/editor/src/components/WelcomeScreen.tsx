@@ -32,17 +32,19 @@ function ShortcutItem(props: ShortcutItemProps) {
   );
 }
 
+import { t } from "../i18n";
+
 export function WelcomeScreen() {
   return (
     <div class="welcome-content">
       <div class="empty-state-icon">
         <DocumentIcon />
       </div>
-      <h1>Text Editor</h1>
-      <p>Open a file from the Files app to start editing</p>
+      <h1>{t("editor.title")}</h1>
+      <p>{t("editor.welcome")}</p>
       <div class="welcome-shortcuts">
-        <ShortcutItem shortcut="Ctrl+S" description="Save file" />
-        <ShortcutItem shortcut="Ctrl+W" description="Close tab" />
+        <ShortcutItem shortcut="Ctrl+S" description={t("editor.saveShortcut")} />
+        <ShortcutItem shortcut="Ctrl+W" description={t("editor.closeTabShortcut")} />
       </div>
     </div>
   );

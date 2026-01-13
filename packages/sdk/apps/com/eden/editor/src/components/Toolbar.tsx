@@ -1,4 +1,5 @@
 import type { EditorTab } from "../types";
+import { t } from "../i18n";
 
 // Floppy disk save icon
 function SaveIcon() {
@@ -29,7 +30,7 @@ export function Toolbar(props: ToolbarProps) {
           class="eden-btn eden-btn-sm"
           onClick={props.onSave}
           disabled={!props.activeTab?.isModified || props.isSaving}
-          title="Save (Ctrl+S)"
+          title={`${t("common.save")} (Ctrl+S)`}
         >
           <SaveIcon />
         </button>

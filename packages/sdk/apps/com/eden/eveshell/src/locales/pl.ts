@@ -11,4 +11,4 @@ export const pl = {
     uninstall: "Odinstaluj",
     uninstallConfirm: "Czy na pewno chcesz odinstalować tę aplikację?",
   }
-};
+} as const;

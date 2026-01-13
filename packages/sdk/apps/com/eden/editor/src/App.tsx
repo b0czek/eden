@@ -4,6 +4,7 @@ import type { Component } from "solid-js";
 // Use lazy-loading components - Monaco is loaded on-demand, not at startup
 import { TabBar, Toolbar, ErrorBanner, WelcomeScreen, LazyMonacoEditor, setEditorContentLazy, getEditorContentLazy, preloadMonaco } from "./components";
 import { EditorTab, FileOpenedEvent, getLanguageFromPath, getFileName } from "./types";
+import { t, initLocale } from "./i18n";
 
 // Type for the editor instance (just the interface, not the actual module)
 type IStandaloneCodeEditor = import("monaco-editor").editor.IStandaloneCodeEditor;
@@ -23,6 +24,9 @@ const App: Component = () => {
   // Subscribe to file open events and set up keyboard shortcuts
   onMount(async () => {
     console.log("Editor app mounted");
+    
+    // Initialize i18n
+    initLocale();
     
     // Start loading Monaco in the background immediately
     // This way it's ready by the time the user opens a file
@@ -98,7 +102,7 @@ const App: Component = () => {
       }
       window.edenFrame?.setTitle(newTab.name);
     } catch (err) {
-      setError(`Failed to load file: ${(err as Error).message}`);
+      setError(t("editor.failedToLoad", { message: (err as Error).message }));
     }
   };
 
@@ -146,7 +150,7 @@ const App: Component = () => {
           : t
       ));
     } catch (err) {
-      setError(`Failed to save file: ${(err as Error).message}`);
+      setError(t("editor.failedToSave", { message: (err as Error).message }));
     } finally {
       setIsSaving(false);
     }
