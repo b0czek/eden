@@ -1,0 +1,160 @@
+/*
+ * AppsTab Styles
+ * Minimal styles that cannot be replaced by edencss utilities
+ */
+
+/* ===== Apps List Screen ===== */
+.apps-list-screen {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.apps-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: var(--eden-space-xs);
+}
+
+.app-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  border: 1px solid var(--eden-color-border-light);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  color: var(--eden-color-text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--eden-transition-fast), border-color var(--eden-transition-fast), background var(--eden-transition-fast);
+}
+
+.app-row:hover {
+  border-color: var(--eden-color-border-hover);
+  transform: translateY(-1px);
+}
+
+.app-row-selected {
+  border-color: var(--eden-color-accent-primary);
+  background: var(--eden-color-bg-glass-medium);
+}
+
+/* ===== App Icons ===== */
+.app-row-icon,
+.app-detail-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-surface-tertiary);
+  color: var(--eden-color-text-tertiary);
+  overflow: hidden;
+  box-shadow: var(--eden-shadow-inner);
+  flex-shrink: 0;
+}
+
+.app-detail-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--eden-radius-lg);
+}
+
+.app-row-icon-no-bg,
+.app-detail-icon-no-bg {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-row-icon img,
+.app-detail-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== App Row Content ===== */
+.app-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-row-badge {
+  margin-left: auto;
+}
+
+/* ===== Apps Detail Panel ===== */
+.apps-detail-panel {
+  border-radius: var(--eden-radius-xl);
+  border: 1px solid var(--eden-color-border-light);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  padding: var(--eden-space-lg);
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.apps-back {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: var(--eden-space-xs);
+  align-items: center;
+}
+
+/* ===== App Detail Content ===== */
+.app-detail-header {
+  display: flex;
+  gap: var(--eden-space-md);
+  align-items: center;
+}
+
+.app-detail-heading {
+  min-width: 0;
+}
+
+.app-detail-actions {
+  flex-wrap: wrap;
+}
+
+/* ===== App Detail Grid ===== */
+.app-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--eden-space-md);
+}
+
+.app-detail-item {
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-glass-medium);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.app-detail-label {
+  font-size: var(--eden-font-size-xs);
+  color: var(--eden-color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--eden-space-xs);
+}
+
+.app-detail-value {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-primary);
+}
+
+/* ===== App Detail Tags ===== */
+.app-detail-tags {
+  flex-wrap: wrap;
+}
+
+.eden-tag-mono {
+  font-family: var(--eden-font-family-mono);
+  font-size: var(--eden-font-size-xs);
+}

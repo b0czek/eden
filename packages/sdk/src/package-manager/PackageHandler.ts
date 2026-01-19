@@ -86,4 +86,16 @@ export class PackageHandler {
     const { path } = args;
     return await this.packageManager.getPackageInfo(path);
   }
+
+  /**
+   * Get the installed size of an app in bytes
+   */
+  @EdenHandler("get-size")
+  async handleGetAppSize(args: {
+    appId: string;
+  }): Promise<{ size: number | undefined }> {
+    const { appId } = args;
+    const size = await this.packageManager.getAppSize(appId);
+    return { size };
+  }
 }

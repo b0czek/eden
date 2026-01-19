@@ -5,7 +5,7 @@ import type { AppManifest, SettingsCategory } from "@edenapp/types";
 import { FiSettings, FiCode, FiPackage, FiImage } from "solid-icons/fi";
 import { VsSettings, VsSymbolColor, VsPulse } from "solid-icons/vs";
 import SettingInput from "./components/SettingInput";
-import AppsTab from "./components/AppsTab";
+import AppsTab from "./components/apps";
 import AppearanceTab from "./components/AppearanceTab";
 import { t, initLocale, locale, getLocalizedValue } from "./i18n";
 import "./App.css";
@@ -16,14 +16,19 @@ interface SelectedItem {
   label: string;
 }
 
-
 const App: Component = () => {
   const [apps, setApps] = createSignal<AppManifest[]>([]);
   const [appIcons, setAppIcons] = createSignal<Record<string, string>>({});
   const [edenSchema, setEdenSchema] = createSignal<SettingsCategory[]>([]);
-  const [selectedItem, setSelectedItem] = createSignal<SelectedItem | null>(null);
-  const [currentSettings, setCurrentSettings] = createSignal<SettingsCategory[]>([]);
-  const [settingValues, setSettingValues] = createStore<Record<string, string>>({});
+  const [selectedItem, setSelectedItem] = createSignal<SelectedItem | null>(
+    null
+  );
+  const [currentSettings, setCurrentSettings] = createSignal<
+    SettingsCategory[]
+  >([]);
+  const [settingValues, setSettingValues] = createStore<Record<string, string>>(
+    {}
+  );
   const [loading, setLoading] = createSignal(true);
 
   onMount(async () => {
@@ -43,16 +48,21 @@ const App: Component = () => {
 
   const loadApps = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("package/list", { showHidden: true });
-      const appsWithSettings = result.filter((app: AppManifest) =>
-        app.settings && app.settings.length > 0
+      const result = await window.edenAPI!.shellCommand("package/list", {
+        showHidden: true,
+      });
+      const appsWithSettings = result.filter(
+        (app: AppManifest) => app.settings && app.settings.length > 0
       );
       setApps(appsWithSettings);
 
       const icons: Record<string, string> = {};
       for (const app of appsWithSettings) {
         try {
-          const iconResult = await window.edenAPI!.shellCommand("package/get-icon", { appId: app.id });
+          const iconResult = await window.edenAPI!.shellCommand(
+            "package/get-icon",
+            { appId: app.id }
+          );
           if (iconResult.icon) {
             icons[app.id] = iconResult.icon;
           }
@@ -87,9 +97,12 @@ const App: Component = () => {
     const values: Record<string, string> = {};
     try {
       // Eden settings use appId "com.eden"
-      const result = await window.edenAPI!.shellCommand("settings/get-all/su", { appId: "com.eden" });
+      const result = await window.edenAPI!.shellCommand("settings/get-all/su", {
+        appId: "com.eden",
+      });
       for (const setting of category.settings) {
-        values[setting.key] = result.settings[setting.key] ?? setting.defaultValue ?? "";
+        values[setting.key] =
+          result.settings[setting.key] ?? setting.defaultValue ?? "";
       }
     } catch (error) {
       console.error("Failed to load Eden settings:", error);
@@ -109,10 +122,13 @@ const App: Component = () => {
 
     const values: Record<string, string> = {};
     try {
-      const result = await window.edenAPI!.shellCommand("settings/get-all/su", { appId });
+      const result = await window.edenAPI!.shellCommand("settings/get-all/su", {
+        appId,
+      });
       for (const category of app.settings) {
         for (const setting of category.settings) {
-          values[setting.key] = result.settings[setting.key] ?? setting.defaultValue ?? "";
+          values[setting.key] =
+            result.settings[setting.key] ?? setting.defaultValue ?? "";
         }
       }
     } catch (error) {
@@ -153,8 +169,6 @@ const App: Component = () => {
     }
   };
 
-
-
   const handleSelectEdenCategory = (category: SettingsCategory) => {
     setSelectedItem({
       type: "eden",
@@ -191,18 +205,27 @@ const App: Component = () => {
       {/* Sidebar - using edencss sidebar component */}
       <aside class="eden-sidebar">
         <div class="eden-sidebar-section">
-          <div class="eden-sidebar-section-title">{t("settings.sidebar.eden")}</div>
+          <div class="eden-sidebar-section-title">
+            {t("settings.sidebar.eden")}
+          </div>
           <div class="eden-sidebar-items">
             <For each={edenSchema()}>
               {(category) => (
                 <div
-                  class={`eden-sidebar-item ${selectedItem()?.type === "eden" && selectedItem()?.id === category.id ? "eden-sidebar-item-selected" : ""}`}
+                  class={`eden-sidebar-item ${
+                    selectedItem()?.type === "eden" &&
+                    selectedItem()?.id === category.id
+                      ? "eden-sidebar-item-selected"
+                      : ""
+                  }`}
                   onClick={() => handleSelectEdenCategory(category)}
                 >
                   <div class="eden-sidebar-item-icon">
                     {getCategoryIcon(category.icon)}
                   </div>
-                  <span class="eden-sidebar-item-text">{getLocalizedValue(category.name, locale())}</span>
+                  <span class="eden-sidebar-item-text">
+                    {getLocalizedValue(category.name, locale())}
+                  </span>
                 </div>
               )}
             </For>
@@ -214,11 +237,25 @@ const App: Component = () => {
         <div class="eden-sidebar-section">
           <div class="eden-sidebar-items">
             <div
-              class={`eden-sidebar-item ${selectedItem()?.type === "apps-management" ? "eden-sidebar-item-selected" : ""}`}
-              onClick={() => setSelectedItem({ type: "apps-management", id: "apps", label: t("settings.sidebar.installedApps") })}
+              class={`eden-sidebar-item ${
+                selectedItem()?.type === "apps-management"
+                  ? "eden-sidebar-item-selected"
+                  : ""
+              }`}
+              onClick={() =>
+                setSelectedItem({
+                  type: "apps-management",
+                  id: "apps",
+                  label: t("settings.sidebar.installedApps"),
+                })
+              }
             >
-              <div class="eden-sidebar-item-icon"><FiPackage /></div>
-              <span class="eden-sidebar-item-text">{t("settings.sidebar.installedApps")}</span>
+              <div class="eden-sidebar-item-icon">
+                <FiPackage />
+              </div>
+              <span class="eden-sidebar-item-text">
+                {t("settings.sidebar.installedApps")}
+              </span>
             </div>
           </div>
         </div>
@@ -226,32 +263,42 @@ const App: Component = () => {
         <div class="eden-sidebar-divider" />
 
         <div class="eden-sidebar-section eden-sidebar-section-scrollable">
-          <div class="eden-sidebar-section-title">{t("settings.sidebar.applications")}</div>
+          <div class="eden-sidebar-section-title">
+            {t("settings.sidebar.applications")}
+          </div>
           <div class="eden-sidebar-items eden-sidebar-items-scrollable">
             <Show
               when={apps().length > 0}
               fallback={
                 <div class="eden-sidebar-item eden-sidebar-item-disabled">
-                  <div class="eden-sidebar-item-icon"><FiPackage /></div>
-                  <span class="eden-sidebar-item-text">{t("settings.sidebar.noAppsWithSettings")}</span>
+                  <div class="eden-sidebar-item-icon">
+                    <FiPackage />
+                  </div>
+                  <span class="eden-sidebar-item-text">
+                    {t("settings.sidebar.noAppsWithSettings")}
+                  </span>
                 </div>
               }
             >
               <For each={apps()}>
                 {(app) => (
                   <div
-                    class={`eden-sidebar-item ${selectedItem()?.type === "app" && selectedItem()?.id === app.id ? "eden-sidebar-item-selected" : ""}`}
+                    class={`eden-sidebar-item ${
+                      selectedItem()?.type === "app" &&
+                      selectedItem()?.id === app.id
+                        ? "eden-sidebar-item-selected"
+                        : ""
+                    }`}
                     onClick={() => handleSelectApp(app)}
                   >
                     <div class="eden-sidebar-item-icon">
-                      <Show
-                        when={appIcons()[app.id]}
-                        fallback={<FiPackage />}
-                      >
+                      <Show when={appIcons()[app.id]} fallback={<FiPackage />}>
                         <img src={appIcons()[app.id]} alt="" />
                       </Show>
                     </div>
-                    <span class="eden-sidebar-item-text">{getLocalizedValue(app.name, locale())}</span>
+                    <span class="eden-sidebar-item-text">
+                      {getLocalizedValue(app.name, locale())}
+                    </span>
                   </div>
                 )}
               </For>
@@ -264,14 +311,22 @@ const App: Component = () => {
       <main class="main-content">
         <Show
           when={!loading()}
-          fallback={<div class="loading"><span class="loading-spinner">⟳</span> {t("common.loading")}</div>}
+          fallback={
+            <div class="loading">
+              <span class="loading-spinner">⟳</span> {t("common.loading")}
+            </div>
+          }
         >
           <Show
             when={selectedItem()}
             fallback={
               <div class="empty-state">
-                <div class="empty-state-icon"><VsSettings /></div>
-                <div class="empty-state-text">{t("settings.selectCategory")}</div>
+                <div class="empty-state-icon">
+                  <VsSettings />
+                </div>
+                <div class="empty-state-text">
+                  {t("settings.selectCategory")}
+                </div>
               </div>
             }
           >
@@ -280,10 +335,14 @@ const App: Component = () => {
                 <header class="content-header">
                   <h1 class="content-title">{item().label}</h1>
                   <Show when={item().type === "app"}>
-                    <p class="content-description">{apps().find(a => a.id === item().id)?.description}</p>
+                    <p class="content-description">
+                      {apps().find((a) => a.id === item().id)?.description}
+                    </p>
                   </Show>
                   <Show when={item().type === "apps-management"}>
-                    <p class="content-description">{t("settings.appsManagementDescription")}</p>
+                    <p class="content-description">
+                      {t("settings.appsManagementDescription")}
+                    </p>
                   </Show>
                 </header>
 
@@ -295,27 +354,47 @@ const App: Component = () => {
                   <AppearanceTab />
                 </Show>
 
-                <Show when={item().type !== "apps-management" && item().id !== "appearance"}>
+                <Show
+                  when={
+                    item().type !== "apps-management" &&
+                    item().id !== "appearance"
+                  }
+                >
                   <div class="settings-list">
                     <For each={currentSettings()}>
                       {(category) => (
                         <>
                           <Show when={currentSettings().length > 1}>
-                            <h3 class="category-header">{getLocalizedValue(category.name, locale())}</h3>
+                            <h3 class="category-header">
+                              {getLocalizedValue(category.name, locale())}
+                            </h3>
                           </Show>
                           <For each={category.settings}>
                             {(setting) => (
                               <div class="setting-item">
                                 <div class="setting-info">
-                                  <h4 class="setting-label">{getLocalizedValue(setting.label, locale())}</h4>
+                                  <h4 class="setting-label">
+                                    {getLocalizedValue(setting.label, locale())}
+                                  </h4>
                                   <Show when={setting.description}>
-                                    <p class="setting-description">{getLocalizedValue(setting.description, locale())}</p>
+                                    <p class="setting-description">
+                                      {getLocalizedValue(
+                                        setting.description,
+                                        locale()
+                                      )}
+                                    </p>
                                   </Show>
                                 </div>
                                 <SettingInput
                                   setting={setting}
-                                  value={(settingValues[setting.key] as string) ?? setting.defaultValue ?? ""}
-                                  onChange={(value) => handleSettingChange(setting.key, value)}
+                                  value={
+                                    (settingValues[setting.key] as string) ??
+                                    setting.defaultValue ??
+                                    ""
+                                  }
+                                  onChange={(value) =>
+                                    handleSettingChange(setting.key, value)
+                                  }
                                 />
                               </div>
                             )}

@@ -18,6 +18,7 @@ export interface I18nCommonTranslations {
   "common.delete": void;
   "common.edit": void;
   "common.close": void;
+  "common.back": void;
   "common.loading": void;
   "common.error": void;
   "common.settings": void;

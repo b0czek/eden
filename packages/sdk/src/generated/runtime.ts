@@ -57,6 +57,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "package/is-hot-reload-enabled",
   "package/get-icon",
   "package/get-info",
+  "package/get-size",
   "process/launch",
   "process/stop",
   "process/list",

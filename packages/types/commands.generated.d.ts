@@ -431,6 +431,14 @@ export interface PackageCommands {
     path: string };
     response: { success: boolean; manifest?: import("./index").AppManifest; error?: string };
   };
+  /**
+   * Get the installed size of an app in bytes
+   */
+  "package/get-size": {
+    args: {
+    appId: string };
+    response: { size: number | undefined };
+  };
 }
 
 /**

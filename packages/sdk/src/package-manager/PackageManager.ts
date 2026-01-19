@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import fg from "fast-glob";
 import { GenesisBundler } from "@edenapp/genesis";
 import { AppManifest } from "@edenapp/types";
 import {
@@ -307,9 +308,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
     // Prevent uninstalling prebuilt apps
     if (manifest.isPrebuilt) {
-      throw new Error(
-        `Cannot uninstall ${manifest.id}: this is a system app.`
-      );
+      throw new Error(`Cannot uninstall ${manifest.id}: this is a system app.`);
     }
 
     // Note: Stopping the app is the responsibility of ProcessManager.
@@ -467,5 +466,32 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       ".ico": "image/x-icon",
     };
     return mimeTypes[ext] || "application/octet-stream";
+  }
+
+  /**
+   * Get the size of an installed app in bytes
+   */
+  async getAppSize(appId: string): Promise<number | undefined> {
+    const appPath = this.getAppPath(appId);
+    if (!appPath) {
+      return undefined;
+    }
+
+    try {
+      return await this.getDirectorySize(appPath);
+    } catch (error) {
+      console.warn(`Failed to calculate size for ${appId}:`, error);
+      return undefined;
+    }
+  }
+
+  private async getDirectorySize(targetPath: string): Promise<number> {
+    const files = await fg("**/*", {
+      cwd: targetPath,
+      stats: true,
+      followSymbolicLinks: false,
+      onlyFiles: true,
+    });
+    return files.reduce((sum, file) => sum + (file.stats?.size ?? 0), 0);
   }
 }

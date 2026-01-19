@@ -6,6 +6,7 @@ export const commonEn = {
     delete: "Delete",
     edit: "Edit",
     close: "Close",
+    back: "Back",
     loading: "Loading...",
     error: "Error",
     settings: "Settings",

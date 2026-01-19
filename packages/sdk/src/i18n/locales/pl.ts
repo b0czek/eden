@@ -6,6 +6,7 @@ export const commonPl = {
     delete: "Usuń",
     edit: "Edytuj",
     close: "Zamknij",
+    back: "Wstecz",
     loading: "Ładowanie...",
     error: "Błąd",
     settings: "Ustawienia",
