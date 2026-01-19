@@ -127,6 +127,8 @@ export class Eden {
     this.mainWindow = new BrowserWindow({
       width: windowConfig.width || 1280,
       height: windowConfig.height || 800,
+      minWidth: 800,
+      minHeight: 600,
       title: windowConfig.title || "Eden",
       webPreferences: {
         nodeIntegration: false,
