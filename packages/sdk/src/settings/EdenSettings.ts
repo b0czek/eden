@@ -6,55 +6,67 @@ import { SettingsCategory } from "@edenapp/types";
  * Defines the settings categories and individual settings for Eden itself.
  */
 export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
-
-    {
-        id: "general",
-        name: {
-            en: "General",
-            pl: "Ogólne",
-        },
-        icon: "settings",
-        settings: [
-            {
-                key: "general.locale",
-                label: {
-                    en: "Language",
-                    pl: "Język",
-                },
-                type: "select",
-                description: {
-                    en: "System language",
-                    pl: "Język systemu",
-                },
-                options: [
-                    { label: "English", value: "en" },
-                    { label: "Polski", value: "pl" },
-                ],
-                defaultValue: "en",
-            },
-        ],
+  {
+    id: "general",
+    name: {
+      en: "General",
+      pl: "Ogólne",
     },
-    {
-        id: "appearance",
-        name: {
-            en: "Appearance",
-            pl: "Wygląd",
+    icon: "settings",
+    settings: [
+      {
+        key: "general.locale",
+        label: {
+          en: "Language",
+          pl: "Język",
         },
-        icon: "image",
-        settings: [
-            {
-                key: "appearance.wallpaper",
-                label: {
-                    en: "Wallpaper",
-                    pl: "Tapeta",
-                },
-                type: "text",
-                description: {
-                    en: "Choose your desktop background",
-                    pl: "Wybierz tło pulpitu",
-                },
-                defaultValue: '{"type":"preset","id":"eden-default"}',
-            },
+        type: "select",
+        description: {
+          en: "System language",
+          pl: "Język systemu",
+        },
+        options: [
+          { label: "English", value: "en" },
+          { label: "Polski", value: "pl" },
         ],
+        defaultValue: "en",
+      },
+    ],
+  },
+  {
+    id: "appearance",
+    name: {
+      en: "Appearance",
+      pl: "Wygląd",
     },
+    icon: "image",
+    settings: [
+      {
+        key: "appearance.wallpaper",
+        label: {
+          en: "Wallpaper",
+          pl: "Tapeta",
+        },
+        type: "text",
+        description: {
+          en: "Choose your desktop background",
+          pl: "Wybierz tło pulpitu",
+        },
+        defaultValue: '{"type":"preset","id":"eden-default"}',
+      },
+    ],
+  },
+  {
+    id: "apps",
+    name: {
+      en: "Installed Apps",
+      pl: "Zainstalowane aplikacje",
+    },
+    description: {
+      en: "Manage installed applications, system services, and daemons.",
+      pl: "Zarządzaj zainstalowanymi aplikacjami, usługami systemowymi i demonami.",
+    },
+    icon: "package",
+    settings: [],
+  },
 ];

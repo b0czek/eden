@@ -146,6 +146,8 @@ export interface SettingsCategory {
   id: string;
   /** Display name */
   name: string | Record<string, string>;
+  /** Category description (optional) */
+  description?: string | Record<string, string>;
   /** Category icon (optional) */
   icon?: string;
   /** Settings in this category */
