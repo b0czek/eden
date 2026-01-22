@@ -1,0 +1,33 @@
+{
+  "id": "com.eden.login",
+  "name": "Login",
+  "version": "1.0.0",
+  "description": "Session login screen",
+  "author": "Dariusz Majnert",
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 720,
+      "height": 440
+    },
+    "minSize": {
+      "width": 480,
+      "height": 360
+    },
+    "resizable": false,
+    "movable": false,
+    "showTitle": false,
+    "injections": {
+      "css": "full",
+      "appFrame": false
+    }
+  },
+  "permissions": ["user/session"],
+  "hidden": true
+}
