@@ -133,12 +133,7 @@ export class CommandRegistry {
       }
     }
 
-    try {
-      return await metadata.handler.call(metadata.target, args);
-    } catch (error) {
-      console.error(`Error executing command ${fullCommand}:`, error);
-      throw error;
-    }
+    return await metadata.handler.call(metadata.target, args);
   }
 
   /**

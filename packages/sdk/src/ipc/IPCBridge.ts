@@ -179,13 +179,17 @@ export class IPCBridge extends EventEmitter {
           resolve(result);
         })
         .catch((error) => {
+          const err = error as Error;
+          const appInfo = appId ? ` (app: ${appId})` : "";
           console.error(
-            `[IPCBridge] Command '${command}' (ID: ${commandId}) failed:`,
-            error
+            `[IPCBridge] Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`
           );
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);
-          reject(error);
+          const sanitized = new Error(err.message);
+          sanitized.name = err.name;
+          sanitized.stack = "";
+          reject(sanitized);
         });
     });
   }
