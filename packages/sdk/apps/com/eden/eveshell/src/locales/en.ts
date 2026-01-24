@@ -10,5 +10,10 @@ export const en = {
     removeFromDock: "Remove from Dock",
     uninstall: "Uninstall",
     uninstallConfirm: "Are you sure you want to uninstall this app?",
-  }
+    signIn: "Sign in",
+    switchUser: "Switch User",
+    close: "Close",
+    logout: "Log out",
+    currentUser: "Current",
+  },
 } as const;

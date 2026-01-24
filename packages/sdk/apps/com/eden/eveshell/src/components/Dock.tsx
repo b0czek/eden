@@ -5,10 +5,14 @@ import { AppInfo } from "../types";
 import { ContextMenuData } from "./AppContextMenu";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
 import { t } from "../i18n";
+import UserBadge from "./UserBadge";
+import type { UserProfile } from "@edenapp/types";
 
 interface DockProps {
   runningApps: AppInfo[];  // Running apps that are NOT pinned
   pinnedApps: AppInfo[];   // Pinned apps (may or may not be running)
+  currentUser: UserProfile | null;
+  onUserClick: (event: MouseEvent) => void;
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
   onContextMenu: (menu: ContextMenuData) => void;
@@ -71,6 +75,11 @@ export default function Dock(props: DockProps) {
   return (
     <div class="dock" classList={{ "dock-initial": isInitial() }} ref={dockRef}>
       <div class="dock-left">
+        <div class="dock-user">
+          <UserBadge user={props.currentUser} onClick={props.onUserClick} />
+        </div>
+      </div>
+      <div class="dock-center">
         <div
           class="app-icons magnify"
           ref={containerRef}

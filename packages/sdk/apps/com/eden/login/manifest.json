@@ -28,6 +28,6 @@
       "appFrame": false
     }
   },
-  "permissions": ["user/session"],
+  "permissions": ["user/session", "user/identity"],
   "hidden": true
 }

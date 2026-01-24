@@ -12,7 +12,7 @@ const getInitials = (name: string): string => {
 
 const App = () => {
   const [users, setUsers] = createSignal<UserProfile[]>([]);
-  const [selectedUserId, setSelectedUserId] = createSignal<string | null>(null);
+  const [selectedUsername, setSelectedUsername] = createSignal<string | null>(null);
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(true);
@@ -77,18 +77,18 @@ const App = () => {
   });
 
   createEffect(() => {
-    if (selectedUserId()) return;
-    const first = users()[0]?.id ?? null;
-    setSelectedUserId(first);
+    if (selectedUsername()) return;
+    const first = users()[0]?.username ?? null;
+    setSelectedUsername(first);
   });
 
   const handleLogin = async () => {
-    if (!selectedUserId() || !password() || submitting()) return;
+    if (!selectedUsername() || !password() || submitting()) return;
     setSubmitting(true);
     setError(null);
     try {
       const result = await window.edenAPI.shellCommand("user/login", {
-        id: selectedUserId()!,
+        username: selectedUsername()!,
         password: password(),
       });
       if (!result.success) {
@@ -150,16 +150,16 @@ const App = () => {
                           class="eden-list-item eden-list-item-interactive"
                           classList={{
                             "eden-list-item-active":
-                              selectedUserId() === user.id,
+                              selectedUsername() === user.username,
                           }}
                           onClick={() => {
-                            setSelectedUserId(user.id);
+                            setSelectedUsername(user.username);
                             setError(null);
                           }}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
-                              setSelectedUserId(user.id);
+                              setSelectedUsername(user.username);
                               setError(null);
                             }
                           }}
@@ -204,7 +204,7 @@ const App = () => {
                     type="button"
                     class="eden-btn eden-btn-primary"
                     onClick={handleLogin}
-                    disabled={submitting() || !password() || !selectedUserId()}
+                    disabled={submitting() || !password() || !selectedUsername()}
                   >
                     {submitting() ? t("login.signingIn") : t("login.signIn")}
                   </button>

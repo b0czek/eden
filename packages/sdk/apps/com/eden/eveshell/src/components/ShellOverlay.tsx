@@ -1,14 +1,16 @@
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
+import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
 import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
+import UserContextMenu from "./UserContextMenu";
 import {
   ViewBounds,
   WindowSize,
   AppManifest,
   AppInstance,
+  UserProfile,
 } from "@edenapp/types";
-import { AppInfo } from "../types";
+import { AppInfo, ContextMenuPosition } from "../types";
 import { t, initLocale, locale, getLocalizedValue } from "../i18n";
 
 // Constants
@@ -23,6 +25,9 @@ export default function ShellOverlay() {
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
+  const [userMenu, setUserMenu] = createSignal<ContextMenuPosition | null>(null);
+  const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
+  const [allowedAppIds, setAllowedAppIds] = createSignal<Set<string>>(new Set());
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -79,6 +84,7 @@ export default function ShellOverlay() {
   // Running apps that are NOT pinned (for the left section of dock)
   const dockRunningApps = (): AppInfo[] => {
     return runningApps()
+      .filter((instance) => isAppAllowed(instance.manifest.id))
       .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
       .map((instance) => ({
         id: instance.manifest.id,
@@ -96,6 +102,7 @@ export default function ShellOverlay() {
       .map((appId) => {
         const manifest = installed.find((m) => m.id === appId);
         if (!manifest) return null;
+        if (!isAppAllowed(appId)) return null;
         return {
           id: appId,
           name: getLocalizedValue(manifest.name, locale()),
@@ -108,11 +115,13 @@ export default function ShellOverlay() {
   // All installed apps for the apps view
   const allApps = (): AppInfo[] => {
     const runningIds = new Set(runningApps().map((i) => i.manifest.id));
-    return installedApps().map((app) => ({
-      id: app.id,
-      name: getLocalizedValue(app.name, locale()),
-      isRunning: runningIds.has(app.id),
-    }));
+    return installedApps()
+      .filter((app) => isAppAllowed(app.id))
+      .map((app) => ({
+        id: app.id,
+        name: getLocalizedValue(app.name, locale()),
+        isRunning: runningIds.has(app.id),
+      }));
   };
 
   const loadSystemInfo = async () => {
@@ -121,6 +130,7 @@ export default function ShellOverlay() {
       const installed = await window.edenAPI.shellCommand("package/list", {});
       if (Array.isArray(installed)) {
         setInstalledApps(installed);
+        await refreshAllowedApps(installed.map((app) => app.id));
       }
 
       // Fetch running apps from process manager
@@ -131,6 +141,31 @@ export default function ShellOverlay() {
     } catch (error) {
       console.error("Failed to load system info:", error);
     }
+  };
+
+  const loadCurrentUser = async () => {
+    try {
+      const result = await window.edenAPI.shellCommand("user/get-current", {});
+      setCurrentUser(result.user ?? null);
+    } catch (error) {
+      console.error("Failed to load current user:", error);
+    }
+  };
+
+  const refreshAllowedApps = async (appIds: string[]) => {
+    try {
+      const result = await window.edenAPI.shellCommand("user/allowed-apps", {
+        appIds,
+      });
+      setAllowedAppIds(new Set(result.allowed ?? []));
+    } catch (error) {
+      console.error("Failed to load allowed apps:", error);
+      setAllowedAppIds(new Set(appIds));
+    }
+  };
+
+  const isAppAllowed = (appId: string): boolean => {
+    return allowedAppIds().has(appId);
   };
 
   // Helper function to calculate bounds based on mode and window size
@@ -175,6 +210,9 @@ export default function ShellOverlay() {
   };
 
   const handleAppClick = async (appId: string) => {
+    if (!isAppAllowed(appId)) {
+      return;
+    }
     const isRunning = runningApps().some((app) => app.manifest.id === appId);
 
     if (isRunning) {
@@ -211,6 +249,12 @@ export default function ShellOverlay() {
     }
   };
 
+  createEffect(() => {
+    if (!showAllApps() && !dockContextMenu() && !userMenu()) {
+      requestResize("dock");
+    }
+  });
+
   const handleStopApp = async (appId: string) => {
     try {
       await window.edenAPI.shellCommand("process/stop", { appId });
@@ -239,6 +283,7 @@ export default function ShellOverlay() {
   // Handle context menu from dock - resize to fullscreen so menu fits
   const handleDockContextMenu = async (menu: ContextMenuData) => {
     await requestResize("fullscreen");
+    setUserMenu(null);
     setDockContextMenu(menu);
   };
 
@@ -247,6 +292,31 @@ export default function ShellOverlay() {
     setDockContextMenu(null);
     if (!showAllApps()) {
       await requestResize("dock");
+    }
+  };
+
+  const handleUserMenu = async (event: MouseEvent) => {
+    if (!currentUser()) return;
+    await requestResize("fullscreen");
+    setDockContextMenu(null);
+    setUserMenu({
+      left: event.clientX,
+      bottom: DOCK_HEIGHT,
+    });
+  };
+
+  const handleCloseUserMenu = async () => {
+    setUserMenu(null);
+    if (!showAllApps() && !dockContextMenu()) {
+      await requestResize("dock");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await window.edenAPI.shellCommand("user/logout", {});
+    } catch (error) {
+      console.error("Failed to log out:", error);
     }
   };
 
@@ -282,6 +352,7 @@ export default function ShellOverlay() {
       // Load initial system info and pinned apps
       loadSystemInfo();
       loadPinnedApps();
+      loadCurrentUser();
 
       // Set initial overlay size
       await requestResize("dock");
@@ -303,7 +374,9 @@ export default function ShellOverlay() {
   return (
     <div
       class="shell-overlay"
-      data-mode={showAllApps() || dockContextMenu() ? "fullscreen" : "dock"}
+      data-mode={
+        showAllApps() || dockContextMenu() || userMenu() ? "fullscreen" : "dock"
+      }
     >
       {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>
@@ -323,6 +396,8 @@ export default function ShellOverlay() {
       <Dock
         runningApps={dockRunningApps()}
         pinnedApps={dockPinnedApps()}
+        currentUser={currentUser()}
+        onUserClick={handleUserMenu}
         onAppClick={handleAppClick}
         onShowAllApps={handleShowAllApps}
         onContextMenu={handleDockContextMenu}
@@ -340,6 +415,24 @@ export default function ShellOverlay() {
             onUninstallApp={handleUninstallApp}
             onClose={handleCloseDockContextMenu}
           />
+        )}
+      </Show>
+
+      <Show when={userMenu()}>
+        {(menu) => (
+          <Show when={currentUser()}>
+            {(user) => (
+              <UserContextMenu
+                user={user()}
+                left={menu().left}
+                right={menu().right}
+                top={menu().top}
+                bottom={menu().bottom}
+                onLogout={handleLogout}
+                onClose={handleCloseUserMenu}
+              />
+            )}
+          </Show>
         )}
       </Show>
     </div>
