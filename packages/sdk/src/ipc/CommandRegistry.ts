@@ -11,7 +11,7 @@ import { PermissionRegistry } from "./PermissionRegistry";
  */
 
 export type CommandHandler<TArgs = any, TResult = any> = (
-  args: TArgs
+  args: TArgs,
 ) => Promise<TResult> | TResult;
 
 export interface CommandMetadata {
@@ -20,17 +20,29 @@ export interface CommandMetadata {
   handler: CommandHandler;
   target: any; // The instance that owns the handler
   permission?: string; // Full permission: "namespace/action"
+  grant?: string; // User grant required to execute
   methodName: string; // Original method name for metadata lookup
 }
+
+/** Callback to check if current user has a grant */
+export type GrantChecker = (grant: string) => boolean;
 
 @singleton()
 @injectable()
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
+  private grantChecker: GrantChecker | null = null;
 
   constructor(
-    @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry
+    @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry,
   ) {}
+
+  /**
+   * Set the grant checker callback (called by UserManager after initialization)
+   */
+  setGrantChecker(checker: GrantChecker): void {
+    this.grantChecker = checker;
+  }
 
   /**
    * Register a command handler under a namespace
@@ -45,7 +57,7 @@ export class CommandRegistry {
     command: string,
     handler: CommandHandler,
     target: any,
-    methodName?: string
+    methodName?: string,
   ): void {
     const fullCommand = `${namespace}/${command}`;
 
@@ -55,15 +67,22 @@ export class CommandRegistry {
 
     // Look up permission from decorator metadata
     let permission: string | undefined;
+    let grant: string | undefined;
     if (methodName && target) {
       const handlerPermission = Reflect.getMetadata(
         "eden:handler:permission",
         target.constructor.prototype,
-        methodName
+        methodName,
       );
       if (handlerPermission) {
         permission = `${namespace}/${handlerPermission}`;
       }
+
+      grant = Reflect.getMetadata(
+        "eden:handler:grant",
+        target.constructor.prototype,
+        methodName,
+      );
     }
 
     this.handlers.set(fullCommand, {
@@ -72,11 +91,9 @@ export class CommandRegistry {
       handler,
       target,
       permission,
+      grant,
       methodName: methodName || "",
     });
-
-    const permStr = permission ? ` (requires: ${permission})` : "";
-    console.log(`Registered command handler: ${fullCommand}${permStr}`);
   }
 
   /**
@@ -100,10 +117,13 @@ export class CommandRegistry {
           command,
           handler.bind(manager),
           manager,
-          methodName
+          methodName,
         );
       }
     }
+    console.log(
+      `Registered ${handlers.size} command handlers for namespace "${namespace}"`,
+    );
   }
 
   /**
@@ -116,7 +136,7 @@ export class CommandRegistry {
   async execute<TResult = any>(
     fullCommand: string,
     args: any,
-    appId?: string
+    appId?: string,
   ): Promise<TResult> {
     const metadata = this.handlers.get(fullCommand);
 
@@ -124,11 +144,25 @@ export class CommandRegistry {
       throw new Error(`Unknown command: ${fullCommand}`);
     }
 
-    // Check permission if required
+    // Check app permission if required
     if (metadata.permission && appId && this.permissionRegistry) {
       if (!this.permissionRegistry.hasPermission(appId, metadata.permission)) {
         throw new Error(
-          `Permission denied: ${metadata.permission} required for ${fullCommand}`
+          `Permission denied: ${metadata.permission} required for ${fullCommand}`,
+        );
+      }
+    }
+
+    // Check user grant if required
+    if (metadata.grant) {
+      if (!this.grantChecker) {
+        throw new Error(
+          `Grant check required but no grant checker registered for ${fullCommand}`,
+        );
+      }
+      if (!this.grantChecker(metadata.grant)) {
+        throw new Error(
+          `Grant denied: ${metadata.grant} required for ${fullCommand}`,
         );
       }
     }
@@ -182,7 +216,7 @@ const MANAGER_METADATA = new Map<
  * Get manager metadata (namespace and handlers)
  */
 export function getManagerMetadata(
-  instance: any
+  instance: any,
 ): { namespace: string; handlers: Map<string, string> } | undefined {
   return MANAGER_METADATA.get(instance.constructor);
 }
@@ -207,7 +241,7 @@ export function setManagerNamespace(target: any, namespace: string): void {
 export function addCommandHandler(
   target: any,
   command: string,
-  methodName: string
+  methodName: string,
 ): void {
   if (!MANAGER_METADATA.has(target)) {
     MANAGER_METADATA.set(target, {

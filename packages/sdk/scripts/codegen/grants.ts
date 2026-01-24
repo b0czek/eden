@@ -167,36 +167,3 @@ export function generateGrantsRuntimeCode(grants: GrantInfo[]): string {
 
   return lines.join("\n") + "\n";
 }
-
-/**
- * Generate grants runtime JS file for @edenapp/types
- */
-export function generateGrantsJSCode(grants: GrantInfo[]): string {
-  const lines: string[] = generateHeader(
-    "Runtime Eden grants derived from EDEN_SETTINGS_SCHEMA.",
-  );
-
-  lines.push("/** Eden's app ID for settings namespace */");
-  lines.push('export const EDEN_APP_ID = "com.eden";');
-  lines.push("");
-  lines.push("/**");
-  lines.push(" * Eden Grants Registry");
-  lines.push(" *");
-  lines.push(" * Typed grants derived from EDEN_SETTINGS_SCHEMA.");
-  lines.push(
-    " * Each category with a `permission` field becomes a grant entry.",
-  );
-  lines.push(" */");
-  lines.push("export const EdenGrants = {");
-
-  for (const grant of grants) {
-    lines.push(
-      `  /** Grant for ${grant.categoryId} settings (${grant.grant}) */`,
-    );
-    lines.push(`  ${grant.key}: "${grant.grant}",`);
-  }
-
-  lines.push("};"); // No 'as const' in JS
-
-  return lines.join("\n") + "\n";
-}
