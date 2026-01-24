@@ -53,18 +53,18 @@
   },
   "users": [
     {
-      "id": "vendor",
+      "username": "vendor",
       "name": "Vendor",
       "role": "vendor",
       "password": "vendor"
     },
     {
-      "id": "demo",
+      "username": "demo",
       "name": "Demo User",
       "role": "standard",
       "password": "demo",
       "grants": ["apps/launch/*", "settings/*"]
     }
   ],
-  "defaultUserId": "demo"
+  "defaultUsername": "demo"
 }

@@ -53,8 +53,8 @@ export interface EdenBuildConfig {
   };
   /** Users to seed on first run */
   users?: EdenUserConfig[];
-  /** Default user ID to seed */
-  defaultUserId?: string;
+  /** Default username to seed */
+  defaultUsername?: string;
   /** Settings to seed (namespaced by appId) */
   settings?: EdenSeedSettings;
 }
@@ -76,7 +76,7 @@ export async function loadConfig(configPath: string): Promise<EdenBuildConfig> {
 /**
  * Build seed configuration from build config
  *
- * Extracts seed data (users, settings, defaultUserId) and hashes passwords
+ * Extracts seed data (users, settings, defaultUsername) and hashes passwords
  * for users.
  */
 export async function buildSeedConfig(
@@ -85,7 +85,7 @@ export async function buildSeedConfig(
   const config = await loadConfig(configPath);
 
   const hasUsers = config.users && config.users.length > 0;
-  const hasDefaultUser = !!config.defaultUserId;
+  const hasDefaultUser = !!config.defaultUsername;
   const hasSettings = hasSeedSettings(config.settings);
 
   if (!hasUsers && !hasDefaultUser && !hasSettings) {
@@ -95,7 +95,7 @@ export async function buildSeedConfig(
   const users = config.users?.map((user) => {
     if (user.passwordHash && user.passwordSalt) {
       return {
-        id: user.id,
+        username: user.username,
         name: user.name,
         role: user.role,
         passwordHash: user.passwordHash,
@@ -105,14 +105,14 @@ export async function buildSeedConfig(
     }
 
     if (!user.password) {
-      throw new Error(`User "${user.id}" is missing password data`);
+      throw new Error(`User "${user.username}" is missing password data`);
     }
 
     const salt = randomBytes(16).toString("hex");
     const hash = scryptSync(user.password, salt, 64).toString("hex");
 
     return {
-      id: user.id,
+      username: user.username,
       name: user.name,
       role: user.role,
       passwordHash: hash,
@@ -123,7 +123,7 @@ export async function buildSeedConfig(
 
   return {
     users,
-    defaultUserId: config.defaultUserId,
+    defaultUsername: config.defaultUsername,
     settings: hasSettings ? config.settings : undefined,
   };
 }

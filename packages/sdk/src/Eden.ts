@@ -22,6 +22,7 @@ import { NotificationManager } from "./notification";
 import { DbManager } from "./db";
 import { SettingsManager } from "./settings";
 import { AppearanceManager } from "./appearance/AppearanceManager";
+import { UserManager } from "./user";
 import { seedDatabase } from "./seed";
 import { container } from "tsyringe";
 
@@ -43,7 +44,10 @@ export class Eden {
   private userManager!: UserManager;
 
   constructor(config: EdenConfig = {}) {
-    this.config = config;
+    this.config = {
+      ...config,
+      loginAppId: config.loginAppId ?? "com.eden.login",
+    };
 
     app.commandLine.appendSwitch("enable-features", "V8CodeCache");
 
@@ -96,6 +100,8 @@ export class Eden {
     await seedDatabase(this.appsDirectory, this.distPath);
 
     this.initializeManagers();
+
+    await this.userManager.initialize();
 
     // Initialize package manager
     await this.packageManager.initialize();

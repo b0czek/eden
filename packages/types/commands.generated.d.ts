@@ -571,6 +571,121 @@ export interface SettingsCommands {
 }
 
 /**
+ * UserCommands - Commands for the "user" namespace
+ */
+export interface UserCommands {
+  /**
+   * List all users.
+   */
+  "user/list": {
+    args: Record<string, never>;
+    response: { users: import("./index").UserProfile[] };
+  };
+  /**
+   * Return the current logged-in user.
+   */
+  "user/get-current": {
+    args: Record<string, never>;
+    response: { user: import("./index").UserProfile | null };
+  };
+  /**
+   * Authenticate a user and establish a session.
+   */
+  "user/login": {
+    args: {
+    username: string;
+    password: string };
+    response: { success: boolean; user?: import("./index").UserProfile; error?: string };
+  };
+  /**
+   * End the current session.
+   */
+  "user/logout": {
+    args: Record<string, never>;
+    response: { success: boolean };
+  };
+  /**
+   * Create a new user.
+   */
+  "user/create": {
+    args: {
+    username?: string;
+    name: string;
+    role?: import("./index").UserRole;
+    password: string;
+    grants?: string[] };
+    response: { user: import("./index").UserProfile };
+  };
+  /**
+   * Update user profile details or grants.
+   */
+  "user/update": {
+    args: {
+    username: string;
+    name?: string;
+    role?: import("./index").UserRole;
+    grants?: string[] };
+    response: { user: import("./index").UserProfile };
+  };
+  /**
+   * Delete a user.
+   */
+  "user/delete": {
+    args: {
+    username: string };
+    response: { success: boolean };
+  };
+  /**
+   * Set a user's password.
+   */
+  "user/set-password": {
+    args: {
+    username: string;
+    password: string };
+    response: { success: boolean };
+  };
+  /**
+   * Check whether the current user has a specific grant.
+   */
+  "user/has-grant": {
+    args: { grant: string };
+    response: { allowed: boolean };
+  };
+  /**
+   * Filter app IDs by launch permissions.
+   */
+  "user/allowed-apps": {
+    args: {
+    appIds: string[] };
+    response: { allowed: string[] };
+  };
+  /**
+   * Filter setting keys by access permissions.
+   */
+  "user/allowed-settings": {
+    args: {
+    appId: string;
+    keys: string[] };
+    response: { allowed: string[] };
+  };
+  /**
+   * Return the configured default username.
+   */
+  "user/get-default": {
+    args: Record<string, never>;
+    response: { username: string | null };
+  };
+  /**
+   * Update the configured default username.
+   */
+  "user/set-default": {
+    args: {
+    username: string | null };
+    response: { success: boolean };
+  };
+}
+
+/**
  * ViewCommands - Commands for the "view" namespace
  */
 export interface ViewCommands {
@@ -671,4 +786,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}

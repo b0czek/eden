@@ -70,9 +70,11 @@ export async function seedDatabase(
     }
 
     // Seed default user
-    if (seedConfig.defaultUserId) {
-      await usersDb.set(DEFAULT_USER_KEY, seedConfig.defaultUserId);
-      console.log(`[Seed] Seeded default user: ${seedConfig.defaultUserId}`);
+    if (seedConfig.defaultUsername) {
+      await usersDb.set(DEFAULT_USER_KEY, seedConfig.defaultUsername);
+      console.log(
+        `[Seed] Seeded default user: ${seedConfig.defaultUsername}`,
+      );
     }
 
     // Mark users as seeded
@@ -99,23 +101,23 @@ function createKeyv(appsDirectory: string, dbName: string): Keyv {
   return new Keyv({ store: sqlite });
 }
 
-function getUserKey(id: string): string {
-  return `user:${id}`;
+function getUserKey(username: string): string {
+  return `user:${username}`;
 }
 
 async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
-  const userIds: string[] = [];
+  const usernames: string[] = [];
 
   for (const user of users) {
-    const existingUser = await db.get(getUserKey(user.id));
+    const existingUser = await db.get(getUserKey(user.username));
     if (existingUser) {
-      console.log(`[Seed] User "${user.id}" already exists, skipping`);
+      console.log(`[Seed] User "${user.username}" already exists, skipping`);
       continue;
     }
 
     const now = Date.now();
     const storedUser = {
-      id: user.id,
+      username: user.username,
       name: user.name,
       role: user.role ?? "standard",
       grants: user.grants ?? defaultGrantsForRole(user.role ?? "standard"),
@@ -125,16 +127,16 @@ async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
       passwordSalt: user.passwordSalt,
     };
 
-    await db.set(getUserKey(user.id), storedUser);
-    userIds.push(user.id);
-    console.log(`[Seed] Seeded user: ${user.name} (${user.id})`);
+    await db.set(getUserKey(user.username), storedUser);
+    usernames.push(user.username);
+    console.log(`[Seed] Seeded user: ${user.name} (${user.username})`);
   }
 
   // Update user index
   const existingIndex = await db.get(USERS_INDEX_KEY);
   const currentIds = Array.isArray(existingIndex) ? existingIndex : [];
-  const mergedIds = [...new Set([...currentIds, ...userIds])];
-  await db.set(USERS_INDEX_KEY, mergedIds);
+  const mergedUsernames = [...new Set([...currentIds, ...usernames])];
+  await db.set(USERS_INDEX_KEY, mergedUsernames);
 }
 
 function defaultGrantsForRole(role: string): string[] {

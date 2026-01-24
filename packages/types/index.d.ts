@@ -1,6 +1,8 @@
 import { AppManifest } from "./AppManifest";
 
 export * from "./EdenConfig";
+export * from "./EdenSeedConfig";
+export * from "./User";
 
 export * from "./AppManifest";
 
@@ -165,7 +167,6 @@ export interface Notification {
   type?: NotificationType;
 }
 
-
 export interface WallpaperPreset {
   id: string;
   name: string;
@@ -176,4 +177,3 @@ export interface WallpaperPreset {
 export type WallpaperConfig =
   | { type: "preset"; id: string }
   | { type: "custom"; value: string };
-

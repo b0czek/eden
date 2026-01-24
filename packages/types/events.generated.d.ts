@@ -61,6 +61,17 @@ export interface SettingsEvents {
 }
 
 /**
+ * UserEvents - Events for the "user" namespace
+ */
+export interface UserEvents {
+  "user/changed": {
+    currentUser: import("./index").UserProfile | null;
+    previousUsername: string | null;
+    reason: "login" | "logout" | "system";
+  };
+}
+
+/**
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
@@ -82,4 +93,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}

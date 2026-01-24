@@ -34,6 +34,6 @@ export interface EdenConfig {
   tiling?: TilingConfig;
   development?: boolean;
 
-  /** List of app IDs to start automatically when Eden launches */
-  autostart?: string[];
+  /** Apps allowed to launch regardless of user grants */
+  coreApps?: string[];
 }
