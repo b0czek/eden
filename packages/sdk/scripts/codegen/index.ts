@@ -1,0 +1,179 @@
+/**
+ * Codegen Orchestrator
+ *
+ * Main entry point that coordinates all code generation:
+ * - Commands: @EdenHandler decorators → commands.generated.d.ts
+ * - Events: EdenEmitter interfaces → events.generated.d.ts
+ * - Grants: EDEN_SETTINGS_SCHEMA permissions → grants.generated.d.ts
+ * - Runtime: Command/event name arrays → runtime.ts
+ * - I18n: SDK locale files → i18n.ts types
+ *
+ * Usage: pnpm run codegen
+ */
+
+import { Project, Node } from "ts-morph";
+import * as path from "path";
+import * as fs from "fs";
+
+import {
+  extractCommandHandlers,
+  groupCommandsByNamespace,
+  generateCommandsCode,
+  CommandInfo,
+} from "./commands";
+
+import {
+  extractEventDeclarations,
+  groupEventsByNamespace,
+  generateEventsCode,
+  EventInfo,
+} from "./events";
+
+import {
+  extractGrantsFromSchema,
+  generateGrantsTypesCode,
+  generateGrantsRuntimeCode,
+} from "./grants";
+
+import { generateRuntimeCode } from "./runtime";
+import { generateI18nTypes } from "./i18n";
+
+/**
+ * Main code generation function
+ */
+export function generateAll(): void {
+  console.log("🔍 Scanning for @EdenHandler and @EdenNamespace decorators...");
+
+  const projectRoot = path.resolve(__dirname, "../..");
+  const srcDir = path.join(projectRoot, "src");
+  const workspaceRoot = path.resolve(projectRoot, "../..");
+  const typesDir = path.join(workspaceRoot, "packages", "types");
+
+  const project = new Project({
+    skipAddingFilesFromTsConfig: true,
+  });
+
+  // Add source files
+  project.addSourceFilesAtPaths([
+    path.join(srcDir, "**/*.ts"),
+    path.join(typesDir, "index.d.ts"),
+  ]);
+
+  console.log(`Found ${project.getSourceFiles().length} TypeScript files`);
+
+  // Get exported types from types/index.d.ts
+  const exportedTypes = new Set<string>();
+  const indexFile = project.getSourceFile(path.join(typesDir, "index.d.ts"));
+  if (indexFile) {
+    indexFile.getExportedDeclarations().forEach((_, name) => {
+      exportedTypes.add(name);
+    });
+    console.log(`Found ${exportedTypes.size} exported types from index.d.ts`);
+  }
+
+  // Extract commands and events from decorated classes
+  const allCommands: CommandInfo[] = [];
+  const allEvents: EventInfo[] = [];
+
+  project.getSourceFiles().forEach((sourceFile) => {
+    if (sourceFile.getFilePath() === indexFile?.getFilePath()) return;
+
+    sourceFile.getClasses().forEach((classDec) => {
+      const namespaceDecorator = classDec.getDecorator("EdenNamespace");
+      if (namespaceDecorator) {
+        const args = namespaceDecorator.getArguments();
+        if (args.length > 0 && Node.isStringLiteral(args[0])) {
+          const namespace = args[0].getLiteralText();
+
+          const commands = extractCommandHandlers(classDec, namespace);
+          const events = extractEventDeclarations(classDec, namespace);
+
+          allCommands.push(...commands);
+          allEvents.push(...events);
+
+          if (commands.length > 0) {
+            console.log(
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${commands.length} commands`,
+            );
+          }
+          if (events.length > 0) {
+            console.log(
+              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${events.length} events`,
+            );
+          }
+        }
+      }
+    });
+  });
+
+  console.log(`\n📦 Found ${allCommands.length} total command handlers`);
+  console.log(`📦 Found ${allEvents.length} total event declarations`);
+
+  // Group by namespace
+  const namespaceCommands = groupCommandsByNamespace(allCommands);
+  const namespaceEvents = groupEventsByNamespace(allEvents);
+
+  console.log(
+    `📋 Grouped commands into ${namespaceCommands.length} namespaces:`,
+  );
+  namespaceCommands.forEach((ns) => {
+    console.log(`  - ${ns.namespace}: ${ns.commands.length} commands`);
+  });
+
+  console.log(`📋 Grouped events into ${namespaceEvents.length} namespaces:`);
+  namespaceEvents.forEach((ns) => {
+    console.log(`  - ${ns.namespace}: ${ns.events.length} events`);
+  });
+
+  // Generate commands
+  const commandsCode = generateCommandsCode(namespaceCommands, exportedTypes);
+  const commandsOutputPath = path.join(typesDir, "commands.generated.d.ts");
+  fs.writeFileSync(commandsOutputPath, commandsCode);
+  console.log(
+    `\n✅ Generated ${path.relative(projectRoot, commandsOutputPath)}`,
+  );
+
+  // Generate events
+  const eventsCode = generateEventsCode(namespaceEvents, exportedTypes);
+  const eventsOutputPath = path.join(typesDir, "events.generated.d.ts");
+  fs.writeFileSync(eventsOutputPath, eventsCode);
+  console.log(`✅ Generated ${path.relative(projectRoot, eventsOutputPath)}`);
+
+  // Generate runtime
+  const generatedDir = path.join(srcDir, "generated");
+  if (!fs.existsSync(generatedDir)) {
+    fs.mkdirSync(generatedDir, { recursive: true });
+  }
+  const runtimeCode = generateRuntimeCode(namespaceCommands, namespaceEvents);
+  const runtimeOutputPath = path.join(generatedDir, "runtime.ts");
+  fs.writeFileSync(runtimeOutputPath, runtimeCode);
+  console.log(`✅ Generated ${path.relative(projectRoot, runtimeOutputPath)}`);
+
+  // Generate grants
+  console.log("\n🔑 Extracting grants from EDEN_SETTINGS_SCHEMA...");
+  const grants = extractGrantsFromSchema(project, srcDir);
+
+  if (grants.length > 0) {
+    console.log(`📦 Found ${grants.length} grant definitions:`);
+    grants.forEach((g) => {
+      console.log(`  - ${g.key}: ${g.grant}`);
+    });
+
+    const grantsTypesCode = generateGrantsTypesCode(grants);
+    const grantsTypesPath = path.join(typesDir, "grants.generated.d.ts");
+    fs.writeFileSync(grantsTypesPath, grantsTypesCode);
+    console.log(`✅ Generated ${path.relative(projectRoot, grantsTypesPath)}`);
+
+    const grantsRuntimeCode = generateGrantsRuntimeCode(grants);
+    const grantsRuntimePath = path.join(generatedDir, "grants.ts");
+    fs.writeFileSync(grantsRuntimePath, grantsRuntimeCode);
+    console.log(
+      `✅ Generated ${path.relative(projectRoot, grantsRuntimePath)}`,
+    );
+  } else {
+    console.log("  ⚠ No grants found in schema");
+  }
+
+  // Generate i18n types
+  generateI18nTypes(projectRoot);
+}
