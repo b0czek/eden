@@ -63,9 +63,9 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 when={props.appIcon}
                 fallback={
                   props.app.isPrebuilt ? (
-                    <FiCpu size={26} />
+                    <FiCpu class="app-detail-fallback-icon" />
                   ) : (
-                    <FiPackage size={26} />
+                    <FiPackage class="app-detail-fallback-icon" />
                   )
                 }
               >

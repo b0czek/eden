@@ -219,9 +219,9 @@ const AppsTab: Component = () => {
                           when={appIcons()[app.id]}
                           fallback={
                             app.isPrebuilt ? (
-                              <FiCpu size={22} />
+                              <FiCpu class="app-row-fallback-icon" />
                             ) : (
-                              <FiPackage size={22} />
+                              <FiPackage class="app-row-fallback-icon" />
                             )
                           }
                         >
@@ -232,10 +232,10 @@ const AppsTab: Component = () => {
                         </Show>
                       </div>
                       <div class="app-row-info">
-                        <div class="app-row-title eden-text-sm eden-font-semibold">
+                        <div class="app-row-title eden-text-md eden-font-semibold">
                           {getLocalizedValue(app.name, locale())}
                         </div>
-                        <div class="app-row-subtitle eden-text-xs eden-text-tertiary">
+                        <div class="app-row-subtitle eden-text-sm eden-text-tertiary">
                           v{app.version}
                         </div>
                       </div>
