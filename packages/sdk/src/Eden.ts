@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { app, BrowserWindow } from "electron";
+import * as fs from "fs";
 import * as path from "path";
 import { IPCBridge, CommandRegistry } from "./ipc";
 import { AppChannelManager } from "./appbus";
@@ -21,21 +22,25 @@ import { NotificationManager } from "./notification";
 import { DbManager } from "./db";
 import { SettingsManager } from "./settings";
 import { AppearanceManager } from "./appearance/AppearanceManager";
+import { seedDatabase } from "./seed";
 import { container } from "tsyringe";
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;
-  private viewManager: ViewManager;
+  private viewManager!: ViewManager;
   private ipcBridge: IPCBridge;
   private appsDirectory: string;
   private userDirectory: string;
+  private distPath: string;
   private config: EdenConfig;
+  private managersInitialized = false;
 
   // New components
-  private packageManager: PackageManager;
-  private processManager: ProcessManager;
-  private fileOpenManager: FileOpenManager;
-  private autostartManager: AutostartManager;
+  private packageManager!: PackageManager;
+  private processManager!: ProcessManager;
+  private fileOpenManager!: FileOpenManager;
+  private autostartManager!: AutostartManager;
+  private userManager!: UserManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = config;
@@ -51,12 +56,15 @@ export class Eden {
       config.userDirectory || path.join(app.getPath("userData"), "eden-user");
 
     // Set dist path for runtime assets (preloads, css, apps, etc.) - consumer's dist
-    const distPath = path.join(process.cwd(), "dist");
+    this.distPath = path.join(process.cwd(), "dist");
+
+    this.ensureDirectory(this.appsDirectory, "appsDirectory");
+    this.ensureDirectory(this.userDirectory, "userDirectory");
 
     // 1. Fundamental registries and config
     container.registerInstance("EdenConfig", this.config);
     container.registerInstance("appsDirectory", this.appsDirectory);
-    container.registerInstance("distPath", distPath);
+    container.registerInstance("distPath", this.distPath);
     container.registerInstance("userDirectory", this.userDirectory);
 
     container.resolve(CommandRegistry);
@@ -64,24 +72,6 @@ export class Eden {
     // 2. Main communication bridge
     container.resolve(BackendManager);
     this.ipcBridge = container.resolve(IPCBridge);
-
-    // 3. UI and Application layer
-    this.viewManager = container.resolve(ViewManager);
-
-    // 4. Feature managers
-    container.resolve(AppChannelManager);
-    this.packageManager = container.resolve(PackageManager);
-    this.processManager = container.resolve(ProcessManager);
-    container.resolve(SystemHandler);
-    container.resolve(I18nManager);
-    container.resolve(FilesystemManager);
-    this.fileOpenManager = container.resolve(FileOpenManager);
-    this.autostartManager = container.resolve(AutostartManager);
-    container.resolve(NotificationManager);
-    container.resolve(DbManager);
-
-    container.resolve(SettingsManager);
-    container.resolve(AppearanceManager);
 
     this.setupAppEventHandlers();
   }
@@ -102,6 +92,11 @@ export class Eden {
   private async onReady(): Promise<void> {
     console.log("Eden starting...");
 
+    // Seed database before initializing managers
+    await seedDatabase(this.appsDirectory, this.distPath);
+
+    this.initializeManagers();
+
     // Initialize package manager
     await this.packageManager.initialize();
 
@@ -117,13 +112,48 @@ export class Eden {
     console.log("Eden ready!");
   }
 
+  private initializeManagers(): void {
+    if (this.managersInitialized) return;
+    this.managersInitialized = true;
+
+    // UI and core services
+    this.viewManager = container.resolve(ViewManager);
+    container.resolve(AppChannelManager);
+    container.resolve(FilesystemManager);
+
+    // Auth + settings should be available before other managers.
+    this.userManager = container.resolve(UserManager);
+    container.resolve(SettingsManager);
+    container.resolve(I18nManager);
+
+    this.packageManager = container.resolve(PackageManager);
+    this.processManager = container.resolve(ProcessManager);
+    this.fileOpenManager = container.resolve(FileOpenManager);
+    this.autostartManager = container.resolve(AutostartManager);
+
+    container.resolve(SystemHandler);
+    container.resolve(NotificationManager);
+    container.resolve(DbManager);
+    container.resolve(AppearanceManager);
+  }
+
+  private ensureDirectory(directory: string, label: string): void {
+    try {
+      fs.mkdirSync(directory, { recursive: true });
+    } catch (error) {
+      console.error(
+        `[Eden] Failed to create ${label} at ${directory}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   /**
    * Create the main Eden window with foundation layer
    */
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
-    const distPath = path.join(process.cwd(), "dist");
-
     this.mainWindow = new BrowserWindow({
       width: windowConfig.width || 1280,
       height: windowConfig.height || 800,
@@ -134,7 +164,7 @@ export class Eden {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(distPath, "foundation/foundation-preload.js"),
+        preload: path.join(this.distPath, "foundation/foundation-preload.js"),
         additionalArguments: [`--window-title=${windowConfig.title || "Eden"}`],
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
@@ -147,7 +177,10 @@ export class Eden {
     this.ipcBridge.setMainWindow(this.mainWindow);
 
     // Load the foundation layer (not eveshell!)
-    const foundationPath = path.join(distPath, "foundation/foundation.html");
+    const foundationPath = path.join(
+      this.distPath,
+      "foundation/foundation.html",
+    );
     this.mainWindow.loadFile(foundationPath);
 
     // Launch autostart apps after foundation loads
@@ -190,6 +223,9 @@ export class Eden {
     console.log("Eden shutting down...");
 
     try {
+      if (!this.managersInitialized) {
+        return;
+      }
       // Shutdown all apps and wait for them to stop
       await this.processManager.shutdown();
 

@@ -65,12 +65,14 @@ program
     "--sdk-path <path>",
     "Path to @edenapp/sdk (auto-detected if installed)"
   )
+  .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
   .option("-o, --output <path>", "Output directory", "dist")
   .action(async (options) => {
     try {
       await copyAssets({
         sdkPath: options.sdkPath,
         outputDir: options.output,
+        configPath: options.config,
       });
     } catch (error) {
       console.error("Copy failed:", error);

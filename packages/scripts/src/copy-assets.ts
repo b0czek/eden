@@ -11,10 +11,12 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import { buildSeedConfig } from "./config";
 
 export interface CopyAssetsOptions {
   sdkPath?: string;
   outputDir?: string;
+  configPath?: string;
 }
 
 const ASSETS_TO_COPY = ["app-runtime", "app-frame", "edencss", "foundation"];
@@ -30,7 +32,7 @@ async function resolveSdkDistPath(sdkPath?: string): Promise<string> {
       return distPath;
     } catch {
       throw new Error(
-        `SDK dist not found at ${distPath}. Run build:sdk first.`
+        `SDK dist not found at ${distPath}. Run build:sdk first.`,
       );
     }
   }
@@ -45,12 +47,12 @@ async function resolveSdkDistPath(sdkPath?: string): Promise<string> {
       return distPath;
     } catch {
       throw new Error(
-        `SDK dist not found at ${distPath}. Is @edenapp/sdk built?`
+        `SDK dist not found at ${distPath}. Is @edenapp/sdk built?`,
       );
     }
   } catch {
     throw new Error(
-      "Could not find @edenapp/sdk. Install it or provide --sdk-path."
+      "Could not find @edenapp/sdk. Install it or provide --sdk-path.",
     );
   }
 }
@@ -78,10 +80,11 @@ async function copyDir(src: string, dest: string): Promise<void> {
  * Copy SDK assets to consumer's dist
  */
 export async function copyAssets(
-  options: CopyAssetsOptions = {}
+  options: CopyAssetsOptions = {},
 ): Promise<void> {
   const cwd = process.cwd();
   const outputDir = options.outputDir || path.join(cwd, "dist");
+  const configPath = options.configPath || path.join(cwd, "eden.config.json");
 
   console.log("📦 Copying SDK assets to consumer dist...\n");
 
@@ -108,4 +111,23 @@ export async function copyAssets(
   }
 
   console.log("\n🎉 SDK assets copied successfully!");
+
+  // Build seed config (hashed users, default user, settings)
+  try {
+    await fs.access(configPath);
+    const seedConfig = await buildSeedConfig(configPath);
+    if (seedConfig) {
+      const seedPath = path.join(outputDir, "eden-seed.json");
+      await fs.writeFile(
+        seedPath,
+        JSON.stringify(seedConfig, null, 2),
+        "utf-8",
+      );
+      console.log(`✅ Generated seed config: ${seedPath}`);
+    } else {
+      console.log("ℹ️  No seed config entries to write");
+    }
+  } catch {
+    console.log("ℹ️  No eden.config.json found for seed config generation");
+  }
 }

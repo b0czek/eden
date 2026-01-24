@@ -9,8 +9,7 @@ new Eden({
     padding: 8, // Padding around workspace in pixels
   },
   userDirectory: ".",
-  autostart: ["com.eden.eveshell", "com.eden.toaster"],
   window: {
-    title: "Eden SDK Example"
-  }
+    title: "Eden SDK Example",
+  },
 });

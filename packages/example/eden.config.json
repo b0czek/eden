@@ -5,6 +5,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.login",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.toaster",
       "source": "builtin"
     },
@@ -37,8 +41,30 @@
       "source": "builtin"
     }
   ],
+  "settings": {
+    "com.eden": {
+      "autostart.com.eden.eveshell": "true",
+      "autostart.com.eden.toaster": "true"
+    }
+  },
   "hotReload": {
     "enabled": true,
     "debounce": 300
-  }
+  },
+  "users": [
+    {
+      "id": "vendor",
+      "name": "Vendor",
+      "role": "vendor",
+      "password": "vendor"
+    },
+    {
+      "id": "demo",
+      "name": "Demo User",
+      "role": "standard",
+      "password": "demo",
+      "grants": ["apps/launch/*", "settings/*"]
+    }
+  ],
+  "defaultUserId": "demo"
 }
