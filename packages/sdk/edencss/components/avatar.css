@@ -31,35 +31,41 @@
   border-radius: inherit;
 }
 
+.eden-avatar-icon {
+  width: 60%;
+  height: 60%;
+  stroke-width: 1.5;
+}
+
 /* ===== Avatar Sizes ===== */
 .eden-avatar-xs {
-  width: 20px;
-  height: 20px;
-  font-size: 9px;
+  width: calc(var(--eden-space-md) + var(--eden-space-xs));
+  height: calc(var(--eden-space-md) + var(--eden-space-xs));
+  font-size: var(--eden-font-size-xs);
 }
 
 .eden-avatar-sm {
-  width: 24px;
-  height: 24px;
-  font-size: 10px;
+  width: var(--eden-space-lg);
+  height: var(--eden-space-lg);
+  font-size: var(--eden-font-size-xs);
 }
 
 .eden-avatar-md {
-  width: 36px; /* Matches --eden-space-xl */
-  height: 36px;
+  width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
   font-size: var(--eden-font-size-sm);
 }
 
 .eden-avatar-lg {
-  width: 48px;
-  height: 48px;
+  width: var(--eden-space-2xl);
+  height: var(--eden-space-2xl);
   font-size: var(--eden-font-size-md);
 }
 
 .eden-avatar-xl {
-  width: 80px;
-  height: 80px;
-  font-size: 24px;
+  width: var(--eden-space-3xl);
+  height: var(--eden-space-3xl);
+  font-size: var(--eden-font-size-xl);
 }
 
 /* ===== Avatar Group ===== */

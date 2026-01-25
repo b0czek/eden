@@ -1,50 +1,16 @@
-/*
- * AppsTab Styles
- * Minimal styles that cannot be replaced by edencss utilities
- */
-
 /* ===== Apps List Screen ===== */
-.apps-list-screen {
+.apps-management {
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--eden-color-border-light);
 }
 
-.apps-list {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: var(--eden-space-xs);
+.app-list-icon-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
-.app-row {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: var(--eden-space-md);
-  padding: var(--eden-space-sm) var(--eden-space-md);
-  border-radius: var(--eden-radius-lg);
-  border: 1px solid var(--eden-color-border-light);
-  background: var(--eden-color-bg-glass-strong);
-  backdrop-filter: var(--eden-glass-strong);
-  color: var(--eden-color-text-primary);
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  transition: transform var(--eden-transition-fast), border-color var(--eden-transition-fast), background var(--eden-transition-fast);
-}
-
-.app-row:hover {
-  border-color: var(--eden-color-border-hover);
-  transform: translateY(-1px);
-}
-
-.app-row-selected {
-  border-color: var(--eden-color-accent-primary);
-  background: var(--eden-color-bg-glass-medium);
-}
-
-/* ===== App Icons ===== */
-.app-row-icon,
+/* ===== App Detail Icons ===== */
 .app-detail-icon {
   width: var(--eden-space-xl);
   height: var(--eden-space-xl);
@@ -65,37 +31,20 @@
   border-radius: var(--eden-radius-lg);
 }
 
-.app-row-icon-no-bg,
 .app-detail-icon-no-bg {
   background: transparent;
   box-shadow: none;
 }
 
-.app-row-icon img,
 .app-detail-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.app-row-fallback-icon {
-  width: var(--eden-space-lg);
-  height: var(--eden-space-lg);
-}
-
 .app-detail-fallback-icon {
   width: var(--eden-space-xl);
   height: var(--eden-space-xl);
-}
-
-/* ===== App Row Content ===== */
-.app-row-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.app-row-badge {
-  margin-left: auto;
 }
 
 /* ===== Apps Detail Panel ===== */

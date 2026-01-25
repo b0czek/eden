@@ -143,7 +143,7 @@ const App = () => {
             >
               <div class="eden-grid eden-grid-2 eden-gap-lg user-login-grid">
                 <div class="eden-flex eden-flex-col eden-gap-sm">
-                  <ul class="eden-list eden-scrollbar user-list">
+                  <ul class="eden-list user-list">
                     <For each={users()}>
                       {(user) => (
                         <li

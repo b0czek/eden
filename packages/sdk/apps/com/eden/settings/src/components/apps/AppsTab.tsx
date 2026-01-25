@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import type { Component } from "solid-js";
 import type { AppManifest } from "@edenapp/types";
-import { FiPackage, FiCpu } from "solid-icons/fi";
+import { FiPackage, FiCpu, FiChevronRight } from "solid-icons/fi";
 import { t, locale, getLocalizedValue } from "../../i18n";
 import AppDetail from "./AppDetail";
 import "./AppsTab.css";
@@ -188,7 +188,6 @@ const AppsTab: Component = () => {
   return (
     <div
       class="apps-management eden-flex-col"
-      style={{ flex: 1, "min-height": 0 }}
     >
       <Show
         when={!loading()}
@@ -199,56 +198,54 @@ const AppsTab: Component = () => {
         <Show
           when={selectedApp()}
           fallback={
-            <section class="apps-list-screen eden-flex-col eden-gap-md eden-glass-strong eden-rounded-xl eden-p-sm">
-              <div class="apps-list eden-flex-col eden-gap-xs eden-p-xs">
+            <div class="eden-list">
                 <For each={sortedApps()}>
                   {(app) => (
-                    <button
-                      type="button"
-                      class="app-row"
+                    <div
+                      class="eden-list-item eden-list-item-interactive"
                       onClick={() => setSelectedAppId(app.id)}
                     >
-                      <div
-                        class={
-                          appIcons()[app.id]
-                            ? "app-row-icon app-row-icon-no-bg"
-                            : "app-row-icon"
-                        }
-                      >
+                      <div class="eden-list-item-icon">
                         <Show
                           when={appIcons()[app.id]}
                           fallback={
-                            app.isPrebuilt ? (
-                              <FiCpu class="app-row-fallback-icon" />
-                            ) : (
-                              <FiPackage class="app-row-fallback-icon" />
-                            )
+                            <div class="eden-avatar eden-avatar-md">
+                              <Show
+                                when={app.isPrebuilt}
+                                fallback={<FiPackage class="eden-avatar-icon" />}
+                              >
+                                <FiCpu class="eden-avatar-icon" />
+                              </Show>
+                            </div>
                           }
                         >
                           <img
+                            class="app-list-icon-img"
                             src={appIcons()[app.id]}
                             alt={getLocalizedValue(app.name, locale())}
                           />
                         </Show>
                       </div>
-                      <div class="app-row-info">
-                        <div class="app-row-title eden-text-md eden-font-semibold">
+                      <div class="eden-list-item-content">
+                        <div class="eden-list-item-title">
                           {getLocalizedValue(app.name, locale())}
                         </div>
-                        <div class="app-row-subtitle eden-text-sm eden-text-tertiary">
+                        <div class="eden-list-item-description">
                           v{app.version}
                         </div>
                       </div>
                       <Show when={app.isPrebuilt}>
-                        <span class="eden-badge eden-badge-info app-row-badge">
+                        <span class="eden-badge eden-badge-info eden-badge-sm">
                           {t("settings.apps.builtin")}
                         </span>
                       </Show>
-                    </button>
+                      <div class="eden-list-item-meta">
+                        <FiChevronRight />
+                      </div>
+                    </div>
                   )}
                 </For>
               </div>
-            </section>
           }
         >
           {(app) => (

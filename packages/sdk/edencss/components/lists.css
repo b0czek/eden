@@ -8,16 +8,20 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  
+
   border-radius: var(--eden-radius-lg);
   overflow: hidden;
-  
+
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
-  
+
   border: 1px solid var(--eden-color-border-light);
   box-shadow: var(--eden-shadow-md);
+
+  /* Make every list scrollable by default */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* ===== List Item ===== */
@@ -98,16 +102,16 @@
   list-style: none;
   padding: var(--eden-space-sm);
   margin: 0;
-  
+
   border-radius: var(--eden-radius-lg);
-  
+
   background: var(--eden-color-bg-glass-strong);
   backdrop-filter: var(--eden-glass-ultra);
   -webkit-backdrop-filter: var(--eden-glass-ultra);
-  
+
   border: 1px solid var(--eden-color-border-medium);
   box-shadow: var(--eden-shadow-xl);
-  
+
   min-width: 200px;
 }
 
@@ -159,8 +163,9 @@
   top: calc(100% + var(--eden-space-sm));
   left: 0;
   z-index: var(--eden-z-dropdown);
-  
-  animation: eden-fade-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+
+  animation: eden-fade-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
 }
 
 .eden-dropdown-menu-right {
@@ -174,11 +179,11 @@
   align-items: center;
   gap: var(--eden-space-md);
   padding: var(--eden-space-lg);
-  
+
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
-  
+
   border-radius: var(--eden-radius-lg);
   border: 1px solid var(--eden-color-border-light);
 }
@@ -192,7 +197,7 @@
 }
 
 .eden-step::after {
-  content: '';
+  content: "";
   position: absolute;
   left: calc(100% + var(--eden-space-sm));
   width: var(--eden-space-md);
@@ -239,4 +244,3 @@
   color: var(--eden-color-text-primary);
   font-weight: var(--eden-font-weight-medium);
 }
-
