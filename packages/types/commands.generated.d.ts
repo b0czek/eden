@@ -645,6 +645,15 @@ export interface UserCommands {
     response: { success: boolean };
   };
   /**
+   * Change the current user's password.
+   */
+  "user/change-password": {
+    args: {
+    currentPassword: string;
+    newPassword: string };
+    response: { success: boolean; error?: string };
+  };
+  /**
    * Check whether the current user has a specific grant.
    */
   "user/has-grant": {

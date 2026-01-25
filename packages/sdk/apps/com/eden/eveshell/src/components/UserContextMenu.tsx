@@ -1,17 +1,23 @@
 import type { UserProfile } from "@edenapp/types";
-import { FiLogOut } from "solid-icons/fi";
+import { FiKey, FiLogOut } from "solid-icons/fi";
 import { t } from "../i18n";
 import { ContextMenuPosition } from "../types";
 
 interface UserContextMenuProps extends ContextMenuPosition {
   user: UserProfile;
   onLogout: () => Promise<void> | void;
+  onChangePassword: () => Promise<void> | void;
   onClose: () => void;
 }
 
 export default function UserContextMenu(props: UserContextMenuProps) {
   const handleLogout = async () => {
     await props.onLogout();
+    props.onClose();
+  };
+
+  const handleChangePassword = async () => {
+    await props.onChangePassword();
     props.onClose();
   };
 
@@ -33,6 +39,14 @@ export default function UserContextMenu(props: UserContextMenuProps) {
         <div class="eden-popover-title context-menu-title">
           {props.user.name}
         </div>
+        <button
+          type="button"
+          class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
+          onClick={handleChangePassword}
+        >
+          <FiKey />
+          {t("shell.changePassword")}
+        </button>
         <button
           type="button"
           class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger context-menu-btn"

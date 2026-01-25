@@ -3,6 +3,7 @@ import Dock from "./Dock";
 import AllApps from "./AllApps";
 import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
 import UserContextMenu from "./UserContextMenu";
+import ChangePasswordModal from "./ChangePasswordModal";
 import {
   ViewBounds,
   WindowSize,
@@ -26,6 +27,7 @@ export default function ShellOverlay() {
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
   const [userMenu, setUserMenu] = createSignal<ContextMenuPosition | null>(null);
+  const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
   const [allowedAppIds, setAllowedAppIds] = createSignal<Set<string>>(new Set());
 
@@ -250,7 +252,7 @@ export default function ShellOverlay() {
   };
 
   createEffect(() => {
-    if (!showAllApps() && !dockContextMenu() && !userMenu()) {
+    if (!showAllApps() && !dockContextMenu() && !userMenu() && !showChangePassword()) {
       requestResize("dock");
     }
   });
@@ -307,7 +309,7 @@ export default function ShellOverlay() {
 
   const handleCloseUserMenu = async () => {
     setUserMenu(null);
-    if (!showAllApps() && !dockContextMenu()) {
+    if (!showAllApps() && !dockContextMenu() && !showChangePassword()) {
       await requestResize("dock");
     }
   };
@@ -317,6 +319,30 @@ export default function ShellOverlay() {
       await window.edenAPI.shellCommand("user/logout", {});
     } catch (error) {
       console.error("Failed to log out:", error);
+    }
+  };
+
+  const handleOpenChangePassword = async () => {
+    setShowChangePassword(true);
+    await requestResize("fullscreen");
+  };
+
+  const handleCloseChangePassword = () => {
+    setShowChangePassword(false);
+    if (!showAllApps() && !dockContextMenu() && !userMenu()) {
+      requestResize("dock");
+    }
+  };
+
+  const handleChangePasswordSubmit = async (args: {
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    try {
+      return await window.edenAPI.shellCommand("user/change-password", args);
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      return { success: false, error: t("shell.passwordUpdateFailed") };
     }
   };
 
@@ -375,7 +401,9 @@ export default function ShellOverlay() {
     <div
       class="shell-overlay"
       data-mode={
-        showAllApps() || dockContextMenu() || userMenu() ? "fullscreen" : "dock"
+        showAllApps() || dockContextMenu() || userMenu() || showChangePassword()
+          ? "fullscreen"
+          : "dock"
       }
     >
       {/* AllApps appears above the dock when active */}
@@ -429,12 +457,19 @@ export default function ShellOverlay() {
                 top={menu().top}
                 bottom={menu().bottom}
                 onLogout={handleLogout}
+                onChangePassword={handleOpenChangePassword}
                 onClose={handleCloseUserMenu}
               />
             )}
           </Show>
         )}
       </Show>
+
+      <ChangePasswordModal
+        show={showChangePassword()}
+        onClose={handleCloseChangePassword}
+        onSubmit={handleChangePasswordSubmit}
+      />
     </div>
   );
 }

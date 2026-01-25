@@ -80,6 +80,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "user/update",
   "user/delete",
   "user/set-password",
+  "user/change-password",
   "user/has-grant",
   "user/allowed-apps",
   "user/allowed-settings",

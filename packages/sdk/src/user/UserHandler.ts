@@ -108,6 +108,28 @@ export class UserHandler {
   }
 
   /**
+   * Change the current user's password.
+   */
+  @EdenHandler("change-password", { permission: "session" })
+  async handleChangePassword(args: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.userManager.changePassword(
+        args.currentPassword,
+        args.newPassword
+      );
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Change password failed",
+      };
+    }
+  }
+
+  /**
    * Check whether the current user has a specific grant.
    */
   @EdenHandler("has-grant", { permission: "grants" })

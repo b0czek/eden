@@ -175,6 +175,35 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     await this.store.saveUserRecord(user);
   }
 
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    if (!this.currentUser) {
+      throw new Error("No active user session");
+    }
+
+    const user = await this.requireUserRecord(this.currentUser.username);
+    const valid = await verifyPassword(
+      currentPassword,
+      user.passwordSalt,
+      user.passwordHash
+    );
+    if (!valid) {
+      throw new Error("Invalid password");
+    }
+
+    const { passwordHash, passwordSalt } = await hashPassword(newPassword);
+    user.passwordHash = passwordHash;
+    user.passwordSalt = passwordSalt;
+    user.updatedAt = Date.now();
+    await this.store.saveUserRecord(user);
+
+    if (this.currentUser?.username === user.username) {
+      this.setCurrentUser(user, "system");
+    }
+  }
+
   async login(username: string, password: string): Promise<UserProfile> {
     const user = await this.requireUserRecord(username);
 
