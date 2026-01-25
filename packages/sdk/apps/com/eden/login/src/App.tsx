@@ -166,9 +166,9 @@ const App = () => {
                           role="button"
                           tabIndex={0}
                         >
-                          <span class="eden-list-item-icon user-avatar">
+                          <div class="eden-avatar eden-avatar-md">
                             {getInitials(user.name)}
-                          </span>
+                          </div>
                           <div class="eden-list-item-content">
                             <div class="eden-list-item-title">
                               {user.name}

@@ -25,20 +25,6 @@ body {
   width: min(720px, 92vw);
 }
 
-.user-avatar {
-  width: var(--eden-space-xl);
-  height: var(--eden-space-xl);
-  border-radius: 50%;
-  background: var(--eden-color-bg-dark);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--eden-font-size-sm);
-  font-weight: var(--eden-font-weight-semibold);
-  color: var(--eden-color-text-primary);
-  flex-shrink: 0;
-}
-
 .user-error {
   color: var(--eden-color-danger);
 }

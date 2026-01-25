@@ -134,19 +134,6 @@ body {
   opacity: 0.7;
 }
 
-.user-badge-avatar {
-  width: var(--eden-space-xl);
-  height: var(--eden-space-xl);
-  border-radius: 50%;
-  background: var(--eden-color-bg-dark);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--eden-font-size-xs);
-  font-weight: var(--eden-font-weight-semibold);
-  color: var(--eden-color-text-primary);
-}
-
 .user-badge-name {
   font-size: var(--eden-font-size-md);
   font-weight: var(--eden-font-weight-medium);

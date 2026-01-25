@@ -16,9 +16,9 @@ const getInitials = (name: string): string => {
 export default function UserBadge(props: UserBadgeProps) {
   return (
     <button type="button" class="user-badge" onClick={props.onClick}>
-      <span class="user-badge-avatar">
+      <div class="eden-avatar eden-avatar-md">
         {props.user ? getInitials(props.user.name) : "?"}
-      </span>
+      </div>
       <span class="user-badge-name">
         <Show when={props.user} fallback={t("shell.signIn")}>
           {props.user?.name}
