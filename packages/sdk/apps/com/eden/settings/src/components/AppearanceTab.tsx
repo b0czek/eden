@@ -1,7 +1,7 @@
 
 import { Component, For, createSignal, onMount } from "solid-js";
 
-import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
+import type { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
 import { t } from "../i18n";
 
 const WallpaperGrid: Component<{

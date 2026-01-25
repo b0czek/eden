@@ -2,8 +2,6 @@ export const en = {
   files: {
     newFolder: "New Folder",
     newFile: "New File",
-    name: "Name",
-    size: "Size",
     modified: "Date Modified",
     items: "items",
     item: "item",
@@ -26,5 +24,5 @@ export const en = {
     goBack: "Go Back",
     goForward: "Go Forward",
     goUp: "Go Up",
-  }
+  },
 };

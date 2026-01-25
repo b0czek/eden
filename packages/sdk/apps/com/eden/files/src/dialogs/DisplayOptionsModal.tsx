@@ -98,8 +98,8 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                                     onChange={(e) => updatePreference('sortBy', e.currentTarget.value as SortBy)}
                                     style={{ flex: "1" }}
                                 >
-                                    <option value="name">{t("files.name")}</option>
-                                    <option value="size">{t("files.size")}</option>
+                                    <option value="name">{t("common.name")}</option>
+                                    <option value="size">{t("common.size")}</option>
                                     <option value="modified">{t("files.modified")}</option>
                                 </select>
 

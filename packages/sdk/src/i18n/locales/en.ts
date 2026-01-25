@@ -14,5 +14,13 @@ export const commonEn = {
     appearance: "Appearance",
     about: "About",
     deleteConfirmation: "Are you sure you want to delete {name}?",
-  }
+    retry: "Retry",
+    password: "Password",
+    name: "Name",
+    size: "Size",
+    version: "Version",
+    add: "Add",
+    remove: "Remove",
+    search: "Search...",
+  },
 };

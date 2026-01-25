@@ -14,5 +14,13 @@ export const commonPl = {
     appearance: "Wygląd",
     about: "O programie",
     deleteConfirmation: "Czy na pewno chcesz usunąć {name}?",
-  }
+    retry: "Spróbuj ponownie",
+    password: "Hasło",
+    name: "Nazwa",
+    size: "Rozmiar",
+    version: "Wersja",
+    add: "Dodaj",
+    remove: "Usuń",
+    search: "Szukaj...",
+  },
 };

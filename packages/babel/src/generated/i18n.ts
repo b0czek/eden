@@ -26,6 +26,14 @@ export interface I18nCommonTranslations {
   "common.appearance": void;
   "common.about": void;
   "common.deleteConfirmation": { name: string | number };
+  "common.retry": void;
+  "common.password": void;
+  "common.name": void;
+  "common.size": void;
+  "common.version": void;
+  "common.add": void;
+  "common.remove": void;
+  "common.search": void;
 }
 
 /**

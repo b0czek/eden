@@ -52,7 +52,7 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">{t("files.name")}</label>
+        <label class="eden-form-label">{t("common.name")}</label>
         <input
           type="text"
           class="eden-input"

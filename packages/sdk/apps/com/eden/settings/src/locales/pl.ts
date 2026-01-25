@@ -17,8 +17,6 @@ export const pl = {
       uninstallConfirm:
         "Czy na pewno chcesz odinstalować tę aplikację? Ta operacja nie może być cofnięta.",
       details: {
-        version: "Wersja",
-        size: "Rozmiar",
         source: "Źródło",
         windowMode: "Tryb okna",
         windowModeUnknown: "Nieznany",

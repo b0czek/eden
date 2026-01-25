@@ -2,8 +2,6 @@ export const pl = {
   files: {
     newFolder: "Nowy Folder",
     newFile: "Nowy Plik",
-    name: "Nazwa",
-    size: "Rozmiar",
     modified: "Data Modyfikacji",
     items: "elementy",
     item: "element",
@@ -26,5 +24,5 @@ export const pl = {
     goBack: "Wstecz",
     goForward: "Dalej",
     goUp: "W Górę",
-  }
+  },
 };

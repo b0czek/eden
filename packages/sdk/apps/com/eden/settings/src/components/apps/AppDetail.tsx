@@ -130,13 +130,13 @@ const AppDetail: Component<AppDetailProps> = (props) => {
         <div class="app-detail-grid">
           <div class="app-detail-item">
             <div class="app-detail-label">
-              {t("settings.apps.details.version")}
+              {t("common.version")}
             </div>
             <div class="app-detail-value">v{props.app.version}</div>
           </div>
           <div class="app-detail-item">
             <div class="app-detail-label">
-              {t("settings.apps.details.size")}
+              {t("common.size")}
             </div>
             <div class="app-detail-value">
               <Show when={!props.sizeLoading} fallback={t("common.loading")}>

@@ -4,8 +4,6 @@ export const pl = {
     subtitle: "Wybierz użytkownika i wprowadź hasło, aby kontynuować.",
     loadingUsers: "Ładowanie użytkowników...",
     noUsersAvailable: "Brak dostępnych użytkowników.",
-    retry: "Ponów",
-    password: "Hasło",
     enterPassword: "Wpisz hasło",
     signingIn: "Logowanie...",
     loginFailed: "Logowanie nie powiodło się.",

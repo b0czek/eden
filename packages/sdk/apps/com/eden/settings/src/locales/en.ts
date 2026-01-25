@@ -17,8 +17,6 @@ export const en = {
       uninstallConfirm:
         "Are you sure you want to uninstall this app? This action cannot be undone.",
       details: {
-        version: "Version",
-        size: "Size",
         source: "Source",
         windowMode: "Window Mode",
         windowModeUnknown: "Unknown",

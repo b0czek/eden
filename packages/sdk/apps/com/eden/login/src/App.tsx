@@ -136,7 +136,7 @@ const App = () => {
                     class="eden-btn eden-btn-secondary"
                     onClick={loadUsers}
                   >
-                    {t("login.retry")}
+                    {t("common.retry")}
                   </button>
                 </div>
               }
@@ -182,7 +182,7 @@ const App = () => {
 
                 <div class="eden-flex eden-flex-col eden-gap-sm login-form-container">
                   <label class="eden-text-sm eden-text-secondary" for="password">
-                    {t("login.password")}
+                    {t("common.password")}
                   </label>
                   <input
                     id="password"

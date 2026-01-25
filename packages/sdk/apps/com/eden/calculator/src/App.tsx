@@ -220,7 +220,7 @@ const App: Component = () => {
         break;
       case "/":
         if (current === 0) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.divByZero"));
           setOperator(null);
           setPreviousInput(null);
@@ -243,7 +243,7 @@ const App: Component = () => {
   };
 
   const formatResult = (result: number): string => {
-    if (!isFinite(result)) return t("calculator.error");
+    if (!isFinite(result)) return t("common.error");
     if (Number.isInteger(result) && Math.abs(result) < 1e15) {
       return result.toString();
     }
@@ -262,7 +262,7 @@ const App: Component = () => {
 
   const deleteLast = () => {
     const current = display();
-    if (current === t("calculator.error")) {
+    if (current === t("common.error")) {
       clearAll();
       return;
     }
@@ -275,7 +275,7 @@ const App: Component = () => {
 
   const toggleSign = () => {
     const current = display();
-    if (current !== "0" && current !== t("calculator.error")) {
+    if (current !== "0" && current !== t("common.error")) {
       if (current.startsWith("-")) {
         setDisplay(current.slice(1));
       } else {
@@ -308,7 +308,7 @@ const App: Component = () => {
         break;
       case "log":
         if (value <= 0) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.invalidInput"));
           return;
         }
@@ -317,7 +317,7 @@ const App: Component = () => {
         break;
       case "ln":
         if (value <= 0) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.invalidInput"));
           return;
         }
@@ -326,7 +326,7 @@ const App: Component = () => {
         break;
       case "sqrt":
         if (value < 0) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.invalidInput"));
           return;
         }
@@ -345,7 +345,7 @@ const App: Component = () => {
         return;
       case "inv":
         if (value === 0) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.divByZero"));
           return;
         }
@@ -358,7 +358,7 @@ const App: Component = () => {
         break;
       case "factorial":
         if (value < 0 || !Number.isInteger(value) || value > 170) {
-          setDisplay(t("calculator.error"));
+          setDisplay(t("common.error"));
           setExpression(t("calculator.invalidInput"));
           return;
         }
