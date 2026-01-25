@@ -1,31 +1,24 @@
-
 import { Component, For, createSignal, onMount } from "solid-js";
-
 import type { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
 import { t } from "../i18n";
+import "./AppearanceTab.css";
 
 const WallpaperGrid: Component<{
     options: WallpaperPreset[],
     onSelect: (preset: WallpaperPreset) => void,
     activeId?: string,
 }> = (props) => (
-    <div class="eden-grid eden-gap-sm" style={{ "grid-template-columns": "repeat(auto-fill, minmax(120px, 1fr))", "margin-top": "var(--eden-space-sm)", "margin-bottom": "var(--eden-space-lg)" }}>
+    <div class="wallpaper-grid">
         <For each={props.options}>
             {(option) => (
                 <div
-                    class="eden-interactive eden-rounded-sm eden-shadow-sm eden-flex eden-text-xs eden-font-medium"
+                    class={`wallpaper-item ${
+                        props.activeId === option.id 
+                            ? "wallpaper-item-active" 
+                            : "wallpaper-item-inactive"
+                    }`}
                     style={{
-                        height: "80px",
                         background: option.value,
-                        border: props.activeId === option.id
-                            ? "2px solid var(--eden-color-accent-primary)"
-                            : "1px solid rgba(255,255,255,0.1)",
-                        "align-items": "flex-end",
-                        "justify-content": "center",
-                        "padding-bottom": "var(--eden-space-sm)",
-                        "text-shadow": "0 1px 2px rgba(0,0,0,0.8)",
-                        color: "var(--eden-color-text-on-dark)",
-                        transform: props.activeId === option.id ? "scale(1.02)" : "scale(1)"
                     }}
                     onClick={() => props.onSelect(option)}
                 >
