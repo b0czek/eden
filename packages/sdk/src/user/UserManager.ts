@@ -7,9 +7,9 @@ import { hashPassword, verifyPassword } from "./UserAuth";
 import {
   defaultGrantsForRole,
   matchesGrants,
-  normalizeCoreApps,
   normalizeGrants,
 } from "./UserGrants";
+import { normalizeAppIds } from "../utils/normalize";
 import { UserStore } from "./UserStore";
 import { StoredUser } from "./UserTypes";
 
@@ -30,6 +30,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
   private currentUser: StoredUser | null = null;
   private defaultUsername: string | null = null;
   private coreApps: Set<string>;
+  private restrictedApps: Set<string>;
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
@@ -39,13 +40,11 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
   ) {
     super(ipcBridge);
     this.store = new UserStore(appsDirectory);
-    this.coreApps = normalizeCoreApps(config.coreApps);
+    this.coreApps = normalizeAppIds(config.coreApps);
+    this.restrictedApps = normalizeAppIds(config.restrictedApps);
 
     this.handler = new UserHandler(this);
     commandRegistry.registerManager(this.handler);
-
-    // Register grant checker for declarative grant checks in handlers
-    commandRegistry.setGrantChecker((grant) => this.hasGrant(grant));
   }
 
   async initialize(): Promise<void> {
@@ -94,7 +93,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     const { passwordHash, passwordSalt } = await hashPassword(args.password);
     const now = Date.now();
 
-    const grants = normalizeGrants(
+    const grants = this.normalizeUserGrants(
       role,
       args.grants ?? defaultGrantsForRole(role),
     );
@@ -135,11 +134,11 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
 
     if (args.role) {
       user.role = args.role;
-      user.grants = normalizeGrants(user.role, user.grants);
+      user.grants = this.normalizeUserGrants(user.role, user.grants);
     }
 
     if (args.grants) {
-      user.grants = normalizeGrants(user.role, args.grants);
+      user.grants = this.normalizeUserGrants(user.role, args.grants);
     }
 
     user.updatedAt = Date.now();
@@ -177,7 +176,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
 
   async changePassword(
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<void> {
     if (!this.currentUser) {
       throw new Error("No active user session");
@@ -187,7 +186,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     const valid = await verifyPassword(
       currentPassword,
       user.passwordSalt,
-      user.passwordHash
+      user.passwordHash,
     );
     if (!valid) {
       throw new Error("Invalid password");
@@ -221,16 +220,17 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     await this.setCurrentUser(null, "logout");
   }
 
-  hasGrant(permission: string): boolean {
+  hasGrant(grant: string): boolean {
     if (!this.currentUser) return false;
     if (this.currentUser.role === "vendor") return true;
     const grants = this.currentUser.grants;
-    return matchesGrants(grants, permission);
+    return matchesGrants(grants, grant);
   }
 
   canLaunchApp(appId: string): boolean {
     if (!this.currentUser) return false;
     if (this.currentUser.role === "vendor") return true;
+    if (this.restrictedApps.has(appId)) return false;
     if (this.coreApps.has(appId)) return true;
     return matchesGrants(this.currentUser.grants, `apps/launch/${appId}`);
   }
@@ -326,5 +326,36 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     const user = await this.store.getUserRecord(this.defaultUsername);
     if (!user) return;
     await this.setCurrentUser(user, "system");
+  }
+
+  private normalizeUserGrants(role: UserRole, grants: string[]): string[] {
+    const normalized = normalizeGrants(role, grants);
+    return this.filterRestrictedAppGrants(role, normalized);
+  }
+
+  /**
+   * Removes apps/launch/* grants for restricted apps to keep grants tidy.
+   * Note: This is cosmetic only - actual restriction is enforced in canLaunchApp()
+   * which checks restrictedApps directly, bypassing grants entirely.
+   */
+  private filterRestrictedAppGrants(
+    role: UserRole,
+    grants: string[],
+  ): string[] {
+    if (role === "vendor" || this.restrictedApps.size === 0) {
+      return grants;
+    }
+
+    return grants.filter((grant) => {
+      if (!grant.startsWith("apps/launch/")) {
+        return true;
+      }
+
+      const appId = grant.slice("apps/launch/".length);
+      if (!appId || appId === "*") {
+        return true;
+      }
+      return !this.restrictedApps.has(appId);
+    });
   }
 }

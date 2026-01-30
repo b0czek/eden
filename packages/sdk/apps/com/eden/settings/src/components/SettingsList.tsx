@@ -22,17 +22,6 @@ const SettingsList: Component<SettingsListProps> = (props) => (
           </Show>
           <For each={category.settings}>
             {(setting) => (
-              <div class="setting-item">
-                <div class="setting-info">
-                  <h4 class="setting-label">
-                    {getLocalizedValue(setting.label, locale())}
-                  </h4>
-                  <Show when={setting.description}>
-                    <p class="setting-description">
-                      {getLocalizedValue(setting.description, locale())}
-                    </p>
-                  </Show>
-                </div>
                 <SettingInput
                   setting={setting}
                   value={
@@ -44,7 +33,6 @@ const SettingsList: Component<SettingsListProps> = (props) => (
                     props.onSettingChange(setting.key, value)
                   }
                 />
-              </div>
             )}
           </For>
         </>

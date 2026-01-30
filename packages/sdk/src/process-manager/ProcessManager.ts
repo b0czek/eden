@@ -1,16 +1,14 @@
-import { EventEmitter } from "events";
-import * as path from "path";
 import { randomUUID } from "crypto";
-import { Worker } from "worker_threads";
 import { BackendManager } from "./BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager/PackageManager";
 import { AppChannelManager } from "../appbus/AppChannelManager";
-import { AppInstance } from "@edenapp/types";
+import type { AppInstance, EdenConfig } from "@edenapp/types";
 import { injectable, inject, singleton } from "tsyringe";
 import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
+import { UserManager } from "../user/UserManager";
 
 /**
  * Events emitted by the ProcessManager
@@ -31,31 +29,25 @@ interface ProcessNamespaceEvents {
 @injectable()
 @EdenNamespace("process")
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
-  private backendManager: BackendManager;
-  private viewManager: ViewManager;
-  private packageManager: PackageManager;
-  private appChannelManager: AppChannelManager;
   private runningApps: Map<string, AppInstance> = new Map();
-  private appsDirectory: string;
   private processHandler: ProcessHandler;
+  private loginAppId?: string;
 
   constructor(
-    @inject(BackendManager) backendManager: BackendManager,
-    @inject(ViewManager) viewManager: ViewManager,
+    @inject(BackendManager) private backendManager: BackendManager,
+    @inject(ViewManager) private viewManager: ViewManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(PackageManager) packageManager: PackageManager,
-    @inject(AppChannelManager) appChannelManager: AppChannelManager,
-    @inject("appsDirectory") appsDirectory: string,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(PackageManager) private packageManager: PackageManager,
+    @inject(AppChannelManager) private appChannelManager: AppChannelManager,
+    @inject(UserManager) private userManager: UserManager,
+    @inject("EdenConfig") config: EdenConfig,
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
-    this.backendManager = backendManager;
-    this.viewManager = viewManager;
-    this.packageManager = packageManager;
-    this.appChannelManager = appChannelManager;
-    this.appsDirectory = appsDirectory;
+    this.loginAppId = config.loginAppId;
 
     this.setupEventHandlers();
+    this.setupUserAccessHandlers();
 
     // Create and register handler
     this.processHandler = new ProcessHandler(this);
@@ -91,7 +83,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           const viewInfo = this.viewManager.getViewInfo(viewId);
           if (viewInfo) {
             console.log(
-              `Transferring backend port to view ${viewId} for app ${appId}`
+              `Transferring backend port to view ${viewId} for app ${appId}`,
             );
             viewInfo.view.webContents.postMessage("backend-port", {}, [
               backendPort,
@@ -100,10 +92,22 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           }
         } else {
           console.log(
-            `No backend port for app ${appId} (may be frontend-only)`
+            `No backend port for app ${appId} (may be frontend-only)`,
           );
         }
-      }
+      },
+    );
+  }
+
+  private setupUserAccessHandlers(): void {
+    this.ipcBridge.eventSubscribers.subscribeInternal(
+      "user/changed",
+      async ({ currentUser, previousUsername }) => {
+        const currentUsername = currentUser?.username ?? null;
+        if (currentUsername !== previousUsername) {
+          await this.stopSessionApps();
+        }
+      },
     );
   }
 
@@ -113,8 +117,12 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   async launchApp(
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
-    launchArgs?: string[]
+    launchArgs?: string[],
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+    if (!this.isLoginApp(appId) && !this.userManager.canLaunchApp(appId)) {
+      throw new Error(`User cannot launch app ${appId}`);
+    }
+
     const manifest = this.packageManager.getAppManifest(appId);
     if (!manifest) {
       throw new Error(`App ${appId} is not installed`);
@@ -123,7 +131,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     // Validate manifest has at least frontend or backend
     if (!manifest.frontend?.entry && !manifest.backend?.entry) {
       throw new Error(
-        `App ${appId} must have at least a frontend or backend entry`
+        `App ${appId} must have at least a frontend or backend entry`,
       );
     }
 
@@ -147,7 +155,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           appId,
           manifest,
           installPath,
-          launchArgs
+          launchArgs,
         );
       }
 
@@ -159,7 +167,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           manifest,
           installPath,
           bounds,
-          launchArgs
+          launchArgs,
         );
       }
 
@@ -237,7 +245,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           (app) =>
             (app.manifest.hidden !== undefined
               ? !app.manifest.hidden
-              : !app.manifest.overlay) && !!app.manifest.frontend?.entry
+              : !app.manifest.overlay) && !!app.manifest.frontend?.entry,
         );
   }
 
@@ -341,5 +349,20 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     await this.launchApp(appId, bounds);
 
     console.log(`App ${appId} reloaded successfully`);
+  }
+
+  private async stopSessionApps(): Promise<void> {
+    const running = Array.from(this.runningApps.keys());
+    for (const appId of running) {
+      try {
+        await this.stopApp(appId);
+      } catch (error) {
+        console.error(`Failed to stop session app ${appId}:`, error);
+      }
+    }
+  }
+
+  private isLoginApp(appId: string): boolean {
+    return !!this.loginAppId && appId === this.loginAppId;
   }
 }

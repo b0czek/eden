@@ -82,8 +82,6 @@ export const COMMAND_NAMES: readonly string[] = [
   "user/set-password",
   "user/change-password",
   "user/has-grant",
-  "user/allowed-apps",
-  "user/allowed-settings",
   "user/get-default",
   "user/set-default",
   "view/update-view-bounds",

@@ -13,6 +13,7 @@ import type {
   EdenSeedConfig,
   EdenUserConfig,
 } from "@edenapp/types";
+import { defaultGrantsForRole } from "../user/UserGrants";
 
 // Key constants matching UserManager and SettingsManager schemas
 const USERS_SEED_VERSION_KEY = "_seed:users:version";
@@ -137,13 +138,6 @@ async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
   const currentIds = Array.isArray(existingIndex) ? existingIndex : [];
   const mergedUsernames = [...new Set([...currentIds, ...usernames])];
   await db.set(USERS_INDEX_KEY, mergedUsernames);
-}
-
-function defaultGrantsForRole(role: string): string[] {
-  if (role === "vendor") {
-    return ["*"];
-  }
-  return ["apps/launch/*", "settings/*"];
 }
 
 function normalizeSeedSettings(

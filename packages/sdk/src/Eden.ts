@@ -147,10 +147,7 @@ export class Eden {
     try {
       fs.mkdirSync(directory, { recursive: true });
     } catch (error) {
-      console.error(
-        `[Eden] Failed to create ${label} at ${directory}:`,
-        error,
-      );
+      console.error(`[Eden] Failed to create ${label} at ${directory}:`, error);
       throw error;
     }
   }
@@ -191,7 +188,7 @@ export class Eden {
 
     // Launch autostart apps after foundation loads
     this.mainWindow.webContents.once("did-finish-load", () => {
-      this.autostartManager.launchAll();
+      this.autostartManager.onFoundationReady();
     });
 
     // Show window when foundation and overlay are ready

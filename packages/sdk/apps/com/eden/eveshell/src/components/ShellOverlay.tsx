@@ -29,7 +29,6 @@ export default function ShellOverlay() {
   const [userMenu, setUserMenu] = createSignal<ContextMenuPosition | null>(null);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
-  const [allowedAppIds, setAllowedAppIds] = createSignal<Set<string>>(new Set());
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -86,7 +85,6 @@ export default function ShellOverlay() {
   // Running apps that are NOT pinned (for the left section of dock)
   const dockRunningApps = (): AppInfo[] => {
     return runningApps()
-      .filter((instance) => isAppAllowed(instance.manifest.id))
       .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
       .map((instance) => ({
         id: instance.manifest.id,
@@ -104,7 +102,6 @@ export default function ShellOverlay() {
       .map((appId) => {
         const manifest = installed.find((m) => m.id === appId);
         if (!manifest) return null;
-        if (!isAppAllowed(appId)) return null;
         return {
           id: appId,
           name: getLocalizedValue(manifest.name, locale()),
@@ -114,16 +111,14 @@ export default function ShellOverlay() {
       .filter((app): app is AppInfo => app !== null);
   };
 
-  // All installed apps for the apps view
+  // All installed apps for the apps view (already filtered by permissions from package/list)
   const allApps = (): AppInfo[] => {
     const runningIds = new Set(runningApps().map((i) => i.manifest.id));
-    return installedApps()
-      .filter((app) => isAppAllowed(app.id))
-      .map((app) => ({
-        id: app.id,
-        name: getLocalizedValue(app.name, locale()),
-        isRunning: runningIds.has(app.id),
-      }));
+    return installedApps().map((app) => ({
+      id: app.id,
+      name: getLocalizedValue(app.name, locale()),
+      isRunning: runningIds.has(app.id),
+    }));
   };
 
   const loadSystemInfo = async () => {
@@ -132,7 +127,6 @@ export default function ShellOverlay() {
       const installed = await window.edenAPI.shellCommand("package/list", {});
       if (Array.isArray(installed)) {
         setInstalledApps(installed);
-        await refreshAllowedApps(installed.map((app) => app.id));
       }
 
       // Fetch running apps from process manager
@@ -152,22 +146,6 @@ export default function ShellOverlay() {
     } catch (error) {
       console.error("Failed to load current user:", error);
     }
-  };
-
-  const refreshAllowedApps = async (appIds: string[]) => {
-    try {
-      const result = await window.edenAPI.shellCommand("user/allowed-apps", {
-        appIds,
-      });
-      setAllowedAppIds(new Set(result.allowed ?? []));
-    } catch (error) {
-      console.error("Failed to load allowed apps:", error);
-      setAllowedAppIds(new Set(appIds));
-    }
-  };
-
-  const isAppAllowed = (appId: string): boolean => {
-    return allowedAppIds().has(appId);
   };
 
   // Helper function to calculate bounds based on mode and window size
@@ -212,9 +190,6 @@ export default function ShellOverlay() {
   };
 
   const handleAppClick = async (appId: string) => {
-    if (!isAppAllowed(appId)) {
-      return;
-    }
     const isRunning = runningApps().some((app) => app.manifest.id === appId);
 
     if (isRunning) {

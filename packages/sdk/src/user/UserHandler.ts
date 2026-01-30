@@ -1,11 +1,17 @@
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { EdenGrants } from "../settings/EdenSettings";
 import type { UserManager } from "./UserManager";
 import type { UserProfile, UserRole } from "@edenapp/types";
 
 @EdenNamespace("user")
 export class UserHandler {
   constructor(private userManager: UserManager) {}
+
+  private assertVendor(): void {
+    const user = this.userManager.getCurrentUser();
+    if (!user || user.role !== "vendor") {
+      throw new Error("Vendor account required");
+    }
+  }
 
   /**
    * List all users.
@@ -55,7 +61,7 @@ export class UserHandler {
   /**
    * Create a new user.
    */
-  @EdenHandler("create", { permission: "manage", grant: EdenGrants.USERS })
+  @EdenHandler("create", { permission: "manage" })
   async handleCreate(args: {
     username?: string;
     name: string;
@@ -63,6 +69,7 @@ export class UserHandler {
     password: string;
     grants?: string[];
   }): Promise<{ user: UserProfile }> {
+    this.assertVendor();
     const user = await this.userManager.createUser(args);
     return { user };
   }
@@ -70,13 +77,14 @@ export class UserHandler {
   /**
    * Update user profile details or grants.
    */
-  @EdenHandler("update", { permission: "manage", grant: EdenGrants.USERS })
+  @EdenHandler("update", { permission: "manage" })
   async handleUpdate(args: {
     username: string;
     name?: string;
     role?: UserRole;
     grants?: string[];
   }): Promise<{ user: UserProfile }> {
+    this.assertVendor();
     const user = await this.userManager.updateUser(args);
     return { user };
   }
@@ -84,10 +92,11 @@ export class UserHandler {
   /**
    * Delete a user.
    */
-  @EdenHandler("delete", { permission: "manage", grant: EdenGrants.USERS })
+  @EdenHandler("delete", { permission: "manage" })
   async handleDelete(args: {
     username: string;
   }): Promise<{ success: boolean }> {
+    this.assertVendor();
     await this.userManager.deleteUser(args.username);
     return { success: true };
   }
@@ -95,14 +104,12 @@ export class UserHandler {
   /**
    * Set a user's password.
    */
-  @EdenHandler("set-password", {
-    permission: "manage",
-    grant: EdenGrants.USERS,
-  })
+  @EdenHandler("set-password", { permission: "manage" })
   async handleSetPassword(args: {
     username: string;
     password: string;
   }): Promise<{ success: boolean }> {
+    this.assertVendor();
     await this.userManager.setPassword(args.username, args.password);
     return { success: true };
   }
@@ -124,7 +131,8 @@ export class UserHandler {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Change password failed",
+        error:
+          error instanceof Error ? error.message : "Change password failed",
       };
     }
   }
@@ -138,43 +146,22 @@ export class UserHandler {
   }
 
   /**
-   * Filter app IDs by launch permissions.
-   */
-  @EdenHandler("allowed-apps", { permission: "grants" })
-  async handleAllowedApps(args: {
-    appIds: string[];
-  }): Promise<{ allowed: string[] }> {
-    return { allowed: this.userManager.getAllowedApps(args.appIds) };
-  }
-
-  /**
-   * Filter setting keys by access permissions.
-   */
-  @EdenHandler("allowed-settings", { permission: "grants" })
-  async handleAllowedSettings(args: {
-    appId: string;
-    keys: string[];
-  }): Promise<{ allowed: string[] }> {
-    return {
-      allowed: this.userManager.getAllowedSettingKeys(args.appId, args.keys),
-    };
-  }
-
-  /**
    * Return the configured default username.
    */
-  @EdenHandler("get-default", { permission: "manage", grant: EdenGrants.USERS })
+  @EdenHandler("get-default", { permission: "manage" })
   async handleGetDefault(): Promise<{ username: string | null }> {
+    this.assertVendor();
     return { username: this.userManager.getDefaultUsername() };
   }
 
   /**
    * Update the configured default username.
    */
-  @EdenHandler("set-default", { permission: "manage", grant: EdenGrants.USERS })
+  @EdenHandler("set-default", { permission: "manage" })
   async handleSetDefault(args: {
     username: string | null;
   }): Promise<{ success: boolean }> {
+    this.assertVendor();
     await this.userManager.setDefaultUsername(args.username);
     return { success: true };
   }

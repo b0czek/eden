@@ -78,7 +78,8 @@ export interface AppbusCommands {
  */
 export interface AppearanceCommands {
   "appearance/set-wallpaper": {
-    args: { wallpaper: import("./index").WallpaperConfig };
+    args: {
+    wallpaper: import("./index").WallpaperConfig };
     response: void;
   };
   "appearance/get-wallpaper": {
@@ -87,7 +88,10 @@ export interface AppearanceCommands {
   };
   "appearance/get-presets": {
     args: Record<string, never>;
-    response: { solid: import("./index").WallpaperPreset[], gradients: import("./index").WallpaperPreset[] };
+    response: {
+    solid: import("./index").WallpaperPreset[];
+    gradients: import("./index").WallpaperPreset[];
+  };
   };
 }
 
@@ -394,10 +398,13 @@ export interface PackageCommands {
   };
   /**
    * List all installed applications.
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
+   * @param showRestricted - If true, includes apps the current user cannot launch (hidden by default)
    */
   "package/list": {
-    args: { showHidden?: boolean };
+    args: {
+    showHidden?: boolean;
+    showRestricted?: boolean };
     response: import("./index").AppManifest[];
   };
   /**
@@ -537,18 +544,22 @@ export interface SettingsCommands {
   };
   /**
    * List all settings in any app's namespace (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   "settings/list/su": {
     args: {
-    appId: string };
+    appId: string;
+    showRestricted?: boolean };
     response: { keys: string[] };
   };
   /**
    * Get all settings with values for any app (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   "settings/get-all/su": {
     args: {
-    appId: string };
+    appId: string;
+    showRestricted?: boolean };
     response: { settings: Record<string, string> };
   };
   /**
@@ -563,9 +574,11 @@ export interface SettingsCommands {
   };
   /**
    * Get the Eden settings schema
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   "settings/schema": {
-    args: Record<string, never>;
+    args: {
+    showRestricted?: boolean };
     response: { schema: import("./index").SettingsCategory[] };
   };
 }
@@ -659,23 +672,6 @@ export interface UserCommands {
   "user/has-grant": {
     args: { grant: string };
     response: { allowed: boolean };
-  };
-  /**
-   * Filter app IDs by launch permissions.
-   */
-  "user/allowed-apps": {
-    args: {
-    appIds: string[] };
-    response: { allowed: string[] };
-  };
-  /**
-   * Filter setting keys by access permissions.
-   */
-  "user/allowed-settings": {
-    args: {
-    appId: string;
-    keys: string[] };
-    response: { allowed: string[] };
   };
   /**
    * Return the configured default username.

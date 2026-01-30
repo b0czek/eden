@@ -1,7 +1,7 @@
 /**
  * Grant Type Generator
  *
- * Extracts permissions from EDEN_SETTINGS_SCHEMA and generates typed grants.
+ * Extracts grants from EDEN_SETTINGS_SCHEMA and generates typed grants.
  */
 
 import { Project, Node } from "ts-morph";
@@ -9,11 +9,11 @@ import * as path from "path";
 import { generateHeader } from "./utils";
 
 export interface GrantInfo {
-  /** Key name in EdenGrants object (e.g., "USERS") */
+  /** Key name in EdenGrants object (e.g., "APPEARANCE") */
   key: string;
-  /** Permission key from schema (e.g., "users") */
-  permission: string;
-  /** Full grant string (e.g., "settings/com.eden/users") */
+  /** Grant key from schema (e.g., "appearance") */
+  grantKey: string;
+  /** Full grant string (e.g., "settings/com.eden/appearance") */
   grant: string;
   /** Category ID for documentation */
   categoryId: string;
@@ -54,7 +54,7 @@ export function extractGrantsFromSchema(
     if (!Node.isObjectLiteralExpression(element)) continue;
 
     let categoryId: string | null = null;
-    let permission: string | null = null;
+    let grantKey: string | null = null;
 
     for (const prop of element.getProperties()) {
       if (!Node.isPropertyAssignment(prop)) continue;
@@ -65,21 +65,17 @@ export function extractGrantsFromSchema(
       if (propName === "id" && propInit && Node.isStringLiteral(propInit)) {
         categoryId = propInit.getLiteralText();
       }
-      if (
-        propName === "permission" &&
-        propInit &&
-        Node.isStringLiteral(propInit)
-      ) {
-        permission = propInit.getLiteralText();
+      if (propName === "grant" && propInit && Node.isStringLiteral(propInit)) {
+        grantKey = propInit.getLiteralText();
       }
     }
 
-    if (categoryId && permission) {
-      // Convert category ID to uppercase key (e.g., "users" -> "USERS")
+    if (categoryId && grantKey) {
+      // Convert category ID to uppercase key (e.g., "appearance" -> "APPEARANCE")
       const key = categoryId.toUpperCase().replace(/-/g, "_");
-      const grant = `settings/com.eden/${permission}`;
+      const grant = `settings/com.eden/${grantKey}`;
 
-      grants.push({ key, permission, grant, categoryId });
+      grants.push({ key, grantKey, grant, categoryId });
     }
   }
 
@@ -101,9 +97,7 @@ export function generateGrantsTypesCode(grants: GrantInfo[]): string {
   lines.push(" * Eden Grants Registry");
   lines.push(" *");
   lines.push(" * Typed grants derived from EDEN_SETTINGS_SCHEMA.");
-  lines.push(
-    " * Each category with a `permission` field becomes a grant entry.",
-  );
+  lines.push(" * Each category with a `grant` field becomes a grant entry.");
   lines.push(" */");
   lines.push("export declare const EdenGrants: {");
 
@@ -137,17 +131,15 @@ export function generateGrantsRuntimeCode(grants: GrantInfo[]): string {
   lines.push("");
   lines.push("/** Build a settings grant string for Eden settings */");
   lines.push(
-    "export const buildEdenSettingsGrant = (permissionKey: string): string =>",
+    "export const buildEdenSettingsGrant = (grantKey: string): string =>",
   );
-  lines.push("  `settings/${EDEN_APP_ID}/${permissionKey}`;");
+  lines.push("  `settings/${EDEN_APP_ID}/${grantKey}`;");
   lines.push("");
   lines.push("/**");
   lines.push(" * Eden Grants Registry");
   lines.push(" *");
   lines.push(" * Typed grants derived from EDEN_SETTINGS_SCHEMA.");
-  lines.push(
-    " * Each category with a `permission` field becomes a grant entry.",
-  );
+  lines.push(" * Each category with a `grant` field becomes a grant entry.");
   lines.push(" */");
   lines.push("export const EdenGrants = {");
 

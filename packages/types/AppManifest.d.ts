@@ -122,6 +122,8 @@ export interface SettingDefinition {
   label: string | Record<string, string>;
   /** Description shown as help text */
   description?: string | Record<string, string>;
+  /** Grant key used for access control */
+  grant?: string;
   /** Input type */
   type: SettingType;
   /** Default value (as string, will be parsed based on type) */
@@ -150,8 +152,26 @@ export interface SettingsCategory {
   description?: string | Record<string, string>;
   /** Category icon (optional) */
   icon?: string;
+  /** Optional custom view ID for system settings */
+  view?: string;
+  /** Grant key used for access control */
+  grant?: string;
   /** Settings in this category */
   settings: SettingDefinition[];
+}
+
+/**
+ * App-specific grant definition
+ */
+export interface AppGrantDefinition {
+  /** Grant ID (namespaced by app ID at runtime) */
+  id: string;
+  /** Human-readable label */
+  label: string | Record<string, string>;
+  /** Optional description */
+  description?: string | Record<string, string>;
+  /** Optional permissions unlocked by this grant */
+  permissions?: string[];
 }
 
 /**
@@ -242,6 +262,12 @@ export interface AppManifest {
   /** Internal flag indicating if this is a prebuilt system app */
   isPrebuilt?: boolean;
 
+  /** Internal flag indicating if this is a core app (always allowed to launch) */
+  isCore?: boolean;
+
+  /** Internal flag indicating if this app is restricted to vendor users */
+  isRestricted?: boolean;
+
   /**
    * Permissions requested by this app.
    * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
@@ -278,6 +304,11 @@ export interface AppManifest {
    * Defines settings categories and individual settings that can be configured.
    */
   settings?: SettingsCategory[];
+
+  /**
+   * App-specific user grants for feature-level access control.
+   */
+  grants?: AppGrantDefinition[];
 
   /**
    * Additional files or directories to include in the bundle.

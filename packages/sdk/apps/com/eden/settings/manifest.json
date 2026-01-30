@@ -26,6 +26,6 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["settings/superuser"],
+  "permissions": ["settings/superuser", "user/grants"],
   "icon": "icon.svg"
 }

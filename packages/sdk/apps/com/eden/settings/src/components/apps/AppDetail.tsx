@@ -40,17 +40,17 @@ const formatBytes = (bytes?: number): string => {
 
 const AppDetail: Component<AppDetailProps> = (props) => {
   return (
-    <section class="apps-detail-panel eden-flex-col eden-gap-md">
-      <button
-        type="button"
-        class="eden-btn eden-btn-ghost eden-btn-sm apps-back"
-        onClick={props.onBack}
-      >
-        <FiArrowLeft />
-        {t("common.back")}
-      </button>
-      <div class="app-detail eden-flex-col eden-gap-lg">
-        <header class="app-detail-header content-header">
+    <div class="eden-card eden-card-glass eden-flex-col eden-gap-md">
+      <div class="eden-card-header eden-flex eden-flex-between eden-items-center">
+        <div class="eden-flex eden-items-center eden-gap-md">
+          <button
+            type="button"
+            class="eden-btn eden-btn-ghost eden-btn-icon"
+            onClick={props.onBack}
+            title={t("common.back")}
+          >
+            <FiArrowLeft />
+          </button>
           <div class="eden-flex eden-items-center eden-gap-md">
             <div
               class={
@@ -63,9 +63,13 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 when={props.appIcon}
                 fallback={
                   props.app.isPrebuilt ? (
-                    <FiCpu class="app-detail-fallback-icon" />
+                    <div class="eden-flex-center eden-h-full eden-w-full eden-text-tertiary">
+                      <FiCpu />
+                    </div>
                   ) : (
-                    <FiPackage class="app-detail-fallback-icon" />
+                    <div class="eden-flex-center eden-h-full eden-w-full eden-text-tertiary">
+                      <FiPackage />
+                    </div>
                   )
                 }
               >
@@ -75,28 +79,27 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 />
               </Show>
             </div>
-            <div class="app-detail-heading">
-              <h3 class="content-title">
+            <div class="eden-flex eden-flex-col">
+              <h3 class="eden-card-title">
                 {getLocalizedValue(props.app.name, locale())}
               </h3>
-              <p class="content-description">
-                {props.app.description ||
-                  (props.app.isPrebuilt
-                    ? t("settings.apps.systemComponent")
-                    : t("settings.apps.noDescription"))}
-              </p>
-              <div class="app-detail-id eden-text-xs eden-text-tertiary">
-                {props.app.id}
+              <div class="eden-flex eden-gap-xs eden-items-center">
+                <span class="eden-text-xs eden-text-tertiary">
+                  {props.app.id}
+                </span>
+                <Show when={props.app.isPrebuilt}>
+                  <span class="eden-badge eden-badge-info eden-badge-sm">
+                    {t("settings.apps.builtin")}
+                  </span>
+                </Show>
               </div>
             </div>
           </div>
-        </header>
+        </div>
 
-        <div class="app-detail-actions eden-flex eden-items-center eden-gap-sm">
-          <div class="eden-flex eden-items-center eden-gap-sm">
-            <span class="eden-text-sm eden-text-tertiary">
-              {t("settings.apps.autostart")}
-            </span>
+        <div class="eden-flex eden-gap-sm eden-items-center">
+           <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
+            <span>{t("settings.apps.autostart")}</span>
             <input
               type="checkbox"
               class="eden-toggle"
@@ -107,10 +110,10 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 )
               }
             />
-          </div>
+          </label>
           <Show when={!props.app.isPrebuilt}>
             <button
-              class="eden-btn eden-btn-danger eden-btn-sm"
+              class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"
               disabled={props.uninstalling}
               onClick={(e) => props.onUninstall(e)}
               title={t("settings.apps.uninstallApp")}
@@ -120,56 +123,52 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               </Show>
             </button>
           </Show>
-          <Show when={props.app.isPrebuilt}>
-            <span class="eden-badge eden-badge-info">
-              {t("settings.apps.builtin")}
-            </span>
-          </Show>
+        </div>
+      </div>
+
+      <div class="eden-card-body eden-flex-col eden-gap-lg">
+        <div class="eden-text-sm eden-text-secondary">
+            {props.app.description ||
+              (props.app.isPrebuilt
+                ? t("settings.apps.systemComponent")
+                : t("settings.apps.noDescription"))}
         </div>
 
-        <div class="app-detail-grid">
-          <div class="app-detail-item">
-            <div class="app-detail-label">
-              {t("common.version")}
-            </div>
-            <div class="app-detail-value">v{props.app.version}</div>
+        <div class="eden-grid eden-grid-2 eden-gap-md">
+          <div class="eden-flex eden-flex-col eden-gap-xs">
+             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("common.version")}</span>
+             <span class="eden-text-md">{props.app.version}</span>
           </div>
-          <div class="app-detail-item">
-            <div class="app-detail-label">
-              {t("common.size")}
-            </div>
-            <div class="app-detail-value">
-              <Show when={!props.sizeLoading} fallback={t("common.loading")}>
-                {formatBytes(props.size)}
-              </Show>
-            </div>
+          <div class="eden-flex eden-flex-col eden-gap-xs">
+             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("common.size")}</span>
+             <span class="eden-text-md">
+               <Show when={!props.sizeLoading} fallback={t("common.loading")}>
+                 {formatBytes(props.size)}
+               </Show>
+             </span>
           </div>
-          <div class="app-detail-item">
-            <div class="app-detail-label">
-              {t("settings.apps.details.source")}
-            </div>
-            <div class="app-detail-value">
+          <div class="eden-flex eden-flex-col eden-gap-xs">
+             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("settings.apps.details.source")}</span>
+             <span class="eden-text-md">
               {props.app.isPrebuilt
                 ? t("settings.apps.builtin")
                 : t("settings.apps.userInstalled")}
-            </div>
+             </span>
           </div>
-          <div class="app-detail-item">
-            <div class="app-detail-label">
-              {t("settings.apps.details.windowMode")}
-            </div>
-            <div class="app-detail-value">
+          <div class="eden-flex eden-flex-col eden-gap-xs">
+             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("settings.apps.details.windowMode")}</span>
+             <span class="eden-text-md">
               {props.app.window?.mode ??
                 t("settings.apps.details.windowModeUnknown")}
-            </div>
+             </span>
           </div>
         </div>
 
-        <div class="app-detail-section eden-flex-col eden-gap-sm">
-          <h4 class="app-detail-section-title eden-text-sm eden-font-semibold">
+        <div class="eden-flex eden-flex-col eden-gap-sm">
+          <h4 class="eden-text-sm eden-font-semibold">
             {t("settings.apps.details.capabilities")}
           </h4>
-          <div class="app-detail-tags eden-flex eden-gap-xs">
+          <div class="eden-flex eden-gap-xs eden-flex-wrap">
             <Show
               when={
                 props.app.frontend ||
@@ -184,22 +183,22 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               }
             >
               <Show when={props.app.frontend}>
-                <span class="eden-tag">
+                <span class="eden-badge">
                   {t("settings.apps.details.frontend")}
                 </span>
               </Show>
               <Show when={props.app.backend}>
-                <span class="eden-tag">
+                <span class="eden-badge">
                   {t("settings.apps.details.backend")}
                 </span>
               </Show>
               <Show when={props.app.overlay}>
-                <span class="eden-tag">
+                <span class="eden-badge">
                   {t("settings.apps.details.overlay")}
                 </span>
               </Show>
               <Show when={props.app.hidden}>
-                <span class="eden-tag">
+                <span class="eden-badge">
                   {t("settings.apps.details.hidden")}
                 </span>
               </Show>
@@ -207,11 +206,11 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           </div>
         </div>
 
-        <div class="app-detail-section eden-flex-col eden-gap-sm">
-          <h4 class="app-detail-section-title eden-text-sm eden-font-semibold">
+        <div class="eden-flex eden-flex-col eden-gap-sm">
+          <h4 class="eden-text-sm eden-font-semibold">
             {t("settings.apps.details.permissions")}
           </h4>
-          <div class="app-detail-tags eden-flex eden-gap-xs">
+          <div class="eden-flex eden-gap-xs eden-flex-wrap">
             <Show
               when={(props.app.permissions?.length ?? 0) > 0}
               fallback={
@@ -222,14 +221,14 @@ const AppDetail: Component<AppDetailProps> = (props) => {
             >
               <For each={props.app.permissions ?? []}>
                 {(permission) => (
-                  <span class="eden-tag eden-tag-mono">{permission}</span>
+                  <span class="eden-badge eden-badge-mono">{permission}</span>
                 )}
               </For>
             </Show>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
 

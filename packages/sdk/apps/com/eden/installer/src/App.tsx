@@ -75,6 +75,11 @@ const App = () => {
       // Implement close logic
   };
 
+const getLocalizedName = (name: AppManifest["name"]): string => {
+    if (typeof name === "string") return name;
+    return name["en"] || Object.values(name)[0] || "Unknown App";
+};
+
   return (
     <div class="eden-glass-medium installer-layout">
       <Show when={loading()}>
@@ -101,7 +106,7 @@ const App = () => {
                     <div class="eden-card eden-flex-center" style="width: 96px; height: 96px; border-radius: 20px; font-size: 48px;">
                         <FiPackage />
                     </div>
-                    <h1 class="eden-mt-md eden-mb-xs">{app.name}</h1>
+                    <h1 class="eden-mt-md eden-mb-xs">{getLocalizedName(app.name)}</h1>
                     <div class="eden-text-secondary eden-text-sm eden-flex-center eden-gap-md">
                         <span class="eden-badge eden-badge-secondary">v{app.version}</span>
                         <span>by {app.author || "Unknown"}</span>
@@ -152,7 +157,7 @@ const App = () => {
                             <FiCheck size={32} />
                         </div>
                         <h2 class="eden-mb-sm">Installed Successfully!</h2>
-                        <p class="eden-text-secondary">{app.name} has been installed.</p>
+                        <p class="eden-text-secondary">{getLocalizedName(app.name)} has been installed.</p>
                     </div>
                 </div>
             </Show>

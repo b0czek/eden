@@ -1,6 +1,14 @@
 import "reflect-metadata";
-import { injectable, singleton, inject } from "tsyringe";
+import { injectable, singleton, inject, delay } from "tsyringe";
 import { PermissionRegistry } from "./PermissionRegistry";
+import type { UserManager } from "../user/UserManager";
+import { getManagerMetadata } from "./CommandMetadata";
+
+export {
+  addCommandHandler,
+  getManagerMetadata,
+  setManagerNamespace,
+} from "./CommandMetadata";
 
 /**
  * CommandRegistry
@@ -24,25 +32,16 @@ export interface CommandMetadata {
   methodName: string; // Original method name for metadata lookup
 }
 
-/** Callback to check if current user has a grant */
-export type GrantChecker = (grant: string) => boolean;
-
 @singleton()
 @injectable()
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
-  private grantChecker: GrantChecker | null = null;
 
   constructor(
     @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry,
+    @inject(delay(() => require("../user/UserManager").UserManager))
+    private userManager: UserManager,
   ) {}
-
-  /**
-   * Set the grant checker callback (called by UserManager after initialization)
-   */
-  setGrantChecker(checker: GrantChecker): void {
-    this.grantChecker = checker;
-  }
 
   /**
    * Register a command handler under a namespace
@@ -145,22 +144,34 @@ export class CommandRegistry {
     }
 
     // Check app permission if required
-    if (metadata.permission && appId && this.permissionRegistry) {
+    if (metadata.permission && appId) {
+      // App must have declared the permission
       if (!this.permissionRegistry.hasPermission(appId, metadata.permission)) {
         throw new Error(
           `Permission denied: ${metadata.permission} required for ${fullCommand}`,
         );
       }
+
+      // If permission requires a grant, check user has it
+      const requiredGrantIds = this.permissionRegistry.getRequiredGrantIds(
+        appId,
+        metadata.permission,
+      );
+      if (requiredGrantIds.length > 0) {
+        const hasGrant = requiredGrantIds.some((grantId) =>
+          this.userManager.hasGrant(`app/${appId}/${grantId}`),
+        );
+        if (!hasGrant) {
+          throw new Error(
+            `Grant denied: app/${appId}/${requiredGrantIds.join(",")} required for ${fullCommand}`,
+          );
+        }
+      }
     }
 
-    // Check user grant if required
+    // Check direct user grant if required - decorator has grant requirement declared
     if (metadata.grant) {
-      if (!this.grantChecker) {
-        throw new Error(
-          `Grant check required but no grant checker registered for ${fullCommand}`,
-        );
-      }
-      if (!this.grantChecker(metadata.grant)) {
+      if (!this.userManager.hasGrant(metadata.grant)) {
         throw new Error(
           `Grant denied: ${metadata.grant} required for ${fullCommand}`,
         );
@@ -199,57 +210,4 @@ export class CommandRegistry {
   clear(): void {
     this.handlers.clear();
   }
-}
-
-/**
- * Metadata storage for manager namespaces and handlers
- */
-const MANAGER_METADATA = new Map<
-  any,
-  {
-    namespace: string;
-    handlers: Map<string, string>;
-  }
->();
-
-/**
- * Get manager metadata (namespace and handlers)
- */
-export function getManagerMetadata(
-  instance: any,
-): { namespace: string; handlers: Map<string, string> } | undefined {
-  return MANAGER_METADATA.get(instance.constructor);
-}
-
-/**
- * Set manager namespace
- */
-export function setManagerNamespace(target: any, namespace: string): void {
-  if (!MANAGER_METADATA.has(target)) {
-    MANAGER_METADATA.set(target, {
-      namespace,
-      handlers: new Map(),
-    });
-  } else {
-    MANAGER_METADATA.get(target)!.namespace = namespace;
-  }
-}
-
-/**
- * Add command handler to manager metadata
- */
-export function addCommandHandler(
-  target: any,
-  command: string,
-  methodName: string,
-): void {
-  if (!MANAGER_METADATA.has(target)) {
-    MANAGER_METADATA.set(target, {
-      namespace: "",
-      handlers: new Map(),
-    });
-  }
-
-  const metadata = MANAGER_METADATA.get(target)!;
-  metadata.handlers.set(command, methodName);
 }

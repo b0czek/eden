@@ -186,9 +186,7 @@ const AppsTab: Component = () => {
   );
 
   return (
-    <div
-      class="apps-management eden-flex-col"
-    >
+    <div class="apps-management eden-flex-col">
       <Show
         when={!loading()}
         fallback={

@@ -1,8 +1,10 @@
 import { injectable, inject, singleton } from "tsyringe";
-import { EdenConfig } from "@edenapp/types";
+import type { EdenConfig } from "@edenapp/types";
 import { ProcessManager } from "./ProcessManager";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsHandler";
+import { UserManager } from "../user/UserManager";
+import { IPCBridge } from "../ipc";
 
 /**
  * AutostartManager handles launching applications when Eden starts
@@ -11,79 +13,131 @@ import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsHandler";
 @injectable()
 export class AutostartManager {
   private static readonly AUTOSTART_KEY_PREFIX = "autostart.";
+  private ready = false;
+  private launchPromise: Promise<void> = Promise.resolve();
+  private loginAppId: string | null;
 
   constructor(
     @inject("EdenConfig") private config: EdenConfig,
     @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(SettingsManager) private settingsManager: SettingsManager
-  ) {}
+    @inject(SettingsManager) private settingsManager: SettingsManager,
+    @inject(UserManager) private userManager: UserManager,
+    @inject(IPCBridge) ipcBridge: IPCBridge,
+  ) {
+    this.loginAppId = config.loginAppId ?? null;
 
-  private async ensureConfigDefaults(): Promise<void> {
-    const defaults = this.config.autostart || [];
-    if (defaults.length === 0) {
-      return;
-    }
+    // Subscribe directly to user/changed event
+    ipcBridge.eventSubscribers.subscribeInternal(
+      "user/changed",
+      ({ currentUser, previousUsername }) => {
+        const currentUsername = currentUser?.username ?? null;
+        if (currentUsername === previousUsername) {
+          // Same user, grants may have changed but no session reset
+          return;
+        }
 
-    for (const appId of defaults) {
-      const key = `${AutostartManager.AUTOSTART_KEY_PREFIX}${appId}`;
-      const existing = await this.settingsManager.get(EDEN_SETTINGS_APP_ID, key);
-      if (existing === undefined) {
-        await this.settingsManager.set(EDEN_SETTINGS_APP_ID, key, "true");
-      }
+        if (!this.ready) {
+          return;
+        }
+
+        if (currentUsername) {
+          void this.queueSessionLaunch();
+        } else {
+          void this.queueLoginLaunch();
+        }
+      },
+    );
+  }
+
+  onFoundationReady(): void {
+    if (this.ready) return;
+    this.ready = true;
+    if (this.userManager.getCurrentUser()) {
+      void this.queueSessionLaunch();
+    } else {
+      void this.queueLoginLaunch();
     }
   }
 
-  private async resolveAutostartApps(): Promise<string[]> {
+  private queueLaunch(task: () => Promise<void>): Promise<void> {
+    this.launchPromise = this.launchPromise.then(task);
+    return this.launchPromise;
+  }
+
+  private queueSessionLaunch(): Promise<void> {
+    return this.queueLaunch(() => this.launchSessionApps());
+  }
+
+  private queueLoginLaunch(): Promise<void> {
+    return this.queueLaunch(() => this.launchLoginApp());
+  }
+
+  private async loadAutostartSettings(): Promise<Map<string, boolean>> {
+    const entries = new Map<string, boolean>();
+    const keys = await this.settingsManager.list(EDEN_SETTINGS_APP_ID);
+
+    for (const key of keys) {
+      if (!key.startsWith(AutostartManager.AUTOSTART_KEY_PREFIX)) {
+        continue;
+      }
+      const appId = key.slice(AutostartManager.AUTOSTART_KEY_PREFIX.length);
+      const value = await this.settingsManager.get(EDEN_SETTINGS_APP_ID, key);
+      entries.set(appId, value === "true");
+    }
+
+    return entries;
+  }
+
+  private async launchSessionApps(): Promise<void> {
+    if (!this.userManager.getCurrentUser()) {
+      return;
+    }
+
     try {
-      await this.ensureConfigDefaults();
+      const settings = await this.loadAutostartSettings();
+      const enabledApps = Array.from(settings.entries())
+        .filter(([, enabled]) => enabled)
+        .map(([appId]) => appId);
 
-      const keys = await this.settingsManager.list(EDEN_SETTINGS_APP_ID);
-      const autostartApps: string[] = [];
-      let foundAutostartKey = false;
-
-      for (const key of keys) {
-        if (!key.startsWith(AutostartManager.AUTOSTART_KEY_PREFIX)) {
+      for (const appId of enabledApps) {
+        if (this.processManager.getAppInstance(appId)) {
           continue;
         }
 
-        foundAutostartKey = true;
-        const appId = key.slice(AutostartManager.AUTOSTART_KEY_PREFIX.length);
-        const value = await this.settingsManager.get(EDEN_SETTINGS_APP_ID, key);
-
-        if (value === "true") {
-          autostartApps.push(appId);
+        try {
+          await this.processManager.launchApp(appId);
+          console.log(`Autostart app launched: ${appId}`);
+        } catch (error) {
+          console.error(`Failed to launch autostart app ${appId}:`, error);
         }
       }
-
-      if (!foundAutostartKey) {
-        return this.config.autostart || [];
-      }
-
-      return autostartApps;
     } catch (error) {
-      console.warn("[AutostartManager] Failed to load autostart settings:", error);
-      return this.config.autostart || [];
+      console.warn(
+        "[AutostartManager] Failed to load autostart settings:",
+        error,
+      );
     }
   }
 
-  /**
-   * Launch all autostart applications
-   */
-  async launchAll(): Promise<void> {
-    const autostartApps = await this.resolveAutostartApps();
-
-    if (autostartApps.length === 0) {
-      console.log("No autostart apps configured");
+  private async launchLoginApp(): Promise<void> {
+    if (this.userManager.getCurrentUser()) {
       return;
     }
 
-    for (const appId of autostartApps) {
-      try {
-        await this.processManager.launchApp(appId);
-        console.log(`Autostart app launched: ${appId}`);
-      } catch (error) {
-        console.error(`Failed to launch autostart app ${appId}:`, error);
-      }
+    const loginAppId = this.loginAppId;
+    if (!loginAppId) {
+      return;
+    }
+
+    if (this.processManager.getAppInstance(loginAppId)) {
+      return;
+    }
+
+    try {
+      await this.processManager.launchApp(loginAppId);
+      console.log(`Login app launched: ${loginAppId}`);
+    } catch (error) {
+      console.error(`Failed to launch login app ${loginAppId}:`, error);
     }
   }
 }

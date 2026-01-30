@@ -34,6 +34,12 @@ export interface EdenConfig {
   tiling?: TilingConfig;
   development?: boolean;
 
+  /** App ID used for login UI when no user is active */
+  loginAppId?: string;
+
   /** Apps allowed to launch regardless of user grants */
   coreApps?: string[];
+
+  /** Apps blocked from launch for non-vendor users */
+  restrictedApps?: string[];
 }

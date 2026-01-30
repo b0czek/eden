@@ -14,7 +14,7 @@ export class PackageHandler {
   /**
    * Install an application from a local path.
    */
-  @EdenHandler("install")
+  @EdenHandler("install", { permission: "manage" })
   async handleInstallApp(args: { sourcePath: string }): Promise<AppManifest> {
     const { sourcePath } = args;
     console.log(`[PackageHandler] Installing from path: ${sourcePath}`);
@@ -24,7 +24,7 @@ export class PackageHandler {
   /**
    * Uninstall an application by its ID.
    */
-  @EdenHandler("uninstall")
+  @EdenHandler("uninstall", { permission: "manage" })
   async handleUninstallApp(args: { appId: string }): Promise<boolean> {
     const { appId } = args;
     return await this.packageManager.uninstallApp(appId);
@@ -32,17 +32,24 @@ export class PackageHandler {
 
   /**
    * List all installed applications.
-   * @param showHidden - If true, includes overlay apps (hidden by default)
+   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
+   * @param showRestricted - If true, includes apps the current user cannot launch (hidden by default)
    */
-  @EdenHandler("list")
-  async handleListApps(args: { showHidden?: boolean }): Promise<AppManifest[]> {
-    return this.packageManager.getInstalledApps(args.showHidden);
+  @EdenHandler("list", { permission: "read" })
+  async handleListApps(args: {
+    showHidden?: boolean;
+    showRestricted?: boolean;
+  }): Promise<AppManifest[]> {
+    return this.packageManager.getInstalledApps({
+      showHidden: args.showHidden,
+      showRestricted: args.showRestricted,
+    });
   }
 
   /**
    * Toggle hot reload for an app
    */
-  @EdenHandler("toggle-hot-reload")
+  @EdenHandler("toggle-hot-reload", { permission: "manage" })
   async handleToggleHotReload(params: {
     appId: string;
   }): Promise<{ enabled: boolean }> {
@@ -56,7 +63,7 @@ export class PackageHandler {
   /**
    * Check if hot reload is enabled for an app
    */
-  @EdenHandler("is-hot-reload-enabled")
+  @EdenHandler("is-hot-reload-enabled", { permission: "read" })
   async handleIsHotReloadEnabled(params: {
     appId: string;
   }): Promise<{ enabled: boolean }> {
@@ -67,7 +74,7 @@ export class PackageHandler {
   /**
    * Get the icon for an installed application as a data URL.
    */
-  @EdenHandler("get-icon")
+  @EdenHandler("get-icon", { permission: "read" })
   async handleGetAppIcon(args: {
     appId: string;
   }): Promise<{ icon: string | undefined }> {
@@ -79,7 +86,7 @@ export class PackageHandler {
   /**
    * Get info about a package file without installing it
    */
-  @EdenHandler("get-info")
+  @EdenHandler("get-info", { permission: "read" })
   async handleGetPackageInfo(args: {
     path: string;
   }): Promise<{ success: boolean; manifest?: AppManifest; error?: string }> {
@@ -90,7 +97,7 @@ export class PackageHandler {
   /**
    * Get the installed size of an app in bytes
    */
-  @EdenHandler("get-size")
+  @EdenHandler("get-size", { permission: "read" })
   async handleGetAppSize(args: {
     appId: string;
   }): Promise<{ size: number | undefined }> {

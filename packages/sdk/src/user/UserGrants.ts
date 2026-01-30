@@ -4,7 +4,7 @@ export function defaultGrantsForRole(role: UserRole): string[] {
   if (role === "vendor") {
     return ["*"];
   }
-  return ["apps/launch/*", "settings/*"];
+  return ["*"];
 }
 
 export function normalizeGrants(role: UserRole, grants: string[]): string[] {
@@ -12,21 +12,11 @@ export function normalizeGrants(role: UserRole, grants: string[]): string[] {
     return ["*"];
   }
 
-  const unique = new Set(
-    grants.map((permission) => permission.trim()).filter(Boolean),
-  );
+  const unique = new Set(grants.map((grant) => grant.trim()).filter(Boolean));
   if (unique.has("*")) {
     return ["*"];
   }
   return Array.from(unique);
-}
-
-export function normalizeCoreApps(appIds?: string[]): Set<string> {
-  if (!appIds || appIds.length === 0) {
-    return new Set();
-  }
-  const normalized = appIds.map((appId) => appId.trim()).filter(Boolean);
-  return new Set(normalized);
 }
 
 export function matchesGrants(grants: string[], required: string): boolean {
@@ -41,11 +31,11 @@ export function matchesGrants(grants: string[], required: string): boolean {
   return false;
 }
 
-function matchesGlob(pattern: string, permission: string): boolean {
+function matchesGlob(pattern: string, grant: string): boolean {
   if (pattern === "*") return true;
   if (pattern.endsWith("/*")) {
     const namespace = pattern.slice(0, -2);
-    return permission.startsWith(`${namespace}/`);
+    return grant.startsWith(`${namespace}/`);
   }
   return false;
 }

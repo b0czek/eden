@@ -10,22 +10,20 @@
 export const EDEN_APP_ID = "com.eden";
 
 /** Build a settings grant string for Eden settings */
-export const buildEdenSettingsGrant = (permissionKey: string): string =>
-  `settings/${EDEN_APP_ID}/${permissionKey}`;
+export const buildEdenSettingsGrant = (grantKey: string): string =>
+  `settings/${EDEN_APP_ID}/${grantKey}`;
 
 /**
  * Eden Grants Registry
  *
  * Typed grants derived from EDEN_SETTINGS_SCHEMA.
- * Each category with a `permission` field becomes a grant entry.
+ * Each category with a `grant` field becomes a grant entry.
  */
 export const EdenGrants = {
   /** Grant for appearance settings (settings/com.eden/appearance) */
   APPEARANCE: "settings/com.eden/appearance",
-  /** Grant for users settings (settings/com.eden/users) */
-  USERS: "settings/com.eden/users",
-  /** Grant for apps settings (settings/com.eden/apps/manage) */
-  APPS: "settings/com.eden/apps/manage",
+  /** Grant for apps settings (settings/com.eden/apps) */
+  APPS: "settings/com.eden/apps",
 } as const;
 
 /** Type for valid Eden grant values */

@@ -40,6 +40,8 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
       pl: "Wygląd",
     },
     icon: "image",
+    view: "appearance",
+    grant: "appearance",
     settings: [
       {
         key: "appearance.wallpaper",
@@ -67,6 +69,8 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
       pl: "Zarządzaj zainstalowanymi aplikacjami, usługami systemowymi i demonami.",
     },
     icon: "package",
+    view: "apps",
+    grant: "apps",
     settings: [],
   },
 ];

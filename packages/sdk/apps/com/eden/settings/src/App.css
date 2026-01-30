@@ -37,6 +37,7 @@ body {
   gap: var(--eden-space-lg);
   overflow: visible;
   min-width: 0;
+  min-height: 0;
 }
 
 .content-header {
@@ -168,5 +169,4 @@ body {
 .setting-item {
   animation: eden-fade-in 0.2s ease-out;
 }
-
 

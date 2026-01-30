@@ -13,15 +13,13 @@ export declare const EDEN_APP_ID = "com.eden";
  * Eden Grants Registry
  *
  * Typed grants derived from EDEN_SETTINGS_SCHEMA.
- * Each category with a `permission` field becomes a grant entry.
+ * Each category with a `grant` field becomes a grant entry.
  */
 export declare const EdenGrants: {
   /** Grant for appearance settings (settings/com.eden/appearance) */
   readonly APPEARANCE: "settings/com.eden/appearance";
-  /** Grant for users settings (settings/com.eden/users) */
-  readonly USERS: "settings/com.eden/users";
-  /** Grant for apps settings (settings/com.eden/apps/manage) */
-  readonly APPS: "settings/com.eden/apps/manage";
+  /** Grant for apps settings (settings/com.eden/apps) */
+  readonly APPS: "settings/com.eden/apps";
 };
 
 /** Type for valid Eden grant values */

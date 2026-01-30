@@ -4,7 +4,7 @@
  * Main entry point that coordinates all code generation:
  * - Commands: @EdenHandler decorators → commands.generated.d.ts
  * - Events: EdenEmitter interfaces → events.generated.d.ts
- * - Grants: EDEN_SETTINGS_SCHEMA permissions → grants.generated.d.ts
+ * - Grants: EDEN_SETTINGS_SCHEMA grants → grants.generated.d.ts
  * - Runtime: Command/event name arrays → runtime.ts
  * - I18n: SDK locale files → i18n.ts types
  *

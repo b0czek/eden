@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { setManagerNamespace, addCommandHandler } from "./CommandRegistry";
+import { setManagerNamespace, addCommandHandler } from "./CommandMetadata";
 
 /**
  * Options for the EdenNamespace decorator

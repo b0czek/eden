@@ -29,6 +29,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.example.hello",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.settings",
       "source": "builtin"
     },
