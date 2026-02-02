@@ -7,14 +7,14 @@ import {
   createMemo,
 } from "solid-js";
 import type { Component } from "solid-js";
-import type { AppManifest } from "@edenapp/types";
+import type { RuntimeAppManifest } from "@edenapp/types";
 import { FiPackage, FiCpu, FiChevronRight } from "solid-icons/fi";
 import { t, locale, getLocalizedValue } from "../../i18n";
 import AppDetail from "./AppDetail";
 import "./AppsTab.css";
 
 const AppsTab: Component = () => {
-  const [apps, setApps] = createSignal<AppManifest[]>([]);
+  const [apps, setApps] = createSignal<RuntimeAppManifest[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [uninstalling, setUninstalling] = createSignal<string | null>(null);
   const [appIcons, setAppIcons] = createSignal<Record<string, string>>({});
@@ -58,7 +58,7 @@ const AppsTab: Component = () => {
     loadApps();
   });
 
-  const loadIcons = async (result: AppManifest[]) => {
+  const loadIcons = async (result: RuntimeAppManifest[]) => {
     const icons: Record<string, string> = {};
     for (const app of result) {
       try {
@@ -76,7 +76,7 @@ const AppsTab: Component = () => {
     setAppIcons(icons);
   };
 
-  const loadAutostartSettings = async (result: AppManifest[]) => {
+  const loadAutostartSettings = async (result: RuntimeAppManifest[]) => {
     const values: Record<string, boolean> = {};
     try {
       const keysResult = await window.edenAPI!.shellCommand(

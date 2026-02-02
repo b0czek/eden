@@ -28,7 +28,6 @@ export interface CommandMetadata {
   handler: CommandHandler;
   target: any; // The instance that owns the handler
   permission?: string; // Full permission: "namespace/action"
-  grant?: string; // User grant required to execute
   methodName: string; // Original method name for metadata lookup
 }
 
@@ -66,7 +65,6 @@ export class CommandRegistry {
 
     // Look up permission from decorator metadata
     let permission: string | undefined;
-    let grant: string | undefined;
     if (methodName && target) {
       const handlerPermission = Reflect.getMetadata(
         "eden:handler:permission",
@@ -76,12 +74,6 @@ export class CommandRegistry {
       if (handlerPermission) {
         permission = `${namespace}/${handlerPermission}`;
       }
-
-      grant = Reflect.getMetadata(
-        "eden:handler:grant",
-        target.constructor.prototype,
-        methodName,
-      );
     }
 
     this.handlers.set(fullCommand, {
@@ -90,7 +82,6 @@ export class CommandRegistry {
       handler,
       target,
       permission,
-      grant,
       methodName: methodName || "",
     });
   }
@@ -145,36 +136,36 @@ export class CommandRegistry {
 
     // Check app permission if required
     if (metadata.permission && appId) {
-      // App must have declared the permission
-      if (!this.permissionRegistry.hasPermission(appId, metadata.permission)) {
-        throw new Error(
-          `Permission denied: ${metadata.permission} required for ${fullCommand}`,
-        );
-      }
-
-      // If permission requires a grant, check user has it
-      const requiredGrantIds = this.permissionRegistry.getRequiredGrantIds(
+      // First check if app has this as a base permission
+      const hasBasePermission = this.permissionRegistry.hasPermission(
         appId,
         metadata.permission,
       );
-      if (requiredGrantIds.length > 0) {
-        const hasGrant = requiredGrantIds.some((grantId) =>
-          this.userManager.hasGrant(`app/${appId}/${grantId}`),
+
+      if (!hasBasePermission) {
+        // Check if app declares a grant that would unlock this permission
+        const requiredGrantKeys = this.permissionRegistry.getRequiredGrantKeys(
+          appId,
+          metadata.permission,
         );
-        if (!hasGrant) {
+
+        if (requiredGrantKeys.length === 0) {
+          // App neither has base permission nor declares any grant for it
           throw new Error(
-            `Grant denied: app/${appId}/${requiredGrantIds.join(",")} required for ${fullCommand}`,
+            `Permission denied: ${metadata.permission} required for ${fullCommand}`,
           );
         }
-      }
-    }
 
-    // Check direct user grant if required - decorator has grant requirement declared
-    if (metadata.grant) {
-      if (!this.userManager.hasGrant(metadata.grant)) {
-        throw new Error(
-          `Grant denied: ${metadata.grant} required for ${fullCommand}`,
+        // Check if user has any of the grants that would unlock this permission
+        const hasGrant = requiredGrantKeys.some((grantKey) =>
+          this.userManager.hasGrant(grantKey),
         );
+
+        if (!hasGrant) {
+          throw new Error(
+            `Grant denied: ${requiredGrantKeys.join(",")} required for ${fullCommand}`,
+          );
+        }
       }
     }
 

@@ -386,8 +386,9 @@ export interface PackageCommands {
    * Install an application from a local path.
    */
   "package/install": {
-    args: { sourcePath: string };
-    response: import("./index").AppManifest;
+    args: {
+    sourcePath: string };
+    response: import("./index").RuntimeAppManifest;
   };
   /**
    * Uninstall an application by its ID.
@@ -405,7 +406,7 @@ export interface PackageCommands {
     args: {
     showHidden?: boolean;
     showRestricted?: boolean };
-    response: import("./index").AppManifest[];
+    response: import("./index").RuntimeAppManifest[];
   };
   /**
    * Toggle hot reload for an app

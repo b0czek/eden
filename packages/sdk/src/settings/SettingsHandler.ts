@@ -1,12 +1,6 @@
-import { SettingsCategory } from "@edenapp/types/AppManifest";
+import { SettingsCategory } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SettingsManager } from "./SettingsManager";
-
-/**
- * Reserved app ID for Eden system settings.
- * No external app can use this ID.
- */
-export const EDEN_SETTINGS_APP_ID = "com.eden";
 
 /**
  * SettingsHandler - IPC layer for settings operations
@@ -33,8 +27,7 @@ export class SettingsHandler {
     key: string;
     _callerAppId: string;
   }): Promise<{ value: string | undefined }> {
-    const { key } = args;
-    const value = await this.settingsManager.get(args._callerAppId, key);
+    const value = await this.settingsManager.get(args._callerAppId, args.key);
     return { value };
   }
 
@@ -47,8 +40,7 @@ export class SettingsHandler {
     value: string;
     _callerAppId: string;
   }): Promise<{ success: boolean }> {
-    const { key, value } = args;
-    await this.settingsManager.set(args._callerAppId, key, value);
+    await this.settingsManager.set(args._callerAppId, args.key, args.value);
     return { success: true };
   }
 
@@ -83,8 +75,7 @@ export class SettingsHandler {
     schema?: SettingsCategory[];
     _callerAppId: string;
   }): Promise<{ success: boolean }> {
-    const { key, schema } = args;
-    await this.settingsManager.reset(args._callerAppId, key, schema);
+    await this.settingsManager.reset(args._callerAppId, args.key, args.schema);
     return { success: true };
   }
 
@@ -100,8 +91,8 @@ export class SettingsHandler {
     appId: string;
     key: string;
   }): Promise<{ value: string | undefined }> {
-    const { appId, key } = args;
-    const value = await this.settingsManager.get(appId, key);
+    this.settingsManager.assertAccess(args.appId, args.key);
+    const value = await this.settingsManager.get(args.appId, args.key);
     return { value };
   }
 
@@ -114,32 +105,40 @@ export class SettingsHandler {
     key: string;
     value: string;
   }): Promise<{ success: boolean }> {
-    const { appId, key, value } = args;
-    await this.settingsManager.set(appId, key, value);
+    this.settingsManager.assertAccess(args.appId, args.key);
+    await this.settingsManager.set(args.appId, args.key, args.value);
     return { success: true };
   }
 
   /**
    * List all settings in any app's namespace (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   @EdenHandler("list/su", { permission: "superuser" })
   async handleListSuperuser(args: {
     appId: string;
+    showRestricted?: boolean;
   }): Promise<{ keys: string[] }> {
-    const { appId } = args;
-    const keys = await this.settingsManager.list(appId);
+    const keys = await this.settingsManager.list(
+      args.appId,
+      args.showRestricted,
+    );
     return { keys };
   }
 
   /**
    * Get all settings with values for any app (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   @EdenHandler("get-all/su", { permission: "superuser" })
   async handleGetAllSuperuser(args: {
     appId: string;
+    showRestricted?: boolean;
   }): Promise<{ settings: Record<string, string> }> {
-    const { appId } = args;
-    const settings = await this.settingsManager.getAll(appId);
+    const settings = await this.settingsManager.getAll(
+      args.appId,
+      args.showRestricted,
+    );
     return { settings };
   }
 
@@ -152,8 +151,8 @@ export class SettingsHandler {
     key: string;
     schema?: SettingsCategory[];
   }): Promise<{ success: boolean }> {
-    const { appId, key, schema } = args;
-    await this.settingsManager.reset(appId, key, schema);
+    this.settingsManager.assertAccess(args.appId, args.key);
+    await this.settingsManager.reset(args.appId, args.key, args.schema);
     return { success: true };
   }
 
@@ -163,10 +162,13 @@ export class SettingsHandler {
 
   /**
    * Get the Eden settings schema
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   @EdenHandler("schema")
-  async handleSchema(): Promise<{ schema: SettingsCategory[] }> {
-    const schema = this.settingsManager.getEdenSchema();
+  async handleSchema(args: {
+    showRestricted?: boolean;
+  }): Promise<{ schema: SettingsCategory[] }> {
+    const schema = this.settingsManager.getEdenSchema(args.showRestricted);
     return { schema };
   }
 }

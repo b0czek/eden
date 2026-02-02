@@ -2,6 +2,10 @@
  * PermissionRegistry
  *
  * Central registry for managing app permissions at runtime.
+ * Tracks:
+ * - Base permissions: what the app always has (from manifest.permissions)
+ * - Grant permissions: what the app CAN have if the user has the grant (from manifest.grants)
+ *
  * Supports glob patterns for permission matching:
  * - "fs/read" matches exactly "fs/read"
  * - "fs/*" matches any permission starting with "fs/"
@@ -9,7 +13,7 @@
  */
 
 import { singleton, injectable } from "tsyringe";
-import type { AppGrantDefinition } from "@edenapp/types";
+import type { ResolvedGrant } from "@edenapp/types";
 
 /**
  * Per-app permission state
@@ -17,8 +21,8 @@ import type { AppGrantDefinition } from "@edenapp/types";
 interface AppPermissionState {
   /** Base permissions from manifest - always available when app runs */
   basePermissions: Set<string>;
-  /** Grants: grantId → Set of permissions it unlocks */
-  grants: Map<string, Set<string>>;
+  /** Grants: grantKey → permissions it unlocks */
+  grants: Map<string, { permissions: Set<string> }>;
 }
 
 @singleton()
@@ -28,22 +32,32 @@ export class PermissionRegistry {
 
   /**
    * Register permissions for an app from manifest data.
+   * Grants should be pre-resolved via normalizeGrantPresets.
    */
   registerApp(
     appId: string,
     permissions?: string[],
-    grants?: AppGrantDefinition[],
+    grants?: ResolvedGrant[],
   ): void {
     const basePermissions = new Set(
       Array.isArray(permissions) ? permissions : [],
     );
 
-    const grantMap = new Map<string, Set<string>>();
+    const grantMap = new Map<string, { permissions: Set<string> }>();
     for (const grant of grants ?? []) {
-      const perms = grant.permissions ?? [];
-      if (perms.length > 0) {
-        grantMap.set(grant.id, new Set(perms));
+      if (!grant.id || grant.permissions.length === 0) {
+        continue;
       }
+
+      // Build grant key based on scope
+      const grantKey =
+        grant.scope === "preset"
+          ? `preset/${grant.id}`
+          : `app/${appId}/${grant.id}`;
+
+      grantMap.set(grantKey, {
+        permissions: new Set(grant.permissions),
+      });
     }
 
     if (basePermissions.size === 0 && grantMap.size === 0) {
@@ -53,7 +67,6 @@ export class PermissionRegistry {
 
     this.apps.set(appId, { basePermissions, grants: grantMap });
 
-    const totalPerms = basePermissions.size + grantMap.size;
     console.log(
       `[PermissionRegistry] Registered app ${appId} (${basePermissions.size} base, ${grantMap.size} grants)`,
     );
@@ -68,52 +81,34 @@ export class PermissionRegistry {
   }
 
   /**
-   * Check if an app has a specific permission (base or via any grant).
+   * Check if an app has a specific permission as a BASE permission.
+   * This does NOT check grants - use getRequiredGrantKeys for that.
    */
   hasPermission(appId: string, requiredPermission: string): boolean {
-    const state = this.apps.get(appId);
-    if (!state) return false;
-
-    // Check base permissions
-    if (this.matchesAny(state.basePermissions, requiredPermission)) {
-      return true;
-    }
-
-    // Check grant permissions
-    for (const permissions of state.grants.values()) {
-      if (this.matchesAny(permissions, requiredPermission)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if a permission is a base permission (no grant required).
-   */
-  isBasePermission(appId: string, requiredPermission: string): boolean {
     const state = this.apps.get(appId);
     if (!state) return false;
     return this.matchesAny(state.basePermissions, requiredPermission);
   }
 
   /**
-   * Return grant IDs that unlock a permission for this app.
+   * Return grant keys that would unlock a permission for this app.
    * If the permission is a base permission, returns empty array.
+   * The caller should check if the user has any of these grants.
    */
-  getRequiredGrantIds(appId: string, requiredPermission: string): string[] {
-    if (this.isBasePermission(appId, requiredPermission)) {
-      return [];
-    }
-
+  getRequiredGrantKeys(appId: string, requiredPermission: string): string[] {
     const state = this.apps.get(appId);
     if (!state) return [];
 
+    // If it's a base permission, no grant needed
+    if (this.matchesAny(state.basePermissions, requiredPermission)) {
+      return [];
+    }
+
+    // Find grants that would unlock this permission
     const matching: string[] = [];
-    for (const [grantId, permissions] of state.grants) {
-      if (this.matchesAny(permissions, requiredPermission)) {
-        matching.push(grantId);
+    for (const [grantKey, grant] of state.grants) {
+      if (this.matchesAny(grant.permissions, requiredPermission)) {
+        matching.push(grantKey);
       }
     }
     return matching;

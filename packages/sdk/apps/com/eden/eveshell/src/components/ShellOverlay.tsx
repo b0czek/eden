@@ -244,18 +244,7 @@ export default function ShellOverlay() {
     }
   };
 
-  const handleUninstallApp = async (appId: string) => {
-    try {
-      // Confirm before uninstalling
-      if (confirm(t("shell.uninstallConfirm"))) {
-        await window.edenAPI.shellCommand("package/uninstall", { appId });
-        // Refresh app list
-        await loadSystemInfo();
-      }
-    } catch (error) {
-      console.error("Failed to uninstall app:", error);
-    }
-  };
+
 
   // Handle context menu from dock - resize to fullscreen so menu fits
   const handleDockContextMenu = async (menu: ContextMenuData) => {
@@ -388,7 +377,6 @@ export default function ShellOverlay() {
           onClose={handleShowAllApps}
           onAppClick={handleAppClick}
           onStopApp={handleStopApp}
-          onUninstallApp={handleUninstallApp}
           isAppPinned={isAppPinned}
           onAddToDock={handleAddToDock}
           onRemoveFromDock={handleRemoveFromDock}
@@ -415,7 +403,6 @@ export default function ShellOverlay() {
             onStopApp={handleStopApp}
             onAddToDock={handleAddToDock}
             onRemoveFromDock={handleRemoveFromDock}
-            onUninstallApp={handleUninstallApp}
             onClose={handleCloseDockContextMenu}
           />
         )}

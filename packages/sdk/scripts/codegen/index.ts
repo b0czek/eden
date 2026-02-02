@@ -4,7 +4,6 @@
  * Main entry point that coordinates all code generation:
  * - Commands: @EdenHandler decorators → commands.generated.d.ts
  * - Events: EdenEmitter interfaces → events.generated.d.ts
- * - Grants: EDEN_SETTINGS_SCHEMA grants → grants.generated.d.ts
  * - Runtime: Command/event name arrays → runtime.ts
  * - I18n: SDK locale files → i18n.ts types
  *
@@ -29,11 +28,6 @@ import {
   EventInfo,
 } from "./events";
 
-import {
-  extractGrantsFromSchema,
-  generateGrantsTypesCode,
-  generateGrantsRuntimeCode,
-} from "./grants";
 
 import { generateRuntimeCode } from "./runtime";
 import { generateI18nTypes } from "./i18n";
@@ -148,31 +142,6 @@ export function generateAll(): void {
   const runtimeOutputPath = path.join(generatedDir, "runtime.ts");
   fs.writeFileSync(runtimeOutputPath, runtimeCode);
   console.log(`✅ Generated ${path.relative(projectRoot, runtimeOutputPath)}`);
-
-  // Generate grants
-  console.log("\n🔑 Extracting grants from EDEN_SETTINGS_SCHEMA...");
-  const grants = extractGrantsFromSchema(project, srcDir);
-
-  if (grants.length > 0) {
-    console.log(`📦 Found ${grants.length} grant definitions:`);
-    grants.forEach((g) => {
-      console.log(`  - ${g.key}: ${g.grant}`);
-    });
-
-    const grantsTypesCode = generateGrantsTypesCode(grants);
-    const grantsTypesPath = path.join(typesDir, "grants.generated.d.ts");
-    fs.writeFileSync(grantsTypesPath, grantsTypesCode);
-    console.log(`✅ Generated ${path.relative(projectRoot, grantsTypesPath)}`);
-
-    const grantsRuntimeCode = generateGrantsRuntimeCode(grants);
-    const grantsRuntimePath = path.join(generatedDir, "grants.ts");
-    fs.writeFileSync(grantsRuntimePath, grantsRuntimeCode);
-    console.log(
-      `✅ Generated ${path.relative(projectRoot, grantsRuntimePath)}`,
-    );
-  } else {
-    console.log("  ⚠ No grants found in schema");
-  }
 
   // Generate i18n types
   generateI18nTypes(projectRoot);

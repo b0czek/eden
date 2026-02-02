@@ -8,8 +8,6 @@ export const en = {
     disableHotReload: "Disable Hot Reload",
     addToDock: "Add to Dock",
     removeFromDock: "Remove from Dock",
-    uninstall: "Uninstall",
-    uninstallConfirm: "Are you sure you want to uninstall this app?",
     signIn: "Sign in",
     switchUser: "Switch User",
     logout: "Log out",

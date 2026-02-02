@@ -25,9 +25,7 @@
       "css": "full"
     }
   },
-  "permissions": [
-    "package/*",
-    "fs/read"
-  ],
+  "permissions": ["package/read", "fs/read"],
+  "grants": [{ "scope": "preset", "preset": "package/manage" }],
   "hidden": true
 }

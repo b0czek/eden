@@ -2,7 +2,7 @@ import { injectable, inject, singleton } from "tsyringe";
 import type { EdenConfig } from "@edenapp/types";
 import { ProcessManager } from "./ProcessManager";
 import { SettingsManager } from "../settings";
-import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsHandler";
+import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
 import { UserManager } from "../user/UserManager";
 import { IPCBridge } from "../ipc";
 

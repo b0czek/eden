@@ -9,7 +9,6 @@ interface AllAppsProps {
   onClose: () => void;
   onAppClick: (appId: string) => Promise<void> | void;
   onStopApp: (appId: string) => Promise<void> | void;
-  onUninstallApp: (appId: string) => Promise<void> | void;
   isAppPinned: (appId: string) => boolean;
   onAddToDock: (appId: string) => Promise<void> | void;
   onRemoveFromDock: (appId: string) => Promise<void> | void;
@@ -219,7 +218,6 @@ export default function AllApps(props: AllAppsProps) {
             onStopApp={props.onStopApp}
             onAddToDock={props.onAddToDock}
             onRemoveFromDock={props.onRemoveFromDock}
-            onUninstallApp={props.onUninstallApp}
             onClose={() => setContextMenu(null)}
           />
         )}

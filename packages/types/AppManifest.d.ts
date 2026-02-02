@@ -156,6 +156,8 @@ export interface SettingsCategory {
   view?: string;
   /** Grant key used for access control */
   grant?: string;
+  /** Grant scope (default: "settings") */
+  grantScope?: "settings" | "global";
   /** Settings in this category */
   settings: SettingDefinition[];
 }
@@ -163,7 +165,13 @@ export interface SettingsCategory {
 /**
  * App-specific grant definition
  */
-export interface AppGrantDefinition {
+export type AppGrantDefinition =
+  | AppGrantDefinitionApp
+  | AppGrantDefinitionPreset;
+
+export interface AppGrantDefinitionApp {
+  /** Grant scope (default) */
+  scope?: "app";
   /** Grant ID (namespaced by app ID at runtime) */
   id: string;
   /** Human-readable label */
@@ -172,6 +180,32 @@ export interface AppGrantDefinition {
   description?: string | Record<string, string>;
   /** Optional permissions unlocked by this grant */
   permissions?: string[];
+}
+
+export interface AppGrantDefinitionPreset {
+  /** Grant scope */
+  scope: "preset";
+  /** Preset ID (resolved by Eden at runtime) */
+  preset: string;
+}
+
+/**
+ * Resolved grant definition with full metadata.
+ * Used after preset resolution - both app and preset grants normalize to this shape.
+ */
+export interface ResolvedGrant {
+  /** Grant scope - "app" for app-specific, "preset" for system-wide presets */
+  scope: "app" | "preset";
+  /** Grant ID - unique identifier for this grant */
+  id: string;
+  /** Human-readable label */
+  label: string | Record<string, string>;
+  /** Optional description */
+  description?: string | Record<string, string>;
+  /** Permissions unlocked by this grant */
+  permissions: string[];
+  /** Original preset ID (only present for preset grants) */
+  preset?: string;
 }
 
 /**
@@ -259,15 +293,6 @@ export interface AppManifest {
     cwd?: string;
   };
 
-  /** Internal flag indicating if this is a prebuilt system app */
-  isPrebuilt?: boolean;
-
-  /** Internal flag indicating if this is a core app (always allowed to launch) */
-  isCore?: boolean;
-
-  /** Internal flag indicating if this app is restricted to vendor users */
-  isRestricted?: boolean;
-
   /**
    * Permissions requested by this app.
    * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
@@ -317,4 +342,24 @@ export interface AppManifest {
    * @example ["node_modules/@linuxcnc-node/core", "node_modules/better-sqlite3"]
    */
   include?: string[];
+}
+
+/**
+ * Runtime App Manifest
+ *
+ * Extended manifest with computed runtime fields.
+ * This is what Eden uses internally after loading and processing an app.
+ */
+export interface RuntimeAppManifest extends AppManifest {
+  /** Whether this is a prebuilt system app */
+  isPrebuilt: boolean;
+
+  /** Whether this is a core app (always allowed to launch) */
+  isCore: boolean;
+
+  /** Whether this app is restricted to vendor users */
+  isRestricted: boolean;
+
+  /** Grants with presets resolved to full definitions */
+  resolvedGrants: ResolvedGrant[];
 }

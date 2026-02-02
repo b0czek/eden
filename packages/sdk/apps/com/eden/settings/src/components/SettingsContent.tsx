@@ -1,4 +1,5 @@
-import { Match, Show, Switch, type Accessor, type Component } from "solid-js";
+import { Show, type Accessor, type Component } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import type { Store } from "solid-js/store";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
 import { VsSettings } from "solid-icons/vs";
@@ -27,6 +28,28 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
       props.edenSchema().find((cat) => cat.id === item.id)?.description,
       locale()
     );
+  };
+
+  const getSelectedCategory = () =>
+    props.selectedItem()?.type === "eden"
+      ? props.edenSchema().find((cat) => cat.id === props.selectedItem()!.id)
+      : null;
+
+  const getSelectedViewId = () => {
+    const item = props.selectedItem();
+    if (!item) return undefined;
+    return getSelectedCategory()?.view;
+  };
+
+  const viewRegistry: Record<string, Component> = {
+    apps: AppsTab,
+    appearance: AppearanceTab,
+  };
+
+  const getViewComponent = () => {
+    const viewId = getSelectedViewId();
+    if (!viewId) return undefined;
+    return viewRegistry[viewId];
   };
 
   return (
@@ -59,21 +82,18 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
                 </Show>
               </header>
 
-              <Switch>
-                <Match when={item().type === "eden" && item().id === "apps"}>
-                  <AppsTab />
-                </Match>
-                <Match when={item().id === "appearance"}>
-                  <AppearanceTab />
-                </Match>
-                <Match when={true}>
+              <Show
+                when={getViewComponent()}
+                fallback={
                   <SettingsList
                     categories={props.currentSettings}
                     values={props.settingValues}
                     onSettingChange={props.onSettingChange}
                   />
-                </Match>
-              </Switch>
+                }
+              >
+                {(ViewComponent) => <Dynamic component={ViewComponent()} />}
+              </Show>
             </>
           )}
         </Show>

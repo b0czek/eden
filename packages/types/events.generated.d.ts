@@ -39,7 +39,7 @@ export interface NotificationEvents {
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
-  "package/installed": { manifest: import("./index").AppManifest };
+  "package/installed": { manifest: import("./index").RuntimeAppManifest };
   "package/uninstalled": { appId: string };
 }
 

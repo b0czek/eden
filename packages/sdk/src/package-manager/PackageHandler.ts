@@ -1,4 +1,4 @@
-import { AppManifest } from "@edenapp/types";
+import type { AppManifest, RuntimeAppManifest } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
 import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";
@@ -15,7 +15,9 @@ export class PackageHandler {
    * Install an application from a local path.
    */
   @EdenHandler("install", { permission: "manage" })
-  async handleInstallApp(args: { sourcePath: string }): Promise<AppManifest> {
+  async handleInstallApp(args: {
+    sourcePath: string;
+  }): Promise<RuntimeAppManifest> {
     const { sourcePath } = args;
     console.log(`[PackageHandler] Installing from path: ${sourcePath}`);
     return await this.packageManager.installApp(sourcePath);
@@ -39,7 +41,7 @@ export class PackageHandler {
   async handleListApps(args: {
     showHidden?: boolean;
     showRestricted?: boolean;
-  }): Promise<AppManifest[]> {
+  }): Promise<RuntimeAppManifest[]> {
     return this.packageManager.getInstalledApps({
       showHidden: args.showHidden,
       showRestricted: args.showRestricted,
@@ -55,7 +57,7 @@ export class PackageHandler {
   }): Promise<{ enabled: boolean }> {
     const enabled = await toggleHotReload(params.appId);
     console.log(
-      `Hot reload ${enabled ? "enabled" : "disabled"} for ${params.appId}`
+      `Hot reload ${enabled ? "enabled" : "disabled"} for ${params.appId}`,
     );
     return { enabled };
   }

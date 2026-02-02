@@ -1,11 +1,11 @@
 import { Show, For } from "solid-js";
 import type { Component } from "solid-js";
-import type { AppManifest } from "@edenapp/types";
+import type { RuntimeAppManifest } from "@edenapp/types";
 import { FiTrash2, FiPackage, FiCpu, FiArrowLeft } from "solid-icons/fi";
 import { t, locale, getLocalizedValue } from "../../i18n";
 
 interface AppDetailProps {
-  app: AppManifest;
+  app: RuntimeAppManifest;
   appIcon?: string;
   autostart: boolean;
   sizeLoading: boolean;

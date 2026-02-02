@@ -12,7 +12,6 @@ export * from "./worker";
 
 export * from "./ipc";
 
-export * from "./grants.generated";
 
 /**
  * App Instance Interface

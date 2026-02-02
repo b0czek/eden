@@ -41,7 +41,8 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
     },
     icon: "image",
     view: "appearance",
-    grant: "appearance",
+    grant: "preset/appearance/manage",
+    grantScope: "global",
     settings: [
       {
         key: "appearance.wallpaper",
@@ -70,7 +71,8 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
     },
     icon: "package",
     view: "apps",
-    grant: "apps",
+    grant: "preset/package/manage",
+    grantScope: "global",
     settings: [],
   },
 ];

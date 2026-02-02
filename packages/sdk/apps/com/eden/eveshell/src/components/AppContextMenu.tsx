@@ -1,5 +1,5 @@
 import { Show, createSignal, onMount } from "solid-js";
-import { FaSolidStop, FaSolidFire, FaSolidBolt, FaSolidThumbtack, FaSolidPlus, FaSolidTrash } from "solid-icons/fa";
+import { FaSolidStop, FaSolidFire, FaSolidBolt, FaSolidThumbtack, FaSolidPlus } from "solid-icons/fa";
 import { t } from "../i18n";
 
 export interface ContextMenuData {
@@ -18,7 +18,6 @@ interface AppContextMenuProps {
   onStopApp: (appId: string) => Promise<void> | void;
   onAddToDock: (appId: string) => Promise<void> | void;
   onRemoveFromDock: (appId: string) => Promise<void> | void;
-  onUninstallApp: (appId: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -67,10 +66,7 @@ export default function AppContextMenu(props: AppContextMenuProps) {
     props.onClose();
   };
 
-  const handleUninstall = async () => {
-    await props.onUninstallApp(props.menu.appId);
-    props.onClose();
-  };
+
 
   return (
     <>
@@ -112,13 +108,6 @@ export default function AppContextMenu(props: AppContextMenuProps) {
         >
           {props.isAppPinned(props.menu.appId) ? <FaSolidThumbtack /> : <FaSolidPlus />}
           {props.isAppPinned(props.menu.appId) ? t("shell.removeFromDock") : t("shell.addToDock")}
-        </button>
-        <button
-          class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-danger context-menu-btn"
-          onClick={handleUninstall}
-        >
-          <FaSolidTrash />
-          {t("shell.uninstall")}
         </button>
       </div>
     </>

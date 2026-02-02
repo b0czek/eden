@@ -32,18 +32,20 @@ const App: Component = () => {
   const loadEdenSchema = async () => {
     try {
       const result = await window.edenAPI!.shellCommand("settings/schema", {});
-      setEdenSchema(result.schema);
+      const schema = Array.isArray(result.schema) ? result.schema : [];
+      setEdenSchema(schema);
     } catch (error) {
       console.error("Failed to load Eden schema:", error);
     }
   };
 
   const loadApps = async () => {
+    let appsWithSettings: AppManifest[] = [];
     try {
       const result = await window.edenAPI!.shellCommand("package/list", {
         showHidden: true,
       });
-      const appsWithSettings = result.filter(
+      appsWithSettings = result.filter(
         (app: AppManifest) => app.settings && app.settings.length > 0
       );
       setApps(appsWithSettings);
@@ -66,7 +68,10 @@ const App: Component = () => {
     } catch (error) {
       console.error("Failed to load apps:", error);
     }
+
   };
+
+  
 
   createEffect(() => {
     const item = selectedItem();
@@ -74,8 +79,18 @@ const App: Component = () => {
 
     if (item.type === "eden") {
       loadEdenSettings(item.id);
-    } else {
+    } else if (item.type === "app") {
       loadAppSettings(item.id);
+    }
+  });
+
+  createEffect(() => {
+    const item = selectedItem();
+    if (!item || item.type !== "eden") return;
+    const exists = edenSchema().some((category) => category.id === item.id);
+    if (!exists) {
+      setSelectedItem(null);
+      setCurrentSettings([]);
     }
   });
 
@@ -83,6 +98,12 @@ const App: Component = () => {
     const schema = edenSchema();
     const category = schema.find((c) => c.id === categoryId);
     if (!category) return;
+
+    if (category.view) {
+      setCurrentSettings([]);
+      setSettingValues({});
+      return;
+    }
 
     setCurrentSettings([category]);
 
@@ -149,7 +170,7 @@ const App: Component = () => {
           key,
           value,
         });
-      } else {
+      } else if (item.type === "app") {
         await window.edenAPI!.shellCommand("settings/set/su", {
           appId: item.id,
           key,

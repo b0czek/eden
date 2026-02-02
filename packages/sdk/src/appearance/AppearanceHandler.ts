@@ -1,4 +1,3 @@
-import { EdenGrants } from "../generated/grants";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { AppearanceManager } from "./AppearanceManager";
 import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
@@ -7,7 +6,7 @@ import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
 export class AppearanceHandler {
   constructor(private manager: AppearanceManager) {}
 
-  @EdenHandler("set-wallpaper", { grant: EdenGrants.APPEARANCE })
+  @EdenHandler("set-wallpaper", { permission: "manage" })
   async handleSetWallpaper({
     wallpaper,
   }: {
