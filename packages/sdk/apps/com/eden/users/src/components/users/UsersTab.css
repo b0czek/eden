@@ -1,0 +1,80 @@
+/*
+ * UsersTab Styles
+ * Minimal styles that cannot be replaced by edencss utilities
+ */
+
+.users-tab {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: var(--eden-space-xs);
+}
+
+.users-management {
+  flex: 1;
+  min-height: 0;
+}
+
+.users-list-screen {
+  flex: 1;
+  min-height: 0;
+}
+
+.users-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: var(--eden-space-xs);
+}
+
+.user-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-lg);
+  border: 1px solid var(--eden-color-border-light);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  color: var(--eden-color-text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.user-row:hover {
+  border-color: var(--eden-color-border-hover);
+}
+
+.user-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-row-badge {
+  margin-left: auto;
+}
+
+.users-detail-panel {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.users-back {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: var(--eden-space-xs);
+  align-items: center;
+}
+
+.users-scroll {
+  max-height: calc(14 * var(--eden-space-md));
+  overflow-y: auto;
+  padding-right: var(--eden-space-xs);
+}
+
+.raw-grants-textarea {
+  min-height: calc(25 * var(--eden-space-md));
+}

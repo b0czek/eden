@@ -1,0 +1,94 @@
+/*
+ * Users App - Custom Styles
+ * Minimal layout and shared setting styles to complement edencss.
+ */
+
+body {
+  font-family: var(--eden-font-family-base);
+  color: var(--eden-color-text-primary);
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.users-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  padding: var(--eden-space-lg);
+  gap: var(--eden-space-lg);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-sm);
+}
+
+.loading-spinner {
+  margin-right: var(--eden-space-xs);
+}
+
+.settings-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-section-title {
+  font-size: var(--eden-font-size-lg);
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eden-space-lg);
+  padding: var(--eden-space-lg);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-strong);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-xl);
+  transition: all var(--eden-transition-base);
+}
+
+.setting-item:hover {
+  border-color: var(--eden-color-border-hover);
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-label {
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-medium);
+  color: var(--eden-color-text-primary);
+  margin: 0;
+}
+
+.setting-description {
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-muted);
+  margin-top: var(--eden-space-xs);
+}
+
+.setting-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}

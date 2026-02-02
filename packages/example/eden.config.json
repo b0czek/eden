@@ -37,6 +37,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.users",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.installer",
       "source": "builtin"
     },
