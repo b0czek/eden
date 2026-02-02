@@ -74,7 +74,8 @@ export class AutostartManager {
 
   private async loadAutostartSettings(): Promise<Map<string, boolean>> {
     const entries = new Map<string, boolean>();
-    const keys = await this.settingsManager.list(EDEN_SETTINGS_APP_ID);
+    // Autostart is a system concern; read settings regardless of user grants.
+    const keys = await this.settingsManager.list(EDEN_SETTINGS_APP_ID, true);
 
     for (const key of keys) {
       if (!key.startsWith(AutostartManager.AUTOSTART_KEY_PREFIX)) {
