@@ -99,6 +99,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
       throw new Error(`App ${appId} is not running`);
     }
     this.viewManager.showView(viewIds[0]);
+    this.viewManager.focusView(viewIds[0]);
     return { success: true };
   }
 

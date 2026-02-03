@@ -15,7 +15,6 @@ export class AutostartManager {
   private static readonly AUTOSTART_KEY_PREFIX = "autostart.";
   private ready = false;
   private launchPromise: Promise<void> = Promise.resolve();
-  private loginAppId: string | null;
 
   constructor(
     @inject("EdenConfig") private config: EdenConfig,
@@ -24,8 +23,6 @@ export class AutostartManager {
     @inject(UserManager) private userManager: UserManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
   ) {
-    this.loginAppId = config.loginAppId ?? null;
-
     // Subscribe directly to user/changed event
     ipcBridge.eventSubscribers.subscribeInternal(
       "user/changed",
@@ -125,7 +122,7 @@ export class AutostartManager {
       return;
     }
 
-    const loginAppId = this.loginAppId;
+    const loginAppId = this.config.loginAppId;
     if (!loginAppId) {
       return;
     }

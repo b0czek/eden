@@ -9,7 +9,13 @@ import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
 import { TilingManager } from "./TilingManager";
 import { ViewCreator } from "./ViewCreator";
-import { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
+import {
+  cleanupDestroyedViews,
+  destroyView,
+  isViewAlive,
+  isWindowAlive,
+  requireView,
+} from "./viewLifecycle";
 import { ViewInfo, ViewMode } from "./types";
 
 import { injectable, inject, singleton, delay } from "tsyringe";
@@ -82,6 +88,18 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     commandRegistry.registerManager(this.viewHandler);
   }
 
+  private markViewFocused(viewInfo: ViewInfo): void {
+    viewInfo.lastFocusedAt = Date.now();
+  }
+
+  private attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
+    viewInfo.view.webContents.on("focus", () => {
+      const trackedView = this.views.get(viewId);
+      if (!trackedView) return;
+      this.markViewFocused(trackedView);
+    });
+  }
+
   /**
    * Set the main window that will host the views
    */
@@ -117,7 +135,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     bounds: Bounds | undefined,
     launchArgs?: string[]
   ): number {
-    if (!ViewGuard.isWindowAlive(this.mainWindow)) {
+    if (!isWindowAlive(this.mainWindow)) {
       throw new Error("Main window not set. Call setMainWindow first.");
     }
 
@@ -134,6 +152,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // Store view info
     this.views.set(viewId, viewInfo);
+    this.attachFocusTracking(viewId, viewInfo);
 
     // Electron event listener for view load failure
     viewInfo.view.webContents.on(
@@ -161,7 +180,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // Recalculate all tiles if using tiling and this is a tiled view
     if (viewInfo.mode === "tiled" && this.tilingManager.isEnabled()) {
-      this.tilingManager.recalculateTiledViews(this.views);
+      this.tilingManager.applyTiledCapacity(
+        this.views,
+        viewId,
+        (hideId) => this.hideView(hideId)
+      );
     }
 
     // Add to main window's contentView and maintain proper layering
@@ -184,7 +207,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       this.devToolsManager.closeDevToolsForView(viewInfo.view);
 
       // Destroy the view safely
-      ViewLifecycle.destroyView(viewInfo, this.mainWindow);
+      destroyView(viewInfo, this.mainWindow);
 
       // Clean up all event subscriptions for this view
       this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
@@ -213,7 +236,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    * Update view bounds
    */
   setViewBounds(viewId: number, bounds: Bounds): void {
-    const viewInfo = ViewGuard.requireView(viewId, this.views);
+    const viewInfo = requireView(viewId, this.views);
 
     // If this is an overlay view, set bounds directly without constraints
     if (viewInfo.viewType === "overlay") {
@@ -319,13 +342,17 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    * Show a view (bring to front)
    */
   showView(viewId: number): void {
-    const viewInfo = ViewGuard.requireView(viewId, this.views);
+    const viewInfo = requireView(viewId, this.views);
 
     try {
       viewInfo.visible = true;
 
       if (viewInfo.mode === "tiled") {
-        this.tilingManager.recalculateTiledViews(this.views);
+        this.tilingManager.applyTiledCapacity(
+          this.views,
+          viewId,
+          (hideId) => this.hideView(hideId)
+        );
         this.reorderViewLayers();
       } else {
         viewInfo.zIndex = this.floatingWindows.getNextZIndex();
@@ -339,10 +366,19 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   }
 
   /**
+   * Focus a view's webContents (does not change bounds).
+   */
+  focusView(viewId: number): void {
+    const viewInfo = requireView(viewId, this.views);
+    if (viewInfo.view.webContents.isDestroyed()) return;
+    viewInfo.view.webContents.focus();
+  }
+
+  /**
    * Hide a view by setting its bounds to zero
    */
   hideView(viewId: number): void {
-    const viewInfo = ViewGuard.requireView(viewId, this.views);
+    const viewInfo = requireView(viewId, this.views);
 
     try {
       viewInfo.visible = false;
@@ -362,10 +398,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    * Reorder all views to maintain proper layering
    */
   private reorderViewLayers(): void {
-    if (!ViewGuard.isWindowAlive(this.mainWindow)) return;
+    if (!isWindowAlive(this.mainWindow)) return;
 
     // Clean up any destroyed views first
-    ViewLifecycle.cleanupDestroyedViews(this.views);
+    cleanupDestroyedViews(this.views);
 
     try {
       const appViews = Array.from(this.views.values()).filter(
@@ -386,28 +422,28 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
       // Remove all views
       for (const info of this.views.values()) {
-        if (ViewGuard.isAlive(info.view)) {
+        if (isViewAlive(info.view)) {
           this.mainWindow.contentView.removeChildView(info.view);
         }
       }
 
       // Add back in order: tiled (bottom), floating apps (middle), overlays (top)
       for (const info of tiledViews) {
-        if (ViewGuard.isAlive(info.view)) {
+        if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
           info.view.setBounds(info.bounds);
         }
       }
 
       for (const info of floatingAppViews) {
-        if (ViewGuard.isAlive(info.view)) {
+        if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
           info.view.setBounds(info.bounds);
         }
       }
 
       for (const info of overlayViews) {
-        if (ViewGuard.isAlive(info.view)) {
+        if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
           info.view.setBounds(info.bounds);
         }
@@ -422,7 +458,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    */
   sendToView(viewId: number, channel: string, ...args: any[]): boolean {
     try {
-      const viewInfo = ViewGuard.requireView(viewId, this.views);
+      const viewInfo = requireView(viewId, this.views);
       viewInfo.view.webContents.send(channel, ...args);
       return true;
     } catch (error) {
@@ -461,7 +497,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    * Toggle or set view mode between tiled and floating
    */
   setViewMode(viewId: number, targetMode?: ViewMode): void {
-    const viewInfo = ViewGuard.requireView(viewId, this.views);
+    const viewInfo = requireView(viewId, this.views);
     const manifest = viewInfo.manifest;
     const windowConfig = manifest.window;
 
@@ -524,7 +560,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
           viewInfo.bounds = tileBounds;
           viewInfo.mode = "tiled";
           viewInfo.view.setBounds(tileBounds);
-          this.tilingManager.recalculateTiledViews(this.views);
+          this.tilingManager.applyTiledCapacity(
+            this.views,
+            viewId,
+            (hideId) => this.hideView(hideId)
+          );
           this.reorderViewLayers();
           this.notifySubscriber(viewId, "mode-changed", {
             mode: "tiled",

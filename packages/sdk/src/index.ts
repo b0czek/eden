@@ -9,4 +9,4 @@ export { IPCBridge } from "./ipc";
 export { UserManager } from "./user";
 
 // Window management exports
-export { ViewManager, LayoutCalculator, MouseTracker } from "./view-manager";
+export { ViewManager } from "./view-manager";

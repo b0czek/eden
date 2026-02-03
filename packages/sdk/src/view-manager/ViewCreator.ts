@@ -3,7 +3,7 @@ import * as path from "path";
 import { AppManifest, WindowConfig } from "@edenapp/types";
 import { ViewMode, ViewType, ViewInfo, Z_LAYERS } from "./types";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
+import { createView } from "./viewLifecycle";
 import { TilingManager } from "./TilingManager";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
@@ -284,7 +284,7 @@ export class ViewCreator {
       "app-runtime/app-preload.js"
     );
 
-    const view = ViewLifecycle.createView({
+    const view = createView({
       preloadScript,
       additionalArguments: [
         `--app-id=${appId}`,

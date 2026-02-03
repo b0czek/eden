@@ -1,10 +1,10 @@
-import { LayoutCalculator } from "./LayoutCalculator";
+import { calculateTileBounds } from "./layoutCalculator";
 
-describe("LayoutCalculator", () => {
+describe("calculateTileBounds", () => {
   it("returns padded bounds for no-tiling or zero visible items", () => {
     const workspace = { x: 0, y: 0, width: 100, height: 50 };
 
-    const none = LayoutCalculator.calculateTileBounds({
+    const none = calculateTileBounds({
       workspace,
       tileIndex: 0,
       visibleCount: 1,
@@ -13,7 +13,7 @@ describe("LayoutCalculator", () => {
 
     expect(none).toEqual({ x: 5, y: 5, width: 90, height: 40 });
 
-    const zero = LayoutCalculator.calculateTileBounds({
+    const zero = calculateTileBounds({
       workspace,
       tileIndex: 0,
       visibleCount: 0,
@@ -25,7 +25,7 @@ describe("LayoutCalculator", () => {
 
   it("calculates horizontal tiling with gaps", () => {
     const workspace = { x: 0, y: 0, width: 100, height: 20 };
-    const bounds = LayoutCalculator.calculateTileBounds({
+    const bounds = calculateTileBounds({
       workspace,
       tileIndex: 1,
       visibleCount: 3,
@@ -41,7 +41,7 @@ describe("LayoutCalculator", () => {
 
   it("calculates vertical tiling", () => {
     const workspace = { x: 10, y: 0, width: 40, height: 90 };
-    const bounds = LayoutCalculator.calculateTileBounds({
+    const bounds = calculateTileBounds({
       workspace,
       tileIndex: 2,
       visibleCount: 3,
@@ -57,7 +57,7 @@ describe("LayoutCalculator", () => {
 
   it("calculates grid tiling with configured rows/columns", () => {
     const workspace = { x: 0, y: 0, width: 80, height: 60 };
-    const bounds = LayoutCalculator.calculateTileBounds({
+    const bounds = calculateTileBounds({
       workspace,
       tileIndex: 3,
       visibleCount: 4,

@@ -24,4 +24,12 @@ export interface ViewInfo {
   tileIndex?: number; // Only for tiled app views
   zIndex?: number; // For floating apps and all overlays
   launchArgs?: string[]; // Arguments passed when launching this view
+  lastFocusedAt?: number; // Timestamp used for LRU-style view selection
+}
+
+export interface ViewCreationOptions {
+  preloadScript: string;
+  transparent?: boolean;
+  backgroundThrottling?: boolean;
+  additionalArguments?: string[];
 }
