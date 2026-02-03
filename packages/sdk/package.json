@@ -33,7 +33,7 @@
   "author": "Dariusz Majnert",
   "license": "MIT",
   "peerDependencies": {
-    "electron": ">=39.0.0"
+    "electron": ">=40.0.0"
   },
   "dependencies": {
     "@edenapp/genesis": "workspace:*",
