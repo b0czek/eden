@@ -3,15 +3,26 @@ import type { LogLevel } from "./levels";
 import type { LogContext, CallsiteInfo } from "./logger";
 import { logExternal } from "./logger";
 
-function mapConsoleLevel(level: number): LogLevel {
+function mapConsoleLevel(level: number | string): LogLevel {
+  if (typeof level === "string") {
+    const normalized = level.toLowerCase();
+    if (normalized.includes("warn")) return "warn";
+    if (normalized.includes("error")) return "error";
+    if (normalized.includes("debug")) return "debug";
+    if (normalized.includes("trace")) return "trace";
+    return "info";
+  }
+
+  // Shifted mapping:
+  // 1=info/log, 2=warn, 3=error, 4=debug
   switch (level) {
-    case 1:
-      return "warn";
     case 2:
-      return "error";
+      return "warn";
     case 3:
+      return "error";
+    case 4:
       return "debug";
-    case 0:
+    case 1:
     default:
       return "info";
   }
@@ -19,12 +30,12 @@ function mapConsoleLevel(level: number): LogLevel {
 
 export function attachWebContentsLogger(
   webContents: WebContents,
-  context: LogContext
+  context: LogContext,
 ): void {
   webContents.on("console-message", (_event, ...args: any[]) => {
     const details = args[0];
 
-    let level: number;
+    let level: number | string;
     let message: string;
     let lineNumber: number | undefined;
     let sourceId: string | undefined;

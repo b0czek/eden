@@ -2,9 +2,6 @@
 // Provides safe IPC communication for the foundation layer
 
 const { contextBridge, ipcRenderer } = require("electron");
-const { log, setLogContext } = require("../logging");
-
-setLogContext({ source: "foundation-preload" });
 
 // Check for title argument
 const titleArg = process.argv.find(arg => arg.startsWith('--window-title='));
@@ -34,7 +31,7 @@ ipcRenderer.on("shell-message", (_event, message) => {
             try {
                 callback(payload);
             } catch (err) {
-                log.error(`Error in event listener for ${type}:`, err);
+                console.error(`Error in event listener for ${type}:`, err);
             }
         });
     }
@@ -77,4 +74,4 @@ contextBridge.exposeInMainWorld("edenAPI", {
     }
 });
 
-log.info("Foundation preload script loaded");
+console.log("Foundation preload script loaded");
