@@ -4,6 +4,7 @@ import { PermissionRegistry } from "./PermissionRegistry";
 import type { UserManager } from "../user/UserManager";
 import { getManagerMetadata } from "./CommandMetadata";
 
+import { log } from "../logging";
 export {
   addCommandHandler,
   getManagerMetadata,
@@ -60,7 +61,7 @@ export class CommandRegistry {
     const fullCommand = `${namespace}/${command}`;
 
     if (this.handlers.has(fullCommand)) {
-      console.warn(`Command handler for "${fullCommand}" is being overwritten`);
+      log.warn(`Command handler for "${fullCommand}" is being overwritten`);
     }
 
     // Look up permission from decorator metadata
@@ -93,7 +94,7 @@ export class CommandRegistry {
   registerManager(manager: any): void {
     const metadata = getManagerMetadata(manager);
     if (!metadata) {
-      console.warn("Manager has no command handlers to register");
+      log.warn("Manager has no command handlers to register");
       return;
     }
 
@@ -111,7 +112,7 @@ export class CommandRegistry {
         );
       }
     }
-    console.log(
+    log.info(
       `Registered ${handlers.size} command handlers for namespace "${namespace}"`,
     );
   }

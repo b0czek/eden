@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * App Frame UI Builder
  * 
@@ -45,17 +46,17 @@ export function createOverlay(windowConfig: NonNullable<Window['edenFrame']>['_i
  */
 export function injectOverlay(overlay: HTMLElement, callback?: () => void): void {
     const inject = () => {
-        console.log('[Eden Frame] injectOverlay called, body exists:', !!document.body);
+        log.info('injectOverlay called, body exists:', !!document.body);
         if (document.body) {
             document.body.insertBefore(overlay, document.body.firstChild);
             document.body.classList.add('eden-framed');
-            console.log('[Eden Frame] Overlay injected into body');
+            log.info('Overlay injected into body');
 
             if (callback) {
                 callback();
             }
         } else {
-            console.log('[Eden Frame] Body not ready, retrying...');
+            log.info('Body not ready, retrying...');
             setTimeout(inject, 10);
         }
     };

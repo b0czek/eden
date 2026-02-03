@@ -1,6 +1,7 @@
 import { WebContentsView } from "electron";
 import { injectable, singleton } from "tsyringe";
 
+import { log } from "../logging";
 /**
  * DevToolsManager
  *
@@ -34,14 +35,14 @@ export class DevToolsManager {
           if (view.webContents.isDevToolsOpened()) {
             view.webContents.closeDevTools();
             this.viewsWithDevTools.delete(webContentsId);
-            console.log("Closed DevTools for view");
+            log.info("Closed DevTools for view");
           } else {
             view.webContents.openDevTools();
             this.viewsWithDevTools.add(webContentsId);
-            console.log("Opened DevTools for view");
+            log.info("Opened DevTools for view");
           }
         } catch (err) {
-          console.error("Failed to toggle DevTools:", err);
+          log.error("Failed to toggle DevTools:", err);
         }
       }
     });
@@ -59,7 +60,7 @@ export class DevToolsManager {
         view.webContents.isDevToolsOpened()
       ) {
         view.webContents.closeDevTools();
-        console.log(
+        log.info(
           `Closed DevTools for view (webContents ID: ${webContentsId})`
         );
       }
@@ -67,7 +68,7 @@ export class DevToolsManager {
       this.viewsWithDevTools.delete(webContentsId);
     } catch (err) {
       // Ignore errors during cleanup
-      console.debug("Error closing DevTools during cleanup:", err);
+      log.debug("Error closing DevTools during cleanup:", err);
     }
   }
 

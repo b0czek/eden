@@ -1,6 +1,7 @@
 import { BrowserWindow, WebContentsView } from "electron";
 import { ViewCreationOptions, ViewInfo } from "./types";
 
+import { log } from "../logging";
 /**
  * Check if a WebContentsView exists and is valid.
  */
@@ -118,8 +119,8 @@ export function destroyView(
         mainWindow.contentView.removeChildView(viewInfo.view);
       } catch (error) {
         // Ignore errors during removal - view might already be removed
-        console.warn(
-          "[ViewLifecycle] Ignoring error during view removal:",
+        log.warn(
+          "Ignoring error during view removal:",
           error
         );
       }
@@ -127,7 +128,7 @@ export function destroyView(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : String(error);
-    console.error("[ViewLifecycle] Failed to destroy view:", errorMessage);
+    log.error("Failed to destroy view:", errorMessage);
     throw new Error(`Failed to destroy view: ${errorMessage}`);
   }
 }
@@ -152,8 +153,8 @@ export function cleanupDestroyedViews(
   }
 
   if (destroyedIds.length > 0) {
-    console.log(
-      `[ViewLifecycle] Cleaned up ${destroyedIds.length} destroyed views`
+    log.info(
+      `Cleaned up ${destroyedIds.length} destroyed views`
     );
   }
 

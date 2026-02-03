@@ -9,6 +9,7 @@ import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { FileOpenHandler } from "./FileOpenHandler";
 import type { FileOpenResult, FileHandlerInfo } from "@edenapp/types";
 
+import { log } from "../logging";
 /**
  * Events emitted by the FileOpenManager
  */
@@ -63,7 +64,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   async initialize(): Promise<void> {
     await this.loadUserPreferences();
-    console.log(
+    log.info(
       `FileOpenManager initialized with ${this.userPreferences.size} user preferences`
     );
   }

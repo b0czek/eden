@@ -1,10 +1,7 @@
 import { BrowserWindow, Rectangle as Bounds, WebContentsView } from "electron";
-import {
-  AppManifest,
-  EdenConfig,
-  WindowSize,
-  ViewBounds,
-} from "@edenapp/types";
+import { AppManifest, EdenConfig, WindowSize, ViewBounds } from "@edenapp/types";
+import { log } from "../logging";
+import { attachWebContentsLogger } from "../logging/electron";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
 import { TilingManager } from "./TilingManager";
@@ -150,6 +147,12 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     const viewId = viewInfo.id;
 
+    attachWebContentsLogger(viewInfo.view.webContents, {
+      appId,
+      viewId,
+      source: viewInfo.viewType === "overlay" ? "overlay" : "app",
+    });
+
     // Store view info
     this.views.set(viewId, viewInfo);
     this.attachFocusTracking(viewId, viewInfo);
@@ -158,8 +161,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     viewInfo.view.webContents.on(
       "did-fail-load",
       (_event: any, errorCode: any, errorDescription: any) => {
-        console.error(
-          `[ViewManager] View load failed for ${appId}:`,
+        log.error(
+          `View load failed for ${appId}:`,
           errorDescription
         );
         this.notify("view-load-failed", {
@@ -222,8 +225,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
-        `[ViewManager] Failed to remove view ${viewId}:`,
+      log.error(
+        `Failed to remove view ${viewId}:`,
         errorMessage
       );
       // Still remove from tracking even if removal failed
@@ -253,8 +256,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // If this is a tiled view, ignore individual bounds updates
     if (viewInfo.mode === "tiled") {
-      console.log(
-        `[ViewManager] Ignoring individual bounds update for tiled view ${viewId}`
+      log.info(
+        `Ignoring individual bounds update for tiled view ${viewId}`
       );
       return;
     }
@@ -449,7 +452,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         }
       }
     } catch (error) {
-      console.error("[ViewManager] Failed to reorder view layers:", error);
+      log.error("Failed to reorder view layers:", error);
     }
   }
 
@@ -462,8 +465,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.view.webContents.send(channel, ...args);
       return true;
     } catch (error) {
-      console.error(
-        `[ViewManager] Failed to send message to view ${viewId}:`,
+      log.error(
+        `Failed to send message to view ${viewId}:`,
         error
       );
       return false;
@@ -479,7 +482,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         this.mainWindow.webContents.send(channel, ...args);
         return true;
       } catch (error) {
-        console.error(`[ViewManager] Failed to send to main window:`, error);
+        log.error(`Failed to send to main window:`, error);
         return false;
       }
     }
@@ -520,8 +523,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       return;
     }
 
-    console.log(
-      `[ViewManager] Switching view ${viewId} from ${viewInfo.mode} to ${newMode} mode`
+    log.info(
+      `Switching view ${viewId} from ${viewInfo.mode} to ${newMode} mode`
     );
 
     try {

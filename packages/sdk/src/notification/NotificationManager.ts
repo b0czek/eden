@@ -3,6 +3,7 @@ import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { NotificationHandler } from "./NotificationHandler";
 import { injectable, inject, singleton } from "tsyringe";
 
+import { log } from "../logging";
 /**
  * Events emitted by the NotificationManager
  */
@@ -61,7 +62,7 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
 
     this.notify("added", { notification });
 
-    console.log(`Notification pushed: "${title}" (${id}, type: ${type})`);
+    log.info(`Notification pushed: "${title}" (${id}, type: ${type})`);
 
     return notification;
   }

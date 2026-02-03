@@ -4,6 +4,7 @@ import { AppearanceHandler } from "./AppearanceHandler";
 import { SettingsManager } from "../settings";
 import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
 
+import { log } from "../logging";
 interface AppearanceEvents {
     "wallpaper-changed": WallpaperPreset;
 }
@@ -48,7 +49,7 @@ export class AppearanceManager extends EdenEmitter<AppearanceEvents> {
                 const config = JSON.parse(savedWallpaper) as WallpaperConfig;
                 this.currentWallpaper = this.resolveWallpaper(config);
             } catch (e) {
-                console.error("Failed to parse saved wallpaper config", e);
+                log.error("Failed to parse saved wallpaper config", e);
             }
         }
     }

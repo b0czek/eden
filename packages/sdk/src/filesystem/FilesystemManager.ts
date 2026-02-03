@@ -6,6 +6,7 @@ import { CommandRegistry } from "../ipc";
 import { FilesystemHandler } from "./FilesystemHandler";
 import type { FileStats, SearchResult } from "@edenapp/types";
 
+import { log } from "../logging";
 /**
  * FilesystemManager
  *
@@ -204,7 +205,7 @@ export class FilesystemManager {
 
       return results;
     } catch (error) {
-      console.error("Search error:", error);
+      log.error("Search error:", error);
       return [];
     }
   }

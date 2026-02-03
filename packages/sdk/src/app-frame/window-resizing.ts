@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * Window Resizing
  *
@@ -61,7 +62,7 @@ export function setupWindowResizing(
           appId,
           bounds: pendingBounds,
         })
-        .catch(console.error);
+        .catch(log.error);
 
       pendingBounds = null;
     }
@@ -72,20 +73,20 @@ export function setupWindowResizing(
   };
 
   const startResize = (e: MouseEvent | TouchEvent): void => {
-    console.log("[Eden Frame] startResize called, event type:", e.type);
+    log.info("startResize called, event type:", e.type);
 
     // Initialize current bounds if not set
     if (!currentBoundsRef.current) {
       const initialBounds = window.edenFrame?._internal.bounds;
       if (initialBounds && initialBounds.x !== undefined) {
         currentBoundsRef.current = { ...initialBounds };
-        console.log(
-          "[Eden Frame] Initialized currentBounds from edenFrame._internal.bounds:",
+        log.info(
+          "Initialized currentBounds from edenFrame._internal.bounds:",
           currentBoundsRef.current
         );
       } else {
-        console.warn(
-          "[Eden Frame] Cannot start resize - currentBounds not initialized!"
+        log.warn(
+          "Cannot start resize - currentBounds not initialized!"
         );
         return;
       }
@@ -100,7 +101,7 @@ export function setupWindowResizing(
     startY = coords.y;
     resizeStartBounds = { ...currentBoundsRef.current };
 
-    console.log("[Eden Frame] Resize started at:", coords, "isTouch:", isTouch);
+    log.info("Resize started at:", coords, "isTouch:", isTouch);
 
     e.preventDefault();
     e.stopPropagation();
@@ -125,7 +126,7 @@ export function setupWindowResizing(
           startX: coords.x,
           startY: coords.y,
         })
-        .catch(console.error);
+        .catch(log.error);
     }
 
     // Add mouseup listener when resize starts (removed when resize ends)
@@ -135,8 +136,8 @@ export function setupWindowResizing(
   };
 
   const moveResize = (e: MouseEvent | TouchEvent): void => {
-    console.log(
-      "[Eden Frame] moveResize called, isResizing:",
+    log.info(
+      "moveResize called, isResizing:",
       isResizing,
       "event type:",
       e.type
@@ -146,8 +147,8 @@ export function setupWindowResizing(
     e.stopPropagation();
 
     if (!isResizing || !resizeStartBounds) {
-      console.log(
-        "[Eden Frame] moveResize returning early - isResizing:",
+      log.info(
+        "moveResize returning early - isResizing:",
         isResizing,
         "resizeStartBounds:",
         resizeStartBounds
@@ -160,7 +161,7 @@ export function setupWindowResizing(
     const deltaX = coords.x - startX;
     const deltaY = coords.y - startY;
 
-    console.log("[Eden Frame] moveResize coords:", coords, "delta:", {
+    log.info("moveResize coords:", coords, "delta:", {
       deltaX,
       deltaY,
     });
@@ -189,7 +190,7 @@ export function setupWindowResizing(
       height: Math.round(newHeight),
     };
 
-    console.log("[Eden Frame] moveResize newBounds:", newBounds);
+    log.info("moveResize newBounds:", newBounds);
 
     // Update tracked bounds immediately for next move calculation
     currentBoundsRef.current = newBounds;
@@ -203,8 +204,8 @@ export function setupWindowResizing(
       return;
     }
 
-    console.log(
-      "[Eden Frame] Resize ended, final currentBounds:",
+    log.info(
+      "Resize ended, final currentBounds:",
       currentBoundsRef.current
     );
     isResizing = false;
@@ -227,7 +228,7 @@ export function setupWindowResizing(
             appId,
             bounds: pendingBounds,
           })
-          .catch(console.error);
+          .catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
         window.edenFrame!._internal.bounds = { ...pendingBounds };
@@ -238,8 +239,8 @@ export function setupWindowResizing(
     // For touch resize, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
-      console.log(
-        "[Eden Frame] Updated edenFrame._internal.bounds after touch resize:",
+      log.info(
+        "Updated edenFrame._internal.bounds after touch resize:",
         window.edenFrame?._internal.bounds
       );
     }
@@ -248,13 +249,13 @@ export function setupWindowResizing(
     if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-resize", { appId })
-        .catch(console.error);
+        .catch(log.error);
     }
 
     if (appId) {
       window.edenAPI
         .shellCommand("view/focus-app", { appId })
-        .catch(console.error);
+        .catch(log.error);
     }
   };
 
@@ -275,5 +276,5 @@ export function setupWindowResizing(
   document.addEventListener("touchend", endResize, { passive: false });
   document.addEventListener("touchcancel", endResize, { passive: false });
 
-  console.log("[Eden Frame] Resize event listeners registered");
+  log.info("Resize event listeners registered");
 }

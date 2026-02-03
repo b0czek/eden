@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * Seed Database
  *
@@ -38,7 +39,7 @@ export async function seedDatabase(
     const content = await fs.readFile(seedPath, "utf-8");
     seedConfig = JSON.parse(content) as EdenSeedConfig;
   } catch {
-    console.log("[Seed] No seed configuration found (eden-seed.json)");
+    log.info("No seed configuration found (eden-seed.json)");
     return;
   }
 
@@ -58,11 +59,11 @@ export async function seedDatabase(
   }
 
   if (usersSeeded && (!hasSettingsSeed || settingsSeeded)) {
-    console.log("[Seed] All sections already seeded, skipping");
+    log.info("All sections already seeded, skipping");
     return;
   }
 
-  console.log("[Seed] Seeding database...");
+  log.info("Seeding database...");
 
   // Seed users
   if (!usersSeeded) {
@@ -73,27 +74,27 @@ export async function seedDatabase(
     // Seed default user
     if (seedConfig.defaultUsername) {
       await usersDb.set(DEFAULT_USER_KEY, seedConfig.defaultUsername);
-      console.log(
-        `[Seed] Seeded default user: ${seedConfig.defaultUsername}`,
+      log.info(
+        `Seeded default user: ${seedConfig.defaultUsername}`,
       );
     }
 
     // Mark users as seeded
     await usersDb.set(USERS_SEED_VERSION_KEY, "1");
   } else {
-    console.log("[Seed] Users already seeded, skipping");
+    log.info("Users already seeded, skipping");
   }
 
   // Seed settings entries (into settings.db)
   if (hasSettingsSeed && settingsDb) {
     if (settingsSeeded) {
-      console.log("[Seed] Settings already seeded, skipping");
+      log.info("Settings already seeded, skipping");
     } else {
       await seedSettings(settingsDb, settingsSeed);
       await settingsDb.set(SETTINGS_SEED_VERSION_KEY, "1");
     }
   }
-  console.log("[Seed] Seeding complete");
+  log.info("Seeding complete");
 }
 
 function createKeyv(appsDirectory: string, dbName: string): Keyv {
@@ -112,7 +113,7 @@ async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
   for (const user of users) {
     const existingUser = await db.get(getUserKey(user.username));
     if (existingUser) {
-      console.log(`[Seed] User "${user.username}" already exists, skipping`);
+      log.info(`User "${user.username}" already exists, skipping`);
       continue;
     }
 
@@ -130,7 +131,7 @@ async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
 
     await db.set(getUserKey(user.username), storedUser);
     usernames.push(user.username);
-    console.log(`[Seed] Seeded user: ${user.name} (${user.username})`);
+    log.info(`Seeded user: ${user.name} (${user.username})`);
   }
 
   // Update user index
@@ -173,14 +174,14 @@ async function seedSettings(
       const namespacedKey = `${appId}:${key}`;
       const existing = await db.get(namespacedKey);
       if (existing !== undefined) {
-        console.log(
-          `[Seed] Setting "${appId}:${key}" already exists, skipping`,
+        log.info(
+          `Setting "${appId}:${key}" already exists, skipping`,
         );
         continue;
       }
 
       await db.set(namespacedKey, value);
-      console.log(`[Seed] Seeded setting: ${appId}:${key}`);
+      log.info(`Seeded setting: ${appId}:${key}`);
     }
   }
 }

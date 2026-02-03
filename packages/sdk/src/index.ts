@@ -10,3 +10,13 @@ export { UserManager } from "./user";
 
 // Window management exports
 export { ViewManager } from "./view-manager";
+
+// Logging exports
+export {
+  log,
+  createLogger,
+  configureLogger,
+  getLoggerConfig,
+  setLogContext,
+} from "./logging";
+export type { LogLevel, Logger, LogContext, LoggerConfig } from "./logging";

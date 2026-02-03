@@ -6,6 +6,7 @@ import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
 import { UserManager } from "../user/UserManager";
 import { IPCBridge } from "../ipc";
 
+import { log } from "../logging";
 /**
  * AutostartManager handles launching applications when Eden starts
  */
@@ -104,14 +105,14 @@ export class AutostartManager {
 
         try {
           await this.processManager.launchApp(appId);
-          console.log(`Autostart app launched: ${appId}`);
+          log.info(`Autostart app launched: ${appId}`);
         } catch (error) {
-          console.error(`Failed to launch autostart app ${appId}:`, error);
+          log.error(`Failed to launch autostart app ${appId}:`, error);
         }
       }
     } catch (error) {
-      console.warn(
-        "[AutostartManager] Failed to load autostart settings:",
+      log.warn(
+        "Failed to load autostart settings:",
         error,
       );
     }
@@ -133,9 +134,9 @@ export class AutostartManager {
 
     try {
       await this.processManager.launchApp(loginAppId);
-      console.log(`Login app launched: ${loginAppId}`);
+      log.info(`Login app launched: ${loginAppId}`);
     } catch (error) {
-      console.error(`Failed to launch login app ${loginAppId}:`, error);
+      log.error(`Failed to launch login app ${loginAppId}:`, error);
     }
   }
 }

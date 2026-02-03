@@ -5,6 +5,7 @@ import type {
   ServiceInfo,
   ConnectResult,
 } from "@edenapp/types";
+import { log } from "../logging";
 import { CommandRegistry } from "../ipc";
 import { AppChannelHandler } from "./AppChannelHandler";
 import { BackendManager } from "../process-manager/BackendManager";
@@ -85,8 +86,8 @@ export class AppChannelManager {
     };
 
     this.services.set(key, service);
-    console.log(
-      `[AppChannelManager] Registered service "${serviceName}" from app "${appId}"`
+    log.info(
+      `Registered service "${serviceName}" from app "${appId}"`
     );
   }
 
@@ -98,8 +99,8 @@ export class AppChannelManager {
     const deleted = this.services.delete(key);
 
     if (deleted) {
-      console.log(
-        `[AppChannelManager] Unregistered service "${serviceName}" from app "${appId}"`
+      log.info(
+        `Unregistered service "${serviceName}" from app "${appId}"`
       );
     }
 
@@ -119,8 +120,8 @@ export class AppChannelManager {
     }
 
     if (count > 0) {
-      console.log(
-        `[AppChannelManager] Unregistered ${count} services from app "${appId}"`
+      log.info(
+        `Unregistered ${count} services from app "${appId}"`
       );
     }
 
@@ -225,8 +226,8 @@ export class AppChannelManager {
       targetWebContentsId: service.webContentsId,
     });
 
-    console.log(
-      `[AppChannelManager] Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`
+    log.info(
+      `Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`
     );
 
     // Transfer port1 to requester
@@ -296,7 +297,7 @@ export class AppChannelManager {
     }
 
     this.connections.delete(connectionId);
-    console.log(`[AppChannelManager] Closed connection: ${connectionId}`);
+    log.info(`Closed connection: ${connectionId}`);
     return true;
   }
 
@@ -342,8 +343,8 @@ export class AppChannelManager {
     webContentsId: number | undefined,
     connectionId: string
   ): void {
-    console.log(
-      `[AppChannelManager] Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`
+    log.info(
+      `Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`
     );
     if (webContentsId) {
       const wc = webContents.fromId(webContentsId);
@@ -399,6 +400,6 @@ export class AppChannelManager {
     }
 
     this.services.clear();
-    console.log("[AppChannelManager] Destroyed");
+    log.info("Destroyed");
   }
 }

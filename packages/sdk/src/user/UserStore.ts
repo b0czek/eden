@@ -3,6 +3,7 @@ import KeyvSqlite from "@keyv/sqlite";
 import * as path from "path";
 import type { StoredUser } from "./UserTypes";
 
+import { log } from "../logging";
 const USERS_INDEX_KEY = "users:index";
 const DEFAULT_USER_KEY = "users:default";
 
@@ -15,10 +16,10 @@ export class UserStore {
     this.keyv = new Keyv({ store: sqlite });
 
     this.keyv.on("error", (err) => {
-      console.error("[UserManager] Database error:", err);
+      log.error("Database error:", err);
     });
 
-    console.log(`[UserManager] Initialized user storage at ${dbPath}`);
+    log.info(`Initialized user storage at ${dbPath}`);
   }
 
   async getDefaultUsername(): Promise<string | null> {

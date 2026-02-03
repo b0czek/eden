@@ -10,6 +10,7 @@ import { injectable, inject, singleton, delay } from "tsyringe";
 
 import { EventHandler } from "./EventHandler";
 
+import { log } from "../logging";
 /**
  * IPCBridge
  *
@@ -124,7 +125,7 @@ export class IPCBridge extends EventEmitter {
             });
           }
         } else {
-          console.warn(
+          log.warn(
             `Unknown backend message type from ${appId}:`,
             message.type
           );
@@ -161,8 +162,8 @@ export class IPCBridge extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error(
-          `[IPCBridge] Command '${command}' (ID: ${commandId}) timed out after 10s`
+        log.error(
+          `Command '${command}' (ID: ${commandId}) timed out after 10s`
         );
         this.pendingCommands.delete(commandId);
         reject(new Error(`Command '${command}' timed out`));
@@ -181,8 +182,8 @@ export class IPCBridge extends EventEmitter {
         .catch((error) => {
           const err = error as Error;
           const appInfo = appId ? ` (app: ${appId})` : "";
-          console.error(
-            `[IPCBridge] Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`
+          log.error(
+            `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`
           );
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);

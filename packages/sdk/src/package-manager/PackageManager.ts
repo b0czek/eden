@@ -7,6 +7,7 @@ import type {
   RuntimeAppManifest,
   EdenConfig,
 } from "@edenapp/types";
+import { log } from "../logging";
 import {
   IPCBridge,
   CommandRegistry,
@@ -95,7 +96,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     ).length;
     const installedCount = this.installedApps.size - prebuiltCount;
 
-    console.log(
+    log.info(
       `PackageManager initialized. Found ${prebuiltCount} prebuilt apps and ${installedCount} installed apps.`,
     );
   }
@@ -109,7 +110,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       try {
         await fs.access(this.prebuiltAppsDirectory);
       } catch {
-        console.log("No prebuilt apps directory found, skipping...");
+        log.info("No prebuilt apps directory found, skipping...");
         return;
       }
 
@@ -151,15 +152,15 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               ) {
                 // Override frontend entry with dev server URL
                 rawManifest.frontend.entry = devManifest.devUrl;
-                console.log(
+                log.info(
                   `Loaded prebuilt app: ${rawManifest.id} (dev mode: ${devManifest.devUrl})`,
                 );
               } else {
-                console.log(`Loaded prebuilt app: ${rawManifest.id}`);
+                log.info(`Loaded prebuilt app: ${rawManifest.id}`);
               }
             } catch {
               // No dev manifest, use production build
-              console.log(`Loaded prebuilt app: ${rawManifest.id}`);
+              log.info(`Loaded prebuilt app: ${rawManifest.id}`);
             }
 
             const runtimeManifest = this.toRuntimeManifest(rawManifest, true);
@@ -172,7 +173,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               runtimeManifest.resolvedGrants,
             );
           } catch (error) {
-            console.warn(
+            log.warn(
               `Failed to load prebuilt app from ${entry.name}:`,
               error,
             );
@@ -180,7 +181,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
         }
       }
     } catch (error) {
-      console.error("Failed to load prebuilt apps:", error);
+      log.error("Failed to load prebuilt apps:", error);
     }
   }
 
@@ -214,12 +215,12 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               runtimeManifest.resolvedGrants,
             );
           } catch (error) {
-            console.warn(`Failed to load app from ${entry.name}:`, error);
+            log.warn(`Failed to load app from ${entry.name}:`, error);
           }
         }
       }
     } catch (error) {
-      console.error("Failed to load installed apps:", error);
+      log.error("Failed to load installed apps:", error);
     }
   }
 
@@ -486,7 +487,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       const mimeType = this.getMimeType(ext);
       return `data:${mimeType};base64,${iconBuffer.toString("base64")}`;
     } catch (error) {
-      console.warn(`Failed to read icon for ${appId}:`, error);
+      log.warn(`Failed to read icon for ${appId}:`, error);
       return undefined;
     }
   }
@@ -519,7 +520,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     try {
       return await this.getDirectorySize(appPath);
     } catch (error) {
-      console.warn(`Failed to calculate size for ${appId}:`, error);
+      log.warn(`Failed to calculate size for ${appId}:`, error);
       return undefined;
     }
   }

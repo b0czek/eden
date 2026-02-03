@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * Eden App Frame Injector
  *
@@ -21,7 +22,7 @@ import { setupWindowDragging } from "./window-dragging.js";
 import { setupWindowResizing } from "./window-resizing.js";
 
 (function () {
-  console.log("[Eden Frame] Injection script started");
+  log.info("Injection script started");
 
   // Initialize edenFrame object if not exists
   if (!window.edenFrame) {
@@ -45,7 +46,7 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Check if already injected
   if (window.edenFrame._internal.injected) {
-    console.log("[Eden Frame] Already injected, skipping");
+    log.info("Already injected, skipping");
     return;
   }
   window.edenFrame._internal.injected = true;
@@ -122,8 +123,8 @@ import { setupWindowResizing } from "./window-resizing.js";
       "view/mode-changed",
       (data: { mode: "tiled" | "floating"; bounds: any }) => {
         const { mode, bounds } = data;
-        console.log(
-          "[Eden Frame] View mode changed to:",
+        log.info(
+          "View mode changed to:",
           mode,
           "with bounds:",
           bounds
@@ -140,7 +141,7 @@ import { setupWindowResizing } from "./window-resizing.js";
         setupFloatingWindowControls();
       }
     );
-    console.log("[Eden Frame] Subscribed to view/mode-changed");
+    log.info("Subscribed to view/mode-changed");
   };
 
   const setupFloatingWindowControls = (): void => {
@@ -148,8 +149,8 @@ import { setupWindowResizing } from "./window-resizing.js";
     const windowConfig = window.edenFrame!._internal.config;
     const initialBounds = window.edenFrame!._internal.bounds;
 
-    console.log(
-      "[Eden Frame] Window mode:",
+    log.info(
+      "Window mode:",
       windowMode,
       "Config:",
       windowConfig,
@@ -165,8 +166,8 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Initialize current bounds from the actual bounds set by ViewManager
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      console.log(
-        "[Eden Frame] Initialized bounds from backend:",
+      log.info(
+        "Initialized bounds from backend:",
         currentBoundsRef.current
       );
     } else if (windowConfig.defaultSize) {
@@ -184,8 +185,8 @@ import { setupWindowResizing } from "./window-resizing.js";
         height: windowConfig.defaultSize.height || 600,
       };
 
-      console.log(
-        "[Eden Frame] Initialized bounds from config:",
+      log.info(
+        "Initialized bounds from config:",
         currentBoundsRef.current
       );
     }
@@ -194,7 +195,7 @@ import { setupWindowResizing } from "./window-resizing.js";
     const isMovable = windowConfig.movable !== false; // default true
     const isResizable = windowConfig.resizable !== false; // default true
 
-    console.log("[Eden Frame] Movable:", isMovable, "Resizable:", isResizable);
+    log.info("Movable:", isMovable, "Resizable:", isResizable);
 
     // Setup window dragging
     if (isMovable) {
@@ -213,13 +214,13 @@ import { setupWindowResizing } from "./window-resizing.js";
     currentBoundsRef.current = { ...newBounds };
     window.edenFrame!._internal.bounds = { ...newBounds };
   });
-  console.log("[Eden Frame] Subscribed to view/bounds-updated");
+  log.info("Subscribed to view/bounds-updated");
 
   // Add global touch handler to diagnose issues
   document.addEventListener(
     "touchstart",
     (e) => {
-      console.log("[Eden Frame] Global touchstart on:", e.target);
+      log.info("Global touchstart on:", e.target);
     },
     { passive: false, capture: true }
   );
@@ -227,8 +228,8 @@ import { setupWindowResizing } from "./window-resizing.js";
   document.addEventListener(
     "touchcancel",
     (e) => {
-      console.log("[Eden Frame] Global touchcancel on:", e.target);
-      console.log("[Eden Frame] Stack trace:", new Error().stack);
+      log.info("Global touchcancel on:", e.target);
+      log.info("Stack trace:", new Error().stack);
     },
     { capture: true }
   );

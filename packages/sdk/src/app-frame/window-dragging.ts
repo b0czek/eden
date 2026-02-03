@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * Window Dragging
  *
@@ -44,7 +45,7 @@ export function setupWindowDragging(
           appId,
           bounds: pendingBounds,
         })
-        .catch(console.error);
+        .catch(log.error);
 
       pendingBounds = null;
     }
@@ -60,9 +61,9 @@ export function setupWindowDragging(
       return;
     }
 
-    console.log("[Eden Frame] startDrag called, event type:", e.type);
-    console.log(
-      "[Eden Frame] currentBounds before refresh:",
+    log.info("startDrag called, event type:", e.type);
+    log.info(
+      "currentBounds before refresh:",
       currentBoundsRef.current
     );
 
@@ -70,13 +71,13 @@ export function setupWindowDragging(
     const initialBounds = window.edenFrame?._internal.bounds;
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      console.log(
-        "[Eden Frame] Refreshed currentBounds from edenFrame._internal.bounds:",
+      log.info(
+        "Refreshed currentBounds from edenFrame._internal.bounds:",
         currentBoundsRef.current
       );
     } else if (!currentBoundsRef.current) {
-      console.warn(
-        "[Eden Frame] Cannot start drag - currentBounds not initialized!"
+      log.warn(
+        "Cannot start drag - currentBounds not initialized!"
       );
       return;
     }
@@ -90,7 +91,7 @@ export function setupWindowDragging(
     startY = coords.y;
     dragStartBounds = { ...currentBoundsRef.current };
 
-    console.log("[Eden Frame] Drag started at:", coords, "isTouch:", isTouch);
+    log.info("Drag started at:", coords, "isTouch:", isTouch);
 
     // IMPORTANT: Prevent default FIRST to stop touch from being canceled
     e.preventDefault();
@@ -117,7 +118,7 @@ export function setupWindowDragging(
           startX: coords.x,
           startY: coords.y,
         })
-        .catch(console.error);
+        .catch(log.error);
     }
 
     // Add mouseup listener when drag starts (removed when drag ends)
@@ -168,8 +169,8 @@ export function setupWindowDragging(
       return;
     }
 
-    console.log(
-      "[Eden Frame] Drag ended, final currentBounds:",
+    log.info(
+      "Drag ended, final currentBounds:",
       currentBoundsRef.current
     );
     isDragging = false;
@@ -192,7 +193,7 @@ export function setupWindowDragging(
             appId,
             bounds: pendingBounds,
           })
-          .catch(console.error);
+          .catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
         window.edenFrame!._internal.bounds = { ...pendingBounds };
@@ -203,8 +204,8 @@ export function setupWindowDragging(
     // For touch drag, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
-      console.log(
-        "[Eden Frame] Updated edenFrame._internal.bounds after touch drag:",
+      log.info(
+        "Updated edenFrame._internal.bounds after touch drag:",
         window.edenFrame?._internal.bounds
       );
     }
@@ -213,13 +214,13 @@ export function setupWindowDragging(
     if (!isTouch && appId) {
       window.edenAPI
         .shellCommand("view/end-drag", { appId })
-        .catch(console.error);
+        .catch(log.error);
     }
 
     if (appId) {
       window.edenAPI
         .shellCommand("view/focus-app", { appId })
-        .catch(console.error);
+        .catch(log.error);
     }
   };
 
@@ -240,5 +241,5 @@ export function setupWindowDragging(
   document.addEventListener("touchend", endDrag, { passive: false });
   document.addEventListener("touchcancel", endDrag, { passive: false });
 
-  console.log("[Eden Frame] Drag event listeners registered");
+  log.info("Drag event listeners registered");
 }

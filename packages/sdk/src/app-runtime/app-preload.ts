@@ -3,6 +3,7 @@ import type {
   AppBusConnection,
   ServiceConnectCallback,
 } from "@edenapp/types/ipc/appbus";
+import { log, setLogContext } from "../logging";
 import {
   type PendingRequest,
   type IPCPort,
@@ -40,9 +41,10 @@ const eventSubscriptions: Map<string, Set<Function>> = new Map();
 const appIdArg = process.argv.find((arg) => arg.startsWith("--app-id="));
 if (appIdArg) {
   appId = appIdArg.split("=")[1];
-  console.log(`[AppPreload] Initialized for app: ${appId}`);
+  setLogContext({ appId });
+  log.info(`Initialized for app: ${appId}`);
 } else {
-  console.warn("[AppPreload] No app ID found in arguments");
+  log.warn("No app ID found in arguments");
 }
 
 // Extract launch args
@@ -55,7 +57,7 @@ if (launchArgsArg) {
     const jsonStr = launchArgsArg.split("=").slice(1).join("=");
     launchArgs = JSON.parse(jsonStr);
   } catch (e) {
-    console.error("[AppPreload] Failed to parse launch args:", e);
+    log.error("Failed to parse launch args:", e);
   }
 }
 
@@ -63,12 +65,12 @@ if (launchArgsArg) {
 ipcRenderer.on("backend-port", (event: any) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
-    console.error("[AppPreload] Received backend-port event without port");
+    log.error("Received backend-port event without port");
     return;
   }
 
   backendPort = port;
-  console.log(`[AppPreload] Backend port received for app ${appId}`);
+  log.info(`Backend port received for app ${appId}`);
 
   // Wrap DOM MessagePort to IPCPort interface
   const wrappedPort = wrapDOMPort(port);
@@ -93,7 +95,7 @@ ipcRenderer.on("shell-message", (_event: any, message: any) => {
       try {
         callback(payload);
       } catch (err) {
-        console.error(`Error in event listener for ${type}:`, err);
+        log.error(`Error in event listener for ${type}:`, err);
       }
     });
   }
@@ -139,14 +141,14 @@ const appBusState = createAppBusState("appbus");
 ipcRenderer.on("appbus-port", (event: any, data: any) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
-    console.error("[AppBus] Received appbus-port event without port");
+    log.error("Received appbus-port event without port");
     return;
   }
 
   // Wrap DOM MessagePort to IPCPort interface
   const wrappedPort = wrapDOMPort(port);
 
-  handleAppBusPort(wrappedPort, data, appBusState, "[AppBus]");
+  handleAppBusPort(wrappedPort, data, appBusState);
 });
 
 // Handle port closed notification
@@ -163,4 +165,4 @@ contextBridge.exposeInMainWorld(
   createAppBusAPI({ transport: shellTransport }, appBusState)
 );
 
-console.log("Universal app preload loaded");
+log.info("Universal app preload loaded");

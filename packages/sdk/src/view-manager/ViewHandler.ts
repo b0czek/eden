@@ -3,6 +3,7 @@ import { ViewManager } from "./ViewManager";
 import { MouseTracker } from "./MouseTracker";
 import { AppInstance, ViewBounds, WindowSize } from "@edenapp/types";
 
+import { log } from "../logging";
 /**
  * Events emitted by the ViewHandler
  */
@@ -219,12 +220,12 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   async handleGlobalMouseUp(): Promise<{ success: boolean }> {
     // Cleanup any active drag or resize operations when mouse is released
     if (this.dragState) {
-      console.log("[ViewHandler] Global mouseup - cleaning up drag state");
+      log.info("Global mouseup - cleaning up drag state");
       this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
       this.dragState = null;
     }
     if (this.resizeState) {
-      console.log("[ViewHandler] Global mouseup - cleaning up resize state");
+      log.info("Global mouseup - cleaning up resize state");
       this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
       this.resizeState = null;
     }

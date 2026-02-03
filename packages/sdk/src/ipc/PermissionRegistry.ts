@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * PermissionRegistry
  *
@@ -67,8 +68,8 @@ export class PermissionRegistry {
 
     this.apps.set(appId, { basePermissions, grants: grantMap });
 
-    console.log(
-      `[PermissionRegistry] Registered app ${appId} (${basePermissions.size} base, ${grantMap.size} grants)`,
+    log.info(
+      `Registered app ${appId} (${basePermissions.size} base, ${grantMap.size} grants)`,
     );
   }
 
@@ -77,7 +78,7 @@ export class PermissionRegistry {
    */
   unregisterApp(appId: string): void {
     this.apps.delete(appId);
-    console.log(`[PermissionRegistry] Unregistered permissions for ${appId}`);
+    log.info(`Unregistered permissions for ${appId}`);
   }
 
   /**

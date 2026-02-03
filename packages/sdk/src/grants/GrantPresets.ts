@@ -1,5 +1,5 @@
 import type { AppGrantDefinition, ResolvedGrant } from "@edenapp/types";
-
+import { log } from "../logging";
 import {
   type GrantPresetDefinition,
   GRANT_PRESET_LIST,
@@ -52,8 +52,8 @@ export const normalizeGrantPresets = (
       const presetGrant = resolveGrantPreset(grant.preset);
       if (!presetGrant) {
         if (appId) {
-          console.warn(
-            `[Grants] Unknown grant preset "${grant.preset}" in ${appId}`,
+          log.warn(
+            `Unknown grant preset "${grant.preset}" in ${appId}`,
           );
         }
         continue;

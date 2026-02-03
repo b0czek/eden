@@ -3,6 +3,7 @@ import { BackendManager } from "../process-manager/BackendManager";
 import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
 import { EventName, EventData } from "@edenapp/types";
 
+import { log } from "../logging";
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private backendManager?: BackendManager;
@@ -37,7 +38,7 @@ export class EventSubscriberManager {
   public subscribe(viewId: number, eventName: string): boolean {
     const viewInfo = this.viewManager.getViewInfo(viewId);
     if (!viewInfo) {
-      console.warn(`Cannot subscribe: view ${viewId} not found`);
+      log.warn(`Cannot subscribe: view ${viewId} not found`);
       return false;
     }
 
@@ -61,7 +62,7 @@ export class EventSubscriberManager {
     }
 
     this.subscriptions.get(eventName)!.add(viewId);
-    console.log(
+    log.info(
       `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`
     );
     return true;
@@ -73,7 +74,7 @@ export class EventSubscriberManager {
   public subscribeFoundation(eventName: string): boolean {
     if (!this.foundationSubscriptions.has(eventName)) {
       this.foundationSubscriptions.set(eventName, true);
-      console.log(`Foundation subscribed to event: ${eventName}`);
+      log.info(`Foundation subscribed to event: ${eventName}`);
     }
     return true;
   }
@@ -97,7 +98,7 @@ export class EventSubscriberManager {
     }
 
     this.backendSubscriptions.get(eventName)!.add(appId);
-    console.log(`Backend (${appId}) subscribed to event: ${eventName}`);
+    log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
     return true;
   }
 
@@ -115,7 +116,7 @@ export class EventSubscriberManager {
     this.internalSubscriptions
       .get(event)!
       .add(callback as (payload: any) => void);
-    console.log(`Internal subscriber added for event: ${event}`);
+    log.info(`Internal subscriber added for event: ${event}`);
   }
 
   /**
@@ -133,7 +134,7 @@ export class EventSubscriberManager {
     }
 
     if (result) {
-      console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
+      log.info(`View ${viewId} unsubscribed from event: ${eventName}`);
     }
     return result;
   }
@@ -144,7 +145,7 @@ export class EventSubscriberManager {
   public unsubscribeFoundation(eventName: string): boolean {
     if (this.foundationSubscriptions.has(eventName)) {
       this.foundationSubscriptions.delete(eventName);
-      console.log(`Foundation unsubscribed from event: ${eventName}`);
+      log.info(`Foundation unsubscribed from event: ${eventName}`);
       return true;
     }
     return false;
@@ -165,7 +166,7 @@ export class EventSubscriberManager {
     }
 
     if (result) {
-      console.log(`Backend (${appId}) unsubscribed from event: ${eventName}`);
+      log.info(`Backend (${appId}) unsubscribed from event: ${eventName}`);
     }
     return result;
   }
@@ -197,7 +198,7 @@ export class EventSubscriberManager {
         try {
           callback(payload);
         } catch (error) {
-          console.error(
+          log.error(
             `Error in internal subscriber for ${eventName}:`,
             error
           );

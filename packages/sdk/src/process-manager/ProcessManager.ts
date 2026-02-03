@@ -10,6 +10,7 @@ import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { ProcessHandler } from "./ProcessHandler";
 import { UserManager } from "../user/UserManager";
 
+import { log } from "../logging";
 /**
  * Events emitted by the ProcessManager
  */
@@ -60,13 +61,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private setupEventHandlers(): void {
     // Handle backend errors
     this.backendManager.on("backend-error", ({ appId, error }) => {
-      console.error(`Backend error for app ${appId}:`, error);
+      log.error(`Backend error for app ${appId}:`, error);
       this.handleAppError(appId, error);
     });
 
     // Handle backend exits
     this.backendManager.on("backend-exit", ({ appId, code }) => {
-      console.log(`Backend exited for app ${appId} with code ${code}`);
+      log.info(`Backend exited for app ${appId} with code ${code}`);
       this.handleAppExit(appId, code);
     });
 
@@ -75,14 +76,14 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     this.ipcBridge.eventSubscribers.subscribeInternal(
       "view/view-loaded",
       ({ viewId, appId }) => {
-        console.log(`View loaded for app ${appId}`);
+        log.info(`View loaded for app ${appId}`);
 
         // If app has a backend, transfer the port to the frontend
         const backendPort = this.backendManager.getFrontendPort(appId);
         if (backendPort) {
           const viewInfo = this.viewManager.getViewInfo(viewId);
           if (viewInfo) {
-            console.log(
+            log.info(
               `Transferring backend port to view ${viewId} for app ${appId}`,
             );
             viewInfo.view.webContents.postMessage("backend-port", {}, [
@@ -91,7 +92,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
             // Port has been transferred
           }
         } else {
-          console.log(
+          log.info(
             `No backend port for app ${appId} (may be frontend-only)`,
           );
         }
@@ -194,7 +195,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         appId,
       };
     } catch (error) {
-      console.error(`Failed to launch app ${appId}:`, error);
+      log.error(`Failed to launch app ${appId}:`, error);
       throw error;
     }
   }
@@ -228,7 +229,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
       this.notify("stopped", { appId });
     } catch (error) {
-      console.error(`Failed to stop app ${appId}:`, error);
+      log.error(`Failed to stop app ${appId}:`, error);
       throw error;
     }
   }
@@ -309,16 +310,16 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   async shutdown(): Promise<void> {
     const runningAppIds = Array.from(this.runningApps.keys());
 
-    console.log(`Stopping ${runningAppIds.length} running app(s)...`);
+    log.info(`Stopping ${runningAppIds.length} running app(s)...`);
 
     // Stop all apps sequentially and wait for each to complete
     for (const appId of runningAppIds) {
       try {
-        console.log(`Stopping app: ${appId}`);
+        log.info(`Stopping app: ${appId}`);
         await this.stopApp(appId);
-        console.log(`✓ Stopped app: ${appId}`);
+        log.info(`✓ Stopped app: ${appId}`);
       } catch (error) {
-        console.error(`Failed to stop app ${appId}:`, error);
+        log.error(`Failed to stop app ${appId}:`, error);
       }
     }
   }
@@ -329,7 +330,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   async reloadApp(appId: string): Promise<void> {
     const instance = this.runningApps.get(appId);
     if (!instance) {
-      console.log(`App ${appId} is not running, skipping reload`);
+      log.info(`App ${appId} is not running, skipping reload`);
       return;
     }
 
@@ -337,7 +338,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     const viewInfo = this.viewManager.getViewInfo(instance.viewId);
     const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
 
-    console.log(`Reloading app ${appId}...`);
+    log.info(`Reloading app ${appId}...`);
 
     // Stop the app
     await this.stopApp(appId);
@@ -348,7 +349,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     // Relaunch with same bounds
     await this.launchApp(appId, bounds);
 
-    console.log(`App ${appId} reloaded successfully`);
+    log.info(`App ${appId} reloaded successfully`);
   }
 
   private async stopSessionApps(): Promise<void> {
@@ -357,7 +358,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       try {
         await this.stopApp(appId);
       } catch (error) {
-        console.error(`Failed to stop session app ${appId}:`, error);
+        log.error(`Failed to stop session app ${appId}:`, error);
       }
     }
   }

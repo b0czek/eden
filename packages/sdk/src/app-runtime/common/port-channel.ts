@@ -1,3 +1,4 @@
+import { log } from "../../logging";
 /**
  * Port Channel - Shared utilities for MessagePort communication
  *
@@ -206,8 +207,8 @@ export function createPortConnection(
           try {
             callback(payload);
           } catch (err) {
-            console.error(
-              `[PortConnection] Error in on('${method}') listener:`,
+            log.error(
+              `Error in on('${method}') listener:`,
               err
             );
           }
@@ -397,21 +398,20 @@ export function handleAppBusPort(
     targetAppId?: string;
     sourceAppId?: string;
   },
-  state: AppBusState,
-  logPrefix: string = "[AppBus]"
+  state: AppBusState
 ): void {
   const { connectionId, role, serviceName, targetAppId, sourceAppId } = data;
 
   if (role === "service") {
     // A client is connecting to our service
-    console.log(
-      `${logPrefix} Received connection from ${sourceAppId} for service ${serviceName}`
+    log.info(
+      `Received connection from ${sourceAppId} for service ${serviceName}`
     );
 
     const onConnect = state.registeredServices.get(serviceName);
     if (!onConnect) {
-      console.error(
-        `${logPrefix} No onConnect callback registered for service "${serviceName}"`
+      log.error(
+        `No onConnect callback registered for service "${serviceName}"`
       );
       return;
     }
@@ -429,14 +429,14 @@ export function handleAppBusPort(
     try {
       onConnect(connection, { appId: sourceAppId || "unknown" });
     } catch (err) {
-      console.error(
-        `${logPrefix} Error in onConnect callback for service "${serviceName}":`,
+      log.error(
+        `Error in onConnect callback for service "${serviceName}":`,
         err
       );
     }
   } else if (role === "client") {
     // We're connecting to another app's service
-    console.log(`${logPrefix} Connected to ${targetAppId}/${serviceName}`);
+    log.info(`Connected to ${targetAppId}/${serviceName}`);
 
     setupClientPort({
       port,

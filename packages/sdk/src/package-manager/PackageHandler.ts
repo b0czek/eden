@@ -3,6 +3,7 @@ import { EdenHandler, EdenNamespace } from "../ipc";
 import { PackageManager } from "./PackageManager";
 import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";
 
+import { log } from "../logging";
 @EdenNamespace("package")
 export class PackageHandler {
   private packageManager: PackageManager;
@@ -19,7 +20,7 @@ export class PackageHandler {
     sourcePath: string;
   }): Promise<RuntimeAppManifest> {
     const { sourcePath } = args;
-    console.log(`[PackageHandler] Installing from path: ${sourcePath}`);
+    log.info(`Installing from path: ${sourcePath}`);
     return await this.packageManager.installApp(sourcePath);
   }
 
@@ -56,7 +57,7 @@ export class PackageHandler {
     appId: string;
   }): Promise<{ enabled: boolean }> {
     const enabled = await toggleHotReload(params.appId);
-    console.log(
+    log.info(
       `Hot reload ${enabled ? "enabled" : "disabled"} for ${params.appId}`,
     );
     return { enabled };

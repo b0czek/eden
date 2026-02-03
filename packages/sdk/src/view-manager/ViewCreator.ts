@@ -8,6 +8,7 @@ import { TilingManager } from "./TilingManager";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
 
+import { log } from "../logging";
 /**
  * ViewCreator
  *
@@ -82,7 +83,7 @@ export class ViewCreator {
     mode: "full" | "tokens"
   ): Promise<boolean> {
     if (view.webContents.isDestroyed()) {
-      console.error("[ViewCreator] Cannot inject CSS - webContents destroyed");
+      log.error("Cannot inject CSS - webContents destroyed");
       return false;
     }
 
@@ -94,10 +95,10 @@ export class ViewCreator {
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log(`[ViewCreator] Injected Eden CSS (${mode})`);
+      log.info(`Injected Eden CSS (${mode})`);
       return true;
     } catch (err) {
-      console.error("[ViewCreator] Failed to inject Eden CSS:", err);
+      log.error("Failed to inject Eden CSS:", err);
       return false;
     }
   }
@@ -115,8 +116,8 @@ export class ViewCreator {
     bounds?: Bounds
   ): Promise<boolean> {
     if (view.webContents.isDestroyed()) {
-      console.error(
-        "[ViewCreator] Cannot inject frame - webContents destroyed"
+      log.error(
+        "Cannot inject frame - webContents destroyed"
       );
       return false;
     }
@@ -156,10 +157,10 @@ export class ViewCreator {
       // Execute config initialization followed by frame script
       await view.webContents.executeJavaScript(configScript + frameScript);
 
-      console.log(`[ViewCreator] App frame injected (mode: ${viewMode})`);
+      log.info(`App frame injected (mode: ${viewMode})`);
       return true;
     } catch (error) {
-      console.error("[ViewCreator] Failed to inject app frame:", error);
+      log.error("Failed to inject app frame:", error);
       return false;
     }
   }
@@ -195,8 +196,8 @@ export class ViewCreator {
     const zIndex = this.nextOverlayZIndex++;
     const viewBounds =
       bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
-    console.log(
-      `[ViewCreator] Creating overlay view for ${appId} at Z=${zIndex}`
+    log.info(
+      `Creating overlay view for ${appId} at Z=${zIndex}`
     );
     return { viewBounds, zIndex, tileIndex: undefined };
   }
@@ -212,7 +213,7 @@ export class ViewCreator {
     const viewBounds =
       bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
     const zIndex = this.floatingWindows.getNextZIndex();
-    console.log(`[ViewCreator] Creating floating app view for ${appId}`);
+    log.info(`Creating floating app view for ${appId}`);
     return { viewBounds, zIndex, tileIndex: undefined };
   }
 
@@ -224,7 +225,7 @@ export class ViewCreator {
     bounds: Bounds | undefined,
     existingViews: Iterable<ViewInfo>
   ) {
-    console.log(`[ViewCreator] Creating tiled app view for ${appId}`);
+    log.info(`Creating tiled app view for ${appId}`);
 
     if (this.tilingManager.isEnabled()) {
       const tileIndex = this.tilingManager.getNextTileIndex(existingViews);
@@ -292,8 +293,8 @@ export class ViewCreator {
       ],
     });
 
-    console.log(
-      `[ViewCreator] Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
+    log.info(
+      `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
     );
 
     // Register DevTools shortcut on this view
@@ -312,8 +313,8 @@ export class ViewCreator {
 
     // Load the frontend HTML or remote URL
     if (this.isRemoteEntry(frontendEntry)) {
-      console.log(
-        `[ViewCreator] Loading remote frontend for ${appId}: ${frontendEntry}`
+      log.info(
+        `Loading remote frontend for ${appId}: ${frontendEntry}`
       );
       view.webContents.loadURL(frontendEntry);
     } else {
@@ -327,8 +328,8 @@ export class ViewCreator {
       const cssMode = this.getCSSInjectionMode(windowConfig);
       if (cssMode !== "none") {
         this.injectEdenCSS(view, cssMode).catch((err) => {
-          console.error(
-            `[ViewCreator] Failed to inject Eden CSS for ${appId}:`,
+          log.error(
+            `Failed to inject Eden CSS for ${appId}:`,
             err
           );
         });
@@ -343,8 +344,8 @@ export class ViewCreator {
             windowConfig,
             viewBounds
           ).catch((err) => {
-          console.error(
-            `[ViewCreator] Failed to inject app frame for ${appId}:`,
+          log.error(
+            `Failed to inject app frame for ${appId}:`,
             err
           );
         });

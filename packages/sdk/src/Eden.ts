@@ -7,7 +7,8 @@ import { AppChannelManager } from "./appbus";
 import { SystemHandler } from "./SystemHandler";
 import { I18nManager } from "./i18n/I18nManager";
 import { EdenConfig } from "@edenapp/types";
-
+import { log } from "./logging";
+import { attachWebContentsLogger } from "./logging/electron";
 // Managers and Handlers
 import { PackageManager } from "./package-manager";
 import {
@@ -94,7 +95,7 @@ export class Eden {
    * Handle app ready event
    */
   private async onReady(): Promise<void> {
-    console.log("Eden starting...");
+    log.info("Eden starting...");
 
     // Seed database before initializing managers
     await seedDatabase(this.appsDirectory, this.distPath);
@@ -115,7 +116,7 @@ export class Eden {
     // Create main window
     this.createMainWindow();
 
-    console.log("Eden ready!");
+    log.info("Eden ready!");
   }
 
   private initializeManagers(): void {
@@ -147,7 +148,7 @@ export class Eden {
     try {
       fs.mkdirSync(directory, { recursive: true });
     } catch (error) {
-      console.error(`[Eden] Failed to create ${label} at ${directory}:`, error);
+      log.error(`Failed to create ${label} at ${directory}:`, error);
       throw error;
     }
   }
@@ -173,6 +174,10 @@ export class Eden {
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
       show: false, // Don't show until ready
+    });
+
+    attachWebContentsLogger(this.mainWindow.webContents, {
+      source: "foundation",
     });
 
     // Set managers to use this window
@@ -223,7 +228,7 @@ export class Eden {
    * Handle app quit
    */
   private async onBeforeQuit(): Promise<void> {
-    console.log("Eden shutting down...");
+    log.info("Eden shutting down...");
 
     try {
       if (!this.managersInitialized) {
@@ -238,9 +243,9 @@ export class Eden {
       // Cleanup IPC bridge
       this.ipcBridge.destroy();
 
-      console.log("Eden shutdown complete");
+      log.info("Eden shutdown complete");
     } catch (error) {
-      console.error("Error during shutdown:", error);
+      log.error("Error during shutdown:", error);
     }
   }
 }

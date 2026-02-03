@@ -8,6 +8,7 @@ import { SettingsHandler } from "./SettingsHandler";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import { UserManager } from "../user/UserManager";
 
+import { log } from "../logging";
 /**
  * Reserved app ID for Eden system settings.
  * No external app can use this ID.
@@ -51,10 +52,10 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
     // Handle errors
     this.keyv.on("error", (err) => {
-      console.error("[SettingsManager] Database error:", err);
+      log.error("Database error:", err);
     });
 
-    console.log(`[SettingsManager] Initialized settings storage at ${dbPath}`);
+    log.info(`Initialized settings storage at ${dbPath}`);
 
     // Create and register handler
     this.handler = new SettingsHandler(this);
@@ -85,8 +86,8 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     }
 
     if (value !== undefined && typeof value !== "string") {
-      console.warn(
-        `[SettingsManager] Non-string value found for key ${key}, converting to string`,
+      log.warn(
+        `Non-string value found for key ${key}, converting to string`,
       );
       return String(value);
     }
@@ -98,9 +99,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   async set(appId: string, key: string, value: string): Promise<void> {
     if (typeof value !== "string") {
-      throw new Error(
-        `[SettingsManager] Value must be a string, got ${typeof value}`,
-      );
+      throw new Error(`Value must be a string, got ${typeof value}`);
     }
     const namespacedKey = this.getAppKey(appId, key);
     await this.keyv.set(namespacedKey, value);
@@ -127,8 +126,8 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
         }
       }
     } catch (error) {
-      console.warn(
-        "[SettingsManager] Iterator not supported or failed:",
+      log.warn(
+        "Iterator not supported or failed:",
         error,
       );
     }
@@ -192,7 +191,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
     if (defaultValue === undefined) {
       throw new Error(
-        `[SettingsManager] Cannot reset key "${key}": no default value found in schema`,
+        `Cannot reset key "${key}": no default value found in schema`,
       );
     }
 

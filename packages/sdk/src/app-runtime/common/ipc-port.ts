@@ -1,3 +1,4 @@
+import { log } from "../../logging";
 /**
  * IPC Port - Unified interface for MessagePort communication
  *
@@ -63,7 +64,7 @@ export function wrapDOMPort(port: MessagePort): IPCPort {
         try {
           listener();
         } catch (e) {
-          console.error("[IPCPort] Error in close listener:", e);
+          log.error("Error in close listener:", e);
         }
       });
       closeListeners.clear();

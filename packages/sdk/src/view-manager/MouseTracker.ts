@@ -1,5 +1,6 @@
 import { screen } from "electron";
 
+import { log } from "../logging";
 /**
  * Callback function for mouse updates
  */
@@ -110,7 +111,7 @@ export class MouseTracker {
         try {
           callback({ ...currentPosition, deltaTime });
         } catch (error) {
-          console.error("Error in MouseTracker callback:", error);
+          log.error("Error in MouseTracker callback:", error);
         }
       }
     }, this.updateInterval);
