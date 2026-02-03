@@ -11,6 +11,7 @@ export const pl = {
       systemComponent: "Komponent Systemowy",
       builtin: "Wbudowana",
       autostart: "Autostart",
+      hotReload: "Hot Reload",
       userInstalled: "Zainstalowana przez użytkownika",
       sizeUnavailable: "Rozmiar niedostępny",
       uninstallApp: "Odinstaluj Aplikację",

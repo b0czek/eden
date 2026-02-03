@@ -8,11 +8,14 @@ interface AppDetailProps {
   app: RuntimeAppManifest;
   appIcon?: string;
   autostart: boolean;
+  hotReload: boolean;
+  devMode: boolean;
   sizeLoading: boolean;
   size?: number;
   uninstalling: boolean;
   onBack: () => void;
   onAutostartToggle: (enabled: boolean) => void;
+  onHotReloadToggle: (enabled: boolean) => void;
   onUninstall: (e: MouseEvent) => void;
 }
 
@@ -111,6 +114,21 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               }
             />
           </label>
+          <Show when={props.devMode}>
+            <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
+              <span>{t("settings.apps.hotReload")}</span>
+              <input
+                type="checkbox"
+                class="eden-toggle"
+                checked={props.hotReload}
+                onChange={(event) =>
+                  props.onHotReloadToggle(
+                    (event.target as HTMLInputElement).checked
+                  )
+                }
+              />
+            </label>
+          </Show>
           <Show when={!props.app.isPrebuilt}>
             <button
               class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"

@@ -1,5 +1,5 @@
-import { Show, createSignal, onMount } from "solid-js";
-import { FaSolidStop, FaSolidFire, FaSolidBolt, FaSolidThumbtack, FaSolidPlus } from "solid-icons/fa";
+import { Show } from "solid-js";
+import { FaSolidStop, FaSolidThumbtack, FaSolidPlus, FaSolidPlay } from "solid-icons/fa";
 import { t } from "../i18n";
 
 export interface ContextMenuData {
@@ -15,6 +15,7 @@ export interface ContextMenuData {
 interface AppContextMenuProps {
   menu: ContextMenuData;
   isAppPinned: (appId: string) => boolean;
+  onOpenApp: (appId: string) => Promise<void> | void;
   onStopApp: (appId: string) => Promise<void> | void;
   onAddToDock: (appId: string) => Promise<void> | void;
   onRemoveFromDock: (appId: string) => Promise<void> | void;
@@ -22,33 +23,8 @@ interface AppContextMenuProps {
 }
 
 export default function AppContextMenu(props: AppContextMenuProps) {
-  const [hotReloadEnabled, setHotReloadEnabled] = createSignal(false);
-
-  onMount(async () => {
-    // Check hot reload status for this app
-    try {
-      const result = await window.edenAPI.shellCommand(
-        "package/is-hot-reload-enabled",
-        { appId: props.menu.appId }
-      );
-      if (result.enabled) {
-        setHotReloadEnabled(true);
-      }
-    } catch (error) {
-      console.error("Failed to check hot reload status:", error);
-    }
-  });
-
-  const handleToggleHotReload = async () => {
-    try {
-      const result = await window.edenAPI.shellCommand(
-        "package/toggle-hot-reload",
-        { appId: props.menu.appId }
-      );
-      setHotReloadEnabled(result.enabled);
-    } catch (error) {
-      console.error("Failed to toggle hot reload:", error);
-    }
+  const handleOpenApp = async () => {
+    await props.onOpenApp(props.menu.appId);
     props.onClose();
   };
 
@@ -86,6 +62,15 @@ export default function AppContextMenu(props: AppContextMenuProps) {
         <div class="eden-popover-title context-menu-title">
           {props.menu.appName}
         </div>
+        <Show when={!props.menu.isRunning}>
+          <button
+            class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
+            onClick={handleOpenApp}
+          >
+            <FaSolidPlay />
+            {t("shell.openApp")}
+          </button>
+        </Show>
         <Show when={props.menu.isRunning}>
           <button
             class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
@@ -95,13 +80,6 @@ export default function AppContextMenu(props: AppContextMenuProps) {
             {t("shell.stopApp")}
           </button>
         </Show>
-        <button
-          class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
-          onClick={handleToggleHotReload}
-        >
-          {hotReloadEnabled() ? <FaSolidFire /> : <FaSolidBolt />}
-          {hotReloadEnabled() ? t("shell.disableHotReload") : t("shell.enableHotReload")}
-        </button>
         <button
           class="eden-btn eden-btn-ghost eden-btn-sm context-menu-btn"
           onClick={handleToggleDock}

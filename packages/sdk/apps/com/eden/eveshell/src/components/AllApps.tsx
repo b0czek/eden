@@ -215,6 +215,7 @@ export default function AllApps(props: AllAppsProps) {
           <AppContextMenu
             menu={menu()}
             isAppPinned={props.isAppPinned}
+            onOpenApp={props.onAppClick}
             onStopApp={props.onStopApp}
             onAddToDock={props.onAddToDock}
             onRemoveFromDock={props.onRemoveFromDock}

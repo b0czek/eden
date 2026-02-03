@@ -1,6 +1,6 @@
 import { EdenHandler, EdenNamespace, IPCBridge, CommandRegistry } from "./ipc";
 import { injectable, inject, singleton } from "tsyringe";
-import { SystemInfo } from "@edenapp/types";
+import { SystemInfo, EdenConfig } from "@edenapp/types";
 
 @singleton()
 @injectable()
@@ -8,7 +8,8 @@ import { SystemInfo } from "@edenapp/types";
 export class SystemHandler {
   constructor(
     @inject(IPCBridge) private ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject("EdenConfig") private config: EdenConfig
   ) {
     commandRegistry.registerManager(this);
   }
@@ -24,6 +25,7 @@ export class SystemHandler {
       nodeVersion: process.version,
       electronVersion: process.versions.electron,
       runningApps: this.ipcBridge.getRunningAppIds(),
+      release: this.config.development !== true,
     };
   }
 }

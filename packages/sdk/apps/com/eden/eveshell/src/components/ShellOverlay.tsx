@@ -400,6 +400,7 @@ export default function ShellOverlay() {
           <AppContextMenu
             menu={menu()}
             isAppPinned={isAppPinned}
+            onOpenApp={handleAppClick}
             onStopApp={handleStopApp}
             onAddToDock={handleAddToDock}
             onRemoveFromDock={handleRemoveFromDock}

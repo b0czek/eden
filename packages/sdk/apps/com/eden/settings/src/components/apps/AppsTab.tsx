@@ -16,9 +16,13 @@ import "./AppsTab.css";
 const AppsTab: Component = () => {
   const [apps, setApps] = createSignal<RuntimeAppManifest[]>([]);
   const [loading, setLoading] = createSignal(true);
+  const [devMode, setDevMode] = createSignal(false);
   const [uninstalling, setUninstalling] = createSignal<string | null>(null);
   const [appIcons, setAppIcons] = createSignal<Record<string, string>>({});
   const [autostartApps, setAutostartApps] = createSignal<
+    Record<string, boolean>
+  >({});
+  const [hotReloadApps, setHotReloadApps] = createSignal<
     Record<string, boolean>
   >({});
   const [selectedAppId, setSelectedAppId] = createSignal<string | null>(null);
@@ -39,7 +43,7 @@ const AppsTab: Component = () => {
       });
       setApps(result);
 
-      await Promise.all([loadIcons(result), loadAutostartSettings(result)]);
+      await Promise.all([loadIcons(result), loadAutostartSettings(result), loadHotReloadSettings(result)]);
 
       if (
         selectedAppId() &&
@@ -54,8 +58,18 @@ const AppsTab: Component = () => {
     }
   };
 
+  const loadDevMode = async () => {
+    try {
+      const result = await window.edenAPI!.shellCommand("system/info", {});
+      setDevMode(result.release !== true);
+    } catch (err) {
+      console.error("Failed to load system info", err);
+    }
+  };
+
   onMount(() => {
     loadApps();
+    loadDevMode();
   });
 
   const loadIcons = async (result: RuntimeAppManifest[]) => {
@@ -116,6 +130,26 @@ const AppsTab: Component = () => {
     setAutostartApps(values);
   };
 
+  const loadHotReloadSettings = async (result: RuntimeAppManifest[]) => {
+    const values: Record<string, boolean> = {};
+    
+    await Promise.all(
+      result.map(async (app) => {
+        try {
+          const hotReloadResult = await window.edenAPI!.shellCommand(
+            "package/is-hot-reload-enabled",
+            { appId: app.id }
+          );
+          values[app.id] = hotReloadResult.enabled === true;
+        } catch {
+          values[app.id] = false;
+        }
+      })
+    );
+
+    setHotReloadApps(values);
+  };
+
   const handleUninstall = async (appId: string, event: MouseEvent) => {
     event.stopPropagation();
     if (!confirm(t("settings.apps.uninstallConfirm"))) return;
@@ -143,6 +177,18 @@ const AppsTab: Component = () => {
       });
     } catch (err) {
       console.error("Failed to save autostart setting", err);
+    }
+  };
+
+  const handleHotReloadToggle = async (appId: string, enabled: boolean) => {
+    try {
+      const result = await window.edenAPI!.shellCommand(
+        "package/toggle-hot-reload",
+        { appId }
+      );
+      setHotReloadApps((current) => ({ ...current, [appId]: result.enabled }));
+    } catch (err) {
+      console.error("Failed to toggle hot reload", err);
     }
   };
 
@@ -196,7 +242,8 @@ const AppsTab: Component = () => {
         <Show
           when={selectedApp()}
           fallback={
-            <div class="eden-list">
+            <>
+              <div class="eden-list">
                 <For each={sortedApps()}>
                   {(app) => (
                     <div
@@ -244,6 +291,7 @@ const AppsTab: Component = () => {
                   )}
                 </For>
               </div>
+            </>
           }
         >
           {(app) => (
@@ -251,12 +299,17 @@ const AppsTab: Component = () => {
               app={app()}
               appIcon={appIcons()[app().id]}
               autostart={autostartApps()[app().id] === true}
+              hotReload={hotReloadApps()[app().id] === true}
+              devMode={devMode()}
               sizeLoading={sizeLoading()[app().id] ?? false}
               size={appSizes()[app().id]}
               uninstalling={uninstalling() === app().id}
               onBack={() => setSelectedAppId(null)}
               onAutostartToggle={(enabled) =>
                 handleAutostartToggle(app().id, enabled)
+              }
+              onHotReloadToggle={(enabled) =>
+                handleHotReloadToggle(app().id, enabled)
               }
               onUninstall={(e) => handleUninstall(app().id, e)}
             />

@@ -11,6 +11,7 @@ export const en = {
       systemComponent: "System Component",
       builtin: "Built-in",
       autostart: "Autostart",
+      hotReload: "Hot Reload",
       userInstalled: "User Installed",
       sizeUnavailable: "Size unavailable",
       uninstallApp: "Uninstall Application",

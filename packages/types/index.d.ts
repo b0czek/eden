@@ -96,6 +96,7 @@ export interface SystemInfo {
   nodeVersion: string;
   electronVersion: string;
   runningApps: string[];
+  release: boolean;
 }
 
 export interface WindowSize {
