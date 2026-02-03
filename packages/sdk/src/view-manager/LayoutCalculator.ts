@@ -67,7 +67,7 @@ export class LayoutCalculator {
     mode: TilingMode,
     visibleCount: number,
     configRows: number,
-    configColumns: number
+    configColumns: number,
   ): GridDimensions {
     switch (mode) {
       case "horizontal":
@@ -94,7 +94,7 @@ export class LayoutCalculator {
     available: Bounds,
     index: number,
     grid: GridDimensions,
-    gap: number
+    gap: number,
   ): Bounds {
     const col = index % grid.columns;
     const row = Math.floor(index / grid.columns);
@@ -109,23 +109,5 @@ export class LayoutCalculator {
       width: tileWidth,
       height: tileHeight,
     };
-  }
-
-  /**
-   * Calculate optimal grid dimensions for a given number of items
-   * Useful for auto-layout modes
-   */
-  static calculateOptimalGrid(itemCount: number): GridDimensions {
-    if (itemCount <= 0) return { rows: 1, columns: 1 };
-    if (itemCount === 1) return { rows: 1, columns: 1 };
-    if (itemCount === 2) return { rows: 1, columns: 2 };
-    if (itemCount === 3) return { rows: 1, columns: 3 };
-    if (itemCount === 4) return { rows: 2, columns: 2 };
-
-    // For larger counts, try to make it roughly square
-    const columns = Math.ceil(Math.sqrt(itemCount));
-    const rows = Math.ceil(itemCount / columns);
-
-    return { rows, columns };
   }
 }
