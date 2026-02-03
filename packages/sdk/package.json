@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets",
-    "build:apps": "eden-build build-sdk -i apps -o dist/apps/prebuilt",
+    "build:apps": "ts-node scripts/build-prebuilt-apps.ts",
     "build:main": "tsc",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
     "bundle:app-runtime": "node scripts/bundle-app-runtime.js",
