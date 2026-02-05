@@ -9,7 +9,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { GenesisBundler } from "@edenapp/genesis";
+import * as genesisBundler from "@edenapp/genesis";
 import { type AppSource, loadConfig, resolveSdkAppsPath } from "./config";
 
 export interface BuildAppsOptions {
@@ -246,7 +246,7 @@ async function buildApp(
   }
 
   // For local/npm apps, use Genesis bundler
-  const result = await GenesisBundler.bundle({
+  const result = await genesisBundler.bundle({
     appDirectory: appDir,
     extractToDirectory: targetDir,
     verbose: false,
@@ -465,7 +465,7 @@ export async function buildSdkApps(
 
     console.log(`\n📦 Building ${manifest.id}...`);
 
-    const result = await GenesisBundler.bundle({
+    const result = await genesisBundler.bundle({
       appDirectory: appPath,
       extractToDirectory: targetDir,
       verbose: false,

@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { GenesisBundler } from "@edenapp/genesis";
+import * as genesisBundler from "@edenapp/genesis";
 import type {
   AppManifest,
   EdenConfig,
@@ -229,7 +229,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   ): Promise<{ success: boolean; manifest?: AppManifest; error?: string }> {
     try {
       const resolvedPath = this.filesystemManager.resolvePath(virtualPath);
-      return await GenesisBundler.getInfo(resolvedPath);
+      return await genesisBundler.getInfo(resolvedPath);
     } catch (error) {
       return {
         success: false,
@@ -262,7 +262,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     }
 
     // Get info from the archive first (validates format and reads manifest)
-    const info = await GenesisBundler.getInfo(edenitePath);
+    const info = await genesisBundler.getInfo(edenitePath);
 
     if (!info.success || !info.manifest) {
       throw new Error(
@@ -294,7 +294,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Extract to apps directory using genesis
     const targetPath = path.join(this.appsDirectory, rawManifest.id);
 
-    const result = await GenesisBundler.extract({
+    const result = await genesisBundler.extract({
       edenitePath,
       outputDirectory: targetPath,
       verbose: false,

@@ -3,7 +3,7 @@
 import * as path from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { GenesisBundler } from "./bundler";
+import * as bundler from "./bundler";
 
 const program = new Command();
 
@@ -41,7 +41,7 @@ program
       process.exit(1);
     }
 
-    const result = await GenesisBundler.bundle({
+    const result = await bundler.bundle({
       appDirectory: path.resolve(appDirectory),
       outputPath: options.output ? path.resolve(options.output) : undefined,
       verbose: options.verbose,
@@ -88,7 +88,7 @@ program
     console.log(chalk.bold.blue("\n🔍 Validating manifest...\n"));
 
     const manifestPath = path.resolve(appDirectory, "manifest.json");
-    const result = await GenesisBundler.validateManifest(manifestPath);
+    const result = await bundler.validateManifest(manifestPath);
 
     if (result.valid && result.manifest) {
       console.log(chalk.green("✓ Manifest is valid\n"));
@@ -112,7 +112,7 @@ program
       );
 
       // Verify files
-      const fileCheck = await GenesisBundler.verifyFiles(
+      const fileCheck = await bundler.verifyFiles(
         path.resolve(appDirectory),
         result.manifest,
       );
@@ -145,7 +145,7 @@ program
   .action(async (edeniteFile: string) => {
     console.log(chalk.bold.blue("\n📄 Reading .edenite file...\n"));
 
-    const result = await GenesisBundler.getInfo(path.resolve(edeniteFile));
+    const result = await bundler.getInfo(path.resolve(edeniteFile));
 
     if (result.success && result.manifest) {
       console.log(chalk.bold("App Information:"));
@@ -190,7 +190,7 @@ program
     async (edeniteFile: string, outputDirectory: string, options: any) => {
       console.log(chalk.bold.blue("\n📂 Extracting .edenite file...\n"));
 
-      const result = await GenesisBundler.extract({
+      const result = await bundler.extract({
         edenitePath: path.resolve(edeniteFile),
         outputDirectory: path.resolve(outputDirectory),
         verbose: options.verbose,

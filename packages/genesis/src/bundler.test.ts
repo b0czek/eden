@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { GenesisBundler } from "./bundler";
+import * as bundler from "./bundler";
 
-describe("GenesisBundler", () => {
+describe("bundler module", () => {
   // Use absolute path from project root
   const projectRoot = path.resolve(__dirname, "..");
   const sampleAppPath = path.join(projectRoot, "examples/sample-app");
@@ -26,7 +26,7 @@ describe("GenesisBundler", () => {
   describe("validateManifest", () => {
     it("should validate a correct manifest", async () => {
       const manifestPath = path.join(sampleAppPath, "manifest.json");
-      const result = await GenesisBundler.validateManifest(manifestPath);
+      const result = await bundler.validateManifest(manifestPath);
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -43,7 +43,7 @@ describe("GenesisBundler", () => {
         JSON.stringify({ name: "Test" }), // Missing required fields
       );
 
-      const result = await GenesisBundler.validateManifest(invalidManifestPath);
+      const result = await bundler.validateManifest(invalidManifestPath);
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
@@ -53,11 +53,11 @@ describe("GenesisBundler", () => {
   describe("verifyFiles", () => {
     it("should verify files exist for sample app", async () => {
       const manifestPath = path.join(sampleAppPath, "manifest.json");
-      const validation = await GenesisBundler.validateManifest(manifestPath);
+      const validation = await bundler.validateManifest(manifestPath);
 
       expect(validation.valid).toBe(true);
 
-      const result = await GenesisBundler.verifyFiles(
+      const result = await bundler.verifyFiles(
         sampleAppPath,
         validation.manifest!,
       );
@@ -71,7 +71,7 @@ describe("GenesisBundler", () => {
     it("should bundle the sample app successfully", async () => {
       const outputPath = path.join(tempDir, "test-app.edenite");
 
-      const result = await GenesisBundler.bundle({
+      const result = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath,
         verbose: false,
@@ -91,7 +91,7 @@ describe("GenesisBundler", () => {
     it("should support dry-run mode", async () => {
       const outputPath = path.join(tempDir, "test-app-dry.edenite");
 
-      const result = await GenesisBundler.bundle({
+      const result = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath,
         verbose: false,
@@ -109,14 +109,14 @@ describe("GenesisBundler", () => {
       const outputPath1 = path.join(tempDir, "test-level-1.edenite");
       const outputPath22 = path.join(tempDir, "test-level-22.edenite");
 
-      const result1 = await GenesisBundler.bundle({
+      const result1 = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath: outputPath1,
         compressionLevel: 1,
         verbose: false,
       });
 
-      const result22 = await GenesisBundler.bundle({
+      const result22 = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath: outputPath22,
         compressionLevel: 22,
@@ -151,7 +151,7 @@ describe("GenesisBundler", () => {
 
       // 4. Bundle
       const outputPath = path.join(tempDir, "include-test.edenite");
-      const result = await GenesisBundler.bundle({
+      const result = await bundler.bundle({
         appDirectory: tempAppPath,
         outputPath,
         verbose: false,
@@ -161,7 +161,7 @@ describe("GenesisBundler", () => {
 
       // 5. Extract and verify
       const extractPath = path.join(tempDir, "extracted-include");
-      await GenesisBundler.extract({
+      await bundler.extract({
         edenitePath: outputPath,
         outputDirectory: extractPath,
         verbose: false,
@@ -184,7 +184,7 @@ describe("GenesisBundler", () => {
       const outputPath = path.join(tempDir, "test-info.edenite");
 
       // First bundle the app
-      const bundleResult = await GenesisBundler.bundle({
+      const bundleResult = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath,
         verbose: false,
@@ -193,7 +193,7 @@ describe("GenesisBundler", () => {
       expect(bundleResult.success).toBe(true);
 
       // Now read the info
-      const infoResult = await GenesisBundler.getInfo(outputPath);
+      const infoResult = await bundler.getInfo(outputPath);
 
       expect(infoResult.success).toBe(true);
       expect(infoResult.manifest?.id).toBe("com.example.hello");
@@ -208,7 +208,7 @@ describe("GenesisBundler", () => {
       const extractPath = path.join(tempDir, "extracted");
 
       // First bundle the app
-      const bundleResult = await GenesisBundler.bundle({
+      const bundleResult = await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath: bundlePath,
         verbose: false,
@@ -217,7 +217,7 @@ describe("GenesisBundler", () => {
       expect(bundleResult.success).toBe(true);
 
       // Now extract it
-      const extractResult = await GenesisBundler.extract({
+      const extractResult = await bundler.extract({
         edenitePath: bundlePath,
         outputDirectory: extractPath,
         verbose: false,
@@ -246,7 +246,7 @@ describe("GenesisBundler", () => {
       const extractPath = path.join(tempDir, "extracted-corrupt");
 
       // First bundle the app
-      await GenesisBundler.bundle({
+      await bundler.bundle({
         appDirectory: sampleAppPath,
         outputPath: bundlePath,
         verbose: false,
@@ -259,7 +259,7 @@ describe("GenesisBundler", () => {
       await fs.writeFile(bundlePath, corruptedData);
 
       // Try to extract with checksum verification
-      const extractResult = await GenesisBundler.extract({
+      const extractResult = await bundler.extract({
         edenitePath: bundlePath,
         outputDirectory: extractPath,
         verbose: false,
