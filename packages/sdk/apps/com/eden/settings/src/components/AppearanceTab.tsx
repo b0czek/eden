@@ -53,7 +53,7 @@ const AppearanceTab: Component = () => {
         "appearance/get-wallpaper",
         {},
       );
-      if (currentResult && currentResult.wallpaper) {
+      if (currentResult?.wallpaper) {
         // appearance/get-wallpaper returns a WallpaperPreset object, so we use its ID
         setActiveId(currentResult.wallpaper.id);
       }

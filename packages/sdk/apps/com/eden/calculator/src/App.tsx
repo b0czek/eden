@@ -192,20 +192,24 @@ const App: Component = () => {
 
   const calculate = () => {
     // Handle power operation
-    if (pendingScientificOp() === "pow" && previousInput() !== null) {
-      const base = parseFloat(previousInput()!);
+    if (pendingScientificOp() === "pow") {
+      const previous = previousInput();
+      if (previous === null) return;
+      const base = parseFloat(previous);
       const exp = parseFloat(display());
       setDisplay(formatResult(base ** exp));
-      setExpression(`${previousInput()}^${exp} =`);
+      setExpression(`${previous}^${exp} =`);
       setPendingScientificOp(null);
       setPreviousInput(null);
       setShouldReset(true);
       return;
     }
 
-    if (operator() === null || previousInput() === null) return;
+    const currentOperator = operator();
+    const previous = previousInput();
+    if (currentOperator === null || previous === null) return;
 
-    const prev = parseFloat(previousInput()!);
+    const prev = parseFloat(previous);
     const current = parseFloat(display());
     let result: number;
 
@@ -217,11 +221,9 @@ const App: Component = () => {
       "%": "mod",
     };
 
-    setExpression(
-      `${previousInput()} ${opSymbols[operator()!]} ${display()} =`,
-    );
+    setExpression(`${previous} ${opSymbols[currentOperator]} ${display()} =`);
 
-    switch (operator()) {
+    switch (currentOperator) {
       case "+":
         result = prev + current;
         break;
@@ -256,7 +258,7 @@ const App: Component = () => {
   };
 
   const formatResult = (result: number): string => {
-    if (!isFinite(result)) return t("common.error");
+    if (!Number.isFinite(result)) return t("common.error");
     if (Number.isInteger(result) && Math.abs(result) < 1e15) {
       return result.toString();
     }
@@ -441,6 +443,7 @@ const App: Component = () => {
               <For each={row}>
                 {(btn) => (
                   <button
+                    type="button"
                     class="eden-btn eden-btn-secondary eden-btn-sm sci-btn"
                     onClick={btn.action}
                   >
@@ -455,19 +458,29 @@ const App: Component = () => {
 
       {/* Main buttons */}
       <div class="buttons-grid">
-        <button class="eden-btn eden-btn-danger" onClick={clearAll}>
+        <button
+          type="button"
+          class="eden-btn eden-btn-danger"
+          onClick={clearAll}
+        >
           C
         </button>
-        <button class="eden-btn eden-btn-secondary" onClick={deleteLast}>
+        <button
+          type="button"
+          class="eden-btn eden-btn-secondary"
+          onClick={deleteLast}
+        >
           ⌫
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-secondary"
           onClick={() => appendOperator("%")}
         >
           %
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-primary"
           onClick={() => appendOperator("/")}
         >
@@ -475,24 +488,28 @@ const App: Component = () => {
         </button>
 
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("7")}
         >
           7
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("8")}
         >
           8
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("9")}
         >
           9
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-primary"
           onClick={() => appendOperator("*")}
         >
@@ -500,24 +517,28 @@ const App: Component = () => {
         </button>
 
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("4")}
         >
           4
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("5")}
         >
           5
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("6")}
         >
           6
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-primary"
           onClick={() => appendOperator("-")}
         >
@@ -525,24 +546,28 @@ const App: Component = () => {
         </button>
 
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("1")}
         >
           1
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("2")}
         >
           2
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber("3")}
         >
           3
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-primary"
           onClick={() => appendOperator("+")}
         >
@@ -550,18 +575,21 @@ const App: Component = () => {
         </button>
 
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn zero-btn"
           onClick={() => appendNumber("0")}
         >
           0
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-ghost num-btn"
           onClick={() => appendNumber(".")}
         >
           .
         </button>
         <button
+          type="button"
           class="eden-btn eden-btn-success equals-btn"
           onClick={calculate}
         >

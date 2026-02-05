@@ -90,7 +90,7 @@
 
     function loadUrl(url, addToHistory = true) {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
+        url = `https://${url}`;
       }
 
       if (addToHistory) {

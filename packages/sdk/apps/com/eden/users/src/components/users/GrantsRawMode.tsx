@@ -19,6 +19,7 @@ const GrantsRawMode = (props: GrantsRawModeProps) => (
       onInput={(e) => props.onTextChange(e.currentTarget.value)}
     />
     <button
+      type="button"
       class="eden-btn eden-btn-primary eden-self-start eden-flex eden-items-center eden-gap-xs"
       onClick={props.onSave}
     >

@@ -61,10 +61,11 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
       size="sm"
       footer={
         <>
-          <button class="eden-btn" onClick={handleClose}>
+          <button type="button" class="eden-btn" onClick={handleClose}>
             {t("common.cancel")}
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-primary"
             onClick={handleSave}
             disabled={!canSave()}
@@ -75,8 +76,11 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">{t("settings.users.newPassword")}</label>
+        <label class="eden-form-label" for="set-password-new">
+          {t("settings.users.newPassword")}
+        </label>
         <input
+          id="set-password-new"
           type="password"
           class="eden-input"
           placeholder={t("settings.users.newPassword")}
@@ -89,10 +93,11 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
         />
       </div>
       <div class="eden-form-group">
-        <label class="eden-form-label">
+        <label class="eden-form-label" for="set-password-confirm">
           {t("settings.users.confirmPassword")}
         </label>
         <input
+          id="set-password-confirm"
           type="password"
           class="eden-input"
           placeholder={t("settings.users.confirmPassword")}

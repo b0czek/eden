@@ -32,7 +32,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
   const getSelectedCategory = () =>
     props.selectedItem()?.type === "eden"
-      ? props.edenSchema().find((cat) => cat.id === props.selectedItem()!.id)
+      ? props.edenSchema().find((cat) => cat.id === props.selectedItem()?.id)
       : null;
 
   const getSelectedViewId = () => {

@@ -49,7 +49,9 @@ const UserDetail = (props: UserDetailProps) => {
         .split("\n")
         .map((s) => s.trim())
         .filter(Boolean)
-        .forEach((s) => set.add(s));
+        .forEach((s) => {
+          set.add(s);
+        });
       return set;
     });
   };
@@ -157,6 +159,7 @@ const UserDetail = (props: UserDetailProps) => {
         <div class="eden-tabs">
           <div class="eden-tab-list">
             <button
+              type="button"
               class={`eden-tab eden-flex-center eden-gap-md ${
                 mode() === "easy" ? "eden-tab-active" : ""
               }`}
@@ -167,6 +170,7 @@ const UserDetail = (props: UserDetailProps) => {
               <span>{t("settings.users.modeEasy")}</span>
             </button>
             <button
+              type="button"
               class={`eden-tab eden-flex-center eden-gap-md ${
                 mode() === "raw" ? "eden-tab-active" : ""
               }`}

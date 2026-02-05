@@ -20,6 +20,7 @@ export function TabBar(props: TabBarProps) {
           >
             <span class="tab-name">{tab.name}</span>
             <button
+              type="button"
               class="tab-close"
               onClick={(e: MouseEvent) => {
                 e.stopPropagation();

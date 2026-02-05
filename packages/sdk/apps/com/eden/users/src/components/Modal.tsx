@@ -24,14 +24,15 @@ const Modal: Component<ModalProps> = (props) => {
 
   return (
     <Show when={props.show}>
-      <div class="eden-modal-overlay" onClick={props.onClose}>
-        <div
-          class={`eden-modal ${sizeClass()}`}
-          onClick={(e) => e.stopPropagation()}
-        >
+      <div class="eden-modal-overlay">
+        <div class={`eden-modal ${sizeClass()}`}>
           <div class="eden-modal-header">
             <h3 class="eden-modal-title">{props.title}</h3>
-            <button class="eden-modal-close" onClick={props.onClose}>
+            <button
+              type="button"
+              class="eden-modal-close"
+              onClick={props.onClose}
+            >
               ×
             </button>
           </div>

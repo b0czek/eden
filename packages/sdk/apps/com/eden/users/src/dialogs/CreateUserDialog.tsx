@@ -51,10 +51,11 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
       size="sm"
       footer={
         <>
-          <button class="eden-btn" onClick={handleClose}>
+          <button type="button" class="eden-btn" onClick={handleClose}>
             {t("common.cancel")}
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-primary"
             onClick={handleCreate}
             disabled={!name().trim() || !password()}
@@ -65,8 +66,11 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">{t("settings.users.userName")}</label>
+        <label class="eden-form-label" for="create-user-name">
+          {t("settings.users.userName")}
+        </label>
         <input
+          id="create-user-name"
           type="text"
           class="eden-input"
           placeholder={t("settings.users.userName")}
@@ -76,8 +80,11 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
         />
       </div>
       <div class="eden-form-group">
-        <label class="eden-form-label">{t("common.password")}</label>
+        <label class="eden-form-label" for="create-user-password">
+          {t("common.password")}
+        </label>
         <input
+          id="create-user-password"
           type="password"
           class="eden-input"
           placeholder={t("common.password")}

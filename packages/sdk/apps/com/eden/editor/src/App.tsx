@@ -147,7 +147,7 @@ const App: Component = () => {
       } else {
         setActiveTabId(null);
         if (editor) editor.setValue("");
-        window.edenFrame!.resetTitle();
+        window.edenFrame?.resetTitle();
       }
     }
   };
@@ -212,7 +212,9 @@ const App: Component = () => {
       </Show>
 
       <Show when={error()}>
-        <ErrorBanner message={error()!} onDismiss={() => setError(null)} />
+        {(message) => (
+          <ErrorBanner message={message()} onDismiss={() => setError(null)} />
+        )}
       </Show>
 
       <Show when={tabs().length === 0}>

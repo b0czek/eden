@@ -31,7 +31,7 @@ const App: Component = () => {
 
   const loadEdenSchema = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("settings/schema", {});
+      const result = await window.edenAPI.shellCommand("settings/schema", {});
       const schema = Array.isArray(result.schema) ? result.schema : [];
       setEdenSchema(schema);
     } catch (error) {
@@ -42,7 +42,7 @@ const App: Component = () => {
   const loadApps = async () => {
     let appsWithSettings: AppManifest[] = [];
     try {
-      const result = await window.edenAPI!.shellCommand("package/list", {
+      const result = await window.edenAPI.shellCommand("package/list", {
         showHidden: true,
       });
       appsWithSettings = result.filter(
@@ -53,7 +53,7 @@ const App: Component = () => {
       const icons: Record<string, string> = {};
       for (const app of appsWithSettings) {
         try {
-          const iconResult = await window.edenAPI!.shellCommand(
+          const iconResult = await window.edenAPI.shellCommand(
             "package/get-icon",
             { appId: app.id },
           );
@@ -107,7 +107,7 @@ const App: Component = () => {
     const values: Record<string, string> = {};
     try {
       // Eden settings use appId "com.eden"
-      const result = await window.edenAPI!.shellCommand("settings/get-all/su", {
+      const result = await window.edenAPI.shellCommand("settings/get-all/su", {
         appId: "com.eden",
       });
       for (const setting of category.settings) {
@@ -132,7 +132,7 @@ const App: Component = () => {
 
     const values: Record<string, string> = {};
     try {
-      const result = await window.edenAPI!.shellCommand("settings/get-all/su", {
+      const result = await window.edenAPI.shellCommand("settings/get-all/su", {
         appId,
       });
       for (const category of app.settings) {
@@ -162,13 +162,13 @@ const App: Component = () => {
     try {
       if (item.type === "eden") {
         // Eden settings use appId "com.eden"
-        await window.edenAPI!.shellCommand("settings/set/su", {
+        await window.edenAPI.shellCommand("settings/set/su", {
           appId: "com.eden",
           key,
           value,
         });
       } else if (item.type === "app") {
-        await window.edenAPI!.shellCommand("settings/set/su", {
+        await window.edenAPI.shellCommand("settings/set/su", {
           appId: item.id,
           key,
           value,

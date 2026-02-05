@@ -39,6 +39,7 @@ const UserDetailHeader = (props: UserDetailHeaderProps) => (
 
     <div class="eden-flex eden-gap-sm">
       <button
+        type="button"
         class="eden-btn eden-btn-secondary eden-btn-sm"
         onClick={props.onSetPassword}
       >
@@ -46,6 +47,7 @@ const UserDetailHeader = (props: UserDetailHeaderProps) => (
       </button>
       <Show when={!props.isVendor}>
         <button
+          type="button"
           class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"
           onClick={props.onDelete}
           title={t("settings.users.delete")}

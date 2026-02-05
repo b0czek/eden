@@ -131,6 +131,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           </Show>
           <Show when={!props.app.isPrebuilt}>
             <button
+              type="button"
               class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"
               disabled={props.uninstalling}
               onClick={(e) => props.onUninstall(e)}
