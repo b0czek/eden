@@ -1,16 +1,24 @@
-import { BrowserWindow, Rectangle as Bounds, WebContentsView } from "electron";
-import {
+import type {
   AppManifest,
   EdenConfig,
-  WindowSize,
   ViewBounds,
+  WindowSize,
 } from "@edenapp/types";
+import type {
+  Rectangle as Bounds,
+  BrowserWindow,
+  WebContentsView,
+} from "electron";
+import { delay, inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { attachWebContentsLogger } from "../logging/electron";
-import { FloatingWindowController } from "./FloatingWindowController";
 import { DevToolsManager } from "./DevToolsManager";
+import { FloatingWindowController } from "./FloatingWindowController";
 import { TilingManager } from "./TilingManager";
+import type { ViewInfo, ViewMode } from "./types";
 import { ViewCreator } from "./ViewCreator";
+import { ViewHandler } from "./ViewHandler";
 import {
   cleanupDestroyedViews,
   destroyView,
@@ -18,11 +26,6 @@ import {
   isWindowAlive,
   requireView,
 } from "./viewLifecycle";
-import { ViewInfo, ViewMode } from "./types";
-
-import { injectable, inject, singleton, delay } from "tsyringe";
-import { CommandRegistry, IPCBridge, EdenEmitter, EdenNamespace } from "../ipc";
-import { ViewHandler } from "./ViewHandler";
 
 /**
  * Events emitted by the ViewManager

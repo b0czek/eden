@@ -1,9 +1,7 @@
 // Foundation Layer
 // Handles workspace area reporting and global event handling
 
-(function () {
-  "use strict";
-
+(() => {
   console.log("Foundation layer initializing...");
 
   const workspace = document.getElementById("workspace");
@@ -91,7 +89,7 @@
     window.edenAPI
       .shellCommand("appearance/get-wallpaper", {})
       .then((response) => {
-        if (response && response.wallpaper) {
+        if (response?.wallpaper) {
           // Update base layer immediately
           const baseLayer = container.querySelector(".wallpaper-layer");
           if (baseLayer) {

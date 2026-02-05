@@ -1,6 +1,6 @@
-import { Show, createResource } from "solid-js";
-import { fetchAppIcon } from "../icon-cache";
+import { createResource, Show } from "solid-js";
 import defaultIcon from "../../assets/default-icon.svg";
+import { fetchAppIcon } from "../icon-cache";
 
 interface AppIconProps {
   appId: string;

@@ -6,7 +6,7 @@
  * Handles timeout/pause logic locally.
  */
 
-import type { WindowSize, ViewBounds, Notification } from "@edenapp/types";
+import type { Notification, ViewBounds, WindowSize } from "@edenapp/types";
 
 // Configuration
 interface ToasterConfig {

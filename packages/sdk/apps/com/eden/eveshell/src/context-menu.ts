@@ -1,4 +1,4 @@
-import { button, menu, title, when, type Menu } from "@edenapp/tablets";
+import { button, type Menu, menu, title, when } from "@edenapp/tablets";
 import { t } from "./i18n";
 import type { AppInfo } from "./types";
 

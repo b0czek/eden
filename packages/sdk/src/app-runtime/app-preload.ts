@@ -1,24 +1,20 @@
+import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
-import type {
-  AppBusConnection,
-  ServiceConnectCallback,
-} from "@edenapp/types/ipc/appbus";
 import { log, setLogContext } from "../logging";
 import {
-  type PendingRequest,
-  type IPCPort,
-  createMessageIdGenerator,
-  handleAppBusPort,
-  createPortConnection,
-  createAppBusState,
-  wrapDOMPort,
-  handlePortClosed,
-} from "./common/port-channel";
-import {
-  createEdenAPI,
   createAppBusAPI,
+  createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import {
+  createAppBusState,
+  createMessageIdGenerator,
+  createPortConnection,
+  handleAppBusPort,
+  handlePortClosed,
+  type PendingRequest,
+  wrapDOMPort,
+} from "./common/port-channel";
 
 // Per-app state
 let appId: string | null = null;

@@ -1,11 +1,10 @@
 import "reflect-metadata";
 
-import { EventSubscriberManager } from "./EventSubscriberManager";
-import { registerEventPermission } from "./PermissionRegistry";
-
-import type { PermissionRegistry } from "./PermissionRegistry";
 import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
+import { EventSubscriberManager } from "./EventSubscriberManager";
+import type { PermissionRegistry } from "./PermissionRegistry";
+import { registerEventPermission } from "./PermissionRegistry";
 
 describe("EventSubscriberManager", () => {
   let viewManager: jest.Mocked<

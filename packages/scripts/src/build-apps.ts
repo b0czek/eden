@@ -7,10 +7,10 @@
  * - npm: Apps from npm packages
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { GenesisBundler } from "@edenapp/genesis";
-import { loadConfig, resolveSdkAppsPath, AppSource } from "./config";
+import { type AppSource, loadConfig, resolveSdkAppsPath } from "./config";
 
 export interface BuildAppsOptions {
   force?: boolean;
@@ -356,7 +356,7 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
   await saveBuildCache(cwd, cache);
 
   // Summary
-  console.log("\n" + "=".repeat(50));
+  console.log(`\n${"=".repeat(50)}`);
   console.log(`✅ Successfully built: ${successCount}`);
   if (skippedCount > 0) {
     console.log(`⏭️  Skipped (unchanged): ${skippedCount}`);
@@ -481,7 +481,7 @@ export async function buildSdkApps(
   }
 
   // Summary
-  console.log("\n" + "=".repeat(50));
+  console.log(`\n${"=".repeat(50)}`);
   console.log(
     `📊 Build complete: ${successCount} succeeded, ${failCount} failed`,
   );

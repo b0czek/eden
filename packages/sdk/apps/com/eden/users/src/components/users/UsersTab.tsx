@@ -1,19 +1,17 @@
-import {
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
-  onMount,
-} from "solid-js";
-
 import type {
   AppManifest,
   RuntimeAppManifest,
   SettingsCategory,
   UserProfile,
 } from "@edenapp/types";
-import { getLocalizedValue, locale, t } from "../../i18n";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import CreateUserDialog from "../../dialogs/CreateUserDialog";
 import SetPasswordDialog from "../../dialogs/SetPasswordDialog";
 import {
@@ -21,9 +19,10 @@ import {
   resolveCategoryGrantTarget,
   resolveSettingGrantTarget,
 } from "../../grants";
-import UsersList from "./UsersList";
-import UserDetail from "./UserDetail";
+import { getLocalizedValue, locale, t } from "../../i18n";
 import type { SettingsOption } from "./types";
+import UserDetail from "./UserDetail";
+import UsersList from "./UsersList";
 import "./UsersTab.css";
 
 interface UsersTabProps {

@@ -1,5 +1,5 @@
-import { contextMenu, type ContextMenuAction } from "./context-menu";
 import type { ContextMenuIconName } from "@edenapp/types";
+import { type ContextMenuAction, contextMenu } from "./context-menu";
 
 type MenuTitle = { __brand: "title"; text: string };
 export type MenuElement =

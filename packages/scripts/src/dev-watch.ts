@@ -4,10 +4,10 @@
  * Starts Vite dev servers for Eden apps with instant HMR
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
-import { spawn, ChildProcess } from "child_process";
-import { loadConfig, resolveSdkAppsPath, AppSource } from "./config";
+import { type ChildProcess, spawn } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { loadConfig, resolveSdkAppsPath } from "./config";
 
 interface HotReloadConfig {
   apps: string[];

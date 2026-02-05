@@ -1,10 +1,10 @@
-import { EdenNamespace, EdenEmitter, IPCBridge, CommandRegistry } from "../ipc";
-import { injectable, inject, singleton } from "tsyringe";
-import { AppearanceHandler } from "./AppearanceHandler";
-import { SettingsManager } from "../settings";
-import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
-
+import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
+import { inject, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { SettingsManager } from "../settings";
+import { AppearanceHandler } from "./AppearanceHandler";
+
 interface AppearanceEvents {
   "wallpaper-changed": WallpaperPreset;
 }

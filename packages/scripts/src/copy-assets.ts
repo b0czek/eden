@@ -9,8 +9,8 @@
  * - foundation (foundation layer HTML/JS)
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { buildSeedConfig } from "./config";
 
 export interface CopyAssetsOptions {
@@ -105,7 +105,7 @@ export async function copyAssets(
       await fs.access(srcPath);
       await copyDir(srcPath, destPath);
       console.log(`✅ Copied ${asset}/`);
-    } catch (error) {
+    } catch (_error) {
       console.warn(`⚠️  ${asset}/ not found in SDK, skipping`);
     }
   }

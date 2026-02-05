@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
-import { EdenEmitter } from "./EdenEmitter";
 import { EdenNamespace } from "./CommandDecorators";
+import { EdenEmitter } from "./EdenEmitter";
 
 interface TestEvents {
   ping: { value: number };

@@ -1,24 +1,24 @@
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import type { Component } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
 // Use lazy-loading components - Monaco is loaded on-demand, not at startup
 import {
+  ErrorBanner,
+  getEditorContentLazy,
+  LazyMonacoEditor,
+  preloadMonaco,
+  setEditorContentLazy,
   TabBar,
   Toolbar,
-  ErrorBanner,
   WelcomeScreen,
-  LazyMonacoEditor,
-  setEditorContentLazy,
-  getEditorContentLazy,
-  preloadMonaco,
 } from "./components";
+import { initLocale, t } from "./i18n";
 import {
-  EditorTab,
-  FileOpenedEvent,
-  getLanguageFromPath,
+  type EditorTab,
+  type FileOpenedEvent,
   getFileName,
+  getLanguageFromPath,
 } from "./types";
-import { t, initLocale } from "./i18n";
 
 // Type for the editor instance (just the interface, not the actual module)
 type IStandaloneCodeEditor =

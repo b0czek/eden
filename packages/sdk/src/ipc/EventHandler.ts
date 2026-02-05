@@ -1,7 +1,7 @@
-import { EdenNamespace, EdenHandler } from "./CommandDecorators";
-import { EventSubscriberManager } from "./EventSubscriberManager";
 import { APP_EVENT_NAMES } from "../generated/runtime";
-import { ViewManager } from "../view-manager/ViewManager";
+import type { ViewManager } from "../view-manager/ViewManager";
+import { EdenHandler, EdenNamespace } from "./CommandDecorators";
+import type { EventSubscriberManager } from "./EventSubscriberManager";
 
 @EdenNamespace("event")
 export class EventHandler {

@@ -1,16 +1,15 @@
-import { randomUUID } from "crypto";
-import { BackendManager } from "./BackendManager";
-import { ViewManager } from "../view-manager/ViewManager";
-import { IPCBridge } from "../ipc";
-import { PackageManager } from "../package-manager/PackageManager";
-import { AppChannelManager } from "../appbus/AppChannelManager";
 import type { AppInstance, EdenConfig } from "@edenapp/types";
-import { injectable, inject, singleton } from "tsyringe";
-import { CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
-import { ProcessHandler } from "./ProcessHandler";
-import { UserManager } from "../user/UserManager";
-
+import { randomUUID } from "crypto";
+import { inject, injectable, singleton } from "tsyringe";
+import { AppChannelManager } from "../appbus/AppChannelManager";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { PackageManager } from "../package-manager/PackageManager";
+import { UserManager } from "../user/UserManager";
+import { ViewManager } from "../view-manager/ViewManager";
+import { BackendManager } from "./BackendManager";
+import { ProcessHandler } from "./ProcessHandler";
+
 /**
  * Events emitted by the ProcessManager
  */

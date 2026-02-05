@@ -1,5 +1,5 @@
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { I18nManager } from "./I18nManager";
+import type { I18nManager } from "./I18nManager";
 
 @EdenNamespace("i18n")
 export class I18nHandler {

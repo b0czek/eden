@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show, onMount } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
 // Types we need from monaco (just the interface, not the actual module)
 type IStandaloneCodeEditor =

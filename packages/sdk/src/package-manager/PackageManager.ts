@@ -1,26 +1,26 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import fg from "fast-glob";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { GenesisBundler } from "@edenapp/genesis";
 import type {
   AppManifest,
-  RuntimeAppManifest,
   EdenConfig,
+  RuntimeAppManifest,
 } from "@edenapp/types";
-import { log } from "../logging";
+import fg from "fast-glob";
+import { inject, injectable, singleton } from "tsyringe";
+import { FilesystemManager } from "../filesystem";
+import { normalizeGrantPresets } from "../grants/GrantPresets";
 import {
-  IPCBridge,
   CommandRegistry,
-  EdenNamespace,
   EdenEmitter,
+  EdenNamespace,
+  IPCBridge,
   PermissionRegistry,
 } from "../ipc";
-import { PackageHandler } from "./PackageHandler";
-import { injectable, inject, singleton } from "tsyringe";
-import { FilesystemManager } from "../filesystem";
-import { normalizeAppIds } from "../utils/normalize";
+import { log } from "../logging";
 import { UserManager } from "../user/UserManager";
-import { normalizeGrantPresets } from "../grants/GrantPresets";
+import { normalizeAppIds } from "../utils/normalize";
+import { PackageHandler } from "./PackageHandler";
 
 /**
  * Events emitted by the PackageManager

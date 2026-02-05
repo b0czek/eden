@@ -1,9 +1,8 @@
 import type { AppManifest, RuntimeAppManifest } from "@edenapp/types";
+import { isHotReloadEnabled, toggleHotReload } from "../hotreload-config";
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { PackageManager } from "./PackageManager";
-import { toggleHotReload, isHotReloadEnabled } from "../hotreload-config";
-
 import { log } from "../logging";
+import type { PackageManager } from "./PackageManager";
 @EdenNamespace("package")
 export class PackageHandler {
   private packageManager: PackageManager;

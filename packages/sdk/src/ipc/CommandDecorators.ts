@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { setManagerNamespace, addCommandHandler } from "./CommandMetadata";
+import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
 
 /**
  * Options for the EdenNamespace decorator
@@ -49,16 +49,16 @@ export function EdenNamespace(
   namespace: string,
   options?: EdenNamespaceOptions,
 ) {
-  return function <T extends { new (...args: any[]): {} }>(constructor: T) {
-    setManagerNamespace(constructor, namespace);
-    Reflect.defineMetadata("eden:namespace", namespace, constructor);
+  return <T extends { new (...args: any[]): {} }>(target: T) => {
+    setManagerNamespace(target, namespace);
+    Reflect.defineMetadata("eden:namespace", namespace, target);
 
     // Store events interface name if provided for codegen
     if (options?.events) {
-      Reflect.defineMetadata("eden:events", options.events, constructor);
+      Reflect.defineMetadata("eden:events", options.events, target);
     }
 
-    return constructor;
+    return target;
   };
 }
 
@@ -94,11 +94,7 @@ export interface EdenHandlerOptions {
 }
 
 export function EdenHandler(command: string, options?: EdenHandlerOptions) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
+  return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
     // Register this handler in metadata
     addCommandHandler(target.constructor, command, propertyKey);
 

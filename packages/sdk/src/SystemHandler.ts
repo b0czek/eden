@@ -1,6 +1,6 @@
-import { EdenHandler, EdenNamespace, IPCBridge, CommandRegistry } from "./ipc";
-import { injectable, inject, singleton } from "tsyringe";
-import { SystemInfo, EdenConfig } from "@edenapp/types";
+import type { EdenConfig, SystemInfo } from "@edenapp/types";
+import { inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry, EdenHandler, EdenNamespace, IPCBridge } from "./ipc";
 
 @singleton()
 @injectable()

@@ -1,13 +1,13 @@
+import type { UserProfile, ViewBounds, WindowSize } from "@edenapp/types";
 import {
-  For,
-  Show,
   createEffect,
   createSignal,
-  onMount,
+  For,
   onCleanup,
+  onMount,
+  Show,
 } from "solid-js";
-import type { UserProfile, ViewBounds, WindowSize } from "@edenapp/types";
-import { t, initLocale } from "./i18n";
+import { initLocale, t } from "./i18n";
 
 const APP_ID = "com.eden.login";
 

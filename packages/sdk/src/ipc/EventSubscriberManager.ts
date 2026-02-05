@@ -1,9 +1,11 @@
-import { ViewManager } from "../view-manager/ViewManager";
-import { BackendManager } from "../process-manager/BackendManager";
-import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
-import { EventName, EventData } from "@edenapp/types";
-
+import type { EventData, EventName } from "@edenapp/types";
 import { log } from "../logging";
+import type { BackendManager } from "../process-manager/BackendManager";
+import type { ViewManager } from "../view-manager/ViewManager";
+import {
+  getEventPermission,
+  type PermissionRegistry,
+} from "./PermissionRegistry";
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private backendManager?: BackendManager;

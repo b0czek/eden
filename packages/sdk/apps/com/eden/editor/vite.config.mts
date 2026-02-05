@@ -1,8 +1,8 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { monaco } from "@bithero/monaco-editor-vite-plugin";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import { monaco } from "@bithero/monaco-editor-vite-plugin";
-import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

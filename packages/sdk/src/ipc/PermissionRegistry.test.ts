@@ -1,13 +1,12 @@
 import "reflect-metadata";
 
+import type { ResolvedGrant } from "@edenapp/types";
 import {
-  PermissionRegistry,
   getAllEventPermissions,
   getEventPermission,
+  PermissionRegistry,
   registerEventPermission,
 } from "./PermissionRegistry";
-
-import type { ResolvedGrant } from "@edenapp/types";
 
 describe("PermissionRegistry", () => {
   let logSpy: jest.SpyInstance;

@@ -1,15 +1,15 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import { injectable, inject, singleton } from "tsyringe";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import type { FileHandlerInfo, FileOpenResult } from "@edenapp/types";
+import { inject, injectable, singleton } from "tsyringe";
+import { FilesystemManager } from "../filesystem";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { log } from "../logging";
 import { PackageManager } from "../package-manager";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
-import { FilesystemManager } from "../filesystem";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { FileOpenHandler } from "./FileOpenHandler";
-import type { FileOpenResult, FileHandlerInfo } from "@edenapp/types";
 
-import { log } from "../logging";
 /**
  * Events emitted by the FileOpenManager
  */
@@ -232,7 +232,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     if (typeof name === "string") {
       return name;
     }
-    return name["en"] || Object.values(name)[0] || "Unknown App";
+    return name.en || Object.values(name)[0] || "Unknown App";
   }
 
   /**

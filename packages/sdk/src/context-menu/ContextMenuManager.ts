@@ -4,11 +4,11 @@ import type {
   ContextMenuPosition,
   ContextMenuResult,
 } from "@edenapp/types";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
-import { ContextMenuHandler } from "./ContextMenuHandler";
-import { injectable, inject, singleton } from "tsyringe";
+import { inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { ViewManager } from "../view-manager";
+import { ContextMenuHandler } from "./ContextMenuHandler";
 
 interface ContextMenuNamespaceEvents {
   opened: { menu: ContextMenuOpenEvent };

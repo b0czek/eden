@@ -1,14 +1,17 @@
-import { WebContentsView, BrowserWindow, Rectangle as Bounds } from "electron";
+import type { AppManifest, WindowConfig } from "@edenapp/types";
+import {
+  type Rectangle as Bounds,
+  BrowserWindow,
+  type WebContentsView,
+} from "electron";
 import * as path from "path";
-import { AppManifest, WindowConfig } from "@edenapp/types";
-import { ViewMode, ViewType, ViewInfo, Z_LAYERS } from "./types";
-import { cachedFileReader } from "../utils/cachedFileReader";
-import { createView } from "./viewLifecycle";
-import { TilingManager } from "./TilingManager";
-import { FloatingWindowController } from "./FloatingWindowController";
-import { DevToolsManager } from "./DevToolsManager";
-
 import { log } from "../logging";
+import { cachedFileReader } from "../utils/cachedFileReader";
+import type { DevToolsManager } from "./DevToolsManager";
+import type { FloatingWindowController } from "./FloatingWindowController";
+import type { TilingManager } from "./TilingManager";
+import { type ViewInfo, type ViewMode, type ViewType, Z_LAYERS } from "./types";
+import { createView } from "./viewLifecycle";
 /**
  * ViewCreator
  *

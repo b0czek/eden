@@ -1,4 +1,4 @@
-import { WebContentsView } from "electron";
+import type { WebContentsView } from "electron";
 import { injectable, singleton } from "tsyringe";
 
 import { log } from "../logging";

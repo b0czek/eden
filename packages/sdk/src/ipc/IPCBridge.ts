@@ -1,16 +1,14 @@
-import { ipcMain, BrowserWindow } from "electron";
+import { randomUUID } from "crypto";
+import { type BrowserWindow, ipcMain } from "electron";
 import { EventEmitter } from "events";
+import { delay, inject, injectable, singleton } from "tsyringe";
+import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
-import { randomUUID } from "crypto";
 import { CommandRegistry } from "./CommandRegistry";
+import { EventHandler } from "./EventHandler";
 import { EventSubscriberManager } from "./EventSubscriberManager";
 import { PermissionRegistry } from "./PermissionRegistry";
-import { injectable, inject, singleton, delay } from "tsyringe";
-
-import { EventHandler } from "./EventHandler";
-
-import { log } from "../logging";
 /**
  * IPCBridge
  *

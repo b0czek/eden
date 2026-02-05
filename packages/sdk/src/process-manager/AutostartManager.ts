@@ -1,12 +1,11 @@
-import { injectable, inject, singleton } from "tsyringe";
 import type { EdenConfig } from "@edenapp/types";
-import { ProcessManager } from "./ProcessManager";
+import { inject, injectable, singleton } from "tsyringe";
+import { IPCBridge } from "../ipc";
+import { log } from "../logging";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
 import { UserManager } from "../user/UserManager";
-import { IPCBridge } from "../ipc";
-
-import { log } from "../logging";
+import { ProcessManager } from "./ProcessManager";
 /**
  * AutostartManager handles launching applications when Eden starts
  */

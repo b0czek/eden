@@ -1,7 +1,7 @@
-import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
-import { t } from "../i18n";
+import { createSignal } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 
 interface CreateUserDialogProps {
   show: boolean;

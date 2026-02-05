@@ -1,6 +1,6 @@
-import { EdenHandler, EdenNamespace } from "../ipc";
-import { NotificationManager } from "./NotificationManager";
 import type { Notification, NotificationType } from "@edenapp/types";
+import { EdenHandler, EdenNamespace } from "../ipc";
+import type { NotificationManager } from "./NotificationManager";
 
 @EdenNamespace("notification")
 export class NotificationHandler {

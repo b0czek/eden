@@ -1,6 +1,6 @@
-import { t } from "../i18n";
 import type { Component } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 import type { FileItem } from "../types";
 
 interface DeleteConfirmDialogProps {

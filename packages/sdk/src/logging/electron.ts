@@ -1,6 +1,6 @@
 import type { WebContents } from "electron";
 import type { LogLevel } from "./levels";
-import type { LogContext, CallsiteInfo } from "./logger";
+import type { CallsiteInfo, LogContext } from "./logger";
 import { logExternal } from "./logger";
 
 function mapConsoleLevel(level: number | string): LogLevel {

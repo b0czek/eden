@@ -1,21 +1,17 @@
 import {
-  createSignal,
+  type Accessor,
   createResource,
-  Accessor,
-  Setter,
-  onCleanup,
   createRoot,
+  createSignal,
+  onCleanup,
+  type Setter,
 } from "solid-js";
 import {
   createEdenI18n,
-  EdenI18nConfig,
+  type EdenI18nConfig,
   loadCommonTranslations,
 } from "./index.js";
-import type {
-  InferTranslations,
-  TranslateFn,
-  EdenI18nHandle as BaseI18nHandle,
-} from "./types.js";
+import type { TranslateFn } from "./types.js";
 
 /**
  * SolidJS-specific i18n handle with reactive locale.
@@ -70,7 +66,7 @@ export function setupI18n<T extends Record<string, any> = Record<string, void>>(
 
     const initLocale = async () => {
       try {
-        // @ts-ignore - access global window
+        // @ts-expect-error - access global window
         const edenAPI = window.edenAPI;
         if (!edenAPI) {
           console.warn("Eden API not found, using default locale");
@@ -104,6 +100,6 @@ export function setupI18n<T extends Record<string, any> = Record<string, void>>(
   });
 }
 
+export { getLocalizedValue } from "./index.js";
 // Re-export types and common utilities
 export type { InferTranslations } from "./types.js";
-export { getLocalizedValue } from "./index.js";

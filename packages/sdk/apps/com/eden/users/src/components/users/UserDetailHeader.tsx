@@ -1,7 +1,7 @@
-import { Show } from "solid-js";
 import type { UserProfile } from "@edenapp/types";
-import { FiArrowLeft } from "solid-icons/fi";
 import { FaSolidTrash } from "solid-icons/fa";
+import { FiArrowLeft } from "solid-icons/fi";
+import { Show } from "solid-js";
 import { t } from "../../i18n";
 
 interface UserDetailHeaderProps {

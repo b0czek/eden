@@ -1,17 +1,17 @@
-import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
-import Dock from "./Dock";
-import AllApps from "./AllApps";
-import ChangePasswordModal from "./ChangePasswordModal";
-import {
+import type {
+  AppInstance,
+  AppManifest,
+  UserProfile,
   ViewBounds,
   WindowSize,
-  AppManifest,
-  AppInstance,
-  UserProfile,
 } from "@edenapp/types";
-import { AppInfo } from "../types";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
-import { t, initLocale, locale, getLocalizedValue } from "../i18n";
+import { getLocalizedValue, initLocale, locale, t } from "../i18n";
+import type { AppInfo } from "../types";
+import AllApps from "./AllApps";
+import ChangePasswordModal from "./ChangePasswordModal";
+import Dock from "./Dock";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels

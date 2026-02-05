@@ -1,13 +1,13 @@
-import { Show, type Accessor, type Component } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import type { Store } from "solid-js/store";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
 import { VsSettings } from "solid-icons/vs";
-import AppsTab from "./apps";
-import AppearanceTab from "./AppearanceTab";
-import SettingsList from "./SettingsList";
-import type { SelectedItem } from "../types";
+import { type Accessor, type Component, Show } from "solid-js";
+import type { Store } from "solid-js/store";
+import { Dynamic } from "solid-js/web";
 import { getLocalizedValue, locale, t } from "../i18n";
+import type { SelectedItem } from "../types";
+import AppearanceTab from "./AppearanceTab";
+import AppsTab from "./apps";
+import SettingsList from "./SettingsList";
 
 interface SettingsContentProps {
   loading: Accessor<boolean>;

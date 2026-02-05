@@ -1,6 +1,6 @@
-import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
 import type { Component } from "solid-js";
-import { t, initLocale } from "./i18n";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { initLocale, t } from "./i18n";
 
 // App constants
 const APP_ID = "com.eden.calculator";
@@ -195,7 +195,7 @@ const App: Component = () => {
     if (pendingScientificOp() === "pow" && previousInput() !== null) {
       const base = parseFloat(previousInput()!);
       const exp = parseFloat(display());
-      setDisplay(formatResult(Math.pow(base, exp)));
+      setDisplay(formatResult(base ** exp));
       setExpression(`${previousInput()}^${exp} =`);
       setPendingScientificOp(null);
       setPreviousInput(null);
@@ -292,7 +292,7 @@ const App: Component = () => {
       if (current.startsWith("-")) {
         setDisplay(current.slice(1));
       } else {
-        setDisplay("-" + current);
+        setDisplay(`-${current}`);
       }
     }
   };
@@ -347,7 +347,7 @@ const App: Component = () => {
         setExpression(`√${value}`);
         break;
       case "pow2":
-        result = Math.pow(value, 2);
+        result = value ** 2;
         setExpression(`${value}²`);
         break;
       case "pow":

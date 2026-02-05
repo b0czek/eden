@@ -1,7 +1,7 @@
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { GenesisBundler } from "./bundler";
-import * as path from "path";
-import * as fs from "fs/promises";
-import * as os from "os";
 
 describe("GenesisBundler", () => {
   // Use absolute path from project root
@@ -18,7 +18,7 @@ describe("GenesisBundler", () => {
     // Clean up temporary directory
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch (_) {
       // Ignore cleanup errors
     }
   });

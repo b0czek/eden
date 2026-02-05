@@ -1,11 +1,10 @@
 import type { AppGrantDefinition } from "@edenapp/types";
-
+import { GRANT_PRESET_LIST } from "./GrantPresetList";
 import {
   getGrantPreset,
   normalizeGrantPresets,
   resolveGrantPreset,
 } from "./GrantPresets";
-import { GRANT_PRESET_LIST } from "./GrantPresetList";
 
 describe("GrantPresets", () => {
   it("returns preset definitions by id", () => {

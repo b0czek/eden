@@ -1,10 +1,10 @@
 export type { LogLevel } from "./levels";
+export type { CallsiteInfo, LogContext, Logger, LoggerConfig } from "./logger";
 export {
-  log,
-  createLogger,
   configureLogger,
+  createLogger,
   getLoggerConfig,
-  setLogContext,
+  log,
   logFromConsole,
+  setLogContext,
 } from "./logger";
-export type { Logger, LogContext, CallsiteInfo, LoggerConfig } from "./logger";

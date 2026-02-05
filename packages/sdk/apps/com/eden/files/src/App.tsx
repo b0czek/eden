@@ -1,16 +1,16 @@
-import { createSignal, createEffect, onMount } from "solid-js";
-import { initLocale } from "./i18n";
 import type { Component } from "solid-js";
-import type { FileItem, DisplayPreferences } from "./types";
-import { joinPath, getParentPath, isValidName } from "./utils";
-import { ITEM_SIZES } from "./constants";
+import { createEffect, createSignal, onMount } from "solid-js";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
-import CreateFolderDialog from "./dialogs/CreateFolderDialog";
+import { ITEM_SIZES } from "./constants";
 import CreateFileDialog from "./dialogs/CreateFileDialog";
+import CreateFolderDialog from "./dialogs/CreateFolderDialog";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
-import ErrorDialog from "./dialogs/ErrorDialog";
 import DisplayOptionsModal from "./dialogs/DisplayOptionsModal";
+import ErrorDialog from "./dialogs/ErrorDialog";
+import { initLocale } from "./i18n";
+import type { DisplayPreferences, FileItem } from "./types";
+import { getParentPath, isValidName, joinPath } from "./utils";
 
 const App: Component = () => {
   const [currentPath, setCurrentPath] = createSignal("/");
@@ -80,7 +80,7 @@ const App: Component = () => {
               size: stats.size,
               modified: new Date(stats.mtime),
             };
-          } catch (error) {
+          } catch (_) {
             return {
               name,
               path: itemPath,
@@ -97,7 +97,7 @@ const App: Component = () => {
       setItems(sorted);
     } catch (error) {
       console.error("Error loading directory:", error);
-      showError("Failed to load directory: " + (error as Error).message);
+      showError(`Failed to load directory: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -275,7 +275,7 @@ const App: Component = () => {
       setShowNewFolderDialog(false);
       refresh();
     } catch (error) {
-      showError("Failed to create folder: " + (error as Error).message);
+      showError(`Failed to create folder: ${(error as Error).message}`);
     }
   };
 
@@ -296,7 +296,7 @@ const App: Component = () => {
       setShowNewFileDialog(false);
       refresh();
     } catch (error) {
-      showError("Failed to create file: " + (error as Error).message);
+      showError(`Failed to create file: ${(error as Error).message}`);
     }
   };
 
@@ -312,7 +312,7 @@ const App: Component = () => {
       setItemToDelete(null);
       refresh();
     } catch (error) {
-      showError("Failed to delete item: " + (error as Error).message);
+      showError(`Failed to delete item: ${(error as Error).message}`);
     }
   };
 
@@ -332,14 +332,14 @@ const App: Component = () => {
     } else {
       // Open files with their registered handler
       try {
-        let result = await window.edenAPI.shellCommand("file/open", {
+        const result = await window.edenAPI.shellCommand("file/open", {
           path: item.path,
         });
         if (!result.success) {
-          showError("Failed to open file: " + result.error);
+          showError(`Failed to open file: ${result.error}`);
         }
       } catch (error) {
-        showError("Failed to open file: " + (error as Error).message);
+        showError(`Failed to open file: ${(error as Error).message}`);
       }
     }
   };
@@ -358,7 +358,7 @@ const App: Component = () => {
     let accumulatedPath = "";
 
     parts.forEach((part) => {
-      accumulatedPath += "/" + part;
+      accumulatedPath += `/${part}`;
       crumbs.push({ name: part, path: accumulatedPath });
     });
 

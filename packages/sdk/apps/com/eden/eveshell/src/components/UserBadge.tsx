@@ -1,5 +1,5 @@
-import { Show } from "solid-js";
 import type { UserProfile } from "@edenapp/types";
+import { Show } from "solid-js";
 import { t } from "../i18n";
 
 interface UserBadgeProps {

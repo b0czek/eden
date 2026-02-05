@@ -4,13 +4,12 @@
  * Extracts @EdenHandler decorators and generates command type interfaces.
  */
 
-import { Project, ClassDeclaration, Node, SyntaxKind } from "ts-morph";
-import * as path from "path";
+import { type ClassDeclaration, Node } from "ts-morph";
 import {
-  replaceTypesWithInlineImports,
   extractDocs,
   generateHeader,
   namespaceToInterfaceName,
+  replaceTypesWithInlineImports,
 } from "./utils";
 
 export interface CommandInfo {
@@ -55,7 +54,7 @@ export function extractCommandHandlers(
           const param = params[0];
           const typeNode = param.getTypeNode();
           if (typeNode) {
-            let rawType = typeNode.getText();
+            const rawType = typeNode.getText();
 
             // Filter out properties starting with underscore (like _callerAppId)
             argsType = rawType
@@ -203,5 +202,5 @@ export function generateCommandsCode(
     lines.push("export interface CommandMap {}");
   }
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

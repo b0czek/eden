@@ -1,17 +1,17 @@
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
+import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
 import { inject, singleton } from "tsyringe";
-import { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
-import { UserHandler } from "./UserHandler";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
 import {
   defaultGrantsForRole,
   matchesGrants,
   normalizeGrants,
 } from "./UserGrants";
-import { normalizeAppIds } from "../utils/normalize";
+import { UserHandler } from "./UserHandler";
 import { UserStore } from "./UserStore";
-import { StoredUser } from "./UserTypes";
+import type { StoredUser } from "./UserTypes";
 
 interface UserNamespaceEvents {
   changed: {

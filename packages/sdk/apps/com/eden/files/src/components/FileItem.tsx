@@ -1,6 +1,6 @@
 import type { Component } from "solid-js";
-import type { FileItem, ViewStyle, ItemSize } from "../types";
-import { getFileIcon, formatFileSize } from "../utils";
+import type { FileItem, ItemSize, ViewStyle } from "../types";
+import { formatFileSize, getFileIcon } from "../utils";
 
 interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;

@@ -1,8 +1,8 @@
-import { Rectangle as Bounds } from "electron";
-import { TilingConfig } from "@edenapp/types";
-import { ViewInfo, ViewMode } from "./types";
-import { calculateTileBounds } from "./layoutCalculator";
+import type { TilingConfig } from "@edenapp/types";
+import type { Rectangle as Bounds } from "electron";
 import { injectable, singleton } from "tsyringe";
+import { calculateTileBounds } from "./layoutCalculator";
+import type { ViewInfo, ViewMode } from "./types";
 
 /**
  * TilingManager
@@ -130,8 +130,7 @@ export class TilingManager {
     if (remaining > capacity && preferredViewId !== undefined) {
       const preferred = views.get(preferredViewId);
       if (
-        preferred &&
-        preferred.visible &&
+        preferred?.visible &&
         preferred.mode === "tiled" &&
         preferred.viewType === "app"
       ) {
@@ -216,7 +215,7 @@ export class TilingManager {
 
     const visibleCount = visibleViews.length;
 
-    visibleViews.forEach(([viewId, info], index) => {
+    visibleViews.forEach(([, info], index) => {
       const bounds = this.calculateTileBounds(index, visibleCount);
       info.tileIndex = index;
       info.bounds = bounds;

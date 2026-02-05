@@ -1,6 +1,6 @@
-import { Rectangle as Bounds } from "electron";
-import { WindowConfig } from "@edenapp/types";
-import { ViewInfo } from "./types";
+import type { WindowConfig } from "@edenapp/types";
+import type { Rectangle as Bounds } from "electron";
+import type { ViewInfo } from "./types";
 
 type ViewCollection = () => Iterable<ViewInfo>;
 
@@ -72,7 +72,7 @@ export class FloatingWindowController {
    * Apply window-level constraints and workspace bounds to floating windows.
    */
   applyWindowConstraints(bounds: Bounds, windowConfig?: WindowConfig): Bounds {
-    let finalBounds = { ...bounds };
+    const finalBounds = { ...bounds };
 
     if (windowConfig?.minSize) {
       finalBounds.width = Math.max(

@@ -1,6 +1,6 @@
+import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { AppearanceManager } from "./AppearanceManager";
-import { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
+import type { AppearanceManager } from "./AppearanceManager";
 
 @EdenNamespace("appearance")
 export class AppearanceHandler {

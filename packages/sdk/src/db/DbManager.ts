@@ -1,11 +1,10 @@
-import Keyv from "keyv";
+import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
-import * as path from "path";
-import { injectable, inject, singleton } from "tsyringe";
+import Keyv from "keyv";
+import { inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
-import { DbHandler } from "./DbHandler";
-
 import { log } from "../logging";
+import { DbHandler } from "./DbHandler";
 /**
  * DbManager - Manages persistent key-value storage for Eden apps
  *

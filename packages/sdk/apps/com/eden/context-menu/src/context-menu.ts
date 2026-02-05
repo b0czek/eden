@@ -1,8 +1,8 @@
 import type {
   ContextMenuOpenEvent,
   ContextMenuResult,
-  WindowSize,
   ViewBounds,
+  WindowSize,
 } from "@edenapp/types";
 import { resolveIconSvg } from "./icons";
 

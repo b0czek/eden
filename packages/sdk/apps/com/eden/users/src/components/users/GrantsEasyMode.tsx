@@ -1,19 +1,19 @@
-import { For, Show } from "solid-js";
-import type { Accessor } from "solid-js";
 import type { ResolvedGrant, RuntimeAppManifest } from "@edenapp/types";
-import { getLocalizedValue, locale, t } from "../../i18n";
+import type { Accessor } from "solid-js";
+import { For, Show } from "solid-js";
 import {
   buildAppGrant,
   buildPresetGrant,
   buildSettingGrant,
-  getGrantScope,
+  getAppGrantKey,
+  getAppScopedGrants,
   getGrantId,
   getGrantLabel,
-  getAppScopedGrants,
-  getAppGrantKey,
+  getGrantScope,
   hasAppFeatureGrant,
   hasPresetGrant,
 } from "../../grants";
+import { getLocalizedValue, locale, t } from "../../i18n";
 import type { SettingsOption } from "./types";
 
 interface GrantsEasyModeProps {

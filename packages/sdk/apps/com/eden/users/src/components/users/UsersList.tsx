@@ -1,6 +1,6 @@
-import { For, Show } from "solid-js";
 import type { UserProfile } from "@edenapp/types";
-import { FiPlus, FiChevronRight } from "solid-icons/fi";
+import { FiChevronRight, FiPlus } from "solid-icons/fi";
+import { For, Show } from "solid-js";
 import { t } from "../../i18n";
 
 interface UsersListProps {

@@ -1,8 +1,8 @@
 import type { AppGrantDefinition, ResolvedGrant } from "@edenapp/types";
 import { log } from "../logging";
 import {
-  type GrantPresetDefinition,
   GRANT_PRESET_LIST,
+  type GrantPresetDefinition,
 } from "./GrantPresetList";
 
 export type { GrantPresetDefinition };

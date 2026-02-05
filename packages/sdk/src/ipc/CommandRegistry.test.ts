@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
+import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
 import { CommandRegistry } from "./CommandRegistry";
-import { setManagerNamespace, addCommandHandler } from "./CommandMetadata";
 
 type PermissionRegistryLike = {
   hasPermission: jest.Mock<boolean, [string, string]>;

@@ -1,6 +1,6 @@
+import type { FileStats, SearchResult } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { FilesystemManager } from "./FilesystemManager";
-import type { FileStats, SearchResult } from "@edenapp/types";
 
 /**
  * FilesystemHandler - Thin IPC layer for filesystem operations.

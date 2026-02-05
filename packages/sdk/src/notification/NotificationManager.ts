@@ -1,9 +1,9 @@
-import { Notification, NotificationType } from "@edenapp/types";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
-import { NotificationHandler } from "./NotificationHandler";
-import { injectable, inject, singleton } from "tsyringe";
-
+import type { Notification, NotificationType } from "@edenapp/types";
+import { inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { NotificationHandler } from "./NotificationHandler";
+
 /**
  * Events emitted by the NotificationManager
  */

@@ -1,6 +1,6 @@
-import { createSignal, onMount, Show, For } from "solid-js";
-import { AppManifest } from "@edenapp/types";
-import { FiPackage, FiAlertTriangle, FiCheck, FiLock } from "solid-icons/fi";
+import type { AppManifest } from "@edenapp/types";
+import { FiAlertTriangle, FiCheck, FiLock, FiPackage } from "solid-icons/fi";
+import { createSignal, For, onMount, Show } from "solid-js";
 
 interface PackageInfoResponse {
   success: boolean;

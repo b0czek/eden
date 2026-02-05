@@ -1,4 +1,5 @@
 import { log } from "../../logging";
+
 /**
  * Port Channel - Shared utilities for MessagePort communication
  *
@@ -10,15 +11,15 @@ import { log } from "../../logging";
  * - backend-preload.ts (backend)
  */
 
+export type { IPCPort } from "./ipc-port";
 // Re-export IPCPort types and wrappers
 export { wrapDOMPort, wrapElectronPort } from "./ipc-port";
-export type { IPCPort } from "./ipc-port";
-import type { IPCPort } from "./ipc-port";
 
 import type {
   AppBusConnection,
   ServiceConnectCallback,
 } from "@edenapp/types/ipc/appbus";
+import type { IPCPort } from "./ipc-port";
 
 /**
  * Pending request tracking

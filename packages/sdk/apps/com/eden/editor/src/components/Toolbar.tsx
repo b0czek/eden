@@ -1,5 +1,5 @@
-import type { EditorTab } from "../types";
 import { t } from "../i18n";
+import type { EditorTab } from "../types";
 
 // Floppy disk save icon
 function SaveIcon() {

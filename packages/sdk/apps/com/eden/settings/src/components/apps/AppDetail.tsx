@@ -1,8 +1,8 @@
-import { Show, For } from "solid-js";
-import type { Component } from "solid-js";
 import type { RuntimeAppManifest } from "@edenapp/types";
-import { FiTrash2, FiPackage, FiCpu, FiArrowLeft } from "solid-icons/fi";
-import { t, locale, getLocalizedValue } from "../../i18n";
+import { FiArrowLeft, FiCpu, FiPackage, FiTrash2 } from "solid-icons/fi";
+import type { Component } from "solid-js";
+import { For, Show } from "solid-js";
+import { getLocalizedValue, locale, t } from "../../i18n";
 
 interface AppDetailProps {
   app: RuntimeAppManifest;

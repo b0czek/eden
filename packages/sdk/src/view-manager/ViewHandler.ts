@@ -1,9 +1,14 @@
-import { EdenHandler, EdenNamespace, IPCBridge, EdenEmitter } from "../ipc";
-import { ViewManager } from "./ViewManager";
-import { MouseTracker } from "./MouseTracker";
-import { AppInstance, ViewBounds, WindowSize } from "@edenapp/types";
-
+import type { ViewBounds, WindowSize } from "@edenapp/types";
+import {
+  EdenEmitter,
+  EdenHandler,
+  EdenNamespace,
+  type IPCBridge,
+} from "../ipc";
 import { log } from "../logging";
+import { MouseTracker } from "./MouseTracker";
+import type { ViewManager } from "./ViewManager";
+
 /**
  * Events emitted by the ViewHandler
  */

@@ -1,9 +1,9 @@
-import Keyv from "keyv";
+import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
-import * as path from "path";
+import Keyv from "keyv";
+import { log } from "../logging";
 import type { StoredUser } from "./UserTypes";
 
-import { log } from "../logging";
 const USERS_INDEX_KEY = "users:index";
 const DEFAULT_USER_KEY = "users:default";
 

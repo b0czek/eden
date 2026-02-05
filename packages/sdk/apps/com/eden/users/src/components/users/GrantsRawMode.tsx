@@ -1,5 +1,5 @@
-import type { Accessor } from "solid-js";
 import { FaSolidFloppyDisk } from "solid-icons/fa";
+import type { Accessor } from "solid-js";
 import { t } from "../../i18n";
 
 interface GrantsRawModeProps {

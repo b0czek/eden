@@ -1,12 +1,12 @@
-import { For, Show, createSignal, onMount } from "solid-js";
-import AppIcon from "./AppIcon";
-import Clock from "./Clock";
-import { AppInfo } from "../types";
+import type { Menu } from "@edenapp/tablets";
+import type { UserProfile } from "@edenapp/types";
+import { createSignal, For, onMount, Show } from "solid-js";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
 import { t } from "../i18n";
+import type { AppInfo } from "../types";
+import AppIcon from "./AppIcon";
+import Clock from "./Clock";
 import UserBadge from "./UserBadge";
-import type { UserProfile } from "@edenapp/types";
-import type { Menu } from "@edenapp/tablets";
 
 interface DockProps {
   runningApps: AppInfo[]; // Running apps that are NOT pinned
@@ -32,7 +32,6 @@ export default function Dock(props: DockProps) {
 
   function handleMouseMove(e: MouseEvent) {
     if (!containerRef) return;
-    const bounds = containerRef.getBoundingClientRect();
     const mouseX = e.clientX;
 
     const sigma = 70; // cursor influence radius (px)

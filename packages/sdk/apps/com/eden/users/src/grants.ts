@@ -1,8 +1,8 @@
 import type {
-  SettingDefinition,
-  SettingsCategory,
   ResolvedGrant,
   RuntimeAppManifest,
+  SettingDefinition,
+  SettingsCategory,
 } from "@edenapp/types";
 
 export const isCustomViewCategory = (category: SettingsCategory): boolean =>

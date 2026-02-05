@@ -4,9 +4,9 @@
  * Generates runtime arrays for command and event names.
  */
 
+import type { NamespaceCommands } from "./commands";
+import type { NamespaceEvents } from "./events";
 import { generateHeader } from "./utils";
-import { NamespaceCommands } from "./commands";
-import { NamespaceEvents } from "./events";
 
 /**
  * Generate TypeScript file with runtime arrays (for SDK bundling)

@@ -1,21 +1,21 @@
-import { Show, createSignal, createEffect, createMemo } from "solid-js";
 import type {
   ResolvedGrant,
   RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { FaSolidCode, FaSolidList } from "solid-icons/fa";
-import { getLocalizedValue, locale, t } from "../../i18n";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import {
   canLaunchApp,
-  getGrantScope,
   getGrantId,
+  getGrantScope,
   getResolvedGrants,
 } from "../../grants";
-import type { SettingsOption } from "./types";
-import UserDetailHeader from "./UserDetailHeader";
+import { getLocalizedValue, locale, t } from "../../i18n";
 import GrantsEasyMode from "./GrantsEasyMode";
 import GrantsRawMode from "./GrantsRawMode";
+import type { SettingsOption } from "./types";
+import UserDetailHeader from "./UserDetailHeader";
 
 interface UserDetailProps {
   user: UserProfile;

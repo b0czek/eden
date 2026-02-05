@@ -1,4 +1,4 @@
-import i18next, { i18n, InitOptions } from "i18next";
+import i18next, { type InitOptions, type i18n } from "i18next";
 
 export interface EdenI18nConfig {
   debug?: boolean;
@@ -38,7 +38,7 @@ export async function createEdenI18n(
  */
 export async function loadCommonTranslations(instance: i18n, locale: string) {
   try {
-    // @ts-ignore
+    // @ts-expect-error
     const edenAPI = window.edenAPI;
     if (!edenAPI) return;
 
@@ -73,5 +73,5 @@ export function getLocalizedValue(
   if (typeof value === "string") {
     return value;
   }
-  return value[currentLocale] || value["en"] || Object.values(value)[0] || "";
+  return value[currentLocale] || value.en || Object.values(value)[0] || "";
 }

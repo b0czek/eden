@@ -1,20 +1,20 @@
-import { Show } from "solid-js";
-import { t } from "../i18n";
+import {
+  FaSolidArrowDown,
+  FaSolidArrowUp,
+  FaSolidGrip,
+  FaSolidList,
+} from "solid-icons/fa";
 import type { Component } from "solid-js";
+import { Show } from "solid-js";
+import { ITEM_SIZES } from "../constants";
+import { t } from "../i18n";
 import type {
   DisplayPreferences,
-  ViewStyle,
   ItemSize,
   SortBy,
   SortOrder,
+  ViewStyle,
 } from "../types";
-import { ITEM_SIZES } from "../constants";
-import {
-  FaSolidGrip,
-  FaSolidList,
-  FaSolidArrowUp,
-  FaSolidArrowDown,
-} from "solid-icons/fa";
 
 interface DisplayOptionsModalProps {
   show: boolean;
@@ -114,7 +114,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   step="1"
                   value={getSizeValue()}
                   onInput={(e) =>
-                    handleSizeChange(parseInt(e.currentTarget.value))
+                    handleSizeChange(parseInt(e.currentTarget.value, 10))
                   }
                   class="eden-slider"
                 />

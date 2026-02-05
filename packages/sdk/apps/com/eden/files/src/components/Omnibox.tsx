@@ -1,5 +1,5 @@
-import { createSignal, createEffect, onCleanup, For, Show } from "solid-js";
 import type { Component } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { getParentPath } from "../utils";
 
 interface Breadcrumb {
@@ -42,7 +42,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         let searchTerm = "";
 
         if (pathParts.length > 0) {
-          basePath = "/" + pathParts.slice(0, -1).join("/");
+          basePath = `/${pathParts.slice(0, -1).join("/")}`;
           if (basePath !== "/") basePath += "/";
           searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
         }

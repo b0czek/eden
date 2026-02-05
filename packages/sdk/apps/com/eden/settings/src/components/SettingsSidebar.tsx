@@ -1,9 +1,9 @@
-import { For, Show, type Accessor, type Component } from "solid-js";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
-import { FiSettings, FiCode, FiPackage, FiImage } from "solid-icons/fi";
-import { VsSymbolColor, VsPulse } from "solid-icons/vs";
-import type { SelectedItem } from "../types";
+import { FiCode, FiImage, FiPackage, FiSettings } from "solid-icons/fi";
+import { VsPulse, VsSymbolColor } from "solid-icons/vs";
+import { type Accessor, type Component, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../i18n";
+import type { SelectedItem } from "../types";
 
 interface SettingsSidebarProps {
   edenSchema: Accessor<SettingsCategory[]>;

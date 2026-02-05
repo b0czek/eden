@@ -1,9 +1,8 @@
-import { Show, For, createEffect } from "solid-js";
 import type { Component } from "solid-js";
-import type { FileItem, ViewStyle, ItemSize } from "../types";
-import FileItemComponent from "./FileItem";
-
+import { createEffect, For, Show } from "solid-js";
 import { t } from "../i18n";
+import type { FileItem, ItemSize, ViewStyle } from "../types";
+import FileItemComponent from "./FileItem";
 
 interface FileListProps {
   loading: boolean;
@@ -19,7 +18,7 @@ interface FileListProps {
 }
 
 const FileList: Component<FileListProps> = (props) => {
-  let fileRefs: Map<string, HTMLDivElement> = new Map();
+  const fileRefs: Map<string, HTMLDivElement> = new Map();
   let containerRef: HTMLDivElement | undefined;
 
   createEffect(() => {

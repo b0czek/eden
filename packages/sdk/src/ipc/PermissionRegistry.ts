@@ -1,4 +1,5 @@
 import { log } from "../logging";
+
 /**
  * PermissionRegistry
  *
@@ -13,8 +14,8 @@ import { log } from "../logging";
  * - "*" matches all permissions
  */
 
-import { singleton, injectable } from "tsyringe";
 import type { ResolvedGrant } from "@edenapp/types";
+import { injectable, singleton } from "tsyringe";
 
 /**
  * Per-app permission state
@@ -134,7 +135,7 @@ export class PermissionRegistry {
       if (pattern === "*") return true;
       if (pattern.endsWith("/*")) {
         const namespace = pattern.slice(0, -2);
-        if (requiredPermission.startsWith(namespace + "/")) return true;
+        if (requiredPermission.startsWith(`${namespace}/`)) return true;
       }
     }
     return false;

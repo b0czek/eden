@@ -1,5 +1,5 @@
-import { Show, createSignal, onMount, type Component } from "solid-js";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
+import { type Component, createSignal, onMount, Show } from "solid-js";
 import UsersTab from "./components/users/UsersTab";
 import { initLocale, t } from "./i18n";
 import "./App.css";
@@ -11,7 +11,7 @@ const App: Component = () => {
 
   const loadEdenSchema = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("settings/schema", {
+      const result = await window.edenAPI.shellCommand("settings/schema", {
         showRestricted: true,
       });
       setEdenSchema(Array.isArray(result.schema) ? result.schema : []);
@@ -23,7 +23,7 @@ const App: Component = () => {
 
   const loadApps = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("package/list", {
+      const result = await window.edenAPI.shellCommand("package/list", {
         showHidden: true,
         showRestricted: true,
       });

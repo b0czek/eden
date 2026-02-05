@@ -1,14 +1,13 @@
-import Keyv from "keyv";
+import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
+import Keyv from "keyv";
 import * as path from "path";
-import { singleton, inject } from "tsyringe";
-import { SettingsCategory } from "@edenapp/types";
-import { CommandRegistry, IPCBridge, EdenNamespace, EdenEmitter } from "../ipc";
-import { SettingsHandler } from "./SettingsHandler";
-import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
-import { UserManager } from "../user/UserManager";
-
+import { inject, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { UserManager } from "../user/UserManager";
+import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
+import { SettingsHandler } from "./SettingsHandler";
 /**
  * Reserved app ID for Eden system settings.
  * No external app can use this ID.

@@ -1,6 +1,6 @@
+import type { ContextMenuOpenArgs, ContextMenuResult } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { ContextMenuManager } from "./ContextMenuManager";
-import type { ContextMenuOpenArgs, ContextMenuResult } from "@edenapp/types";
 
 @EdenNamespace("context-menu")
 export class ContextMenuHandler {

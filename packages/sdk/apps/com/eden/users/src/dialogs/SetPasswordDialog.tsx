@@ -1,8 +1,8 @@
-import { createSignal, Show } from "solid-js";
-import type { Component } from "solid-js";
 import type { UserProfile } from "@edenapp/types";
-import { t } from "../i18n";
+import type { Component } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 
 interface SetPasswordDialogProps {
   show: boolean;

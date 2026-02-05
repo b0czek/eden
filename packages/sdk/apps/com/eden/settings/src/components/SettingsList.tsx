@@ -1,8 +1,8 @@
-import { For, Show, type Accessor, type Component } from "solid-js";
-import type { Store } from "solid-js/store";
 import type { SettingsCategory } from "@edenapp/types";
-import SettingInput from "./SettingInput";
+import { type Accessor, type Component, For, Show } from "solid-js";
+import type { Store } from "solid-js/store";
 import { getLocalizedValue, locale } from "../i18n";
+import SettingInput from "./SettingInput";
 
 interface SettingsListProps {
   categories: Accessor<SettingsCategory[]>;

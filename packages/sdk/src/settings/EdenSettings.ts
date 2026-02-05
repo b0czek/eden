@@ -1,4 +1,4 @@
-import { SettingsCategory } from "@edenapp/types";
+import type { SettingsCategory } from "@edenapp/types";
 
 /**
  * Eden System Settings Schema

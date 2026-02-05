@@ -1,8 +1,8 @@
 import {
+  type CallsiteInfo,
   log,
   logFromConsole,
   setLogContext,
-  type CallsiteInfo,
 } from "../logging";
 /**
  * Backend Runtime
@@ -18,24 +18,22 @@ import {
  * - EDEN_MANIFEST: JSON-stringified app manifest
  */
 
-import type { EdenAPI, AppBusAPI, AppBusConnection } from "@edenapp/types";
+import type { AppBusAPI, AppBusConnection, EdenAPI } from "@edenapp/types";
 
 import type { WorkerGlobal } from "@edenapp/types/worker";
-
 import {
-  createMessageIdGenerator,
-  handleAppBusPort as handlePortSetup,
-  createPortConnection,
-  createAppBusState,
-  wrapElectronPort,
-  handlePortClosed,
-} from "./common/port-channel";
-
-import {
-  createEdenAPI,
   createAppBusAPI,
+  createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import {
+  createAppBusState,
+  createMessageIdGenerator,
+  createPortConnection,
+  handlePortClosed,
+  handleAppBusPort as handlePortSetup,
+  wrapElectronPort,
+} from "./common/port-channel";
 
 // Electron utility process extends the Node process with parentPort
 // This is available when running inside utilityProcess.fork()

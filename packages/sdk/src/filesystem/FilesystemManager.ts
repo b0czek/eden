@@ -1,12 +1,11 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import fg from "fast-glob";
-import { injectable, inject, singleton } from "tsyringe";
-import { CommandRegistry } from "../ipc";
-import { FilesystemHandler } from "./FilesystemHandler";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
-
+import fg from "fast-glob";
+import { inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
+import { FilesystemHandler } from "./FilesystemHandler";
 /**
  * FilesystemManager
  *
@@ -78,7 +77,7 @@ export class FilesystemManager {
 
     const relativePath = normalizedAbsolute.slice(this.baseDir.length);
     // Ensure it starts with /
-    return relativePath.startsWith("/") ? relativePath : "/" + relativePath;
+    return relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
   }
 
   /**

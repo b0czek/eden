@@ -2,13 +2,13 @@
  * Eden Config Types and Loader
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
-import { randomBytes, scryptSync } from "crypto";
+import { randomBytes, scryptSync } from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type {
-  EdenUserConfig,
   EdenSeedConfig,
   EdenSeedSettings,
+  EdenUserConfig,
 } from "@edenapp/types";
 
 /**
@@ -67,7 +67,7 @@ export async function loadConfig(configPath: string): Promise<EdenBuildConfig> {
     const content = await fs.readFile(configPath, "utf-8");
     const config = JSON.parse(content);
     return config as EdenBuildConfig;
-  } catch (error) {
+  } catch (_error) {
     console.warn(`⚠️  Could not load ${configPath}, using defaults`);
     return { apps: [] };
   }

@@ -1,5 +1,5 @@
-import { Show, JSX } from "solid-js";
 import type { Component } from "solid-js";
+import { type JSX, Show } from "solid-js";
 
 interface ModalProps {
   show: boolean;

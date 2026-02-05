@@ -1,6 +1,6 @@
+import type { UserProfile, UserRole } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { UserManager } from "./UserManager";
-import type { UserProfile, UserRole } from "@edenapp/types";
 
 @EdenNamespace("user")
 export class UserHandler {

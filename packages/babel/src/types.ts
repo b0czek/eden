@@ -91,7 +91,7 @@ type ExtractArgNames<S extends string> =
  */
 type StringToArgs<S extends string> =
   ExtractArgNames<S> extends never
-    ? void
+    ? undefined
     : { [K in ExtractArgNames<S>]: string | number };
 
 /**
@@ -105,7 +105,7 @@ type StringToArgs<S extends string> =
  * ```
  */
 export type LocaleToTranslations<T> = {
-  [K in keyof T]: T[K] extends string ? StringToArgs<T[K]> : void;
+  [K in keyof T]: T[K] extends string ? StringToArgs<T[K]> : undefined;
 };
 
 // =============================================================================
@@ -168,12 +168,12 @@ export interface EdenI18nHandle<T = Record<string, void>> {
   /**
    * Current locale accessor (framework-specific, e.g., signal for SolidJS).
    */
-  locale: any;
+  locale: unknown;
 
   /**
    * Locale setter (framework-specific, e.g., setter for SolidJS).
    */
-  setLocale: any;
+  setLocale: unknown;
 
   /**
    * Initialize function to load settings from system.

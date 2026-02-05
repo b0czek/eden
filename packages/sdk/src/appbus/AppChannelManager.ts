@@ -1,14 +1,14 @@
-import { MessageChannelMain, webContents } from "electron";
-import { inject, injectable, singleton, delay } from "tsyringe";
 import type {
+  ConnectResult,
   RegisteredService,
   ServiceInfo,
-  ConnectResult,
 } from "@edenapp/types";
-import { log } from "../logging";
+import { MessageChannelMain, webContents } from "electron";
+import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
-import { AppChannelHandler } from "./AppChannelHandler";
+import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";
+import { AppChannelHandler } from "./AppChannelHandler";
 
 /**
  * AppChannelManager

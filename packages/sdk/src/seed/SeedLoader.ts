@@ -1,4 +1,5 @@
 import { log } from "../logging";
+
 /**
  * Seed Database
  *
@@ -6,11 +7,11 @@ import { log } from "../logging";
  * to the database. This runs once at startup before managers initialize.
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
-import Keyv from "keyv";
-import KeyvSqlite from "@keyv/sqlite";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
+import KeyvSqlite from "@keyv/sqlite";
+import Keyv from "keyv";
 import { defaultGrantsForRole } from "../user/UserGrants";
 
 // Key constants matching UserManager and SettingsManager schemas

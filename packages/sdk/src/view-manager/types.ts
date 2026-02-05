@@ -1,5 +1,5 @@
-import { Rectangle as Bounds, WebContentsView } from "electron";
-import { AppManifest } from "@edenapp/types";
+import type { AppManifest } from "@edenapp/types";
+import type { Rectangle as Bounds, WebContentsView } from "electron";
 
 export type ViewMode = "floating" | "tiled";
 export type ViewType = "app" | "overlay";

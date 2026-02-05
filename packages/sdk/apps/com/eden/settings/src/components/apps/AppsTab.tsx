@@ -1,15 +1,15 @@
+import type { RuntimeAppManifest } from "@edenapp/types";
+import { FiChevronRight, FiCpu, FiPackage } from "solid-icons/fi";
+import type { Component } from "solid-js";
 import {
-  createSignal,
-  onMount,
-  For,
-  Show,
   createEffect,
   createMemo,
+  createSignal,
+  For,
+  onMount,
+  Show,
 } from "solid-js";
-import type { Component } from "solid-js";
-import type { RuntimeAppManifest } from "@edenapp/types";
-import { FiPackage, FiCpu, FiChevronRight } from "solid-icons/fi";
-import { t, locale, getLocalizedValue } from "../../i18n";
+import { getLocalizedValue, locale, t } from "../../i18n";
 import AppDetail from "./AppDetail";
 import "./AppsTab.css";
 
@@ -38,7 +38,7 @@ const AppsTab: Component = () => {
   const loadApps = async () => {
     try {
       setLoading(true);
-      const result = await window.edenAPI!.shellCommand("package/list", {
+      const result = await window.edenAPI.shellCommand("package/list", {
         showHidden: true,
       });
       setApps(result);
@@ -64,7 +64,7 @@ const AppsTab: Component = () => {
 
   const loadDevMode = async () => {
     try {
-      const result = await window.edenAPI!.shellCommand("system/info", {});
+      const result = await window.edenAPI.shellCommand("system/info", {});
       setDevMode(result.release !== true);
     } catch (err) {
       console.error("Failed to load system info", err);
@@ -80,7 +80,7 @@ const AppsTab: Component = () => {
     const icons: Record<string, string> = {};
     for (const app of result) {
       try {
-        const iconResult = await window.edenAPI!.shellCommand(
+        const iconResult = await window.edenAPI.shellCommand(
           "package/get-icon",
           { appId: app.id },
         );
@@ -97,12 +97,9 @@ const AppsTab: Component = () => {
   const loadAutostartSettings = async (result: RuntimeAppManifest[]) => {
     const values: Record<string, boolean> = {};
     try {
-      const keysResult = await window.edenAPI!.shellCommand(
-        "settings/list/su",
-        {
-          appId: "com.eden",
-        },
-      );
+      const keysResult = await window.edenAPI.shellCommand("settings/list/su", {
+        appId: "com.eden",
+      });
       const keys: string[] = keysResult.keys ?? [];
       const autostartKeys = keys.filter((key) =>
         key.startsWith(AUTOSTART_KEY_PREFIX),
@@ -111,7 +108,7 @@ const AppsTab: Component = () => {
       await Promise.all(
         autostartKeys.map(async (key) => {
           const appId = key.slice(AUTOSTART_KEY_PREFIX.length);
-          const valueResult = await window.edenAPI!.shellCommand(
+          const valueResult = await window.edenAPI.shellCommand(
             "settings/get/su",
             {
               appId: "com.eden",
@@ -140,7 +137,7 @@ const AppsTab: Component = () => {
     await Promise.all(
       result.map(async (app) => {
         try {
-          const hotReloadResult = await window.edenAPI!.shellCommand(
+          const hotReloadResult = await window.edenAPI.shellCommand(
             "package/is-hot-reload-enabled",
             { appId: app.id },
           );
@@ -160,7 +157,7 @@ const AppsTab: Component = () => {
 
     try {
       setUninstalling(appId);
-      await window.edenAPI!.shellCommand("package/uninstall", { appId });
+      await window.edenAPI.shellCommand("package/uninstall", { appId });
       await loadApps();
     } catch (err) {
       console.error("Failed to uninstall app", err);
@@ -174,7 +171,7 @@ const AppsTab: Component = () => {
     setAutostartApps((current) => ({ ...current, [appId]: enabled }));
 
     try {
-      await window.edenAPI!.shellCommand("settings/set/su", {
+      await window.edenAPI.shellCommand("settings/set/su", {
         appId: "com.eden",
         key: `${AUTOSTART_KEY_PREFIX}${appId}`,
         value: enabled ? "true" : "false",
@@ -184,9 +181,9 @@ const AppsTab: Component = () => {
     }
   };
 
-  const handleHotReloadToggle = async (appId: string, enabled: boolean) => {
+  const handleHotReloadToggle = async (appId: string) => {
     try {
-      const result = await window.edenAPI!.shellCommand(
+      const result = await window.edenAPI.shellCommand(
         "package/toggle-hot-reload",
         { appId },
       );
@@ -203,7 +200,7 @@ const AppsTab: Component = () => {
 
     setSizeLoading((current) => ({ ...current, [appId]: true }));
     try {
-      const result = await window.edenAPI!.shellCommand("package/get-size", {
+      const result = await window.edenAPI.shellCommand("package/get-size", {
         appId,
       });
       setAppSizes((current) => ({ ...current, [appId]: result.size }));
@@ -246,58 +243,54 @@ const AppsTab: Component = () => {
         <Show
           when={selectedApp()}
           fallback={
-            <>
-              <div class="eden-list">
-                <For each={sortedApps()}>
-                  {(app) => (
-                    <div
-                      class="eden-list-item eden-list-item-interactive"
-                      onClick={() => setSelectedAppId(app.id)}
-                    >
-                      <div class="eden-list-item-icon">
-                        <Show
-                          when={appIcons()[app.id]}
-                          fallback={
-                            <div class="eden-avatar eden-avatar-md">
-                              <Show
-                                when={app.isPrebuilt}
-                                fallback={
-                                  <FiPackage class="eden-avatar-icon" />
-                                }
-                              >
-                                <FiCpu class="eden-avatar-icon" />
-                              </Show>
-                            </div>
-                          }
-                        >
-                          <img
-                            class="app-list-icon-img"
-                            src={appIcons()[app.id]}
-                            alt={getLocalizedValue(app.name, locale())}
-                          />
-                        </Show>
-                      </div>
-                      <div class="eden-list-item-content">
-                        <div class="eden-list-item-title">
-                          {getLocalizedValue(app.name, locale())}
-                        </div>
-                        <div class="eden-list-item-description">
-                          v{app.version}
-                        </div>
-                      </div>
-                      <Show when={app.isPrebuilt}>
-                        <span class="eden-badge eden-badge-info eden-badge-sm">
-                          {t("settings.apps.builtin")}
-                        </span>
+            <div class="eden-list">
+              <For each={sortedApps()}>
+                {(app) => (
+                  <div
+                    class="eden-list-item eden-list-item-interactive"
+                    onClick={() => setSelectedAppId(app.id)}
+                  >
+                    <div class="eden-list-item-icon">
+                      <Show
+                        when={appIcons()[app.id]}
+                        fallback={
+                          <div class="eden-avatar eden-avatar-md">
+                            <Show
+                              when={app.isPrebuilt}
+                              fallback={<FiPackage class="eden-avatar-icon" />}
+                            >
+                              <FiCpu class="eden-avatar-icon" />
+                            </Show>
+                          </div>
+                        }
+                      >
+                        <img
+                          class="app-list-icon-img"
+                          src={appIcons()[app.id]}
+                          alt={getLocalizedValue(app.name, locale())}
+                        />
                       </Show>
-                      <div class="eden-list-item-meta">
-                        <FiChevronRight />
+                    </div>
+                    <div class="eden-list-item-content">
+                      <div class="eden-list-item-title">
+                        {getLocalizedValue(app.name, locale())}
+                      </div>
+                      <div class="eden-list-item-description">
+                        v{app.version}
                       </div>
                     </div>
-                  )}
-                </For>
-              </div>
-            </>
+                    <Show when={app.isPrebuilt}>
+                      <span class="eden-badge eden-badge-info eden-badge-sm">
+                        {t("settings.apps.builtin")}
+                      </span>
+                    </Show>
+                    <div class="eden-list-item-meta">
+                      <FiChevronRight />
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
           }
         >
           {(app) => (
@@ -314,9 +307,7 @@ const AppsTab: Component = () => {
               onAutostartToggle={(enabled) =>
                 handleAutostartToggle(app().id, enabled)
               }
-              onHotReloadToggle={(enabled) =>
-                handleHotReloadToggle(app().id, enabled)
-              }
+              onHotReloadToggle={() => handleHotReloadToggle(app().id)}
               onUninstall={(e) => handleUninstall(app().id, e)}
             />
           )}

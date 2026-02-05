@@ -1,2 +1,2 @@
-export * from "./NotificationManager";
 export * from "./NotificationHandler";
+export * from "./NotificationManager";

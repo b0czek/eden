@@ -10,26 +10,25 @@
  * Usage: pnpm run codegen
  */
 
-import { Project, Node } from "ts-morph";
-import * as path from "path";
-import * as fs from "fs";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { Node, Project } from "ts-morph";
 
 import {
+  type CommandInfo,
   extractCommandHandlers,
-  groupCommandsByNamespace,
   generateCommandsCode,
-  CommandInfo,
+  groupCommandsByNamespace,
 } from "./commands";
 
 import {
+  type EventInfo,
   extractEventDeclarations,
-  groupEventsByNamespace,
   generateEventsCode,
-  EventInfo,
+  groupEventsByNamespace,
 } from "./events";
-
-import { generateRuntimeCode } from "./runtime";
 import { generateI18nTypes } from "./i18n";
+import { generateRuntimeCode } from "./runtime";
 
 /**
  * Main code generation function

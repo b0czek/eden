@@ -1,32 +1,32 @@
 import "reflect-metadata";
+import type { EdenConfig } from "@edenapp/types";
 import { app, BrowserWindow } from "electron";
 import * as fs from "fs";
 import * as path from "path";
-import { IPCBridge, CommandRegistry } from "./ipc";
+import { container } from "tsyringe";
 import { AppChannelManager } from "./appbus";
-import { SystemHandler } from "./SystemHandler";
+import { AppearanceManager } from "./appearance/AppearanceManager";
+import { ContextMenuManager } from "./context-menu";
+import { DbManager } from "./db";
+import { FileOpenManager } from "./file-open";
+import { FilesystemManager } from "./filesystem";
 import { I18nManager } from "./i18n/I18nManager";
-import { EdenConfig } from "@edenapp/types";
+import { CommandRegistry, IPCBridge } from "./ipc";
 import { log } from "./logging";
 import { attachWebContentsLogger } from "./logging/electron";
+import { NotificationManager } from "./notification";
 // Managers and Handlers
 import { PackageManager } from "./package-manager";
 import {
-  ProcessManager,
-  BackendManager,
   AutostartManager,
+  BackendManager,
+  ProcessManager,
 } from "./process-manager";
-import { ViewManager } from "./view-manager";
-import { FilesystemManager } from "./filesystem";
-import { FileOpenManager } from "./file-open";
-import { NotificationManager } from "./notification";
-import { ContextMenuManager } from "./context-menu";
-import { DbManager } from "./db";
-import { SettingsManager } from "./settings";
-import { AppearanceManager } from "./appearance/AppearanceManager";
-import { UserManager } from "./user";
+import { SystemHandler } from "./SystemHandler";
 import { seedDatabase } from "./seed";
-import { container } from "tsyringe";
+import { SettingsManager } from "./settings";
+import { UserManager } from "./user";
+import { ViewManager } from "./view-manager";
 
 export class Eden {
   private mainWindow: BrowserWindow | null = null;

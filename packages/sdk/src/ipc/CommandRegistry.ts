@@ -1,10 +1,10 @@
 import "reflect-metadata";
-import { injectable, singleton, inject, delay } from "tsyringe";
-import { PermissionRegistry } from "./PermissionRegistry";
+import { delay, inject, injectable, singleton } from "tsyringe";
+import { log } from "../logging";
 import type { UserManager } from "../user/UserManager";
 import { getManagerMetadata } from "./CommandMetadata";
+import { PermissionRegistry } from "./PermissionRegistry";
 
-import { log } from "../logging";
 export {
   addCommandHandler,
   getManagerMetadata,

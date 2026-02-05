@@ -1,5 +1,5 @@
-import { Component, For, createSignal, onMount } from "solid-js";
-import type { WallpaperPreset, WallpaperConfig } from "@edenapp/types";
+import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
+import { type Component, createSignal, For, onMount } from "solid-js";
 import { t } from "../i18n";
 import "./AppearanceTab.css";
 

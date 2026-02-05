@@ -1,8 +1,12 @@
-import { utilityProcess, MessageChannelMain, UtilityProcess } from "electron";
-import { EventEmitter } from "events";
-import * as path from "path";
-import { AppManifest } from "@edenapp/types";
-import { singleton, injectable, inject } from "tsyringe";
+import { EventEmitter } from "node:events";
+import * as path from "node:path";
+import type { AppManifest } from "@edenapp/types";
+import {
+  MessageChannelMain,
+  type UtilityProcess,
+  utilityProcess,
+} from "electron";
+import { inject, injectable, singleton } from "tsyringe";
 
 import { log } from "../logging";
 /**

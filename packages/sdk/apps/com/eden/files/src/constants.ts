@@ -1,4 +1,4 @@
-import { ItemSize } from "./types";
+import type { ItemSize } from "./types";
 
 export const ITEM_SIZES: ItemSize[] = [
   "tiny",

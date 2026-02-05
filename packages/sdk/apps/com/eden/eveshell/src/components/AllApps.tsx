@@ -1,8 +1,8 @@
-import { For, Show, createSignal, onMount } from "solid-js";
-import AppIcon from "./AppIcon";
-import { AppInfo } from "../types";
-import { t } from "../i18n";
 import { contextMenu, type Menu } from "@edenapp/tablets";
+import { createSignal, For, onMount, Show } from "solid-js";
+import { t } from "../i18n";
+import type { AppInfo } from "../types";
+import AppIcon from "./AppIcon";
 
 interface AllAppsProps {
   apps: AppInfo[];

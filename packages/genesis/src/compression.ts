@@ -3,8 +3,8 @@
  * Makes it easy to switch between different compression libraries
  */
 
-import * as fs from "fs";
-import * as crypto from "crypto";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
 
 /**
  * Result of streaming compression

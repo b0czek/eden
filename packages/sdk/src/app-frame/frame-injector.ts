@@ -1,4 +1,5 @@
 import { log } from "../logging";
+
 /**
  * Eden App Frame Injector
  *
@@ -7,21 +8,21 @@ import { log } from "../logging";
  */
 
 import {
-  createOverlay,
-  injectOverlay,
-  setupDarkMode,
-  setTitle,
-  getAppName,
-} from "./ui-builder.js";
-import {
   setupCloseButton,
   setupMinimizeButton,
   setupToggleModeButton,
 } from "./button-handlers.js";
+import {
+  createOverlay,
+  getAppName,
+  injectOverlay,
+  setTitle,
+  setupDarkMode,
+} from "./ui-builder.js";
 import { setupWindowDragging } from "./window-dragging.js";
 import { setupWindowResizing } from "./window-resizing.js";
 
-(function () {
+(() => {
   log.info("Injection script started");
 
   // Initialize edenFrame object if not exists

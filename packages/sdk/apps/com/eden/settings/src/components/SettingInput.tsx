@@ -1,5 +1,5 @@
-import { Component, Show, For } from "solid-js";
 import type { SettingDefinition } from "@edenapp/types";
+import { type Component, For, Show } from "solid-js";
 import { getLocalizedValue, locale } from "../i18n";
 
 interface SettingInputProps {

@@ -1,10 +1,10 @@
-import { createSignal, createEffect, onMount } from "solid-js";
-import { createStore } from "solid-js/store";
-import type { Component } from "solid-js";
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
-import SettingsSidebar from "./components/SettingsSidebar";
+import type { Component } from "solid-js";
+import { createEffect, createSignal, onMount } from "solid-js";
+import { createStore } from "solid-js/store";
 import SettingsContent from "./components/SettingsContent";
-import { initLocale, locale, getLocalizedValue } from "./i18n";
+import SettingsSidebar from "./components/SettingsSidebar";
+import { getLocalizedValue, initLocale, locale } from "./i18n";
 import type { SelectedItem } from "./types";
 import "./App.css";
 

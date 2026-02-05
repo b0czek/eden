@@ -1,5 +1,5 @@
 import { inject, injectable, singleton } from "tsyringe";
-import { EdenEmitter, EdenNamespace, IPCBridge, CommandRegistry } from "../ipc";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { SettingsManager } from "../settings/SettingsManager";
 import { I18nHandler } from "./I18nHandler";
 import { commonEn } from "./locales/en";
@@ -53,7 +53,7 @@ export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {
   getCommon(locale: string): { translations: Record<string, any> } {
     const validLocale = locale as keyof typeof CommonTranslations;
     return {
-      translations: CommonTranslations[validLocale] || CommonTranslations["en"],
+      translations: CommonTranslations[validLocale] || CommonTranslations.en,
     };
   }
 }

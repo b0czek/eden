@@ -1,5 +1,5 @@
-import { setupI18n } from "@edenapp/babel/solid";
 import type { I18nCommonTranslations } from "@edenapp/babel/generated/i18n";
+import { setupI18n } from "@edenapp/babel/solid";
 import type { InferTranslations } from "@edenapp/babel/types";
 import { en } from "./locales/en";
 import { pl } from "./locales/pl";

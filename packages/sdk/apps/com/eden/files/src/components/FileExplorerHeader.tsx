@@ -1,16 +1,14 @@
-import { createSignal } from "solid-js";
-import type { Component } from "solid-js";
-import Omnibox from "./Omnibox";
 import {
   FaSolidArrowLeft,
   FaSolidArrowRight,
   FaSolidArrowUp,
-  FaSolidFolderPlus,
-  FaSolidFileMedical,
   FaSolidEllipsis,
+  FaSolidFileMedical,
+  FaSolidFolderPlus,
 } from "solid-icons/fa";
-
+import type { Component } from "solid-js";
 import { t } from "../i18n";
+import Omnibox from "./Omnibox";
 
 interface Breadcrumb {
   name: string;

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
-import * as path from "path";
+import * as path from "node:path";
 import chalk from "chalk";
+import { Command } from "commander";
 import { GenesisBundler } from "./bundler";
 
 const program = new Command();
@@ -30,7 +30,7 @@ program
 
     const compressionLevel = parseInt(options.compression, 10);
     if (
-      isNaN(compressionLevel) ||
+      Number.isNaN(compressionLevel) ||
       compressionLevel < 1 ||
       compressionLevel > 22
     ) {
@@ -121,15 +121,17 @@ program
         process.exit(0);
       } else {
         console.log(chalk.yellow("⚠ Warning: Missing files"));
-        fileCheck.errors.forEach((error) =>
-          console.log(chalk.gray(`  - ${error}`)),
-        );
+        fileCheck.errors.forEach((error) => {
+          console.log(chalk.gray(`  - ${error}`));
+        });
         console.log();
         process.exit(1);
       }
     } else {
       console.log(chalk.red("❌ Manifest is invalid\n"));
-      result.errors.forEach((error) => console.log(chalk.gray(`  - ${error}`)));
+      result.errors.forEach((error) => {
+        console.log(chalk.gray(`  - ${error}`));
+      });
       console.log();
       process.exit(1);
     }

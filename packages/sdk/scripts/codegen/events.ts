@@ -4,12 +4,12 @@
  * Extracts event declarations and generates event type interfaces.
  */
 
-import { ClassDeclaration, Node, SyntaxKind } from "ts-morph";
+import { type ClassDeclaration, Node, SyntaxKind } from "ts-morph";
 import {
-  replaceTypesWithInlineImports,
   extractDocs,
   generateHeader,
   namespaceToInterfaceName,
+  replaceTypesWithInlineImports,
 } from "./utils";
 
 export interface EventInfo {
@@ -198,5 +198,5 @@ export function generateEventsCode(
     lines.push("export interface AppEvents {}");
   }
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

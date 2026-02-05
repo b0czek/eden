@@ -1,7 +1,6 @@
-import { BrowserWindow, WebContentsView } from "electron";
-import { ViewCreationOptions, ViewInfo } from "./types";
-
+import { type BrowserWindow, WebContentsView } from "electron";
 import { log } from "../logging";
+import type { ViewCreationOptions, ViewInfo } from "./types";
 /**
  * Check if a WebContentsView exists and is valid.
  */

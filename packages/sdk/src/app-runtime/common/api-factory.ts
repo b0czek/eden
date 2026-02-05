@@ -1,11 +1,11 @@
 import type {
-  EdenAPI,
   AppBusAPI,
   AppBusConnection,
-  ServiceInfo,
+  EdenAPI,
   ServiceConnectCallback,
+  ServiceInfo,
 } from "@edenapp/types";
-import type { PendingRequest, IPCPort, AppBusState } from "./port-channel";
+import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
 
 /**
