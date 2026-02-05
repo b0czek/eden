@@ -124,12 +124,11 @@ const shellTransport: ShellTransport = {
 };
 
 // Expose edenAPI for shell commands and event subscriptions
-contextBridge.exposeInMainWorld(
-  "edenAPI",
-  createEdenAPI(shellTransport, eventSubscriptions, {
-    getLaunchArgs: () => launchArgs,
-  })
-);
+const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
+  getLaunchArgs: () => launchArgs,
+});
+
+contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 
 // ===================================================================
 // AppBus - App-to-App Communication System

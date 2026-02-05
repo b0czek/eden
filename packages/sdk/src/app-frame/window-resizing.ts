@@ -26,7 +26,7 @@ interface BoundsRef {
  */
 export function setupWindowResizing(
   windowConfig: NonNullable<Window["edenFrame"]>["_internal"]["config"],
-  currentBoundsRef: BoundsRef
+  currentBoundsRef: BoundsRef,
 ): void {
   // Create resize handle in bottom-right corner
   const resizeHandle = document.createElement("div");
@@ -73,8 +73,6 @@ export function setupWindowResizing(
   };
 
   const startResize = (e: MouseEvent | TouchEvent): void => {
-    log.info("startResize called, event type:", e.type);
-
     // Initialize current bounds if not set
     if (!currentBoundsRef.current) {
       const initialBounds = window.edenFrame?._internal.bounds;
@@ -82,12 +80,10 @@ export function setupWindowResizing(
         currentBoundsRef.current = { ...initialBounds };
         log.info(
           "Initialized currentBounds from edenFrame._internal.bounds:",
-          currentBoundsRef.current
+          currentBoundsRef.current,
         );
       } else {
-        log.warn(
-          "Cannot start resize - currentBounds not initialized!"
-        );
+        log.warn("Cannot start resize - currentBounds not initialized!");
         return;
       }
     }
@@ -100,8 +96,6 @@ export function setupWindowResizing(
     startX = coords.x;
     startY = coords.y;
     resizeStartBounds = { ...currentBoundsRef.current };
-
-    log.info("Resize started at:", coords, "isTouch:", isTouch);
 
     e.preventDefault();
     e.stopPropagation();
@@ -140,7 +134,7 @@ export function setupWindowResizing(
       "moveResize called, isResizing:",
       isResizing,
       "event type:",
-      e.type
+      e.type,
     );
 
     e.preventDefault();
@@ -151,7 +145,7 @@ export function setupWindowResizing(
         "moveResize returning early - isResizing:",
         isResizing,
         "resizeStartBounds:",
-        resizeStartBounds
+        resizeStartBounds,
       );
       return;
     }
@@ -204,10 +198,6 @@ export function setupWindowResizing(
       return;
     }
 
-    log.info(
-      "Resize ended, final currentBounds:",
-      currentBoundsRef.current
-    );
     isResizing = false;
     resizeStartBounds = null;
 
@@ -241,7 +231,7 @@ export function setupWindowResizing(
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
       log.info(
         "Updated edenFrame._internal.bounds after touch resize:",
-        window.edenFrame?._internal.bounds
+        window.edenFrame?._internal.bounds,
       );
     }
 
@@ -253,9 +243,7 @@ export function setupWindowResizing(
     }
 
     if (appId) {
-      window.edenAPI
-        .shellCommand("view/focus-app", { appId })
-        .catch(log.error);
+      window.edenAPI.shellCommand("view/focus-app", { appId }).catch(log.error);
     }
   };
 

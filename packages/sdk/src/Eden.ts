@@ -20,6 +20,7 @@ import { ViewManager } from "./view-manager";
 import { FilesystemManager } from "./filesystem";
 import { FileOpenManager } from "./file-open";
 import { NotificationManager } from "./notification";
+import { ContextMenuManager } from "./context-menu";
 import { DbManager } from "./db";
 import { SettingsManager } from "./settings";
 import { AppearanceManager } from "./appearance/AppearanceManager";
@@ -140,6 +141,7 @@ export class Eden {
 
     container.resolve(SystemHandler);
     container.resolve(NotificationManager);
+    container.resolve(ContextMenuManager);
     container.resolve(DbManager);
     container.resolve(AppearanceManager);
   }

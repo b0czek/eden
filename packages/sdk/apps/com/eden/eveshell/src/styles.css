@@ -425,22 +425,3 @@ body {
   justify-content: center;
 }
 
-/* ============================
-   App Context Menu
-   ============================ */
-
-.context-menu-overlay {
-  background: transparent;
-  backdrop-filter: none;
-}
-
-.context-menu-title {
-  border-bottom: 1px solid var(--eden-color-border-light);
-  padding-bottom: var(--eden-space-xs);
-  margin-bottom: var(--eden-space-xs);
-}
-
-.context-menu-btn {
-  justify-content: flex-start;
-  width: 100%;
-}

@@ -1,0 +1,29 @@
+{
+  "id": "com.eden.context-menu",
+  "name": "Context Menu",
+  "version": "1.0.0",
+  "overlay": true,
+  "autostart": true,
+  "permissions": ["context-menu/display"],
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 0,
+      "height": 0
+    },
+    "defaultPosition": {
+      "x": 0,
+      "y": 0
+    },
+    "injections": {
+      "css": "tokens",
+      "appFrame": false
+    }
+  }
+}

@@ -201,6 +201,15 @@ importers:
         specifier: ^2.11.10
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@24.10.10))
 
+  packages/sdk/apps/com/eden/context-menu:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../../../../../types
+      vite:
+        specifier: ^5.4.14
+        version: 5.4.21(@types/node@24.10.10)
+
   packages/sdk/apps/com/eden/editor:
     dependencies:
       monaco-editor:
@@ -230,17 +239,19 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@24.10.10))
 
   packages/sdk/apps/com/eden/eveshell:
-    dependencies:
-      solid-icons:
-        specifier: ^1.1.0
-        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/tablets':
+        specifier: workspace:*
+        version: link:../../../../../tablets
       '@edenapp/types':
         specifier: workspace:*
         version: link:../../../../../types
+      '@types/feather-icons':
+        specifier: ^4.29.4
+        version: 4.29.4
       solid-js:
         specifier: ^1.9.10
         version: 1.9.10
@@ -408,6 +419,15 @@ importers:
       vite:
         specifier: ^7.2.4
         version: 7.2.6(@types/node@24.10.10)
+
+  packages/tablets:
+    devDependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../types
+      typescript:
+        specifier: ^5.3.0
+        version: 5.6.3
 
   packages/types: {}
 
@@ -1471,6 +1491,9 @@ packages:
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
+
+  '@types/feather-icons@4.29.4':
+    resolution: {integrity: sha512-cvwI455PWx/gJ33XDTIZOdauRy+XCxZggkOT/tAQYZLdySPFATD4RnDC9mxOnCIEaK9kwPm3zZigkAsMkhXb5w==}
 
   '@types/graceful-fs@4.1.9':
     resolution: {integrity: sha512-olP3sd1qOEe5dXTSaFvQG+02VdRXcdytWLAZsAq1PecU8uqQAhkrnbli7DagjtXKW/Bl7YJbUsa8MPcuc8LHEQ==}
@@ -3377,10 +3400,12 @@ packages:
   tar@6.2.1:
     resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
     engines: {node: '>=10'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   tar@7.5.2:
     resolution: {integrity: sha512-7NyxrTE4Anh8km8iEy7o0QYPs+0JKBTj5ZaqHg6B39erLg0qYXN3BijtShwbsNSvQ+LN75+KV+C4QR/f6Gwnpg==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   term-size@2.2.1:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
@@ -4798,6 +4823,8 @@ snapshots:
       '@types/node': 20.19.25
 
   '@types/estree@1.0.8': {}
+
+  '@types/feather-icons@4.29.4': {}
 
   '@types/graceful-fs@4.1.9':
     dependencies:

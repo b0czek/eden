@@ -12,7 +12,6 @@ export * from "./worker";
 
 export * from "./ipc";
 
-
 /**
  * App Instance Interface
  *
@@ -166,6 +165,8 @@ export interface Notification {
   /** Notification type for styling (default: info) */
   type?: NotificationType;
 }
+
+export * from "./ContextMenu";
 
 export interface WallpaperPreset {
   id: string;

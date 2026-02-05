@@ -12,6 +12,6 @@ new Eden({
   window: {
     title: "Eden SDK Example",
   },
-  coreApps: ["com.eden.eveshell", "com.eden.toaster"],
+  coreApps: ["com.eden.eveshell", "com.eden.toaster", "com.eden.context-menu"],
   restrictedApps: ["com.eden.login", "com.eden.users"],
 });

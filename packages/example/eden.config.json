@@ -13,6 +13,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.context-menu",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.files",
       "source": "builtin"
     },
@@ -52,7 +56,8 @@
   "settings": {
     "com.eden": {
       "autostart.com.eden.eveshell": "true",
-      "autostart.com.eden.toaster": "true"
+      "autostart.com.eden.toaster": "true",
+      "autostart.com.eden.context-menu": "true"
     }
   },
   "hotReload": {

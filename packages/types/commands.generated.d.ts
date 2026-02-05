@@ -96,6 +96,29 @@ export interface AppearanceCommands {
 }
 
 /**
+ * ContextMenuCommands - Commands for the "context-menu" namespace
+ */
+export interface ContextMenuCommands {
+  "context-menu/register-display": {
+    args: { };
+    response: { success: boolean };
+  };
+  "context-menu/open": {
+    args: import("./index").ContextMenuOpenArgs & { };
+    response: { requestId: string };
+  };
+  "context-menu/resolve": {
+    args: import("./index").ContextMenuResult & { };
+    response: { success: boolean };
+  };
+  "context-menu/close": {
+    args: {
+    requestId?: string };
+    response: { success: boolean };
+  };
+}
+
+/**
  * DbCommands - Commands for the "db" namespace
  */
 export interface DbCommands {
@@ -792,4 +815,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}

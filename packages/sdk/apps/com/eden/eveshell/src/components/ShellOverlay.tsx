@@ -1,8 +1,6 @@
 import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
 import Dock from "./Dock";
 import AllApps from "./AllApps";
-import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
-import UserContextMenu from "./UserContextMenu";
 import ChangePasswordModal from "./ChangePasswordModal";
 import {
   ViewBounds,
@@ -11,7 +9,8 @@ import {
   AppInstance,
   UserProfile,
 } from "@edenapp/types";
-import { AppInfo, ContextMenuPosition } from "../types";
+import { AppInfo } from "../types";
+import { createAppMenu, createUserContextMenu } from "../context-menu";
 import { t, initLocale, locale, getLocalizedValue } from "../i18n";
 
 // Constants
@@ -25,8 +24,6 @@ export default function ShellOverlay() {
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
-  const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
-  const [userMenu, setUserMenu] = createSignal<ContextMenuPosition | null>(null);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
 
@@ -227,7 +224,7 @@ export default function ShellOverlay() {
   };
 
   createEffect(() => {
-    if (!showAllApps() && !dockContextMenu() && !userMenu() && !showChangePassword()) {
+    if (!showAllApps() && !showChangePassword()) {
       requestResize("dock");
     }
   });
@@ -244,39 +241,14 @@ export default function ShellOverlay() {
     }
   };
 
-
-
-  // Handle context menu from dock - resize to fullscreen so menu fits
-  const handleDockContextMenu = async (menu: ContextMenuData) => {
-    await requestResize("fullscreen");
-    setUserMenu(null);
-    setDockContextMenu(menu);
-  };
-
-  // Close dock context menu and resize back to dock
-  const handleCloseDockContextMenu = async () => {
-    setDockContextMenu(null);
-    if (!showAllApps()) {
-      await requestResize("dock");
-    }
-  };
-
-  const handleUserMenu = async (event: MouseEvent) => {
-    if (!currentUser()) return;
-    await requestResize("fullscreen");
-    setDockContextMenu(null);
-    setUserMenu({
-      left: event.clientX,
-      bottom: DOCK_HEIGHT,
-    });
-  };
-
-  const handleCloseUserMenu = async () => {
-    setUserMenu(null);
-    if (!showAllApps() && !dockContextMenu() && !showChangePassword()) {
-      await requestResize("dock");
-    }
-  };
+  // Create menu once with actions - just pass app data when opening
+  const appMenu = createAppMenu({
+    open: handleAppClick,
+    stop: handleStopApp,
+    addToDock: handleAddToDock,
+    removeFromDock: handleRemoveFromDock,
+    isPinned: isAppPinned,
+  });
 
   const handleLogout = async () => {
     try {
@@ -291,9 +263,15 @@ export default function ShellOverlay() {
     await requestResize("fullscreen");
   };
 
+  // Create user menu factory
+  const userContextMenu = createUserContextMenu({
+    changePassword: handleOpenChangePassword,
+    logout: handleLogout,
+  });
+
   const handleCloseChangePassword = () => {
     setShowChangePassword(false);
-    if (!showAllApps() && !dockContextMenu() && !userMenu()) {
+    if (!showAllApps()) {
       requestResize("dock");
     }
   };
@@ -365,7 +343,7 @@ export default function ShellOverlay() {
     <div
       class="shell-overlay"
       data-mode={
-        showAllApps() || dockContextMenu() || userMenu() || showChangePassword()
+        showAllApps() || showChangePassword()
           ? "fullscreen"
           : "dock"
       }
@@ -376,56 +354,21 @@ export default function ShellOverlay() {
           apps={allApps()}
           onClose={handleShowAllApps}
           onAppClick={handleAppClick}
-          onStopApp={handleStopApp}
-          isAppPinned={isAppPinned}
-          onAddToDock={handleAddToDock}
-          onRemoveFromDock={handleRemoveFromDock}
+          appMenu={appMenu}
         />
       </Show>
 
-      {/* Dock is always visible */}
-      <Dock
-        runningApps={dockRunningApps()}
-        pinnedApps={dockPinnedApps()}
-        currentUser={currentUser()}
-        onUserClick={handleUserMenu}
-        onAppClick={handleAppClick}
-        onShowAllApps={handleShowAllApps}
-        onContextMenu={handleDockContextMenu}
-      />
-
-      {/* Context menu for dock apps */}
-      <Show when={dockContextMenu()}>
-        {(menu) => (
-          <AppContextMenu
-            menu={menu()}
-            isAppPinned={isAppPinned}
-            onOpenApp={handleAppClick}
-            onStopApp={handleStopApp}
-            onAddToDock={handleAddToDock}
-            onRemoveFromDock={handleRemoveFromDock}
-            onClose={handleCloseDockContextMenu}
-          />
-        )}
-      </Show>
-
-      <Show when={userMenu()}>
-        {(menu) => (
-          <Show when={currentUser()}>
-            {(user) => (
-              <UserContextMenu
-                user={user()}
-                left={menu().left}
-                right={menu().right}
-                top={menu().top}
-                bottom={menu().bottom}
-                onLogout={handleLogout}
-                onChangePassword={handleOpenChangePassword}
-                onClose={handleCloseUserMenu}
-              />
-            )}
-          </Show>
-        )}
+      {/* Dock hidden when AllApps is open */}
+      <Show when={!showAllApps()}>
+        <Dock
+          runningApps={dockRunningApps()}
+          pinnedApps={dockPinnedApps()}
+          currentUser={currentUser()}
+          onAppClick={handleAppClick}
+          onShowAllApps={handleShowAllApps}
+          userMenu={userContextMenu}
+          appMenu={appMenu}
+        />
       </Show>
 
       <ChangePasswordModal

@@ -14,6 +14,14 @@ export interface AppearanceEvents {
 }
 
 /**
+ * ContextMenuEvents - Events for the "context-menu" namespace
+ */
+export interface ContextMenuEvents {
+  "context-menu/opened": { menu: import("./index").ContextMenuOpenEvent };
+  "context-menu/closed": import("./index").ContextMenuResult;
+}
+
+/**
  * FileEvents - Events for the "file" namespace
  */
 export interface FileEvents {
@@ -93,4 +101,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}

@@ -2,20 +2,20 @@ import { For, Show, createSignal, onMount } from "solid-js";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
 import { AppInfo } from "../types";
-import { ContextMenuData } from "./AppContextMenu";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
 import { t } from "../i18n";
 import UserBadge from "./UserBadge";
 import type { UserProfile } from "@edenapp/types";
+import type { Menu } from "@edenapp/tablets";
 
 interface DockProps {
   runningApps: AppInfo[];  // Running apps that are NOT pinned
   pinnedApps: AppInfo[];   // Pinned apps (may or may not be running)
   currentUser: UserProfile | null;
-  onUserClick: (event: MouseEvent) => void;
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
-  onContextMenu: (menu: ContextMenuData) => void;
+  userMenu: Menu<UserProfile | null>;
+  appMenu: Menu<AppInfo>;
 }
 
 export default function Dock(props: DockProps) {
@@ -76,7 +76,10 @@ export default function Dock(props: DockProps) {
     <div class="dock" classList={{ "dock-initial": isInitial() }} ref={dockRef}>
       <div class="dock-left">
         <div class="dock-user">
-          <UserBadge user={props.currentUser} onClick={props.onUserClick} />
+          <UserBadge
+            user={props.currentUser}
+            onClick={props.userMenu.handler(() => props.currentUser)}
+          />
         </div>
       </div>
       <div class="dock-center">
@@ -94,16 +97,7 @@ export default function Dock(props: DockProps) {
                 appName={app.name}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  props.onContextMenu({
-                    appId: app.id,
-                    appName: app.name,
-                    isRunning: app.isRunning,
-                    left: e.clientX,
-                    bottom: 72,
-                  });
-                }}
+                onContextMenu={props.appMenu.handler(app)}
               />
             )}
           </For>
@@ -121,17 +115,7 @@ export default function Dock(props: DockProps) {
                 appName={app.name}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  console.log(e.clientX, e.clientY);
-                  props.onContextMenu({
-                    appId: app.id,
-                    appName: app.name,
-                    isRunning: app.isRunning,
-                    left: e.clientX,
-                    bottom: 72,
-                  });
-                }}
+                onContextMenu={props.appMenu.handler(app)}
               />
             )}
           </For>

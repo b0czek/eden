@@ -17,6 +17,10 @@ export const COMMAND_NAMES: readonly string[] = [
   "appearance/set-wallpaper",
   "appearance/get-wallpaper",
   "appearance/get-presets",
+  "context-menu/register-display",
+  "context-menu/open",
+  "context-menu/resolve",
+  "context-menu/close",
   "db/get",
   "db/set",
   "db/delete",
@@ -100,6 +104,8 @@ export const COMMAND_NAMES: readonly string[] = [
 // Event names array
 export const APP_EVENT_NAMES: readonly string[] = [
   "appearance/wallpaper-changed",
+  "context-menu/opened",
+  "context-menu/closed",
   "file/opened",
   "i18n/locale-changed",
   "notification/added",

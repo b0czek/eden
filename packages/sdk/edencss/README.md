@@ -141,17 +141,11 @@ Variants: `eden-card-glass`, `eden-card-elevated`, `eden-card-interactive`
 <span class="eden-tag">Label</span>
 ```
 
-### Lists & Menus
+### Lists
 
 ```html
 <ul class="eden-list">
   <li class="eden-list-item eden-list-item-interactive">Click me</li>
-</ul>
-
-<ul class="eden-menu">
-  <li class="eden-menu-item">Action</li>
-  <li class="eden-menu-divider"></li>
-  <li class="eden-menu-item eden-menu-item-danger">Delete</li>
 </ul>
 ```
 

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eden Context Menu</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+
+<body>
+  <div id="context-menu-root" class="context-menu-root">
+    <div id="context-menu-overlay" class="context-menu-overlay"></div>
+    <div id="context-menu" class="eden-popover context-menu" tabindex="-1">
+      <div id="context-menu-title" class="eden-popover-title context-menu-title"></div>
+      <ul id="context-menu-items" class="context-menu-items"></ul>
+    </div>
+  </div>
+  <script type="module" src="/src/context-menu.ts"></script>
+</body>
+
+</html>
