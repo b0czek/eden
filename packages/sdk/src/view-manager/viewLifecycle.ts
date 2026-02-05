@@ -5,9 +5,7 @@ import { log } from "../logging";
 /**
  * Check if a WebContentsView exists and is valid.
  */
-export function isValidView(
-  view?: WebContentsView
-): view is WebContentsView {
+export function isValidView(view?: WebContentsView): view is WebContentsView {
   return view !== undefined && view !== null;
 }
 
@@ -27,7 +25,7 @@ export function isViewAlive(view?: WebContentsView): boolean {
  * Check if a BrowserWindow exists and is not destroyed.
  */
 export function isWindowAlive(
-  window?: BrowserWindow | null
+  window?: BrowserWindow | null,
 ): window is BrowserWindow {
   return window !== undefined && window !== null && !window.isDestroyed();
 }
@@ -38,7 +36,7 @@ export function isWindowAlive(
  */
 export function requireView(
   viewId: number,
-  views: Map<number, ViewInfo>
+  views: Map<number, ViewInfo>,
 ): ViewInfo {
   const viewInfo = views.get(viewId);
 
@@ -59,7 +57,7 @@ export function requireView(
  */
 export function requireViewByAppId(
   appId: string,
-  views: Map<number, ViewInfo>
+  views: Map<number, ViewInfo>,
 ): { viewId: number; viewInfo: ViewInfo } {
   for (const [viewId, info] of views.entries()) {
     if (info.appId === appId) {
@@ -104,7 +102,7 @@ export function createView(options: ViewCreationOptions): WebContentsView {
  */
 export function destroyView(
   viewInfo: ViewInfo,
-  mainWindow: BrowserWindow | null
+  mainWindow: BrowserWindow | null,
 ): void {
   try {
     // Check if view is already destroyed
@@ -119,15 +117,11 @@ export function destroyView(
         mainWindow.contentView.removeChildView(viewInfo.view);
       } catch (error) {
         // Ignore errors during removal - view might already be removed
-        log.warn(
-          "Ignoring error during view removal:",
-          error
-        );
+        log.warn("Ignoring error during view removal:", error);
       }
     }
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     log.error("Failed to destroy view:", errorMessage);
     throw new Error(`Failed to destroy view: ${errorMessage}`);
   }
@@ -137,9 +131,7 @@ export function destroyView(
  * Remove all destroyed views from a view map.
  * Returns the number of views cleaned up.
  */
-export function cleanupDestroyedViews(
-  views: Map<number, ViewInfo>
-): number {
+export function cleanupDestroyedViews(views: Map<number, ViewInfo>): number {
   const destroyedIds: number[] = [];
 
   for (const [viewId, info] of views.entries()) {
@@ -153,9 +145,7 @@ export function cleanupDestroyedViews(
   }
 
   if (destroyedIds.length > 0) {
-    log.info(
-      `Cleaned up ${destroyedIds.length} destroyed views`
-    );
+    log.info(`Cleaned up ${destroyedIds.length} destroyed views`);
   }
 
   return destroyedIds.length;

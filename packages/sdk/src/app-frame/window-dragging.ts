@@ -17,7 +17,7 @@ export function setupWindowDragging(
   currentBoundsRef: {
     current: { x: number; y: number; width: number; height: number } | null;
   },
-): void {
+): () => void {
   let isDragging = false;
   let startX = 0;
   let startY = 0;
@@ -221,4 +221,20 @@ export function setupWindowDragging(
   document.addEventListener("touchcancel", endDrag, { passive: false });
 
   log.info("Drag event listeners registered");
+
+  return () => {
+    overlay.removeEventListener("mousedown", startDrag);
+    overlay.removeEventListener("touchstart", startDrag);
+    document.removeEventListener("touchmove", moveDrag as EventListener, {
+      capture: true,
+    });
+    document.removeEventListener("touchend", endDrag);
+    document.removeEventListener("touchcancel", endDrag);
+    window.removeEventListener("mouseup", endDrag);
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    log.info("Drag event listeners removed");
+  };
 }

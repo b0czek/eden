@@ -27,7 +27,7 @@ interface BoundsRef {
 export function setupWindowResizing(
   windowConfig: NonNullable<Window["edenFrame"]>["_internal"]["config"],
   currentBoundsRef: BoundsRef,
-): void {
+): () => void {
   // Create resize handle in bottom-right corner
   const resizeHandle = document.createElement("div");
   resizeHandle.id = "eden-resize-handle";
@@ -265,4 +265,25 @@ export function setupWindowResizing(
   document.addEventListener("touchcancel", endResize, { passive: false });
 
   log.info("Resize event listeners registered");
+
+  return () => {
+    if (resizeHandle.parentNode) {
+      resizeHandle.parentNode.removeChild(resizeHandle);
+    }
+
+    resizeHandle.removeEventListener("mousedown", startResize);
+    resizeHandle.removeEventListener("touchstart", startResize);
+
+    document.removeEventListener("touchmove", moveResize, {
+      capture: true,
+    });
+    document.removeEventListener("touchend", endResize);
+    document.removeEventListener("touchcancel", endResize);
+    window.removeEventListener("mouseup", endResize);
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    log.info("Resize event listeners removed");
+  };
 }
