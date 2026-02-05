@@ -148,7 +148,7 @@ export default function ShellOverlay() {
   // Helper function to calculate bounds based on mode and window size
   const calculateBounds = (
     mode: "dock" | "fullscreen",
-    windowSize: WindowSize
+    windowSize: WindowSize,
   ) => {
     return mode === "fullscreen"
       ? { x: 0, y: 0, width: windowSize.width, height: windowSize.height }
@@ -177,7 +177,7 @@ export default function ShellOverlay() {
       // Get current window bounds
       const windowSize = await window.edenAPI.shellCommand(
         "view/window-size",
-        {}
+        {},
       );
       const bounds = calculateBounds(mode, windowSize);
       await updateOverlayBounds(bounds);
@@ -308,7 +308,7 @@ export default function ShellOverlay() {
       window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
       window.edenAPI.unsubscribe(
         "view/global-bounds-changed",
-        handleBoundsChange
+        handleBoundsChange,
       );
     });
 
@@ -316,7 +316,7 @@ export default function ShellOverlay() {
     (async () => {
       // Initialize i18n (will load locale and subscribe to changes)
       await initLocale();
-      
+
       // Load initial system info and pinned apps
       loadSystemInfo();
       loadPinnedApps();
@@ -331,7 +331,7 @@ export default function ShellOverlay() {
         await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
         await window.edenAPI.subscribe(
           "view/global-bounds-changed",
-          handleBoundsChange
+          handleBoundsChange,
         );
       } catch (error) {
         console.error("Failed to subscribe to events:", error);
@@ -342,11 +342,7 @@ export default function ShellOverlay() {
   return (
     <div
       class="shell-overlay"
-      data-mode={
-        showAllApps() || showChangePassword()
-          ? "fullscreen"
-          : "dock"
-      }
+      data-mode={showAllApps() || showChangePassword() ? "fullscreen" : "dock"}
     >
       {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>

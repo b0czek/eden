@@ -9,7 +9,7 @@ export class SystemHandler {
   constructor(
     @inject(IPCBridge) private ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject("EdenConfig") private config: EdenConfig
+    @inject("EdenConfig") private config: EdenConfig,
   ) {
     commandRegistry.registerManager(this);
   }

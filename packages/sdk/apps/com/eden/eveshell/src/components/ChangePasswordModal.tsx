@@ -59,7 +59,10 @@ const ChangePasswordModal: Component<ChangePasswordModalProps> = (props) => {
   return (
     <Show when={props.show}>
       <div class="eden-modal-overlay" onClick={handleClose}>
-        <div class="eden-modal eden-modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          class="eden-modal eden-modal-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div class="eden-modal-header">
             <h3 class="eden-modal-title">{t("shell.changePassword")}</h3>
             <button class="eden-modal-close" onClick={handleClose}>
@@ -84,9 +87,7 @@ const ChangePasswordModal: Component<ChangePasswordModalProps> = (props) => {
               />
             </div>
             <div class="eden-form-group">
-              <label class="eden-form-label">
-                {t("shell.newPassword")}
-              </label>
+              <label class="eden-form-label">{t("shell.newPassword")}</label>
               <input
                 type="password"
                 class="eden-input"

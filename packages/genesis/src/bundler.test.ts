@@ -40,7 +40,7 @@ describe("GenesisBundler", () => {
       const invalidManifestPath = path.join(tempDir, "invalid-manifest.json");
       await fs.writeFile(
         invalidManifestPath,
-        JSON.stringify({ name: "Test" }) // Missing required fields
+        JSON.stringify({ name: "Test" }), // Missing required fields
       );
 
       const result = await GenesisBundler.validateManifest(invalidManifestPath);
@@ -59,7 +59,7 @@ describe("GenesisBundler", () => {
 
       const result = await GenesisBundler.verifyFiles(
         sampleAppPath,
-        validation.manifest!
+        validation.manifest!,
       );
 
       expect(result.valid).toBe(true);
@@ -144,7 +144,7 @@ describe("GenesisBundler", () => {
       // 3. Update manifest to include it
       const manifestPath = path.join(tempAppPath, "manifest.json");
       const manifestContent = JSON.parse(
-        await fs.readFile(manifestPath, "utf-8")
+        await fs.readFile(manifestPath, "utf-8"),
       );
       manifestContent.include = ["extra-data.txt"];
       await fs.writeFile(manifestPath, JSON.stringify(manifestContent));

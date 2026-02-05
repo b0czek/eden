@@ -1,7 +1,8 @@
 import { createSignal, onCleanup, Show, onMount } from "solid-js";
 
 // Types we need from monaco (just the interface, not the actual module)
-type IStandaloneCodeEditor = import("monaco-editor").editor.IStandaloneCodeEditor;
+type IStandaloneCodeEditor =
+  import("monaco-editor").editor.IStandaloneCodeEditor;
 type MonacoModule = typeof import("monaco-editor");
 
 interface LazyMonacoEditorProps {
@@ -22,20 +23,22 @@ async function loadMonaco(): Promise<MonacoModule> {
   if (monacoModule) {
     return monacoModule;
   }
-  
+
   if (monacoLoadPromise) {
     return monacoLoadPromise;
   }
-  
+
   console.log("[LazyMonaco] Starting Monaco load...");
   const startTime = performance.now();
-  
+
   monacoLoadPromise = import("monaco-editor").then((mod) => {
     monacoModule = mod;
-    console.log(`[LazyMonaco] Monaco loaded in ${(performance.now() - startTime).toFixed(0)}ms`);
+    console.log(
+      `[LazyMonaco] Monaco loaded in ${(performance.now() - startTime).toFixed(0)}ms`,
+    );
     return mod;
   });
-  
+
   return monacoLoadPromise;
 }
 
@@ -46,18 +49,18 @@ async function loadMonaco(): Promise<MonacoModule> {
 export function LazyMonacoEditor(props: LazyMonacoEditorProps) {
   const [isLoading, setIsLoading] = createSignal(true);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  
+
   let containerRef: HTMLDivElement | undefined;
   let editor: IStandaloneCodeEditor | undefined;
 
   onMount(async () => {
     try {
       const monaco = await loadMonaco();
-      
+
       if (!containerRef) {
         throw new Error("Container ref not available");
       }
-      
+
       editor = monaco.editor.create(containerRef, {
         value: "",
         language: "plaintext",
@@ -81,10 +84,9 @@ export function LazyMonacoEditor(props: LazyMonacoEditorProps) {
         const currentContent = editor?.getValue() || "";
         props.onContentChange(currentContent);
       });
-      
+
       setIsLoading(false);
       props.onReady?.();
-      
     } catch (err) {
       console.error("[LazyMonaco] Failed to load Monaco:", err);
       setLoadError((err as Error).message);
@@ -105,9 +107,7 @@ export function LazyMonacoEditor(props: LazyMonacoEditorProps) {
         </div>
       </Show>
       <Show when={loadError()}>
-        <div class="monaco-error">
-          Failed to load editor: {loadError()}
-        </div>
+        <div class="monaco-error">Failed to load editor: {loadError()}</div>
       </Show>
     </div>
   );
@@ -120,13 +120,13 @@ export function LazyMonacoEditor(props: LazyMonacoEditorProps) {
 export async function setEditorContentLazy(
   editor: IStandaloneCodeEditor | undefined,
   content: string,
-  language: string
+  language: string,
 ): Promise<void> {
   if (!editor) return;
-  
+
   // Ensure Monaco is loaded (should be instant if already loaded)
   const monaco = await loadMonaco();
-  
+
   const model = editor.getModel();
   if (model) {
     monaco.editor.setModelLanguage(model, language);
@@ -138,7 +138,7 @@ export async function setEditorContentLazy(
  * Get editor content.
  */
 export function getEditorContentLazy(
-  editor: IStandaloneCodeEditor | undefined
+  editor: IStandaloneCodeEditor | undefined,
 ): string {
   return editor?.getValue() || "";
 }

@@ -321,7 +321,8 @@
 /* Default scrollbar for all scrollable elements */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--eden-color-border-separator) var(--eden-color-bg-glass-light);
+  scrollbar-color: var(--eden-color-border-separator)
+    var(--eden-color-bg-glass-light);
 }
 
 *::-webkit-scrollbar {

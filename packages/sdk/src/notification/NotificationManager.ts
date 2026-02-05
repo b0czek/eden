@@ -21,7 +21,7 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
 
@@ -48,7 +48,7 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     title: string,
     message: string,
     timeout: number = 5000,
-    type: NotificationType = "info"
+    type: NotificationType = "info",
   ): Notification {
     const id = this.generateId();
     const notification: Notification = {

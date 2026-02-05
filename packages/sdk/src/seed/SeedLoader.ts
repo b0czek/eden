@@ -10,10 +10,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import Keyv from "keyv";
 import KeyvSqlite from "@keyv/sqlite";
-import type {
-  EdenSeedConfig,
-  EdenUserConfig,
-} from "@edenapp/types";
+import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
 import { defaultGrantsForRole } from "../user/UserGrants";
 
 // Key constants matching UserManager and SettingsManager schemas
@@ -74,9 +71,7 @@ export async function seedDatabase(
     // Seed default user
     if (seedConfig.defaultUsername) {
       await usersDb.set(DEFAULT_USER_KEY, seedConfig.defaultUsername);
-      log.info(
-        `Seeded default user: ${seedConfig.defaultUsername}`,
-      );
+      log.info(`Seeded default user: ${seedConfig.defaultUsername}`);
     }
 
     // Mark users as seeded
@@ -174,9 +169,7 @@ async function seedSettings(
       const namespacedKey = `${appId}:${key}`;
       const existing = await db.get(namespacedKey);
       if (existing !== undefined) {
-        log.info(
-          `Setting "${appId}:${key}" already exists, skipping`,
-        );
+        log.info(`Setting "${appId}:${key}" already exists, skipping`);
         continue;
       }
 

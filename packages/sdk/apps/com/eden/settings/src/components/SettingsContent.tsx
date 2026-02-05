@@ -26,7 +26,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
     }
     return getLocalizedValue(
       props.edenSchema().find((cat) => cat.id === item.id)?.description,
-      locale()
+      locale(),
     );
   };
 

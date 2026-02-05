@@ -3,11 +3,11 @@
  * Utilities for managing which apps have hot reload enabled
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from "fs/promises";
+import * as path from "path";
 
-const ROOT_DIR = path.join(__dirname, '../..');
-const CONFIG_PATH = path.join(ROOT_DIR, '.eden-hra.json');
+const ROOT_DIR = path.join(__dirname, "../..");
+const CONFIG_PATH = path.join(ROOT_DIR, ".eden-hra.json");
 
 interface HotReloadConfig {
   apps: string[];
@@ -15,7 +15,7 @@ interface HotReloadConfig {
 
 async function loadConfig(): Promise<HotReloadConfig> {
   try {
-    const content = await fs.readFile(CONFIG_PATH, 'utf-8');
+    const content = await fs.readFile(CONFIG_PATH, "utf-8");
     return JSON.parse(content);
   } catch {
     return { apps: [] };
@@ -34,7 +34,7 @@ export async function isHotReloadEnabled(appId: string): Promise<boolean> {
 export async function toggleHotReload(appId: string): Promise<boolean> {
   const config = await loadConfig();
   const index = config.apps.indexOf(appId);
-  
+
   if (index >= 0) {
     // Disable hot reload
     config.apps.splice(index, 1);

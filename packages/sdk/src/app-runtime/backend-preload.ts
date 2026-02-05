@@ -1,4 +1,9 @@
-import { log, logFromConsole, setLogContext, type CallsiteInfo } from "../logging";
+import {
+  log,
+  logFromConsole,
+  setLogContext,
+  type CallsiteInfo,
+} from "../logging";
 /**
  * Backend Runtime
  *
@@ -99,7 +104,7 @@ console.trace = (...args: unknown[]) =>
 // Extract launch args
 let launchArgs: string[] = [];
 const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args=")
+  arg.startsWith("--launch-args="),
 );
 if (launchArgsArg) {
   try {
@@ -116,9 +121,7 @@ let frontendPort: Electron.MessagePortMain | null = null;
 // Port for IPC with main process (process.parentPort)
 const parentPort = process.parentPort;
 if (!parentPort) {
-  log.error(
-    "Not running in utility process - parentPort not available"
-  );
+  log.error("Not running in utility process - parentPort not available");
   process.exit(1);
 }
 
@@ -198,7 +201,7 @@ const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
  */
 const appBus: AppBusAPI = createAppBusAPI(
   { transport: shellTransport, isBackend: true },
-  appBusState
+  appBusState,
 );
 
 // Frontend communication state
@@ -236,10 +239,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
         try {
           callback(payload);
         } catch (err) {
-          log.error(
-            `Error in event callback for ${eventName}:`,
-            err
-          );
+          log.error(`Error in event callback for ${eventName}:`, err);
         }
       });
     }
@@ -271,7 +271,7 @@ function setupFrontendPort(port: Electron.MessagePortMain): void {
     "__frontend__",
     new Map([["__frontend__", wrappedPort]]),
     new Map(),
-    createMessageIdGenerator("backend-to-frontend")
+    createMessageIdGenerator("backend-to-frontend"),
   );
 }
 
@@ -341,7 +341,7 @@ function getAppAPI(): AppBusConnection {
   if (!frontendConnection) {
     throw new Error(
       "AppAPI not available: This app has no frontend connection. " +
-        "Ensure 'frontend.entry' is defined in manifest.json if you need frontend communication."
+        "Ensure 'frontend.entry' is defined in manifest.json if you need frontend communication.",
     );
   }
   return frontendConnection;

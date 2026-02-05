@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createSignal, onMount, onCleanup } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createSignal,
+  onMount,
+  onCleanup,
+} from "solid-js";
 import type { UserProfile, ViewBounds, WindowSize } from "@edenapp/types";
 import { t, initLocale } from "./i18n";
 
@@ -12,7 +19,9 @@ const getInitials = (name: string): string => {
 
 const App = () => {
   const [users, setUsers] = createSignal<UserProfile[]>([]);
-  const [selectedUsername, setSelectedUsername] = createSignal<string | null>(null);
+  const [selectedUsername, setSelectedUsername] = createSignal<string | null>(
+    null,
+  );
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(true);
@@ -52,7 +61,10 @@ const App = () => {
 
   onMount(() => {
     onCleanup(() => {
-      window.edenAPI.unsubscribe("view/global-bounds-changed", updateViewBounds);
+      window.edenAPI.unsubscribe(
+        "view/global-bounds-changed",
+        updateViewBounds,
+      );
     });
 
     (async () => {
@@ -61,7 +73,10 @@ const App = () => {
 
       // Set initial bounds
       try {
-        const windowSize = await window.edenAPI.shellCommand("view/window-size", {});
+        const windowSize = await window.edenAPI.shellCommand(
+          "view/window-size",
+          {},
+        );
         await updateViewBounds({ windowSize });
       } catch (error) {
         console.error("Failed to get initial window size:", error);
@@ -69,7 +84,10 @@ const App = () => {
 
       // Subscribe to resize events
       try {
-        await window.edenAPI.subscribe("view/global-bounds-changed", updateViewBounds);
+        await window.edenAPI.subscribe(
+          "view/global-bounds-changed",
+          updateViewBounds,
+        );
       } catch (error) {
         console.error("Failed to subscribe to bounds change:", error);
       }
@@ -109,7 +127,9 @@ const App = () => {
       <div class="login-card eden-glass-strong eden-rounded-xl eden-p-lg">
         <div class="eden-flex eden-flex-col eden-gap-md">
           <header class="eden-flex eden-flex-col eden-gap-xs">
-            <h2 class="eden-text-2xl eden-font-semibold">{t("login.signIn")}</h2>
+            <h2 class="eden-text-2xl eden-font-semibold">
+              {t("login.signIn")}
+            </h2>
             <p class="eden-text-sm eden-text-secondary">
               {t("login.subtitle")}
             </p>
@@ -120,7 +140,9 @@ const App = () => {
             fallback={
               <div class="eden-flex eden-flex-center eden-gap-sm">
                 <div class="eden-loading-spinner"></div>
-                <span class="eden-text-sm eden-text-secondary">{t("login.loadingUsers")}</span>
+                <span class="eden-text-sm eden-text-secondary">
+                  {t("login.loadingUsers")}
+                </span>
               </div>
             }
           >
@@ -170,9 +192,7 @@ const App = () => {
                             {getInitials(user.name)}
                           </div>
                           <div class="eden-list-item-content">
-                            <div class="eden-list-item-title">
-                              {user.name}
-                            </div>
+                            <div class="eden-list-item-title">{user.name}</div>
                           </div>
                         </li>
                       )}
@@ -181,7 +201,10 @@ const App = () => {
                 </div>
 
                 <div class="eden-flex eden-flex-col eden-gap-sm login-form-container">
-                  <label class="eden-text-sm eden-text-secondary" for="password">
+                  <label
+                    class="eden-text-sm eden-text-secondary"
+                    for="password"
+                  >
                     {t("common.password")}
                   </label>
                   <input
@@ -204,7 +227,9 @@ const App = () => {
                     type="button"
                     class="eden-btn eden-btn-primary"
                     onClick={handleLogin}
-                    disabled={submitting() || !password() || !selectedUsername()}
+                    disabled={
+                      submitting() || !password() || !selectedUsername()
+                    }
                   >
                     {submitting() ? t("login.signingIn") : t("login.signIn")}
                   </button>

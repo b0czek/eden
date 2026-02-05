@@ -34,8 +34,14 @@ export default defineConfig({
       // without the language service workers (IntelliSense, error checking, etc.)
       customLanguages: [
         // TypeScript/JavaScript - only basic syntax highlighting, no tsserver
-        { label: "typescript", entry: "vs/basic-languages/typescript/typescript.contribution" },
-        { label: "javascript", entry: "vs/basic-languages/javascript/javascript.contribution" },
+        {
+          label: "typescript",
+          entry: "vs/basic-languages/typescript/typescript.contribution",
+        },
+        {
+          label: "javascript",
+          entry: "vs/basic-languages/javascript/javascript.contribution",
+        },
         // Web languages - only syntax highlighting, no workers
         { label: "html", entry: "vs/basic-languages/html/html.contribution" },
         { label: "css", entry: "vs/basic-languages/css/css.contribution" },
@@ -45,9 +51,15 @@ export default defineConfig({
         { label: "yaml", entry: "vs/basic-languages/yaml/yaml.contribution" },
         // Config files
         { label: "ini", entry: "vs/basic-languages/ini/ini.contribution" },
-        { label: "shell", entry: "vs/basic-languages/shell/shell.contribution" },
+        {
+          label: "shell",
+          entry: "vs/basic-languages/shell/shell.contribution",
+        },
         // Markdown
-        { label: "markdown", entry: "vs/basic-languages/markdown/markdown.contribution" },
+        {
+          label: "markdown",
+          entry: "vs/basic-languages/markdown/markdown.contribution",
+        },
       ],
       globalAPI: false,
     }),

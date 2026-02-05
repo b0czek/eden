@@ -28,7 +28,6 @@ import {
   EventInfo,
 } from "./events";
 
-
 import { generateRuntimeCode } from "./runtime";
 import { generateI18nTypes } from "./i18n";
 

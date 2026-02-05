@@ -20,7 +20,7 @@ export function parseLogLevel(value?: string | null): LogLevel | null {
 
 export function isLogLevelEnabled(
   level: LogLevel,
-  minLevel: LogLevel
+  minLevel: LogLevel,
 ): boolean {
   return LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER[minLevel];
 }

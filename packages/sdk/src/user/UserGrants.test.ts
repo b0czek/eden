@@ -11,8 +11,9 @@ describe("UserGrants", () => {
   });
 
   it("normalizes grants for standard users", () => {
-    expect(normalizeGrants("standard", [" fs/read ", "", "fs/read", "fs/* "]))
-      .toEqual(["fs/read", "fs/*"]);
+    expect(
+      normalizeGrants("standard", [" fs/read ", "", "fs/read", "fs/* "]),
+    ).toEqual(["fs/read", "fs/*"]);
 
     expect(normalizeGrants("standard", ["*", "fs/read"])).toEqual(["*"]);
   });

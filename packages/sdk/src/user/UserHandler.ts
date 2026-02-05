@@ -125,7 +125,7 @@ export class UserHandler {
     try {
       await this.userManager.changePassword(
         args.currentPassword,
-        args.newPassword
+        args.newPassword,
       );
       return { success: true };
     } catch (error) {

@@ -7,10 +7,10 @@ export interface FileItem {
   modified: Date;
 }
 
-export type ViewStyle = 'grid' | 'list';
-export type ItemSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge';
-export type SortBy = 'name' | 'size' | 'modified';
-export type SortOrder = 'asc' | 'desc';
+export type ViewStyle = "grid" | "list";
+export type ItemSize = "tiny" | "small" | "medium" | "large" | "huge";
+export type SortBy = "name" | "size" | "modified";
+export type SortOrder = "asc" | "desc";
 
 export interface DisplayPreferences {
   viewStyle: ViewStyle;

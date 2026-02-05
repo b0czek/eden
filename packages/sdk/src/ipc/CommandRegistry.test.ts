@@ -29,7 +29,7 @@ describe("CommandRegistry", () => {
     };
     registry = new CommandRegistry(
       permissionRegistry as any,
-      userManager as any
+      userManager as any,
     );
 
     warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -47,7 +47,9 @@ describe("CommandRegistry", () => {
     registry.register("system", "ping", handler, { name: "target" });
 
     expect(registry.has("system/ping")).toBe(true);
-    await expect(registry.execute("system/ping", { value: 1 })).resolves.toBe("ok");
+    await expect(registry.execute("system/ping", { value: 1 })).resolves.toBe(
+      "ok",
+    );
     expect(handler).toHaveBeenCalledWith({ value: 1 });
   });
 
@@ -58,7 +60,7 @@ describe("CommandRegistry", () => {
     registry.register("system", "ping", handler, {});
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "Command handler for \"system/ping\" is being overwritten"
+      'Command handler for "system/ping" is being overwritten',
     );
   });
 
@@ -92,7 +94,7 @@ describe("CommandRegistry", () => {
       "eden:handler:permission",
       "read",
       SecureManager.prototype,
-      "handle"
+      "handle",
     );
 
     const instance = new SecureManager();
@@ -101,24 +103,24 @@ describe("CommandRegistry", () => {
     permissionRegistry.hasPermission.mockReturnValue(false);
     permissionRegistry.getRequiredGrantKeys.mockReturnValue([]);
 
-    await expect(
-      registry.execute("files/read", {}, "app.one")
-    ).rejects.toThrow("Permission denied: files/read required for files/read");
+    await expect(registry.execute("files/read", {}, "app.one")).rejects.toThrow(
+      "Permission denied: files/read required for files/read",
+    );
 
-    permissionRegistry.getRequiredGrantKeys.mockReturnValue(["preset/files/read"]);
+    permissionRegistry.getRequiredGrantKeys.mockReturnValue([
+      "preset/files/read",
+    ]);
     userManager.hasGrant.mockReturnValue(false);
 
-    await expect(
-      registry.execute("files/read", {}, "app.one")
-    ).rejects.toThrow(
-      "Grant denied: preset/files/read required for files/read"
+    await expect(registry.execute("files/read", {}, "app.one")).rejects.toThrow(
+      "Grant denied: preset/files/read required for files/read",
     );
 
     userManager.hasGrant.mockReturnValue(true);
 
-    await expect(
-      registry.execute("files/read", {}, "app.one")
-    ).resolves.toBe("secured");
+    await expect(registry.execute("files/read", {}, "app.one")).resolves.toBe(
+      "secured",
+    );
   });
 
   it("skips grant checks when base permission is present", async () => {
@@ -132,7 +134,7 @@ describe("CommandRegistry", () => {
       "eden:handler:permission",
       "manage",
       ManageManager.prototype,
-      "handle"
+      "handle",
     );
 
     const instance = new ManageManager();
@@ -140,15 +142,15 @@ describe("CommandRegistry", () => {
 
     permissionRegistry.hasPermission.mockReturnValue(true);
 
-    await expect(
-      registry.execute("apps/manage", {}, "app.two")
-    ).resolves.toBe("ok");
+    await expect(registry.execute("apps/manage", {}, "app.two")).resolves.toBe(
+      "ok",
+    );
     expect(permissionRegistry.getRequiredGrantKeys).not.toHaveBeenCalled();
   });
 
   it("throws on unknown commands", async () => {
     await expect(registry.execute("missing/command", {})).rejects.toThrow(
-      "Unknown command: missing/command"
+      "Unknown command: missing/command",
     );
   });
 });

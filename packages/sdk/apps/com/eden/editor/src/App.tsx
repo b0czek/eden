@@ -2,12 +2,27 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import type { Component } from "solid-js";
 
 // Use lazy-loading components - Monaco is loaded on-demand, not at startup
-import { TabBar, Toolbar, ErrorBanner, WelcomeScreen, LazyMonacoEditor, setEditorContentLazy, getEditorContentLazy, preloadMonaco } from "./components";
-import { EditorTab, FileOpenedEvent, getLanguageFromPath, getFileName } from "./types";
+import {
+  TabBar,
+  Toolbar,
+  ErrorBanner,
+  WelcomeScreen,
+  LazyMonacoEditor,
+  setEditorContentLazy,
+  getEditorContentLazy,
+  preloadMonaco,
+} from "./components";
+import {
+  EditorTab,
+  FileOpenedEvent,
+  getLanguageFromPath,
+  getFileName,
+} from "./types";
 import { t, initLocale } from "./i18n";
 
 // Type for the editor instance (just the interface, not the actual module)
-type IStandaloneCodeEditor = import("monaco-editor").editor.IStandaloneCodeEditor;
+type IStandaloneCodeEditor =
+  import("monaco-editor").editor.IStandaloneCodeEditor;
 
 const App: Component = () => {
   const [tabs, setTabs] = createSignal<EditorTab[]>([]);
@@ -15,23 +30,23 @@ const App: Component = () => {
   const [isSaving, setIsSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [editorReady, setEditorReady] = createSignal(false);
-  
+
   let editor: IStandaloneCodeEditor | undefined;
 
   // Get the currently active tab
-  const activeTab = () => tabs().find(t => t.id === activeTabId());
+  const activeTab = () => tabs().find((t) => t.id === activeTabId());
 
   // Subscribe to file open events and set up keyboard shortcuts
   onMount(async () => {
     console.log("Editor app mounted");
-    
+
     // Initialize i18n
     initLocale();
-    
+
     // Start loading Monaco in the background immediately
     // This way it's ready by the time the user opens a file
     preloadMonaco();
-    
+
     // Check for launch arguments - if app was launched with a file path, open it
     const launchArgs = window.edenAPI.getLaunchArgs();
     console.log("Launch args:", launchArgs);
@@ -39,9 +54,12 @@ const App: Component = () => {
       // Open the first argument as a file path
       openFile(launchArgs[0]);
     }
-    
+
     // Subscribe to file open events for when app is already running
-    window.edenAPI.subscribe("file/opened", handleFileOpened as (data: unknown) => void);
+    window.edenAPI.subscribe(
+      "file/opened",
+      handleFileOpened as (data: unknown) => void,
+    );
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -58,7 +76,10 @@ const App: Component = () => {
 
     onCleanup(() => {
       document.removeEventListener("keydown", handleKeyDown);
-      window.edenAPI.unsubscribe("file/opened", handleFileOpened as (data: unknown) => void);
+      window.edenAPI.unsubscribe(
+        "file/opened",
+        handleFileOpened as (data: unknown) => void,
+      );
     });
   });
 
@@ -71,7 +92,7 @@ const App: Component = () => {
 
   const openFile = async (path: string) => {
     // Check if file is already open
-    const existingTab = tabs().find(t => t.path === path);
+    const existingTab = tabs().find((t) => t.path === path);
     if (existingTab) {
       setActiveTabId(existingTab.id);
       switchToTab(existingTab);
@@ -80,9 +101,11 @@ const App: Component = () => {
 
     try {
       setError(null);
-      
-      const fileContent = await window.edenAPI.shellCommand("fs/read", { path });
-      
+
+      const fileContent = await window.edenAPI.shellCommand("fs/read", {
+        path,
+      });
+
       const newTab: EditorTab = {
         id: `tab-${Date.now()}`,
         path,
@@ -95,7 +118,7 @@ const App: Component = () => {
 
       setTabs([...tabs(), newTab]);
       setActiveTabId(newTab.id);
-      
+
       // Only set content if editor is ready, otherwise onEditorReady will handle it
       if (editorReady()) {
         await setEditorContentLazy(editor, fileContent, newTab.language);
@@ -113,8 +136,8 @@ const App: Component = () => {
   };
 
   const closeTab = (tabId: string) => {
-    const tabIndex = tabs().findIndex(t => t.id === tabId);
-    const newTabs = tabs().filter(t => t.id !== tabId);
+    const tabIndex = tabs().findIndex((t) => t.id === tabId);
+    const newTabs = tabs().filter((t) => t.id !== tabId);
     setTabs(newTabs);
 
     if (activeTabId() === tabId) {
@@ -138,17 +161,19 @@ const App: Component = () => {
       setError(null);
 
       const currentContent = getEditorContentLazy(editor);
-      
+
       await window.edenAPI.shellCommand("fs/write", {
         path: active.path,
         content: currentContent,
       });
 
-      setTabs(tabs().map(t => 
-        t.id === active.id 
-          ? { ...t, originalContent: currentContent, isModified: false }
-          : t
-      ));
+      setTabs(
+        tabs().map((t) =>
+          t.id === active.id
+            ? { ...t, originalContent: currentContent, isModified: false }
+            : t,
+        ),
+      );
     } catch (err) {
       setError(t("editor.failedToSave", { message: (err as Error).message }));
     } finally {
@@ -159,11 +184,13 @@ const App: Component = () => {
   const handleEditorContentChange = (content: string) => {
     const active = activeTab();
     if (active) {
-      setTabs(tabs().map(t => 
-        t.id === active.id 
-          ? { ...t, content, isModified: content !== t.originalContent }
-          : t
-      ));
+      setTabs(
+        tabs().map((t) =>
+          t.id === active.id
+            ? { ...t, content, isModified: content !== t.originalContent }
+            : t,
+        ),
+      );
     }
   };
 
@@ -185,10 +212,7 @@ const App: Component = () => {
       </Show>
 
       <Show when={error()}>
-        <ErrorBanner
-          message={error()!}
-          onDismiss={() => setError(null)}
-        />
+        <ErrorBanner message={error()!} onDismiss={() => setError(null)} />
       </Show>
 
       <Show when={tabs().length === 0}>
@@ -198,7 +222,9 @@ const App: Component = () => {
       <Show when={tabs().length > 0}>
         <LazyMonacoEditor
           onContentChange={handleEditorContentChange}
-          ref={(e: IStandaloneCodeEditor) => { editor = e; }}
+          ref={(e: IStandaloneCodeEditor) => {
+            editor = e;
+          }}
           onReady={() => {
             setEditorReady(true);
             // Set content for the active tab now that editor is ready

@@ -92,9 +92,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
             // Port has been transferred
           }
         } else {
-          log.info(
-            `No backend port for app ${appId} (may be frontend-only)`,
-          );
+          log.info(`No backend port for app ${appId} (may be frontend-only)`);
         }
       },
     );

@@ -75,9 +75,7 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">
-          {t("settings.users.newPassword")}
-        </label>
+        <label class="eden-form-label">{t("settings.users.newPassword")}</label>
         <input
           type="password"
           class="eden-input"

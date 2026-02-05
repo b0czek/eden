@@ -41,7 +41,7 @@ export class BackendManager extends EventEmitter {
     appId: string,
     manifest: AppManifest,
     installPath: string,
-    launchArgs?: string[]
+    launchArgs?: string[],
   ): Promise<{ backend: UtilityProcess }> {
     // Check if backend already exists
     if (this.backends.has(appId)) {
@@ -59,7 +59,7 @@ export class BackendManager extends EventEmitter {
     // Path to the backend runtime that wraps the actual backend
     const runtimePath = path.join(
       this.distPath,
-      "app-runtime/backend-preload.js"
+      "app-runtime/backend-preload.js",
     );
 
     // Create utility process with the runtime as entry point
@@ -75,7 +75,7 @@ export class BackendManager extends EventEmitter {
           EDEN_INSTALL_PATH: installPath,
           EDEN_MANIFEST: JSON.stringify(manifest),
         },
-      }
+      },
     );
 
     // Only create frontend<->backend MessageChannel if app has a frontend
@@ -116,7 +116,7 @@ export class BackendManager extends EventEmitter {
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(
-            new Error(`Backend ${appId} startup timed out after 10 seconds`)
+            new Error(`Backend ${appId} startup timed out after 10 seconds`),
           );
         }, 10000);
 
@@ -145,7 +145,7 @@ export class BackendManager extends EventEmitter {
     log.info(
       `Backend started for app ${appId}${
         hasFrontend ? " (with frontend port)" : " (backend-only)"
-      }`
+      }`,
     );
 
     return { backend };
@@ -177,7 +177,7 @@ export class BackendManager extends EventEmitter {
   sendPortToBackend(
     appId: string,
     message: any,
-    ports: Electron.MessagePortMain[]
+    ports: Electron.MessagePortMain[],
   ): boolean {
     const backend = this.backends.get(appId);
     if (!backend) {
@@ -188,14 +188,14 @@ export class BackendManager extends EventEmitter {
     try {
       log.info(
         `Sending message with ${ports.length} ports to backend ${appId}:`,
-        message.type
+        message.type,
       );
       backend.postMessage(message, ports);
       return true;
     } catch (error) {
       log.error(
         `Failed to send message with ports to backend ${appId}:`,
-        error
+        error,
       );
       return false;
     }
@@ -230,7 +230,7 @@ export class BackendManager extends EventEmitter {
       const timeoutPromise = new Promise<void>((_, reject) => {
         setTimeout(() => {
           reject(
-            new Error(`Backend ${appId} termination timed out after 5 seconds`)
+            new Error(`Backend ${appId} termination timed out after 5 seconds`),
           );
         }, 5000);
       });
@@ -305,7 +305,7 @@ export class BackendManager extends EventEmitter {
    */
   async terminateAll(): Promise<void> {
     const terminationPromises = Array.from(this.backends.keys()).map((appId) =>
-      this.terminateBackend(appId)
+      this.terminateBackend(appId),
     );
     await Promise.all(terminationPromises);
   }

@@ -61,9 +61,7 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
           onInput={(e) => setFileName(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
         />
-        <p class="eden-form-help">
-          {t("files.extensionHelp")}
-        </p>
+        <p class="eden-form-help">{t("files.extensionHelp")}</p>
       </div>
     </Modal>
   );

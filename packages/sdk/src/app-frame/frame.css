@@ -2,215 +2,222 @@
 
 /* Squircle container styling */
 html {
-    background: transparent !important;
-    height: 100%;
-    /* Ensure shadows aren't clipped by html bounds if we want them, 
+  background: transparent !important;
+  height: 100%;
+  /* Ensure shadows aren't clipped by html bounds if we want them, 
        but for a frameless window filling the view, we typically clip. 
        However, if we want shadows, we need margin. 
        Assuming view fills window exactly, we just want content clipped. */
-    overflow: hidden;
-    border-radius: 20px;
-    /* Force clip-path to cleanly cut background pixels in Electron views */
-    clip-path: inset(0 round 20px);
-    /* Composite layer promotion to help with anti-aliasing of rounded corners */
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-    transform: translate3d(0, 0, 0);
-    box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 20px;
+  /* Force clip-path to cleanly cut background pixels in Electron views */
+  clip-path: inset(0 round 20px);
+  /* Composite layer promotion to help with anti-aliasing of rounded corners */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    width: 100%;
-    border-radius: 20px;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  border-radius: 20px;
 
-    /* Inner border to help definition against dark backgrounds */
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  /* Inner border to help definition against dark backgrounds */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 
-    overflow: hidden;
-    /* Apps should handle scrolling internally */
-    box-sizing: border-box;
+  overflow: hidden;
+  /* Apps should handle scrolling internally */
+  box-sizing: border-box;
 
-    /* Ensure body background is transparent to prevent canvas propagation */
-    background-color: transparent !important;
+  /* Ensure body background is transparent to prevent canvas propagation */
+  background-color: transparent !important;
 }
-
 
 /* Paint background on a layer that DOES NOT propagate to canvas, allowing clip-path to work */
 body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--app-bg, var(--eden-color-bg-secondary));
-    backdrop-filter: var(--app-glass, none);
-    z-index: -1;
-    pointer-events: none;
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--app-bg, var(--eden-color-bg-secondary));
+  backdrop-filter: var(--app-glass, none);
+  z-index: -1;
+  pointer-events: none;
 }
 
 #eden-app-frame-overlay#eden-app-frame-overlay {
-    all: revert;
-    /* Now only set what we actually need */
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
-    background: transparent;
-    border-bottom: none;
-    border-radius: 20px 20px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 0 16px;
-    user-select: none;
-    z-index: 2147483647;
-    -webkit-app-region: no-drag;
-    touch-action: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    pointer-events: auto;
-    will-change: transform;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    box-sizing: border-box;
+  all: revert;
+  /* Now only set what we actually need */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: transparent;
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px;
+  user-select: none;
+  z-index: 2147483647;
+  -webkit-app-region: no-drag;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+  will-change: transform;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
+  box-sizing: border-box;
 }
 
 #eden-app-frame-overlay.dark#eden-app-frame-overlay.dark {
-    background: transparent;
-    border-bottom: none;
-    color: #cccccc;
+  background: transparent;
+  border-bottom: none;
+  color: #cccccc;
 }
 
 #eden-app-frame-overlay #eden-app-frame-title {
-    all: revert;
-    /* Now only set what we actually need */
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: calc(100% - 200px);
-    text-align: center;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    line-height: 1;
-    letter-spacing: -0.3px;
-    pointer-events: none;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    padding: 8px 16px;
-    border-radius: 10px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  all: revert;
+  /* Now only set what we actually need */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100% - 200px);
+  text-align: center;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
+  line-height: 1;
+  letter-spacing: -0.3px;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  padding: 8px 16px;
+  border-radius: 10px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 #eden-app-frame-overlay.dark #eden-app-frame-title {
-    color: #ffffff;
-    background: rgba(40, 40, 40, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  background: rgba(40, 40, 40, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 #eden-app-frame-overlay #eden-app-frame-controls {
-    all: revert;
-    /* Now only set what we actually need */
-    display: flex;
-    gap: 8px;
-    -webkit-app-region: no-drag;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    padding: 4px;
-    border-radius: 10px;
-    height: 32px;
-    box-sizing: border-box;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  all: revert;
+  /* Now only set what we actually need */
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  padding: 4px;
+  border-radius: 10px;
+  height: 32px;
+  box-sizing: border-box;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 #eden-app-frame-overlay.dark #eden-app-frame-controls {
-    background: rgba(40, 40, 40, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: rgba(40, 40, 40, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 #eden-app-frame-overlay .eden-app-frame-button {
-    all: revert;
-    /* Now only set what we actually need */
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
-    min-height: 24px;
-    max-width: 24px;
-    max-height: 24px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    color: #666;
-    line-height: 1;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-    font-weight: 400;
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
-    flex-shrink: 0;
+  all: revert;
+  /* Now only set what we actually need */
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #666;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-weight: 400;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 #eden-app-frame-overlay.dark .eden-app-frame-button {
-    color: #aaa;
+  color: #aaa;
 }
 
 #eden-app-frame-overlay .eden-app-frame-button:hover {
-    background: rgba(0, 0, 0, 0.08);
-    transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.08);
+  transform: scale(1.05);
 }
 
 #eden-app-frame-overlay.dark .eden-app-frame-button:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
 }
 
 #eden-app-frame-overlay .eden-app-frame-button.close:hover {
-    background: #e81123;
-    color: white;
-    transform: scale(1.05);
+  background: #e81123;
+  color: white;
+  transform: scale(1.05);
 }
 
 #eden-app-frame-overlay .eden-app-frame-button:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 #eden-app-frame-overlay .eden-app-frame-button.minimize {
-    font-size: 20px;
-    font-weight: 300;
+  font-size: 20px;
+  font-weight: 300;
 }
 
 #eden-app-frame-overlay .eden-app-frame-button.close {
-    font-size: 20px;
-    font-weight: 400;
+  font-size: 20px;
+  font-weight: 400;
 }
 
 /* Adjust body to account for title bar */
 body.eden-framed.eden-framed {
-    padding-top: 41px;
+  padding-top: 41px;
 }

@@ -8,9 +8,13 @@ import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
 
 describe("EventSubscriberManager", () => {
-  let viewManager: jest.Mocked<Pick<ViewManager, "getViewInfo" | "sendToView" | "sendToMainWindow">>;
+  let viewManager: jest.Mocked<
+    Pick<ViewManager, "getViewInfo" | "sendToView" | "sendToMainWindow">
+  >;
   let backendManager: jest.Mocked<Pick<BackendManager, "sendMessage">>;
-  let permissionRegistry: jest.Mocked<Pick<PermissionRegistry, "hasPermission">>;
+  let permissionRegistry: jest.Mocked<
+    Pick<PermissionRegistry, "hasPermission">
+  >;
   let logSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
@@ -60,7 +64,7 @@ describe("EventSubscriberManager", () => {
     permissionRegistry.hasPermission.mockReturnValue(false);
 
     expect(() => manager.subscribe(1, "event/secure")).toThrow(
-      "Permission denied: permissions/secure required to subscribe to event/secure"
+      "Permission denied: permissions/secure required to subscribe to event/secure",
     );
   });
 

@@ -3,7 +3,6 @@
  * Uses edencss sidebar component
  */
 
-
 body {
   font-family: var(--eden-font-family-base);
   color: var(--eden-color-text-on-dark);
@@ -169,4 +168,3 @@ body {
 .setting-item {
   animation: eden-fade-in 0.2s ease-out;
 }
-

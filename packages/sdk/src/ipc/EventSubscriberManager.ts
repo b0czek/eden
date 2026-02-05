@@ -48,11 +48,11 @@ export class EventSubscriberManager {
       if (
         !this.permissionRegistry.hasPermission(
           viewInfo.appId,
-          requiredPermission
+          requiredPermission,
         )
       ) {
         throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
         );
       }
     }
@@ -63,7 +63,7 @@ export class EventSubscriberManager {
 
     this.subscriptions.get(eventName)!.add(viewId);
     log.info(
-      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`
+      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
     );
     return true;
   }
@@ -88,7 +88,7 @@ export class EventSubscriberManager {
     if (requiredPermission && this.permissionRegistry) {
       if (!this.permissionRegistry.hasPermission(appId, requiredPermission)) {
         throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
         );
       }
     }
@@ -108,7 +108,7 @@ export class EventSubscriberManager {
    */
   public subscribeInternal<T extends EventName>(
     event: T,
-    callback: (data: EventData<T>) => void
+    callback: (data: EventData<T>) => void,
   ): void {
     if (!this.internalSubscriptions.has(event)) {
       this.internalSubscriptions.set(event, new Set());
@@ -198,10 +198,7 @@ export class EventSubscriberManager {
         try {
           callback(payload);
         } catch (error) {
-          log.error(
-            `Error in internal subscriber for ${eventName}:`,
-            error
-          );
+          log.error(`Error in internal subscriber for ${eventName}:`, error);
         }
       }
     }
@@ -210,7 +207,7 @@ export class EventSubscriberManager {
     if (this.foundationSubscriptions.has(eventName)) {
       this.viewManager.sendToMainWindow("shell-message", {
         type: eventName,
-        payload
+        payload,
       });
     }
 

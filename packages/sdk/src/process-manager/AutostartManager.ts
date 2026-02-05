@@ -111,10 +111,7 @@ export class AutostartManager {
         }
       }
     } catch (error) {
-      log.warn(
-        "Failed to load autostart settings:",
-        error,
-      );
+      log.warn("Failed to load autostart settings:", error);
     }
   }
 

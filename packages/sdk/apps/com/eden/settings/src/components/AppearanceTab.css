@@ -2,9 +2,9 @@
   display: grid;
   gap: var(--eden-space-sm);
   grid-template-columns: repeat(
-    auto-fill,
-    minmax(calc(7.5 * var(--eden-space-md)), 1fr)
-  );
+      auto-fill,
+      minmax(calc(7.5 * var(--eden-space-md)), 1fr)
+    );
   margin-top: var(--eden-space-sm);
   margin-bottom: var(--eden-space-lg);
 }

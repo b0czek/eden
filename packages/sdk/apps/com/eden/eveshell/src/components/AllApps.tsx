@@ -21,7 +21,7 @@ export default function AllApps(props: AllAppsProps) {
     return props.apps.filter(
       (app) =>
         app.name.toLowerCase().includes(query) ||
-        app.id.toLowerCase().includes(query)
+        app.id.toLowerCase().includes(query),
     );
   };
 

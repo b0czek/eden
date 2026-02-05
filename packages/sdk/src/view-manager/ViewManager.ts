@@ -1,5 +1,10 @@
 import { BrowserWindow, Rectangle as Bounds, WebContentsView } from "electron";
-import { AppManifest, EdenConfig, WindowSize, ViewBounds } from "@edenapp/types";
+import {
+  AppManifest,
+  EdenConfig,
+  WindowSize,
+  ViewBounds,
+} from "@edenapp/types";
 import { log } from "../logging";
 import { attachWebContentsLogger } from "../logging/electron";
 import { FloatingWindowController } from "./FloatingWindowController";
@@ -58,7 +63,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject("EdenConfig") config: EdenConfig,
-    @inject("distPath") distPath: string
+    @inject("distPath") distPath: string,
   ) {
     super(ipcBridge);
 
@@ -69,7 +74,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     this.floatingWindows = new FloatingWindowController(
       () => this.tilingManager.getWorkspaceBounds(),
-      () => this.views.values()
+      () => this.views.values(),
     );
 
     // Use consumer's dist path for runtime assets
@@ -77,7 +82,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       distPath,
       this.tilingManager,
       this.floatingWindows,
-      this.devToolsManager
+      this.devToolsManager,
     );
 
     // Create and register handler
@@ -130,7 +135,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     manifest: AppManifest,
     installPath: string,
     bounds: Bounds | undefined,
-    launchArgs?: string[]
+    launchArgs?: string[],
   ): number {
     if (!isWindowAlive(this.mainWindow)) {
       throw new Error("Main window not set. Call setMainWindow first.");
@@ -142,7 +147,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       installPath,
       bounds,
       this.views.values(),
-      launchArgs
+      launchArgs,
     );
 
     const viewId = viewInfo.id;
@@ -161,17 +166,14 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     viewInfo.view.webContents.on(
       "did-fail-load",
       (_event: any, errorCode: any, errorDescription: any) => {
-        log.error(
-          `View load failed for ${appId}:`,
-          errorDescription
-        );
+        log.error(`View load failed for ${appId}:`, errorDescription);
         this.notify("view-load-failed", {
           viewId: viewInfo.id,
           appId,
           errorCode,
           errorDescription,
         });
-      }
+      },
     );
 
     // Notify listeners that the view has been loaded
@@ -183,10 +185,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // Recalculate all tiles if using tiling and this is a tiled view
     if (viewInfo.mode === "tiled" && this.tilingManager.isEnabled()) {
-      this.tilingManager.applyTiledCapacity(
-        this.views,
-        viewId,
-        (hideId) => this.hideView(hideId)
+      this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
+        this.hideView(hideId),
       );
     }
 
@@ -225,10 +225,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      log.error(
-        `Failed to remove view ${viewId}:`,
-        errorMessage
-      );
+      log.error(`Failed to remove view ${viewId}:`, errorMessage);
       // Still remove from tracking even if removal failed
       this.views.delete(viewId);
       throw new Error(`Failed to remove view: ${errorMessage}`);
@@ -256,9 +253,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // If this is a tiled view, ignore individual bounds updates
     if (viewInfo.mode === "tiled") {
-      log.info(
-        `Ignoring individual bounds update for tiled view ${viewId}`
-      );
+      log.info(`Ignoring individual bounds update for tiled view ${viewId}`);
       return;
     }
 
@@ -272,7 +267,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       const windowConfig = viewInfo.manifest.window;
       const finalBounds = this.floatingWindows.applyWindowConstraints(
         bounds,
-        windowConfig
+        windowConfig,
       );
       viewInfo.view.setBounds(finalBounds);
       viewInfo.bounds = finalBounds;
@@ -351,10 +346,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.visible = true;
 
       if (viewInfo.mode === "tiled") {
-        this.tilingManager.applyTiledCapacity(
-          this.views,
-          viewId,
-          (hideId) => this.hideView(hideId)
+        this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
+          this.hideView(hideId),
         );
         this.reorderViewLayers();
       } else {
@@ -408,7 +401,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     try {
       const appViews = Array.from(this.views.values()).filter(
-        (v) => v.viewType === "app"
+        (v) => v.viewType === "app",
       );
 
       const tiledViews = appViews
@@ -465,10 +458,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.view.webContents.send(channel, ...args);
       return true;
     } catch (error) {
-      log.error(
-        `Failed to send message to view ${viewId}:`,
-        error
-      );
+      log.error(`Failed to send message to view ${viewId}:`, error);
       return false;
     }
   }
@@ -524,7 +514,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
 
     log.info(
-      `Switching view ${viewId} from ${viewInfo.mode} to ${newMode} mode`
+      `Switching view ${viewId} from ${viewInfo.mode} to ${newMode} mode`,
     );
 
     try {
@@ -551,22 +541,20 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
         if (this.tilingManager.isEnabled()) {
           viewInfo.tileIndex = this.tilingManager.getNextTileIndex(
-            this.views.values()
+            this.views.values(),
           );
           const visibleCount = this.tilingManager.getVisibleTiledCount(
-            this.views.values()
+            this.views.values(),
           );
           const tileBounds = this.tilingManager.calculateTileBounds(
             viewInfo.tileIndex,
-            visibleCount
+            visibleCount,
           );
           viewInfo.bounds = tileBounds;
           viewInfo.mode = "tiled";
           viewInfo.view.setBounds(tileBounds);
-          this.tilingManager.applyTiledCapacity(
-            this.views,
-            viewId,
-            (hideId) => this.hideView(hideId)
+          this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
+            this.hideView(hideId),
           );
           this.reorderViewLayers();
           this.notifySubscriber(viewId, "mode-changed", {

@@ -31,7 +31,7 @@ const UsersList = (props: UsersListProps) => (
         <FiPlus />
       </button>
     </div>
-    
+
     <div class="eden-list">
       <For each={props.users}>
         {(user) => (
@@ -42,14 +42,10 @@ const UsersList = (props: UsersListProps) => (
             <div class="eden-avatar eden-avatar-md">
               {getInitials(user.name)}
             </div>
-            
+
             <div class="eden-list-item-content">
-              <div class="eden-list-item-title">
-                {user.name}
-              </div>
-              <div class="eden-list-item-description">
-                {user.role}
-              </div>
+              <div class="eden-list-item-title">{user.name}</div>
+              <div class="eden-list-item-description">{user.role}</div>
             </div>
 
             <Show when={props.currentUser?.username === user.username}>
@@ -63,7 +59,7 @@ const UsersList = (props: UsersListProps) => (
                 {t("settings.users.autoLogin")}
               </span>
             </Show>
-            
+
             <div class="eden-list-item-meta">
               <FiChevronRight />
             </div>

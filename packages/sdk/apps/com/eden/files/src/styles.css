@@ -40,7 +40,6 @@ body {
   gap: var(--eden-space-lg);
 }
 
-
 .toolbar-left,
 .toolbar-right {
   display: flex;
@@ -117,7 +116,9 @@ body {
   border: 2px solid var(--eden-color-accent-primary);
   border-radius: var(--eden-radius-md);
   padding: calc(var(--eden-space-sm) - 1px) calc(var(--eden-space-md) - 1px);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1), var(--eden-shadow-lg);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.1),
+    var(--eden-shadow-lg);
   animation: eden-fade-in 0.15s ease-out;
 }
 
@@ -161,7 +162,6 @@ body {
   overflow-y: auto;
   z-index: 1000;
   animation: eden-fade-in 0.15s ease-out;
-
 }
 
 .suggestion-item {
@@ -205,8 +205,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-
 
 /* ===== Main Content Area ===== */
 .explorer-content {
@@ -401,7 +399,8 @@ body {
   width: 280px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
-  animation: eden-scale-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+  animation: eden-scale-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
 }
 
 /* ===== List View Layout ===== */

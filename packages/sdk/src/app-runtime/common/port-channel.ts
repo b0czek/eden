@@ -91,7 +91,7 @@ export function createAppBusState(prefix: string = "appbus"): AppBusState {
 export function waitForPort(
   connectionId: string,
   state: AppBusState,
-  timeoutMs: number = 5000
+  timeoutMs: number = 5000,
 ): Promise<IPCPort> {
   // Check if port is already available
   const existing = state.connectedPorts.get(connectionId);
@@ -104,8 +104,8 @@ export function waitForPort(
       state.pendingPortArrivals.delete(connectionId);
       reject(
         new Error(
-          `Port for connection ${connectionId} not received within ${timeoutMs}ms`
-        )
+          `Port for connection ${connectionId} not received within ${timeoutMs}ms`,
+        ),
       );
     }, timeoutMs);
 
@@ -183,7 +183,7 @@ export function createPortConnection(
   connectionId: string,
   portStore: Map<string, IPCPort>,
   pendingRequests: Map<string, PendingRequest>,
-  generateMessageId: () => string
+  generateMessageId: () => string,
 ): AppBusConnection {
   // Method-specific listeners for fire-and-forget messages (send → on)
   const messageListeners: Map<string, Set<(args: any) => void>> = new Map();
@@ -207,10 +207,7 @@ export function createPortConnection(
           try {
             callback(payload);
           } catch (err) {
-            log.error(
-              `Error in on('${method}') listener:`,
-              err
-            );
+            log.error(`Error in on('${method}') listener:`, err);
           }
         });
       }
@@ -316,7 +313,7 @@ export function createPortConnection(
     request: (
       method: string,
       args?: any,
-      timeout: number = 30000
+      timeout: number = 30000,
     ): Promise<any> => {
       return new Promise((resolve, reject) => {
         const messageId = generateMessageId();
@@ -398,20 +395,20 @@ export function handleAppBusPort(
     targetAppId?: string;
     sourceAppId?: string;
   },
-  state: AppBusState
+  state: AppBusState,
 ): void {
   const { connectionId, role, serviceName, targetAppId, sourceAppId } = data;
 
   if (role === "service") {
     // A client is connecting to our service
     log.info(
-      `Received connection from ${sourceAppId} for service ${serviceName}`
+      `Received connection from ${sourceAppId} for service ${serviceName}`,
     );
 
     const onConnect = state.registeredServices.get(serviceName);
     if (!onConnect) {
       log.error(
-        `No onConnect callback registered for service "${serviceName}"`
+        `No onConnect callback registered for service "${serviceName}"`,
       );
       return;
     }
@@ -422,7 +419,7 @@ export function handleAppBusPort(
       connectionId,
       state.connectedPorts,
       state.pendingRequests,
-      state.messageIdGenerator
+      state.messageIdGenerator,
     );
 
     // Call the onConnect callback with the connection and client info
@@ -431,7 +428,7 @@ export function handleAppBusPort(
     } catch (err) {
       log.error(
         `Error in onConnect callback for service "${serviceName}":`,
-        err
+        err,
       );
     }
   } else if (role === "client") {
@@ -456,7 +453,7 @@ export function handleAppBusPort(
  */
 export function handlePortClosed(
   state: AppBusState,
-  connectionId: string
+  connectionId: string,
 ): void {
   const port = state.connectedPorts.get(connectionId);
   if (port) {

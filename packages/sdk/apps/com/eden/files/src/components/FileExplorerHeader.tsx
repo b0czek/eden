@@ -1,7 +1,14 @@
 import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
 import Omnibox from "./Omnibox";
-import { FaSolidArrowLeft, FaSolidArrowRight, FaSolidArrowUp, FaSolidFolderPlus, FaSolidFileMedical, FaSolidEllipsis } from "solid-icons/fa";
+import {
+  FaSolidArrowLeft,
+  FaSolidArrowRight,
+  FaSolidArrowUp,
+  FaSolidFolderPlus,
+  FaSolidFileMedical,
+  FaSolidEllipsis,
+} from "solid-icons/fa";
 
 import { t } from "../i18n";
 

@@ -1,5 +1,9 @@
 import { Show, createSignal, createEffect, createMemo } from "solid-js";
-import type { ResolvedGrant, RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import type {
+  ResolvedGrant,
+  RuntimeAppManifest,
+  UserProfile,
+} from "@edenapp/types";
 import { FaSolidCode, FaSolidList } from "solid-icons/fa";
 import { getLocalizedValue, locale, t } from "../../i18n";
 import {
@@ -25,7 +29,7 @@ interface UserDetailProps {
   onToggleDefaultUser: (username: string, enabled: boolean) => void;
   updateGrants: (
     username: string,
-    updater: (grants: Set<string>) => Set<string>
+    updater: (grants: Set<string>) => Set<string>,
   ) => void;
 }
 
@@ -50,7 +54,9 @@ const UserDetail = (props: UserDetailProps) => {
     });
   };
 
-  const updateGrants = (updater: (grants: Set<string>) => Set<string>): void => {
+  const updateGrants = (
+    updater: (grants: Set<string>) => Set<string>,
+  ): void => {
     props.updateGrants(props.user.username, (grants) => {
       if (grants.has("*")) {
         grants.delete("*");
@@ -68,24 +74,24 @@ const UserDetail = (props: UserDetailProps) => {
     hasWildcard() || (props.user.grants?.includes("settings/*") ?? false);
 
   const grantableApps = createMemo(() =>
-    props.installedApps.filter((app) => !app.isCore && !app.isRestricted)
+    props.installedApps.filter((app) => !app.isCore && !app.isRestricted),
   );
 
   const launchableApps = createMemo(() => {
     const apps = props.installedApps.filter((app) =>
-      canLaunchApp(app, props.user.grants ?? [], isVendor())
+      canLaunchApp(app, props.user.grants ?? [], isVendor()),
     );
     return apps.sort((a, b) =>
       getLocalizedValue(a.name, locale()).localeCompare(
-        getLocalizedValue(b.name, locale())
-      )
+        getLocalizedValue(b.name, locale()),
+      ),
     );
   });
 
   const appGrantApps = createMemo(() =>
     launchableApps().filter((app) =>
-      getResolvedGrants(app).some((grant) => getGrantScope(grant) === "app")
-    )
+      getResolvedGrants(app).some((grant) => getGrantScope(grant) === "app"),
+    ),
   );
 
   const systemGrants = createMemo(() => {
@@ -103,9 +109,13 @@ const UserDetail = (props: UserDetailProps) => {
     const grants = Array.from(map.values());
     return grants.sort((a, b) => {
       const labelA =
-        typeof a.label === "string" ? a.label : getLocalizedValue(a.label ?? a.preset, locale());
+        typeof a.label === "string"
+          ? a.label
+          : getLocalizedValue(a.label ?? a.preset, locale());
       const labelB =
-        typeof b.label === "string" ? b.label : getLocalizedValue(b.label ?? b.preset, locale());
+        typeof b.label === "string"
+          ? b.label
+          : getLocalizedValue(b.label ?? b.preset, locale());
       return labelA.localeCompare(labelB);
     });
   });
@@ -124,7 +134,9 @@ const UserDetail = (props: UserDetailProps) => {
       <div class="eden-card-body eden-flex-col eden-gap-lg">
         <label class="eden-list-item eden-list-item-interactive eden-flex-between">
           <div class="eden-list-item-content">
-            <span class="eden-list-item-title">{t("settings.users.autoLogin")}</span>
+            <span class="eden-list-item-title">
+              {t("settings.users.autoLogin")}
+            </span>
             <span class="eden-list-item-description">
               {t("settings.users.autoLoginDescription")}
             </span>
@@ -134,7 +146,10 @@ const UserDetail = (props: UserDetailProps) => {
             class="eden-toggle"
             checked={props.isDefaultUser}
             onChange={(e) =>
-              props.onToggleDefaultUser(props.user.username, e.currentTarget.checked)
+              props.onToggleDefaultUser(
+                props.user.username,
+                e.currentTarget.checked,
+              )
             }
           />
         </label>

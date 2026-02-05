@@ -20,7 +20,7 @@ export class DbManager {
 
   constructor(
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject("appsDirectory") appsDirectory: string
+    @inject("appsDirectory") appsDirectory: string,
   ) {
     // Initialize Keyv with SQLite backend
     const dbPath = path.join(appsDirectory, "storage.db");
@@ -72,9 +72,7 @@ export class DbManager {
     const value = await this.keyv.get(namespacedKey);
     // Runtime check: ensure we always return string or undefined
     if (value !== undefined && typeof value !== "string") {
-      log.warn(
-        `Non-string value found for key ${key}, converting to string`
-      );
+      log.warn(`Non-string value found for key ${key}, converting to string`);
       return String(value);
     }
     return value;

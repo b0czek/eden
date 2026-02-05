@@ -76,9 +76,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
         />
       </div>
       <div class="eden-form-group">
-        <label class="eden-form-label">
-          {t("common.password")}
-        </label>
+        <label class="eden-form-label">{t("common.password")}</label>
         <input
           type="password"
           class="eden-input"

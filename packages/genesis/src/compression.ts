@@ -33,7 +33,7 @@ export interface Compressor {
   compressFileStreaming(
     inputPath: string,
     outputPath: string,
-    level: number
+    level: number,
   ): Promise<{ checksum: string }>;
 
   /**
@@ -70,7 +70,7 @@ export class ZstdCodecCompressor implements Compressor {
   async compressFileStreaming(
     inputPath: string,
     outputPath: string,
-    level: number
+    level: number,
   ): Promise<{ checksum: string }> {
     if (!this.zstd) {
       throw new Error("Compressor not initialized. Call initialize() first.");

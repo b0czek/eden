@@ -117,31 +117,31 @@ export interface AppBusConnection<
   /** Listen for messages from the other side */
   on<K extends keyof TReceive>(
     method: K,
-    callback: (args: TReceive[K]) => void
+    callback: (args: TReceive[K]) => void,
   ): void;
   /** Listen for messages only once, then auto-remove */
   once<K extends keyof TReceive>(
     method: K,
-    callback: (args: TReceive[K]) => void
+    callback: (args: TReceive[K]) => void,
   ): void;
   /** Remove a listener */
   off<K extends keyof TReceive>(
     method: K,
-    callback: (args: TReceive[K]) => void
+    callback: (args: TReceive[K]) => void,
   ): void;
 
   /** Send a request and wait for response (other side handles) */
   request<K extends keyof TRequest>(
     method: K,
-    args?: TRequest[K]["args"]
+    args?: TRequest[K]["args"],
   ): Promise<TRequest[K]["result"]>;
 
   /** Register a handler for requests from the other side */
   handle<K extends keyof THandle>(
     method: K,
     handler: (
-      args: THandle[K]["args"]
-    ) => THandle[K]["result"] | Promise<THandle[K]["result"]>
+      args: THandle[K]["args"],
+    ) => THandle[K]["result"] | Promise<THandle[K]["result"]>,
   ): void;
   /** Remove a handler */
   removeHandler<K extends keyof THandle>(method: K): void;
@@ -166,7 +166,7 @@ export interface ClientInfo {
  */
 export type ServiceConnectCallback = (
   connection: AppBusConnection,
-  clientInfo: ClientInfo
+  clientInfo: ClientInfo,
 ) => void;
 
 /**
@@ -200,7 +200,7 @@ export interface AppBusAPI {
   exposeService(
     serviceName: string,
     onConnect: ServiceConnectCallback,
-    options?: ServiceOptions
+    options?: ServiceOptions,
   ): Promise<{ success: boolean; error?: string }>;
 
   /**
@@ -216,7 +216,7 @@ export interface AppBusAPI {
    */
   connect(
     targetAppId: string,
-    serviceName: string
+    serviceName: string,
   ): Promise<AppBusConnection | { error: string }>;
 
   /**

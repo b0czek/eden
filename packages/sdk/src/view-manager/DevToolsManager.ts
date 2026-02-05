@@ -60,9 +60,7 @@ export class DevToolsManager {
         view.webContents.isDevToolsOpened()
       ) {
         view.webContents.closeDevTools();
-        log.info(
-          `Closed DevTools for view (webContents ID: ${webContentsId})`
-        );
+        log.info(`Closed DevTools for view (webContents ID: ${webContentsId})`);
       }
 
       this.viewsWithDevTools.delete(webContentsId);

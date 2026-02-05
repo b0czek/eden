@@ -11,11 +11,11 @@ describe("UserAuth", () => {
     expect(passwordSalt.length).toBeGreaterThan(0);
 
     await expect(
-      verifyPassword(password, passwordSalt, passwordHash)
+      verifyPassword(password, passwordSalt, passwordHash),
     ).resolves.toBe(true);
 
     await expect(
-      verifyPassword("wrong-password", passwordSalt, passwordHash)
+      verifyPassword("wrong-password", passwordSalt, passwordHash),
     ).resolves.toBe(false);
   });
 
@@ -32,7 +32,7 @@ describe("UserAuth", () => {
     const { passwordSalt } = await hashPassword("password");
 
     await expect(
-      verifyPassword("password", passwordSalt, "deadbeef")
+      verifyPassword("password", passwordSalt, "deadbeef"),
     ).resolves.toBe(false);
   });
 });

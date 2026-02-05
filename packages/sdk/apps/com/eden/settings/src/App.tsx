@@ -13,13 +13,13 @@ const App: Component = () => {
   const [appIcons, setAppIcons] = createSignal<Record<string, string>>({});
   const [edenSchema, setEdenSchema] = createSignal<SettingsCategory[]>([]);
   const [selectedItem, setSelectedItem] = createSignal<SelectedItem | null>(
-    null
+    null,
   );
   const [currentSettings, setCurrentSettings] = createSignal<
     SettingsCategory[]
   >([]);
   const [settingValues, setSettingValues] = createStore<Record<string, string>>(
-    {}
+    {},
   );
   const [loading, setLoading] = createSignal(true);
 
@@ -46,7 +46,7 @@ const App: Component = () => {
         showHidden: true,
       });
       appsWithSettings = result.filter(
-        (app: AppManifest) => app.settings && app.settings.length > 0
+        (app: AppManifest) => app.settings && app.settings.length > 0,
       );
       setApps(appsWithSettings);
 
@@ -55,7 +55,7 @@ const App: Component = () => {
         try {
           const iconResult = await window.edenAPI!.shellCommand(
             "package/get-icon",
-            { appId: app.id }
+            { appId: app.id },
           );
           if (iconResult.icon) {
             icons[app.id] = iconResult.icon;
@@ -68,10 +68,7 @@ const App: Component = () => {
     } catch (error) {
       console.error("Failed to load apps:", error);
     }
-
   };
-
-  
 
   createEffect(() => {
     const item = selectedItem();

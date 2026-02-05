@@ -16,9 +16,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": [
-      "@edenapp/types/global"
-    ]
+    "types": ["@edenapp/types/global"]
   },
   "include": ["src"]
 }

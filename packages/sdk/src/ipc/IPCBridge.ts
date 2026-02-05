@@ -39,7 +39,7 @@ export class IPCBridge extends EventEmitter {
     @inject(BackendManager) private backendManager: BackendManager,
     @inject(CommandRegistry) private commandRegistry: CommandRegistry,
     @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
-    @inject(delay(() => ViewManager)) private viewManager: ViewManager
+    @inject(delay(() => ViewManager)) private viewManager: ViewManager,
   ) {
     super();
 
@@ -80,7 +80,8 @@ export class IPCBridge extends EventEmitter {
       async (event, command: string, args: any) => {
         // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
-        const isFoundation = this.mainWindow?.webContents.id === event.sender.id;
+        const isFoundation =
+          this.mainWindow?.webContents.id === event.sender.id;
 
         const argsWithContext = {
           ...args,
@@ -89,7 +90,7 @@ export class IPCBridge extends EventEmitter {
           _isFoundation: isFoundation,
         };
         return this.handleShellCommand(command, argsWithContext, appId);
-      }
+      },
     );
   }
 
@@ -113,7 +114,7 @@ export class IPCBridge extends EventEmitter {
             const result = await this.handleShellCommand(
               message.command,
               argsWithContext,
-              appId
+              appId,
             );
             // Send response back to backend
             this.sendBackendResponse(appId, message.commandId, result);
@@ -125,12 +126,9 @@ export class IPCBridge extends EventEmitter {
             });
           }
         } else {
-          log.warn(
-            `Unknown backend message type from ${appId}:`,
-            message.type
-          );
+          log.warn(`Unknown backend message type from ${appId}:`, message.type);
         }
-      }
+      },
     );
   }
 
@@ -140,7 +138,7 @@ export class IPCBridge extends EventEmitter {
   private sendBackendResponse(
     appId: string,
     commandId: string,
-    result: any
+    result: any,
   ): void {
     this.backendManager.sendMessage(appId, {
       type: "shell-command-response",
@@ -155,7 +153,7 @@ export class IPCBridge extends EventEmitter {
   private async handleShellCommand(
     command: string,
     args: any,
-    appId?: string
+    appId?: string,
   ): Promise<any> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
@@ -163,7 +161,7 @@ export class IPCBridge extends EventEmitter {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         log.error(
-          `Command '${command}' (ID: ${commandId}) timed out after 10s`
+          `Command '${command}' (ID: ${commandId}) timed out after 10s`,
         );
         this.pendingCommands.delete(commandId);
         reject(new Error(`Command '${command}' timed out`));
@@ -183,7 +181,7 @@ export class IPCBridge extends EventEmitter {
           const err = error as Error;
           const appInfo = appId ? ` (app: ${appId})` : "";
           log.error(
-            `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`
+            `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`,
           );
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);

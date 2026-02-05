@@ -17,6 +17,8 @@ const resources = {
 };
 
 // Fully typed i18n setup
-export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({ resources });
+export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({
+  resources,
+});
 
 export { getLocalizedValue } from "@edenapp/babel/solid";

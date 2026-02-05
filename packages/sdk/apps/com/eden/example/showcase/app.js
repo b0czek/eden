@@ -2,21 +2,23 @@
 
 // Tab functionality
 function setupTabs() {
-  const tabLists = document.querySelectorAll('.eden-tab-list');
-  
-  tabLists.forEach(tabList => {
-    const tabs = tabList.querySelectorAll('.eden-tab');
-    const panels = tabList.closest('.eden-tabs').querySelectorAll('.eden-tab-panel');
-    
+  const tabLists = document.querySelectorAll(".eden-tab-list");
+
+  tabLists.forEach((tabList) => {
+    const tabs = tabList.querySelectorAll(".eden-tab");
+    const panels = tabList
+      .closest(".eden-tabs")
+      .querySelectorAll(".eden-tab-panel");
+
     tabs.forEach((tab, index) => {
-      tab.addEventListener('click', () => {
+      tab.addEventListener("click", () => {
         // Remove active class from all tabs and panels
-        tabs.forEach(t => t.classList.remove('eden-tab-active'));
-        panels.forEach(p => p.classList.remove('eden-tab-panel-active'));
-        
+        tabs.forEach((t) => t.classList.remove("eden-tab-active"));
+        panels.forEach((p) => p.classList.remove("eden-tab-panel-active"));
+
         // Add active class to clicked tab and corresponding panel
-        tab.classList.add('eden-tab-active');
-        panels[index].classList.add('eden-tab-panel-active');
+        tab.classList.add("eden-tab-active");
+        panels[index].classList.add("eden-tab-panel-active");
       });
     });
   });
@@ -26,38 +28,38 @@ function setupTabs() {
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
   }
 }
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
+    modal.style.display = "none";
+    document.body.style.overflow = "";
   }
 }
 
 // Setup modal event listeners
 function setupModals() {
   // Close on overlay click
-  document.querySelectorAll('.eden-modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
+  document.querySelectorAll(".eden-modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
-        overlay.style.display = 'none';
-        document.body.style.overflow = '';
+        overlay.style.display = "none";
+        document.body.style.overflow = "";
       }
     });
   });
-  
+
   // Close buttons
-  document.querySelectorAll('.eden-modal-close').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const modal = btn.closest('.eden-modal-overlay');
+  document.querySelectorAll(".eden-modal-close").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modal = btn.closest(".eden-modal-overlay");
       if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
+        modal.style.display = "none";
+        document.body.style.overflow = "";
       }
     });
   });
@@ -65,22 +67,24 @@ function setupModals() {
 
 // Progress bar animation
 function animateProgress() {
-  const progressBars = document.querySelectorAll('.eden-progress-bar[data-target]');
-  
-  progressBars.forEach(bar => {
-    const target = parseInt(bar.getAttribute('data-target'));
+  const progressBars = document.querySelectorAll(
+    ".eden-progress-bar[data-target]",
+  );
+
+  progressBars.forEach((bar) => {
+    const target = parseInt(bar.getAttribute("data-target"));
     setTimeout(() => {
-      bar.style.width = target + '%';
+      bar.style.width = target + "%";
     }, 100);
   });
 }
 
 // Slider value display
 function setupSliders() {
-  document.querySelectorAll('.eden-slider').forEach(slider => {
+  document.querySelectorAll(".eden-slider").forEach((slider) => {
     const display = slider.nextElementSibling;
-    if (display && display.classList.contains('slider-value')) {
-      slider.addEventListener('input', (e) => {
+    if (display && display.classList.contains("slider-value")) {
+      slider.addEventListener("input", (e) => {
         display.textContent = e.target.value;
       });
     }
@@ -90,46 +94,46 @@ function setupSliders() {
 // Toggle notification badge
 let notificationCount = 0;
 function toggleNotification() {
-  const badge = document.querySelector('.eden-notification-badge');
+  const badge = document.querySelector(".eden-notification-badge");
   if (badge) {
     notificationCount = (notificationCount + 1) % 10;
-    badge.textContent = notificationCount || '';
-    badge.style.display = notificationCount > 0 ? 'flex' : 'none';
+    badge.textContent = notificationCount || "";
+    badge.style.display = notificationCount > 0 ? "flex" : "none";
   }
 }
 
 // Dropdown menu functionality
 function setupDropdowns() {
-  document.querySelectorAll('.eden-dropdown').forEach(dropdown => {
-    const button = dropdown.querySelector('button');
-    const menu = dropdown.querySelector('.eden-dropdown-menu');
-    
+  document.querySelectorAll(".eden-dropdown").forEach((dropdown) => {
+    const button = dropdown.querySelector("button");
+    const menu = dropdown.querySelector(".eden-dropdown-menu");
+
     if (button && menu) {
-      button.addEventListener('click', (e) => {
+      button.addEventListener("click", (e) => {
         e.stopPropagation();
-        const isVisible = menu.style.display === 'block';
-        
+        const isVisible = menu.style.display === "block";
+
         // Close all other dropdowns
-        document.querySelectorAll('.eden-dropdown-menu').forEach(m => {
-          m.style.display = 'none';
+        document.querySelectorAll(".eden-dropdown-menu").forEach((m) => {
+          m.style.display = "none";
         });
-        
-        menu.style.display = isVisible ? 'none' : 'block';
+
+        menu.style.display = isVisible ? "none" : "block";
       });
     }
   });
-  
+
   // Close dropdowns when clicking outside
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.eden-dropdown-menu').forEach(m => {
-      m.style.display = 'none';
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".eden-dropdown-menu").forEach((m) => {
+      m.style.display = "none";
     });
   });
 }
 
 // Toast notification system
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
+function showToast(message, type = "info") {
+  const toast = document.createElement("div");
   toast.className = `eden-card eden-card-glass`;
   toast.style.cssText = `
     position: fixed;
@@ -140,14 +144,14 @@ function showToast(message, type = 'info') {
     padding: 16px 24px;
     animation: eden-slide-up 0.3s ease-out;
   `;
-  
+
   const colors = {
-    info: 'var(--eden-color-info)',
-    success: 'var(--eden-color-success)',
-    warning: 'var(--eden-color-warning)',
-    danger: 'var(--eden-color-danger)'
+    info: "var(--eden-color-info)",
+    success: "var(--eden-color-success)",
+    warning: "var(--eden-color-warning)",
+    danger: "var(--eden-color-danger)",
   };
-  
+
   toast.innerHTML = `
     <div style="display: flex; align-items: center; gap: 12px;">
       <div style="width: 4px; height: 40px; background: ${colors[type]}; border-radius: 999px;"></div>
@@ -158,24 +162,24 @@ function showToast(message, type = 'info') {
       <button onclick="this.closest('div').remove()" style="background: none; border: none; color: var(--eden-color-text-muted); cursor: pointer; font-size: 20px;">×</button>
     </div>
   `;
-  
+
   document.body.appendChild(toast);
-  
+
   setTimeout(() => {
-    toast.style.animation = 'eden-fade-out 0.3s ease-out';
+    toast.style.animation = "eden-fade-out 0.3s ease-out";
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
 
 // Initialize all functionality
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupModals();
   setupSliders();
   setupDropdowns();
   animateProgress();
-  
-  console.log('Design Showcase initialized');
+
+  console.log("Design Showcase initialized");
 });
 
 // Make functions globally available
@@ -183,4 +187,3 @@ window.showModal = showModal;
 window.closeModal = closeModal;
 window.showToast = showToast;
 window.toggleNotification = toggleNotification;
-

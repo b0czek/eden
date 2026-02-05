@@ -43,8 +43,14 @@ export function WelcomeScreen() {
       <h1>{t("editor.title")}</h1>
       <p>{t("editor.welcome")}</p>
       <div class="welcome-shortcuts">
-        <ShortcutItem shortcut="Ctrl+S" description={t("editor.saveShortcut")} />
-        <ShortcutItem shortcut="Ctrl+W" description={t("editor.closeTabShortcut")} />
+        <ShortcutItem
+          shortcut="Ctrl+S"
+          description={t("editor.saveShortcut")}
+        />
+        <ShortcutItem
+          shortcut="Ctrl+W"
+          description={t("editor.closeTabShortcut")}
+        />
       </div>
     </div>
   );

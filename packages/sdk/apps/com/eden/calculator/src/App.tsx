@@ -15,7 +15,9 @@ const App: Component = () => {
   const [previousInput, setPreviousInput] = createSignal<string | null>(null);
   const [operator, setOperator] = createSignal<string | null>(null);
   const [shouldReset, setShouldReset] = createSignal(false);
-  const [pendingScientificOp, setPendingScientificOp] = createSignal<string | null>(null);
+  const [pendingScientificOp, setPendingScientificOp] = createSignal<
+    string | null
+  >(null);
 
   // Settings state / Mode state
   const [isScientificMode, setIsScientificMode] = createSignal(false);
@@ -24,7 +26,10 @@ const App: Component = () => {
   // Block zoom with Ctrl/Cmd + and Ctrl/Cmd -
   const handleKeyDown = (e: KeyboardEvent) => {
     // Block zoom
-    if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=")) {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === "+" || e.key === "-" || e.key === "=")
+    ) {
       e.preventDefault();
       return;
     }
@@ -42,7 +47,7 @@ const App: Component = () => {
       appendOperator("*");
     } else if (e.key === "/") {
       appendOperator("/");
-    } else if (e.key === "%" ) {
+    } else if (e.key === "%") {
       appendOperator("%");
     } else if (e.key === "Enter" || e.key === "=") {
       calculate();
@@ -51,7 +56,6 @@ const App: Component = () => {
     } else if (e.key === "Escape" || e.key === "Delete") {
       clearAll();
     }
-
   };
 
   // Block wheel zoom
@@ -63,7 +67,7 @@ const App: Component = () => {
 
   onMount(async () => {
     await initLocale();
-    
+
     // Add event listeners
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("wheel", handleWheel, { passive: false });
@@ -72,17 +76,20 @@ const App: Component = () => {
     const checkSize = () => {
       setIsScientificMode(window.innerHeight >= SCIENTIFIC_THRESHOLD);
     };
-    
+
     // Initial check
     checkSize();
-    
+
     // Listen for resize
     window.addEventListener("resize", checkSize);
 
     // Subscribe to settings changes
     if (window.edenAPI) {
       try {
-        await window.edenAPI.subscribe("settings/changed", handleSettingsChanged);
+        await window.edenAPI.subscribe(
+          "settings/changed",
+          handleSettingsChanged,
+        );
 
         // Load initial settings
         await loadSettings();
@@ -90,7 +97,7 @@ const App: Component = () => {
         console.error("Failed to initialize:", error);
       }
     }
-    
+
     onCleanup(() => {
       window.removeEventListener("resize", checkSize);
     });
@@ -106,7 +113,7 @@ const App: Component = () => {
 
     try {
       // scientificMode setting is removed, handled by window size now
-      
+
       const angleResult = await window.edenAPI.shellCommand("settings/get", {
         key: "angleUnit",
       });
@@ -118,7 +125,11 @@ const App: Component = () => {
     }
   };
 
-  const handleSettingsChanged = (data: { appId: string; key: string; value: string }) => {
+  const handleSettingsChanged = (data: {
+    appId: string;
+    key: string;
+    value: string;
+  }) => {
     if (data.appId !== APP_ID) return;
 
     if (data.key === "angleUnit") {
@@ -206,7 +217,9 @@ const App: Component = () => {
       "%": "mod",
     };
 
-    setExpression(`${previousInput()} ${opSymbols[operator()!]} ${display()} =`);
+    setExpression(
+      `${previousInput()} ${opSymbols[operator()!]} ${display()} =`,
+    );
 
     switch (operator()) {
       case "+":
@@ -414,7 +427,9 @@ const App: Component = () => {
     <div class="calculator">
       {/* Display */}
       <div class="display-container eden-card">
-        <div class="display-expression eden-text-secondary eden-text-sm">{expression()}</div>
+        <div class="display-expression eden-text-secondary eden-text-sm">
+          {expression()}
+        </div>
         <div class="display-value">{display()}</div>
       </div>
 
@@ -440,29 +455,118 @@ const App: Component = () => {
 
       {/* Main buttons */}
       <div class="buttons-grid">
-        <button class="eden-btn eden-btn-danger" onClick={clearAll}>C</button>
-        <button class="eden-btn eden-btn-secondary" onClick={deleteLast}>⌫</button>
-        <button class="eden-btn eden-btn-secondary" onClick={() => appendOperator("%")}>%</button>
-        <button class="eden-btn eden-btn-primary" onClick={() => appendOperator("/")}>÷</button>
+        <button class="eden-btn eden-btn-danger" onClick={clearAll}>
+          C
+        </button>
+        <button class="eden-btn eden-btn-secondary" onClick={deleteLast}>
+          ⌫
+        </button>
+        <button
+          class="eden-btn eden-btn-secondary"
+          onClick={() => appendOperator("%")}
+        >
+          %
+        </button>
+        <button
+          class="eden-btn eden-btn-primary"
+          onClick={() => appendOperator("/")}
+        >
+          ÷
+        </button>
 
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("7")}>7</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("8")}>8</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("9")}>9</button>
-        <button class="eden-btn eden-btn-primary" onClick={() => appendOperator("*")}>×</button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("7")}
+        >
+          7
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("8")}
+        >
+          8
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("9")}
+        >
+          9
+        </button>
+        <button
+          class="eden-btn eden-btn-primary"
+          onClick={() => appendOperator("*")}
+        >
+          ×
+        </button>
 
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("4")}>4</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("5")}>5</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("6")}>6</button>
-        <button class="eden-btn eden-btn-primary" onClick={() => appendOperator("-")}>−</button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("4")}
+        >
+          4
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("5")}
+        >
+          5
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("6")}
+        >
+          6
+        </button>
+        <button
+          class="eden-btn eden-btn-primary"
+          onClick={() => appendOperator("-")}
+        >
+          −
+        </button>
 
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("1")}>1</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("2")}>2</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber("3")}>3</button>
-        <button class="eden-btn eden-btn-primary" onClick={() => appendOperator("+")}>+</button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("1")}
+        >
+          1
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("2")}
+        >
+          2
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber("3")}
+        >
+          3
+        </button>
+        <button
+          class="eden-btn eden-btn-primary"
+          onClick={() => appendOperator("+")}
+        >
+          +
+        </button>
 
-        <button class="eden-btn eden-btn-ghost num-btn zero-btn" onClick={() => appendNumber("0")}>0</button>
-        <button class="eden-btn eden-btn-ghost num-btn" onClick={() => appendNumber(".")}>.</button>
-        <button class="eden-btn eden-btn-success equals-btn" onClick={calculate}>=</button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn zero-btn"
+          onClick={() => appendNumber("0")}
+        >
+          0
+        </button>
+        <button
+          class="eden-btn eden-btn-ghost num-btn"
+          onClick={() => appendNumber(".")}
+        >
+          .
+        </button>
+        <button
+          class="eden-btn eden-btn-success equals-btn"
+          onClick={calculate}
+        >
+          =
+        </button>
       </div>
     </div>
   );

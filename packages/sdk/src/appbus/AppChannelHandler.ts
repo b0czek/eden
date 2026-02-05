@@ -37,7 +37,7 @@ export class AppChannelHandler {
         {
           description: args.description,
           allowedClients: args.allowedClients,
-        }
+        },
       );
       return { success: true };
     } catch (error) {
@@ -59,7 +59,7 @@ export class AppChannelHandler {
   }): Promise<{ success: boolean }> {
     const deleted = this.channelManager.unregisterService(
       args._callerAppId,
-      args.serviceName
+      args.serviceName,
     );
     return { success: deleted };
   }
@@ -108,7 +108,7 @@ export class AppChannelHandler {
       args._callerAppId,
       args._callerWebContentsId,
       args.targetAppId,
-      args.serviceName
+      args.serviceName,
     );
   }
 }

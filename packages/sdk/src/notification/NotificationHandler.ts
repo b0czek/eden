@@ -25,7 +25,7 @@ export class NotificationHandler {
       title,
       message,
       timeout,
-      type
+      type,
     );
   }
 }

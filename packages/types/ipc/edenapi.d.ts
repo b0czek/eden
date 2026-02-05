@@ -28,7 +28,7 @@ export interface EdenAPI {
    */
   shellCommand<T extends CommandName>(
     command: T,
-    args: CommandArgs<T>
+    args: CommandArgs<T>,
   ): Promise<CommandResult<T>>;
 
   /**
@@ -38,7 +38,7 @@ export interface EdenAPI {
    */
   subscribe<T extends EventName>(
     event: T,
-    callback: (data: EventData<T>) => void
+    callback: (data: EventData<T>) => void,
   ): Promise<void>;
 
   /**
@@ -46,7 +46,7 @@ export interface EdenAPI {
    */
   unsubscribe<T extends EventName>(
     event: T,
-    callback: (data: EventData<T>) => void
+    callback: (data: EventData<T>) => void,
   ): void;
 
   /**

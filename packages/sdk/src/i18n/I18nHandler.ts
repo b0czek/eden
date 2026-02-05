@@ -12,7 +12,9 @@ export class I18nHandler {
   }
 
   @EdenHandler("get-common")
-  handleGetCommon(args: { locale: string }): { translations: Record<string, any> } {
+  handleGetCommon(args: { locale: string }): {
+    translations: Record<string, any>;
+  } {
     return this.i18nManager.getCommon(args.locale);
   }
 }

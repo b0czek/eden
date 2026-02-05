@@ -15,12 +15,18 @@ const SettingInput: Component<SettingInputProps> = (props) => {
   };
 
   const handleInput = (e: Event) => {
-    const target = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    const target = e.target as
+      | HTMLInputElement
+      | HTMLTextAreaElement
+      | HTMLSelectElement;
     props.onChange(target.value);
   };
 
   const label = () => getLocalizedValue(props.setting.label, locale());
-  const description = () => props.setting.description ? getLocalizedValue(props.setting.description, locale()) : undefined;
+  const description = () =>
+    props.setting.description
+      ? getLocalizedValue(props.setting.description, locale())
+      : undefined;
 
   return (
     <div class="setting-item">
@@ -61,7 +67,10 @@ const SettingInput: Component<SettingInputProps> = (props) => {
           >
             <For each={props.setting.options}>
               {(option) => (
-                <option value={option.value} selected={option.value === props.value}>
+                <option
+                  value={option.value}
+                  selected={option.value === props.value}
+                >
                   {getLocalizedValue(option.label, locale())}
                 </option>
               )}
@@ -83,7 +92,9 @@ const SettingInput: Component<SettingInputProps> = (props) => {
                     checked={props.value === option.value}
                     onChange={handleInput}
                   />
-                  <span class="eden-radio-option-label">{getLocalizedValue(option.label, locale())}</span>
+                  <span class="eden-radio-option-label">
+                    {getLocalizedValue(option.label, locale())}
+                  </span>
                 </label>
               )}
             </For>

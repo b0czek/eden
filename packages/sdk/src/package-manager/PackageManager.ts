@@ -173,10 +173,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               runtimeManifest.resolvedGrants,
             );
           } catch (error) {
-            log.warn(
-              `Failed to load prebuilt app from ${entry.name}:`,
-              error,
-            );
+            log.warn(`Failed to load prebuilt app from ${entry.name}:`, error);
           }
         }
       }
@@ -356,10 +353,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    * @param options.showRestricted - If true, includes apps the current user cannot launch (hidden by default)
    */
   getInstalledApps(
-    options: {
-      showHidden?: boolean;
-      showRestricted?: boolean;
-    } = {},
+    options: { showHidden?: boolean; showRestricted?: boolean } = {},
   ): RuntimeAppManifest[] {
     const { showHidden = false, showRestricted = false } = options;
     const apps = Array.from(this.installedApps.values());

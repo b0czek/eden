@@ -23,7 +23,7 @@ export const extensionToLanguage: Record<string, string> = {
   md: "markdown",
   markdown: "markdown",
   log: "plaintext",
-  
+
   // JavaScript/TypeScript
   js: "javascript",
   jsx: "javascript",
@@ -33,25 +33,25 @@ export const extensionToLanguage: Record<string, string> = {
   tsx: "typescript",
   mts: "typescript",
   cts: "typescript",
-  
+
   // Web
   html: "html",
   htm: "html",
   css: "css",
   less: "less",
-  
+
   // Data
   json: "json",
   yaml: "yaml",
   yml: "yaml",
   toml: "ini",
-  
+
   // Config
   ini: "ini",
   cfg: "ini",
   conf: "ini",
   env: "shell",
-  
+
   // Shell scripts
   sh: "shell",
   bash: "shell",

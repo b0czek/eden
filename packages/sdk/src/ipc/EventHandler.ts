@@ -10,7 +10,7 @@ export class EventHandler {
 
   constructor(
     subscriberManager: EventSubscriberManager,
-    viewManager: ViewManager
+    viewManager: ViewManager,
   ) {
     this.subscriberManager = subscriberManager;
     this.viewManager = viewManager;
@@ -23,7 +23,8 @@ export class EventHandler {
     _callerAppId?: string;
     _isFoundation?: boolean;
   }): void {
-    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } = args;
+    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } =
+      args;
 
     if (!APP_EVENT_NAMES.includes(eventName as any)) {
       throw new Error(`Event '${eventName}' is not supported`);
@@ -54,7 +55,8 @@ export class EventHandler {
     _callerAppId?: string;
     _isFoundation?: boolean;
   }): void {
-    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } = args;
+    const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } =
+      args;
 
     if (_isFoundation) {
       this.subscriberManager.unsubscribeFoundation(eventName);

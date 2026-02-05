@@ -60,7 +60,7 @@ function getGridDimensions(
   mode: TilingMode,
   visibleCount: number,
   configRows: number,
-  configColumns: number
+  configColumns: number,
 ): GridDimensions {
   switch (mode) {
     case "horizontal":
@@ -87,15 +87,13 @@ function calculateGridCell(
   available: Bounds,
   index: number,
   grid: GridDimensions,
-  gap: number
+  gap: number,
 ): Bounds {
   const col = index % grid.columns;
   const row = Math.floor(index / grid.columns);
 
-  const tileWidth =
-    (available.width - gap * (grid.columns - 1)) / grid.columns;
-  const tileHeight =
-    (available.height - gap * (grid.rows - 1)) / grid.rows;
+  const tileWidth = (available.width - gap * (grid.columns - 1)) / grid.columns;
+  const tileHeight = (available.height - gap * (grid.rows - 1)) / grid.rows;
 
   return {
     x: available.x + col * (tileWidth + gap),

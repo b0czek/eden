@@ -4,7 +4,7 @@ import { EdenEmitter } from "./EdenEmitter";
 import { EdenNamespace } from "./CommandDecorators";
 
 interface TestEvents {
-  "ping": { value: number };
+  ping: { value: number };
 }
 
 describe("EdenEmitter", () => {
@@ -15,9 +15,13 @@ describe("EdenEmitter", () => {
       }
     }
 
-    const emitter = new NoNamespace({ eventSubscribers: { notify: jest.fn(), notifyView: jest.fn() } } as any);
+    const emitter = new NoNamespace({
+      eventSubscribers: { notify: jest.fn(), notifyView: jest.fn() },
+    } as any);
 
-    expect(() => emitter.emit()).toThrow(/must be decorated with @EdenNamespace/);
+    expect(() => emitter.emit()).toThrow(
+      /must be decorated with @EdenNamespace/,
+    );
   });
 
   it("emits namespaced events via the IPC bridge", () => {
@@ -34,7 +38,9 @@ describe("EdenEmitter", () => {
 
     const notify = jest.fn();
     const notifyView = jest.fn();
-    const emitter = new Namespaced({ eventSubscribers: { notify, notifyView } } as any);
+    const emitter = new Namespaced({
+      eventSubscribers: { notify, notifyView },
+    } as any);
 
     emitter.emit();
     expect(notify).toHaveBeenCalledWith("test/ping", { value: 42 });

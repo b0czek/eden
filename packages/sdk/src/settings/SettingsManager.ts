@@ -86,9 +86,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     }
 
     if (value !== undefined && typeof value !== "string") {
-      log.warn(
-        `Non-string value found for key ${key}, converting to string`,
-      );
+      log.warn(`Non-string value found for key ${key}, converting to string`);
       return String(value);
     }
     return value;
@@ -126,10 +124,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
         }
       }
     } catch (error) {
-      log.warn(
-        "Iterator not supported or failed:",
-        error,
-      );
+      log.warn("Iterator not supported or failed:", error);
     }
 
     if (showRestricted) {

@@ -50,7 +50,7 @@ if (appIdArg) {
 // Extract launch args
 let launchArgs: string[] = [];
 const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args=")
+  arg.startsWith("--launch-args="),
 );
 if (launchArgsArg) {
   try {
@@ -81,7 +81,7 @@ ipcRenderer.on("backend-port", (event: any) => {
     "__backend__",
     new Map([["__backend__", wrappedPort]]), // Dummy map since we won't close this
     pendingBackendRequests,
-    generateBackendMessageId
+    generateBackendMessageId,
   );
 });
 
@@ -106,7 +106,7 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
   if (!backendConnection) {
     throw new Error(
       "AppAPI not available: Backend not connected. " +
-        "This could mean the app has no backend, or the connection is not yet established."
+        "This could mean the app has no backend, or the connection is not yet established.",
     );
   }
   return backendConnection;
@@ -155,13 +155,13 @@ ipcRenderer.on(
   "appbus-port-closed",
   (_event: any, data: { connectionId: string }) => {
     handlePortClosed(appBusState, data.connectionId);
-  }
+  },
 );
 
 // Expose appBus API for app-to-app communication
 contextBridge.exposeInMainWorld(
   "appBus",
-  createAppBusAPI({ transport: shellTransport }, appBusState)
+  createAppBusAPI({ transport: shellTransport }, appBusState),
 );
 
 log.info("Universal app preload loaded");

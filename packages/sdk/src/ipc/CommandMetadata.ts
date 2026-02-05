@@ -13,9 +13,7 @@ const MANAGER_METADATA = new Map<any, ManagerMetadata>();
 /**
  * Get manager metadata (namespace and handlers).
  */
-export function getManagerMetadata(
-  instance: any,
-): ManagerMetadata | undefined {
+export function getManagerMetadata(instance: any): ManagerMetadata | undefined {
   return MANAGER_METADATA.get(instance.constructor);
 }
 

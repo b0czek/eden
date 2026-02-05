@@ -3,9 +3,9 @@ export { Toolbar } from "./Toolbar";
 export { ErrorBanner } from "./ErrorBanner";
 export { WelcomeScreen } from "./WelcomeScreen";
 // Lazy-loading exports (recommended for faster startup)
-export { 
-  LazyMonacoEditor, 
-  setEditorContentLazy, 
+export {
+  LazyMonacoEditor,
+  setEditorContentLazy,
   getEditorContentLazy,
-  preloadMonaco 
+  preloadMonaco,
 } from "./LazyMonacoEditor";

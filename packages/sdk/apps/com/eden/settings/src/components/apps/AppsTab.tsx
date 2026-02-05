@@ -30,7 +30,7 @@ const AppsTab: Component = () => {
     Record<string, number | undefined>
   >({});
   const [sizeLoading, setSizeLoading] = createSignal<Record<string, boolean>>(
-    {}
+    {},
   );
 
   const AUTOSTART_KEY_PREFIX = "autostart.";
@@ -43,7 +43,11 @@ const AppsTab: Component = () => {
       });
       setApps(result);
 
-      await Promise.all([loadIcons(result), loadAutostartSettings(result), loadHotReloadSettings(result)]);
+      await Promise.all([
+        loadIcons(result),
+        loadAutostartSettings(result),
+        loadHotReloadSettings(result),
+      ]);
 
       if (
         selectedAppId() &&
@@ -78,7 +82,7 @@ const AppsTab: Component = () => {
       try {
         const iconResult = await window.edenAPI!.shellCommand(
           "package/get-icon",
-          { appId: app.id }
+          { appId: app.id },
         );
         if (iconResult.icon) {
           icons[app.id] = iconResult.icon;
@@ -97,11 +101,11 @@ const AppsTab: Component = () => {
         "settings/list/su",
         {
           appId: "com.eden",
-        }
+        },
       );
       const keys: string[] = keysResult.keys ?? [];
       const autostartKeys = keys.filter((key) =>
-        key.startsWith(AUTOSTART_KEY_PREFIX)
+        key.startsWith(AUTOSTART_KEY_PREFIX),
       );
 
       await Promise.all(
@@ -112,10 +116,10 @@ const AppsTab: Component = () => {
             {
               appId: "com.eden",
               key,
-            }
+            },
           );
           values[appId] = valueResult.value === "true";
-        })
+        }),
       );
     } catch (err) {
       console.error("Failed to load autostart settings", err);
@@ -132,19 +136,19 @@ const AppsTab: Component = () => {
 
   const loadHotReloadSettings = async (result: RuntimeAppManifest[]) => {
     const values: Record<string, boolean> = {};
-    
+
     await Promise.all(
       result.map(async (app) => {
         try {
           const hotReloadResult = await window.edenAPI!.shellCommand(
             "package/is-hot-reload-enabled",
-            { appId: app.id }
+            { appId: app.id },
           );
           values[app.id] = hotReloadResult.enabled === true;
         } catch {
           values[app.id] = false;
         }
-      })
+      }),
     );
 
     setHotReloadApps(values);
@@ -184,7 +188,7 @@ const AppsTab: Component = () => {
     try {
       const result = await window.edenAPI!.shellCommand(
         "package/toggle-hot-reload",
-        { appId }
+        { appId },
       );
       setHotReloadApps((current) => ({ ...current, [appId]: result.enabled }));
     } catch (err) {
@@ -222,13 +226,13 @@ const AppsTab: Component = () => {
     const appList = [...apps()];
     appList.sort((a, b) =>
       getLocalizedValue(a.name, locale()).localeCompare(
-        getLocalizedValue(b.name, locale())
-      )
+        getLocalizedValue(b.name, locale()),
+      ),
     );
     return appList;
   });
   const selectedApp = createMemo(
-    () => apps().find((app) => app.id === selectedAppId()) ?? null
+    () => apps().find((app) => app.id === selectedAppId()) ?? null,
   );
 
   return (
@@ -257,7 +261,9 @@ const AppsTab: Component = () => {
                             <div class="eden-avatar eden-avatar-md">
                               <Show
                                 when={app.isPrebuilt}
-                                fallback={<FiPackage class="eden-avatar-icon" />}
+                                fallback={
+                                  <FiPackage class="eden-avatar-icon" />
+                                }
                               >
                                 <FiCpu class="eden-avatar-icon" />
                               </Show>

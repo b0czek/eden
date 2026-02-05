@@ -23,7 +23,7 @@ program
   .option(
     "-c, --compression <level>",
     "Zstd compression level (1-22, default: 11)",
-    "11"
+    "11",
   )
   .action(async (appDirectory: string, options: any) => {
     console.log(chalk.bold.blue("\n🌱 Genesis - Creating life...\n"));
@@ -36,7 +36,7 @@ program
     ) {
       console.log(chalk.red("\n❌ Invalid compression level"));
       console.log(
-        chalk.gray("   Compression level must be between 1 and 22\n")
+        chalk.gray("   Compression level must be between 1 and 22\n"),
       );
       process.exit(1);
     }
@@ -53,13 +53,17 @@ program
       if (options.dryRun) {
         console.log(chalk.green("\n✨ Dry run successful - validation passed"));
         console.log(
-          chalk.gray(`   ${result.manifest?.name} v${result.manifest?.version}`)
+          chalk.gray(
+            `   ${result.manifest?.name} v${result.manifest?.version}`,
+          ),
         );
         console.log(chalk.gray("   No files were created\n"));
       } else {
         console.log(chalk.green("\n✨ Success! App bundled successfully"));
         console.log(
-          chalk.gray(`   ${result.manifest?.name} v${result.manifest?.version}`)
+          chalk.gray(
+            `   ${result.manifest?.name} v${result.manifest?.version}`,
+          ),
         );
         console.log(chalk.gray(`   → ${result.outputPath}`));
         if (result.checksum) {
@@ -93,24 +97,24 @@ program
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
       console.log(
-        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`)
+        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
+        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
       );
       console.log(
         chalk.gray(
-          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`
-        )
+          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`,
+        ),
       );
 
       // Verify files
       const fileCheck = await GenesisBundler.verifyFiles(
         path.resolve(appDirectory),
-        result.manifest
+        result.manifest,
       );
       if (fileCheck.valid) {
         console.log(chalk.green("✓ All required files present\n"));
@@ -118,7 +122,7 @@ program
       } else {
         console.log(chalk.yellow("⚠ Warning: Missing files"));
         fileCheck.errors.forEach((error) =>
-          console.log(chalk.gray(`  - ${error}`))
+          console.log(chalk.gray(`  - ${error}`)),
         );
         console.log();
         process.exit(1);
@@ -147,16 +151,18 @@ program
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
       console.log(
-        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`)
+        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
+        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`)
+        chalk.gray(
+          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`,
+        ),
       );
       if (result.checksum) {
         console.log(chalk.gray(`  SHA256:      ${result.checksum}`));
@@ -193,7 +199,9 @@ program
         console.log(chalk.green("\n✨ Success! Archive extracted"));
         if (result.manifest) {
           console.log(
-            chalk.gray(`   ${result.manifest.name} v${result.manifest.version}`)
+            chalk.gray(
+              `   ${result.manifest.name} v${result.manifest.version}`,
+            ),
           );
         }
         console.log(chalk.gray(`   → ${path.resolve(outputDirectory)}\n`));
@@ -203,7 +211,7 @@ program
         console.log(chalk.gray(`   ${result.error}\n`));
         process.exit(1);
       }
-    }
+    },
   );
 
 program.parse();

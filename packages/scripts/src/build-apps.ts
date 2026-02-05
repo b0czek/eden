@@ -32,7 +32,7 @@ async function loadBuildCache(cwd: string): Promise<BuildCache> {
   try {
     const content = await fs.readFile(
       path.join(cwd, BUILD_CACHE_PATH),
-      "utf-8"
+      "utf-8",
     );
     return JSON.parse(content);
   } catch {
@@ -43,7 +43,7 @@ async function loadBuildCache(cwd: string): Promise<BuildCache> {
 async function saveBuildCache(cwd: string, cache: BuildCache): Promise<void> {
   await fs.writeFile(
     path.join(cwd, BUILD_CACHE_PATH),
-    JSON.stringify(cache, null, 2)
+    JSON.stringify(cache, null, 2),
   );
 }
 
@@ -83,7 +83,7 @@ async function needsRebuild(
   appId: string,
   appDir: string,
   targetDir: string,
-  cache: BuildCache
+  cache: BuildCache,
 ): Promise<boolean> {
   // Always rebuild if output doesn't exist
   try {
@@ -107,13 +107,13 @@ async function needsRebuild(
 async function resolveAppDirectory(
   appSource: AppSource,
   cwd: string,
-  sdkAppsPath: string | null
+  sdkAppsPath: string | null,
 ): Promise<string | null> {
   switch (appSource.source) {
     case "builtin": {
       if (!sdkAppsPath) {
         console.error(
-          `❌ Cannot find SDK prebuilt apps directory for: ${appSource.id}`
+          `❌ Cannot find SDK prebuilt apps directory for: ${appSource.id}`,
         );
         return null;
       }
@@ -124,7 +124,7 @@ async function resolveAppDirectory(
         return appPath;
       } catch {
         console.error(
-          `❌ Prebuilt app not found: ${appSource.id} (looked in ${appPath})`
+          `❌ Prebuilt app not found: ${appSource.id} (looked in ${appPath})`,
         );
         return null;
       }
@@ -139,7 +139,7 @@ async function resolveAppDirectory(
         return appPath;
       } catch {
         console.error(
-          `❌ Local app not found: ${appSource.id} (looked in ${appPath})`
+          `❌ Local app not found: ${appSource.id} (looked in ${appPath})`,
         );
         return null;
       }
@@ -152,7 +152,7 @@ async function resolveAppDirectory(
           `${appSource.package}/package.json`,
           {
             paths: [cwd],
-          }
+          },
         );
         const packageDir = path.dirname(packageJsonPath);
         return packageDir;
@@ -166,7 +166,7 @@ async function resolveAppDirectory(
       // Exhaustive check - this should never happen
       const _exhaustiveCheck: never = appSource;
       console.error(
-        `❌ Unknown app source type for: ${(_exhaustiveCheck as AppSource).id}`
+        `❌ Unknown app source type for: ${(_exhaustiveCheck as AppSource).id}`,
       );
       return null;
     }
@@ -197,13 +197,13 @@ async function buildApp(
   appDir: string,
   targetDir: string,
   cache: BuildCache,
-  force: boolean
+  force: boolean,
 ): Promise<boolean> {
   console.log(`\n📦 Building ${appSource.id}...`);
   console.log(
     `   Source: ${appSource.source}${
       appSource.source === "local" ? ` (${appSource.path})` : ""
-    }`
+    }`,
   );
 
   // Check if rebuild is needed
@@ -265,7 +265,7 @@ async function buildApp(
   };
 
   console.log(
-    `✅ Successfully built ${result.manifest?.name} (${appSource.id})`
+    `✅ Successfully built ${result.manifest?.name} (${appSource.id})`,
   );
   return true;
 }
@@ -290,8 +290,8 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
       app.source === "local"
         ? ` (${app.path})`
         : app.source === "npm"
-        ? ` (${app.package})`
-        : "";
+          ? ` (${app.package})`
+          : "";
     console.log(`  - ${app.id} [${app.source}]${sourceInfo}`);
   });
 
@@ -300,7 +300,7 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
   if (config.apps.some((app) => app.source === "builtin") && !sdkAppsPath) {
     console.error("\n❌ Cannot find @edenapp/sdk apps directory.");
     console.error(
-      "   Make sure @edenapp/sdk is installed or provide --sdk-path"
+      "   Make sure @edenapp/sdk is installed or provide --sdk-path",
     );
     process.exit(1);
   }
@@ -419,7 +419,7 @@ async function findAllApps(dir: string): Promise<string[]> {
  * This is used when building the SDK itself to prebuild all builtin apps.
  */
 export async function buildSdkApps(
-  options: BuildSdkAppsOptions
+  options: BuildSdkAppsOptions,
 ): Promise<void> {
   const { appsDir, outputDir, force = false } = options;
 
@@ -437,7 +437,7 @@ export async function buildSdkApps(
   for (const appPath of appPaths) {
     const manifestContent = await fs.readFile(
       path.join(appPath, "manifest.json"),
-      "utf-8"
+      "utf-8",
     );
     const manifest = JSON.parse(manifestContent);
     console.log(`  - ${manifest.id}`);
@@ -458,7 +458,7 @@ export async function buildSdkApps(
   for (const appPath of appPaths) {
     const manifestContent = await fs.readFile(
       path.join(appPath, "manifest.json"),
-      "utf-8"
+      "utf-8",
     );
     const manifest = JSON.parse(manifestContent);
     const targetDir = path.join(outputDir, manifest.id);
@@ -483,7 +483,7 @@ export async function buildSdkApps(
   // Summary
   console.log("\n" + "=".repeat(50));
   console.log(
-    `📊 Build complete: ${successCount} succeeded, ${failCount} failed`
+    `📊 Build complete: ${successCount} succeeded, ${failCount} failed`,
   );
 
   if (failCount > 0) {

@@ -3,12 +3,7 @@
   "name": "Shell for Eden",
   "version": "1.0.0",
   "overlay": true,
-  "permissions": [
-    "db/rw",
-    "user/identity",
-    "user/session",
-    "package/read"
-  ],
+  "permissions": ["db/rw", "user/identity", "user/session", "package/read"],
   "build": {
     "command": "npm run build"
   },

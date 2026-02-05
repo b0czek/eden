@@ -23,7 +23,7 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
             {t("common.cancel")}
           </button>
           <button class="eden-btn eden-btn-danger" onClick={props.onConfirm}>
-             {t("common.delete")}
+            {t("common.delete")}
           </button>
         </>
       }

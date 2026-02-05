@@ -9,7 +9,9 @@ import { GRANT_PRESET_LIST } from "./GrantPresetList";
 
 describe("GrantPresets", () => {
   it("returns preset definitions by id", () => {
-    const preset = GRANT_PRESET_LIST.find((item) => item.id === "package/manage");
+    const preset = GRANT_PRESET_LIST.find(
+      (item) => item.id === "package/manage",
+    );
     if (!preset) {
       throw new Error("Expected package/manage preset to exist");
     }
@@ -17,7 +19,9 @@ describe("GrantPresets", () => {
   });
 
   it("resolves preset grants to resolved grant shape", () => {
-    const preset = GRANT_PRESET_LIST.find((item) => item.id === "package/manage");
+    const preset = GRANT_PRESET_LIST.find(
+      (item) => item.id === "package/manage",
+    );
     if (!preset) {
       throw new Error("Expected package/manage preset to exist");
     }
@@ -34,7 +38,9 @@ describe("GrantPresets", () => {
   });
 
   it("normalizes app and preset grants and ignores unknown presets", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
 
     const grants: AppGrantDefinition[] = [
       { scope: "preset", preset: "package/manage" },
@@ -43,7 +49,9 @@ describe("GrantPresets", () => {
     ];
 
     const normalized = normalizeGrantPresets(grants, "com.eden.test");
-    const preset = GRANT_PRESET_LIST.find((item) => item.id === "package/manage");
+    const preset = GRANT_PRESET_LIST.find(
+      (item) => item.id === "package/manage",
+    );
     if (!preset) {
       throw new Error("Expected package/manage preset to exist");
     }

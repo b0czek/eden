@@ -14,7 +14,7 @@ export function TabBar(props: TabBarProps) {
       <For each={props.tabs}>
         {(tab) => (
           <div
-            class={`editor-tab ${props.activeTabId === tab.id ? 'active' : ''} ${tab.isModified ? 'modified' : ''}`}
+            class={`editor-tab ${props.activeTabId === tab.id ? "active" : ""} ${tab.isModified ? "modified" : ""}`}
             onClick={() => props.onTabClick(tab)}
             role="tab"
           >

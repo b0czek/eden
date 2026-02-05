@@ -7,7 +7,13 @@ describe("normalizeAppIds", () => {
   });
 
   it("trims whitespace, removes empty entries, and ensures uniqueness", () => {
-    const result = normalizeAppIds([" app.one ", "", "app.two", "app.one", "   "]);
+    const result = normalizeAppIds([
+      " app.one ",
+      "",
+      "app.two",
+      "app.one",
+      "   ",
+    ]);
     const values = Array.from(result).sort();
     expect(values).toEqual(["app.one", "app.two"]);
   });

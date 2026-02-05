@@ -18,7 +18,7 @@ export class TilingManager {
 
   constructor(
     config: TilingConfig = { mode: "none", gap: 0, padding: 0 },
-    workspaceBounds: Bounds = { x: 0, y: 0, width: 800, height: 600 }
+    workspaceBounds: Bounds = { x: 0, y: 0, width: 800, height: 600 },
   ) {
     this.config = config;
     this.workspaceBounds = workspaceBounds;
@@ -100,7 +100,7 @@ export class TilingManager {
    */
   enforceTiledCapacity(
     views: Map<number, ViewInfo>,
-    preferredViewId?: number
+    preferredViewId?: number,
   ): number[] {
     if (!this.isEnabled()) return [];
 
@@ -108,7 +108,8 @@ export class TilingManager {
     if (capacity === undefined) return [];
 
     const visibleTiledApps = Array.from(views.values()).filter(
-      (view) => view.viewType === "app" && view.mode === "tiled" && view.visible
+      (view) =>
+        view.viewType === "app" && view.mode === "tiled" && view.visible,
     );
 
     if (visibleTiledApps.length <= capacity) return [];
@@ -148,7 +149,7 @@ export class TilingManager {
   applyTiledCapacity(
     views: Map<number, ViewInfo>,
     preferredViewId: number | undefined,
-    hideView: (viewId: number) => void
+    hideView: (viewId: number) => void,
   ): boolean {
     const toHide = this.enforceTiledCapacity(views, preferredViewId);
     if (toHide.length > 0) {
@@ -183,7 +184,7 @@ export class TilingManager {
   getNextTileIndex(views: Iterable<ViewInfo>): number {
     const indices = Array.from(views)
       .filter(
-        (v) => v.visible && v.mode === "tiled" && v.tileIndex !== undefined
+        (v) => v.visible && v.mode === "tiled" && v.tileIndex !== undefined,
       )
       .map((v) => v.tileIndex!);
 

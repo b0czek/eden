@@ -23,7 +23,7 @@ export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(SettingsManager) private settingsManager: SettingsManager
+    @inject(SettingsManager) private settingsManager: SettingsManager,
   ) {
     super(ipcBridge);
 
@@ -32,15 +32,21 @@ export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {
     commandRegistry.registerManager(this.i18nHandler);
 
     // Listen for locale changes
-    this.ipcBridge.eventSubscribers.subscribeInternal("settings/changed", (data) => {
-      if (data.key === "general.locale") {
-        this.notify("locale-changed", { locale: data.value });
-      }
-    });
+    this.ipcBridge.eventSubscribers.subscribeInternal(
+      "settings/changed",
+      (data) => {
+        if (data.key === "general.locale") {
+          this.notify("locale-changed", { locale: data.value });
+        }
+      },
+    );
   }
 
   async getLocale(): Promise<string> {
-    const setting = await this.settingsManager.get("com.eden", "general.locale");
+    const setting = await this.settingsManager.get(
+      "com.eden",
+      "general.locale",
+    );
     return setting || "en";
   }
 

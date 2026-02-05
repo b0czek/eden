@@ -24,7 +24,7 @@ program
   .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
   .option(
     "--sdk-path <path>",
-    "Path to @edenapp/sdk (auto-detected if installed)"
+    "Path to @edenapp/sdk (auto-detected if installed)",
   )
   .action(async (options) => {
     try {
@@ -63,7 +63,7 @@ program
   .description("Copy SDK runtime assets to consumer dist")
   .option(
     "--sdk-path <path>",
-    "Path to @edenapp/sdk (auto-detected if installed)"
+    "Path to @edenapp/sdk (auto-detected if installed)",
   )
   .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
   .option("-o, --output <path>", "Output directory", "dist")
@@ -86,7 +86,7 @@ program
   .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
   .option(
     "--sdk-path <path>",
-    "Path to @edenapp/sdk (auto-detected if installed)"
+    "Path to @edenapp/sdk (auto-detected if installed)",
   )
   .action(async (options) => {
     try {

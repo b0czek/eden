@@ -28,28 +28,32 @@ const App: Component = () => {
   const [showNewFileDialog, setShowNewFileDialog] = createSignal(false);
   const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
   const [showErrorDialog, setShowErrorDialog] = createSignal(false);
-  const [showDisplayOptionsModal, setShowDisplayOptionsModal] = createSignal(false);
+  const [showDisplayOptionsModal, setShowDisplayOptionsModal] =
+    createSignal(false);
   const [errorMessage, setErrorMessage] = createSignal("");
   const [itemToDelete, setItemToDelete] = createSignal<FileItem | null>(null);
 
   // Display preferences
-  const [displayPreferences, setDisplayPreferences] = createSignal<DisplayPreferences>({
-    viewStyle: 'grid',
-    itemSize: 'medium',
-    sortBy: 'name',
-    sortOrder: 'asc',
-  });
+  const [displayPreferences, setDisplayPreferences] =
+    createSignal<DisplayPreferences>({
+      viewStyle: "grid",
+      itemSize: "medium",
+      sortBy: "name",
+      sortOrder: "asc",
+    });
 
   // Load preferences from database on mount
   onMount(async () => {
     initLocale(); // Initialize locale
     try {
-      const result = await window.edenAPI.shellCommand('db/get', { key: 'display-preferences' });
+      const result = await window.edenAPI.shellCommand("db/get", {
+        key: "display-preferences",
+      });
       if (result.value) {
         setDisplayPreferences(JSON.parse(result.value));
       }
     } catch (error) {
-      console.error('Failed to load display preferences:', error);
+      console.error("Failed to load display preferences:", error);
     }
   });
 
@@ -58,18 +62,16 @@ const App: Component = () => {
       setLoading(true);
       setCurrentPath(path);
 
-      const dirItems = await window.edenAPI.shellCommand(
-        "fs/readdir",
-        { path }
-      );
+      const dirItems = await window.edenAPI.shellCommand("fs/readdir", {
+        path,
+      });
       const itemsWithStats = await Promise.all(
         dirItems.map(async (name: string) => {
           const itemPath = joinPath(path, name);
           try {
-            const stats = await window.edenAPI.shellCommand(
-              "fs/stat",
-              { path: itemPath }
-            );
+            const stats = await window.edenAPI.shellCommand("fs/stat", {
+              path: itemPath,
+            });
             return {
               name,
               path: itemPath,
@@ -88,7 +90,7 @@ const App: Component = () => {
               modified: new Date(),
             };
           }
-        })
+        }),
       );
 
       const sorted = sortItems(itemsWithStats);
@@ -109,20 +111,23 @@ const App: Component = () => {
   createEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if input is focused (e.g. Omnibox or dialogs)
-      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
 
       const prefs = displayPreferences();
       const sizes = ITEM_SIZES;
 
       // Zoom Controls (Ctrl/Cmd + +/-)
-      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === '-')) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "=" || e.key === "+" || e.key === "-")
+      ) {
         e.preventDefault();
         const currentIndex = sizes.indexOf(prefs.itemSize);
         let newIndex = currentIndex;
 
-        if (e.key === '=' || e.key === '+') {
+        if (e.key === "=" || e.key === "+") {
           newIndex = Math.min(currentIndex + 1, sizes.length - 1);
-        } else if (e.key === '-') {
+        } else if (e.key === "-") {
           newIndex = Math.max(currentIndex - 1, 0);
         }
 
@@ -218,22 +223,24 @@ const App: Component = () => {
       // Then sort by selected criteria
       let comparison = 0;
       switch (prefs.sortBy) {
-        case 'name':
+        case "name":
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'size':
+        case "size":
           comparison = a.size - b.size;
           break;
-        case 'modified':
+        case "modified":
           comparison = a.modified.getTime() - b.modified.getTime();
           break;
       }
 
-      return prefs.sortOrder === 'asc' ? comparison : -comparison;
+      return prefs.sortOrder === "asc" ? comparison : -comparison;
     });
   };
 
-  const handlePreferencesChange = async (newPreferences: DisplayPreferences) => {
+  const handlePreferencesChange = async (
+    newPreferences: DisplayPreferences,
+  ) => {
     setDisplayPreferences(newPreferences);
     // Re-sort existing items with new preferences
     const currentItems = items();
@@ -243,12 +250,12 @@ const App: Component = () => {
 
     // Persist preferences to database
     try {
-      await window.edenAPI.shellCommand('db/set', {
-        key: 'display-preferences',
-        value: JSON.stringify(newPreferences)
+      await window.edenAPI.shellCommand("db/set", {
+        key: "display-preferences",
+        value: JSON.stringify(newPreferences),
       });
     } catch (error) {
-      console.error('Failed to save display preferences:', error);
+      console.error("Failed to save display preferences:", error);
     }
   };
 
@@ -325,7 +332,9 @@ const App: Component = () => {
     } else {
       // Open files with their registered handler
       try {
-        let result = await window.edenAPI.shellCommand("file/open", { path: item.path });
+        let result = await window.edenAPI.shellCommand("file/open", {
+          path: item.path,
+        });
         if (!result.success) {
           showError("Failed to open file: " + result.error);
         }

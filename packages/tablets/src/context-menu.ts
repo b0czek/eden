@@ -5,7 +5,10 @@ import type {
   ContextMenuResult,
 } from "@edenapp/types";
 
-export type ContextMenuActionItem = Extract<ContextMenuItem, { type: "item" }> & {
+export type ContextMenuActionItem = Extract<
+  ContextMenuItem,
+  { type: "item" }
+> & {
   onSelect?: () => Promise<void> | void;
 };
 
@@ -25,19 +28,22 @@ export interface ContextMenuOpenOptions
 export interface EdenContextMenuAPI {
   open: (options: ContextMenuOpenOptions) => Promise<ContextMenuResult>;
   openAtCursor: (
-    options: Omit<ContextMenuOpenOptions, "position" | "event">
+    options: Omit<ContextMenuOpenOptions, "position" | "event">,
   ) => Promise<ContextMenuResult>;
   createHandler: (
     getOptions: (
-      event: MouseEvent | TouchEvent | PointerEvent
-    ) => ContextMenuOpenOptions
+      event: MouseEvent | TouchEvent | PointerEvent,
+    ) => ContextMenuOpenOptions,
   ) => (event: MouseEvent | TouchEvent | PointerEvent) => void;
   close: (requestId?: string) => Promise<void>;
 }
 
 type EdenAPITransport = {
   shellCommand: (command: string, args: any) => Promise<any>;
-  subscribe: (event: string, handler: (payload: any) => void) => Promise<void> | void;
+  subscribe: (
+    event: string,
+    handler: (payload: any) => void,
+  ) => Promise<void> | void;
 };
 
 const getEdenAPI = (): EdenAPITransport => {
@@ -53,7 +59,10 @@ const getEdenAPI = (): EdenAPITransport => {
   return api;
 };
 
-const contextMenuPending = new Map<string, (result: ContextMenuResult) => void>();
+const contextMenuPending = new Map<
+  string,
+  (result: ContextMenuResult) => void
+>();
 let contextMenuSubscribed = false;
 let lastPointer: { x: number; y: number } | null = null;
 let pointerTracking = false;
@@ -84,7 +93,7 @@ const ensurePointerTracking = () => {
 };
 
 const resolvePositionFromEvent = (
-  event?: MouseEvent | TouchEvent | PointerEvent
+  event?: MouseEvent | TouchEvent | PointerEvent,
 ): ContextMenuPosition | undefined => {
   if (!event) return undefined;
   if ("clientX" in event && "clientY" in event) {
@@ -123,11 +132,9 @@ const openContextMenu: EdenContextMenuAPI["open"] = async (options) => {
   ensurePointerTracking();
   await ensureContextMenuSubscribed();
 
-  const position =
-    options.position ||
+  const position = options.position ||
     resolvePositionFromEvent(options.event) ||
-    (lastPointer ? { left: lastPointer.x, top: lastPointer.y } : undefined) ||
-    {
+    (lastPointer ? { left: lastPointer.x, top: lastPointer.y } : undefined) || {
       left: Math.round(window.innerWidth / 2),
       top: Math.round(window.innerHeight / 2),
     };
@@ -145,7 +152,7 @@ const openContextMenu: EdenContextMenuAPI["open"] = async (options) => {
         try {
           if (result.itemId) {
             const selected = options.items.find(
-              (item) => item.type === "item" && item.id === result.itemId
+              (item) => item.type === "item" && item.id === result.itemId,
             ) as ContextMenuActionItem | undefined;
             if (selected?.onSelect) {
               await selected.onSelect();
@@ -170,20 +177,26 @@ const openContextMenu: EdenContextMenuAPI["open"] = async (options) => {
 };
 
 const openContextMenuAtCursor: EdenContextMenuAPI["openAtCursor"] = async (
-  options
+  options,
 ) => {
   return openContextMenu({ ...options });
 };
 
 const createContextMenuHandler: EdenContextMenuAPI["createHandler"] = (
-  getOptions
+  getOptions,
 ) => {
   ensurePointerTracking();
   return (event) => {
-    if ("preventDefault" in event && typeof event.preventDefault === "function") {
+    if (
+      "preventDefault" in event &&
+      typeof event.preventDefault === "function"
+    ) {
       event.preventDefault();
     }
-    if ("stopPropagation" in event && typeof event.stopPropagation === "function") {
+    if (
+      "stopPropagation" in event &&
+      typeof event.stopPropagation === "function"
+    ) {
       event.stopPropagation();
     }
     const options = getOptions(event);

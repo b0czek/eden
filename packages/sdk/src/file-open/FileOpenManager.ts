@@ -46,7 +46,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
     this.userDirectory = userDirectory;
@@ -65,7 +65,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   async initialize(): Promise<void> {
     await this.loadUserPreferences();
     log.info(
-      `FileOpenManager initialized with ${this.userPreferences.size} user preferences`
+      `FileOpenManager initialized with ${this.userPreferences.size} user preferences`,
     );
   }
 
@@ -177,7 +177,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   getHandler(
     filePath: string,
-    isDirectory: boolean = false
+    isDirectory: boolean = false,
   ): string | undefined {
     const key = isDirectory
       ? FileOpenManager.DIRECTORY_KEY

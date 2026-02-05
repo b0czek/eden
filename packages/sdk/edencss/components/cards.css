@@ -7,16 +7,16 @@
 .eden-card {
   border-radius: var(--eden-radius-lg);
   padding: var(--eden-space-lg);
-  
+
   /* Frosted glass effect */
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
-  
+
   border: 1px solid var(--eden-color-border-light);
   box-shadow: var(--eden-shadow-md);
   color: var(--eden-color-text-primary);
-  
+
   transition: all var(--eden-transition-base);
 }
 
@@ -29,12 +29,12 @@
 .eden-card-glass {
   border-radius: var(--eden-radius-2xl);
   padding: var(--eden-space-xl);
-  
+
   /* Ultra frosted glass effect */
   background: var(--eden-color-bg-glass-strong);
   backdrop-filter: var(--eden-glass-ultra);
   -webkit-backdrop-filter: var(--eden-glass-ultra);
-  
+
   border: 1px solid var(--eden-color-border-light);
   box-shadow: var(--eden-shadow-2xl);
   color: var(--eden-color-text-primary);
@@ -135,7 +135,7 @@
   gap: var(--eden-space-md);
   padding: var(--eden-space-md);
   border-radius: var(--eden-radius-md);
-  
+
   background: var(--eden-color-bg-glass-light);
   backdrop-filter: var(--eden-glass-light);
   -webkit-backdrop-filter: var(--eden-glass-light);
@@ -198,4 +198,3 @@
   gap: var(--eden-space-lg);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
-

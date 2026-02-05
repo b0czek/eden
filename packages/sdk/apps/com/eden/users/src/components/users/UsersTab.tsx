@@ -1,6 +1,18 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 
-import type { AppManifest, RuntimeAppManifest, SettingsCategory, UserProfile } from "@edenapp/types";
+import type {
+  AppManifest,
+  RuntimeAppManifest,
+  SettingsCategory,
+  UserProfile,
+} from "@edenapp/types";
 import { getLocalizedValue, locale, t } from "../../i18n";
 import CreateUserDialog from "../../dialogs/CreateUserDialog";
 import SetPasswordDialog from "../../dialogs/SetPasswordDialog";
@@ -22,13 +34,18 @@ interface UsersTabProps {
 export default function UsersTab(props: UsersTabProps) {
   const [users, setUsers] = createSignal<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
-  const [defaultUsername, setDefaultUsername] = createSignal<string | null>(null);
-  const [installedApps, setInstalledApps] = createSignal<RuntimeAppManifest[]>([]);
-  const [selectedUsername, setSelectedUsername] = createSignal<string | null>(null);
+  const [defaultUsername, setDefaultUsername] = createSignal<string | null>(
+    null,
+  );
+  const [installedApps, setInstalledApps] = createSignal<RuntimeAppManifest[]>(
+    [],
+  );
+  const [selectedUsername, setSelectedUsername] = createSignal<string | null>(
+    null,
+  );
   const [showCreateDialog, setShowCreateDialog] = createSignal(false);
   const [passwordModalUser, setPasswordModalUser] =
     createSignal<UserProfile | null>(null);
-
 
   const loadUsers = async () => {
     try {
@@ -93,7 +110,10 @@ export default function UsersTab(props: UsersTabProps) {
     const subscribe = async () => {
       try {
         await window.edenAPI.subscribe("package/installed", handleInstalled);
-        await window.edenAPI.subscribe("package/uninstalled", handleUninstalled);
+        await window.edenAPI.subscribe(
+          "package/uninstalled",
+          handleUninstalled,
+        );
       } catch (error) {
         console.error("Failed to subscribe to package events:", error);
       }
@@ -107,8 +127,6 @@ export default function UsersTab(props: UsersTabProps) {
     });
   });
 
-
-
   const sortedUsers = createMemo(() => {
     const list = [...users()];
     list.sort((a, b) => a.name.localeCompare(b.name));
@@ -116,7 +134,7 @@ export default function UsersTab(props: UsersTabProps) {
   });
 
   const selectedUser = createMemo(
-    () => users().find((user) => user.username === selectedUsername()) ?? null
+    () => users().find((user) => user.username === selectedUsername()) ?? null,
   );
 
   createEffect(() => {
@@ -144,7 +162,7 @@ export default function UsersTab(props: UsersTabProps) {
         pushOption(
           "com.eden",
           categoryGrant,
-          getLocalizedValue(category.name, locale())
+          getLocalizedValue(category.name, locale()),
         );
       }
 
@@ -159,8 +177,8 @@ export default function UsersTab(props: UsersTabProps) {
           grant,
           `${getLocalizedValue(category.name, locale())} · ${getLocalizedValue(
             setting.label,
-            locale()
-          )}`
+            locale(),
+          )}`,
         );
       }
     }
@@ -175,7 +193,7 @@ export default function UsersTab(props: UsersTabProps) {
             appId: app.id,
             label: `${appName} · ${getLocalizedValue(category.name, locale())} · ${getLocalizedValue(
               setting.label,
-              locale()
+              locale(),
             )}`,
           });
         }
@@ -187,7 +205,7 @@ export default function UsersTab(props: UsersTabProps) {
 
   const handleCreateUser = async (
     name: string,
-    password: string
+    password: string,
   ): Promise<boolean> => {
     if (!name || !password) return false;
     try {
@@ -222,7 +240,7 @@ export default function UsersTab(props: UsersTabProps) {
 
   const handlePasswordSave = async (
     username: string,
-    password: string
+    password: string,
   ): Promise<boolean> => {
     if (!password) return false;
     try {
@@ -239,7 +257,7 @@ export default function UsersTab(props: UsersTabProps) {
 
   const updateGrants = async (
     username: string,
-    updater: (grants: Set<string>) => Set<string>
+    updater: (grants: Set<string>) => Set<string>,
   ) => {
     const user = users().find((item) => item.username === username);
     if (!user) return;
@@ -255,9 +273,10 @@ export default function UsersTab(props: UsersTabProps) {
     }
   };
 
-
-
-  const handleToggleDefaultUser = async (username: string, enabled: boolean) => {
+  const handleToggleDefaultUser = async (
+    username: string,
+    enabled: boolean,
+  ) => {
     try {
       const next = enabled ? username : null;
       await window.edenAPI.shellCommand("user/set-default", {

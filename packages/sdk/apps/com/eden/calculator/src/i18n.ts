@@ -17,4 +17,6 @@ const resources = {
 };
 
 // Fully typed!
-export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({ resources });
+export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({
+  resources,
+});

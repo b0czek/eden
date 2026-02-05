@@ -1,6 +1,11 @@
 import "reflect-metadata";
 
-import { PermissionRegistry, getAllEventPermissions, getEventPermission, registerEventPermission } from "./PermissionRegistry";
+import {
+  PermissionRegistry,
+  getAllEventPermissions,
+  getEventPermission,
+  registerEventPermission,
+} from "./PermissionRegistry";
 
 import type { ResolvedGrant } from "@edenapp/types";
 
@@ -54,9 +59,9 @@ describe("PermissionRegistry", () => {
     registry.registerApp("app.two", ["fs/read"], grants);
 
     expect(registry.getRequiredGrantKeys("app.two", "fs/read")).toEqual([]);
-    expect(registry.getRequiredGrantKeys("app.two", "appearance/manage")).toEqual([
-      "preset/appearance/manage",
-    ]);
+    expect(
+      registry.getRequiredGrantKeys("app.two", "appearance/manage"),
+    ).toEqual(["preset/appearance/manage"]);
     expect(registry.getRequiredGrantKeys("app.two", "net/write")).toEqual([
       "app/app.two/special",
     ]);

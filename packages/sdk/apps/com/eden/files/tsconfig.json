@@ -2,11 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "moduleResolution": "bundler",
@@ -16,12 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": [
-      "vite/client",
-      "@edenapp/types/global"
-    ]
+    "types": ["vite/client", "@edenapp/types/global"]
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

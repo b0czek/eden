@@ -101,7 +101,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
         </div>
 
         <div class="eden-flex eden-gap-sm eden-items-center">
-           <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
+          <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
             <span>{t("settings.apps.autostart")}</span>
             <input
               type="checkbox"
@@ -109,7 +109,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               checked={props.autostart}
               onChange={(event) =>
                 props.onAutostartToggle(
-                  (event.target as HTMLInputElement).checked
+                  (event.target as HTMLInputElement).checked,
                 )
               }
             />
@@ -123,7 +123,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 checked={props.hotReload}
                 onChange={(event) =>
                   props.onHotReloadToggle(
-                    (event.target as HTMLInputElement).checked
+                    (event.target as HTMLInputElement).checked,
                   )
                 }
               />
@@ -146,39 +146,47 @@ const AppDetail: Component<AppDetailProps> = (props) => {
 
       <div class="eden-card-body eden-flex-col eden-gap-lg">
         <div class="eden-text-sm eden-text-secondary">
-            {props.app.description ||
-              (props.app.isPrebuilt
-                ? t("settings.apps.systemComponent")
-                : t("settings.apps.noDescription"))}
+          {props.app.description ||
+            (props.app.isPrebuilt
+              ? t("settings.apps.systemComponent")
+              : t("settings.apps.noDescription"))}
         </div>
 
         <div class="eden-grid eden-grid-2 eden-gap-md">
           <div class="eden-flex eden-flex-col eden-gap-xs">
-             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("common.version")}</span>
-             <span class="eden-text-md">{props.app.version}</span>
+            <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">
+              {t("common.version")}
+            </span>
+            <span class="eden-text-md">{props.app.version}</span>
           </div>
           <div class="eden-flex eden-flex-col eden-gap-xs">
-             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("common.size")}</span>
-             <span class="eden-text-md">
-               <Show when={!props.sizeLoading} fallback={t("common.loading")}>
-                 {formatBytes(props.size)}
-               </Show>
-             </span>
+            <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">
+              {t("common.size")}
+            </span>
+            <span class="eden-text-md">
+              <Show when={!props.sizeLoading} fallback={t("common.loading")}>
+                {formatBytes(props.size)}
+              </Show>
+            </span>
           </div>
           <div class="eden-flex eden-flex-col eden-gap-xs">
-             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("settings.apps.details.source")}</span>
-             <span class="eden-text-md">
+            <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">
+              {t("settings.apps.details.source")}
+            </span>
+            <span class="eden-text-md">
               {props.app.isPrebuilt
                 ? t("settings.apps.builtin")
                 : t("settings.apps.userInstalled")}
-             </span>
+            </span>
           </div>
           <div class="eden-flex eden-flex-col eden-gap-xs">
-             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">{t("settings.apps.details.windowMode")}</span>
-             <span class="eden-text-md">
+            <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">
+              {t("settings.apps.details.windowMode")}
+            </span>
+            <span class="eden-text-md">
               {props.app.window?.mode ??
                 t("settings.apps.details.windowModeUnknown")}
-             </span>
+            </span>
           </div>
         </div>
 

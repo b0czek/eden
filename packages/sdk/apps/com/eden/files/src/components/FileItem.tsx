@@ -15,12 +15,12 @@ interface FileItemComponentProps {
 
 const FileItemComponent: Component<FileItemComponentProps> = (props) => {
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(date);
   };
 
@@ -30,8 +30,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       class="file-item"
       classList={{
         selected: props.isSelected,
-        'list-view': props.viewStyle === 'list',
-        [`size-${props.itemSize}`]: true
+        "list-view": props.viewStyle === "list",
+        [`size-${props.itemSize}`]: true,
       }}
       onClick={() => props.onClick(props.item)}
       onDblClick={() => props.onDoubleClick(props.item)}
@@ -39,7 +39,7 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       <div class="file-icon">{getFileIcon(props.item)}</div>
       <div class="file-name">{props.item.name}</div>
 
-      {props.viewStyle === 'list' && (
+      {props.viewStyle === "list" && (
         <>
           <div class="file-size">
             {props.item.isFile ? formatFileSize(props.item.size) : "—"}
@@ -48,7 +48,7 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         </>
       )}
 
-      {props.viewStyle === 'grid' && (
+      {props.viewStyle === "grid" && (
         <div class="file-meta">
           {props.item.isFile ? formatFileSize(props.item.size) : "Folder"}
         </div>

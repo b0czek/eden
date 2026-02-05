@@ -32,15 +32,16 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
   const appGrants = () =>
     new Set(
       props.grants.filter(
-        (grant) => grant.startsWith("apps/launch/") && grant !== "apps/launch/*"
-      )
+        (grant) =>
+          grant.startsWith("apps/launch/") && grant !== "apps/launch/*",
+      ),
     );
 
   const settingGrants = () =>
     new Set(
       props.grants.filter(
-        (grant) => grant.startsWith("settings/") && grant !== "settings/*"
-      )
+        (grant) => grant.startsWith("settings/") && grant !== "settings/*",
+      ),
     );
 
   return (
@@ -241,14 +242,14 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                               <span class="eden-list-item-title">
                                 {getLocalizedValue(
                                   getGrantLabel(grant),
-                                  locale()
+                                  locale(),
                                 )}
                               </span>
                               <Show when={grant.description}>
                                 <span class="eden-list-item-description">
                                   {getLocalizedValue(
                                     grant.description,
-                                    locale()
+                                    locale(),
                                   )}
                                 </span>
                               </Show>
@@ -260,7 +261,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                                 props.grants,
                                 app.id,
                                 getGrantId(grant),
-                                getGrantScope(grant)
+                                getGrantScope(grant),
                               )}
                               onChange={(e) =>
                                 props.updateGrants((grants) => {
@@ -268,7 +269,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                                   const perm = getAppGrantKey(
                                     app.id,
                                     getGrantId(grant),
-                                    scope
+                                    scope,
                                   );
                                   if (!perm) {
                                     return grants;
@@ -312,11 +313,14 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                       type="checkbox"
                       class="eden-toggle"
                       checked={settingGrants().has(
-                        buildSettingGrant(option.appId, option.id)
+                        buildSettingGrant(option.appId, option.id),
                       )}
                       onChange={(e) =>
                         props.updateGrants((grants) => {
-                          const perm = buildSettingGrant(option.appId, option.id);
+                          const perm = buildSettingGrant(
+                            option.appId,
+                            option.id,
+                          );
                           grants.delete("settings/*");
                           if (e.currentTarget.checked) {
                             grants.add(perm);

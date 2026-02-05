@@ -80,7 +80,7 @@ export class GenesisBundler {
   static async executeBuild(
     appDirectory: string,
     manifest: AppManifest,
-    verbose?: boolean
+    verbose?: boolean,
   ): Promise<{ success: boolean; error?: string }> {
     if (!manifest.build?.command) {
       return { success: true }; // No build command defined, skip
@@ -126,7 +126,7 @@ export class GenesisBundler {
    * Validate an app manifest
    */
   static async validateManifest(
-    manifestPath: string
+    manifestPath: string,
   ): Promise<{ valid: boolean; errors: string[]; manifest?: AppManifest }> {
     const errors: string[] = [];
 
@@ -142,7 +142,7 @@ export class GenesisBundler {
       // Validate ID format
       if (manifest.id && !/^[a-z0-9\.\-]+$/.test(manifest.id)) {
         errors.push(
-          "Invalid ID format. Use lowercase letters, numbers, dots, and hyphens only."
+          "Invalid ID format. Use lowercase letters, numbers, dots, and hyphens only.",
         );
       }
 
@@ -183,7 +183,7 @@ export class GenesisBundler {
    */
   static async verifyFiles(
     appDirectory: string,
-    manifest: AppManifest
+    manifest: AppManifest,
   ): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
 
@@ -207,7 +207,7 @@ export class GenesisBundler {
         await fs.access(frontendPath);
       } catch {
         errors.push(
-          `Frontend entry file not found: ${manifest.frontend.entry}`
+          `Frontend entry file not found: ${manifest.frontend.entry}`,
         );
       }
     }
@@ -231,7 +231,7 @@ export class GenesisBundler {
    */
   private static shouldExcludeFile(
     filePath: string,
-    manifest?: AppManifest
+    manifest?: AppManifest,
   ): boolean {
     // Check if this path is explicitly included via manifest
     if (manifest?.include) {
@@ -289,7 +289,7 @@ export class GenesisBundler {
     appDirectory: string,
     targetDir: string,
     manifest?: AppManifest,
-    verbose?: boolean
+    verbose?: boolean,
   ): Promise<void> {
     const resolvedTarget = path.resolve(targetDir);
 
@@ -334,7 +334,7 @@ export class GenesisBundler {
     if (verbose) {
       console.log(`✓ Files copied to: ${resolvedTarget}`);
       console.log(
-        `  Copied: ${copiedCount} files, Skipped: ${skippedCount} (dev files)`
+        `  Copied: ${copiedCount} files, Skipped: ${skippedCount} (dev files)`,
       );
     }
   }
@@ -347,7 +347,7 @@ export class GenesisBundler {
     manifest: AppManifest,
     outputPath?: string,
     verbose?: boolean,
-    compressionLevel: number = 11
+    compressionLevel: number = 11,
   ): Promise<{ path: string; checksum: string; size: number }> {
     await this.initCompressor();
 
@@ -408,7 +408,7 @@ export class GenesisBundler {
           return true;
         },
       },
-      fileList
+      fileList,
     );
 
     if (progressBar) {
@@ -424,7 +424,7 @@ export class GenesisBundler {
     const { checksum } = await this.compressor.compressFileStreaming(
       tempTarPath,
       tempCompressedPath,
-      compressionLevel
+      compressionLevel,
     );
 
     // Create metadata
@@ -475,13 +475,12 @@ export class GenesisBundler {
       console.log(`✓ Archive created: ${finalOutputPath}`);
       console.log(`  Original size: ${(originalSize / 1024).toFixed(2)} KB`);
       console.log(
-        `  Compressed size: ${(compressedSize / 1024).toFixed(2)} KB`
+        `  Compressed size: ${(compressedSize / 1024).toFixed(2)} KB`,
       );
       console.log(
         `  Compression ratio: ${(
-          (1 - compressedSize / originalSize) *
-          100
-        ).toFixed(1)}%`
+          (1 - compressedSize / originalSize) * 100
+        ).toFixed(1)}%`,
       );
       console.log(`  SHA256: ${checksum}`);
     }
@@ -552,7 +551,7 @@ export class GenesisBundler {
       const buildResult = await this.executeBuild(
         appDirectory,
         manifest,
-        verbose
+        verbose,
       );
       if (!buildResult.success) {
         return {
@@ -578,7 +577,7 @@ export class GenesisBundler {
           appDirectory,
           extractToDirectory,
           manifest,
-          verbose
+          verbose,
         );
 
         return {
@@ -594,7 +593,7 @@ export class GenesisBundler {
         manifest,
         outputPath,
         verbose,
-        compressionLevel
+        compressionLevel,
       );
 
       return {
@@ -633,7 +632,7 @@ export class GenesisBundler {
       // Read metadata
       const metadataBuffer = data.subarray(4, 4 + metadataLength);
       const metadata: ArchiveMetadata = JSON.parse(
-        metadataBuffer.toString("utf-8")
+        metadataBuffer.toString("utf-8"),
       );
 
       return {
@@ -678,7 +677,7 @@ export class GenesisBundler {
       // Read metadata
       const metadataBuffer = data.subarray(4, 4 + metadataLength);
       const metadata: ArchiveMetadata = JSON.parse(
-        metadataBuffer.toString("utf-8")
+        metadataBuffer.toString("utf-8"),
       );
 
       if (verbose) {
@@ -692,7 +691,7 @@ export class GenesisBundler {
       // Verify checksum if requested
       if (verifyChecksum) {
         const actualChecksum = this.calculateChecksum(
-          Buffer.from(compressedData)
+          Buffer.from(compressedData),
         );
         if (actualChecksum !== metadata.checksum) {
           return {
@@ -707,7 +706,7 @@ export class GenesisBundler {
 
       // Decompress with configured compressor
       const decompressedBuffer = await this.compressor.decompress(
-        Buffer.from(compressedData)
+        Buffer.from(compressedData),
       );
 
       // Write to temporary tar file

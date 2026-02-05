@@ -52,9 +52,7 @@ export const normalizeGrantPresets = (
       const presetGrant = resolveGrantPreset(grant.preset);
       if (!presetGrant) {
         if (appId) {
-          log.warn(
-            `Unknown grant preset "${grant.preset}" in ${appId}`,
-          );
+          log.warn(`Unknown grant preset "${grant.preset}" in ${appId}`);
         }
         continue;
       }

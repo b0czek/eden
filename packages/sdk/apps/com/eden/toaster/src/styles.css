@@ -79,7 +79,8 @@ body {
   cursor: pointer;
   padding: var(--eden-space-xs);
   border-radius: var(--eden-radius-sm);
-  transition: color var(--eden-transition-fast),
+  transition:
+    color var(--eden-transition-fast),
     background var(--eden-transition-fast);
 }
 
@@ -127,9 +128,11 @@ body {
 
 /* Success */
 .toast-success .eden-progress-bar {
-  background: linear-gradient(90deg,
-      var(--eden-color-success),
-      var(--eden-color-success-hover));
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-success),
+    var(--eden-color-success-hover)
+  );
   box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
 }
 
@@ -141,9 +144,11 @@ body {
 
 /* Danger */
 .toast-danger .eden-progress-bar {
-  background: linear-gradient(90deg,
-      var(--eden-color-danger),
-      var(--eden-color-danger-hover));
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-danger),
+    var(--eden-color-danger-hover)
+  );
   box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
 }
 

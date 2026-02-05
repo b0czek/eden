@@ -44,7 +44,7 @@ const FileList: Component<FileListProps> = (props) => {
   createEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if input is focused
-      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
 
       const items = props.items;
       const selected = props.selectedItem;
@@ -52,10 +52,10 @@ const FileList: Component<FileListProps> = (props) => {
 
       if (!items.length) return;
 
-      if (e.key === 'Enter') {
+      if (e.key === "Enter") {
         if (selected) {
           e.preventDefault();
-          const item = items.find(i => i.path === selected);
+          const item = items.find((i) => i.path === selected);
           if (item) {
             props.onItemDoubleClick(item);
           }
@@ -63,7 +63,7 @@ const FileList: Component<FileListProps> = (props) => {
         return;
       }
 
-      if (e.key === 'Backspace') {
+      if (e.key === "Backspace") {
         if (props.onBack) {
           e.preventDefault();
           props.onBack();
@@ -71,14 +71,14 @@ const FileList: Component<FileListProps> = (props) => {
         return;
       }
 
-      const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      const navKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
       if (!navKeys.includes(e.key)) return;
 
       e.preventDefault();
 
       let currentIndex = -1;
       if (selected) {
-        currentIndex = items.findIndex(i => i.path === selected);
+        currentIndex = items.findIndex((i) => i.path === selected);
       }
 
       // If nothing selected, select first
@@ -91,29 +91,31 @@ const FileList: Component<FileListProps> = (props) => {
       let columns = 1;
 
       // Calculate columns if in grid view
-      if (viewStyle === 'grid' && containerRef) {
+      if (viewStyle === "grid" && containerRef) {
         // Robust way to find number of columns using CSS Grid computed styles
         const gridComputedStyle = window.getComputedStyle(containerRef);
-        const gridTemplateColumns = gridComputedStyle.getPropertyValue("grid-template-columns");
-        
+        const gridTemplateColumns = gridComputedStyle.getPropertyValue(
+          "grid-template-columns",
+        );
+
         if (gridTemplateColumns) {
-           // grid-template-columns returns a space-separated string of pixel values (e.g. "200px 200px")
-           // We just need to count them to know how many columns there are
-           columns = gridTemplateColumns.split(" ").length;
+          // grid-template-columns returns a space-separated string of pixel values (e.g. "200px 200px")
+          // We just need to count them to know how many columns there are
+          columns = gridTemplateColumns.split(" ").length;
         }
       }
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === "ArrowRight") {
         nextIndex = Math.min(currentIndex + 1, items.length - 1);
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === "ArrowLeft") {
         nextIndex = Math.max(currentIndex - 1, 0);
-      } else if (e.key === 'ArrowDown') {
+      } else if (e.key === "ArrowDown") {
         // In grid: +columns. In list: +1
-        const stride = viewStyle === 'grid' ? columns : 1;
+        const stride = viewStyle === "grid" ? columns : 1;
         nextIndex = Math.min(currentIndex + stride, items.length - 1);
-      } else if (e.key === 'ArrowUp') {
+      } else if (e.key === "ArrowUp") {
         // In grid: -columns. In list: -1
-        const stride = viewStyle === 'grid' ? columns : 1;
+        const stride = viewStyle === "grid" ? columns : 1;
         nextIndex = Math.max(currentIndex - stride, 0);
       }
 
@@ -144,16 +146,14 @@ const FileList: Component<FileListProps> = (props) => {
         <div class="empty-state">
           <div class="empty-icon">📂</div>
           <div class="empty-message">{t("files.empty")}</div>
-          <div class="empty-hint">
-            {t("files.emptyHint")}
-          </div>
+          <div class="empty-hint">{t("files.emptyHint")}</div>
         </div>
       </Show>
 
       <Show when={!props.loading && props.items.length > 0}>
         <div
           class="file-list"
-          classList={{ 'list-view': props.viewStyle === 'list' }}
+          classList={{ "list-view": props.viewStyle === "list" }}
           ref={containerRef}
         >
           <For each={props.items}>

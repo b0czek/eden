@@ -239,21 +239,26 @@ export interface FileCommands {
    * Open a file with a specific app
    */
   "file/open-with": {
-    args: { path: string; appId: string };
+    args: {
+    path: string;
+    appId: string };
     response: import("./index").FileOpenResult;
   };
   /**
    * Get the default handler app for a file extension
    */
   "file/get-handler": {
-    args: { extension: string };
+    args: {
+    extension: string };
     response: { appId: string | undefined };
   };
   /**
    * Set user preference for a file extension's default handler
    */
   "file/set-default-handler": {
-    args: { extension: string; appId: string };
+    args: {
+    extension: string;
+    appId: string };
     response: void;
   };
   /**
@@ -267,7 +272,8 @@ export interface FileCommands {
    * Get all apps that can handle a specific file extension
    */
   "file/get-supported-handlers": {
-    args: { extension: string };
+    args: {
+    extension: string };
     response: import("./index").FileHandlerInfo[];
   };
   /**
@@ -275,7 +281,10 @@ export interface FileCommands {
    */
   "file/get-associations": {
     args: Record<string, never>;
-    response: Record<string, { default: string | undefined; userOverride: string | undefined }>;
+    response: Record<
+      string,
+      { default: string | undefined; userOverride: string | undefined }
+    >;
   };
 }
 
@@ -360,7 +369,9 @@ export interface I18nCommands {
   };
   "i18n/get-common": {
     args: { locale: string };
-    response: { translations: Record<string, any> };
+    response: {
+    translations: Record<string, any>;
+  };
   };
 }
 

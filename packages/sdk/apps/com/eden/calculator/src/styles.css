@@ -12,7 +12,9 @@
   -webkit-user-select: none;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   overflow: hidden;
@@ -113,10 +115,18 @@ body {
 
 /* Equals button styling */
 .equals-btn {
-  background: linear-gradient(135deg, var(--eden-color-success), var(--eden-color-success-hover)) !important;
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-success),
+    var(--eden-color-success-hover)
+  ) !important;
 }
 
 /* Primary operator button enhancements */
 .buttons-grid .eden-btn-primary {
-  background: linear-gradient(135deg, var(--eden-color-primary), var(--eden-color-primary-hover)) !important;
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-primary),
+    var(--eden-color-primary-hover)
+  ) !important;
 }

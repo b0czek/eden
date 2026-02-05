@@ -176,10 +176,7 @@ function resolveDefaultConfig(): LoggerConfig {
     minLevel: envLevel ?? "debug",
     format: envFormat ?? (isTest || isRenderer ? "raw" : "pretty"),
     includeTimestamp: getEnvBool("EDEN_LOG_TIMESTAMP", !isTest),
-    includeCallsite: getEnvBool(
-      "EDEN_LOG_CALLSITE",
-      !isTest && !isRenderer
-    ),
+    includeCallsite: getEnvBool("EDEN_LOG_CALLSITE", !isTest && !isRenderer),
     pathMode: envPathMode ?? "short",
   };
 }

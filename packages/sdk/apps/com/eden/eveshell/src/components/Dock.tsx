@@ -9,8 +9,8 @@ import type { UserProfile } from "@edenapp/types";
 import type { Menu } from "@edenapp/tablets";
 
 interface DockProps {
-  runningApps: AppInfo[];  // Running apps that are NOT pinned
-  pinnedApps: AppInfo[];   // Pinned apps (may or may not be running)
+  runningApps: AppInfo[]; // Running apps that are NOT pinned
+  pinnedApps: AppInfo[]; // Pinned apps (may or may not be running)
   currentUser: UserProfile | null;
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
@@ -101,12 +101,14 @@ export default function Dock(props: DockProps) {
               />
             )}
           </For>
-          
+
           {/* Separator between running and pinned */}
-          <Show when={props.runningApps.length > 0 && props.pinnedApps.length > 0}>
+          <Show
+            when={props.runningApps.length > 0 && props.pinnedApps.length > 0}
+          >
             <div class="separator"></div>
           </Show>
-          
+
           {/* Pinned apps */}
           <For each={props.pinnedApps}>
             {(app) => (
@@ -119,12 +121,14 @@ export default function Dock(props: DockProps) {
               />
             )}
           </For>
-          
+
           {/* Separator before All Apps button */}
-          <Show when={props.runningApps.length > 0 || props.pinnedApps.length > 0}>
+          <Show
+            when={props.runningApps.length > 0 || props.pinnedApps.length > 0}
+          >
             <div class="separator"></div>
           </Show>
-          
+
           <AppIcon
             appId="apps-view"
             appName={t("shell.allApps")}

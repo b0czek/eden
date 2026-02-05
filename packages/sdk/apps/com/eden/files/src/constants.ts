@@ -1,3 +1,9 @@
 import { ItemSize } from "./types";
 
-export const ITEM_SIZES: ItemSize[] = ['tiny', 'small', 'medium', 'large', 'huge'];
+export const ITEM_SIZES: ItemSize[] = [
+  "tiny",
+  "small",
+  "medium",
+  "large",
+  "huge",
+];

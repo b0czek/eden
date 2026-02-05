@@ -19,9 +19,7 @@ export function setupCloseButton(): void {
       log.info("Stopping app:", appId);
 
       if (appId) {
-        window.edenAPI
-          .shellCommand("process/stop", { appId })
-          .catch(log.error);
+        window.edenAPI.shellCommand("process/stop", { appId }).catch(log.error);
       } else {
         // Retry if API or appId not yet available
         setTimeout(stopApp, 100);
