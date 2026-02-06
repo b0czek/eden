@@ -14,6 +14,8 @@ import {
 } from "../settings/SettingsManager";
 import type { ViewInfo, ViewType } from "./types";
 
+const INTERFACE_SCALE_KEY = "general.interfaceScale";
+
 export class ScaleController {
   private currentScale: number = 1.0;
   private readonly getViews: () => Iterable<ViewInfo>;
@@ -29,7 +31,7 @@ export class ScaleController {
 
     // Listen for interface scale setting changes
     ipcBridge.eventSubscribers.subscribeInternal("settings/changed", (data) => {
-      if (data.key === "appearance.interfaceScale") {
+      if (data.key === INTERFACE_SCALE_KEY) {
         const scale = parseFloat(data.value);
         if (!Number.isNaN(scale)) {
           this.setScale(scale);
@@ -55,7 +57,7 @@ export class ScaleController {
     try {
       const scaleSetting = await this.settingsManager.get(
         EDEN_SETTINGS_APP_ID,
-        "general.interfaceScale",
+        INTERFACE_SCALE_KEY,
       );
 
       if (scaleSetting) {
