@@ -1,15 +1,10 @@
+import * as path from "node:path";
 import type { AppManifest, WindowConfig } from "@edenapp/types";
-import {
-  type Rectangle as Bounds,
-  BrowserWindow,
-  type WebContentsView,
-} from "electron";
-import * as path from "path";
+import type { Rectangle as Bounds, WebContentsView } from "electron";
 import { log } from "../logging";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import type { DevToolsManager } from "./DevToolsManager";
 import type { FloatingWindowController } from "./FloatingWindowController";
-import type { TilingManager } from "./TilingManager";
+import type { TilingController } from "./TilingController";
 import { type ViewInfo, type ViewMode, type ViewType, Z_LAYERS } from "./types";
 import { createView } from "./viewLifecycle";
 /**
@@ -24,9 +19,8 @@ export class ViewCreator {
 
   constructor(
     private readonly basePath: string,
-    private readonly tilingManager: TilingManager,
+    private readonly tilingController: TilingController,
     private readonly floatingWindows: FloatingWindowController,
-    private readonly devToolsManager: DevToolsManager,
   ) {}
 
   /**
@@ -226,11 +220,11 @@ export class ViewCreator {
   ) {
     log.info(`Creating tiled app view for ${appId}`);
 
-    if (this.tilingManager.isEnabled()) {
-      const tileIndex = this.tilingManager.getNextTileIndex(existingViews);
+    if (this.tilingController.isEnabled()) {
+      const tileIndex = this.tilingController.getNextTileIndex(existingViews);
       const visibleCount =
-        this.tilingManager.getVisibleTiledCount(existingViews) + 1;
-      const viewBounds = this.tilingManager.calculateTileBounds(
+        this.tilingController.getVisibleTiledCount(existingViews) + 1;
+      const viewBounds = this.tilingController.calculateTileBounds(
         tileIndex,
         visibleCount,
       );
@@ -265,7 +259,7 @@ export class ViewCreator {
     // Determine view mode
     const viewMode: ViewMode = isOverlay
       ? "floating"
-      : this.tilingManager.determineViewMode(windowConfig?.mode);
+      : this.tilingController.determineViewMode(windowConfig?.mode);
 
     // Calculate bounds and Z-index based on view type and mode
     const { viewBounds, tileIndex, zIndex } = this.calculateViewBounds(
@@ -295,9 +289,6 @@ export class ViewCreator {
     log.info(
       `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,
     );
-
-    // Register DevTools shortcut on this view
-    this.devToolsManager.registerShortcut(view);
 
     // Set bounds
     view.setBounds(viewBounds);

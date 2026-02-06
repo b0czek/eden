@@ -67,6 +67,13 @@ export interface WindowConfig {
 
   /** Controls which Eden runtime helpers are injected into the app */
   injections?: WindowInjectionOptions;
+
+  /**
+   * How interface scaling is handled for this app.
+   * - "auto": SDK applies interface scale automatically (default for regular apps)
+   * - "manual": SDK doesn't apply scaling, app handles it (default for overlays)
+   */
+  scaling?: "auto" | "manual";
 }
 
 /**

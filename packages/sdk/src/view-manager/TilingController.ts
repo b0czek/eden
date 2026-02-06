@@ -1,18 +1,15 @@
 import type { TilingConfig } from "@edenapp/types";
 import type { Rectangle as Bounds } from "electron";
-import { injectable, singleton } from "tsyringe";
 import { calculateTileBounds } from "./layoutCalculator";
 import type { ViewInfo, ViewMode } from "./types";
 
 /**
- * TilingManager
+ * TilingController
  *
  * Handles tiling calculations and view positioning for tiled window mode.
  * Extracted from ViewManager for better separation of concerns.
  */
-@singleton()
-@injectable()
-export class TilingManager {
+export class TilingController {
   private config: TilingConfig;
   private workspaceBounds: Bounds;
 

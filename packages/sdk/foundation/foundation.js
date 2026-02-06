@@ -10,6 +10,29 @@
     return;
   }
 
+  // Prevent zoom shortcuts in foundation layer
+  document.addEventListener("keydown", (event) => {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === "+" ||
+        event.key === "-" ||
+        event.key === "=" ||
+        event.key === "0")
+    ) {
+      event.preventDefault();
+    }
+  });
+
+  document.addEventListener(
+    "wheel",
+    (event) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+      }
+    },
+    { passive: false },
+  );
+
   /**
    * Report workspace bounds to the backend
    */

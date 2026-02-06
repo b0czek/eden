@@ -13,9 +13,11 @@ import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { attachWebContentsLogger } from "../logging/electron";
-import { DevToolsManager } from "./DevToolsManager";
+import { SettingsManager } from "../settings/SettingsManager";
+import { DevToolsController } from "./DevToolsController";
 import { FloatingWindowController } from "./FloatingWindowController";
-import { TilingManager } from "./TilingManager";
+import { ScaleController } from "./ScaleController";
+import { TilingController } from "./TilingController";
 import type { ViewInfo, ViewMode } from "./types";
 import { ViewCreator } from "./ViewCreator";
 import { ViewHandler } from "./ViewHandler";
@@ -54,10 +56,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   private mainWindow: BrowserWindow | null = null;
 
   // Specialized modules
-  private readonly tilingManager: TilingManager;
+  private readonly tilingController: TilingController;
   private readonly floatingWindows: FloatingWindowController;
   private readonly viewCreator: ViewCreator;
-  private readonly devToolsManager: DevToolsManager;
+  private readonly devToolsController: DevToolsController;
+  private readonly scaleController: ScaleController;
 
   private windowSize: WindowSize = { width: 800, height: 600 };
   private viewHandler: ViewHandler;
@@ -67,25 +70,32 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject("EdenConfig") config: EdenConfig,
     @inject("distPath") distPath: string,
+    @inject(delay(() => SettingsManager)) settingsManager: SettingsManager,
   ) {
     super(ipcBridge);
 
     // Initialize specialized modules
     const tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
-    this.tilingManager = new TilingManager(tilingConfig);
-    this.devToolsManager = new DevToolsManager();
+    const getViews = () => this.views.values();
+
+    this.tilingController = new TilingController(tilingConfig);
+    this.devToolsController = new DevToolsController();
+    this.scaleController = new ScaleController(
+      settingsManager,
+      getViews,
+      ipcBridge,
+    );
 
     this.floatingWindows = new FloatingWindowController(
-      () => this.tilingManager.getWorkspaceBounds(),
-      () => this.views.values(),
+      () => this.tilingController.getWorkspaceBounds(),
+      getViews,
     );
 
     // Use consumer's dist path for runtime assets
     this.viewCreator = new ViewCreator(
       distPath,
-      this.tilingManager,
+      this.tilingController,
       this.floatingWindows,
-      this.devToolsManager,
     );
 
     // Create and register handler
@@ -116,9 +126,9 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    * Set workspace bounds (the area where views can be placed)
    */
   setWorkspaceBounds(bounds: Bounds): void {
-    this.tilingManager.setWorkspaceBounds(bounds);
-    if (this.tilingManager.isEnabled()) {
-      this.tilingManager.recalculateTiledViews(this.views);
+    this.tilingController.setWorkspaceBounds(bounds);
+    if (this.tilingController.isEnabled()) {
+      this.tilingController.recalculateTiledViews(this.views);
     }
   }
 
@@ -165,6 +175,17 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     this.views.set(viewId, viewInfo);
     this.attachFocusTracking(viewId, viewInfo);
 
+    // Apply current interface scale to the new view
+    this.scaleController.applyToView(viewInfo);
+
+    // Register DevTools shortcut on this view
+    this.devToolsController.registerShortcut(viewInfo.view);
+
+    // Re-apply zoom after page finishes loading (content load can reset zoom)
+    viewInfo.view.webContents.on("did-finish-load", () => {
+      this.scaleController.applyToView(viewInfo);
+    });
+
     // Electron event listener for view load failure
     viewInfo.view.webContents.on(
       "did-fail-load",
@@ -187,8 +208,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     });
 
     // Recalculate all tiles if using tiling and this is a tiled view
-    if (viewInfo.mode === "tiled" && this.tilingManager.isEnabled()) {
-      this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
+    if (viewInfo.mode === "tiled" && this.tilingController.isEnabled()) {
+      this.tilingController.applyTiledCapacity(this.views, viewId, (hideId) =>
         this.hideView(hideId),
       );
     }
@@ -210,7 +231,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     try {
       // Close DevTools if open
-      this.devToolsManager.closeDevToolsForView(viewInfo.view);
+      this.devToolsController.closeDevToolsForView(viewInfo.view);
 
       // Destroy the view safely
       destroyView(viewInfo, this.mainWindow);
@@ -222,8 +243,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       this.views.delete(viewId);
 
       // Recalculate tiles if using tiling and this was an app view
-      if (viewInfo.viewType === "app" && this.tilingManager.isEnabled()) {
-        this.tilingManager.recalculateTiledViews(this.views);
+      if (viewInfo.viewType === "app" && this.tilingController.isEnabled()) {
+        this.tilingController.recalculateTiledViews(this.views);
       }
     } catch (error) {
       const errorMessage =
@@ -349,7 +370,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.visible = true;
 
       if (viewInfo.mode === "tiled") {
-        this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
+        this.tilingController.applyTiledCapacity(this.views, viewId, (hideId) =>
           this.hideView(hideId),
         );
         this.reorderViewLayers();
@@ -384,7 +405,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
 
       if (viewInfo.mode === "tiled") {
-        this.tilingManager.recalculateTiledViews(this.views);
+        this.tilingController.recalculateTiledViews(this.views);
       }
     } catch (error) {
       const errorMessage =
@@ -530,8 +551,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         viewInfo.mode = "floating";
         viewInfo.view.setBounds(floatingBounds);
 
-        if (this.tilingManager.isEnabled()) {
-          this.tilingManager.recalculateTiledViews(this.views);
+        if (this.tilingController.isEnabled()) {
+          this.tilingController.recalculateTiledViews(this.views);
         }
 
         this.reorderViewLayers();
@@ -542,22 +563,24 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       } else {
         viewInfo.zIndex = undefined;
 
-        if (this.tilingManager.isEnabled()) {
-          viewInfo.tileIndex = this.tilingManager.getNextTileIndex(
+        if (this.tilingController.isEnabled()) {
+          viewInfo.tileIndex = this.tilingController.getNextTileIndex(
             this.views.values(),
           );
-          const visibleCount = this.tilingManager.getVisibleTiledCount(
+          const visibleCount = this.tilingController.getVisibleTiledCount(
             this.views.values(),
           );
-          const tileBounds = this.tilingManager.calculateTileBounds(
+          const tileBounds = this.tilingController.calculateTileBounds(
             viewInfo.tileIndex,
             visibleCount,
           );
           viewInfo.bounds = tileBounds;
           viewInfo.mode = "tiled";
           viewInfo.view.setBounds(tileBounds);
-          this.tilingManager.applyTiledCapacity(this.views, viewId, (hideId) =>
-            this.hideView(hideId),
+          this.tilingController.applyTiledCapacity(
+            this.views,
+            viewId,
+            (hideId) => this.hideView(hideId),
           );
           this.reorderViewLayers();
           this.notifySubscriber(viewId, "mode-changed", {
@@ -565,7 +588,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
             bounds: tileBounds,
           });
         } else {
-          const bounds = { ...this.tilingManager.getWorkspaceBounds() };
+          const bounds = { ...this.tilingController.getWorkspaceBounds() };
           viewInfo.bounds = bounds;
           viewInfo.mode = "tiled";
           viewInfo.view.setBounds(bounds);
@@ -581,5 +604,24 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to switch mode: ${errorMessage}`);
     }
+  }
+
+  // ===================================================================
+  // Interface Scale Methods
+  // ===================================================================
+
+  /**
+   * Get the current interface scale factor
+   */
+  getCurrentScale(): number {
+    return this.scaleController.getScale();
+  }
+
+  /**
+   * Set the interface scale for all views
+   * @param scale - Zoom factor (e.g., 1.0 = 100%, 1.5 = 150%)
+   */
+  setInterfaceScale(scale: number): void {
+    this.scaleController.setScale(scale);
   }
 }

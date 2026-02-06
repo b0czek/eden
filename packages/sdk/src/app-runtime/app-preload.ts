@@ -160,4 +160,46 @@ contextBridge.exposeInMainWorld(
   createAppBusAPI({ transport: shellTransport }, appBusState),
 );
 
+// ===================================================================
+// Universal Zoom Prevention
+// ===================================================================
+// Disable default browser zoom behavior for all apps
+// This runs when the DOM is ready for all apps, regardless of app-frame usage
+
+const setupZoomPrevention = () => {
+  // Block Ctrl/Cmd + Plus/Minus/Equals for keyboard zoom
+  document.addEventListener(
+    "keydown",
+    (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")
+      ) {
+        e.preventDefault();
+      }
+    },
+    { capture: true },
+  );
+
+  // Block Ctrl/Cmd + Mouse wheel for zoom
+  document.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    },
+    { passive: false, capture: true },
+  );
+
+  log.info("Zoom prevention enabled");
+};
+
+// Setup when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupZoomPrevention);
+} else {
+  setupZoomPrevention();
+}
+
 log.info("Universal app preload loaded");

@@ -1,8 +1,8 @@
+import * as path from "node:path";
 import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
-import * as path from "path";
-import { inject, singleton } from "tsyringe";
+import { delay, inject, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { UserManager } from "../user/UserManager";
@@ -37,10 +37,10 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   private handler: SettingsHandler;
 
   constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
-    @inject(UserManager) private userManager: UserManager,
+    @inject(delay(() => UserManager)) private userManager: UserManager,
   ) {
     super(ipcBridge);
 

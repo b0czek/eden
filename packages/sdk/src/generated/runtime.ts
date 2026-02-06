@@ -99,6 +99,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "view/start-resize",
   "view/end-resize",
   "view/window-size",
+  "view/set-interface-scale",
+  "view/get-interface-scale",
 ] as const;
 
 // Event names array

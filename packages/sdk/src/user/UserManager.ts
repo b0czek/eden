@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { delay, inject, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
@@ -33,7 +33,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
   private restrictedApps: Set<string>;
 
   constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("EdenConfig") config: EdenConfig,
     @inject("appsDirectory") appsDirectory: string,

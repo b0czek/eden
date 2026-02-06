@@ -1,17 +1,14 @@
 import type { WebContentsView } from "electron";
-import { injectable, singleton } from "tsyringe";
 
 import { log } from "../logging";
 /**
- * DevToolsManager
+ * DevToolsController
  *
  * Manages DevTools for WebContentsViews, including:
  * - Keyboard shortcut registration (Ctrl+Shift+D)
  * - Automatic cleanup when views are destroyed
  */
-@singleton()
-@injectable()
-export class DevToolsManager {
+export class DevToolsController {
   private viewsWithDevTools: Set<number> = new Set();
 
   /**

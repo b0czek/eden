@@ -23,18 +23,8 @@ const App: Component = () => {
   const [isScientificMode, setIsScientificMode] = createSignal(false);
   const [angleUnit, setAngleUnit] = createSignal<AngleUnit>("deg");
 
-  // Block zoom with Ctrl/Cmd + and Ctrl/Cmd -
+  // Calculator keyboard shortcuts
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Block zoom
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      (e.key === "+" || e.key === "-" || e.key === "=")
-    ) {
-      e.preventDefault();
-      return;
-    }
-
-    // Calculator keyboard shortcuts
     if (e.key >= "0" && e.key <= "9") {
       appendNumber(e.key);
     } else if (e.key === ".") {
@@ -58,19 +48,11 @@ const App: Component = () => {
     }
   };
 
-  // Block wheel zoom
-  const handleWheel = (e: WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-    }
-  };
-
   onMount(async () => {
     await initLocale();
 
-    // Add event listeners
+    // Add keyboard listener for calculator shortcuts
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("wheel", handleWheel, { passive: false });
 
     // window resize handling for scientific mode
     const checkSize = () => {
@@ -105,7 +87,6 @@ const App: Component = () => {
 
   onCleanup(() => {
     document.removeEventListener("keydown", handleKeyDown);
-    document.removeEventListener("wheel", handleWheel);
   });
 
   const loadSettings = async () => {

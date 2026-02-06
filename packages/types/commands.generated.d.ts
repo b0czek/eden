@@ -821,6 +821,22 @@ export interface ViewCommands {
     args: Record<string, never>;
     response: import("./index").WindowSize;
   };
+  /**
+   * Set the interface scale (zoom factor) for all views.
+   * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
+   */
+  "view/set-interface-scale": {
+    args: {
+    scale: string };
+    response: { success: boolean };
+  };
+  /**
+   * Get the current interface scale.
+   */
+  "view/get-interface-scale": {
+    args: Record<string, never>;
+    response: { scale: number };
+  };
 }
 
 /**

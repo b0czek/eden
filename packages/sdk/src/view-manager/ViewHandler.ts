@@ -326,4 +326,32 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   async handleGetWindowSize(): Promise<WindowSize> {
     return this.viewManager.getWindowSize();
   }
+
+  // ===================================================================
+  // Interface Scale Handlers
+  // ===================================================================
+
+  /**
+   * Set the interface scale (zoom factor) for all views.
+   * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
+   */
+  @EdenHandler("set-interface-scale")
+  async handleSetInterfaceScale(args: {
+    scale: string;
+  }): Promise<{ success: boolean }> {
+    const scaleNum = parseFloat(args.scale);
+    if (Number.isNaN(scaleNum)) {
+      throw new Error(`Invalid scale value: ${args.scale}`);
+    }
+    this.viewManager.setInterfaceScale(scaleNum);
+    return { success: true };
+  }
+
+  /**
+   * Get the current interface scale.
+   */
+  @EdenHandler("get-interface-scale")
+  async handleGetInterfaceScale(): Promise<{ scale: number }> {
+    return { scale: this.viewManager.getCurrentScale() };
+  }
 }
