@@ -1,3 +1,9 @@
+import {
+  type CallsiteInfo,
+  log,
+  logFromConsole,
+  setLogContext,
+} from "../logging";
 /**
  * Backend Runtime
  *
@@ -12,24 +18,22 @@
  * - EDEN_MANIFEST: JSON-stringified app manifest
  */
 
-import type { EdenAPI, AppBusAPI, AppBusConnection } from "@edenapp/types";
+import type { AppBusAPI, AppBusConnection, EdenAPI } from "@edenapp/types";
 
 import type { WorkerGlobal } from "@edenapp/types/worker";
-
 import {
-  createMessageIdGenerator,
-  handleAppBusPort as handlePortSetup,
-  createPortConnection,
-  createAppBusState,
-  wrapElectronPort,
-  handlePortClosed,
-} from "./common/port-channel";
-
-import {
-  createEdenAPI,
   createAppBusAPI,
+  createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import {
+  createAppBusState,
+  createMessageIdGenerator,
+  createPortConnection,
+  handlePortClosed,
+  handleAppBusPort as handlePortSetup,
+  wrapElectronPort,
+} from "./common/port-channel";
 
 // Electron utility process extends the Node process with parentPort
 // This is available when running inside utilityProcess.fork()
@@ -40,17 +44,72 @@ const appId = process.env.EDEN_APP_ID!;
 const backendEntry = process.env.EDEN_BACKEND_ENTRY!;
 const manifest = JSON.parse(process.env.EDEN_MANIFEST || "{}");
 
+setLogContext({ appId });
+
+const captureConsoleCallsite = (): CallsiteInfo | undefined => {
+  const err = new Error();
+  Error.captureStackTrace?.(err, captureConsoleCallsite);
+  const stack = err.stack;
+  if (!stack) return undefined;
+
+  const lines = stack.split("\n").slice(1);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (
+      trimmed.includes("backend-preload") ||
+      trimmed.includes("/logging/") ||
+      trimmed.includes("\\logging\\")
+    ) {
+      continue;
+    }
+
+    const match =
+      trimmed.match(/\(([^)]+):(\d+):(\d+)\)$/) ??
+      trimmed.match(/at\s+([^\s]+):(\d+):(\d+)$/);
+
+    if (!match) continue;
+
+    const file = match[1];
+    const lineNumber = Number(match[2]);
+    const columnNumber = Number(match[3]);
+
+    if (!file || Number.isNaN(lineNumber)) continue;
+
+    return {
+      file,
+      line: lineNumber,
+      column: Number.isNaN(columnNumber) ? undefined : columnNumber,
+    };
+  }
+
+  return undefined;
+};
+
+console.log = (...args: unknown[]) =>
+  logFromConsole({ level: "info", args, callsite: captureConsoleCallsite() });
+console.info = (...args: unknown[]) =>
+  logFromConsole({ level: "info", args, callsite: captureConsoleCallsite() });
+console.warn = (...args: unknown[]) =>
+  logFromConsole({ level: "warn", args, callsite: captureConsoleCallsite() });
+console.error = (...args: unknown[]) =>
+  logFromConsole({ level: "error", args, callsite: captureConsoleCallsite() });
+console.debug = (...args: unknown[]) =>
+  logFromConsole({ level: "debug", args, callsite: captureConsoleCallsite() });
+console.trace = (...args: unknown[]) =>
+  logFromConsole({ level: "trace", args, callsite: captureConsoleCallsite() });
+
 // Extract launch args
 let launchArgs: string[] = [];
 const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args=")
+  arg.startsWith("--launch-args="),
 );
 if (launchArgsArg) {
   try {
     const jsonStr = launchArgsArg.split("=").slice(1).join("=");
     launchArgs = JSON.parse(jsonStr);
   } catch (e) {
-    console.error("[Backend Runtime] Failed to parse launch args:", e);
+    log.error("Failed to parse launch args:", e);
   }
 }
 
@@ -60,9 +119,7 @@ let frontendPort: Electron.MessagePortMain | null = null;
 // Port for IPC with main process (process.parentPort)
 const parentPort = process.parentPort;
 if (!parentPort) {
-  console.error(
-    "[Backend Runtime] Not running in utility process - parentPort not available"
-  );
+  log.error("Not running in utility process - parentPort not available");
   process.exit(1);
 }
 
@@ -142,7 +199,7 @@ const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
  */
 const appBus: AppBusAPI = createAppBusAPI(
   { transport: shellTransport, isBackend: true },
-  appBusState
+  appBusState,
 );
 
 // Frontend communication state
@@ -180,10 +237,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
         try {
           callback(payload);
         } catch (err) {
-          console.error(
-            `[Backend ${appId}] Error in event callback for ${eventName}:`,
-            err
-          );
+          log.error(`Error in event callback for ${eventName}:`, err);
         }
       });
     }
@@ -198,7 +252,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
     handlePortClosed(appBusState, message.connectionId);
   } else if (message.type === "shutdown") {
     // Graceful shutdown request
-    console.log(`[Backend ${appId}] Shutdown requested`);
+    log.info(`Shutdown requested`);
     process.exit(0);
   }
 });
@@ -215,7 +269,7 @@ function setupFrontendPort(port: Electron.MessagePortMain): void {
     "__frontend__",
     new Map([["__frontend__", wrappedPort]]),
     new Map(),
-    createMessageIdGenerator("backend-to-frontend")
+    createMessageIdGenerator("backend-to-frontend"),
   );
 }
 
@@ -226,7 +280,7 @@ function handleAppBusPort(port: Electron.MessagePortMain, data: any): void {
   // Wrap Electron MessagePortMain to IPCPort interface
   const wrappedPort = wrapElectronPort(port);
 
-  handlePortSetup(wrappedPort, data, appBusState, `[Backend ${appId}]`);
+  handlePortSetup(wrappedPort, data, appBusState);
 }
 
 /**
@@ -234,14 +288,14 @@ function handleAppBusPort(port: Electron.MessagePortMain, data: any): void {
  */
 async function loadBackendEntry(): Promise<void> {
   try {
-    console.log(`[Backend ${appId}] Loading backend entry: ${backendEntry}`);
+    log.info(`Loading backend entry: ${backendEntry}`);
     await import(backendEntry);
-    console.log(`[Backend ${appId}] Backend loaded successfully`);
+    log.info(`Backend loaded successfully`);
 
     // Signal to main that we're ready
     parentPort!.postMessage({ type: "backend-ready" });
   } catch (error) {
-    console.error(`[Backend ${appId}] Failed to load backend:`, error);
+    log.error(`Failed to load backend:`, error);
     parentPort!.postMessage({
       type: "backend-error",
       error: error instanceof Error ? error.message : String(error),
@@ -263,7 +317,7 @@ async function initializeBackend(): Promise<void> {
           if (port) {
             frontendPort = port;
             setupFrontendPort(port);
-            console.log(`[Backend ${appId}] Frontend port initialized`);
+            log.info(`Frontend port initialized`);
           }
           parentPort.removeListener("message", handler);
           resolve();
@@ -285,7 +339,7 @@ function getAppAPI(): AppBusConnection {
   if (!frontendConnection) {
     throw new Error(
       "AppAPI not available: This app has no frontend connection. " +
-        "Ensure 'frontend.entry' is defined in manifest.json if you need frontend communication."
+        "Ensure 'frontend.entry' is defined in manifest.json if you need frontend communication.",
     );
   }
   return frontendConnection;

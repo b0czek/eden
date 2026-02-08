@@ -1,11 +1,11 @@
 import type {
-  EdenAPI,
   AppBusAPI,
   AppBusConnection,
-  ServiceInfo,
+  EdenAPI,
   ServiceConnectCallback,
+  ServiceInfo,
 } from "@edenapp/types";
-import type { PendingRequest, IPCPort, AppBusState } from "./port-channel";
+import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
 
 /**
@@ -29,7 +29,7 @@ export interface AppBusConfig {
 export function createEdenAPI(
   transport: ShellTransport,
   eventSubscriptions: Map<string, Set<Function>>,
-  options?: { getLaunchArgs?: () => string[] }
+  options?: { getLaunchArgs?: () => string[] },
 ): EdenAPI {
   return {
     shellCommand: (command: string, args: any) => {
@@ -82,7 +82,7 @@ export function createEdenAPI(
  */
 export function createAppBusAPI(
   config: AppBusConfig,
-  state: AppBusState
+  state: AppBusState,
 ): AppBusAPI {
   const { transport, isBackend } = config;
   const {
@@ -99,7 +99,7 @@ export function createAppBusAPI(
       options?: {
         description?: string;
         allowedClients?: string[];
-      }
+      },
     ): Promise<{ success: boolean; error?: string }> => {
       if (typeof onConnect !== "function") {
         throw new Error("onConnect callback must be a function");
@@ -125,7 +125,7 @@ export function createAppBusAPI(
     },
 
     unexposeService: async (
-      serviceName: string
+      serviceName: string,
     ): Promise<{ success: boolean }> => {
       registeredServices.delete(serviceName);
       return transport.exec("appbus/unregister", {
@@ -135,7 +135,7 @@ export function createAppBusAPI(
 
     connect: async (
       targetAppId: string,
-      serviceName: string
+      serviceName: string,
     ): Promise<AppBusConnection | { error: string }> => {
       // Request connection through shell command
       const result = await transport.exec("appbus/connect", {
@@ -167,7 +167,7 @@ export function createAppBusAPI(
         connectionId,
         connectedPorts,
         pendingRequests,
-        messageIdGenerator
+        messageIdGenerator,
       );
     },
 
@@ -176,7 +176,7 @@ export function createAppBusAPI(
     },
 
     listServicesByApp: async (
-      appId: string
+      appId: string,
     ): Promise<{ services: ServiceInfo[] }> => {
       return transport.exec("appbus/list-by-app", { appId });
     },

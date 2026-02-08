@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * Window Dragging
  *
@@ -15,8 +16,8 @@ export function setupWindowDragging(
   overlay: HTMLElement,
   currentBoundsRef: {
     current: { x: number; y: number; width: number; height: number } | null;
-  }
-): void {
+  },
+): () => void {
   let isDragging = false;
   let startX = 0;
   let startY = 0;
@@ -44,7 +45,7 @@ export function setupWindowDragging(
           appId,
           bounds: pendingBounds,
         })
-        .catch(console.error);
+        .catch(log.error);
 
       pendingBounds = null;
     }
@@ -60,24 +61,13 @@ export function setupWindowDragging(
       return;
     }
 
-    console.log("[Eden Frame] startDrag called, event type:", e.type);
-    console.log(
-      "[Eden Frame] currentBounds before refresh:",
-      currentBoundsRef.current
-    );
-
     // ALWAYS refresh currentBounds at start to handle case where mouse drag updated position
     const initialBounds = window.edenFrame?._internal.bounds;
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      console.log(
-        "[Eden Frame] Refreshed currentBounds from edenFrame._internal.bounds:",
-        currentBoundsRef.current
-      );
+      log.info(currentBoundsRef.current);
     } else if (!currentBoundsRef.current) {
-      console.warn(
-        "[Eden Frame] Cannot start drag - currentBounds not initialized!"
-      );
+      log.warn("Cannot start drag - currentBounds not initialized!");
       return;
     }
 
@@ -89,8 +79,6 @@ export function setupWindowDragging(
     startX = coords.x;
     startY = coords.y;
     dragStartBounds = { ...currentBoundsRef.current };
-
-    console.log("[Eden Frame] Drag started at:", coords, "isTouch:", isTouch);
 
     // IMPORTANT: Prevent default FIRST to stop touch from being canceled
     e.preventDefault();
@@ -104,14 +92,9 @@ export function setupWindowDragging(
 
     const appId = window.edenFrame?._internal.appId;
 
-    // Bring window to front - but ONLY for mouse events
-    // For touch, calling focus-app during the touch causes view reordering which triggers touchcancel
-    // Touch users need to tap elsewhere to focus, then tap title bar to drag
-    if (!isTouch && appId) {
-      window.edenAPI
-        .shellCommand("view/focus-app", { appId })
-        .catch(console.error);
-    }
+    // NOTE: We do NOT call focus-app here anymore.
+    // On macOS (and Linux touch), calling focus-app during drag start causes view reordering
+    // which cancels the drag/touch event. Instead, we bring the window to front after drag ends.
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
@@ -122,7 +105,7 @@ export function setupWindowDragging(
           startX: coords.x,
           startY: coords.y,
         })
-        .catch(console.error);
+        .catch(log.error);
     }
 
     // Add mouseup listener when drag starts (removed when drag ends)
@@ -173,10 +156,6 @@ export function setupWindowDragging(
       return;
     }
 
-    console.log(
-      "[Eden Frame] Drag ended, final currentBounds:",
-      currentBoundsRef.current
-    );
     isDragging = false;
     dragStartBounds = null;
 
@@ -197,7 +176,7 @@ export function setupWindowDragging(
             appId,
             bounds: pendingBounds,
           })
-          .catch(console.error);
+          .catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
         window.edenFrame!._internal.bounds = { ...pendingBounds };
@@ -208,17 +187,19 @@ export function setupWindowDragging(
     // For touch drag, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
-      console.log(
-        "[Eden Frame] Updated edenFrame._internal.bounds after touch drag:",
-        window.edenFrame?._internal.bounds
+      log.info(
+        "Updated edenFrame._internal.bounds after touch drag:",
+        window.edenFrame?._internal.bounds,
       );
     }
 
     // Stop global drag tracking in main process (for mouse events)
     if (!isTouch && appId) {
-      window.edenAPI
-        .shellCommand("view/end-drag", { appId })
-        .catch(console.error);
+      window.edenAPI.shellCommand("view/end-drag", { appId }).catch(log.error);
+    }
+
+    if (appId) {
+      window.edenAPI.shellCommand("view/focus-app", { appId }).catch(log.error);
     }
   };
 
@@ -239,5 +220,21 @@ export function setupWindowDragging(
   document.addEventListener("touchend", endDrag, { passive: false });
   document.addEventListener("touchcancel", endDrag, { passive: false });
 
-  console.log("[Eden Frame] Drag event listeners registered");
+  log.info("Drag event listeners registered");
+
+  return () => {
+    overlay.removeEventListener("mousedown", startDrag);
+    overlay.removeEventListener("touchstart", startDrag);
+    document.removeEventListener("touchmove", moveDrag as EventListener, {
+      capture: true,
+    });
+    document.removeEventListener("touchend", endDrag);
+    document.removeEventListener("touchcancel", endDrag);
+    window.removeEventListener("mouseup", endDrag);
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    log.info("Drag event listeners removed");
+  };
 }

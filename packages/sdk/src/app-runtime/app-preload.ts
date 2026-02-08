@@ -1,23 +1,20 @@
+import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
-import type {
-  AppBusConnection,
-  ServiceConnectCallback,
-} from "@edenapp/types/ipc/appbus";
+import { log, setLogContext } from "../logging";
 import {
-  type PendingRequest,
-  type IPCPort,
-  createMessageIdGenerator,
-  handleAppBusPort,
-  createPortConnection,
-  createAppBusState,
-  wrapDOMPort,
-  handlePortClosed,
-} from "./common/port-channel";
-import {
-  createEdenAPI,
   createAppBusAPI,
+  createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import {
+  createAppBusState,
+  createMessageIdGenerator,
+  createPortConnection,
+  handleAppBusPort,
+  handlePortClosed,
+  type PendingRequest,
+  wrapDOMPort,
+} from "./common/port-channel";
 
 // Per-app state
 let appId: string | null = null;
@@ -40,22 +37,23 @@ const eventSubscriptions: Map<string, Set<Function>> = new Map();
 const appIdArg = process.argv.find((arg) => arg.startsWith("--app-id="));
 if (appIdArg) {
   appId = appIdArg.split("=")[1];
-  console.log(`[AppPreload] Initialized for app: ${appId}`);
+  setLogContext({ appId });
+  log.info(`Initialized for app: ${appId}`);
 } else {
-  console.warn("[AppPreload] No app ID found in arguments");
+  log.warn("No app ID found in arguments");
 }
 
 // Extract launch args
 let launchArgs: string[] = [];
 const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args=")
+  arg.startsWith("--launch-args="),
 );
 if (launchArgsArg) {
   try {
     const jsonStr = launchArgsArg.split("=").slice(1).join("=");
     launchArgs = JSON.parse(jsonStr);
   } catch (e) {
-    console.error("[AppPreload] Failed to parse launch args:", e);
+    log.error("Failed to parse launch args:", e);
   }
 }
 
@@ -63,12 +61,12 @@ if (launchArgsArg) {
 ipcRenderer.on("backend-port", (event: any) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
-    console.error("[AppPreload] Received backend-port event without port");
+    log.error("Received backend-port event without port");
     return;
   }
 
   backendPort = port;
-  console.log(`[AppPreload] Backend port received for app ${appId}`);
+  log.info(`Backend port received for app ${appId}`);
 
   // Wrap DOM MessagePort to IPCPort interface
   const wrappedPort = wrapDOMPort(port);
@@ -79,7 +77,7 @@ ipcRenderer.on("backend-port", (event: any) => {
     "__backend__",
     new Map([["__backend__", wrappedPort]]), // Dummy map since we won't close this
     pendingBackendRequests,
-    generateBackendMessageId
+    generateBackendMessageId,
   );
 });
 
@@ -93,7 +91,7 @@ ipcRenderer.on("shell-message", (_event: any, message: any) => {
       try {
         callback(payload);
       } catch (err) {
-        console.error(`Error in event listener for ${type}:`, err);
+        log.error(`Error in event listener for ${type}:`, err);
       }
     });
   }
@@ -104,7 +102,7 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
   if (!backendConnection) {
     throw new Error(
       "AppAPI not available: Backend not connected. " +
-        "This could mean the app has no backend, or the connection is not yet established."
+        "This could mean the app has no backend, or the connection is not yet established.",
     );
   }
   return backendConnection;
@@ -122,12 +120,11 @@ const shellTransport: ShellTransport = {
 };
 
 // Expose edenAPI for shell commands and event subscriptions
-contextBridge.exposeInMainWorld(
-  "edenAPI",
-  createEdenAPI(shellTransport, eventSubscriptions, {
-    getLaunchArgs: () => launchArgs,
-  })
-);
+const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
+  getLaunchArgs: () => launchArgs,
+});
+
+contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 
 // ===================================================================
 // AppBus - App-to-App Communication System
@@ -139,14 +136,14 @@ const appBusState = createAppBusState("appbus");
 ipcRenderer.on("appbus-port", (event: any, data: any) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
-    console.error("[AppBus] Received appbus-port event without port");
+    log.error("Received appbus-port event without port");
     return;
   }
 
   // Wrap DOM MessagePort to IPCPort interface
   const wrappedPort = wrapDOMPort(port);
 
-  handleAppBusPort(wrappedPort, data, appBusState, "[AppBus]");
+  handleAppBusPort(wrappedPort, data, appBusState);
 });
 
 // Handle port closed notification
@@ -154,13 +151,55 @@ ipcRenderer.on(
   "appbus-port-closed",
   (_event: any, data: { connectionId: string }) => {
     handlePortClosed(appBusState, data.connectionId);
-  }
+  },
 );
 
 // Expose appBus API for app-to-app communication
 contextBridge.exposeInMainWorld(
   "appBus",
-  createAppBusAPI({ transport: shellTransport }, appBusState)
+  createAppBusAPI({ transport: shellTransport }, appBusState),
 );
 
-console.log("Universal app preload loaded");
+// ===================================================================
+// Universal Zoom Prevention
+// ===================================================================
+// Disable default browser zoom behavior for all apps
+// This runs when the DOM is ready for all apps, regardless of app-frame usage
+
+const setupZoomPrevention = () => {
+  // Block Ctrl/Cmd + Plus/Minus/Equals for keyboard zoom
+  document.addEventListener(
+    "keydown",
+    (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")
+      ) {
+        e.preventDefault();
+      }
+    },
+    { capture: true },
+  );
+
+  // Block Ctrl/Cmd + Mouse wheel for zoom
+  document.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    },
+    { passive: false, capture: true },
+  );
+
+  log.info("Zoom prevention enabled");
+};
+
+// Setup when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupZoomPrevention);
+} else {
+  setupZoomPrevention();
+}
+
+log.info("Universal app preload loaded");

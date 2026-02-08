@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets",
-    "build:apps": "eden-build build-sdk -i apps -o dist/apps/prebuilt",
+    "build:apps": "ts-node scripts/build-prebuilt-apps.ts",
     "build:main": "tsc",
     "bundle:app-frame": "node scripts/bundle-app-frame.js",
     "bundle:app-runtime": "node scripts/bundle-app-runtime.js",
@@ -20,7 +20,8 @@
     "copy-assets": "mkdir -p dist/foundation && cp foundation/* dist/foundation/",
     "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' edencss/eden.css -o dist/edencss/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' edencss/tokens.css -o dist/edencss/eden-tokens.css",
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "jest"
   },
   "keywords": [
     "eden",
@@ -32,7 +33,7 @@
   "author": "Dariusz Majnert",
   "license": "MIT",
   "peerDependencies": {
-    "electron": ">=39.0.0"
+    "electron": ">=40.0.0"
   },
   "dependencies": {
     "@edenapp/genesis": "workspace:*",
@@ -45,10 +46,13 @@
   },
   "devDependencies": {
     "@edenapp/scripts": "workspace:*",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.10.0",
     "esbuild": "^0.27.0",
+    "jest": "^29.7.0",
     "lightningcss-cli": "^1.30.2",
     "style-dictionary": "^5.1.1",
+    "ts-jest": "^29.4.5",
     "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"

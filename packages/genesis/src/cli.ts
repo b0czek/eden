@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
-import * as path from "path";
+import * as path from "node:path";
 import chalk from "chalk";
-import { GenesisBundler } from "./bundler";
+import { Command } from "commander";
+import * as bundler from "./bundler";
 
 const program = new Command();
 
@@ -23,25 +23,25 @@ program
   .option(
     "-c, --compression <level>",
     "Zstd compression level (1-22, default: 11)",
-    "11"
+    "11",
   )
   .action(async (appDirectory: string, options: any) => {
     console.log(chalk.bold.blue("\n🌱 Genesis - Creating life...\n"));
 
     const compressionLevel = parseInt(options.compression, 10);
     if (
-      isNaN(compressionLevel) ||
+      Number.isNaN(compressionLevel) ||
       compressionLevel < 1 ||
       compressionLevel > 22
     ) {
       console.log(chalk.red("\n❌ Invalid compression level"));
       console.log(
-        chalk.gray("   Compression level must be between 1 and 22\n")
+        chalk.gray("   Compression level must be between 1 and 22\n"),
       );
       process.exit(1);
     }
 
-    const result = await GenesisBundler.bundle({
+    const result = await bundler.bundle({
       appDirectory: path.resolve(appDirectory),
       outputPath: options.output ? path.resolve(options.output) : undefined,
       verbose: options.verbose,
@@ -53,13 +53,17 @@ program
       if (options.dryRun) {
         console.log(chalk.green("\n✨ Dry run successful - validation passed"));
         console.log(
-          chalk.gray(`   ${result.manifest?.name} v${result.manifest?.version}`)
+          chalk.gray(
+            `   ${result.manifest?.name} v${result.manifest?.version}`,
+          ),
         );
         console.log(chalk.gray("   No files were created\n"));
       } else {
         console.log(chalk.green("\n✨ Success! App bundled successfully"));
         console.log(
-          chalk.gray(`   ${result.manifest?.name} v${result.manifest?.version}`)
+          chalk.gray(
+            `   ${result.manifest?.name} v${result.manifest?.version}`,
+          ),
         );
         console.log(chalk.gray(`   → ${result.outputPath}`));
         if (result.checksum) {
@@ -84,7 +88,7 @@ program
     console.log(chalk.bold.blue("\n🔍 Validating manifest...\n"));
 
     const manifestPath = path.resolve(appDirectory, "manifest.json");
-    const result = await GenesisBundler.validateManifest(manifestPath);
+    const result = await bundler.validateManifest(manifestPath);
 
     if (result.valid && result.manifest) {
       console.log(chalk.green("✓ Manifest is valid\n"));
@@ -93,39 +97,41 @@ program
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
       console.log(
-        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`)
+        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
+        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
       );
       console.log(
         chalk.gray(
-          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`
-        )
+          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`,
+        ),
       );
 
       // Verify files
-      const fileCheck = await GenesisBundler.verifyFiles(
+      const fileCheck = await bundler.verifyFiles(
         path.resolve(appDirectory),
-        result.manifest
+        result.manifest,
       );
       if (fileCheck.valid) {
         console.log(chalk.green("✓ All required files present\n"));
         process.exit(0);
       } else {
         console.log(chalk.yellow("⚠ Warning: Missing files"));
-        fileCheck.errors.forEach((error) =>
-          console.log(chalk.gray(`  - ${error}`))
-        );
+        fileCheck.errors.forEach((error) => {
+          console.log(chalk.gray(`  - ${error}`));
+        });
         console.log();
         process.exit(1);
       }
     } else {
       console.log(chalk.red("❌ Manifest is invalid\n"));
-      result.errors.forEach((error) => console.log(chalk.gray(`  - ${error}`)));
+      result.errors.forEach((error) => {
+        console.log(chalk.gray(`  - ${error}`));
+      });
       console.log();
       process.exit(1);
     }
@@ -139,7 +145,7 @@ program
   .action(async (edeniteFile: string) => {
     console.log(chalk.bold.blue("\n📄 Reading .edenite file...\n"));
 
-    const result = await GenesisBundler.getInfo(path.resolve(edeniteFile));
+    const result = await bundler.getInfo(path.resolve(edeniteFile));
 
     if (result.success && result.manifest) {
       console.log(chalk.bold("App Information:"));
@@ -147,16 +153,18 @@ program
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
       console.log(
-        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`)
+        chalk.gray(`  Description: ${result.manifest.description || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`)
+        chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`)
+        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
       );
       console.log(
-        chalk.gray(`  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`)
+        chalk.gray(
+          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`,
+        ),
       );
       if (result.checksum) {
         console.log(chalk.gray(`  SHA256:      ${result.checksum}`));
@@ -182,7 +190,7 @@ program
     async (edeniteFile: string, outputDirectory: string, options: any) => {
       console.log(chalk.bold.blue("\n📂 Extracting .edenite file...\n"));
 
-      const result = await GenesisBundler.extract({
+      const result = await bundler.extract({
         edenitePath: path.resolve(edeniteFile),
         outputDirectory: path.resolve(outputDirectory),
         verbose: options.verbose,
@@ -193,7 +201,9 @@ program
         console.log(chalk.green("\n✨ Success! Archive extracted"));
         if (result.manifest) {
           console.log(
-            chalk.gray(`   ${result.manifest.name} v${result.manifest.version}`)
+            chalk.gray(
+              `   ${result.manifest.name} v${result.manifest.version}`,
+            ),
           );
         }
         console.log(chalk.gray(`   → ${path.resolve(outputDirectory)}\n`));
@@ -203,7 +213,7 @@ program
         console.log(chalk.gray(`   ${result.error}\n`));
         process.exit(1);
       }
-    }
+    },
   );
 
 program.parse();

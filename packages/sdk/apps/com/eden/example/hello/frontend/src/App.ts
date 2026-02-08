@@ -78,7 +78,7 @@ class HelloApp {
     const userMessage = await this.showInputDialog(
       "Say Hello",
       "What would you like to say?",
-      "Hello from frontend!"
+      "Hello from frontend!",
     );
     if (!userMessage) return;
 
@@ -99,13 +99,13 @@ class HelloApp {
   private showInputDialog(
     title: string,
     placeholder = "Enter value...",
-    defaultValue = ""
+    defaultValue = "",
   ): Promise<string | null> {
     return new Promise((resolve) => {
       const overlay = document.getElementById("input-dialog");
       const titleEl = document.getElementById("input-dialog-title");
       const input = document.getElementById(
-        "input-dialog-input"
+        "input-dialog-input",
       ) as HTMLInputElement | null;
       const closeBtn = document.getElementById("input-dialog-close");
       const cancelBtn = document.getElementById("input-dialog-cancel");

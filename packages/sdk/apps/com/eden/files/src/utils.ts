@@ -8,7 +8,7 @@ export const getParentPath = (path: string) => {
   if (path === "/") return "/";
   const parts = path.split("/").filter((p) => p);
   parts.pop();
-  return "/" + parts.join("/");
+  return `/${parts.join("/")}`;
 };
 
 export const isValidName = (name: string) => {
@@ -20,7 +20,7 @@ export const formatFileSize = (bytes: number) => {
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  return `${Math.round((bytes / k ** i) * 100) / 100} ${sizes[i]}`;
 };
 
 export const getFileIcon = (item: FileItem) => {

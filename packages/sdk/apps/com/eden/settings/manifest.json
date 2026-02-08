@@ -1,6 +1,9 @@
 {
   "id": "com.eden.settings",
-  "name": "Settings",
+  "name": {
+    "en": "Settings",
+    "pl": "Ustawienia"
+  },
   "version": "1.0.0",
   "description": "System and application settings",
   "author": "Dariusz Majnert",
@@ -23,6 +26,10 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["settings/superuser"],
+  "permissions": ["settings/superuser", "user/grants", "package/read"],
+  "grants": [
+    { "scope": "preset", "preset": "package/manage" },
+    { "scope": "preset", "preset": "appearance/manage" }
+  ],
   "icon": "icon.svg"
 }

@@ -1,2 +1,2 @@
-export { DbManager } from "./DbManager";
 export { DbHandler } from "./DbHandler";
+export { DbManager } from "./DbManager";

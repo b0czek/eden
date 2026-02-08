@@ -26,9 +26,12 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": {
-    "system": {
-      "notifications": true
+  "permissions": ["user/grants"],
+  "grants": [
+    {
+      "id": "say-hello",
+      "label": "Say hello",
+      "description": "Allow sending messages to the backend"
     }
-  }
+  ]
 }

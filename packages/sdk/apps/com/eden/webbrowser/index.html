@@ -1,19 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Web Browser</title>
   <style>
-    .eden-framed {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: var(--eden-color-bg-glass-medium);
-      backdrop-filter: var(--eden-glass-light);
-    }
 
     .browser-container {
       display: flex;
@@ -63,16 +55,20 @@
     }
   </style>
 </head>
+
 <body>
   <div class="browser-container">
     <div class="address-bar">
       <button class="nav-btn" id="back" title="Back">←</button>
       <button class="nav-btn" id="forward" title="Forward">→</button>
       <button class="nav-btn" id="reload" title="Reload">⟳</button>
-      <input type="text" class="eden-input eden-input-sm address-input" id="url" placeholder="Enter URL..." value="https://www.google.com">
+      <input type="text" class="eden-input eden-input-sm address-input" id="url" placeholder="Enter URL..."
+        value="https://www.google.com">
       <button class="nav-btn" id="go" title="Go">↵</button>
     </div>
-    <iframe class="browser-frame" id="frame" src="https://www.google.com" allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; payment; picture-in-picture" allowfullscreen></iframe>
+    <iframe class="browser-frame" id="frame" src="https://www.google.com"
+      allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; payment; picture-in-picture"
+      allowfullscreen></iframe>
   </div>
 
   <script>
@@ -94,16 +90,16 @@
 
     function loadUrl(url, addToHistory = true) {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
+        url = `https://${url}`;
       }
-      
+
       if (addToHistory) {
         // Remove any forward history when navigating to a new page
         history.splice(historyIndex + 1);
         history.push(url);
         historyIndex = history.length - 1;
       }
-      
+
       frame.src = url;
       urlInput.value = url;
       updateButtons();
@@ -111,7 +107,7 @@
 
 
     // TODO: nothing here works
-    
+
     document.getElementById('go').addEventListener('click', () => loadUrl(urlInput.value));
     urlInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') loadUrl(urlInput.value);
@@ -138,4 +134,5 @@
     updateButtons();
   </script>
 </body>
+
 </html>

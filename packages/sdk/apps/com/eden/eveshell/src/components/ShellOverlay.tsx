@@ -1,14 +1,17 @@
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
-import Dock from "./Dock";
-import AllApps from "./AllApps";
-import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
-import {
+import type {
+  AppInstance,
+  AppManifest,
+  UserProfile,
   ViewBounds,
   WindowSize,
-  AppManifest,
-  AppInstance,
 } from "@edenapp/types";
-import { AppInfo } from "../types";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createAppMenu, createUserContextMenu } from "../context-menu";
+import { getLocalizedValue, initLocale, locale, t } from "../i18n";
+import type { AppInfo } from "../types";
+import AllApps from "./AllApps";
+import ChangePasswordModal from "./ChangePasswordModal";
+import Dock from "./Dock";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
@@ -21,7 +24,8 @@ export default function ShellOverlay() {
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
-  const [dockContextMenu, setDockContextMenu] = createSignal<ContextMenuData | null>(null);
+  const [showChangePassword, setShowChangePassword] = createSignal(false);
+  const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -81,7 +85,7 @@ export default function ShellOverlay() {
       .filter((instance) => !pinnedDockApps().includes(instance.manifest.id))
       .map((instance) => ({
         id: instance.manifest.id,
-        name: instance.manifest.name,
+        name: getLocalizedValue(instance.manifest.name, locale()),
         isRunning: true,
       }));
   };
@@ -97,19 +101,19 @@ export default function ShellOverlay() {
         if (!manifest) return null;
         return {
           id: appId,
-          name: manifest.name,
+          name: getLocalizedValue(manifest.name, locale()),
           isRunning: runningIds.has(appId),
         };
       })
       .filter((app): app is AppInfo => app !== null);
   };
 
-  // All installed apps for the apps view
+  // All installed apps for the apps view (already filtered by permissions from package/list)
   const allApps = (): AppInfo[] => {
     const runningIds = new Set(runningApps().map((i) => i.manifest.id));
     return installedApps().map((app) => ({
       id: app.id,
-      name: app.name,
+      name: getLocalizedValue(app.name, locale()),
       isRunning: runningIds.has(app.id),
     }));
   };
@@ -132,10 +136,19 @@ export default function ShellOverlay() {
     }
   };
 
+  const loadCurrentUser = async () => {
+    try {
+      const result = await window.edenAPI.shellCommand("user/get-current", {});
+      setCurrentUser(result.user ?? null);
+    } catch (error) {
+      console.error("Failed to load current user:", error);
+    }
+  };
+
   // Helper function to calculate bounds based on mode and window size
   const calculateBounds = (
     mode: "dock" | "fullscreen",
-    windowSize: WindowSize
+    windowSize: WindowSize,
   ) => {
     return mode === "fullscreen"
       ? { x: 0, y: 0, width: windowSize.width, height: windowSize.height }
@@ -164,7 +177,7 @@ export default function ShellOverlay() {
       // Get current window bounds
       const windowSize = await window.edenAPI.shellCommand(
         "view/window-size",
-        {}
+        {},
       );
       const bounds = calculateBounds(mode, windowSize);
       await updateOverlayBounds(bounds);
@@ -210,6 +223,12 @@ export default function ShellOverlay() {
     }
   };
 
+  createEffect(() => {
+    if (!showAllApps() && !showChangePassword()) {
+      requestResize("dock");
+    }
+  });
+
   const handleStopApp = async (appId: string) => {
     try {
       await window.edenAPI.shellCommand("process/stop", { appId });
@@ -222,30 +241,50 @@ export default function ShellOverlay() {
     }
   };
 
-  const handleUninstallApp = async (appId: string) => {
+  // Create menu once with actions - just pass app data when opening
+  const appMenu = createAppMenu({
+    open: handleAppClick,
+    stop: handleStopApp,
+    addToDock: handleAddToDock,
+    removeFromDock: handleRemoveFromDock,
+    isPinned: isAppPinned,
+  });
+
+  const handleLogout = async () => {
     try {
-      // Confirm before uninstalling
-      if (confirm(`Are you sure you want to uninstall this app?`)) {
-        await window.edenAPI.shellCommand("package/uninstall", { appId });
-        // Refresh app list
-        await loadSystemInfo();
-      }
+      await window.edenAPI.shellCommand("user/logout", {});
     } catch (error) {
-      console.error("Failed to uninstall app:", error);
+      console.error("Failed to log out:", error);
     }
   };
 
-  // Handle context menu from dock - resize to fullscreen so menu fits
-  const handleDockContextMenu = async (menu: ContextMenuData) => {
+  const handleOpenChangePassword = async () => {
+    setShowChangePassword(true);
     await requestResize("fullscreen");
-    setDockContextMenu(menu);
   };
 
-  // Close dock context menu and resize back to dock
-  const handleCloseDockContextMenu = async () => {
-    setDockContextMenu(null);
+  // Create user menu factory
+  const userContextMenu = createUserContextMenu({
+    changePassword: handleOpenChangePassword,
+    logout: handleLogout,
+  });
+
+  const handleCloseChangePassword = () => {
+    setShowChangePassword(false);
     if (!showAllApps()) {
-      await requestResize("dock");
+      requestResize("dock");
+    }
+  };
+
+  const handleChangePasswordSubmit = async (args: {
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    try {
+      return await window.edenAPI.shellCommand("user/change-password", args);
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      return { success: false, error: t("shell.passwordUpdateFailed") };
     }
   };
 
@@ -269,15 +308,19 @@ export default function ShellOverlay() {
       window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
       window.edenAPI.unsubscribe(
         "view/global-bounds-changed",
-        handleBoundsChange
+        handleBoundsChange,
       );
     });
 
     // Async initialization
     (async () => {
+      // Initialize i18n (will load locale and subscribe to changes)
+      await initLocale();
+
       // Load initial system info and pinned apps
       loadSystemInfo();
       loadPinnedApps();
+      loadCurrentUser();
 
       // Set initial overlay size
       await requestResize("dock");
@@ -288,7 +331,7 @@ export default function ShellOverlay() {
         await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
         await window.edenAPI.subscribe(
           "view/global-bounds-changed",
-          handleBoundsChange
+          handleBoundsChange,
         );
       } catch (error) {
         console.error("Failed to subscribe to events:", error);
@@ -299,7 +342,7 @@ export default function ShellOverlay() {
   return (
     <div
       class="shell-overlay"
-      data-mode={showAllApps() || dockContextMenu() ? "fullscreen" : "dock"}
+      data-mode={showAllApps() || showChangePassword() ? "fullscreen" : "dock"}
     >
       {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>
@@ -307,37 +350,28 @@ export default function ShellOverlay() {
           apps={allApps()}
           onClose={handleShowAllApps}
           onAppClick={handleAppClick}
-          onStopApp={handleStopApp}
-          onUninstallApp={handleUninstallApp}
-          isAppPinned={isAppPinned}
-          onAddToDock={handleAddToDock}
-          onRemoveFromDock={handleRemoveFromDock}
+          appMenu={appMenu}
         />
       </Show>
 
-      {/* Dock is always visible */}
-      <Dock
-        runningApps={dockRunningApps()}
-        pinnedApps={dockPinnedApps()}
-        onAppClick={handleAppClick}
-        onShowAllApps={handleShowAllApps}
-        onContextMenu={handleDockContextMenu}
-      />
-
-      {/* Context menu for dock apps */}
-      <Show when={dockContextMenu()}>
-        {(menu) => (
-          <AppContextMenu
-            menu={menu()}
-            isAppPinned={isAppPinned}
-            onStopApp={handleStopApp}
-            onAddToDock={handleAddToDock}
-            onRemoveFromDock={handleRemoveFromDock}
-            onUninstallApp={handleUninstallApp}
-            onClose={handleCloseDockContextMenu}
-          />
-        )}
+      {/* Dock hidden when AllApps is open */}
+      <Show when={!showAllApps()}>
+        <Dock
+          runningApps={dockRunningApps()}
+          pinnedApps={dockPinnedApps()}
+          currentUser={currentUser()}
+          onAppClick={handleAppClick}
+          onShowAllApps={handleShowAllApps}
+          userMenu={userContextMenu}
+          appMenu={appMenu}
+        />
       </Show>
+
+      <ChangePasswordModal
+        show={showChangePassword()}
+        onClose={handleCloseChangePassword}
+        onSubmit={handleChangePasswordSubmit}
+      />
     </div>
   );
 }

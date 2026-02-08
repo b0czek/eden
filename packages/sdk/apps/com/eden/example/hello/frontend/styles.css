@@ -1,6 +1,6 @@
 /**
  * Hello World App - Using Eden CSS
- * 
+ *
  * This demonstrates how to use the auto-injected CSS
  * in a real Eden app with actual functionality.
  */
@@ -93,4 +93,3 @@ p {
     transform: translateY(0);
   }
 }
-

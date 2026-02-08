@@ -1,22 +1,15 @@
 {
-    "compilerOptions": {
-        "target": "ES2020",
-        "module": "ESNext",
-        "moduleResolution": "node",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "outDir": "./dist",
-        "lib": [
-            "dom",
-            "esnext"
-        ],
-        "types": [
-            "@edenapp/types/global"
-        ]
-    },
-    "include": [
-        "./**/*.ts"
-    ]
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "lib": ["dom", "esnext"],
+    "types": ["@edenapp/types/global"]
+  },
+  "include": ["./**/*.ts"]
 }

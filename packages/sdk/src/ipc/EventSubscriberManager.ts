@@ -1,13 +1,17 @@
-import { ViewManager } from "../view-manager/ViewManager";
-import { BackendManager } from "../process-manager/BackendManager";
-import { PermissionRegistry, getEventPermission } from "./PermissionRegistry";
-import { EventName, EventData } from "@edenapp/types";
-
+import type { EventData, EventName } from "@edenapp/types";
+import { log } from "../logging";
+import type { BackendManager } from "../process-manager/BackendManager";
+import type { ViewManager } from "../view-manager/ViewManager";
+import {
+  getEventPermission,
+  type PermissionRegistry,
+} from "./PermissionRegistry";
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private backendManager?: BackendManager;
   private subscriptions: Map<string, Set<number>> = new Map();
   private backendSubscriptions: Map<string, Set<string>> = new Map();
+  private foundationSubscriptions: Map<string, boolean> = new Map();
   private internalSubscriptions: Map<string, Set<(payload: any) => void>> =
     new Map();
   private permissionRegistry?: PermissionRegistry;
@@ -36,7 +40,7 @@ export class EventSubscriberManager {
   public subscribe(viewId: number, eventName: string): boolean {
     const viewInfo = this.viewManager.getViewInfo(viewId);
     if (!viewInfo) {
-      console.warn(`Cannot subscribe: view ${viewId} not found`);
+      log.warn(`Cannot subscribe: view ${viewId} not found`);
       return false;
     }
 
@@ -46,11 +50,11 @@ export class EventSubscriberManager {
       if (
         !this.permissionRegistry.hasPermission(
           viewInfo.appId,
-          requiredPermission
+          requiredPermission,
         )
       ) {
         throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
         );
       }
     }
@@ -60,9 +64,20 @@ export class EventSubscriberManager {
     }
 
     this.subscriptions.get(eventName)!.add(viewId);
-    console.log(
-      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`
+    log.info(
+      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
     );
+    return true;
+  }
+
+  /**
+   * Subscribe foundation to an event
+   */
+  public subscribeFoundation(eventName: string): boolean {
+    if (!this.foundationSubscriptions.has(eventName)) {
+      this.foundationSubscriptions.set(eventName, true);
+      log.info(`Foundation subscribed to event: ${eventName}`);
+    }
     return true;
   }
 
@@ -75,7 +90,7 @@ export class EventSubscriberManager {
     if (requiredPermission && this.permissionRegistry) {
       if (!this.permissionRegistry.hasPermission(appId, requiredPermission)) {
         throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`
+          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
         );
       }
     }
@@ -85,7 +100,7 @@ export class EventSubscriberManager {
     }
 
     this.backendSubscriptions.get(eventName)!.add(appId);
-    console.log(`Backend (${appId}) subscribed to event: ${eventName}`);
+    log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
     return true;
   }
 
@@ -95,7 +110,7 @@ export class EventSubscriberManager {
    */
   public subscribeInternal<T extends EventName>(
     event: T,
-    callback: (data: EventData<T>) => void
+    callback: (data: EventData<T>) => void,
   ): void {
     if (!this.internalSubscriptions.has(event)) {
       this.internalSubscriptions.set(event, new Set());
@@ -103,7 +118,7 @@ export class EventSubscriberManager {
     this.internalSubscriptions
       .get(event)!
       .add(callback as (payload: any) => void);
-    console.log(`Internal subscriber added for event: ${event}`);
+    log.info(`Internal subscriber added for event: ${event}`);
   }
 
   /**
@@ -121,9 +136,21 @@ export class EventSubscriberManager {
     }
 
     if (result) {
-      console.log(`View ${viewId} unsubscribed from event: ${eventName}`);
+      log.info(`View ${viewId} unsubscribed from event: ${eventName}`);
     }
     return result;
+  }
+
+  /**
+   * Unsubscribe foundation from an event
+   */
+  public unsubscribeFoundation(eventName: string): boolean {
+    if (this.foundationSubscriptions.has(eventName)) {
+      this.foundationSubscriptions.delete(eventName);
+      log.info(`Foundation unsubscribed from event: ${eventName}`);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -141,7 +168,7 @@ export class EventSubscriberManager {
     }
 
     if (result) {
-      console.log(`Backend (${appId}) unsubscribed from event: ${eventName}`);
+      log.info(`Backend (${appId}) unsubscribed from event: ${eventName}`);
     }
     return result;
   }
@@ -173,12 +200,17 @@ export class EventSubscriberManager {
         try {
           callback(payload);
         } catch (error) {
-          console.error(
-            `Error in internal subscriber for ${eventName}:`,
-            error
-          );
+          log.error(`Error in internal subscriber for ${eventName}:`, error);
         }
       }
+    }
+
+    // Notify foundation if subscribed
+    if (this.foundationSubscriptions.has(eventName)) {
+      this.viewManager.sendToMainWindow("shell-message", {
+        type: eventName,
+        payload,
+      });
     }
 
     // Notify view subscribers

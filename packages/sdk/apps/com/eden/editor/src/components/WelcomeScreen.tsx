@@ -9,6 +9,7 @@ function DocumentIcon() {
       stroke="currentColor"
       stroke-width="1.5"
     >
+      <title>{t("editor.title")}</title>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
       <polyline points="14 2 14 8 20 8"></polyline>
       <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -32,17 +33,25 @@ function ShortcutItem(props: ShortcutItemProps) {
   );
 }
 
+import { t } from "../i18n";
+
 export function WelcomeScreen() {
   return (
     <div class="welcome-content">
       <div class="empty-state-icon">
         <DocumentIcon />
       </div>
-      <h1>Text Editor</h1>
-      <p>Open a file from the Files app to start editing</p>
+      <h1>{t("editor.title")}</h1>
+      <p>{t("editor.welcome")}</p>
       <div class="welcome-shortcuts">
-        <ShortcutItem shortcut="Ctrl+S" description="Save file" />
-        <ShortcutItem shortcut="Ctrl+W" description="Close tab" />
+        <ShortcutItem
+          shortcut="Ctrl+S"
+          description={t("editor.saveShortcut")}
+        />
+        <ShortcutItem
+          shortcut="Ctrl+W"
+          description={t("editor.closeTabShortcut")}
+        />
       </div>
     </div>
   );

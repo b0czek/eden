@@ -9,11 +9,11 @@
   height: 8px;
   border-radius: 999px;
   overflow: hidden;
-  
+
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-light);
   -webkit-backdrop-filter: var(--eden-glass-light);
-  
+
   border: 1px solid var(--eden-color-border-light);
   position: relative;
 }
@@ -21,18 +21,30 @@
 .eden-progress-bar {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-accent-blue),
+    var(--eden-color-accent-blue-dark)
+  );
   transition: width var(--eden-duration-slow) var(--eden-transition-ease-out);
   box-shadow: 0 0 10px rgba(82, 163, 255, 0.5);
 }
 
 .eden-progress-bar-success {
-  background: linear-gradient(90deg, var(--eden-color-success), var(--eden-color-success-hover));
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-success),
+    var(--eden-color-success-hover)
+  );
   box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
 }
 
 .eden-progress-bar-danger {
-  background: linear-gradient(90deg, var(--eden-color-danger), var(--eden-color-danger-hover));
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-danger),
+    var(--eden-color-danger-hover)
+  );
   box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
 }
 
@@ -95,7 +107,8 @@
   stroke: var(--eden-color-accent-primary);
   stroke-width: 4;
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--eden-duration-slow) var(--eden-transition-ease-out);
+  transition: stroke-dashoffset var(--eden-duration-slow)
+    var(--eden-transition-ease-out);
 }
 
 .eden-progress-circle-text {
@@ -142,7 +155,7 @@
 }
 
 .eden-skeleton::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
@@ -183,4 +196,3 @@
   height: 40px;
   width: 120px;
 }
-

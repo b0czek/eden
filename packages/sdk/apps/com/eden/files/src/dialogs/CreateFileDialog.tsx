@@ -1,6 +1,7 @@
-import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
+import { createSignal } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 
 interface CreateFileDialogProps {
   show: boolean;
@@ -31,7 +32,7 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
         props.onClose();
         setFileName("");
       }}
-      title="Create New File"
+      title={t("files.newFile")}
       size="sm"
       footer={
         <>
@@ -42,16 +43,16 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
               setFileName("");
             }}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button class="eden-btn eden-btn-primary" onClick={handleCreate}>
-            Create
+            {t("common.ok")}
           </button>
         </>
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">File Name</label>
+        <label class="eden-form-label">{t("common.name")}</label>
         <input
           type="text"
           class="eden-input"
@@ -60,9 +61,7 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
           onInput={(e) => setFileName(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
         />
-        <p class="eden-form-help">
-          Include file extension (e.g., .txt, .js, .md)
-        </p>
+        <p class="eden-form-help">{t("files.extensionHelp")}</p>
       </div>
     </Modal>
   );

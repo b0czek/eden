@@ -6,7 +6,7 @@
  * Handles timeout/pause logic locally.
  */
 
-import type { WindowSize, ViewBounds, Notification } from "@edenapp/types";
+import type { Notification, ViewBounds, WindowSize } from "@edenapp/types";
 
 // Configuration
 interface ToasterConfig {
@@ -291,7 +291,7 @@ function doPauseToast(toast: ActiveToast): void {
 
   // Pause the progress bar animation
   const progressBar = toast.element.querySelector(
-    ".eden-progress-bar"
+    ".eden-progress-bar",
   ) as HTMLElement;
   if (progressBar) {
     progressBar.style.animationPlayState = "paused";
@@ -309,7 +309,7 @@ function doResumeToast(toast: ActiveToast): void {
 
   // Resume the progress bar animation
   const progressBar = toast.element.querySelector(
-    ".eden-progress-bar"
+    ".eden-progress-bar",
   ) as HTMLElement;
   if (progressBar) {
     progressBar.style.animationPlayState = "running";
@@ -434,7 +434,7 @@ function handleToastAdded(data: { notification: Notification }): void {
     pendingQueue.push(notification);
     updateDismissAllButton();
     console.log(
-      `Toast queued: ${notification.id} (${pendingQueue.length} pending)`
+      `Toast queued: ${notification.id} (${pendingQueue.length} pending)`,
     );
   }
 }
@@ -457,7 +457,7 @@ async function init(): Promise<void> {
     (data: { windowSize: WindowSize }) => {
       windowSize = data.windowSize;
       updateOverlayBounds();
-    }
+    },
   );
 
   // Initial bounds (0x0)

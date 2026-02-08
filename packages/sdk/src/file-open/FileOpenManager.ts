@@ -1,13 +1,14 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import { injectable, inject, singleton } from "tsyringe";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import type { FileHandlerInfo, FileOpenResult } from "@edenapp/types";
+import { inject, injectable, singleton } from "tsyringe";
+import { FilesystemManager } from "../filesystem";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { log } from "../logging";
 import { PackageManager } from "../package-manager";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
-import { FilesystemManager } from "../filesystem";
-import { IPCBridge, CommandRegistry, EdenNamespace, EdenEmitter } from "../ipc";
 import { FileOpenHandler } from "./FileOpenHandler";
-import type { FileOpenResult, FileHandlerInfo } from "@edenapp/types";
 
 /**
  * Events emitted by the FileOpenManager
@@ -45,7 +46,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
     this.userDirectory = userDirectory;
@@ -63,8 +64,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   async initialize(): Promise<void> {
     await this.loadUserPreferences();
-    console.log(
-      `FileOpenManager initialized with ${this.userPreferences.size} user preferences`
+    log.info(
+      `FileOpenManager initialized with ${this.userPreferences.size} user preferences`,
     );
   }
 
@@ -176,7 +177,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   getHandler(
     filePath: string,
-    isDirectory: boolean = false
+    isDirectory: boolean = false,
   ): string | undefined {
     const key = isDirectory
       ? FileOpenManager.DIRECTORY_KEY
@@ -225,6 +226,16 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   }
 
   /**
+   * Helper to resolve localized app name to string
+   */
+  private getAppName(name: string | Record<string, string>): string {
+    if (typeof name === "string") {
+      return name;
+    }
+    return name.en || Object.values(name)[0] || "Unknown App";
+  }
+
+  /**
    * Get all apps that can handle a specific extension
    */
   getSupportedHandlers(extension: string): FileHandlerInfo[] {
@@ -240,7 +251,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
           if (handler.extensions.map((e) => e.toLowerCase()).includes(ext)) {
             handlers.push({
               appId: app.id,
-              appName: app.name,
+              appName: this.getAppName(app.name),
               handlerName: handler.name,
               icon: handler.icon || app.icon,
             });
@@ -256,7 +267,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       if (app) {
         handlers.push({
           appId: app.id,
-          appName: app.name,
+          appName: this.getAppName(app.name),
         });
       }
     }

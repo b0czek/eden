@@ -1,0 +1,37 @@
+/* ===== Apps List Screen ===== */
+.apps-management {
+  flex: 1;
+  min-height: 0;
+}
+
+.app-list-icon-img {
+  width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
+  object-fit: contain;
+}
+
+/* ===== App Detail Icons ===== */
+.app-detail-icon {
+  width: var(--eden-space-2xl);
+  height: var(--eden-space-2xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-surface-tertiary);
+  color: var(--eden-color-text-tertiary);
+  overflow: hidden;
+  box-shadow: var(--eden-shadow-inner);
+  flex-shrink: 0;
+}
+
+.app-detail-icon-no-bg {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-detail-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

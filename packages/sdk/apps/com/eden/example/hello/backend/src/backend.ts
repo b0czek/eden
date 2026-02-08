@@ -12,6 +12,8 @@ const appId = process.env.EDEN_APP_ID;
 console.log(`Hello World backend starting for ${appId}`);
 console.log("Install path:", process.env.EDEN_INSTALL_PATH);
 
+const helloGrantId = "say-hello";
+
 // State
 let messageCount = 0;
 
@@ -35,7 +37,15 @@ appAPI.handle("get-status", (_payload) => {
   };
 });
 
-appAPI.handle("hello", (payload) => {
+appAPI.handle("hello", async (payload) => {
+  const grant = `app/${appId}/${helloGrantId}`;
+  const result = await worker!.edenAPI.shellCommand("user/has-grant", {
+    grant,
+  });
+  if (!result?.allowed) {
+    throw new Error("Missing grant: say hello");
+  }
+
   // payload.message is typed as string
   return {
     message: `Hello from backend! You said: ${payload.message}`,

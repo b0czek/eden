@@ -1,6 +1,6 @@
 /**
  * Eden Design System - List Components
- * Frosted glass styled lists and menus
+ * Frosted glass styled lists
  */
 
 /* ===== Base List ===== */
@@ -8,16 +8,20 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  
+
   border-radius: var(--eden-radius-lg);
   overflow: hidden;
-  
+
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
-  
+
   border: 1px solid var(--eden-color-border-light);
   box-shadow: var(--eden-shadow-md);
+
+  /* Make every list scrollable by default */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* ===== List Item ===== */
@@ -93,92 +97,17 @@
   flex-shrink: 0;
 }
 
-/* ===== Menu ===== */
-.eden-menu {
-  list-style: none;
-  padding: var(--eden-space-sm);
-  margin: 0;
-  
-  border-radius: var(--eden-radius-lg);
-  
-  background: var(--eden-color-bg-glass-strong);
-  backdrop-filter: var(--eden-glass-ultra);
-  -webkit-backdrop-filter: var(--eden-glass-ultra);
-  
-  border: 1px solid var(--eden-color-border-medium);
-  box-shadow: var(--eden-shadow-xl);
-  
-  min-width: 200px;
-}
-
-.eden-menu-item {
-  padding: var(--eden-space-sm) var(--eden-space-md);
-  border-radius: var(--eden-radius-sm);
-  cursor: pointer;
-  transition: all var(--eden-transition-fast);
-  color: var(--eden-color-text-primary);
-  display: flex;
-  align-items: center;
-  gap: var(--eden-space-sm);
-  font-size: var(--eden-font-size-md);
-  user-select: none;
-}
-
-.eden-menu-item:hover {
-  background: var(--eden-color-surface-hover);
-}
-
-.eden-menu-item-active {
-  background: var(--eden-color-surface-active);
-  color: var(--eden-color-accent-primary);
-}
-
-.eden-menu-divider {
-  height: 1px;
-  background: var(--eden-color-border-light);
-  margin: var(--eden-space-sm) 0;
-}
-
-.eden-menu-title {
-  padding: var(--eden-space-sm) var(--eden-space-md);
-  font-size: var(--eden-font-size-xs);
-  font-weight: var(--eden-font-weight-semibold);
-  color: var(--eden-color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--eden-font-letter-spacing-wide);
-}
-
-/* ===== Dropdown Menu ===== */
-.eden-dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-.eden-dropdown-menu {
-  position: absolute;
-  top: calc(100% + var(--eden-space-sm));
-  left: 0;
-  z-index: var(--eden-z-dropdown);
-  
-  animation: eden-fade-in var(--eden-duration-fast) var(--eden-transition-ease-out);
-}
-
-.eden-dropdown-menu-right {
-  left: auto;
-  right: 0;
-}
-
 /* ===== Steps List ===== */
 .eden-steps {
   display: flex;
   align-items: center;
   gap: var(--eden-space-md);
   padding: var(--eden-space-lg);
-  
+
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   -webkit-backdrop-filter: var(--eden-glass-medium);
-  
+
   border-radius: var(--eden-radius-lg);
   border: 1px solid var(--eden-color-border-light);
 }
@@ -192,7 +121,7 @@
 }
 
 .eden-step::after {
-  content: '';
+  content: "";
   position: absolute;
   left: calc(100% + var(--eden-space-sm));
   width: var(--eden-space-md);
@@ -239,4 +168,3 @@
   color: var(--eden-color-text-primary);
   font-weight: var(--eden-font-weight-medium);
 }
-

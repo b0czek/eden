@@ -1,6 +1,6 @@
-import { AppInstance, LaunchResult, ViewBounds } from "@edenapp/types";
+import type { AppInstance, LaunchResult, ViewBounds } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
-import { ProcessManager } from "./ProcessManager";
+import type { ProcessManager } from "./ProcessManager";
 
 @EdenNamespace("process")
 export class ProcessHandler {

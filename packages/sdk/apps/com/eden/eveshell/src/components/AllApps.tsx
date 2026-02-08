@@ -1,26 +1,18 @@
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { contextMenu, type Menu } from "@edenapp/tablets";
+import { createSignal, For, onMount, Show } from "solid-js";
+import { t } from "../i18n";
+import type { AppInfo } from "../types";
 import AppIcon from "./AppIcon";
-import AppContextMenu, { ContextMenuData } from "./AppContextMenu";
-import { AppInfo } from "../types";
 
 interface AllAppsProps {
   apps: AppInfo[];
   onClose: () => void;
   onAppClick: (appId: string) => Promise<void> | void;
-  onStopApp: (appId: string) => Promise<void> | void;
-  onUninstallApp: (appId: string) => Promise<void> | void;
-  isAppPinned: (appId: string) => boolean;
-  onAddToDock: (appId: string) => Promise<void> | void;
-  onRemoveFromDock: (appId: string) => Promise<void> | void;
+  appMenu: Menu<AppInfo>;
 }
 
 export default function AllApps(props: AllAppsProps) {
   const [searchQuery, setSearchQuery] = createSignal("");
-  const [contextMenu, setContextMenu] = createSignal<ContextMenuData | null>(null);
-  const [longPressTimer, setLongPressTimer] = createSignal<number | null>(null);
-  const [isClosing, setIsClosing] = createSignal(false);
-  const EXIT_ANIMATION_MS = 280;
-  let exitTimer: number | undefined;
   let searchInputRef: HTMLInputElement | undefined;
 
   const filteredApps = () => {
@@ -29,7 +21,7 @@ export default function AllApps(props: AllAppsProps) {
     return props.apps.filter(
       (app) =>
         app.name.toLowerCase().includes(query) ||
-        app.id.toLowerCase().includes(query)
+        app.id.toLowerCase().includes(query),
     );
   };
 
@@ -37,37 +29,13 @@ export default function AllApps(props: AllAppsProps) {
     searchInputRef?.focus();
   });
 
-  onCleanup(() => {
-    const timer = longPressTimer();
-    if (timer) clearTimeout(timer);
-    if (exitTimer) clearTimeout(exitTimer);
-  });
-
-  function clearLongPressTimer() {
-    const timer = longPressTimer();
-    if (timer) {
-      clearTimeout(timer);
-      setLongPressTimer(null);
-    }
-  }
-
-  function triggerClose() {
-    if (isClosing()) return;
-    setContextMenu(null);
-    setIsClosing(true);
-    exitTimer = window.setTimeout(() => {
-      props.onClose();
-      exitTimer = undefined;
-    }, EXIT_ANIMATION_MS);
-  }
-
-  function handleOverlayClick() {
-    if (isClosing()) return;
-    triggerClose();
+  function handleClose() {
+    void contextMenu.close();
+    props.onClose();
   }
 
   async function handleTileClick(appId: string) {
-    if (!isClosing()) triggerClose();
+    handleClose();
 
     // Show all running apps when clicking a tile
     const runningAppIds = props.apps
@@ -87,41 +55,8 @@ export default function AllApps(props: AllAppsProps) {
     await props.onAppClick(appId);
   }
 
-  function handleContextMenu(
-    e: MouseEvent,
-    appId: string,
-    appName: string,
-    isRunning: boolean
-  ) {
-    if (isClosing()) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ appId, appName, isRunning, left: e.clientX, top: e.clientY });
-  }
-
-  function handleLongPressStart(
-    e: TouchEvent | MouseEvent,
-    appId: string,
-    appName: string,
-    isRunning: boolean
-  ) {
-    if (isClosing()) return;
-    const timer = window.setTimeout(() => {
-      const clientX =
-        "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY =
-        "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      setContextMenu({ appId, appName, isRunning, left: clientX, top: clientY });
-    }, 500);
-    setLongPressTimer(timer);
-  }
-
-  function handleLongPressEnd() {
-    clearLongPressTimer();
-  }
-
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") triggerClose();
+    if (e.key === "Escape") handleClose();
   }
 
   return (
@@ -129,15 +64,13 @@ export default function AllApps(props: AllAppsProps) {
       {/* Main overlay - uses eden-modal-overlay but without blur */}
       <div
         class="eden-modal-overlay"
-        classList={{ closing: isClosing() }}
         style="background: rgba(0,0,0,0.4); backdrop-filter: none;"
-        onClick={handleOverlayClick}
+        onClick={handleClose}
         onKeyDown={handleKeyDown}
       >
         {/* Floating island - uses eden-modal as base */}
         <div
           class="eden-modal eden-modal-lg"
-          classList={{ closing: isClosing() }}
           style="max-height: 70vh; background: var(--eden-color-surface-primary);"
           onClick={(e) => e.stopPropagation()}
         >
@@ -148,7 +81,7 @@ export default function AllApps(props: AllAppsProps) {
                 ref={searchInputRef}
                 type="text"
                 class="eden-input"
-                placeholder="Search apps..."
+                placeholder={t("shell.searchApps")}
                 value={searchQuery()}
                 onInput={(e) => setSearchQuery(e.currentTarget.value)}
               />
@@ -163,30 +96,8 @@ export default function AllApps(props: AllAppsProps) {
                   <div
                     class="all-apps-tile eden-interactive"
                     classList={{ running: app.isRunning }}
-                    onClick={async () => {
-                      if (contextMenu() || isClosing()) return;
-                      await handleTileClick(app.id);
-                    }}
-                    onContextMenu={(e) =>
-                      handleContextMenu(e, app.id, app.name, app.isRunning)
-                    }
-                    onMouseDown={(e) => {
-                      if (e.button === 0) {
-                        handleLongPressStart(
-                          e,
-                          app.id,
-                          app.name,
-                          app.isRunning
-                        );
-                      }
-                    }}
-                    onMouseUp={handleLongPressEnd}
-                    onMouseLeave={handleLongPressEnd}
-                    onTouchStart={(e) =>
-                      handleLongPressStart(e, app.id, app.name, app.isRunning)
-                    }
-                    onTouchEnd={handleLongPressEnd}
-                    onTouchCancel={handleLongPressEnd}
+                    onClick={() => handleTileClick(app.id)}
+                    onContextMenu={props.appMenu.handler(app)}
                   >
                     <AppIcon
                       appId={app.id}
@@ -201,28 +112,13 @@ export default function AllApps(props: AllAppsProps) {
                   class="eden-text-tertiary eden-text-md"
                   style="grid-column: 1 / -1; text-align: center; padding: var(--eden-space-2xl);"
                 >
-                  No apps found
+                  {t("shell.noAppsFound")}
                 </div>
               </Show>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Context menu */}
-      <Show when={contextMenu()}>
-        {(menu) => (
-          <AppContextMenu
-            menu={menu()}
-            isAppPinned={props.isAppPinned}
-            onStopApp={props.onStopApp}
-            onAddToDock={props.onAddToDock}
-            onRemoveFromDock={props.onRemoveFromDock}
-            onUninstallApp={props.onUninstallApp}
-            onClose={() => setContextMenu(null)}
-          />
-        )}
-      </Show>
     </>
   );
 }

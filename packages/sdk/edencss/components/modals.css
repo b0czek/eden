@@ -8,17 +8,18 @@
   position: fixed;
   inset: 0;
   z-index: var(--eden-z-modal);
-  
+
   background: var(--eden-color-bg-overlay);
   backdrop-filter: var(--eden-glass-strong);
   -webkit-backdrop-filter: var(--eden-glass-strong);
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--eden-space-2xl);
-  
-  animation: eden-fade-in var(--eden-duration-normal) var(--eden-transition-ease-out);
+
+  animation: eden-fade-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
 }
 
 /* ===== Modal Container ===== */
@@ -27,21 +28,22 @@
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
-  
+
   border-radius: var(--eden-radius-2xl);
-  
+
   /* Ultra frosted glass effect */
   background: var(--eden-color-bg-glass-strong);
   backdrop-filter: var(--eden-glass-ultra);
   -webkit-backdrop-filter: var(--eden-glass-ultra);
-  
+
   border: 1px solid var(--eden-color-border-medium);
   box-shadow: var(--eden-shadow-2xl);
-  
+
   display: flex;
   flex-direction: column;
-  
-  animation: eden-scale-in var(--eden-duration-normal) var(--eden-transition-ease-out);
+
+  animation: eden-scale-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
   overflow: hidden;
 }
 
@@ -158,20 +160,21 @@
   z-index: var(--eden-z-tooltip);
   padding: var(--eden-space-sm) var(--eden-space-md);
   border-radius: var(--eden-radius-sm);
-  
+
   background: var(--eden-color-surface-secondary);
   backdrop-filter: var(--eden-glass-strong);
   -webkit-backdrop-filter: var(--eden-glass-strong);
-  
+
   border: 1px solid var(--eden-color-border-light);
   box-shadow: var(--eden-shadow-lg);
-  
+
   font-size: var(--eden-font-size-sm);
   color: var(--eden-color-text-primary);
   white-space: nowrap;
-  
+
   pointer-events: none;
-  animation: eden-fade-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+  animation: eden-fade-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
 }
 
 /* ===== Popover ===== */
@@ -182,17 +185,18 @@
   max-width: 400px;
   border-radius: var(--eden-radius-lg);
   padding: var(--eden-space-lg);
-  
+
   background: var(--eden-color-bg-glass-strong);
   backdrop-filter: var(--eden-glass-ultra);
   -webkit-backdrop-filter: var(--eden-glass-ultra);
-  
+
   border: 1px solid var(--eden-color-border-medium);
   box-shadow: var(--eden-shadow-xl);
-  
+
   color: var(--eden-color-text-primary);
-  
-  animation: eden-scale-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+
+  animation: eden-scale-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
 }
 
 .eden-popover-title {
@@ -204,4 +208,3 @@
   font-size: var(--eden-font-size-sm);
   color: var(--eden-color-text-secondary);
 }
-

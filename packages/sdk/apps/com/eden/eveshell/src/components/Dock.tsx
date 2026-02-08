@@ -1,16 +1,21 @@
-import { For, Show, createSignal, onMount } from "solid-js";
+import type { Menu } from "@edenapp/tablets";
+import type { UserProfile } from "@edenapp/types";
+import { createSignal, For, onMount, Show } from "solid-js";
+import appsViewIcon from "../../assets/apps-grid-icon.svg";
+import { t } from "../i18n";
+import type { AppInfo } from "../types";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
-import { AppInfo } from "../types";
-import { ContextMenuData } from "./AppContextMenu";
-import appsViewIcon from "../../assets/apps-grid-icon.svg";
+import UserBadge from "./UserBadge";
 
 interface DockProps {
-  runningApps: AppInfo[];  // Running apps that are NOT pinned
-  pinnedApps: AppInfo[];   // Pinned apps (may or may not be running)
+  runningApps: AppInfo[]; // Running apps that are NOT pinned
+  pinnedApps: AppInfo[]; // Pinned apps (may or may not be running)
+  currentUser: UserProfile | null;
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
-  onContextMenu: (menu: ContextMenuData) => void;
+  userMenu: Menu<UserProfile | null>;
+  appMenu: Menu<AppInfo>;
 }
 
 export default function Dock(props: DockProps) {
@@ -27,7 +32,6 @@ export default function Dock(props: DockProps) {
 
   function handleMouseMove(e: MouseEvent) {
     if (!containerRef) return;
-    const bounds = containerRef.getBoundingClientRect();
     const mouseX = e.clientX;
 
     const sigma = 70; // cursor influence radius (px)
@@ -70,6 +74,14 @@ export default function Dock(props: DockProps) {
   return (
     <div class="dock" classList={{ "dock-initial": isInitial() }} ref={dockRef}>
       <div class="dock-left">
+        <div class="dock-user">
+          <UserBadge
+            user={props.currentUser}
+            onClick={props.userMenu.handler(() => props.currentUser)}
+          />
+        </div>
+      </div>
+      <div class="dock-center">
         <div
           class="app-icons magnify"
           ref={containerRef}
@@ -84,25 +96,18 @@ export default function Dock(props: DockProps) {
                 appName={app.name}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  props.onContextMenu({
-                    appId: app.id,
-                    appName: app.name,
-                    isRunning: app.isRunning,
-                    left: e.clientX,
-                    bottom: 72,
-                  });
-                }}
+                onContextMenu={props.appMenu.handler(app)}
               />
             )}
           </For>
-          
+
           {/* Separator between running and pinned */}
-          <Show when={props.runningApps.length > 0 && props.pinnedApps.length > 0}>
+          <Show
+            when={props.runningApps.length > 0 && props.pinnedApps.length > 0}
+          >
             <div class="separator"></div>
           </Show>
-          
+
           {/* Pinned apps */}
           <For each={props.pinnedApps}>
             {(app) => (
@@ -111,29 +116,21 @@ export default function Dock(props: DockProps) {
                 appName={app.name}
                 isRunning={app.isRunning}
                 onClick={() => props.onAppClick(app.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  console.log(e.clientX, e.clientY);
-                  props.onContextMenu({
-                    appId: app.id,
-                    appName: app.name,
-                    isRunning: app.isRunning,
-                    left: e.clientX,
-                    bottom: 72,
-                  });
-                }}
+                onContextMenu={props.appMenu.handler(app)}
               />
             )}
           </For>
-          
+
           {/* Separator before All Apps button */}
-          <Show when={props.runningApps.length > 0 || props.pinnedApps.length > 0}>
+          <Show
+            when={props.runningApps.length > 0 || props.pinnedApps.length > 0}
+          >
             <div class="separator"></div>
           </Show>
-          
+
           <AppIcon
             appId="apps-view"
-            appName="All Apps"
+            appName={t("shell.allApps")}
             icon={appsViewIcon}
             onClick={props.onShowAllApps}
           />

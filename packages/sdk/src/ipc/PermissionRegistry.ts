@@ -1,27 +1,76 @@
+import { log } from "../logging";
+
 /**
  * PermissionRegistry
  *
  * Central registry for managing app permissions at runtime.
+ * Tracks:
+ * - Base permissions: what the app always has (from manifest.permissions)
+ * - Grant permissions: what the app CAN have if the user has the grant (from manifest.grants)
+ *
  * Supports glob patterns for permission matching:
  * - "fs/read" matches exactly "fs/read"
  * - "fs/*" matches any permission starting with "fs/"
  * - "*" matches all permissions
  */
 
-import { singleton, injectable } from "tsyringe";
+import type { ResolvedGrant } from "@edenapp/types";
+import { injectable, singleton } from "tsyringe";
+
+/**
+ * Per-app permission state
+ */
+interface AppPermissionState {
+  /** Base permissions from manifest - always available when app runs */
+  basePermissions: Set<string>;
+  /** Grants: grantKey → permissions it unlocks */
+  grants: Map<string, { permissions: Set<string> }>;
+}
 
 @singleton()
 @injectable()
 export class PermissionRegistry {
-  private appPermissions: Map<string, Set<string>> = new Map();
+  private apps: Map<string, AppPermissionState> = new Map();
 
   /**
-   * Register permissions for an app (called during install/load)
+   * Register permissions for an app from manifest data.
+   * Grants should be pre-resolved via normalizeGrantPresets.
    */
-  registerApp(appId: string, permissions: string[]): void {
-    this.appPermissions.set(appId, new Set(permissions));
-    console.log(
-      `[PermissionRegistry] Registered ${permissions.length} permissions for ${appId}`
+  registerApp(
+    appId: string,
+    permissions?: string[],
+    grants?: ResolvedGrant[],
+  ): void {
+    const basePermissions = new Set(
+      Array.isArray(permissions) ? permissions : [],
+    );
+
+    const grantMap = new Map<string, { permissions: Set<string> }>();
+    for (const grant of grants ?? []) {
+      if (!grant.id || grant.permissions.length === 0) {
+        continue;
+      }
+
+      // Build grant key based on scope
+      const grantKey =
+        grant.scope === "preset"
+          ? `preset/${grant.id}`
+          : `app/${appId}/${grant.id}`;
+
+      grantMap.set(grantKey, {
+        permissions: new Set(grant.permissions),
+      });
+    }
+
+    if (basePermissions.size === 0 && grantMap.size === 0) {
+      this.unregisterApp(appId);
+      return;
+    }
+
+    this.apps.set(appId, { basePermissions, grants: grantMap });
+
+    log.info(
+      `Registered app ${appId} (${basePermissions.size} base, ${grantMap.size} grants)`,
     );
   }
 
@@ -29,68 +78,67 @@ export class PermissionRegistry {
    * Unregister app permissions (called during uninstall)
    */
   unregisterApp(appId: string): void {
-    this.appPermissions.delete(appId);
-    console.log(`[PermissionRegistry] Unregistered permissions for ${appId}`);
+    this.apps.delete(appId);
+    log.info(`Unregistered permissions for ${appId}`);
   }
 
   /**
-   * Check if an app has a specific permission.
-   * Supports glob patterns in the app's granted permissions.
+   * Check if an app has a specific permission as a BASE permission.
+   * This does NOT check grants - use getRequiredGrantKeys for that.
    */
   hasPermission(appId: string, requiredPermission: string): boolean {
-    const permissions = this.appPermissions.get(appId);
-    if (!permissions) {
-      return false;
+    const state = this.apps.get(appId);
+    if (!state) return false;
+    return this.matchesAny(state.basePermissions, requiredPermission);
+  }
+
+  /**
+   * Return grant keys that would unlock a permission for this app.
+   * If the permission is a base permission, returns empty array.
+   * The caller should check if the user has any of these grants.
+   */
+  getRequiredGrantKeys(appId: string, requiredPermission: string): string[] {
+    const state = this.apps.get(appId);
+    if (!state) return [];
+
+    // If it's a base permission, no grant needed
+    if (this.matchesAny(state.basePermissions, requiredPermission)) {
+      return [];
     }
 
-    // Check for exact match first
-    if (permissions.has(requiredPermission)) {
-      return true;
-    }
-
-    // Check for glob patterns
-    for (const granted of permissions) {
-      if (this.matchesGlob(granted, requiredPermission)) {
-        return true;
+    // Find grants that would unlock this permission
+    const matching: string[] = [];
+    for (const [grantKey, grant] of state.grants) {
+      if (this.matchesAny(grant.permissions, requiredPermission)) {
+        matching.push(grantKey);
       }
     }
-
-    return false;
-  }
-
-  /**
-   * Match a glob pattern against a permission.
-   * - "*" matches everything
-   * - "namespace/*" matches anything starting with "namespace/"
-   */
-  private matchesGlob(pattern: string, permission: string): boolean {
-    // Wildcard matches everything
-    if (pattern === "*") {
-      return true;
-    }
-
-    // Namespace wildcard: "fs/*" matches "fs/read", "fs/write", etc.
-    if (pattern.endsWith("/*")) {
-      const namespace = pattern.slice(0, -2); // Remove "/*"
-      return permission.startsWith(namespace + "/");
-    }
-
-    return false;
-  }
-
-  /**
-   * Get all permissions for an app
-   */
-  getPermissions(appId: string): string[] {
-    const permissions = this.appPermissions.get(appId);
-    return permissions ? Array.from(permissions) : [];
+    return matching;
   }
 
   /**
    * Check if an app is registered
    */
   hasApp(appId: string): boolean {
-    return this.appPermissions.has(appId);
+    return this.apps.has(appId);
+  }
+
+  /**
+   * Check if any permission pattern matches the required permission.
+   */
+  private matchesAny(
+    permissions: Iterable<string>,
+    requiredPermission: string,
+  ): boolean {
+    for (const pattern of permissions) {
+      if (pattern === requiredPermission) return true;
+      if (pattern === "*") return true;
+      if (pattern.endsWith("/*")) {
+        const namespace = pattern.slice(0, -2);
+        if (requiredPermission.startsWith(`${namespace}/`)) return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -106,7 +154,7 @@ const EVENT_PERMISSIONS: Map<string, string> = new Map();
  */
 export function registerEventPermission(
   eventName: string,
-  permission: string
+  permission: string,
 ): void {
   EVENT_PERMISSIONS.set(eventName, permission);
 }

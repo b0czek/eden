@@ -1,6 +1,6 @@
+import type { FileStats, SearchResult } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { FilesystemManager } from "./FilesystemManager";
-import type { FileStats, SearchResult } from "@edenapp/types";
 
 /**
  * FilesystemHandler - Thin IPC layer for filesystem operations.
@@ -21,7 +21,7 @@ export class FilesystemHandler {
     const { path: targetPath, encoding = "utf-8" } = args;
     return await this.fsManager.readFile(
       targetPath,
-      encoding as BufferEncoding
+      encoding as BufferEncoding,
     );
   }
 
@@ -38,7 +38,7 @@ export class FilesystemHandler {
     await this.fsManager.writeFile(
       targetPath,
       content,
-      encoding as BufferEncoding
+      encoding as BufferEncoding,
     );
   }
 

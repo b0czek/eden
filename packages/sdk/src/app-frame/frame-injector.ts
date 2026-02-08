@@ -1,3 +1,5 @@
+import { log } from "../logging";
+
 /**
  * Eden App Frame Injector
  *
@@ -6,22 +8,22 @@
  */
 
 import {
-  createOverlay,
-  injectOverlay,
-  setupDarkMode,
-  setTitle,
-  getAppName,
-} from "./ui-builder.js";
-import {
   setupCloseButton,
   setupMinimizeButton,
   setupToggleModeButton,
 } from "./button-handlers.js";
+import {
+  createOverlay,
+  getAppName,
+  injectOverlay,
+  setTitle,
+  setupDarkMode,
+} from "./ui-builder.js";
 import { setupWindowDragging } from "./window-dragging.js";
 import { setupWindowResizing } from "./window-resizing.js";
 
-(function () {
-  console.log("[Eden Frame] Injection script started");
+(() => {
+  log.info("Injection script started");
 
   // Initialize edenFrame object if not exists
   if (!window.edenFrame) {
@@ -29,8 +31,12 @@ import { setupWindowResizing } from "./window-resizing.js";
       setTitle: (title: string) => {
         /* will be set later */
       },
+      resetTitle: () => {
+        /* will be set later */
+      },
       _internal: {
         appId: "",
+        appName: "" as string | Record<string, string>,
         injected: false,
         config: {},
         currentMode: "tiled",
@@ -41,7 +47,7 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Check if already injected
   if (window.edenFrame._internal.injected) {
-    console.log("[Eden Frame] Already injected, skipping");
+    log.info("Already injected, skipping");
     return;
   }
   window.edenFrame._internal.injected = true;
@@ -55,6 +61,9 @@ import { setupWindowResizing } from "./window-resizing.js";
     current: { x: number; y: number; width: number; height: number } | null;
   } = { current: null };
 
+  let cleanupDrag: (() => void) | null = null;
+  let cleanupResize: (() => void) | null = null;
+
   // Create the overlay
   const overlay = createOverlay(window.edenFrame._internal.config);
 
@@ -63,8 +72,51 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Get appId from injected config
     if (window.edenFrame && window.edenFrame._internal.appId) {
       appId = window.edenFrame._internal.appId;
-      appName = getAppName(appId);
-      setTitle(appName);
+      const rawName = window.edenFrame._internal.appName;
+
+      // Async fetch locale
+      window.edenAPI
+        .shellCommand("i18n/get-locale", {})
+        .then((response: { locale: string }) => {
+          const locale = response?.locale;
+          const currentLocale = locale || "en";
+          appName = getAppName(rawName, currentLocale);
+          setTitle(appName);
+
+          // Update resetTitle to use this locale
+          if (window.edenFrame) {
+            window.edenFrame.setTitle = (title: string) => setTitle(title);
+            (window.edenFrame as any).resetTitle = () => setTitle(appName);
+          }
+        })
+        .catch(() => {
+          appName = getAppName(rawName, "en");
+          setTitle(appName);
+          if (window.edenFrame) {
+            window.edenFrame.setTitle = (title: string) => setTitle(title);
+            (window.edenFrame as any).resetTitle = () => setTitle(appName);
+          }
+        });
+
+      // Set initial title (english fallback) to avoid empty title while fetching
+      setTitle(getAppName(rawName, "en"));
+
+      // Subscribe to locale changes for live updates
+      window.edenAPI.subscribe(
+        "i18n/locale-changed",
+        (data: { locale: string }) => {
+          const newLocale = data.locale;
+          const currentName = getAppName(rawName, newLocale);
+
+          // Update title
+          setTitle(currentName);
+
+          // Update resetTitle to use the new locale
+          if (window.edenFrame) {
+            (window.edenFrame as any).resetTitle = () => setTitle(currentName);
+          }
+        },
+      );
     }
 
     // Setup button handlers
@@ -79,12 +131,7 @@ import { setupWindowResizing } from "./window-resizing.js";
       "view/mode-changed",
       (data: { mode: "tiled" | "floating"; bounds: any }) => {
         const { mode, bounds } = data;
-        console.log(
-          "[Eden Frame] View mode changed to:",
-          mode,
-          "with bounds:",
-          bounds
-        );
+        log.info("View mode changed to:", mode, "with bounds:", bounds);
 
         // Update window mode and bounds
         window.edenFrame!._internal.currentMode = mode;
@@ -95,9 +142,9 @@ import { setupWindowResizing } from "./window-resizing.js";
 
         // Re-setup controls for new mode
         setupFloatingWindowControls();
-      }
+      },
     );
-    console.log("[Eden Frame] Subscribed to view/mode-changed");
+    log.info("Subscribed to view/mode-changed");
   };
 
   const setupFloatingWindowControls = (): void => {
@@ -105,27 +152,28 @@ import { setupWindowResizing } from "./window-resizing.js";
     const windowConfig = window.edenFrame!._internal.config;
     const initialBounds = window.edenFrame!._internal.bounds;
 
-    console.log(
-      "[Eden Frame] Window mode:",
-      windowMode,
-      "Config:",
-      windowConfig,
-      "Initial bounds:",
-      initialBounds
-    );
+    log.info("Window mode:", initialBounds);
+
+    // Clean up previous controls if they exist (crucial for mode switching)
+    if (cleanupDrag) {
+      cleanupDrag();
+      cleanupDrag = null;
+    }
+    if (cleanupResize) {
+      cleanupResize();
+      cleanupResize = null;
+    }
 
     // Only enable dragging/resizing for floating windows
     if (windowMode !== "floating") {
+      // If we are not floating, we just returned after cleanup, so handles are gone.
       return;
     }
 
     // Initialize current bounds from the actual bounds set by ViewManager
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      console.log(
-        "[Eden Frame] Initialized bounds from backend:",
-        currentBoundsRef.current
-      );
+      log.info("Initialized bounds from backend:", currentBoundsRef.current);
     } else if (windowConfig.defaultSize) {
       // Fallback to config if no initial bounds provided
       const workspaceX = 0;
@@ -141,26 +189,23 @@ import { setupWindowResizing } from "./window-resizing.js";
         height: windowConfig.defaultSize.height || 600,
       };
 
-      console.log(
-        "[Eden Frame] Initialized bounds from config:",
-        currentBoundsRef.current
-      );
+      log.info("Initialized bounds from config:", currentBoundsRef.current);
     }
 
     // Check if dragging is allowed
     const isMovable = windowConfig.movable !== false; // default true
     const isResizable = windowConfig.resizable !== false; // default true
 
-    console.log("[Eden Frame] Movable:", isMovable, "Resizable:", isResizable);
+    log.info("Movable:", isMovable, "Resizable:", isResizable);
 
     // Setup window dragging
     if (isMovable) {
-      setupWindowDragging(overlay, currentBoundsRef);
+      cleanupDrag = setupWindowDragging(overlay, currentBoundsRef);
     }
 
     // Setup window resizing
     if (isResizable) {
-      setupWindowResizing(windowConfig, currentBoundsRef);
+      cleanupResize = setupWindowResizing(windowConfig, currentBoundsRef);
     }
   };
 
@@ -170,24 +215,24 @@ import { setupWindowResizing } from "./window-resizing.js";
     currentBoundsRef.current = { ...newBounds };
     window.edenFrame!._internal.bounds = { ...newBounds };
   });
-  console.log("[Eden Frame] Subscribed to view/bounds-updated");
+  log.info("Subscribed to view/bounds-updated");
 
   // Add global touch handler to diagnose issues
   document.addEventListener(
     "touchstart",
     (e) => {
-      console.log("[Eden Frame] Global touchstart on:", e.target);
+      log.info("Global touchstart on:", e.target);
     },
-    { passive: false, capture: true }
+    { passive: false, capture: true },
   );
 
   document.addEventListener(
     "touchcancel",
     (e) => {
-      console.log("[Eden Frame] Global touchcancel on:", e.target);
-      console.log("[Eden Frame] Stack trace:", new Error().stack);
+      log.info("Global touchcancel on:", e.target);
+      log.info("Stack trace:", new Error().stack);
     },
-    { capture: true }
+    { capture: true },
   );
 
   // Inject overlay and setup handlers
@@ -199,5 +244,18 @@ import { setupWindowResizing } from "./window-resizing.js";
   // Expose API for apps to update the title
   window.edenFrame.setTitle = (title: string) => {
     setTitle(title);
+  };
+
+  // Expose resetTitle immediately (using English/default name initially)
+  // This will be updated to use the correct locale once fetched
+  window.edenFrame.resetTitle = () => {
+    // If locale hasn't loaded yet, getAppName will use 'en' fallback
+    if (window.edenFrame) {
+      const currentName = getAppName(
+        window.edenFrame._internal.appName || window.edenFrame._internal.appId,
+        "en",
+      );
+      setTitle(currentName);
+    }
   };
 })();

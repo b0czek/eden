@@ -1,0 +1,22 @@
+export const en = {
+  shell: {
+    allApps: "All Apps",
+    searchApps: "Search apps...",
+    noAppsFound: "No apps found",
+    openApp: "Open",
+    stopApp: "Stop App",
+    addToDock: "Add to Dock",
+    removeFromDock: "Remove from Dock",
+    signIn: "Sign in",
+    switchUser: "Switch User",
+    logout: "Log out",
+    currentUser: "Current",
+    changePassword: "Change password",
+    currentPassword: "Current password",
+    newPassword: "New password",
+    confirmPassword: "Confirm new password",
+    savePassword: "Save password",
+    passwordMismatch: "Passwords do not match",
+    passwordUpdateFailed: "Failed to update password",
+  },
+} as const;

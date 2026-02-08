@@ -1,16 +1,83 @@
 {
   "apps": [
-    { "id": "com.eden.eveshell", "source": "builtin" },
-    { "id": "com.eden.toaster", "source": "builtin" },
-    { "id": "com.eden.files", "source": "builtin" },
-    { "id": "com.eden.editor", "source": "builtin" },
-    { "id": "com.eden.example.calculator", "source": "builtin" },
-    { "id": "com.eden.example.showcase", "source": "builtin" },
-    { "id": "com.eden.settings", "source": "builtin" },
-    { "id": "com.eden.installer", "source": "builtin"}
+    {
+      "id": "com.eden.eveshell",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.login",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.toaster",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.context-menu",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.files",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.editor",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.calculator",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.example.showcase",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.example.hello",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.settings",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.users",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.installer",
+      "source": "builtin"
+    },
+    {
+      "id": "com.eden.webbrowser",
+      "source": "builtin"
+    }
   ],
+  "settings": {
+    "com.eden": {
+      "autostart.com.eden.eveshell": "true",
+      "autostart.com.eden.toaster": "true",
+      "autostart.com.eden.context-menu": "true"
+    }
+  },
   "hotReload": {
     "enabled": true,
     "debounce": 300
-  }
+  },
+  "users": [
+    {
+      "username": "vendor",
+      "name": "Vendor",
+      "role": "vendor",
+      "password": "vendor"
+    },
+    {
+      "username": "demo",
+      "name": "Demo User",
+      "role": "standard",
+      "password": "demo",
+      "grants": ["apps/launch/*", "settings/*"]
+    }
+  ],
+  "defaultUsername": "demo"
 }

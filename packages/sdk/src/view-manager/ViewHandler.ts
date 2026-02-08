@@ -1,7 +1,13 @@
-import { EdenHandler, EdenNamespace, IPCBridge, EdenEmitter } from "../ipc";
-import { ViewManager } from "./ViewManager";
+import type { ViewBounds, WindowSize } from "@edenapp/types";
+import {
+  EdenEmitter,
+  EdenHandler,
+  EdenNamespace,
+  type IPCBridge,
+} from "../ipc";
+import { log } from "../logging";
 import { MouseTracker } from "./MouseTracker";
-import { AppInstance, ViewBounds, WindowSize } from "@edenapp/types";
+import type { ViewManager } from "./ViewManager";
 
 /**
  * Events emitted by the ViewHandler
@@ -99,6 +105,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
       throw new Error(`App ${appId} is not running`);
     }
     this.viewManager.showView(viewIds[0]);
+    this.viewManager.focusView(viewIds[0]);
     return { success: true };
   }
 
@@ -218,12 +225,12 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   async handleGlobalMouseUp(): Promise<{ success: boolean }> {
     // Cleanup any active drag or resize operations when mouse is released
     if (this.dragState) {
-      console.log("[ViewHandler] Global mouseup - cleaning up drag state");
+      log.info("Global mouseup - cleaning up drag state");
       this.mouseTracker.unsubscribe(`drag-${this.dragState.appId}`);
       this.dragState = null;
     }
     if (this.resizeState) {
-      console.log("[ViewHandler] Global mouseup - cleaning up resize state");
+      log.info("Global mouseup - cleaning up resize state");
       this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
       this.resizeState = null;
     }
@@ -318,5 +325,33 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   @EdenHandler("window-size")
   async handleGetWindowSize(): Promise<WindowSize> {
     return this.viewManager.getWindowSize();
+  }
+
+  // ===================================================================
+  // Interface Scale Handlers
+  // ===================================================================
+
+  /**
+   * Set the interface scale (zoom factor) for all views.
+   * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
+   */
+  @EdenHandler("set-interface-scale")
+  async handleSetInterfaceScale(args: {
+    scale: string;
+  }): Promise<{ success: boolean }> {
+    const scaleNum = parseFloat(args.scale);
+    if (Number.isNaN(scaleNum)) {
+      throw new Error(`Invalid scale value: ${args.scale}`);
+    }
+    this.viewManager.setInterfaceScale(scaleNum);
+    return { success: true };
+  }
+
+  /**
+   * Get the current interface scale.
+   */
+  @EdenHandler("get-interface-scale")
+  async handleGetInterfaceScale(): Promise<{ scale: number }> {
+    return { scale: this.viewManager.getCurrentScale() };
   }
 }

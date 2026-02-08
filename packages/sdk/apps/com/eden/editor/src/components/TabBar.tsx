@@ -14,12 +14,13 @@ export function TabBar(props: TabBarProps) {
       <For each={props.tabs}>
         {(tab) => (
           <div
-            class={`editor-tab ${props.activeTabId === tab.id ? 'active' : ''} ${tab.isModified ? 'modified' : ''}`}
+            class={`editor-tab ${props.activeTabId === tab.id ? "active" : ""} ${tab.isModified ? "modified" : ""}`}
             onClick={() => props.onTabClick(tab)}
             role="tab"
           >
             <span class="tab-name">{tab.name}</span>
             <button
+              type="button"
               class="tab-close"
               onClick={(e: MouseEvent) => {
                 e.stopPropagation();

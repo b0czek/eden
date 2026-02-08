@@ -1,10 +1,10 @@
-import Keyv from "keyv";
+import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
-import * as path from "path";
-import { injectable, inject, singleton } from "tsyringe";
+import Keyv from "keyv";
+import { inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
+import { log } from "../logging";
 import { DbHandler } from "./DbHandler";
-
 /**
  * DbManager - Manages persistent key-value storage for Eden apps
  *
@@ -19,7 +19,7 @@ export class DbManager {
 
   constructor(
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject("appsDirectory") appsDirectory: string
+    @inject("appsDirectory") appsDirectory: string,
   ) {
     // Initialize Keyv with SQLite backend
     const dbPath = path.join(appsDirectory, "storage.db");
@@ -28,10 +28,10 @@ export class DbManager {
 
     // Handle errors
     this.keyv.on("error", (err) => {
-      console.error("[DbManager] Database error:", err);
+      log.error("Database error:", err);
     });
 
-    console.log(`[DbManager] Initialized storage at ${dbPath}`);
+    log.info(`Initialized storage at ${dbPath}`);
 
     // Create and register handler
     this.handler = new DbHandler(this);
@@ -71,9 +71,7 @@ export class DbManager {
     const value = await this.keyv.get(namespacedKey);
     // Runtime check: ensure we always return string or undefined
     if (value !== undefined && typeof value !== "string") {
-      console.warn(
-        `[DbManager] Non-string value found for key ${key}, converting to string`
-      );
+      log.warn(`Non-string value found for key ${key}, converting to string`);
       return String(value);
     }
     return value;
@@ -85,9 +83,7 @@ export class DbManager {
   async set(appId: string, key: string, value: string): Promise<void> {
     // Runtime check: ensure value is a string
     if (typeof value !== "string") {
-      throw new Error(
-        `[DbManager] Value must be a string, got ${typeof value}`
-      );
+      throw new Error(`Value must be a string, got ${typeof value}`);
     }
     const namespacedKey = this.getNamespacedKey(appId, key);
     await this.keyv.set(namespacedKey, value);
@@ -129,7 +125,7 @@ export class DbManager {
         }
       }
     } catch (error) {
-      console.warn("[DbManager] Iterator not supported or failed:", error);
+      log.warn("Iterator not supported or failed:", error);
     }
 
     return allKeys;

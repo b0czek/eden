@@ -24,11 +24,11 @@ body {
 .toast {
   min-width: 320px;
   max-width: 320px;
-  max-height: 400px; /* Clip very long messages */
+  max-height: 400px;
+  /* Clip very long messages */
   padding: var(--eden-space-lg) var(--eden-space-lg);
-  padding-bottom: calc(
-    var(--eden-space-lg) + var(--eden-space-sm) + 4px
-  ); /* Extra space for progress bar */
+  padding-bottom: calc(var(--eden-space-lg) + var(--eden-space-sm) + 4px);
+  /* Extra space for progress bar */
   overflow: hidden;
 
   /* Override eden-card-glass large shadow due to restricted view's size */
@@ -79,7 +79,8 @@ body {
   cursor: pointer;
   padding: var(--eden-space-xs);
   border-radius: var(--eden-radius-sm);
-  transition: color var(--eden-transition-fast),
+  transition:
+    color var(--eden-transition-fast),
     background var(--eden-transition-fast);
 }
 
@@ -112,6 +113,7 @@ body {
   from {
     width: 100%;
   }
+
   to {
     width: 0%;
   }

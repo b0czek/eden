@@ -1,0 +1,22 @@
+export const pl = {
+  shell: {
+    allApps: "Aplikacje",
+    searchApps: "Szukaj aplikacji...",
+    noAppsFound: "Nie znaleziono aplikacji",
+    openApp: "Otwórz",
+    stopApp: "Zatrzymaj Aplikację",
+    addToDock: "Dodaj do Docka",
+    removeFromDock: "Usuń z Docka",
+    signIn: "Zaloguj",
+    switchUser: "Przełącz użytkownika",
+    logout: "Wyloguj",
+    currentUser: "Aktualny",
+    changePassword: "Zmień hasło",
+    currentPassword: "Aktualne hasło",
+    newPassword: "Nowe hasło",
+    confirmPassword: "Potwierdź nowe hasło",
+    savePassword: "Zapisz hasło",
+    passwordMismatch: "Hasła nie są takie same",
+    passwordUpdateFailed: "Nie udało się zmienić hasła",
+  },
+} as const;

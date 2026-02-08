@@ -1,13 +1,12 @@
-import { WebContentsView, BrowserWindow, Rectangle as Bounds } from "electron";
-import * as path from "path";
-import { AppManifest, WindowConfig } from "@edenapp/types";
-import { ViewMode, ViewType, ViewInfo, Z_LAYERS } from "./types";
+import * as path from "node:path";
+import type { AppManifest, WindowConfig } from "@edenapp/types";
+import type { Rectangle as Bounds, WebContentsView } from "electron";
+import { log } from "../logging";
 import { cachedFileReader } from "../utils/cachedFileReader";
-import { ViewGuard, ViewLifecycle } from "./ViewLifecycle";
-import { TilingManager } from "./TilingManager";
-import { FloatingWindowController } from "./FloatingWindowController";
-import { DevToolsManager } from "./DevToolsManager";
-
+import type { FloatingWindowController } from "./FloatingWindowController";
+import type { TilingController } from "./TilingController";
+import { type ViewInfo, type ViewMode, type ViewType, Z_LAYERS } from "./types";
+import { createView } from "./viewLifecycle";
 /**
  * ViewCreator
  *
@@ -20,9 +19,8 @@ export class ViewCreator {
 
   constructor(
     private readonly basePath: string,
-    private readonly tilingManager: TilingManager,
+    private readonly tilingController: TilingController,
     private readonly floatingWindows: FloatingWindowController,
-    private readonly devToolsManager: DevToolsManager
   ) {}
 
   /**
@@ -56,7 +54,7 @@ export class ViewCreator {
    */
   private static embeddingHeadersFilter(
     details: Electron.OnHeadersReceivedListenerDetails,
-    callback: (response: Electron.HeadersReceivedResponse) => void
+    callback: (response: Electron.HeadersReceivedResponse) => void,
   ): void {
     const responseHeaders = { ...details.responseHeaders };
     for (const key of Object.keys(responseHeaders)) {
@@ -79,10 +77,10 @@ export class ViewCreator {
    */
   async injectEdenCSS(
     view: WebContentsView,
-    mode: "full" | "tokens"
+    mode: "full" | "tokens",
   ): Promise<boolean> {
     if (view.webContents.isDestroyed()) {
-      console.error("[ViewCreator] Cannot inject CSS - webContents destroyed");
+      log.error("Cannot inject CSS - webContents destroyed");
       return false;
     }
 
@@ -94,10 +92,10 @@ export class ViewCreator {
       const css = await cachedFileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
-      console.log(`[ViewCreator] Injected Eden CSS (${mode})`);
+      log.info(`Injected Eden CSS (${mode})`);
       return true;
     } catch (err) {
-      console.error("[ViewCreator] Failed to inject Eden CSS:", err);
+      log.error("Failed to inject Eden CSS:", err);
       return false;
     }
   }
@@ -109,14 +107,13 @@ export class ViewCreator {
   async injectAppFrame(
     view: WebContentsView,
     appId: string,
+    manifestName: string | Record<string, string>,
     viewMode: ViewMode,
     windowConfig?: WindowConfig,
-    bounds?: Bounds
+    bounds?: Bounds,
   ): Promise<boolean> {
     if (view.webContents.isDestroyed()) {
-      console.error(
-        "[ViewCreator] Cannot inject frame - webContents destroyed"
-      );
+      log.error("Cannot inject frame - webContents destroyed");
       return false;
     }
 
@@ -129,11 +126,11 @@ export class ViewCreator {
       // Inject bundled JavaScript
       const frameScriptPath = path.join(
         this.basePath,
-        "app-frame/frame-injector.js"
+        "app-frame/frame-injector.js",
       );
       const frameScript = await cachedFileReader.readAsync(
         frameScriptPath,
-        "utf-8"
+        "utf-8",
       );
 
       // Pre-populate window.edenFrame with config
@@ -141,11 +138,12 @@ export class ViewCreator {
         window.edenFrame = {
           _internal: {
             appId: "${appId}",
+            appName: ${JSON.stringify(manifestName)},
             injected: false,
             config: ${JSON.stringify(windowConfig || {})},
             currentMode: "${viewMode}",
             bounds: ${JSON.stringify(
-              bounds || { x: 0, y: 0, width: 0, height: 0 }
+              bounds || { x: 0, y: 0, width: 0, height: 0 },
             )}
           }
         };
@@ -154,10 +152,10 @@ export class ViewCreator {
       // Execute config initialization followed by frame script
       await view.webContents.executeJavaScript(configScript + frameScript);
 
-      console.log(`[ViewCreator] App frame injected (mode: ${viewMode})`);
+      log.info(`App frame injected (mode: ${viewMode})`);
       return true;
     } catch (error) {
-      console.error("[ViewCreator] Failed to inject app frame:", error);
+      log.error("Failed to inject app frame:", error);
       return false;
     }
   }
@@ -171,7 +169,7 @@ export class ViewCreator {
     appId: string,
     bounds: Bounds | undefined,
     windowConfig: WindowConfig | undefined,
-    existingViews: Iterable<ViewInfo>
+    existingViews: Iterable<ViewInfo>,
   ) {
     if (isOverlay) {
       return this.calculateOverlayBounds(appId, bounds, windowConfig);
@@ -188,14 +186,12 @@ export class ViewCreator {
   private calculateOverlayBounds(
     appId: string,
     bounds: Bounds | undefined,
-    windowConfig?: WindowConfig
+    windowConfig?: WindowConfig,
   ) {
     const zIndex = this.nextOverlayZIndex++;
     const viewBounds =
       bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
-    console.log(
-      `[ViewCreator] Creating overlay view for ${appId} at Z=${zIndex}`
-    );
+    log.info(`Creating overlay view for ${appId} at Z=${zIndex}`);
     return { viewBounds, zIndex, tileIndex: undefined };
   }
 
@@ -205,12 +201,12 @@ export class ViewCreator {
   private calculateFloatingAppBounds(
     appId: string,
     bounds: Bounds | undefined,
-    windowConfig?: WindowConfig
+    windowConfig?: WindowConfig,
   ) {
     const viewBounds =
       bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
     const zIndex = this.floatingWindows.getNextZIndex();
-    console.log(`[ViewCreator] Creating floating app view for ${appId}`);
+    log.info(`Creating floating app view for ${appId}`);
     return { viewBounds, zIndex, tileIndex: undefined };
   }
 
@@ -220,17 +216,17 @@ export class ViewCreator {
   private calculateTiledAppBounds(
     appId: string,
     bounds: Bounds | undefined,
-    existingViews: Iterable<ViewInfo>
+    existingViews: Iterable<ViewInfo>,
   ) {
-    console.log(`[ViewCreator] Creating tiled app view for ${appId}`);
+    log.info(`Creating tiled app view for ${appId}`);
 
-    if (this.tilingManager.isEnabled()) {
-      const tileIndex = this.tilingManager.getNextTileIndex(existingViews);
+    if (this.tilingController.isEnabled()) {
+      const tileIndex = this.tilingController.getNextTileIndex(existingViews);
       const visibleCount =
-        this.tilingManager.getVisibleTiledCount(existingViews) + 1;
-      const viewBounds = this.tilingManager.calculateTileBounds(
+        this.tilingController.getVisibleTiledCount(existingViews) + 1;
+      const viewBounds = this.tilingController.calculateTileBounds(
         tileIndex,
-        visibleCount
+        visibleCount,
       );
       return { viewBounds, tileIndex, zIndex: undefined };
     }
@@ -250,7 +246,7 @@ export class ViewCreator {
     installPath: string,
     bounds: Bounds | undefined,
     existingViews: Iterable<ViewInfo>,
-    launchArgs?: string[]
+    launchArgs?: string[],
   ): ViewInfo {
     // Extract manifest properties
     const windowConfig = manifest.window;
@@ -263,7 +259,7 @@ export class ViewCreator {
     // Determine view mode
     const viewMode: ViewMode = isOverlay
       ? "floating"
-      : this.tilingManager.determineViewMode(windowConfig?.mode);
+      : this.tilingController.determineViewMode(windowConfig?.mode);
 
     // Calculate bounds and Z-index based on view type and mode
     const { viewBounds, tileIndex, zIndex } = this.calculateViewBounds(
@@ -272,17 +268,17 @@ export class ViewCreator {
       appId,
       bounds,
       windowConfig,
-      existingViews
+      existingViews,
     );
 
     // View identifiers and paths
     const viewId = this.nextViewId++;
     const preloadScript = path.join(
       this.basePath,
-      "app-runtime/app-preload.js"
+      "app-runtime/app-preload.js",
     );
 
-    const view = ViewLifecycle.createView({
+    const view = createView({
       preloadScript,
       additionalArguments: [
         `--app-id=${appId}`,
@@ -290,12 +286,9 @@ export class ViewCreator {
       ],
     });
 
-    console.log(
-      `[ViewCreator] Creating ${viewType} view for ${appId} with preload: ${preloadScript}`
+    log.info(
+      `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,
     );
-
-    // Register DevTools shortcut on this view
-    this.devToolsManager.registerShortcut(view);
 
     // Set bounds
     view.setBounds(viewBounds);
@@ -304,15 +297,13 @@ export class ViewCreator {
     if (manifest.frontend?.allowEmbedding) {
       view.webContents.session.webRequest.onHeadersReceived(
         { urls: ["*://*/*"] },
-        ViewCreator.embeddingHeadersFilter
+        ViewCreator.embeddingHeadersFilter,
       );
     }
 
     // Load the frontend HTML or remote URL
     if (this.isRemoteEntry(frontendEntry)) {
-      console.log(
-        `[ViewCreator] Loading remote frontend for ${appId}: ${frontendEntry}`
-      );
+      log.info(`Loading remote frontend for ${appId}: ${frontendEntry}`);
       view.webContents.loadURL(frontendEntry);
     } else {
       const frontendPath = path.join(installPath, frontendEntry);
@@ -325,26 +316,20 @@ export class ViewCreator {
       const cssMode = this.getCSSInjectionMode(windowConfig);
       if (cssMode !== "none") {
         this.injectEdenCSS(view, cssMode).catch((err) => {
-          console.error(
-            `[ViewCreator] Failed to inject Eden CSS for ${appId}:`,
-            err
-          );
+          log.error(`Failed to inject Eden CSS for ${appId}:`, err);
         });
       }
 
-      // Inject the app frame script (only for app views, not overlays)
       if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
         this.injectAppFrame(
           view,
           appId,
+          manifest.name,
           viewMode,
           windowConfig,
-          viewBounds
+          viewBounds,
         ).catch((err) => {
-          console.error(
-            `[ViewCreator] Failed to inject app frame for ${appId}:`,
-            err
-          );
+          log.error(`Failed to inject app frame for ${appId}:`, err);
         });
       }
     });

@@ -133,10 +133,10 @@ An `.edenite` file is a Zstandard-compressed TAR archive with the following stru
 ## Programmatic API
 
 ```typescript
-import { GenesisBundler } from '@edenapp/genesis';
+import * as genesisBundler from '@edenapp/genesis';
 
 // Bundle an app
-const result = await GenesisBundler.bundle({
+const result = await genesisBundler.bundle({
   appDirectory: './my-app',
   outputPath: './output/my-app.edenite',
   verbose: true,
@@ -145,7 +145,7 @@ const result = await GenesisBundler.bundle({
 });
 
 // Extract an app
-const extractResult = await GenesisBundler.extract({
+const extractResult = await genesisBundler.extract({
   edenitePath: './my-app.edenite',
   outputDirectory: './extracted',
   verbose: true,
@@ -153,7 +153,7 @@ const extractResult = await GenesisBundler.extract({
 });
 
 // Get archive info
-const info = await GenesisBundler.getInfo('./my-app.edenite');
+const info = await genesisBundler.getInfo('./my-app.edenite');
 console.log(info.manifest);
 console.log(info.checksum);
 ```

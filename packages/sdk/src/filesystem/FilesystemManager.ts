@@ -1,11 +1,11 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import fg from "fast-glob";
-import { injectable, inject, singleton } from "tsyringe";
-import { CommandRegistry } from "../ipc";
-import { FilesystemHandler } from "./FilesystemHandler";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
-
+import fg from "fast-glob";
+import { inject, injectable, singleton } from "tsyringe";
+import { CommandRegistry } from "../ipc";
+import { log } from "../logging";
+import { FilesystemHandler } from "./FilesystemHandler";
 /**
  * FilesystemManager
  *
@@ -19,7 +19,7 @@ export class FilesystemManager {
 
   constructor(
     @inject("userDirectory") baseDir: string,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry
+    @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
@@ -53,7 +53,7 @@ export class FilesystemManager {
     // Double check it's still inside baseDir
     if (!resolved.startsWith(this.baseDir)) {
       throw new Error(
-        `Access denied: Path '${targetPath}' resolves to '${resolved}', which is outside of base directory '${this.baseDir}'`
+        `Access denied: Path '${targetPath}' resolves to '${resolved}', which is outside of base directory '${this.baseDir}'`,
       );
     }
     return resolved;
@@ -71,13 +71,13 @@ export class FilesystemManager {
 
     if (!normalizedAbsolute.startsWith(this.baseDir)) {
       throw new Error(
-        `Path '${absolutePath}' is outside of base directory '${this.baseDir}'`
+        `Path '${absolutePath}' is outside of base directory '${this.baseDir}'`,
       );
     }
 
     const relativePath = normalizedAbsolute.slice(this.baseDir.length);
     // Ensure it starts with /
-    return relativePath.startsWith("/") ? relativePath : "/" + relativePath;
+    return relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
   }
 
   /**
@@ -101,7 +101,7 @@ export class FilesystemManager {
    */
   async readFile(
     targetPath: string,
-    encoding: BufferEncoding = "utf-8"
+    encoding: BufferEncoding = "utf-8",
   ): Promise<string> {
     const fullPath = this.resolvePath(targetPath);
     return await fs.readFile(fullPath, encoding);
@@ -113,7 +113,7 @@ export class FilesystemManager {
   async writeFile(
     targetPath: string,
     content: string,
-    encoding: BufferEncoding = "utf-8"
+    encoding: BufferEncoding = "utf-8",
   ): Promise<void> {
     const fullPath = this.resolvePath(targetPath);
     // Ensure directory exists
@@ -170,7 +170,7 @@ export class FilesystemManager {
   async search(
     basePath: string,
     pattern: string,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<SearchResult[]> {
     const fullPath = this.resolvePath(basePath);
 
@@ -204,7 +204,7 @@ export class FilesystemManager {
 
       return results;
     } catch (error) {
-      console.error("Search error:", error);
+      log.error("Search error:", error);
       return [];
     }
   }

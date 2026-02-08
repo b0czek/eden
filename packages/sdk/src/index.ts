@@ -1,11 +1,20 @@
 // Re-export the Eden library
-export { Eden } from "./Eden";
-export { EdenConfig } from "@edenapp/types";
 
+export { EdenConfig } from "@edenapp/types";
+export { Eden } from "./Eden";
+export { IPCBridge } from "./ipc";
+export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";
+// Logging exports
+export {
+  configureLogger,
+  createLogger,
+  getLoggerConfig,
+  log,
+  setLogContext,
+} from "./logging";
 // Re-export core managers for library usage
 export { PackageManager } from "./package-manager";
-export { ProcessManager, BackendManager } from "./process-manager";
-export { IPCBridge } from "./ipc";
-
+export { BackendManager, ProcessManager } from "./process-manager";
+export { UserManager } from "./user";
 // Window management exports
-export { ViewManager, LayoutCalculator, MouseTracker } from "./view-manager";
+export { ViewManager } from "./view-manager";

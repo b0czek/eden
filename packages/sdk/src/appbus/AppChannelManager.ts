@@ -1,13 +1,14 @@
-import { MessageChannelMain, webContents } from "electron";
-import { inject, injectable, singleton, delay } from "tsyringe";
 import type {
+  ConnectResult,
   RegisteredService,
   ServiceInfo,
-  ConnectResult,
 } from "@edenapp/types";
+import { MessageChannelMain, webContents } from "electron";
+import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
-import { AppChannelHandler } from "./AppChannelHandler";
+import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";
+import { AppChannelHandler } from "./AppChannelHandler";
 
 /**
  * AppChannelManager
@@ -39,7 +40,7 @@ export class AppChannelManager {
 
   constructor(
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => BackendManager)) backendManager: BackendManager
+    @inject(delay(() => BackendManager)) backendManager: BackendManager,
   ) {
     this.handler = new AppChannelHandler(this);
     this.backendManager = backendManager;
@@ -60,13 +61,13 @@ export class AppChannelManager {
     appId: string,
     serviceName: string,
     webContentsId: number,
-    options?: { description?: string; allowedClients?: string[] }
+    options?: { description?: string; allowedClients?: string[] },
   ): void {
     const key = this.serviceKey(appId, serviceName);
 
     if (this.services.has(key)) {
       throw new Error(
-        `Service "${serviceName}" is already registered by app "${appId}"`
+        `Service "${serviceName}" is already registered by app "${appId}"`,
       );
     }
 
@@ -85,9 +86,7 @@ export class AppChannelManager {
     };
 
     this.services.set(key, service);
-    console.log(
-      `[AppChannelManager] Registered service "${serviceName}" from app "${appId}"`
-    );
+    log.info(`Registered service "${serviceName}" from app "${appId}"`);
   }
 
   /**
@@ -98,9 +97,7 @@ export class AppChannelManager {
     const deleted = this.services.delete(key);
 
     if (deleted) {
-      console.log(
-        `[AppChannelManager] Unregistered service "${serviceName}" from app "${appId}"`
-      );
+      log.info(`Unregistered service "${serviceName}" from app "${appId}"`);
     }
 
     return deleted;
@@ -119,9 +116,7 @@ export class AppChannelManager {
     }
 
     if (count > 0) {
-      console.log(
-        `[AppChannelManager] Unregistered ${count} services from app "${appId}"`
-      );
+      log.info(`Unregistered ${count} services from app "${appId}"`);
     }
 
     // Also close all active connections for this app
@@ -135,7 +130,7 @@ export class AppChannelManager {
    */
   getService(
     appId: string,
-    serviceName: string
+    serviceName: string,
   ): RegisteredService | undefined {
     return this.services.get(this.serviceKey(appId, serviceName));
   }
@@ -160,7 +155,7 @@ export class AppChannelManager {
     requesterAppId: string,
     requesterWebContentsId: number,
     targetAppId: string,
-    serviceName: string
+    serviceName: string,
   ): ConnectResult {
     const service = this.getService(targetAppId, serviceName);
 
@@ -225,8 +220,8 @@ export class AppChannelManager {
       targetWebContentsId: service.webContentsId,
     });
 
-    console.log(
-      `[AppChannelManager] Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`
+    log.info(
+      `Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`,
     );
 
     // Transfer port1 to requester
@@ -239,7 +234,7 @@ export class AppChannelManager {
           serviceName,
           role: "client",
         },
-        [port1]
+        [port1],
       );
     } else {
       // Requester is backend
@@ -252,7 +247,7 @@ export class AppChannelManager {
           serviceName,
           role: "client",
         },
-        [port1]
+        [port1],
       );
     }
 
@@ -266,7 +261,7 @@ export class AppChannelManager {
           serviceName,
           role: "service",
         },
-        [port2]
+        [port2],
       );
     } else {
       // Target is backend
@@ -279,7 +274,7 @@ export class AppChannelManager {
           serviceName,
           role: "service",
         },
-        [port2]
+        [port2],
       );
     }
 
@@ -296,7 +291,7 @@ export class AppChannelManager {
     }
 
     this.connections.delete(connectionId);
-    console.log(`[AppChannelManager] Closed connection: ${connectionId}`);
+    log.info(`Closed connection: ${connectionId}`);
     return true;
   }
 
@@ -316,14 +311,14 @@ export class AppChannelManager {
           this.notifyPortClosed(
             conn.targetAppId,
             conn.targetWebContentsId,
-            connectionId
+            connectionId,
           );
         } else {
           // Target closed, notify requester
           this.notifyPortClosed(
             conn.requesterAppId,
             conn.requesterWebContentsId,
-            connectionId
+            connectionId,
           );
         }
       }
@@ -340,10 +335,10 @@ export class AppChannelManager {
   private notifyPortClosed(
     appId: string,
     webContentsId: number | undefined,
-    connectionId: string
+    connectionId: string,
   ): void {
-    console.log(
-      `[AppChannelManager] Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`
+    log.info(
+      `Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`,
     );
     if (webContentsId) {
       const wc = webContents.fromId(webContentsId);
@@ -399,6 +394,6 @@ export class AppChannelManager {
     }
 
     this.services.clear();
-    console.log("[AppChannelManager] Destroyed");
+    log.info("Destroyed");
   }
 }

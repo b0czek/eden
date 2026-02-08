@@ -1,0 +1,77 @@
+{
+  "id": "com.eden.calculator",
+  "name": {
+    "en": "Calculator",
+    "pl": "Kalkulator"
+  },
+  "version": "1.0.0",
+  "description": "Solves math",
+  "author": "Dariusz Majnert",
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "build": {
+    "command": "pnpm run build",
+    "cwd": "."
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 280,
+      "height": 420
+    },
+    "minSize": {
+      "width": 280,
+      "height": 420
+    },
+    "maxSize": {
+      "width": 480,
+      "height": 640
+    },
+    "resizable": true,
+    "movable": true,
+    "showTitle": false
+  },
+  "permissions": ["settings/rw"],
+  "icon": "icon.svg",
+  "settings": [
+    {
+      "id": "display",
+      "name": {
+        "en": "Display",
+        "pl": "Wyświetlanie"
+      },
+      "settings": [
+        {
+          "key": "angleUnit",
+          "label": {
+            "en": "Angle Unit",
+            "pl": "Jednostka kąta"
+          },
+          "description": {
+            "en": "Unit for trigonometric functions (sin, cos, tan)",
+            "pl": "Jednostka dla funkcji trygonometrycznych (sin, cos, tan)"
+          },
+          "type": "select",
+          "defaultValue": "deg",
+          "options": [
+            {
+              "value": "deg",
+              "label": {
+                "en": "Degrees",
+                "pl": "Stopnie"
+              }
+            },
+            {
+              "value": "rad",
+              "label": {
+                "en": "Radians",
+                "pl": "Radiany"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

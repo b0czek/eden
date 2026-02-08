@@ -9,5 +9,9 @@ new Eden({
     padding: 8, // Padding around workspace in pixels
   },
   userDirectory: ".",
-  autostart: ["com.eden.eveshell", "com.eden.toaster"],
+  window: {
+    title: "Eden SDK Example",
+  },
+  coreApps: ["com.eden.eveshell", "com.eden.toaster", "com.eden.context-menu"],
+  restrictedApps: ["com.eden.login", "com.eden.users"],
 });

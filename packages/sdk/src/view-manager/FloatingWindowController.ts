@@ -1,6 +1,6 @@
-import { Rectangle as Bounds } from "electron";
-import { WindowConfig } from "@edenapp/types";
-import { ViewInfo } from "./types";
+import type { WindowConfig } from "@edenapp/types";
+import type { Rectangle as Bounds } from "electron";
+import type { ViewInfo } from "./types";
 
 type ViewCollection = () => Iterable<ViewInfo>;
 
@@ -15,7 +15,7 @@ export class FloatingWindowController {
 
   constructor(
     private readonly getWorkspaceBounds: () => Bounds,
-    private readonly getViews: ViewCollection
+    private readonly getViews: ViewCollection,
   ) {}
 
   /**
@@ -35,14 +35,14 @@ export class FloatingWindowController {
     const width = windowConfig?.minSize?.width
       ? Math.max(defaultWidth, windowConfig.minSize.width)
       : windowConfig?.maxSize?.width
-      ? Math.min(defaultWidth, windowConfig.maxSize.width)
-      : defaultWidth;
+        ? Math.min(defaultWidth, windowConfig.maxSize.width)
+        : defaultWidth;
 
     const height = windowConfig?.minSize?.height
       ? Math.max(defaultHeight, windowConfig.minSize.height)
       : windowConfig?.maxSize?.height
-      ? Math.min(defaultHeight, windowConfig.maxSize.height)
-      : defaultHeight;
+        ? Math.min(defaultHeight, windowConfig.maxSize.height)
+        : defaultHeight;
 
     let x: number;
     let y: number;
@@ -72,27 +72,27 @@ export class FloatingWindowController {
    * Apply window-level constraints and workspace bounds to floating windows.
    */
   applyWindowConstraints(bounds: Bounds, windowConfig?: WindowConfig): Bounds {
-    let finalBounds = { ...bounds };
+    const finalBounds = { ...bounds };
 
     if (windowConfig?.minSize) {
       finalBounds.width = Math.max(
         finalBounds.width,
-        windowConfig.minSize.width
+        windowConfig.minSize.width,
       );
       finalBounds.height = Math.max(
         finalBounds.height,
-        windowConfig.minSize.height
+        windowConfig.minSize.height,
       );
     }
 
     if (windowConfig?.maxSize) {
       finalBounds.width = Math.min(
         finalBounds.width,
-        windowConfig.maxSize.width
+        windowConfig.maxSize.width,
       );
       finalBounds.height = Math.min(
         finalBounds.height,
-        windowConfig.maxSize.height
+        windowConfig.maxSize.height,
       );
     }
 
@@ -130,7 +130,7 @@ export class FloatingWindowController {
 
     const targetIndex = Math.max(
       0,
-      Math.min(position, floatingViews.length - 1)
+      Math.min(position, floatingViews.length - 1),
     );
     const baseZIndex = floatingViews[0].zIndex ?? 1;
     return baseZIndex + targetIndex;
@@ -141,13 +141,13 @@ export class FloatingWindowController {
    */
   getOrderedFloatingViews(): ViewInfo[] {
     return this.getFloatingViews().sort(
-      (a, b) => (a.zIndex || 0) - (b.zIndex || 0)
+      (a, b) => (a.zIndex || 0) - (b.zIndex || 0),
     );
   }
 
   private getFloatingViews(): ViewInfo[] {
     return Array.from(this.getViews()).filter(
-      (view) => view.mode === "floating"
+      (view) => view.mode === "floating",
     );
   }
 

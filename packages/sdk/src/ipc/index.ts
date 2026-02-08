@@ -1,4 +1,5 @@
 export * from "./CommandDecorators";
+export * from "./CommandMetadata";
 export * from "./CommandRegistry";
 export * from "./EdenEmitter";
 export * from "./EventSubscriberManager";

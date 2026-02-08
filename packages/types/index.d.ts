@@ -1,6 +1,8 @@
 import { AppManifest } from "./AppManifest";
 
 export * from "./EdenConfig";
+export * from "./EdenSeedConfig";
+export * from "./User";
 
 export * from "./AppManifest";
 
@@ -93,6 +95,7 @@ export interface SystemInfo {
   nodeVersion: string;
   electronVersion: string;
   runningApps: string[];
+  release: boolean;
 }
 
 export interface WindowSize {
@@ -162,3 +165,16 @@ export interface Notification {
   /** Notification type for styling (default: info) */
   type?: NotificationType;
 }
+
+export * from "./ContextMenu";
+
+export interface WallpaperPreset {
+  id: string;
+  name: string;
+  type: "color" | "gradient" | "custom";
+  value: string;
+}
+
+export type WallpaperConfig =
+  | { type: "preset"; id: string }
+  | { type: "custom"; value: string };

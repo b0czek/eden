@@ -1,4 +1,4 @@
-export { ProcessManager } from "./ProcessManager";
-export { ProcessHandler } from "./ProcessHandler";
-export { BackendManager } from "./BackendManager";
 export { AutostartManager } from "./AutostartManager";
+export { BackendManager } from "./BackendManager";
+export { ProcessHandler } from "./ProcessHandler";
+export { ProcessManager } from "./ProcessManager";

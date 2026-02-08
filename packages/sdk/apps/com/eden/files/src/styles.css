@@ -1,17 +1,15 @@
-/**
+/*
  * File Explorer - Custom Styles
  */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: var(--eden-font-family-base);
-  background: var(--eden-color-bg-secondary);
   color: var(--eden-color-text-on-dark);
+}
+
+#root {
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -19,17 +17,21 @@ body {
 .file-explorer {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  /* Ensure it contains the flex children */
+  /* Removed background so body's inset shadow/border (from frame.css) is visible */
 }
 
 /* ===== Header with Breadcrumb and Navigation ===== */
 .explorer-header {
-  background: var(--eden-color-bg-glass-strong);
+  background: transparent;
   position: relative;
   z-index: 100;
   border-bottom: 1px solid var(--eden-color-border-light);
   padding: var(--eden-space-md) var(--eden-space-lg);
+  flex-shrink: 0;
 }
 
 .header-content {
@@ -37,7 +39,6 @@ body {
   align-items: center;
   gap: var(--eden-space-lg);
 }
-
 
 .toolbar-left,
 .toolbar-right {
@@ -115,7 +116,9 @@ body {
   border: 2px solid var(--eden-color-accent-primary);
   border-radius: var(--eden-radius-md);
   padding: calc(var(--eden-space-sm) - 1px) calc(var(--eden-space-md) - 1px);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1), var(--eden-shadow-lg);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.1),
+    var(--eden-shadow-lg);
   animation: eden-fade-in 0.15s ease-out;
 }
 
@@ -159,7 +162,6 @@ body {
   overflow-y: auto;
   z-index: 1000;
   animation: eden-fade-in 0.15s ease-out;
-
 }
 
 .suggestion-item {
@@ -204,14 +206,13 @@ body {
   white-space: nowrap;
 }
 
-
-
 /* ===== Main Content Area ===== */
 .explorer-content {
   flex: 1;
+  /* min-height: 0 is critical for flex items to scroll instead of expanding */
+  min-height: 0;
   overflow-y: auto;
   padding: var(--eden-space-lg);
-  background: var(--eden-color-bg-secondary);
 }
 
 /* ===== File List ===== */
@@ -398,7 +399,8 @@ body {
   width: 280px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
-  animation: eden-scale-in var(--eden-duration-fast) var(--eden-transition-ease-out);
+  animation: eden-scale-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
 }
 
 /* ===== List View Layout ===== */

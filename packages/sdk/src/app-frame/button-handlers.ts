@@ -1,3 +1,4 @@
+import { log } from "../logging";
 /**
  * App Frame Button Handlers
  *
@@ -15,12 +16,10 @@ export function setupCloseButton(): void {
     // Wait for edenFrame to be available
     const stopApp = () => {
       const appId = window.edenFrame?._internal.appId;
-      console.log("[Eden Frame] Stopping app:", appId);
+      log.info("Stopping app:", appId);
 
       if (appId) {
-        window.edenAPI
-          .shellCommand("process/stop", { appId })
-          .catch(console.error);
+        window.edenAPI.shellCommand("process/stop", { appId }).catch(log.error);
       } else {
         // Retry if API or appId not yet available
         setTimeout(stopApp, 100);
@@ -47,7 +46,7 @@ export function setupMinimizeButton(): void {
             appId,
             visible: false,
           })
-          .catch(console.error);
+          .catch(log.error);
       } else {
         setTimeout(minimize, 100);
       }
@@ -73,9 +72,9 @@ export function setupToggleModeButton(): void {
             appId,
           })
           .then(() => {
-            console.log("[Eden Frame] View mode toggled");
+            log.info("View mode toggled");
           })
-          .catch(console.error);
+          .catch(log.error);
       } else {
         setTimeout(toggleMode, 100);
       }

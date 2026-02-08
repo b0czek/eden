@@ -1,0 +1,1 @@
+export { seedDatabase } from "./SeedLoader";

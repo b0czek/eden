@@ -1,6 +1,9 @@
 {
   "id": "com.eden.installer",
-  "name": "Package Installer",
+  "name": {
+    "en": "Package Installer",
+    "pl": "Instalator pakietów"
+  },
   "version": "1.0.0",
   "description": "Install Eden packages",
   "build": {
@@ -22,9 +25,7 @@
       "css": "full"
     }
   },
-  "permissions": [
-    "package/*",
-    "fs/read"
-  ],
+  "permissions": ["package/read", "fs/read"],
+  "grants": [{ "scope": "preset", "preset": "package/manage" }],
   "hidden": true
 }

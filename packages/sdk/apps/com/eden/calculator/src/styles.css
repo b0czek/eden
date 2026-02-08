@@ -1,0 +1,132 @@
+/**
+ * Calculator App Styles
+ * Uses EdenCSS for most styling - only layout-specific styles here
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* Prevent text selection on buttons */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--eden-font-family-base);
+  background: var(--eden-color-bg-primary);
+}
+
+/* Main container */
+.calculator {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--eden-space-md);
+  gap: var(--eden-space-sm);
+  background: var(--eden-color-surface-elevated);
+}
+
+/* Display area */
+.display-container {
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.display-expression {
+  text-align: right;
+  min-height: 1.25rem;
+  font-family: var(--eden-font-family-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.display-value {
+  font-size: clamp(1.75rem, 8vw, 2.5rem);
+  font-weight: var(--eden-font-weight-semibold);
+  font-family: var(--eden-font-family-mono);
+  text-align: right;
+  color: var(--eden-color-text-primary);
+  word-wrap: break-word;
+  word-break: break-all;
+  line-height: 1.2;
+}
+
+/* Scientific buttons grid */
+.scientific-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--eden-space-xs);
+}
+
+.sci-btn {
+  font-size: 0.8rem;
+  font-weight: var(--eden-font-weight-medium);
+  min-height: 40px;
+}
+
+/* Main buttons grid */
+.buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--eden-space-xs);
+  flex: 1;
+  min-height: 0;
+}
+
+.buttons-grid .eden-btn {
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: var(--eden-font-weight-semibold);
+  width: 100%;
+  height: 100%;
+  min-height: 48px;
+}
+
+.buttons-grid .eden-btn:active {
+  transform: scale(0.96);
+}
+
+/* Number button styling */
+.num-btn {
+  background: var(--eden-color-surface-tertiary);
+  border: 1px solid var(--eden-color-border-light);
+}
+
+.num-btn:hover {
+  background: var(--eden-color-surface-secondary);
+  border-color: var(--eden-color-border);
+}
+
+/* Zero button spans 2 columns */
+.zero-btn {
+  grid-column: span 2;
+}
+
+/* Equals button styling */
+.equals-btn {
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-success),
+    var(--eden-color-success-hover)
+  );
+}
+
+/* Primary operator button enhancements */
+.buttons-grid .eden-btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-primary),
+    var(--eden-color-primary-hover)
+  );
+}

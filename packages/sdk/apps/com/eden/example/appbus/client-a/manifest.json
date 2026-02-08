@@ -20,8 +20,5 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": [
-    "appbus/expose",
-    "appbus/connect"
-  ]
+  "permissions": ["appbus/expose", "appbus/connect"]
 }

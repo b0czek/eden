@@ -3,3 +3,10 @@ export interface AppInfo {
   name: string;
   isRunning: boolean;
 }
+
+export interface ContextMenuPosition {
+  left?: number;
+  right?: number;
+  top?: number;
+  bottom?: number;
+}

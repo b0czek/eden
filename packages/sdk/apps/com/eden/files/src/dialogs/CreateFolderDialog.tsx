@@ -1,6 +1,7 @@
-import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
+import { createSignal } from "solid-js";
 import Modal from "../components/Modal";
+import { t } from "../i18n";
 
 interface CreateFolderDialogProps {
   show: boolean;
@@ -31,7 +32,7 @@ const CreateFolderDialog: Component<CreateFolderDialogProps> = (props) => {
         props.onClose();
         setFolderName("");
       }}
-      title="Create New Folder"
+      title={t("files.newFolder")}
       size="sm"
       footer={
         <>
@@ -42,20 +43,20 @@ const CreateFolderDialog: Component<CreateFolderDialogProps> = (props) => {
               setFolderName("");
             }}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button class="eden-btn eden-btn-primary" onClick={handleCreate}>
-            Create
+            {t("common.ok")}
           </button>
         </>
       }
     >
       <div class="eden-form-group">
-        <label class="eden-form-label">Folder Name</label>
+        <label class="eden-form-label">{t("common.name")}</label>
         <input
           type="text"
           class="eden-input"
-          placeholder="Enter folder name..."
+          placeholder={`${t("files.newFolder")}...`}
           value={folderName()}
           onInput={(e) => setFolderName(e.currentTarget.value)}
           onKeyDown={handleKeyDown}

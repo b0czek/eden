@@ -4,10 +4,10 @@
  * Starts Vite dev servers for Eden apps with instant HMR
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
-import { spawn, ChildProcess } from "child_process";
-import { loadConfig, resolveSdkAppsPath, AppSource } from "./config";
+import { type ChildProcess, spawn } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { loadConfig, resolveSdkAppsPath } from "./config";
 
 interface HotReloadConfig {
   apps: string[];
@@ -24,7 +24,7 @@ const BASE_PORT = 5173; // Vite's default port
 
 export async function devWatch(
   configPath: string = "eden.config.json",
-  sdkPath?: string
+  sdkPath?: string,
 ) {
   console.log("🔥 Eden Instant HMR Development Server\n");
 
@@ -96,7 +96,7 @@ export async function devWatch(
   async function startViteServer(
     appId: string,
     appDir: string,
-    port: number
+    port: number,
   ): Promise<DevServer | null> {
     console.log(`🚀 Starting Vite dev server for ${appId} on port ${port}...`);
 
@@ -117,7 +117,7 @@ export async function devWatch(
         cwd: appDir,
         stdio: ["ignore", "pipe", "pipe"],
         shell: true,
-      }
+      },
     );
 
     let serverReady = false;
@@ -169,7 +169,7 @@ export async function devWatch(
   async function writeDevManifest(
     appId: string,
     appDir: string,
-    port: number
+    port: number,
   ): Promise<void> {
     const devManifestPath = path.join(appDir, ".dev-manifest.json");
 
@@ -182,8 +182,8 @@ export async function devWatch(
           port,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
   }
 
@@ -222,7 +222,7 @@ export async function devWatch(
     if (appsToStart.length > 0) {
       hasChanges = true;
       console.log(
-        `\n🚀 Starting Vite servers for ${appsToStart.length} new app(s)...\n`
+        `\n🚀 Starting Vite servers for ${appsToStart.length} new app(s)...\n`,
       );
 
       for (const appId of appsToStart) {
@@ -257,7 +257,7 @@ export async function devWatch(
       if (DEV_SERVERS.length === 0) {
         console.log("\nℹ️  No apps enabled for hot reload");
         console.log(
-          '💡 Right-click an app in Eden and select "Enable Hot Reload"'
+          '💡 Right-click an app in Eden and select "Enable Hot Reload"',
         );
       } else {
         console.log(`\n🔥 Running ${DEV_SERVERS.length} Vite dev server(s)`);
@@ -277,7 +277,7 @@ export async function devWatch(
       // Only log every 30th check (once per minute) to avoid spam
       if (checkCount % 30 === 0) {
         console.log(
-          `[DEBUG] Config check #${checkCount} (no changes detected)`
+          `[DEBUG] Config check #${checkCount} (no changes detected)`,
         );
       }
       await syncServers();

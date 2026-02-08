@@ -58,7 +58,11 @@
 
 /* ===== Button Variants ===== */
 .eden-btn-primary {
-  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-accent-blue),
+    var(--eden-color-accent-blue-dark)
+  );
   border-color: transparent;
   color: white;
   box-shadow: var(--eden-shadow-md);
@@ -198,7 +202,11 @@
   height: 56px;
   border-radius: var(--eden-radius-round);
 
-  background: linear-gradient(135deg, var(--eden-color-accent-blue), var(--eden-color-accent-blue-dark));
+  background: linear-gradient(
+    135deg,
+    var(--eden-color-accent-blue),
+    var(--eden-color-accent-blue-dark)
+  );
   border: none;
   box-shadow: var(--eden-shadow-2xl);
 

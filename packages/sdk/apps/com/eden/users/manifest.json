@@ -1,0 +1,31 @@
+{
+  "id": "com.eden.users",
+  "name": {
+    "en": "Users",
+    "pl": "Użytkownicy"
+  },
+  "version": "1.0.0",
+  "description": "User management and access control",
+  "author": "Dariusz Majnert",
+  "build": {
+    "command": "npm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 800,
+      "height": 600
+    },
+    "minSize": {
+      "width": 600,
+      "height": 400
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": ["user/identity", "user/manage", "package/read"],
+  "icon": "icon.svg"
+}

@@ -1,11 +1,18 @@
-import Keyv from "keyv";
+import * as path from "node:path";
+import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
-import * as path from "path";
-import { singleton, inject } from "tsyringe";
-import { SettingsCategory } from "@edenapp/types";
-import { CommandRegistry, IPCBridge, EdenNamespace, EdenEmitter } from "../ipc";
-import { SettingsHandler, EDEN_SETTINGS_APP_ID } from "./SettingsHandler";
+import Keyv from "keyv";
+import { delay, inject, singleton } from "tsyringe";
+import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { log } from "../logging";
+import { UserManager } from "../user/UserManager";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
+import { SettingsHandler } from "./SettingsHandler";
+/**
+ * Reserved app ID for Eden system settings.
+ * No external app can use this ID.
+ */
+export const EDEN_SETTINGS_APP_ID = "com.eden";
 
 /**
  * Events emitted by the SettingsManager
@@ -30,11 +37,13 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   private handler: SettingsHandler;
 
   constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject("appsDirectory") appsDirectory: string
+    @inject("appsDirectory") appsDirectory: string,
+    @inject(delay(() => UserManager)) private userManager: UserManager,
   ) {
     super(ipcBridge);
+
     // Initialize Keyv with SQLite backend - separate from app storage
     const dbPath = path.join(appsDirectory, "settings.db");
     const sqlite = new KeyvSqlite(`sqlite://${dbPath}`);
@@ -42,10 +51,10 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
     // Handle errors
     this.keyv.on("error", (err) => {
-      console.error("[SettingsManager] Database error:", err);
+      log.error("Database error:", err);
     });
 
-    console.log(`[SettingsManager] Initialized settings storage at ${dbPath}`);
+    log.info(`Initialized settings storage at ${dbPath}`);
 
     // Create and register handler
     this.handler = new SettingsHandler(this);
@@ -76,9 +85,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     }
 
     if (value !== undefined && typeof value !== "string") {
-      console.warn(
-        `[SettingsManager] Non-string value found for key ${key}, converting to string`
-      );
+      log.warn(`Non-string value found for key ${key}, converting to string`);
       return String(value);
     }
     return value;
@@ -89,9 +96,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   async set(appId: string, key: string, value: string): Promise<void> {
     if (typeof value !== "string") {
-      throw new Error(
-        `[SettingsManager] Value must be a string, got ${typeof value}`
-      );
+      throw new Error(`Value must be a string, got ${typeof value}`);
     }
     const namespacedKey = this.getAppKey(appId, key);
     await this.keyv.set(namespacedKey, value);
@@ -102,8 +107,9 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
   /**
    * List all setting keys for an app
+   * @param showRestricted - If true, includes keys the current user cannot access (for superuser use)
    */
-  async list(appId: string): Promise<string[]> {
+  async list(appId: string, showRestricted?: boolean): Promise<string[]> {
     const prefix = `${appId}:`;
     const allKeys: string[] = [];
 
@@ -117,25 +123,29 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
         }
       }
     } catch (error) {
-      console.warn(
-        "[SettingsManager] Iterator not supported or failed:",
-        error
-      );
+      log.warn("Iterator not supported or failed:", error);
     }
 
-    return allKeys;
+    if (showRestricted) {
+      return allKeys;
+    }
+    return this.filterAllowedKeys(appId, allKeys);
   }
 
   /**
    * Get all settings with values for an app
+   * @param showRestricted - If true, includes settings the current user cannot access (for superuser use)
    */
-  async getAll(appId: string): Promise<Record<string, string>> {
+  async getAll(
+    appId: string,
+    showRestricted?: boolean,
+  ): Promise<Record<string, string>> {
     // For com.eden, return all settings with defaults
     if (appId === EDEN_SETTINGS_APP_ID) {
-      return this.getAllEdenSettings();
+      return this.getAllEdenSettings(showRestricted);
     }
 
-    const keys = await this.list(appId);
+    const keys = await this.list(appId, showRestricted);
     const result: Record<string, string> = {};
 
     for (const key of keys) {
@@ -154,7 +164,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   async reset(
     appId: string,
     key: string,
-    schema?: SettingsCategory[]
+    schema?: SettingsCategory[],
   ): Promise<void> {
     // Find default value from schema
     let defaultValue: string | undefined;
@@ -175,7 +185,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
     if (defaultValue === undefined) {
       throw new Error(
-        `[SettingsManager] Cannot reset key "${key}": no default value found in schema`
+        `Cannot reset key "${key}": no default value found in schema`,
       );
     }
 
@@ -188,9 +198,13 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
   /**
    * Get Eden settings schema
+   * @param showRestricted - If true, includes settings the current user cannot access
    */
-  getEdenSchema(): SettingsCategory[] {
-    return EDEN_SETTINGS_SCHEMA;
+  getEdenSchema(showRestricted?: boolean): SettingsCategory[] {
+    if (showRestricted) {
+      return EDEN_SETTINGS_SCHEMA;
+    }
+    return this.filterSchemaByGrants(EDEN_SETTINGS_SCHEMA);
   }
 
   /**
@@ -209,10 +223,15 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   /**
    * Get all Eden settings with values (including defaults)
    */
-  private async getAllEdenSettings(): Promise<Record<string, string>> {
+  private async getAllEdenSettings(
+    showRestricted?: boolean,
+  ): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
+    const schema = showRestricted
+      ? EDEN_SETTINGS_SCHEMA
+      : this.filterSchemaByGrants(EDEN_SETTINGS_SCHEMA);
 
-    for (const category of EDEN_SETTINGS_SCHEMA) {
+    for (const category of schema) {
       for (const setting of category.settings) {
         const value = await this.get(EDEN_SETTINGS_APP_ID, setting.key);
         if (value !== undefined) {
@@ -222,5 +241,74 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     }
 
     return result;
+  }
+
+  // ===================================================================
+  // Access Control Methods
+  // ===================================================================
+
+  /**
+   * Resolve the grant key for a setting.
+   * For Eden settings, uses the setting's explicit grant or falls back to the key itself.
+   */
+  resolveGrantKey(appId: string, settingKey: string): string {
+    if (appId !== EDEN_SETTINGS_APP_ID) {
+      return settingKey;
+    }
+    for (const category of EDEN_SETTINGS_SCHEMA) {
+      for (const setting of category.settings) {
+        if (setting.key === settingKey) {
+          return setting.grant ?? settingKey;
+        }
+      }
+    }
+    return settingKey;
+  }
+
+  /**
+   * Assert the current user has access to a setting, throwing if not.
+   */
+  assertAccess(appId: string, key: string): void {
+    const grantKey = this.resolveGrantKey(appId, key);
+    if (!this.userManager.canAccessSetting(appId, grantKey)) {
+      throw new Error("User does not have grant to access this setting");
+    }
+  }
+
+  /**
+   * Filter a list of keys to only those the current user can access.
+   */
+  filterAllowedKeys(appId: string, keys: string[]): string[] {
+    if (appId !== EDEN_SETTINGS_APP_ID) {
+      return this.userManager.getAllowedSettingKeys(appId, keys);
+    }
+    return keys.filter((key) => {
+      const grantKey = this.resolveGrantKey(EDEN_SETTINGS_APP_ID, key);
+      return this.userManager.canAccessSetting(EDEN_SETTINGS_APP_ID, grantKey);
+    });
+  }
+
+  /**
+   * Filter the Eden settings schema to only categories/settings the current user can access.
+   */
+  filterSchemaByGrants(categories: SettingsCategory[]): SettingsCategory[] {
+    return categories
+      .map((category) => ({
+        ...category,
+        settings: category.settings.filter((setting) => {
+          const grantKey = setting.grant ?? setting.key;
+          return this.userManager.canAccessSetting(
+            EDEN_SETTINGS_APP_ID,
+            grantKey,
+          );
+        }),
+      }))
+      .filter((category) => {
+        if (category.view && category.grant) {
+          return this.userManager.hasGrant(category.grant);
+        }
+        // For regular categories, must have at least one setting
+        return category.settings.length > 0;
+      });
   }
 }

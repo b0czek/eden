@@ -10,8 +10,5 @@
   "window": {
     "mode": "none"
   },
-  "permissions": [
-    "appbus/expose",
-    "appbus/connect"
-  ]
+  "permissions": ["appbus/expose", "appbus/connect"]
 }

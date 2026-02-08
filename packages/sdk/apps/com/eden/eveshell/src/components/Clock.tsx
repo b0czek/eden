@@ -1,4 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
+import { locale } from "../i18n";
 
 export default function Clock() {
   const [time, setTime] = createSignal(new Date());
@@ -11,7 +12,7 @@ export default function Clock() {
 
   const formatTime = () => {
     const t = time();
-    return t.toLocaleTimeString("en-US", {
+    return t.toLocaleTimeString(locale(), {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -19,7 +20,7 @@ export default function Clock() {
 
   const formatDate = () => {
     const t = time();
-    return t.toLocaleDateString("en-US", {
+    return t.toLocaleDateString(locale(), {
       weekday: "short",
       month: "short",
       day: "numeric",

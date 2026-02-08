@@ -1,3 +1,3 @@
-import { generateCommands } from './generate-commands';
+import { generateAll } from "./codegen";
 
-generateCommands();
+generateAll();

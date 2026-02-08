@@ -4,16 +4,28 @@
   "private": true,
   "description": "Eden Desktop Environment",
   "scripts": {
-    "sdk:build": "cd packages/sdk && pnpm run build",
-    "scripts:build": "cd packages/scripts && pnpm run build",
-    "genesis:build": "cd packages/genesis && pnpm run build",
-    "clean": "rm -rf dist packages/*/dist genesis/dist",
+    "build": "pnpm -r --filter=!@edenapp/example run build && pnpm install",
+    "clean": "rm -rf dist packages/*/dist",
     "dev": "cd packages/example && pnpm dev",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint-staged": "lint-staged",
+    "prepare": "simple-git-hooks",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm run build && changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.8"
+    "@biomejs/biome": "^2.3.14",
+    "@changesets/cli": "^2.29.8",
+    "lint-staged": "^16.1.6",
+    "simple-git-hooks": "^2.13.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,cjs,mjs,json,jsonc}": "biome format --write"
   }
 }
