@@ -12,14 +12,14 @@ Eden is a complete desktop environment SDK that lets you build custom desktop ex
 
 ## 🚀 Best Features
 
--   **🪟 Window Management** - Tiling window manager (horizontal, vertical, grid) with floating window support
--   **🔌 Three-Layer IPC** - EdenAPI (system ops), AppAPI (frontend↔backend), AppBus (app-to-app communication)
--   **🎨 EdenCSS Design System** - Glassmorphism UI with dark theme, component library, and design tokens
--   **📦 Genesis Bundler** - App packaging with Zstandard compression and integrity verification
--   **🔐 Permission System** - Granular access control for filesystem, database, processes, and more
--   **🎯 Built-in Apps** - File manager, editor, settings, launcher, browser, and more
--   **🛠️ TypeScript First** - Full type safety with code generation, and comprehensive docs
--   **💾 Data Management** - Per-app SQLite databases, persistent settings, and file associations
+- **🪟 Window Management** - Tiling window manager (horizontal, vertical, grid) with floating window support
+- **🔌 Three-Layer IPC** - EdenAPI (system ops), AppAPI (frontend↔backend), AppBus (app-to-app communication)
+- **🎨 EdenCSS Design System** - Glassmorphism UI with dark theme, component library, and design tokens
+- **🎯 Built-in Apps** - File manager, editor, settings, launcher, browser, calculator, and more
+- **💾 Data Management** - Per-app SQLite databases, persistent settings, and file associations
+- **👤 User Management** - Multi-user support with roles (vendor/standard), login/logout sessions, password management
+- **🔑 Grants & Access Control** - Fine-grained per-user grants with glob matching, app-level feature grants, and restricted app enforcement
+- **🌍 Internationalization (i18n)** - Full localization framework with typed translations, interpolation support, reactive locale switching, and localized app manifests
 
 ## 📖 Quick Start
 
@@ -34,9 +34,7 @@ cd eden
 pnpm install
 
 # Build all packages
-pnpm run sdk:build
-pnpm run scripts:build
-pnpm run genesis:build
+pnpm build
 ```
 
 ### Running the Example
@@ -59,10 +57,12 @@ genesis build ./my-app -o ./dist/my-app.edenite
 
 ## 📚 Documentation
 
--   **[App Development Guide](docs/app-development.md)**: Learn how to build Eden apps
--   **[IPC Architecture](docs/ipc-architecture.md)**: Deep dive into Eden's IPC system
--   **[Genesis README](packages/genesis/README.md)**: App bundling and packaging
--   **[EdenCSS Documentation](packages/sdk/edencss/README.md)**: Design system reference
+- **[App Development Guide](docs/app-development.md)**: Learn how to build Eden apps
+- **[IPC Architecture](docs/ipc-architecture.md)**: Deep dive into Eden's IPC system
+- **[Localizing Apps](docs/localizing-apps.md)**: Add i18n support to your Eden app
+- **[User Management](docs/users.md)**: Users, roles, grants, and sessions
+- **[Genesis README](packages/genesis/README.md)**: App bundling and packaging
+- **[EdenCSS Documentation](packages/sdk/edencss/README.md)**: Design system reference
 
 ## 📝 License
 
