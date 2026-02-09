@@ -28,6 +28,8 @@ export interface EdenConfig {
   window?: {
     width?: number;
     height?: number;
+    minWidth?: number;
+    minHeight?: number;
     title?: string;
     backgroundColor?: string;
   };
