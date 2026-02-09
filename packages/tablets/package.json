@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/tablets",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Context menu utilities for Eden apps",
   "type": "module",
   "main": "dist/index.js",
