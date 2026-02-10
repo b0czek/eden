@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/genesis",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Genesis - Package and bundle Eden applications into .edenite format.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

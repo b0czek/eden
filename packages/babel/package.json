@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/babel",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Shared i18n logic and translations for Eden apps",
   "type": "module",
   "main": "dist/index.js",
