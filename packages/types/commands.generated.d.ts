@@ -490,6 +490,7 @@ export interface PackageCommands {
 export interface ProcessCommands {
   /**
    * Launch an application instance.
+   * Requires "process/manage" permission.
    */
   "process/launch": {
     args: {
@@ -499,13 +500,23 @@ export interface ProcessCommands {
   };
   /**
    * Stop a running application instance.
+   * Requires "process/manage" permission.
    */
   "process/stop": {
     args: { appId: string };
     response: { success: boolean };
   };
   /**
+   * Stop the caller app instance.
+   * No explicit permission required - this endpoint only allows self-exit.
+   */
+  "process/exit": {
+    args: { };
+    response: { success: boolean };
+  };
+  /**
    * List all running application processes.
+   * Requires "process/read" permission.
    * @param showHidden - If true, includes overlay apps (hidden by default)
    */
   "process/list": {

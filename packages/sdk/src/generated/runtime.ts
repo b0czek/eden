@@ -64,6 +64,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "package/get-size",
   "process/launch",
   "process/stop",
+  "process/exit",
   "process/list",
   "settings/get",
   "settings/set",

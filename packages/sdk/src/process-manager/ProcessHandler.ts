@@ -12,8 +12,9 @@ export class ProcessHandler {
 
   /**
    * Launch an application instance.
+   * Requires "process/manage" permission.
    */
-  @EdenHandler("launch")
+  @EdenHandler("launch", { permission: "manage" })
   async handleLaunchApp(args: {
     appId: string;
     bounds?: ViewBounds;
@@ -24,8 +25,9 @@ export class ProcessHandler {
 
   /**
    * Stop a running application instance.
+   * Requires "process/manage" permission.
    */
-  @EdenHandler("stop")
+  @EdenHandler("stop", { permission: "manage" })
   async handleStopApp(args: { appId: string }): Promise<{ success: boolean }> {
     const { appId } = args;
     await this.processManager.stopApp(appId);
@@ -33,10 +35,28 @@ export class ProcessHandler {
   }
 
   /**
+   * Stop the caller app instance.
+   * No explicit permission required - this endpoint only allows self-exit.
+   */
+  @EdenHandler("exit")
+  async handleExitApp(args: {
+    _callerAppId?: string;
+  }): Promise<{ success: boolean }> {
+    const { _callerAppId } = args;
+    if (!_callerAppId) {
+      throw new Error("process/exit requires caller app context");
+    }
+
+    await this.processManager.stopApp(_callerAppId);
+    return { success: true };
+  }
+
+  /**
    * List all running application processes.
+   * Requires "process/read" permission.
    * @param showHidden - If true, includes overlay apps (hidden by default)
    */
-  @EdenHandler("list")
+  @EdenHandler("list", { permission: "read" })
   async handleListApps(args: { showHidden?: boolean }): Promise<AppInstance[]> {
     return this.processManager.getRunningApps(args.showHidden);
   }
