@@ -9,8 +9,6 @@ import {
 } from "solid-js";
 import { initLocale, t } from "./i18n";
 
-const APP_ID = "com.eden.login";
-
 const getInitials = (name: string): string => {
   const parts = name.trim().split(/\s+/);
   const initials = parts.map((part) => part[0]).join("");
@@ -36,8 +34,7 @@ const App = () => {
       height: windowSize.height,
     };
     try {
-      await window.edenAPI.shellCommand("view/update-view-bounds", {
-        appId: APP_ID,
+      await window.edenAPI.shellCommand("view/update-bounds", {
         bounds,
       });
     } catch (error) {

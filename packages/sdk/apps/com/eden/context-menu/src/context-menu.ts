@@ -39,8 +39,7 @@ async function updateOverlayBounds(visible: boolean): Promise<void> {
     : { x: 0, y: 0, width: 0, height: 0 };
 
   try {
-    await window.edenAPI.shellCommand("view/update-view-bounds", {
-      appId: "com.eden.context-menu",
+    await window.edenAPI.shellCommand("view/update-bounds", {
       bounds,
     });
   } catch (err) {

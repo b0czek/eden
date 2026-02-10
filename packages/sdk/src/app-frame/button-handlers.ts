@@ -2,8 +2,23 @@ import { log } from "../logging";
 /**
  * App Frame Button Handlers
  *
- * Event handlers for frame control buttons (close, minimize, toggle mode)
+ * Shared actions + event handlers for frame control buttons.
  */
+
+export async function closeAppFrameView(): Promise<void> {
+  await window.edenAPI.shellCommand("process/exit", {});
+}
+
+export async function minimizeAppFrameView(): Promise<void> {
+  await window.edenAPI.shellCommand("view/set-visibility", {
+    visible: false,
+  });
+}
+
+export async function toggleAppFrameViewMode(): Promise<void> {
+  await window.edenAPI.shellCommand("view/toggle-mode", {});
+  log.info("View mode toggled");
+}
 
 /**
  * Setup close button handler
@@ -13,19 +28,7 @@ export function setupCloseButton(): void {
   if (!closeBtn) return;
 
   closeBtn.addEventListener("click", () => {
-    // Wait for edenFrame to be available
-    const stopApp = () => {
-      const appId = window.edenFrame?._internal.appId;
-      log.info("Stopping app:", appId);
-
-      if (appId) {
-        window.edenAPI.shellCommand("process/stop", { appId }).catch(log.error);
-      } else {
-        // Retry if API or appId not yet available
-        setTimeout(stopApp, 100);
-      }
-    };
-    stopApp();
+    closeAppFrameView().catch(log.error);
   });
 }
 
@@ -37,21 +40,7 @@ export function setupMinimizeButton(): void {
   if (!minBtn) return;
 
   minBtn.addEventListener("click", () => {
-    const minimize = () => {
-      const appId = window.edenFrame?._internal.appId;
-
-      if (appId) {
-        window.edenAPI
-          .shellCommand("view/set-view-visibility", {
-            appId,
-            visible: false,
-          })
-          .catch(log.error);
-      } else {
-        setTimeout(minimize, 100);
-      }
-    };
-    minimize();
+    minimizeAppFrameView().catch(log.error);
   });
 }
 
@@ -63,22 +52,6 @@ export function setupToggleModeButton(): void {
   if (!toggleBtn) return;
 
   toggleBtn.addEventListener("click", () => {
-    const toggleMode = () => {
-      const appId = window.edenFrame?._internal.appId;
-
-      if (appId) {
-        window.edenAPI
-          .shellCommand("view/toggle-view-mode", {
-            appId,
-          })
-          .then(() => {
-            log.info("View mode toggled");
-          })
-          .catch(log.error);
-      } else {
-        setTimeout(toggleMode, 100);
-      }
-    };
-    toggleMode();
+    toggleAppFrameViewMode().catch(log.error);
   });
 }

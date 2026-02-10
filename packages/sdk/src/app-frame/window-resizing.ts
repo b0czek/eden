@@ -55,11 +55,9 @@ export function setupWindowResizing(
 
   // Animation frame update function - throttles IPC to 60fps
   const updateResizePosition = () => {
-    const appId = window.edenFrame?._internal.appId;
-    if (pendingBounds && appId) {
+    if (pendingBounds) {
       window.edenAPI
-        .shellCommand("view/update-view-bounds", {
-          appId,
+        .shellCommand("view/update-bounds", {
           bounds: pendingBounds,
         })
         .catch(log.error);
@@ -105,18 +103,15 @@ export function setupWindowResizing(
       rafId = requestAnimationFrame(updateResizePosition);
     }
 
-    const appId = window.edenFrame?._internal.appId;
-
-    // NOTE: We do NOT call focus-app here anymore.
-    // On macOS (and Linux touch), calling focus-app during resize start causes view reordering
+    // NOTE: We do NOT call focus here anymore.
+    // On macOS (and Linux touch), calling focus during resize start causes view reordering
     // which cancels the resize/touch event. Instead, we bring the window to front after resize ends.
 
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
-    if (!isTouch && appId) {
+    if (!isTouch) {
       window.edenAPI
         .shellCommand("view/start-resize", {
-          appId,
           startX: coords.x,
           startY: coords.y,
         })
@@ -204,18 +199,15 @@ export function setupWindowResizing(
     // Remove mouseup listener since resize is done
     window.removeEventListener("mouseup", endResize);
 
-    const appId = window.edenFrame?._internal.appId;
-
     // Cancel animation frame and send final position
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = null;
 
       // Send final pending bounds immediately
-      if (pendingBounds && appId) {
+      if (pendingBounds) {
         window.edenAPI
-          .shellCommand("view/update-view-bounds", {
-            appId,
+          .shellCommand("view/update-bounds", {
             bounds: pendingBounds,
           })
           .catch(log.error);
@@ -236,15 +228,11 @@ export function setupWindowResizing(
     }
 
     // Stop global resize tracking in main process (for mouse events)
-    if (!isTouch && appId) {
-      window.edenAPI
-        .shellCommand("view/end-resize", { appId })
-        .catch(log.error);
+    if (!isTouch) {
+      window.edenAPI.shellCommand("view/end-resize", {}).catch(log.error);
     }
 
-    if (appId) {
-      window.edenAPI.shellCommand("view/focus-app", { appId }).catch(log.error);
-    }
+    window.edenAPI.shellCommand("view/focus", {}).catch(log.error);
   };
 
   // Mouse events

@@ -163,8 +163,7 @@ export default function ShellOverlay() {
   // Helper function to update overlay bounds via API
   const updateOverlayBounds = async (bounds: ViewBounds) => {
     try {
-      await window.edenAPI.shellCommand("view/update-view-bounds", {
-        appId: "com.eden.eveshell",
+      await window.edenAPI.shellCommand("view/update-bounds", {
         bounds,
       });
     } catch (error) {
@@ -192,7 +191,7 @@ export default function ShellOverlay() {
     if (isRunning) {
       // App is running, focus/show it
       try {
-        await window.edenAPI.shellCommand("view/focus-app", { appId });
+        await window.edenAPI.shellCommand("view/focus-view", { appId });
       } catch (error) {
         console.error("Failed to focus app:", error);
       }

@@ -9,7 +9,7 @@
     "copy-assets": "eden-build copy-assets",
     "build:apps": "eden-build apps",
     "build:main": "tsc",
-    "dev": "pnpm run build && concurrently --kill-others \"pnpm run dev:watch\" \"sleep 3 && NODE_ENV=development electron .\"",
+    "dev": "pnpm build && NODE_ENV=development electron .",
     "dev:watch": "eden-build watch",
     "start": "electron .",
     "clean": "rm -rf dist"

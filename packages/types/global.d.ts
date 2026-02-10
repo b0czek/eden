@@ -1,11 +1,15 @@
 // Ambient declarations for renderer globals
 
+import type { AppFrameInjectionMode, CSSInjectionMode } from "./AppManifest";
 import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 
 export interface EdenFrame {
   // Public API
   setTitle: (title: string) => void;
   resetTitle: () => void;
+  close: () => Promise<void>;
+  minimize: () => Promise<void>;
+  toggleMode: () => Promise<void>;
 
   // Internal state (used by frame system)
   _internal: {
@@ -21,6 +25,10 @@ export interface EdenFrame {
       resizable?: boolean;
       minSize?: { width: number; height: number };
       maxSize?: { width: number; height: number };
+      injections?: {
+        css?: CSSInjectionMode;
+        appFrame?: AppFrameInjectionMode;
+      };
     };
     currentMode: "tiled" | "floating";
     bounds: {
@@ -53,6 +61,3 @@ declare global {
     edenFrame?: EdenFrame;
   }
 }
-
-// This export is important - it marks the file as a module
-export {};

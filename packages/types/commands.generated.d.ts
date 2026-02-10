@@ -741,7 +741,16 @@ export interface UserCommands {
  */
 export interface ViewCommands {
   /**
-   * Update the bounds (position and size) of a specific view.
+   * Update bounds for the caller's own view.
+   */
+  "view/update-bounds": {
+    args: {
+    bounds: import("./index").ViewBounds };
+    response: { success: boolean };
+  };
+  /**
+   * Update bounds for any app view.
+   * Requires "view/manage" permission.
    */
   "view/update-view-bounds": {
     args: {
@@ -750,7 +759,16 @@ export interface ViewCommands {
     response: { success: boolean };
   };
   /**
-   * Show or hide a specific view.
+   * Show or hide the caller's own view.
+   */
+  "view/set-visibility": {
+    args: {
+    visible: boolean };
+    response: { success: boolean };
+  };
+  /**
+   * Show or hide any app view.
+   * Requires "view/manage" permission.
    */
   "view/set-view-visibility": {
     args: {
@@ -759,14 +777,24 @@ export interface ViewCommands {
     response: { success: boolean };
   };
   /**
-   * Bring an application's view to the front and focus it.
+   * Bring caller's own view to the front and focus it.
    */
-  "view/focus-app": {
-    args: { appId: string };
+  "view/focus": {
+    args: { };
+    response: { success: boolean };
+  };
+  /**
+   * Bring any app view to the front and focus it.
+   * Requires "view/manage" permission.
+   */
+  "view/focus-view": {
+    args: {
+    appId: string };
     response: { success: boolean };
   };
   /**
    * Update the available workspace bounds (e.g. after taskbar resize).
+   * Requires "view/manage" permission for app callers.
    */
   "view/update-global-bounds": {
     args: {
@@ -775,7 +803,16 @@ export interface ViewCommands {
     response: { success: boolean };
   };
   /**
-   * Toggle between floating and tiled window modes.
+   * Toggle caller's own view between floating and tiled window modes.
+   */
+  "view/toggle-mode": {
+    args: {
+    mode?: "floating" | "tiled" };
+    response: { success: boolean };
+  };
+  /**
+   * Toggle any app view between floating and tiled window modes.
+   * Requires "view/manage" permission.
    */
   "view/toggle-view-mode": {
     args: {
@@ -784,45 +821,43 @@ export interface ViewCommands {
     response: { success: boolean };
   };
   /**
-   * Start dragging a window.
+   * Start dragging caller's own view.
    */
   "view/start-drag": {
     args: {
-    appId: string;
     startX: number;
     startY: number };
     response: { success: boolean };
   };
   /**
-   * End the current drag operation.
+   * End drag operation for caller's own view.
    */
   "view/end-drag": {
-    args: { appId: string };
+    args: { };
     response: { success: boolean };
   };
   /**
    * Handle global mouse up event to stop any active drag/resize operations.
+   * Requires "view/manage" permission for app callers.
    */
   "view/global-mouseup": {
     args: Record<string, never>;
     response: { success: boolean };
   };
   /**
-   * Start resizing a window.
+   * Start resizing caller's own view.
    */
   "view/start-resize": {
     args: {
-    appId: string;
     startX: number;
     startY: number };
     response: { success: boolean };
   };
   /**
-   * End the current resize operation.
+   * End resize operation for caller's own view.
    */
   "view/end-resize": {
-    args: {
-    appId: string };
+    args: { };
     response: { success: boolean };
   };
   /**

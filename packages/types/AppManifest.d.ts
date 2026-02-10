@@ -13,7 +13,8 @@ export type WindowMode = "floating" | "tiled" | "both";
  * - "tokens": Inject only CSS custom property definitions
  * - "none": Don't inject any CSS
  */
-export type CSSInjectionMode = "full" | "tokens" | "none";
+export type CSSInjectionMode = "none" | "tokens" | "full";
+export type AppFrameInjectionMode = "none" | "window-only" | "full" | boolean;
 
 export interface WindowInjectionOptions {
   /**
@@ -24,8 +25,13 @@ export interface WindowInjectionOptions {
    */
   css?: CSSInjectionMode;
 
-  /** Inject the Eden app frame with title bar controls (default: true) */
-  appFrame?: boolean;
+  /**
+   * Inject Eden app frame runtime and visuals (default: true).
+   * - true | "full": full Eden frame (rounded container + system top bar controls)
+   * - "window-only": keep frame runtime/container, but app renders its own top bar
+   * - false | "none": disable app frame injection entirely
+   */
+  appFrame?: AppFrameInjectionMode;
 }
 
 export interface WindowConfig {

@@ -34,7 +34,8 @@ export class ViewCreator {
    * Determine whether the app frame should be injected
    */
   shouldInjectAppFrame(windowConfig?: WindowConfig): boolean {
-    return windowConfig?.injections?.appFrame !== false;
+    const appFrameMode = windowConfig?.injections?.appFrame;
+    return appFrameMode !== false && appFrameMode !== "none";
   }
 
   /**

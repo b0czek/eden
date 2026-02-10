@@ -4,13 +4,16 @@ import { log } from "../logging";
  * Eden App Frame Injector
  *
  * Main orchestrator for the app frame system.
- * This script is injected into every app to add a title bar with controls.
+ * This script is injected into app views to apply frame runtime behavior.
  */
 
 import {
+  closeAppFrameView,
+  minimizeAppFrameView,
   setupCloseButton,
   setupMinimizeButton,
   setupToggleModeButton,
+  toggleAppFrameViewMode,
 } from "./button-handlers.js";
 import {
   createOverlay,
@@ -34,6 +37,15 @@ import { setupWindowResizing } from "./window-resizing.js";
       resetTitle: () => {
         /* will be set later */
       },
+      close: async () => {
+        /* will be set later */
+      },
+      minimize: async () => {
+        /* will be set later */
+      },
+      toggleMode: async () => {
+        /* will be set later */
+      },
       _internal: {
         appId: "",
         appName: "" as string | Record<string, string>,
@@ -44,6 +56,31 @@ import { setupWindowResizing } from "./window-resizing.js";
       },
     };
   }
+  if (!window.edenFrame.setTitle) {
+    window.edenFrame.setTitle = () => {
+      /* no-op until initialized */
+    };
+  }
+  if (!window.edenFrame.resetTitle) {
+    window.edenFrame.resetTitle = () => {
+      /* no-op until initialized */
+    };
+  }
+  if (!window.edenFrame.close) {
+    window.edenFrame.close = async () => {
+      /* no-op until initialized */
+    };
+  }
+  if (!window.edenFrame.minimize) {
+    window.edenFrame.minimize = async () => {
+      /* no-op until initialized */
+    };
+  }
+  if (!window.edenFrame.toggleMode) {
+    window.edenFrame.toggleMode = async () => {
+      /* no-op until initialized */
+    };
+  }
 
   // Check if already injected
   if (window.edenFrame._internal.injected) {
@@ -52,7 +89,6 @@ import { setupWindowResizing } from "./window-resizing.js";
   }
   window.edenFrame._internal.injected = true;
 
-  let appId: string | null = null;
   let appName: string = "App";
 
   // Track current window bounds for floating windows
@@ -64,65 +100,61 @@ import { setupWindowResizing } from "./window-resizing.js";
   let cleanupDrag: (() => void) | null = null;
   let cleanupResize: (() => void) | null = null;
 
-  // Create the overlay
-  const overlay = createOverlay(window.edenFrame._internal.config);
+  const configuredAppFrameMode =
+    window.edenFrame._internal.config.injections?.appFrame;
+  const appFrameMode =
+    configuredAppFrameMode === "window-only" ? "window-only" : "full";
+  const includeSystemTopBar = appFrameMode === "full";
+
+  // Only create the Eden title bar in full mode.
+  const overlay = includeSystemTopBar
+    ? createOverlay(window.edenFrame._internal.config)
+    : null;
 
   // Setup handlers after overlay is injected
   const setupHandlers = (): void => {
     // Get appId from injected config
-    if (window.edenFrame && window.edenFrame._internal.appId) {
-      appId = window.edenFrame._internal.appId;
+    if (window.edenFrame) {
       const rawName = window.edenFrame._internal.appName;
+      appName = getAppName(rawName, "en");
 
-      // Async fetch locale
-      window.edenAPI
-        .shellCommand("i18n/get-locale", {})
-        .then((response: { locale: string }) => {
-          const locale = response?.locale;
-          const currentLocale = locale || "en";
-          appName = getAppName(rawName, currentLocale);
-          setTitle(appName);
+      if (includeSystemTopBar) {
+        // Async fetch locale for title text
+        window.edenAPI
+          .shellCommand("i18n/get-locale", {})
+          .then((response: { locale: string }) => {
+            const locale = response?.locale;
+            const currentLocale = locale || "en";
+            appName = getAppName(rawName, currentLocale);
+            setTitle(appName);
+          })
+          .catch(() => {
+            appName = getAppName(rawName, "en");
+            setTitle(appName);
+          });
 
-          // Update resetTitle to use this locale
-          if (window.edenFrame) {
-            window.edenFrame.setTitle = (title: string) => setTitle(title);
-            (window.edenFrame as any).resetTitle = () => setTitle(appName);
-          }
-        })
-        .catch(() => {
-          appName = getAppName(rawName, "en");
-          setTitle(appName);
-          if (window.edenFrame) {
-            window.edenFrame.setTitle = (title: string) => setTitle(title);
-            (window.edenFrame as any).resetTitle = () => setTitle(appName);
-          }
-        });
+        // Set initial title (english fallback) to avoid empty title while fetching
+        setTitle(appName);
 
-      // Set initial title (english fallback) to avoid empty title while fetching
-      setTitle(getAppName(rawName, "en"));
-
-      // Subscribe to locale changes for live updates
-      window.edenAPI.subscribe(
-        "i18n/locale-changed",
-        (data: { locale: string }) => {
-          const newLocale = data.locale;
-          const currentName = getAppName(rawName, newLocale);
-
-          // Update title
-          setTitle(currentName);
-
-          // Update resetTitle to use the new locale
-          if (window.edenFrame) {
-            (window.edenFrame as any).resetTitle = () => setTitle(currentName);
-          }
-        },
-      );
+        // Subscribe to locale changes for live updates
+        window.edenAPI.subscribe(
+          "i18n/locale-changed",
+          (data: { locale: string }) => {
+            const newLocale = data.locale;
+            const currentName = getAppName(rawName, newLocale);
+            setTitle(currentName);
+            appName = currentName;
+          },
+        );
+      }
     }
 
-    // Setup button handlers
-    setupCloseButton();
-    setupMinimizeButton();
-    setupToggleModeButton();
+    if (includeSystemTopBar) {
+      // Setup system top bar button handlers
+      setupCloseButton();
+      setupMinimizeButton();
+      setupToggleModeButton();
+    }
 
     // Setup floating window controls
     setupFloatingWindowControls();
@@ -200,7 +232,13 @@ import { setupWindowResizing } from "./window-resizing.js";
 
     // Setup window dragging
     if (isMovable) {
-      cleanupDrag = setupWindowDragging(overlay, currentBoundsRef);
+      if (overlay) {
+        cleanupDrag = setupWindowDragging(overlay, currentBoundsRef);
+      } else {
+        cleanupDrag = setupWindowDragging(document, currentBoundsRef, {
+          dragRegionSelector: "[data-eden-drag-region]",
+        });
+      }
     }
 
     // Setup window resizing
@@ -236,10 +274,16 @@ import { setupWindowResizing } from "./window-resizing.js";
   );
 
   // Inject overlay and setup handlers
-  injectOverlay(overlay, () => {
-    setupDarkMode(overlay);
+  if (overlay) {
+    injectOverlay(overlay, () => {
+      setupDarkMode(overlay);
+      setupHandlers();
+    });
+  } else if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupHandlers);
+  } else {
     setupHandlers();
-  });
+  }
 
   // Expose API for apps to update the title
   window.edenFrame.setTitle = (title: string) => {
@@ -247,15 +291,12 @@ import { setupWindowResizing } from "./window-resizing.js";
   };
 
   // Expose resetTitle immediately (using English/default name initially)
-  // This will be updated to use the correct locale once fetched
   window.edenFrame.resetTitle = () => {
-    // If locale hasn't loaded yet, getAppName will use 'en' fallback
-    if (window.edenFrame) {
-      const currentName = getAppName(
-        window.edenFrame._internal.appName || window.edenFrame._internal.appId,
-        "en",
-      );
-      setTitle(currentName);
-    }
+    setTitle(appName);
   };
+
+  // Expose app frame actions for custom title bars.
+  window.edenFrame.close = () => closeAppFrameView();
+  window.edenFrame.minimize = () => minimizeAppFrameView();
+  window.edenFrame.toggleMode = () => toggleAppFrameViewMode();
 })();

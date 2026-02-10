@@ -142,8 +142,7 @@ function calculateBounds(): ViewBounds {
 async function updateOverlayBounds(): Promise<void> {
   const bounds = calculateBounds();
   try {
-    await window.edenAPI.shellCommand("view/update-view-bounds", {
-      appId: "com.eden.toaster",
+    await window.edenAPI.shellCommand("view/update-bounds", {
       bounds,
     });
   } catch (err) {
