@@ -227,4 +227,42 @@ export class FilesystemManager {
       await fs.unlink(fullPath);
     }
   }
+
+  /**
+   * Copy a file or directory to another location.
+   */
+  async copy(fromPath: string, toPath: string): Promise<void> {
+    const fullFromPath = this.resolvePath(fromPath);
+    const fullToPath = this.resolvePath(toPath);
+
+    await fs.mkdir(path.dirname(fullToPath), { recursive: true });
+    await fs.cp(fullFromPath, fullToPath, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+    });
+  }
+
+  /**
+   * Move or rename a file or directory.
+   * Falls back to copy+delete when rename crosses filesystem boundaries.
+   */
+  async move(fromPath: string, toPath: string): Promise<void> {
+    const fullFromPath = this.resolvePath(fromPath);
+    const fullToPath = this.resolvePath(toPath);
+
+    await fs.mkdir(path.dirname(fullToPath), { recursive: true });
+
+    try {
+      await fs.rename(fullFromPath, fullToPath);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code !== "EXDEV") {
+        throw error;
+      }
+
+      await this.copy(fromPath, toPath);
+      await this.delete(fromPath);
+    }
+  }
 }
