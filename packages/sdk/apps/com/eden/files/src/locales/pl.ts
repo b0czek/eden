@@ -24,5 +24,11 @@ export const pl = {
     goBack: "Wstecz",
     goForward: "Dalej",
     goUp: "W Górę",
+    open: "Otwórz",
+    rename: "Zmień nazwę",
+    duplicate: "Duplikuj",
+    refresh: "Odśwież",
+    copySuffix: "kopia",
+    itemAlreadyExists: "Element o tej nazwie już istnieje",
   },
 };

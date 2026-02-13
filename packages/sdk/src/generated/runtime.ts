@@ -48,6 +48,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "fs/stat",
   "fs/search",
   "fs/delete",
+  "fs/cp",
+  "fs/mv",
   "i18n/get-locale",
   "i18n/get-common",
   "event/subscribe",

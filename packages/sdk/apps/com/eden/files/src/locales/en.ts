@@ -24,5 +24,11 @@ export const en = {
     goBack: "Go Back",
     goForward: "Go Forward",
     goUp: "Go Up",
+    open: "Open",
+    rename: "Rename",
+    duplicate: "Duplicate",
+    refresh: "Refresh",
+    copySuffix: "copy",
+    itemAlreadyExists: "An item with this name already exists",
   },
 };

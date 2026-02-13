@@ -1,9 +1,10 @@
 import type { Component } from "solid-js";
-import { type JSX, Show } from "solid-js";
+import { createEffect, type JSX, onCleanup, Show } from "solid-js";
 
 interface ModalProps {
   show: boolean;
   onClose: () => void;
+  onConfirm?: () => void;
   title: string;
   size?: "sm" | "md" | "lg";
   children: JSX.Element;
@@ -11,6 +12,36 @@ interface ModalProps {
 }
 
 const Modal: Component<ModalProps> = (props) => {
+  createEffect(() => {
+    if (!props.show) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Keep all keyboard interaction scoped to the active dialog.
+      e.stopPropagation();
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        props.onClose();
+        return;
+      }
+
+      if (e.key === "Enter" && props.onConfirm) {
+        const target = e.target as HTMLElement | null;
+        if (target?.tagName === "TEXTAREA") {
+          return;
+        }
+
+        e.preventDefault();
+        props.onConfirm();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    onCleanup(() =>
+      document.removeEventListener("keydown", handleKeyDown, true),
+    );
+  });
+
   const sizeClass = () => {
     switch (props.size) {
       case "sm":

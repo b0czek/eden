@@ -10,6 +10,7 @@ interface FileItemComponentProps {
   itemSize: ItemSize;
   onClick: (item: FileItem) => void;
   onDoubleClick: (item: FileItem) => void;
+  onContextMenu: (item: FileItem, e: MouseEvent) => void;
   onDelete: (item: FileItem, e: MouseEvent) => void;
 }
 
@@ -35,6 +36,7 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       }}
       onClick={() => props.onClick(props.item)}
       onDblClick={() => props.onDoubleClick(props.item)}
+      onContextMenu={(e) => props.onContextMenu(props.item, e)}
     >
       <div class="file-icon">{getFileIcon(props.item)}</div>
       <div class="file-name">{props.item.name}</div>

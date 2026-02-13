@@ -15,6 +15,7 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
     <Modal
       show={props.show}
       onClose={props.onClose}
+      onConfirm={props.onConfirm}
       title={t("common.delete")}
       size="sm"
       footer={

@@ -13,6 +13,7 @@ const ErrorDialog: Component<ErrorDialogProps> = (props) => {
     <Modal
       show={props.show}
       onClose={props.onClose}
+      onConfirm={props.onClose}
       title={t("common.error")}
       size="sm"
       footer={

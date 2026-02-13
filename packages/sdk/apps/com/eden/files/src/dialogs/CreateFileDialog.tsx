@@ -17,14 +17,6 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
     setFileName("");
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleCreate();
-    if (e.key === "Escape") {
-      props.onClose();
-      setFileName("");
-    }
-  };
-
   return (
     <Modal
       show={props.show}
@@ -32,6 +24,7 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
         props.onClose();
         setFileName("");
       }}
+      onConfirm={handleCreate}
       title={t("files.newFile")}
       size="sm"
       footer={
@@ -59,7 +52,6 @@ const CreateFileDialog: Component<CreateFileDialogProps> = (props) => {
           placeholder="example.txt"
           value={fileName()}
           onInput={(e) => setFileName(e.currentTarget.value)}
-          onKeyDown={handleKeyDown}
         />
         <p class="eden-form-help">{t("files.extensionHelp")}</p>
       </div>

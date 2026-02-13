@@ -17,14 +17,6 @@ const CreateFolderDialog: Component<CreateFolderDialogProps> = (props) => {
     setFolderName("");
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleCreate();
-    if (e.key === "Escape") {
-      props.onClose();
-      setFolderName("");
-    }
-  };
-
   return (
     <Modal
       show={props.show}
@@ -32,6 +24,7 @@ const CreateFolderDialog: Component<CreateFolderDialogProps> = (props) => {
         props.onClose();
         setFolderName("");
       }}
+      onConfirm={handleCreate}
       title={t("files.newFolder")}
       size="sm"
       footer={
@@ -59,7 +52,6 @@ const CreateFolderDialog: Component<CreateFolderDialogProps> = (props) => {
           placeholder={`${t("files.newFolder")}...`}
           value={folderName()}
           onInput={(e) => setFolderName(e.currentTarget.value)}
-          onKeyDown={handleKeyDown}
         />
       </div>
     </Modal>

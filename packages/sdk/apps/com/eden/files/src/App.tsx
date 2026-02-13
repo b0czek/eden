@@ -8,32 +8,30 @@ import CreateFolderDialog from "./dialogs/CreateFolderDialog";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 import DisplayOptionsModal from "./dialogs/DisplayOptionsModal";
 import ErrorDialog from "./dialogs/ErrorDialog";
+import RenameDialog from "./dialogs/RenameDialog";
+import { buildBreadcrumbs } from "./features/breadcrumbs";
+import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
+import { useExplorerNavigation } from "./features/useExplorerNavigation";
+import { useFileActions } from "./features/useFileActions";
 import { initLocale } from "./i18n";
 import type { DisplayPreferences, FileItem } from "./types";
-import { getParentPath, isValidName, joinPath } from "./utils";
 
 const App: Component = () => {
-  const [currentPath, setCurrentPath] = createSignal("/");
-  const [items, setItems] = createSignal<FileItem[]>([]);
-  const [loading, setLoading] = createSignal(true);
   const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
   const [scrollToSelected, setScrollToSelected] = createSignal(false);
-  const [navigationHistory, setNavigationHistory] = createSignal<string[]>([
-    "/",
-  ]);
-  const [historyIndex, setHistoryIndex] = createSignal(0);
 
-  // Modal states
   const [showNewFolderDialog, setShowNewFolderDialog] = createSignal(false);
   const [showNewFileDialog, setShowNewFileDialog] = createSignal(false);
+  const [showRenameDialog, setShowRenameDialog] = createSignal(false);
   const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
   const [showErrorDialog, setShowErrorDialog] = createSignal(false);
   const [showDisplayOptionsModal, setShowDisplayOptionsModal] =
     createSignal(false);
+
   const [errorMessage, setErrorMessage] = createSignal("");
+  const [itemToRename, setItemToRename] = createSignal<FileItem | null>(null);
   const [itemToDelete, setItemToDelete] = createSignal<FileItem | null>(null);
 
-  // Display preferences
   const [displayPreferences, setDisplayPreferences] =
     createSignal<DisplayPreferences>({
       viewStyle: "grid",
@@ -42,185 +40,18 @@ const App: Component = () => {
       sortOrder: "asc",
     });
 
-  // Load preferences from database on mount
-  onMount(async () => {
-    initLocale(); // Initialize locale
-    try {
-      const result = await window.edenAPI.shellCommand("db/get", {
-        key: "display-preferences",
-      });
-      if (result.value) {
-        setDisplayPreferences(JSON.parse(result.value));
-      }
-    } catch (error) {
-      console.error("Failed to load display preferences:", error);
-    }
-  });
-
-  const loadDirectory = async (path: string) => {
-    try {
-      setLoading(true);
-      setCurrentPath(path);
-
-      const dirItems = await window.edenAPI.shellCommand("fs/readdir", {
-        path,
-      });
-      const itemsWithStats = await Promise.all(
-        dirItems.map(async (name: string) => {
-          const itemPath = joinPath(path, name);
-          try {
-            const stats = await window.edenAPI.shellCommand("fs/stat", {
-              path: itemPath,
-            });
-            return {
-              name,
-              path: itemPath,
-              isDirectory: stats.isDirectory,
-              isFile: stats.isFile,
-              size: stats.size,
-              modified: new Date(stats.mtime),
-            };
-          } catch (_) {
-            return {
-              name,
-              path: itemPath,
-              isDirectory: false,
-              isFile: true,
-              size: 0,
-              modified: new Date(),
-            };
-          }
-        }),
-      );
-
-      const sorted = sortItems(itemsWithStats);
-      setItems(sorted);
-    } catch (error) {
-      console.error("Error loading directory:", error);
-      showError(`Failed to load directory: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  createEffect(() => {
-    loadDirectory(currentPath());
-  });
-
-  // Handle keyboard shortcuts (Zoom only - Navigation moved to FileList)
-  createEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if input is focused (e.g. Omnibox or dialogs)
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
-
-      const prefs = displayPreferences();
-      const sizes = ITEM_SIZES;
-
-      // Zoom Controls (Ctrl/Cmd + +/-)
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        (e.key === "=" || e.key === "+" || e.key === "-")
-      ) {
-        e.preventDefault();
-        const currentIndex = sizes.indexOf(prefs.itemSize);
-        let newIndex = currentIndex;
-
-        if (e.key === "=" || e.key === "+") {
-          newIndex = Math.min(currentIndex + 1, sizes.length - 1);
-        } else if (e.key === "-") {
-          newIndex = Math.max(currentIndex - 1, 0);
-        }
-
-        if (newIndex !== currentIndex) {
-          handlePreferencesChange({ ...prefs, itemSize: sizes[newIndex] });
-        }
-        return;
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  });
-
-  // Handle mouse button 4/5 for back/forward navigation
-  createEffect(() => {
-    const handleMouseButton = (e: MouseEvent) => {
-      if (e.button === 3) {
-        // Mouse button 4 (back)
-        e.preventDefault();
-        goBack();
-      } else if (e.button === 4) {
-        // Mouse button 5 (forward)
-        e.preventDefault();
-        goForward();
-      }
-    };
-
-    document.addEventListener("mousedown", handleMouseButton);
-
-    return () => {
-      document.removeEventListener("mousedown", handleMouseButton);
-    };
-  });
-
-  const navigateTo = (path: string, selectedItem?: string) => {
-    const history = navigationHistory();
-    const index = historyIndex();
-
-    if (index === history.length - 1) {
-      setNavigationHistory([...history, path]);
-      setHistoryIndex(index + 1);
-    } else {
-      setNavigationHistory([...history.slice(0, index + 1), path]);
-      setHistoryIndex(index + 1);
-    }
-
-    loadDirectory(path);
-
-    // If a specific item should be selected, set it after navigation and trigger scroll
-    if (selectedItem) {
-      setScrollToSelected(true);
-      setSelectedItem(selectedItem);
-    }
-  };
-
-  const goBack = () => {
-    const index = historyIndex();
-    if (index > 0) {
-      setHistoryIndex(index - 1);
-      loadDirectory(navigationHistory()[index - 1]);
-    }
-  };
-
-  const goForward = () => {
-    const history = navigationHistory();
-    const index = historyIndex();
-    if (index < history.length - 1) {
-      setHistoryIndex(index + 1);
-      loadDirectory(history[index + 1]);
-    }
-  };
-
-  const goUp = () => {
-    const parentPath = getParentPath(currentPath());
-    if (parentPath !== currentPath()) {
-      navigateTo(parentPath);
-    }
-  };
-
-  const refresh = () => {
-    loadDirectory(currentPath());
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setShowErrorDialog(true);
   };
 
   const sortItems = (items: FileItem[]): FileItem[] => {
     const prefs = displayPreferences();
 
     return [...items].sort((a, b) => {
-      // Folders always come first
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
 
-      // Then sort by selected criteria
       let comparison = 0;
       switch (prefs.sortBy) {
         case "name":
@@ -238,17 +69,49 @@ const App: Component = () => {
     });
   };
 
+  const {
+    currentPath,
+    items,
+    setItems,
+    loading,
+    navigationHistory,
+    historyIndex,
+    navigateTo,
+    goBack,
+    goForward,
+    goUp,
+    refresh,
+  } = useExplorerNavigation({
+    sortItems,
+    onLoadError: showError,
+    setSelectedItem,
+    setScrollToSelected,
+  });
+
+  onMount(async () => {
+    initLocale();
+    try {
+      const result = await window.edenAPI.shellCommand("db/get", {
+        key: "display-preferences",
+      });
+      if (result.value) {
+        setDisplayPreferences(JSON.parse(result.value));
+      }
+    } catch (error) {
+      console.error("Failed to load display preferences:", error);
+    }
+  });
+
   const handlePreferencesChange = async (
     newPreferences: DisplayPreferences,
   ) => {
     setDisplayPreferences(newPreferences);
-    // Re-sort existing items with new preferences
+
     const currentItems = items();
     if (currentItems.length > 0) {
       setItems(sortItems(currentItems));
     }
 
-    // Persist preferences to database
     try {
       await window.edenAPI.shellCommand("db/set", {
         key: "display-preferences",
@@ -259,111 +122,80 @@ const App: Component = () => {
     }
   };
 
-  const createFolder = async (name: string) => {
-    const trimmedName = name.trim();
-    if (!trimmedName || !isValidName(trimmedName)) {
-      showError("Invalid folder name");
-      return;
-    }
+  createEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
 
-    const folderPath = joinPath(currentPath(), trimmedName);
+      const prefs = displayPreferences();
+      const sizes = ITEM_SIZES;
 
-    try {
-      await window.edenAPI.shellCommand("fs/mkdir", {
-        path: folderPath,
-      });
-      setShowNewFolderDialog(false);
-      refresh();
-    } catch (error) {
-      showError(`Failed to create folder: ${(error as Error).message}`);
-    }
-  };
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "=" || e.key === "+" || e.key === "-")
+      ) {
+        e.preventDefault();
 
-  const createFile = async (name: string) => {
-    const trimmedName = name.trim();
-    if (!trimmedName || !isValidName(trimmedName)) {
-      showError("Invalid file name");
-      return;
-    }
+        const currentIndex = sizes.indexOf(prefs.itemSize);
+        let newIndex = currentIndex;
 
-    const filePath = joinPath(currentPath(), trimmedName);
-
-    try {
-      await window.edenAPI.shellCommand("fs/write", {
-        path: filePath,
-        content: "",
-      });
-      setShowNewFileDialog(false);
-      refresh();
-    } catch (error) {
-      showError(`Failed to create file: ${(error as Error).message}`);
-    }
-  };
-
-  const confirmDelete = async () => {
-    const item = itemToDelete();
-    if (!item) return;
-
-    try {
-      await window.edenAPI.shellCommand("fs/delete", {
-        path: item.path,
-      });
-      setShowDeleteDialog(false);
-      setItemToDelete(null);
-      refresh();
-    } catch (error) {
-      showError(`Failed to delete item: ${(error as Error).message}`);
-    }
-  };
-
-  const showError = (message: string) => {
-    setErrorMessage(message);
-    setShowErrorDialog(true);
-  };
-
-  const handleItemClick = (item: FileItem) => {
-    setScrollToSelected(false); // Don't scroll when clicking directly
-    setSelectedItem(item.path);
-  };
-
-  const handleItemDoubleClick = async (item: FileItem) => {
-    if (item.isDirectory) {
-      navigateTo(item.path);
-    } else {
-      // Open files with their registered handler
-      try {
-        const result = await window.edenAPI.shellCommand("file/open", {
-          path: item.path,
-        });
-        if (!result.success) {
-          showError(`Failed to open file: ${result.error}`);
+        if (e.key === "=" || e.key === "+") {
+          newIndex = Math.min(currentIndex + 1, sizes.length - 1);
+        } else if (e.key === "-") {
+          newIndex = Math.max(currentIndex - 1, 0);
         }
-      } catch (error) {
-        showError(`Failed to open file: ${(error as Error).message}`);
+
+        if (newIndex !== currentIndex) {
+          handlePreferencesChange({ ...prefs, itemSize: sizes[newIndex] });
+        }
       }
-    }
-  };
+    };
 
-  const handleDeleteClick = (item: FileItem, e: MouseEvent) => {
-    e.stopPropagation();
-    setItemToDelete(item);
-    setShowDeleteDialog(true);
-  };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  });
 
-  const getBreadcrumbs = () => {
-    const path = currentPath();
-    const parts = path.split("/").filter((p) => p);
+  const {
+    createFolder,
+    createFile,
+    duplicateItem,
+    openItem,
+    renameItem,
+    confirmDelete,
+    handleItemClick,
+    handleItemDoubleClick,
+    promptRename,
+    promptDelete,
+    handleDeleteClick,
+    handleDeleteShortcut,
+  } = useFileActions({
+    currentPath,
+    refresh,
+    navigateTo,
+    showError,
+    setSelectedItem,
+    setScrollToSelected,
+    showNewFolderDialog: setShowNewFolderDialog,
+    showNewFileDialog: setShowNewFileDialog,
+    showRenameDialog: setShowRenameDialog,
+    showDeleteDialog: setShowDeleteDialog,
+    itemToRename,
+    setItemToRename,
+    itemToDelete,
+    setItemToDelete,
+  });
 
-    const crumbs = [{ name: "/", path: "/" }];
-    let accumulatedPath = "";
-
-    parts.forEach((part) => {
-      accumulatedPath += `/${part}`;
-      crumbs.push({ name: part, path: accumulatedPath });
+  const { handleItemContextMenu, handleBackgroundContextMenu } =
+    useExplorerContextMenus({
+      openItem,
+      promptRename,
+      duplicateItem,
+      promptDelete,
+      refresh,
+      setSelectedItem,
+      setScrollToSelected,
+      showNewFolderDialog: setShowNewFolderDialog,
+      showNewFileDialog: setShowNewFileDialog,
     });
-
-    return crumbs;
-  };
 
   return (
     <div class="file-explorer">
@@ -371,7 +203,7 @@ const App: Component = () => {
         currentPath={currentPath()}
         historyIndex={historyIndex()}
         historyLength={navigationHistory().length}
-        breadcrumbs={getBreadcrumbs()}
+        breadcrumbs={buildBreadcrumbs(currentPath())}
         onGoBack={goBack}
         onGoForward={goForward}
         onGoUp={goUp}
@@ -390,7 +222,10 @@ const App: Component = () => {
         itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
         onItemDoubleClick={handleItemDoubleClick}
+        onItemContextMenu={handleItemContextMenu}
+        onBackgroundContextMenu={handleBackgroundContextMenu}
         onItemDelete={handleDeleteClick}
+        onItemDeleteShortcut={handleDeleteShortcut}
         onBack={goBack}
       />
 
@@ -404,6 +239,16 @@ const App: Component = () => {
         show={showNewFileDialog()}
         onClose={() => setShowNewFileDialog(false)}
         onCreate={createFile}
+      />
+
+      <RenameDialog
+        show={showRenameDialog()}
+        item={itemToRename()}
+        onClose={() => {
+          setShowRenameDialog(false);
+          setItemToRename(null);
+        }}
+        onRename={renameItem}
       />
 
       <DeleteConfirmDialog
