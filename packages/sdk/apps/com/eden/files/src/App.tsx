@@ -1,36 +1,24 @@
+import { DialogHost, createDialogs } from "@edenapp/solid-kit/dialogs";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, onMount } from "solid-js";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
 import { ITEM_SIZES } from "./constants";
-import CreateFileDialog from "./dialogs/CreateFileDialog";
-import CreateFolderDialog from "./dialogs/CreateFolderDialog";
-import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 import DisplayOptionsModal from "./dialogs/DisplayOptionsModal";
-import ErrorDialog from "./dialogs/ErrorDialog";
-import RenameDialog from "./dialogs/RenameDialog";
 import { buildBreadcrumbs } from "./features/breadcrumbs";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
 import { useExplorerNavigation } from "./features/useExplorerNavigation";
 import { useFileActions } from "./features/useFileActions";
-import { initLocale } from "./i18n";
+import { initLocale, t } from "./i18n";
 import type { DisplayPreferences, FileItem } from "./types";
 
 const App: Component = () => {
+  const dialogs = createDialogs();
+
   const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
   const [scrollToSelected, setScrollToSelected] = createSignal(false);
-
-  const [showNewFolderDialog, setShowNewFolderDialog] = createSignal(false);
-  const [showNewFileDialog, setShowNewFileDialog] = createSignal(false);
-  const [showRenameDialog, setShowRenameDialog] = createSignal(false);
-  const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
-  const [showErrorDialog, setShowErrorDialog] = createSignal(false);
   const [showDisplayOptionsModal, setShowDisplayOptionsModal] =
     createSignal(false);
-
-  const [errorMessage, setErrorMessage] = createSignal("");
-  const [itemToRename, setItemToRename] = createSignal<FileItem | null>(null);
-  const [itemToDelete, setItemToDelete] = createSignal<FileItem | null>(null);
 
   const [displayPreferences, setDisplayPreferences] =
     createSignal<DisplayPreferences>({
@@ -41,8 +29,11 @@ const App: Component = () => {
     });
 
   const showError = (message: string) => {
-    setErrorMessage(message);
-    setShowErrorDialog(true);
+    void dialogs.alert({
+      title: t("common.error"),
+      message,
+      okLabel: t("common.ok"),
+    });
   };
 
   const sortItems = (items: FileItem[]): FileItem[] => {
@@ -155,14 +146,12 @@ const App: Component = () => {
   });
 
   const {
-    createFolder,
-    createFile,
     duplicateItem,
     openItem,
-    renameItem,
-    confirmDelete,
     handleItemClick,
     handleItemDoubleClick,
+    promptCreateFolder,
+    promptCreateFile,
     promptRename,
     promptDelete,
     handleDeleteClick,
@@ -172,16 +161,9 @@ const App: Component = () => {
     refresh,
     navigateTo,
     showError,
+    dialogs,
     setSelectedItem,
     setScrollToSelected,
-    showNewFolderDialog: setShowNewFolderDialog,
-    showNewFileDialog: setShowNewFileDialog,
-    showRenameDialog: setShowRenameDialog,
-    showDeleteDialog: setShowDeleteDialog,
-    itemToRename,
-    setItemToRename,
-    itemToDelete,
-    setItemToDelete,
   });
 
   const { handleItemContextMenu, handleBackgroundContextMenu } =
@@ -193,8 +175,8 @@ const App: Component = () => {
       refresh,
       setSelectedItem,
       setScrollToSelected,
-      showNewFolderDialog: setShowNewFolderDialog,
-      showNewFileDialog: setShowNewFileDialog,
+      promptCreateFolder,
+      promptCreateFile,
     });
 
   return (
@@ -208,8 +190,12 @@ const App: Component = () => {
         onGoForward={goForward}
         onGoUp={goUp}
         onNavigate={navigateTo}
-        onNewFolder={() => setShowNewFolderDialog(true)}
-        onNewFile={() => setShowNewFileDialog(true)}
+        onNewFolder={() => {
+          void promptCreateFolder();
+        }}
+        onNewFile={() => {
+          void promptCreateFile();
+        }}
         onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
       />
 
@@ -229,40 +215,7 @@ const App: Component = () => {
         onBack={goBack}
       />
 
-      <CreateFolderDialog
-        show={showNewFolderDialog()}
-        onClose={() => setShowNewFolderDialog(false)}
-        onCreate={createFolder}
-      />
-
-      <CreateFileDialog
-        show={showNewFileDialog()}
-        onClose={() => setShowNewFileDialog(false)}
-        onCreate={createFile}
-      />
-
-      <RenameDialog
-        show={showRenameDialog()}
-        item={itemToRename()}
-        onClose={() => {
-          setShowRenameDialog(false);
-          setItemToRename(null);
-        }}
-        onRename={renameItem}
-      />
-
-      <DeleteConfirmDialog
-        show={showDeleteDialog()}
-        onClose={() => setShowDeleteDialog(false)}
-        onConfirm={confirmDelete}
-        item={itemToDelete()}
-      />
-
-      <ErrorDialog
-        show={showErrorDialog()}
-        onClose={() => setShowErrorDialog(false)}
-        message={errorMessage()}
-      />
+      <DialogHost dialogs={dialogs} />
 
       <DisplayOptionsModal
         show={showDisplayOptionsModal()}

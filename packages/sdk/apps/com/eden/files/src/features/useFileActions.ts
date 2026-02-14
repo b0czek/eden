@@ -1,3 +1,4 @@
+import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import type { Accessor, Setter } from "solid-js";
 import { t } from "../i18n";
 import type { FileItem } from "../types";
@@ -8,16 +9,9 @@ interface UseFileActionsOptions {
   refresh: () => void;
   navigateTo: (path: string) => void;
   showError: (message: string) => void;
+  dialogs: DialogController;
   setSelectedItem: Setter<string | null>;
   setScrollToSelected: Setter<boolean>;
-  showNewFolderDialog: Setter<boolean>;
-  showNewFileDialog: Setter<boolean>;
-  showRenameDialog: Setter<boolean>;
-  showDeleteDialog: Setter<boolean>;
-  itemToRename: Accessor<FileItem | null>;
-  setItemToRename: Setter<FileItem | null>;
-  itemToDelete: Accessor<FileItem | null>;
-  setItemToDelete: Setter<FileItem | null>;
 }
 
 export const useFileActions = (options: UseFileActionsOptions) => {
@@ -34,7 +28,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       await window.edenAPI.shellCommand("fs/mkdir", {
         path: folderPath,
       });
-      options.showNewFolderDialog(false);
       options.refresh();
     } catch (error) {
       options.showError(`Failed to create folder: ${(error as Error).message}`);
@@ -55,7 +48,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         path: filePath,
         content: "",
       });
-      options.showNewFileDialog(false);
       options.refresh();
     } catch (error) {
       options.showError(`Failed to create file: ${(error as Error).message}`);
@@ -136,10 +128,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
   };
 
-  const renameItem = async (name: string) => {
-    const item = options.itemToRename();
-    if (!item) return;
-
+  const renameItem = async (item: FileItem, name: string) => {
     const trimmedName = name.trim();
     if (!trimmedName || !isValidName(trimmedName)) {
       options.showError("Invalid file or folder name");
@@ -149,8 +138,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     const targetPath = joinPath(options.currentPath(), trimmedName);
 
     if (targetPath === item.path) {
-      options.showRenameDialog(false);
-      options.setItemToRename(null);
       return;
     }
 
@@ -168,8 +155,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         to: targetPath,
       });
 
-      options.showRenameDialog(false);
-      options.setItemToRename(null);
       options.setScrollToSelected(true);
       options.setSelectedItem(targetPath);
       options.refresh();
@@ -178,20 +163,80 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
   };
 
-  const confirmDelete = async () => {
-    const item = options.itemToDelete();
-    if (!item) return;
-
+  const deleteItem = async (item: FileItem) => {
     try {
       await window.edenAPI.shellCommand("fs/delete", {
         path: item.path,
       });
-      options.showDeleteDialog(false);
-      options.setItemToDelete(null);
       options.refresh();
     } catch (error) {
       options.showError(`Failed to delete item: ${(error as Error).message}`);
     }
+  };
+
+  const promptCreateFolder = async () => {
+    const name = await options.dialogs.prompt({
+      title: t("files.newFolder"),
+      label: t("common.name"),
+      placeholder: `${t("files.newFolder")}...`,
+      confirmLabel: t("common.ok"),
+      cancelLabel: t("common.cancel"),
+    });
+
+    if (name === null) {
+      return;
+    }
+
+    await createFolder(name);
+  };
+
+  const promptCreateFile = async () => {
+    const name = await options.dialogs.prompt({
+      title: t("files.newFile"),
+      label: t("common.name"),
+      placeholder: "example.txt",
+      hint: t("files.extensionHelp"),
+      confirmLabel: t("common.ok"),
+      cancelLabel: t("common.cancel"),
+    });
+
+    if (name === null) {
+      return;
+    }
+
+    await createFile(name);
+  };
+
+  const promptRename = async (item: FileItem) => {
+    const name = await options.dialogs.prompt({
+      title: t("files.rename"),
+      label: t("common.name"),
+      initialValue: item.name,
+      confirmLabel: t("files.rename"),
+      cancelLabel: t("common.cancel"),
+    });
+
+    if (name === null) {
+      return;
+    }
+
+    await renameItem(item, name);
+  };
+
+  const promptDelete = async (item: FileItem) => {
+    const confirmed = await options.dialogs.confirm({
+      title: t("common.delete"),
+      message: t("common.deleteConfirmation", { name: item.name }),
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteItem(item);
   };
 
   const handleItemClick = (item: FileItem) => {
@@ -203,23 +248,13 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     await openItem(item);
   };
 
-  const promptRename = (item: FileItem) => {
-    options.setItemToRename(item);
-    options.showRenameDialog(true);
-  };
-
-  const promptDelete = (item: FileItem) => {
-    options.setItemToDelete(item);
-    options.showDeleteDialog(true);
-  };
-
   const handleDeleteClick = (item: FileItem, e: MouseEvent) => {
     e.stopPropagation();
-    promptDelete(item);
+    void promptDelete(item);
   };
 
   const handleDeleteShortcut = (item: FileItem) => {
-    promptDelete(item);
+    void promptDelete(item);
   };
 
   return {
@@ -228,7 +263,9 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     duplicateItem,
     openItem,
     renameItem,
-    confirmDelete,
+    deleteItem,
+    promptCreateFolder,
+    promptCreateFile,
     handleItemClick,
     handleItemDoubleClick,
     promptRename,

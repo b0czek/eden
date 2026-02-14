@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@edenapp/babel": "workspace:*",
+    "@edenapp/solid-kit": "workspace:*",
     "@edenapp/tablets": "workspace:*",
     "solid-icons": "^1.1.0"
   }

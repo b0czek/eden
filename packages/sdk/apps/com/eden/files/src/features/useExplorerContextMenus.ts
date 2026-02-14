@@ -5,14 +5,14 @@ import type { FileItem } from "../types";
 
 interface UseExplorerContextMenusOptions {
   openItem: (item: FileItem) => Promise<void>;
-  promptRename: (item: FileItem) => void;
+  promptRename: (item: FileItem) => Promise<void>;
   duplicateItem: (item: FileItem) => Promise<void>;
-  promptDelete: (item: FileItem) => void;
+  promptDelete: (item: FileItem) => Promise<void>;
   refresh: () => void;
   setSelectedItem: Setter<string | null>;
   setScrollToSelected: Setter<boolean>;
-  showNewFolderDialog: Setter<boolean>;
-  showNewFileDialog: Setter<boolean>;
+  promptCreateFolder: () => Promise<void>;
+  promptCreateFile: () => Promise<void>;
 }
 
 export const useExplorerContextMenus = (
@@ -42,26 +42,12 @@ export const useExplorerContextMenus = (
   ]);
 
   const emptyAreaMenu = menu<null>(() => [
-    button(
-      "new-folder",
-      t("files.newFolder"),
-      () => {
-        options.showNewFolderDialog(true);
-      },
-      {
-        icon: "folder-plus",
-      },
-    ),
-    button(
-      "new-file",
-      t("files.newFile"),
-      () => {
-        options.showNewFileDialog(true);
-      },
-      {
-        icon: "file-plus",
-      },
-    ),
+    button("new-folder", t("files.newFolder"), options.promptCreateFolder, {
+      icon: "folder-plus",
+    }),
+    button("new-file", t("files.newFile"), options.promptCreateFile, {
+      icon: "file-plus",
+    }),
     separator(),
     button("refresh", t("files.refresh"), options.refresh, {
       icon: "refresh-cw",
