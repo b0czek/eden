@@ -1,13 +1,12 @@
-import { createSignal } from "solid-js";
+import { createSignal, For, type JSX } from "solid-js";
+import { registerDialogRuntime } from "./runtimeRegistry.js";
+import type { DialogRequest, DialogRuntimeController } from "./runtimeTypes.js";
 import type {
   AlertDialogOptions,
   ConfirmDialogOptions,
-  CustomDialogOptions,
-  CustomDialogRenderContext,
   DialogController,
   DialogFormField,
   DialogFormValues,
-  DialogRequest,
   DialogTone,
   FormDialogOptions,
   PromptDialogOptions,
@@ -17,9 +16,7 @@ type FormValueRecord = Record<string, string | boolean>;
 
 const hasOwn = <K extends string>(value: unknown, key: K): boolean => {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    Object.prototype.hasOwnProperty.call(value, key)
+    typeof value === "object" && value !== null && Object.hasOwn(value, key)
   );
 };
 
@@ -81,6 +78,10 @@ const getInitialFocusFieldKey = (
   return firstInteractive?.key ?? null;
 };
 
+/**
+ * Creates a dialogs controller instance for a renderer tree.
+ * Mount `<DialogHost dialogs={dialogs} />` once in that tree to render dialogs.
+ */
 export const createDialogs = (): DialogController => {
   const [active, setActive] = createSignal<DialogRequest | null>(null);
   const queue: DialogRequest[] = [];
@@ -138,21 +139,40 @@ export const createDialogs = (): DialogController => {
         cancelResult: hasCancelResult
           ? (options as { cancelResult: unknown }).cancelResult
           : undefined,
+        onSubmitAttempt:
+          options.onSubmitAttempt as DialogRequest["onSubmitAttempt"],
         resolve: resolve as (result: unknown) => void,
       });
     });
   };
 
-  const submit: DialogController["submit"] = function (result?: unknown) {
+  const submit: DialogRuntimeController["submit"] = async (...args) => {
     const current = active();
     if (!current || !current.canSubmit()) return;
 
-    const hasExplicitResult = arguments.length > 0;
-    const resolvedResult = hasExplicitResult
+    const hasExplicitResult = args.length > 0;
+    const result = args[0];
+    let resolvedResult = hasExplicitResult
       ? result
       : current.hasDefaultSubmitResult
         ? current.defaultSubmitResult
         : current.value();
+
+    if (current.onSubmitAttempt) {
+      try {
+        const submitResult = await current.onSubmitAttempt(resolvedResult);
+        if (!submitResult.allowClose) {
+          return;
+        }
+
+        if (hasOwn(submitResult, "result")) {
+          resolvedResult = submitResult.result;
+        }
+      } catch (error) {
+        console.error("Dialog submit handler failed:", error);
+        return;
+      }
+    }
 
     current.resolve(resolvedResult);
     closeAndContinue();
@@ -181,6 +201,7 @@ export const createDialogs = (): DialogController => {
       cancelResult: undefined,
       footer: (ctx) => (
         <button
+          type="button"
           ref={ctx.setPrimaryActionRef}
           class="eden-btn eden-btn-primary"
           onClick={() => ctx.submit()}
@@ -206,10 +227,11 @@ export const createDialogs = (): DialogController => {
       cancelResult: false,
       footer: (ctx) => (
         <>
-          <button class="eden-btn" onClick={() => ctx.cancel()}>
+          <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
             {options.cancelLabel ?? "Cancel"}
           </button>
           <button
+            type="button"
             ref={ctx.setPrimaryActionRef}
             class={confirmButtonClass(tone)}
             onClick={() => ctx.submit(true)}
@@ -223,6 +245,7 @@ export const createDialogs = (): DialogController => {
 
   const prompt = (options: PromptDialogOptions): Promise<string | null> => {
     const tone = options.tone ?? "default";
+    const promptInputId = `eden-dialog-prompt-${requestId + 1}`;
 
     return custom<string, string | null>({
       title: options.title,
@@ -237,9 +260,12 @@ export const createDialogs = (): DialogController => {
       render: (ctx) => (
         <div class="eden-form-group">
           {options.label && (
-            <label class="eden-form-label">{options.label}</label>
+            <label class="eden-form-label" for={promptInputId}>
+              {options.label}
+            </label>
           )}
           <input
+            id={promptInputId}
             ref={ctx.setInitialFocusRef}
             type="text"
             class="eden-input"
@@ -252,10 +278,11 @@ export const createDialogs = (): DialogController => {
       ),
       footer: (ctx) => (
         <>
-          <button class="eden-btn" onClick={() => ctx.cancel()}>
+          <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
             {options.cancelLabel ?? "Cancel"}
           </button>
           <button
+            type="button"
             ref={ctx.setPrimaryActionRef}
             class={confirmButtonClass(tone)}
             onClick={() => ctx.submit()}
@@ -272,6 +299,10 @@ export const createDialogs = (): DialogController => {
   ): Promise<DialogFormValues<TFields> | null> => {
     const tone = options.tone ?? "default";
     const focusFieldKey = getInitialFocusFieldKey(options.fields);
+    const formIdPrefix = `eden-dialog-form-${requestId + 1}`;
+    const [submitError, setSubmitError] = createSignal<
+      JSX.Element | string | null
+    >(null);
     const initialValues = createInitialFormValues(
       options.fields,
     ) as DialogFormValues<TFields>;
@@ -291,85 +322,130 @@ export const createDialogs = (): DialogController => {
       cancelResult: null,
       render: (ctx) => (
         <div class="eden-flex-col eden-gap-md">
-          {options.fields.map((field) => {
-            const values = ctx.value() as FormValueRecord;
-            const fieldValue = values[field.key];
-            const setFieldValue = (nextValue: string | boolean) => {
-              const nextValues = {
-                ...values,
-                [field.key]: nextValue,
-              } as FormValueRecord;
+          <For each={options.fields}>
+            {(field) => {
+              const fieldValue = () => {
+                const values = ctx.value() as FormValueRecord;
+                return values[field.key];
+              };
 
-              ctx.setValue(() => nextValues as DialogFormValues<TFields>);
-              ctx.setCanSubmit(isFormSubmittable(options.fields, nextValues));
-            };
+              const setFieldValue = (nextValue: string | boolean) => {
+                const currentValues = ctx.value() as FormValueRecord;
+                const nextValues = {
+                  ...currentValues,
+                  [field.key]: nextValue,
+                } as FormValueRecord;
 
-            const isFocusField =
-              focusFieldKey != null && focusFieldKey === field.key;
+                setSubmitError(null);
+                ctx.setValue(() => nextValues as DialogFormValues<TFields>);
+                ctx.setCanSubmit(isFormSubmittable(options.fields, nextValues));
+              };
 
-            if (field.kind === "checkbox") {
-              return (
-                <div class="eden-form-group">
-                  <label class="eden-checkbox-option">
-                    <input
-                      ref={isFocusField ? ctx.setInitialFocusRef : undefined}
-                      type="checkbox"
-                      class="eden-checkbox"
-                      checked={fieldValue === true}
-                      disabled={field.disabled}
-                      onChange={(e) => setFieldValue(e.currentTarget.checked)}
-                    />
-                    <span class="eden-checkbox-option-label">
+              const isFocusField =
+                focusFieldKey != null && focusFieldKey === field.key;
+              const fieldId = `${formIdPrefix}-${field.key}`;
+
+              if (field.kind === "checkbox") {
+                return (
+                  <div class="eden-form-group">
+                    <label class="eden-checkbox-option">
+                      <input
+                        ref={isFocusField ? ctx.setInitialFocusRef : undefined}
+                        type="checkbox"
+                        class="eden-checkbox"
+                        checked={fieldValue() === true}
+                        disabled={field.disabled}
+                        onChange={(e) => setFieldValue(e.currentTarget.checked)}
+                      />
+                      <span class="eden-checkbox-option-label">
+                        {field.label}
+                      </span>
+                    </label>
+                    {field.hint && <p class="eden-form-help">{field.hint}</p>}
+                  </div>
+                );
+              }
+
+              if (field.kind === "textarea") {
+                return (
+                  <div class="eden-form-group">
+                    <label class="eden-form-label" for={fieldId}>
                       {field.label}
-                    </span>
-                  </label>
-                  {field.hint && <p class="eden-form-help">{field.hint}</p>}
-                </div>
-              );
-            }
+                    </label>
+                    <textarea
+                      id={fieldId}
+                      ref={isFocusField ? ctx.setInitialFocusRef : undefined}
+                      class="eden-textarea"
+                      placeholder={field.placeholder}
+                      value={String(fieldValue() ?? "")}
+                      disabled={field.disabled}
+                      rows={3}
+                      onInput={(e) => setFieldValue(e.currentTarget.value)}
+                    />
+                    {field.hint && <p class="eden-form-help">{field.hint}</p>}
+                  </div>
+                );
+              }
 
-            if (field.kind === "textarea") {
               return (
                 <div class="eden-form-group">
-                  <label class="eden-form-label">{field.label}</label>
-                  <textarea
+                  <label class="eden-form-label" for={fieldId}>
+                    {field.label}
+                  </label>
+                  <input
+                    id={fieldId}
                     ref={isFocusField ? ctx.setInitialFocusRef : undefined}
-                    class="eden-textarea"
+                    type={field.kind}
+                    class="eden-input"
                     placeholder={field.placeholder}
-                    value={String(fieldValue ?? "")}
+                    value={String(fieldValue() ?? "")}
                     disabled={field.disabled}
-                    rows={3}
                     onInput={(e) => setFieldValue(e.currentTarget.value)}
                   />
                   {field.hint && <p class="eden-form-help">{field.hint}</p>}
                 </div>
               );
-            }
-
-            return (
-              <div class="eden-form-group">
-                <label class="eden-form-label">{field.label}</label>
-                <input
-                  ref={isFocusField ? ctx.setInitialFocusRef : undefined}
-                  type={field.kind}
-                  class="eden-input"
-                  placeholder={field.placeholder}
-                  value={String(fieldValue ?? "")}
-                  disabled={field.disabled}
-                  onInput={(e) => setFieldValue(e.currentTarget.value)}
-                />
-                {field.hint && <p class="eden-form-help">{field.hint}</p>}
-              </div>
-            );
-          })}
+            }}
+          </For>
+          {submitError() && (
+            <div
+              class="eden-text-xs"
+              style={{ color: "var(--eden-color-danger)" }}
+            >
+              {submitError()}
+            </div>
+          )}
         </div>
       ),
+      onSubmitAttempt: async (result) => {
+        const values = result as DialogFormValues<TFields>;
+
+        const validationError = options.validate?.(values) ?? null;
+        if (validationError) {
+          setSubmitError(validationError);
+          return { allowClose: false };
+        }
+
+        if (options.onSubmit) {
+          const submitResult = await options.onSubmit(values);
+          if (submitResult) {
+            setSubmitError(submitResult);
+            return { allowClose: false };
+          }
+        }
+
+        return {
+          allowClose: true,
+          result: values,
+        };
+      },
       footer: (ctx) => (
         <>
-          <button class="eden-btn" onClick={() => ctx.cancel()}>
+          <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
             {options.cancelLabel ?? "Cancel"}
           </button>
           <button
+            type="button"
             ref={ctx.setPrimaryActionRef}
             class={confirmButtonClass(tone)}
             disabled={!ctx.canSubmit()}
@@ -382,7 +458,7 @@ export const createDialogs = (): DialogController => {
     });
   };
 
-  return {
+  const controller: DialogRuntimeController = {
     active,
     submit,
     cancel,
@@ -392,6 +468,9 @@ export const createDialogs = (): DialogController => {
     prompt,
     form,
   };
+  registerDialogRuntime(controller, controller);
+
+  return controller;
 };
 
 export type {

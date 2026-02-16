@@ -1,13 +1,16 @@
 import type { Accessor, Component, Setter } from "solid-js";
 import { createEffect, onCleanup } from "solid-js";
+import { getDialogRuntime } from "./runtimeRegistry.js";
+import type { DialogRequest } from "./runtimeTypes.js";
 import type {
   CustomDialogRenderContext,
   DialogController,
-  DialogRequest,
   DialogSize,
 } from "./types.js";
 
+/** Props for the dialogs host component. */
 export interface DialogHostProps {
+  /** Controller returned by `createDialogs()`. */
   dialogs: DialogController;
 }
 
@@ -17,9 +20,19 @@ const sizeClass = (size: DialogSize) => {
   return "";
 };
 
+/** Renders local dialog overlays for a dialogs controller instance. */
 export const DialogHost: Component<DialogHostProps> = (props) => {
+  const dialogs = getDialogRuntime(props.dialogs);
+  if (!dialogs) {
+    console.error(
+      "DialogHost received an unsupported controller. Pass the value returned by createDialogs().",
+    );
+    return null;
+  }
+
   let primaryActionRef: HTMLButtonElement | undefined;
   let initialFocusRef: HTMLElement | undefined;
+  let modalRef: HTMLDivElement | undefined;
 
   const createRenderContext = (
     dialog: DialogRequest,
@@ -29,8 +42,8 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
       setValue: dialog.setValue as Setter<unknown>,
       canSubmit: dialog.canSubmit,
       setCanSubmit: dialog.setCanSubmit,
-      submit: (result) => props.dialogs.submit(result),
-      cancel: props.dialogs.cancel,
+      submit: (result) => dialogs.submit(result),
+      cancel: dialogs.cancel,
       setPrimaryActionRef: (el) => {
         primaryActionRef = el;
       },
@@ -41,9 +54,10 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
   };
 
   createEffect(() => {
-    const current = props.dialogs.active();
+    const current = dialogs.active();
     if (!current) return;
 
+    modalRef = undefined;
     primaryActionRef = undefined;
     initialFocusRef = undefined;
 
@@ -69,7 +83,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
   });
 
   createEffect(() => {
-    const current = props.dialogs.active();
+    const current = dialogs.active();
     if (!current) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,7 +91,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
 
       if (e.key === "Escape" && current.dismissOnEscape) {
         e.preventDefault();
-        props.dialogs.cancel();
+        dialogs.cancel();
         return;
       }
 
@@ -88,30 +102,36 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
         }
 
         e.preventDefault();
-        props.dialogs.submit();
+        dialogs.submit();
       }
     };
 
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!current.dismissOnBackdrop) return;
+
+      const target = e.target as Node | null;
+      if (!target || !modalRef) return;
+
+      if (!modalRef.contains(target)) {
+        dialogs.cancel();
+      }
+    };
+
+    document.addEventListener("mousedown", handleMouseDown, true);
     document.addEventListener("keydown", handleKeyDown, true);
-    onCleanup(() =>
-      document.removeEventListener("keydown", handleKeyDown, true),
-    );
+    onCleanup(() => {
+      document.removeEventListener("mousedown", handleMouseDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      modalRef = undefined;
+    });
   });
 
   return (
     <>
-      {props.dialogs.active() && (
-        <div
-          class="eden-modal-overlay"
-          onClick={() => {
-            const dialog = props.dialogs.active();
-            if (dialog?.dismissOnBackdrop) {
-              props.dialogs.cancel();
-            }
-          }}
-        >
+      {dialogs.active() && (
+        <div class="eden-modal-overlay">
           {(() => {
-            const dialog = props.dialogs.active();
+            const dialog = dialogs.active();
             if (!dialog) {
               return null;
             }
@@ -120,16 +140,17 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
 
             return (
               <div
+                ref={modalRef}
                 class={`eden-modal ${sizeClass(dialog.size)}`}
                 role="dialog"
                 aria-modal="true"
-                onClick={(e) => e.stopPropagation()}
               >
                 <div class="eden-modal-header">
                   <h3 class="eden-modal-title">{dialog.title}</h3>
                   <button
+                    type="button"
                     class="eden-modal-close"
-                    onClick={() => props.dialogs.cancel()}
+                    onClick={() => dialogs.cancel()}
                   >
                     ×
                   </button>

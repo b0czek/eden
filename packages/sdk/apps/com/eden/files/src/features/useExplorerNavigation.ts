@@ -1,5 +1,6 @@
 import { createEffect, createSignal } from "solid-js";
 import type { Setter } from "solid-js";
+import { t } from "../i18n";
 import type { FileItem } from "../types";
 import { getParentPath, joinPath } from "../utils";
 
@@ -62,7 +63,7 @@ export const useExplorerNavigation = (
     } catch (error) {
       console.error("Error loading directory:", error);
       options.onLoadError(
-        `Failed to load directory: ${(error as Error).message}`,
+        `${t("files.errors.loadDirectoryFailed")}: ${(error as Error).message}`,
       );
     } finally {
       setLoading(false);

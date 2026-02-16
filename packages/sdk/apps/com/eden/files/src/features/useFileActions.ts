@@ -15,42 +15,89 @@ interface UseFileActionsOptions {
 }
 
 export const useFileActions = (options: UseFileActionsOptions) => {
-  const createFolder = async (name: string) => {
+  const validateName = (
+    name: string,
+    invalidMessageKey:
+      | "files.errors.invalidFolderName"
+      | "files.errors.invalidFileName"
+      | "files.errors.invalidItemName",
+  ) => {
     const trimmedName = name.trim();
     if (!trimmedName || !isValidName(trimmedName)) {
-      options.showError("Invalid folder name");
-      return;
+      return t(invalidMessageKey);
+    }
+
+    return null;
+  };
+
+  const tryCreateFolder = async (name: string): Promise<string | null> => {
+    const trimmedName = name.trim();
+    const invalid = validateName(trimmedName, "files.errors.invalidFolderName");
+    if (invalid) {
+      return invalid;
     }
 
     const folderPath = joinPath(options.currentPath(), trimmedName);
 
     try {
+      const exists = await window.edenAPI.shellCommand("fs/exists", {
+        path: folderPath,
+      });
+      if (exists) {
+        return t("files.errors.itemAlreadyExists");
+      }
+
       await window.edenAPI.shellCommand("fs/mkdir", {
         path: folderPath,
       });
       options.refresh();
     } catch (error) {
-      options.showError(`Failed to create folder: ${(error as Error).message}`);
+      return `${t("files.errors.createFolderFailed")}: ${(error as Error).message}`;
+    }
+
+    return null;
+  };
+
+  const createFolder = async (name: string) => {
+    const error = await tryCreateFolder(name);
+    if (error) {
+      options.showError(error);
     }
   };
 
-  const createFile = async (name: string) => {
+  const tryCreateFile = async (name: string): Promise<string | null> => {
     const trimmedName = name.trim();
-    if (!trimmedName || !isValidName(trimmedName)) {
-      options.showError("Invalid file name");
-      return;
+    const invalid = validateName(trimmedName, "files.errors.invalidFileName");
+    if (invalid) {
+      return invalid;
     }
 
     const filePath = joinPath(options.currentPath(), trimmedName);
 
     try {
+      const exists = await window.edenAPI.shellCommand("fs/exists", {
+        path: filePath,
+      });
+      if (exists) {
+        return t("files.errors.itemAlreadyExists");
+      }
+
       await window.edenAPI.shellCommand("fs/write", {
         path: filePath,
         content: "",
       });
       options.refresh();
     } catch (error) {
-      options.showError(`Failed to create file: ${(error as Error).message}`);
+      return `${t("files.errors.createFileFailed")}: ${(error as Error).message}`;
+    }
+
+    return null;
+  };
+
+  const createFile = async (name: string) => {
+    const error = await tryCreateFile(name);
+    if (error) {
+      options.showError(error);
     }
   };
 
@@ -105,7 +152,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       options.refresh();
     } catch (error) {
       options.showError(
-        `Failed to duplicate item: ${(error as Error).message}`,
+        `${t("files.errors.duplicateFailed")}: ${(error as Error).message}`,
       );
     }
   };
@@ -121,24 +168,29 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         path: item.path,
       });
       if (!result.success) {
-        options.showError(`Failed to open file: ${result.error}`);
+        options.showError(`${t("files.errors.openFailed")}: ${result.error}`);
       }
     } catch (error) {
-      options.showError(`Failed to open file: ${(error as Error).message}`);
+      options.showError(
+        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
+      );
     }
   };
 
-  const renameItem = async (item: FileItem, name: string) => {
+  const tryRenameItem = async (
+    item: FileItem,
+    name: string,
+  ): Promise<string | null> => {
     const trimmedName = name.trim();
-    if (!trimmedName || !isValidName(trimmedName)) {
-      options.showError("Invalid file or folder name");
-      return;
+    const invalid = validateName(trimmedName, "files.errors.invalidItemName");
+    if (invalid) {
+      return invalid;
     }
 
     const targetPath = joinPath(options.currentPath(), trimmedName);
 
     if (targetPath === item.path) {
-      return;
+      return null;
     }
 
     try {
@@ -146,8 +198,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         path: targetPath,
       });
       if (exists) {
-        options.showError(t("files.itemAlreadyExists"));
-        return;
+        return t("files.errors.itemAlreadyExists");
       }
 
       await window.edenAPI.shellCommand("fs/mv", {
@@ -159,7 +210,16 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       options.setSelectedItem(targetPath);
       options.refresh();
     } catch (error) {
-      options.showError(`Failed to rename item: ${(error as Error).message}`);
+      return `${t("files.errors.renameFailed")}: ${(error as Error).message}`;
+    }
+
+    return null;
+  };
+
+  const renameItem = async (item: FileItem, name: string) => {
+    const error = await tryRenameItem(item, name);
+    if (error) {
+      options.showError(error);
     }
   };
 
@@ -170,57 +230,80 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       });
       options.refresh();
     } catch (error) {
-      options.showError(`Failed to delete item: ${(error as Error).message}`);
+      options.showError(
+        `${t("files.errors.deleteFailed")}: ${(error as Error).message}`,
+      );
     }
   };
 
   const promptCreateFolder = async () => {
-    const name = await options.dialogs.prompt({
+    await options.dialogs.form({
       title: t("files.newFolder"),
-      label: t("common.name"),
-      placeholder: `${t("files.newFolder")}...`,
+      fields: [
+        {
+          kind: "text",
+          key: "name",
+          label: t("common.name"),
+          placeholder: `${t("files.newFolder")}...`,
+          required: true,
+          autofocus: true,
+        },
+      ] as const,
       confirmLabel: t("common.ok"),
       cancelLabel: t("common.cancel"),
+      validate: (values) =>
+        validateName(values.name, "files.errors.invalidFolderName"),
+      onSubmit: async (values) => {
+        return await tryCreateFolder(values.name);
+      },
     });
-
-    if (name === null) {
-      return;
-    }
-
-    await createFolder(name);
   };
 
   const promptCreateFile = async () => {
-    const name = await options.dialogs.prompt({
+    await options.dialogs.form({
       title: t("files.newFile"),
-      label: t("common.name"),
-      placeholder: "example.txt",
-      hint: t("files.extensionHelp"),
+      fields: [
+        {
+          kind: "text",
+          key: "name",
+          label: t("common.name"),
+          placeholder: "example.txt",
+          hint: t("files.extensionHelp"),
+          required: true,
+          autofocus: true,
+        },
+      ] as const,
       confirmLabel: t("common.ok"),
       cancelLabel: t("common.cancel"),
+      validate: (values) =>
+        validateName(values.name, "files.errors.invalidFileName"),
+      onSubmit: async (values) => {
+        return await tryCreateFile(values.name);
+      },
     });
-
-    if (name === null) {
-      return;
-    }
-
-    await createFile(name);
   };
 
   const promptRename = async (item: FileItem) => {
-    const name = await options.dialogs.prompt({
+    await options.dialogs.form({
       title: t("files.rename"),
-      label: t("common.name"),
-      initialValue: item.name,
+      fields: [
+        {
+          kind: "text",
+          key: "name",
+          label: t("common.name"),
+          initialValue: item.name,
+          required: true,
+          autofocus: true,
+        },
+      ] as const,
       confirmLabel: t("files.rename"),
       cancelLabel: t("common.cancel"),
+      validate: (values) =>
+        validateName(values.name, "files.errors.invalidItemName"),
+      onSubmit: async (values) => {
+        return await tryRenameItem(item, values.name);
+      },
     });
-
-    if (name === null) {
-      return;
-    }
-
-    await renameItem(item, name);
   };
 
   const promptDelete = async (item: FileItem) => {

@@ -16,6 +16,7 @@ interface CheckboxFieldOptions extends BaseFieldOptions {
   initialValue?: boolean;
 }
 
+/** Creates a single-line text field config for `dialogs.form`. */
 const text = <TKey extends string>(
   key: TKey,
   label: string,
@@ -32,6 +33,7 @@ const text = <TKey extends string>(
   hint: options.hint,
 });
 
+/** Creates an email field config for `dialogs.form`. */
 const email = <TKey extends string>(
   key: TKey,
   label: string,
@@ -48,6 +50,7 @@ const email = <TKey extends string>(
   hint: options.hint,
 });
 
+/** Creates a password field config for `dialogs.form`. */
 const password = <TKey extends string>(
   key: TKey,
   label: string,
@@ -64,6 +67,7 @@ const password = <TKey extends string>(
   hint: options.hint,
 });
 
+/** Creates a multiline textarea field config for `dialogs.form`. */
 const textarea = <TKey extends string>(
   key: TKey,
   label: string,
@@ -80,6 +84,7 @@ const textarea = <TKey extends string>(
   hint: options.hint,
 });
 
+/** Creates a checkbox field config for `dialogs.form`. */
 const checkbox = <TKey extends string>(
   key: TKey,
   label: string,
@@ -95,6 +100,7 @@ const checkbox = <TKey extends string>(
   hint: options.hint,
 });
 
+/** Declarative form field builders used with `dialogs.form({ fields: [...] })`. */
 export const field = {
   text,
   email,

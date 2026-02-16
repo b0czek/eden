@@ -252,6 +252,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/solid-kit':
+        specifier: workspace:*
+        version: link:../../../../../solid-kit
       '@edenapp/tablets':
         specifier: workspace:*
         version: link:../../../../../tablets
