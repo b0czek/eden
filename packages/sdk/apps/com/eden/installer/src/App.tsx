@@ -25,7 +25,7 @@ const App = () => {
       setError("No package file specified.");
     }
 
-    window.edenAPI.subscribe("file/opened", (data: any) => {
+    window.edenAPI.subscribe("file/opened", (data) => {
       if (data.path) {
         loadPackage(data.path);
       }
@@ -105,6 +105,7 @@ const App = () => {
           <h2 class="eden-mt-md">Error</h2>
           <p class="eden-text-secondary eden-mb-lg">{error()}</p>
           <button
+            type="button"
             class="eden-btn eden-btn-secondary"
             onClick={() => loadPackage(packagePath()!)}
           >
@@ -183,6 +184,7 @@ const App = () => {
 
               <div class="eden-mt-auto eden-flex-end eden-gap-md eden-pt-lg">
                 <button
+                  type="button"
                   class="eden-btn eden-btn-secondary"
                   disabled={installing() || success()}
                   onClick={closeWindow}
@@ -190,6 +192,7 @@ const App = () => {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   class="eden-btn eden-btn-primary"
                   disabled={installing() || success()}
                   onClick={installPackage}
