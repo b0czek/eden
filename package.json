@@ -10,6 +10,8 @@
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "test": "pnpm -r --if-present run test",
+    "typecheck": "bash ./scripts/ci-typecheck.sh",
     "lint-staged": "lint-staged",
     "prepare": "simple-git-hooks",
     "changeset": "changeset",
