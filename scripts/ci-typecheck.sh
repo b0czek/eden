@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+pnpm run build:packages
+
 while IFS= read -r -d '' tsconfig; do
   dir="$(dirname "$tsconfig")"
 

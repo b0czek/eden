@@ -4,7 +4,8 @@
   "private": true,
   "description": "Eden Desktop Environment",
   "scripts": {
-    "build": "pnpm -r --filter=!@edenapp/example run build && pnpm install",
+    "build": "pnpm run build:packages && pnpm install",
+    "build:packages": "pnpm -r --filter=!@edenapp/example run build",
     "clean": "rm -rf dist packages/*/dist",
     "dev": "cd packages/example && pnpm dev",
     "format": "biome format --write .",
