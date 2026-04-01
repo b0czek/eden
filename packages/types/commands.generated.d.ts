@@ -357,6 +357,21 @@ export interface FsCommands {
     args: { path: string };
     response: void;
   };
+  /**
+   * Copy a file or directory.
+   * Directories are copied recursively.
+   */
+  "fs/cp": {
+    args: { from: string; to: string };
+    response: void;
+  };
+  /**
+   * Move or rename a file or directory.
+   */
+  "fs/mv": {
+    args: { from: string; to: string };
+    response: void;
+  };
 }
 
 /**

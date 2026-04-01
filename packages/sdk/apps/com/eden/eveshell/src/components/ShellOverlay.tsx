@@ -5,12 +5,13 @@ import type {
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
+import { DialogHost, createDialogs } from "@edenapp/solid-kit/dialogs";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
-import { getLocalizedValue, initLocale, locale, t } from "../i18n";
+import { getLocalizedValue, initLocale, locale } from "../i18n";
 import type { AppInfo } from "../types";
 import AllApps from "./AllApps";
-import ChangePasswordModal from "./ChangePasswordModal";
+import { openChangePasswordDialog } from "./ChangePasswordDialog";
 import Dock from "./Dock";
 
 // Constants
@@ -20,12 +21,15 @@ const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
 const PINNED_DOCK_APPS_KEY = "pinned-dock-apps";
 
 export default function ShellOverlay() {
+  const dialogs = createDialogs();
   const [runningApps, setRunningApps] = createSignal<AppInstance[]>([]);
   const [installedApps, setInstalledApps] = createSignal<AppManifest[]>([]);
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
+  const isFullscreen = () => showAllApps() || showChangePassword();
+  let lastResizeMode: "dock" | "fullscreen" | null = null;
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -209,12 +213,9 @@ export default function ShellOverlay() {
     }
   };
 
-  const handleShowAllApps = async () => {
+  const handleShowAllApps = () => {
     const next = !showAllApps();
     setShowAllApps(next);
-
-    // Resize overlay
-    await requestResize(next ? "fullscreen" : "dock");
 
     // Refresh installed apps when opening the apps view
     if (next) {
@@ -223,9 +224,10 @@ export default function ShellOverlay() {
   };
 
   createEffect(() => {
-    if (!showAllApps() && !showChangePassword()) {
-      requestResize("dock");
-    }
+    const mode = isFullscreen() ? "fullscreen" : "dock";
+    if (mode === lastResizeMode) return;
+    lastResizeMode = mode;
+    void requestResize(mode);
   });
 
   const handleStopApp = async (appId: string) => {
@@ -259,7 +261,14 @@ export default function ShellOverlay() {
 
   const handleOpenChangePassword = async () => {
     setShowChangePassword(true);
-    await requestResize("fullscreen");
+
+    try {
+      await openChangePasswordDialog({
+        dialogs,
+      });
+    } finally {
+      setShowChangePassword(false);
+    }
   };
 
   // Create user menu factory
@@ -267,25 +276,6 @@ export default function ShellOverlay() {
     changePassword: handleOpenChangePassword,
     logout: handleLogout,
   });
-
-  const handleCloseChangePassword = () => {
-    setShowChangePassword(false);
-    if (!showAllApps()) {
-      requestResize("dock");
-    }
-  };
-
-  const handleChangePasswordSubmit = async (args: {
-    currentPassword: string;
-    newPassword: string;
-  }) => {
-    try {
-      return await window.edenAPI.shellCommand("user/change-password", args);
-    } catch (error) {
-      console.error("Failed to change password:", error);
-      return { success: false, error: t("shell.passwordUpdateFailed") };
-    }
-  };
 
   onMount(() => {
     // Event handlers
@@ -296,7 +286,7 @@ export default function ShellOverlay() {
       windowSize: WindowSize;
     }) => {
       const { windowSize } = data;
-      const mode = showAllApps() ? "fullscreen" : "dock";
+      const mode = isFullscreen() ? "fullscreen" : "dock";
       const bounds = calculateBounds(mode, windowSize);
       updateOverlayBounds(bounds);
     };
@@ -321,9 +311,6 @@ export default function ShellOverlay() {
       loadPinnedApps();
       loadCurrentUser();
 
-      // Set initial overlay size
-      await requestResize("dock");
-
       try {
         // Subscribe to events
         await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
@@ -341,7 +328,7 @@ export default function ShellOverlay() {
   return (
     <div
       class="shell-overlay"
-      data-mode={showAllApps() || showChangePassword() ? "fullscreen" : "dock"}
+      data-mode={isFullscreen() ? "fullscreen" : "dock"}
     >
       {/* AllApps appears above the dock when active */}
       <Show when={showAllApps()}>
@@ -353,8 +340,8 @@ export default function ShellOverlay() {
         />
       </Show>
 
-      {/* Dock hidden when AllApps is open */}
-      <Show when={!showAllApps()}>
+      {/* Dock hidden when AllApps or ChangePassword dialog is open */}
+      <Show when={!isFullscreen()}>
         <Dock
           runningApps={dockRunningApps()}
           pinnedApps={dockPinnedApps()}
@@ -366,11 +353,7 @@ export default function ShellOverlay() {
         />
       </Show>
 
-      <ChangePasswordModal
-        show={showChangePassword()}
-        onClose={handleCloseChangePassword}
-        onSubmit={handleChangePasswordSubmit}
-      />
+      <DialogHost dialogs={dialogs} />
     </div>
   );
 }

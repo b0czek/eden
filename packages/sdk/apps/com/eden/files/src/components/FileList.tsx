@@ -13,7 +13,10 @@ interface FileListProps {
   itemSize: ItemSize;
   onItemClick: (item: FileItem) => void;
   onItemDoubleClick: (item: FileItem) => void;
+  onItemContextMenu: (item: FileItem, e: MouseEvent) => void;
+  onBackgroundContextMenu: (e: MouseEvent) => void;
   onItemDelete: (item: FileItem, e: MouseEvent) => void;
+  onItemDeleteShortcut: (item: FileItem) => void;
   onBack?: () => void;
 }
 
@@ -66,6 +69,17 @@ const FileList: Component<FileListProps> = (props) => {
         if (props.onBack) {
           e.preventDefault();
           props.onBack();
+        }
+        return;
+      }
+
+      if (e.key === "Delete") {
+        if (selected) {
+          const item = items.find((i) => i.path === selected);
+          if (item) {
+            e.preventDefault();
+            props.onItemDeleteShortcut(item);
+          }
         }
         return;
       }
@@ -136,7 +150,10 @@ const FileList: Component<FileListProps> = (props) => {
   });
 
   return (
-    <main class="explorer-content">
+    <main
+      class="explorer-content"
+      onContextMenu={props.onBackgroundContextMenu}
+    >
       <Show when={props.loading}>
         <div class="loading-message">{t("common.loading")}</div>
       </Show>
@@ -165,6 +182,7 @@ const FileList: Component<FileListProps> = (props) => {
                 itemSize={props.itemSize}
                 onClick={props.onItemClick}
                 onDoubleClick={props.onItemDoubleClick}
+                onContextMenu={props.onItemContextMenu}
                 onDelete={props.onItemDelete}
               />
             )}

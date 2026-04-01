@@ -100,4 +100,21 @@ export class FilesystemHandler {
     const { path: targetPath } = args;
     await this.fsManager.delete(targetPath);
   }
+
+  /**
+   * Copy a file or directory.
+   * Directories are copied recursively.
+   */
+  @EdenHandler("cp", { permission: "write" })
+  async handleCopy(args: { from: string; to: string }): Promise<void> {
+    await this.fsManager.copy(args.from, args.to);
+  }
+
+  /**
+   * Move or rename a file or directory.
+   */
+  @EdenHandler("mv", { permission: "write" })
+  async handleMove(args: { from: string; to: string }): Promise<void> {
+    await this.fsManager.move(args.from, args.to);
+  }
 }

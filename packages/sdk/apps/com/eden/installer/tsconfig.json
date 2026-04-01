@@ -1,15 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "types": ["vite/client", "@edenapp/types"],
-    "noEmit": true,
-    "isolatedModules": true
-  },
+  "extends": "../../../tsconfig.web.solid.json",
   "include": ["src"]
 }

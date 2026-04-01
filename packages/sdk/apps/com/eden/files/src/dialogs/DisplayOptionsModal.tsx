@@ -8,13 +8,7 @@ import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import { ITEM_SIZES } from "../constants";
 import { t } from "../i18n";
-import type {
-  DisplayPreferences,
-  ItemSize,
-  SortBy,
-  SortOrder,
-  ViewStyle,
-} from "../types";
+import type { DisplayPreferences, SortBy } from "../types";
 
 interface DisplayOptionsModalProps {
   show: boolean;
@@ -55,6 +49,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
           <div class="eden-flex-between eden-gap-md">
             <h3 class="eden-popover-title">{t("files.displayOptions")}</h3>
             <button
+              type="button"
               class="eden-modal-close"
               onClick={props.onClose}
               aria-label="Close"
@@ -72,6 +67,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
               <label class="eden-form-label">{t("files.viewStyle")}</label>
               <div class="eden-btn-group">
                 <button
+                  type="button"
                   class="eden-btn eden-btn-md"
                   classList={{
                     "eden-btn-primary": props.preferences.viewStyle === "grid",
@@ -81,6 +77,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   <FaSolidGrip /> {t("files.grid")}
                 </button>
                 <button
+                  type="button"
                   class="eden-btn eden-btn-md"
                   classList={{
                     "eden-btn-primary": props.preferences.viewStyle === "list",
@@ -142,6 +139,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                 </select>
 
                 <button
+                  type="button"
                   class="eden-btn eden-btn-sm eden-btn-square"
                   onClick={() =>
                     updatePreference(

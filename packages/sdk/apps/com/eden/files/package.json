@@ -16,7 +16,9 @@
     "vite-plugin-solid": "^2.11.10"
   },
   "dependencies": {
-    "solid-icons": "^1.1.0",
-    "@edenapp/babel": "workspace:*"
+    "@edenapp/babel": "workspace:*",
+    "@edenapp/solid-kit": "workspace:*",
+    "@edenapp/tablets": "workspace:*",
+    "solid-icons": "^1.1.0"
   }
 }

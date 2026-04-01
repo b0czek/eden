@@ -26,6 +26,9 @@ export async function createEdenI18n(
     resources,
     interpolation: {
       escapeValue: false,
+      // Eden locale strings use single-brace placeholders, e.g. "{name}".
+      prefix: "{",
+      suffix: "}",
     },
     partialBundledLanguages: true,
   });
