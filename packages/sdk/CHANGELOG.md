@@ -1,5 +1,19 @@
 # @edenapp/sdk
 
+## 0.6.0
+
+### Minor Changes
+
+- add fs/mv fs/cp
+  unify dialogs api through solid-kit
+  add process manager app
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/types@0.6.0
+  - @edenapp/genesis@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes

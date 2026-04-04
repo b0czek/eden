@@ -1,5 +1,12 @@
 # @edenapp/genesis
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/types@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes
