@@ -32,6 +32,11 @@
   ],
   "author": "Dariusz Majnert",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/sdk"
+  },
   "peerDependencies": {
     "electron": ">=40.0.0"
   },
