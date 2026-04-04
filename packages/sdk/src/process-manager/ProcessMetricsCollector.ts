@@ -205,20 +205,26 @@ export class ProcessMetricsCollector {
       })
       .filter((snapshot) => visibleAppIds.has(snapshot.instance.manifest.id))
       .sort((left, right) => {
-        if (right.totalCPUPercent !== left.totalCPUPercent) {
-          return right.totalCPUPercent - left.totalCPUPercent;
-        }
-        return right.totalMemoryWorkingSetSize - left.totalMemoryWorkingSetSize;
+        const leftName = String(
+          left.instance.manifest.name || left.instance.manifest.id,
+        );
+        const rightName = String(
+          right.instance.manifest.name || right.instance.manifest.id,
+        );
+        return leftName.localeCompare(rightName);
       });
 
     const sharedProcesses = appMetrics
       .filter((metric) => !matchedPids.has(metric.pid))
       .map((metric) => this.toProcessMetric(metric, "shared"))
       .sort((left, right) => {
-        if (right.cpu.percentCPUUsage !== left.cpu.percentCPUUsage) {
-          return right.cpu.percentCPUUsage - left.cpu.percentCPUUsage;
-        }
-        return right.memory.workingSetSize - left.memory.workingSetSize;
+        const leftName = String(
+          left.name || left.serviceName || left.processType || left.pid,
+        );
+        const rightName = String(
+          right.name || right.serviceName || right.processType || right.pid,
+        );
+        return leftName.localeCompare(rightName);
       });
 
     const appCPUPercent = apps.reduce(

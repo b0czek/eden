@@ -68,11 +68,19 @@ describe("ProcessMetricsCollector", () => {
   });
 
   it("uses a fixed main-process sampling cadence and lets callers extend sampler keepalive", async () => {
-    const visibleApp = createApp("com.eden.visible", 10);
+    const visibleApp = createApp("com.eden.visible", 10, {
+      manifest: {
+        id: "com.eden.visible",
+        name: "Zulu",
+        version: "1.0.0",
+        frontend: { entry: "dist/index.html" },
+        permissions: [],
+      } as any,
+    });
     const hiddenApp = createApp("com.eden.hidden", 20, {
       manifest: {
         id: "com.eden.hidden",
-        name: "Hidden",
+        name: "Alpha",
         version: "1.0.0",
         frontend: { entry: "dist/index.html" },
         overlay: true,
@@ -120,7 +128,11 @@ describe("ProcessMetricsCollector", () => {
         }),
         metric(999, 2, 3500, 4200, {
           type: "GPU",
-          name: "GPU Process",
+          name: "Zulu Process",
+        }),
+        metric(998, 9, 1200, 1600, {
+          type: "Browser",
+          name: "Alpha Process",
         }),
         metric(222, 1, 450, 650),
       ])
@@ -132,7 +144,11 @@ describe("ProcessMetricsCollector", () => {
         }),
         metric(999, 5, 4000, 4500, {
           type: "GPU",
-          name: "GPU Process",
+          name: "Zulu Process",
+        }),
+        metric(998, 7, 1300, 1700, {
+          type: "Browser",
+          name: "Alpha Process",
         }),
         metric(222, 3, 500, 700),
       ])
@@ -144,7 +160,11 @@ describe("ProcessMetricsCollector", () => {
         }),
         metric(999, 4, 4100, 4550, {
           type: "GPU",
-          name: "GPU Process",
+          name: "Zulu Process",
+        }),
+        metric(998, 6, 1400, 1800, {
+          type: "Browser",
+          name: "Alpha Process",
         }),
         metric(222, 4, 550, 750),
       ]);
@@ -168,16 +188,22 @@ describe("ProcessMetricsCollector", () => {
         serviceName: "eden-backend-com.eden.visible",
       },
     });
-    expect(visibleOnly.sharedProcesses.map((entry) => entry.pid)).toEqual([
-      999,
+    expect(
+      visibleOnly.sharedProcesses.map((entry) => ({
+        pid: entry.pid,
+        name: entry.name,
+      })),
+    ).toEqual([
+      { pid: 998, name: "Alpha Process" },
+      { pid: 999, name: "Zulu Process" },
     ]);
     expect(visibleOnly.totals).toMatchObject({
       appCPUPercent: 10,
-      sharedCPUPercent: 2,
-      overallCPUPercent: 12,
+      sharedCPUPercent: 11,
+      overallCPUPercent: 21,
       appMemoryWorkingSetSize: 2700,
-      sharedMemoryWorkingSetSize: 3500,
-      overallMemoryWorkingSetSize: 6200,
+      sharedMemoryWorkingSetSize: 4700,
+      overallMemoryWorkingSetSize: 7400,
     });
 
     await jest.advanceTimersByTimeAsync(1000);
@@ -189,11 +215,17 @@ describe("ProcessMetricsCollector", () => {
     expect(includingHidden.apps).toHaveLength(2);
     expect(
       includingHidden.apps.map((entry) => entry.instance.manifest.id),
-    ).toEqual(["com.eden.visible", "com.eden.hidden"]);
-    expect(includingHidden.apps[0].totalCPUPercent).toBe(20);
-    expect(includingHidden.apps[1].totalCPUPercent).toBe(3);
-    expect(includingHidden.sharedProcesses.map((entry) => entry.pid)).toEqual([
-      999,
+    ).toEqual(["com.eden.hidden", "com.eden.visible"]);
+    expect(includingHidden.apps[0].totalCPUPercent).toBe(3);
+    expect(includingHidden.apps[1].totalCPUPercent).toBe(20);
+    expect(
+      includingHidden.sharedProcesses.map((entry) => ({
+        pid: entry.pid,
+        name: entry.name,
+      })),
+    ).toEqual([
+      { pid: 998, name: "Alpha Process" },
+      { pid: 999, name: "Zulu Process" },
     ]);
   });
 
