@@ -30,6 +30,11 @@
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/babel"
+  },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"

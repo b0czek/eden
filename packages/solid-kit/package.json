@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/solid-kit",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "High-level SolidJS UI primitives for Eden apps",
   "type": "module",
   "main": "src/index.ts",
@@ -37,5 +37,10 @@
     "renderer"
   ],
   "author": "Dariusz Majnert",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/solid-kit"
+  }
 }

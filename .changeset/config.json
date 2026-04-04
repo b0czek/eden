@@ -9,7 +9,8 @@
       "@edenapp/types",
       "@edenapp/genesis",
       "@edenapp/babel",
-      "@edenapp/tablets"
+      "@edenapp/tablets",
+      "@edenapp/solid-kit"
     ]
   ],
   "linked": [],

@@ -31,5 +31,10 @@
     "ipc"
   ],
   "author": "Dariusz Majnert",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/tablets"
+  }
 }
