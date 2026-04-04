@@ -9,6 +9,10 @@ import { Command } from "commander";
 import { buildApps, buildSdkApps } from "./build-apps";
 import { copyAssets } from "./copy-assets";
 import { devWatch } from "./dev-watch";
+import {
+  type ScaffoldSolidAppMode,
+  scaffoldSolidApp,
+} from "./scaffold-solid-app";
 
 const program = new Command();
 
@@ -76,6 +80,32 @@ program
       });
     } catch (error) {
       console.error("Copy failed:", error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("scaffold-solid")
+  .description("Scaffold a minimal renderer-only Solid Eden app")
+  .argument("<app-id>", "App ID (for example: com.eden.my-app)")
+  .argument(
+    "[output-dir]",
+    "Directory to create the app in (defaults depend on scaffold mode)",
+  )
+  .option("-n, --name <name>", "Display name for the app")
+  .option("-m, --mode <mode>", "Scaffold mode: auto, sdk, consumer", "auto")
+  .option("-f, --force", "Allow writing into a non-empty target directory")
+  .action(async (appId, outputDir, options) => {
+    try {
+      await scaffoldSolidApp({
+        appId,
+        outputDir,
+        name: options.name,
+        mode: options.mode as ScaffoldSolidAppMode,
+        force: options.force || false,
+      });
+    } catch (error) {
+      console.error("Scaffold failed:", error);
       process.exit(1);
     }
   });

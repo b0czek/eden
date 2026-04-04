@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eden App Creation"
+  short_description: "Create and start new Eden apps"
+  default_prompt: "Use $eden-app-creation to create a new Eden app."
