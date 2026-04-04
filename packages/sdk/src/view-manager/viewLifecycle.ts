@@ -119,6 +119,12 @@ export function destroyView(
         log.warn("Ignoring error during view removal:", error);
       }
     }
+
+    // Detaching the view from the window is not enough. The renderer process
+    // keeps running until its webContents is explicitly closed.
+    if (!viewInfo.view.webContents.isDestroyed()) {
+      viewInfo.view.webContents.close();
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error("Failed to destroy view:", errorMessage);
