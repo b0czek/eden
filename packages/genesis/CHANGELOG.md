@@ -1,5 +1,13 @@
 # @edenapp/genesis
 
+## 0.6.2
+
+### Patch Changes
+
+- error while publishing
+- Updated dependencies
+  - @edenapp/types@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes
