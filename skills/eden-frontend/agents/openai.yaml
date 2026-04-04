@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eden Frontend"
+  short_description: "Build Eden app frontends with EdenCSS"
+  default_prompt: "Use $eden-frontend to build or restyle an Eden app UI with EdenCSS tokens, utilities, components, and existing repo patterns."
