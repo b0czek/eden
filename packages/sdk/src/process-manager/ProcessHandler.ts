@@ -1,4 +1,9 @@
-import type { AppInstance, LaunchResult, ViewBounds } from "@edenapp/types";
+import type {
+  AppInstance,
+  LaunchResult,
+  ProcessMetricsSnapshot,
+  ViewBounds,
+} from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { ProcessManager } from "./ProcessManager";
 
@@ -59,5 +64,22 @@ export class ProcessHandler {
   @EdenHandler("list", { permission: "read" })
   async handleListApps(args: { showHidden?: boolean }): Promise<AppInstance[]> {
     return this.processManager.getRunningApps(args.showHidden);
+  }
+
+  /**
+   * Return CPU and memory metrics for running Eden apps.
+   * Requires "process/read" permission.
+   * @param showHidden - If true, includes overlay apps and backend-only apps
+   * @param pollingTimeoutMs - How long main should keep the shared sampler alive
+   */
+  @EdenHandler("metrics", { permission: "read" })
+  async handleMetrics(args: {
+    showHidden?: boolean;
+    pollingTimeoutMs?: number;
+  }): Promise<ProcessMetricsSnapshot> {
+    return await this.processManager.getMetrics(
+      args.showHidden,
+      args.pollingTimeoutMs,
+    );
   }
 }

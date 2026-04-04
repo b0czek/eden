@@ -1,4 +1,8 @@
-import type { AppInstance, EdenConfig } from "@edenapp/types";
+import type {
+  AppInstance,
+  EdenConfig,
+  ProcessMetricsSnapshot,
+} from "@edenapp/types";
 import { randomUUID } from "crypto";
 import { inject, injectable, singleton } from "tsyringe";
 import { AppChannelManager } from "../appbus/AppChannelManager";
@@ -9,6 +13,7 @@ import { UserManager } from "../user/UserManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
 import { ProcessHandler } from "./ProcessHandler";
+import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 
 /**
  * Events emitted by the ProcessManager
@@ -31,6 +36,7 @@ interface ProcessNamespaceEvents {
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private runningApps: Map<string, AppInstance> = new Map();
   private processHandler: ProcessHandler;
+  private processMetrics: ProcessMetricsCollector;
   private loginAppId?: string;
 
   constructor(
@@ -45,6 +51,11 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   ) {
     super(ipcBridge);
     this.loginAppId = config.loginAppId;
+    this.processMetrics = new ProcessMetricsCollector({
+      backendManager: this.backendManager,
+      viewManager: this.viewManager,
+      getRunningApps: (showHidden) => this.getRunningApps(showHidden),
+    });
 
     this.setupEventHandlers();
     this.setupUserAccessHandlers();
@@ -252,6 +263,21 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    */
   getAppInstance(appId: string): AppInstance | undefined {
     return this.runningApps.get(appId);
+  }
+
+  /**
+   * Return a process metrics snapshot for running Eden apps.
+   *
+   * CPU percentages are interval-based values supplied by Electron. To avoid
+   * concurrent callers resetting each other's sampling window, the main process
+   * owns a shared sampler with a fixed cadence and can keep it alive for slower
+   * polling clients.
+   */
+  async getMetrics(
+    showHidden: boolean = false,
+    pollingTimeoutMs?: number,
+  ): Promise<ProcessMetricsSnapshot> {
+    return await this.processMetrics.getMetrics(showHidden, pollingTimeoutMs);
   }
 
   /**

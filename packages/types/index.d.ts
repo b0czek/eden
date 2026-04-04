@@ -5,6 +5,7 @@ export * from "./EdenSeedConfig";
 export * from "./User";
 
 export * from "./AppManifest";
+export * from "./ProcessMetrics";
 
 export * from "./global";
 

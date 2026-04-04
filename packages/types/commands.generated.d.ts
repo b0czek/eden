@@ -538,6 +538,18 @@ export interface ProcessCommands {
     args: { showHidden?: boolean };
     response: import("./index").AppInstance[];
   };
+  /**
+   * Return CPU and memory metrics for running Eden apps.
+   * Requires "process/read" permission.
+   * @param showHidden - If true, includes overlay apps and backend-only apps
+   * @param pollingTimeoutMs - How long main should keep the shared sampler alive
+   */
+  "process/metrics": {
+    args: {
+    showHidden?: boolean;
+    pollingTimeoutMs?: number };
+    response: import("./index").ProcessMetricsSnapshot;
+  };
 }
 
 /**
