@@ -1,5 +1,7 @@
 # @edenapp/types
 
+## 0.6.1
+
 ## 0.6.0
 
 ### Minor Changes

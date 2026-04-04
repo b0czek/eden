@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.6.1
+
+### Patch Changes
+
+- process metrics are now sorted by process name, not cpu usage
+  - @edenapp/types@0.6.1
+  - @edenapp/genesis@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes

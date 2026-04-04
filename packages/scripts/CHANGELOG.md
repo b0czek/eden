@@ -1,5 +1,12 @@
 # @edenapp/scripts
 
+## 0.6.1
+
+### Patch Changes
+
+- @edenapp/types@0.6.1
+- @edenapp/genesis@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
