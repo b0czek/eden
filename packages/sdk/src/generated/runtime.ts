@@ -68,6 +68,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "process/stop",
   "process/exit",
   "process/list",
+  "process/metrics",
   "settings/get",
   "settings/set",
   "settings/list",

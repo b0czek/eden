@@ -1,0 +1,31 @@
+{
+  "id": "com.eden.process-manager",
+  "name": {
+    "en": "Process Manager",
+    "pl": "Menedżer Procesów"
+  },
+  "version": "1.0.0",
+  "description": "Monitor Eden apps and shared system processes",
+  "author": "Dariusz Majnert",
+  "build": {
+    "command": "pnpm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultSize": {
+      "width": 980,
+      "height": 680
+    },
+    "minSize": {
+      "width": 720,
+      "height": 420
+    },
+    "resizable": true,
+    "movable": true
+  },
+  "permissions": ["process/read", "package/read"],
+  "icon": "icon.svg"
+}
