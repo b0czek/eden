@@ -196,4 +196,38 @@ describe("ProcessMetricsCollector", () => {
       999,
     ]);
   });
+
+  it("can return an immediate cold-start sample without waiting for the first CPU interval", async () => {
+    const visibleApp = createApp("com.eden.visible", 10);
+
+    const collector = new ProcessMetricsCollector({
+      backendManager: { getBackend: jest.fn(() => undefined) } as any,
+      viewManager: {
+        getView: jest.fn(() => ({
+          webContents: {
+            isDestroyed: () => false,
+            getOSProcessId: () => 111,
+          },
+        })),
+      } as any,
+      getRunningApps: () => [visibleApp],
+    });
+
+    getAppMetrics
+      .mockReturnValueOnce([metric(111, 0, 1800, 2200)])
+      .mockReturnValue([metric(111, 5, 2000, 2500)]);
+
+    const snapshot = await collector.getMetrics(false, 3000, false);
+
+    expect(getAppMetrics).toHaveBeenCalledTimes(1);
+    expect(snapshot.apps).toHaveLength(1);
+    expect(snapshot.apps[0]).toMatchObject({
+      totalCPUPercent: 0,
+      totalMemoryWorkingSetSize: 1800,
+      renderer: { pid: 111, category: "renderer" },
+    });
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(getAppMetrics).toHaveBeenCalledTimes(2);
+  });
 });

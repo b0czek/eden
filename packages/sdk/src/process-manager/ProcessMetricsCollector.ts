@@ -48,18 +48,28 @@ export class ProcessMetricsCollector {
   async getMetrics(
     showHidden: boolean = false,
     pollingTimeoutMs: number = DEFAULT_METRICS_POLLING_TIMEOUT_MS,
+    waitForAccurateCpu: boolean = true,
   ): Promise<ProcessMetricsSnapshot> {
     const normalizedTimeout = Math.max(
       METRICS_SAMPLE_INTERVAL_MS,
       Math.min(MAX_METRICS_POLLING_TIMEOUT_MS, pollingTimeoutMs),
     );
     this.extendMetricsSamplerKeepAlive(normalizedTimeout);
-    this.ensureMetricsSampler();
+    this.ensureMetricsSampler(waitForAccurateCpu);
 
     if (this.latestMetricsSample) {
       return this.buildMetricsSnapshot(
         this.latestMetricsSample.appMetrics,
         this.latestMetricsSample.sampledAt,
+        showHidden,
+      );
+    }
+
+    if (!waitForAccurateCpu) {
+      const immediateSample = this.captureMetricsSample();
+      return this.buildMetricsSnapshot(
+        immediateSample.appMetrics,
+        immediateSample.sampledAt,
         showHidden,
       );
     }
@@ -73,12 +83,16 @@ export class ProcessMetricsCollector {
     });
   }
 
-  private ensureMetricsSampler(): void {
+  private ensureMetricsSampler(waitForAccurateCpu: boolean): void {
     if (this.metricsSampler) return;
 
-    // Prime Electron's CPU sampler so the next interval-based sample is useful.
-    app.getAppMetrics();
-    this.latestMetricsSample = null;
+    if (waitForAccurateCpu) {
+      // Prime Electron's CPU sampler so the next interval-based sample is useful.
+      app.getAppMetrics();
+      this.latestMetricsSample = null;
+    } else {
+      this.captureMetricsSample();
+    }
 
     this.metricsSampler = setInterval(() => {
       this.collectMetricsSample();
@@ -102,9 +116,7 @@ export class ProcessMetricsCollector {
     }
 
     try {
-      const appMetrics = app.getAppMetrics();
-      const sampledAt = new Date().toISOString();
-      this.latestMetricsSample = { sampledAt, appMetrics };
+      const { appMetrics, sampledAt } = this.captureMetricsSample();
 
       for (const [
         requestId,
@@ -127,6 +139,14 @@ export class ProcessMetricsCollector {
       this.pendingMetricsRequests.clear();
       this.stopMetricsSampler();
     }
+  }
+
+  private captureMetricsSample(): CachedMetricsSample {
+    const appMetrics = app.getAppMetrics();
+    const sampledAt = new Date().toISOString();
+    const sample = { sampledAt, appMetrics };
+    this.latestMetricsSample = sample;
+    return sample;
   }
 
   private stopMetricsSampler(): void {

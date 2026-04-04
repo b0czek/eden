@@ -543,11 +543,14 @@ export interface ProcessCommands {
    * Requires "process/read" permission.
    * @param showHidden - If true, includes overlay apps and backend-only apps
    * @param pollingTimeoutMs - How long main should keep the shared sampler alive
+   * @param waitForAccurateCpu - If false, returns the current sample immediately,
+   * even before Electron has a full CPU interval
    */
   "process/metrics": {
     args: {
     showHidden?: boolean;
-    pollingTimeoutMs?: number };
+    pollingTimeoutMs?: number;
+    waitForAccurateCpu?: boolean };
     response: import("./index").ProcessMetricsSnapshot;
   };
 }

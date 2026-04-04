@@ -71,15 +71,19 @@ export class ProcessHandler {
    * Requires "process/read" permission.
    * @param showHidden - If true, includes overlay apps and backend-only apps
    * @param pollingTimeoutMs - How long main should keep the shared sampler alive
+   * @param waitForAccurateCpu - If false, returns the current sample immediately,
+   * even before Electron has a full CPU interval
    */
   @EdenHandler("metrics", { permission: "read" })
   async handleMetrics(args: {
     showHidden?: boolean;
     pollingTimeoutMs?: number;
+    waitForAccurateCpu?: boolean;
   }): Promise<ProcessMetricsSnapshot> {
     return await this.processManager.getMetrics(
       args.showHidden,
       args.pollingTimeoutMs,
+      args.waitForAccurateCpu,
     );
   }
 }

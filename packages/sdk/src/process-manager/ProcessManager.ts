@@ -276,8 +276,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   async getMetrics(
     showHidden: boolean = false,
     pollingTimeoutMs?: number,
+    waitForAccurateCpu: boolean = true,
   ): Promise<ProcessMetricsSnapshot> {
-    return await this.processMetrics.getMetrics(showHidden, pollingTimeoutMs);
+    return await this.processMetrics.getMetrics(
+      showHidden,
+      pollingTimeoutMs,
+      waitForAccurateCpu,
+    );
   }
 
   /**
