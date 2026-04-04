@@ -62,35 +62,35 @@
 
 /* ===== Surfaces ===== */
 .eden-surface {
-  background: var(--eden-surface-primary);
-  color: var(--eden-text-primary);
+  background: var(--eden-color-surface-primary);
+  color: var(--eden-color-text-primary);
 }
 
 .eden-surface-secondary {
-  background: var(--eden-surface-secondary);
-  color: var(--eden-text-primary);
+  background: var(--eden-color-surface-secondary);
+  color: var(--eden-color-text-primary);
 }
 
 .eden-surface-elevated {
-  background: var(--eden-surface-elevated);
-  color: var(--eden-text-primary);
+  background: var(--eden-color-surface-elevated);
+  color: var(--eden-color-text-primary);
 }
 
 /* ===== Text Utilities ===== */
 .eden-text-primary {
-  color: var(--eden-text-primary);
+  color: var(--eden-color-text-primary);
 }
 
 .eden-text-secondary {
-  color: var(--eden-text-secondary);
+  color: var(--eden-color-text-secondary);
 }
 
 .eden-text-tertiary {
-  color: var(--eden-text-tertiary);
+  color: var(--eden-color-text-tertiary);
 }
 
 .eden-text-muted {
-  color: var(--eden-text-muted);
+  color: var(--eden-color-text-muted);
 }
 
 .eden-text-xs {
@@ -348,7 +348,7 @@
 .eden-overlay {
   position: fixed;
   inset: 0;
-  background: var(--eden-bg-overlay);
+  background: var(--eden-color-bg-overlay);
   backdrop-filter: var(--eden-glass-strong);
   z-index: var(--eden-z-overlay);
 }
@@ -423,13 +423,16 @@
 }
 
 .eden-animate-fade-in {
-  animation: eden-fade-in var(--eden-duration-normal) var(--eden-ease-out);
+  animation: eden-fade-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
 }
 
 .eden-animate-slide-up {
-  animation: eden-slide-up var(--eden-duration-slow) var(--eden-ease-out);
+  animation: eden-slide-up var(--eden-duration-slow)
+    var(--eden-transition-ease-out);
 }
 
 .eden-animate-scale-in {
-  animation: eden-scale-in var(--eden-duration-normal) var(--eden-ease-out);
+  animation: eden-scale-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
 }

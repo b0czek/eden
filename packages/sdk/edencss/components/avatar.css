@@ -77,7 +77,7 @@
 }
 
 .eden-avatar-group .eden-avatar {
-  border: 2px solid var(--eden-color-bg-base);
+  border: 2px solid var(--eden-color-bg-primary);
   margin-left: -10px;
   transition: transform var(--eden-transition-fast);
 }

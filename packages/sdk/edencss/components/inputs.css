@@ -377,7 +377,7 @@
   color: var(--eden-color-text-muted);
   min-width: 40px;
   text-align: right;
-  font-family: var(--eden-font-mono);
+  font-family: var(--eden-font-family-mono);
 }
 
 /* ===== Radio Group ===== */

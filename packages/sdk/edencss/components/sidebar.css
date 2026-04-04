@@ -167,7 +167,7 @@
   color: var(--eden-color-text-muted);
   background: var(--eden-color-bg-glass-medium);
   padding: var(--eden-space-xs) var(--eden-space-sm);
-  border-radius: var(--eden-radius-full);
+  border-radius: var(--eden-radius-round);
   flex-shrink: 0;
 }
 
@@ -192,7 +192,7 @@
 .eden-sidebar-item-subtitle {
   font-size: var(--eden-font-size-xs);
   color: var(--eden-color-text-muted);
-  font-family: var(--eden-font-mono);
+  font-family: var(--eden-font-family-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
