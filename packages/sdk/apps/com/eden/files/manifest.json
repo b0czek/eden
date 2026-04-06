@@ -27,5 +27,11 @@
     "movable": true
   },
   "permissions": ["fs/*", "db/rw"],
+  "fileHandlers": [
+    {
+      "name": "Directories",
+      "directories": true
+    }
+  ],
   "icon": "icon.svg"
 }

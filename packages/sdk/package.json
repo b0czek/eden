@@ -47,7 +47,8 @@
     "fast-glob": "^3.3.3",
     "keyv": "^5.1.0",
     "reflect-metadata": "^0.2.2",
-    "tsyringe": "^4.10.0"
+    "tsyringe": "^4.10.0",
+    "wasmagic": "^1.0.8"
   },
   "devDependencies": {
     "@edenapp/scripts": "workspace:*",

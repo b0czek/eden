@@ -1,7 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { FileHandlerInfo, FileOpenResult } from "@edenapp/types";
+import type {
+  FileHandlerConfig,
+  FileHandlerInfo,
+  FileOpenResult,
+  RuntimeAppManifest,
+} from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
+import { WASMagic } from "wasmagic";
 import { FilesystemManager } from "../filesystem";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
@@ -26,18 +32,14 @@ interface FileNamespaceEvents {
 @injectable()
 @EdenNamespace("file")
 export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
-  private userDirectory: string;
   private preferencesPath: string;
   private fileOpenHandler: FileOpenHandler;
+  private mimeDetectorPromise?: Promise<WASMagic>;
 
-  // Built-in default extension -> app ID mappings
-  private defaultRegistry: Map<string, string> = new Map();
-
-  // User override preferences (extension -> app ID)
+  // User override preferences (file type key -> app ID)
   private userPreferences: Map<string, string> = new Map();
-
-  // Special key for directories
-  private static readonly DIRECTORY_KEY = "__directory__";
+  private static readonly DIRECTORY_PREFERENCE_KEY = "directory";
+  private static readonly MIME_DETECTION_BYTES = 8192;
 
   constructor(
     @inject("userDirectory") userDirectory: string,
@@ -49,10 +51,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
-    this.userDirectory = userDirectory;
     this.preferencesPath = path.join(userDirectory, "file-associations.json");
-
-    this.initializeDefaultRegistry();
 
     // Create and register handler
     this.fileOpenHandler = new FileOpenHandler(this);
@@ -67,78 +66,6 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     log.info(
       `FileOpenManager initialized with ${this.userPreferences.size} user preferences`,
     );
-  }
-
-  /**
-   * Set up built-in default handlers
-   */
-  private initializeDefaultRegistry(): void {
-    // Directories open in file manager
-    this.defaultRegistry.set(FileOpenManager.DIRECTORY_KEY, "com.eden.files");
-
-    // Text files - open in text editor
-    const textExtensions = [
-      "txt",
-      "md",
-      "markdown",
-      "log",
-      "json",
-      "xml",
-      "yaml",
-      "yml",
-      "toml",
-      "js",
-      "jsx",
-      "mjs",
-      "cjs",
-      "ts",
-      "tsx",
-      "mts",
-      "cts",
-      "css",
-      "scss",
-      "sass",
-      "less",
-      "html",
-      "htm",
-      "ini",
-      "cfg",
-      "conf",
-      "env",
-      "py",
-      "rs",
-      "go",
-      "java",
-      "c",
-      "cpp",
-      "h",
-      "hpp",
-      "sh",
-      "bash",
-      "zsh",
-      "fish",
-    ];
-    for (const ext of textExtensions) {
-      this.defaultRegistry.set(ext, "com.eden.editor");
-    }
-
-    // Image files
-    const imageExtensions = [
-      "png",
-      "jpg",
-      "jpeg",
-      "gif",
-      "webp",
-      "svg",
-      "bmp",
-      "ico",
-    ];
-    for (const ext of imageExtensions) {
-      this.defaultRegistry.set(ext, "com.eden.files"); // Fallback to file manager for now
-    }
-
-    // Eden packages
-    this.defaultRegistry.set("edenite", "com.eden.installer");
   }
 
   /**
@@ -165,6 +92,34 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   }
 
   /**
+   * Normalize a file extension (lowercase, without leading dot)
+   */
+  private normalizeExtension(extension: string): string {
+    return extension.toLowerCase().replace(/^\./, "");
+  }
+
+  /**
+   * Normalize a MIME type for comparisons
+   */
+  private normalizeMimeType(mimeType: string): string {
+    return mimeType.toLowerCase().split(";")[0].trim();
+  }
+
+  /**
+   * Normalize the internal preference key for a MIME type
+   */
+  private getMimePreferenceKey(mimeType: string): string {
+    return `mime:${this.normalizeMimeType(mimeType)}`;
+  }
+
+  /**
+   * Normalize the internal preference key for a file extension
+   */
+  private getExtensionPreferenceKey(extension: string): string {
+    return `ext:${this.normalizeExtension(extension)}`;
+  }
+
+  /**
    * Get the file extension from a path (lowercase, without dot)
    */
   private getExtension(filePath: string): string {
@@ -173,55 +128,302 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   }
 
   /**
-   * Get the handler app ID for a file path
+   * Resolve file metadata used for matching and preference lookup
    */
-  getHandler(
-    filePath: string,
-    isDirectory: boolean = false,
-  ): string | undefined {
-    const key = isDirectory
-      ? FileOpenManager.DIRECTORY_KEY
-      : this.getExtension(filePath);
+  private async getFileContext(filePath: string): Promise<{
+    fullPath: string;
+    isDirectory: boolean;
+    extension: string | undefined;
+    mimeType: string | undefined;
+    preferenceKeys: string[];
+    canonicalPreferenceKey: string | undefined;
+  }> {
+    const fullPath = this.fsManager.resolvePath(filePath);
+    const stats = await fs.stat(fullPath);
+    const isDirectory = stats.isDirectory();
 
-    // User preference takes priority
-    if (this.userPreferences.has(key)) {
-      return this.userPreferences.get(key);
+    if (isDirectory) {
+      return {
+        fullPath,
+        isDirectory: true,
+        extension: undefined,
+        mimeType: undefined,
+        preferenceKeys: [FileOpenManager.DIRECTORY_PREFERENCE_KEY],
+        canonicalPreferenceKey: FileOpenManager.DIRECTORY_PREFERENCE_KEY,
+      };
     }
 
-    // Fall back to default registry
-    return this.defaultRegistry.get(key);
+    const extension = this.getExtension(filePath) || undefined;
+    const mimeType = await this.detectMimeType(fullPath);
+    const preferenceKeys: string[] = [];
+
+    if (mimeType) {
+      preferenceKeys.push(this.getMimePreferenceKey(mimeType));
+    }
+
+    if (extension) {
+      preferenceKeys.push(this.getExtensionPreferenceKey(extension));
+      preferenceKeys.push(extension);
+    }
+
+    return {
+      fullPath,
+      isDirectory: false,
+      extension,
+      mimeType,
+      preferenceKeys,
+      canonicalPreferenceKey: mimeType
+        ? this.getMimePreferenceKey(mimeType)
+        : extension
+          ? this.getExtensionPreferenceKey(extension)
+          : undefined,
+    };
   }
 
   /**
-   * Get handler for a specific extension
+   * Lazily create the shared WASMagic MIME detector
    */
-  getHandlerForExtension(extension: string): string | undefined {
-    const ext = extension.toLowerCase().replace(/^\./, "");
-
-    // User preference takes priority
-    if (this.userPreferences.has(ext)) {
-      return this.userPreferences.get(ext);
+  private getMimeDetector(): Promise<WASMagic> {
+    if (!this.mimeDetectorPromise) {
+      this.mimeDetectorPromise = WASMagic.create();
     }
 
-    // Fall back to default registry
-    return this.defaultRegistry.get(ext);
+    return this.mimeDetectorPromise;
   }
 
   /**
-   * Set user preference for a file extension
+   * Detect the MIME type from file contents
    */
-  async setDefaultHandler(extension: string, appId: string): Promise<void> {
-    const ext = extension.toLowerCase().replace(/^\./, "");
-    this.userPreferences.set(ext, appId);
+  private async detectMimeType(fullPath: string): Promise<string | undefined> {
+    let handle: fs.FileHandle | undefined;
+
+    try {
+      handle = await fs.open(fullPath, "r");
+      const buffer = Buffer.alloc(FileOpenManager.MIME_DETECTION_BYTES);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+
+      if (bytesRead === 0) {
+        return undefined;
+      }
+
+      const magic = await this.getMimeDetector();
+      return this.normalizeMimeType(
+        magic.detect(buffer.subarray(0, bytesRead)),
+      );
+    } catch (error) {
+      log.warn(`Failed to detect MIME type for ${fullPath}:`, error);
+      return undefined;
+    } finally {
+      await handle?.close();
+    }
+  }
+
+  /**
+   * Get installed apps that expose file handlers
+   */
+  private getInstalledFileHandlers(): Array<{
+    app: RuntimeAppManifest;
+    handler: FileHandlerConfig;
+  }> {
+    const handlers: Array<{
+      app: RuntimeAppManifest;
+      handler: FileHandlerConfig;
+    }> = [];
+
+    for (const app of this.packageManager.getInstalledApps()) {
+      for (const handler of app.fileHandlers ?? []) {
+        handlers.push({ app, handler });
+      }
+    }
+
+    return handlers;
+  }
+
+  /**
+   * Check whether a handler supports a file extension
+   */
+  private handlerSupportsExtension(
+    handler: FileHandlerConfig,
+    extension: string,
+  ): boolean {
+    return (
+      handler.extensions?.some(
+        (candidate) => this.normalizeExtension(candidate) === extension,
+      ) ?? false
+    );
+  }
+
+  /**
+   * Score a MIME pattern match for sorting
+   */
+  private getMimeMatchScore(
+    handler: FileHandlerConfig,
+    mimeType: string,
+  ): number {
+    let bestScore = 0;
+
+    for (const candidate of handler.mimeTypes ?? []) {
+      const normalizedCandidate = this.normalizeMimeType(candidate);
+
+      if (normalizedCandidate === mimeType) {
+        bestScore = Math.max(bestScore, 8);
+        continue;
+      }
+
+      if (
+        normalizedCandidate.endsWith("/*") &&
+        mimeType.startsWith(normalizedCandidate.slice(0, -1))
+      ) {
+        bestScore = Math.max(bestScore, 6);
+      }
+    }
+
+    return bestScore;
+  }
+
+  /**
+   * Get matching handlers for the provided file metadata
+   */
+  private getMatchingHandlers(criteria: {
+    extension?: string;
+    mimeType?: string;
+    isDirectory?: boolean;
+  }): Array<{
+    app: RuntimeAppManifest;
+    handler: FileHandlerConfig;
+    score: number;
+  }> {
+    const extension = criteria.extension
+      ? this.normalizeExtension(criteria.extension)
+      : undefined;
+    const mimeType = criteria.mimeType
+      ? this.normalizeMimeType(criteria.mimeType)
+      : undefined;
+
+    const matches: Array<{
+      app: RuntimeAppManifest;
+      handler: FileHandlerConfig;
+      score: number;
+    }> = [];
+
+    for (const { app, handler } of this.getInstalledFileHandlers()) {
+      if (criteria.isDirectory) {
+        if (!handler.directories) {
+          continue;
+        }
+
+        matches.push({ app, handler, score: 100 });
+        continue;
+      }
+
+      let score = 0;
+
+      if (extension && this.handlerSupportsExtension(handler, extension)) {
+        score += 2;
+      }
+
+      if (mimeType) {
+        score += this.getMimeMatchScore(handler, mimeType);
+      }
+
+      if (score === 0) {
+        continue;
+      }
+
+      matches.push({ app, handler, score });
+    }
+
+    return matches.sort((left, right) => right.score - left.score);
+  }
+
+  /**
+   * Resolve the handler app ID for a file or directory
+   */
+  private resolveUserPreference(preferenceKeys: string[]): string | undefined {
+    for (const key of preferenceKeys) {
+      const preferredAppId = this.userPreferences.get(key);
+      if (
+        preferredAppId &&
+        this.packageManager.getAppManifest(preferredAppId)
+      ) {
+        return preferredAppId;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Resolve the handler app ID for a file or directory
+   */
+  private resolveHandler(fileContext: {
+    isDirectory: boolean;
+    extension: string | undefined;
+    mimeType: string | undefined;
+    preferenceKeys: string[];
+  }): {
+    appId: string | undefined;
+    mimeType: string | undefined;
+  } {
+    if (fileContext.isDirectory) {
+      return {
+        appId: this.getMatchingHandlers({ isDirectory: true })[0]?.app.id,
+        mimeType: undefined,
+      };
+    }
+
+    const preferredAppId = this.resolveUserPreference(
+      fileContext.preferenceKeys,
+    );
+    if (preferredAppId) {
+      return { appId: preferredAppId, mimeType: fileContext.mimeType };
+    }
+
+    const appId = this.getMatchingHandlers({
+      extension: fileContext.extension,
+      mimeType: fileContext.mimeType,
+    })[0]?.app.id;
+
+    return { appId, mimeType: fileContext.mimeType };
+  }
+
+  /**
+   * Get the default handler app for a file path
+   */
+  async getHandlerForPath(filePath: string): Promise<string | undefined> {
+    const fileContext = await this.getFileContext(filePath);
+    return this.resolveHandler(fileContext).appId;
+  }
+
+  /**
+   * Set user preference for a file path
+   */
+  async setDefaultHandler(filePath: string, appId: string): Promise<void> {
+    const fileContext = await this.getFileContext(filePath);
+    const preferenceKey = fileContext.canonicalPreferenceKey;
+
+    if (!preferenceKey) {
+      throw new Error(`Unable to determine file type for ${filePath}`);
+    }
+
+    for (const key of fileContext.preferenceKeys) {
+      this.userPreferences.delete(key);
+    }
+
+    this.userPreferences.set(preferenceKey, appId);
     await this.saveUserPreferences();
   }
 
   /**
-   * Remove user preference for a file extension (revert to default)
+   * Remove user preference for a file path (revert to default)
    */
-  async removeDefaultHandler(extension: string): Promise<void> {
-    const ext = extension.toLowerCase().replace(/^\./, "");
-    this.userPreferences.delete(ext);
+  async removeDefaultHandler(filePath: string): Promise<void> {
+    const fileContext = await this.getFileContext(filePath);
+
+    for (const key of fileContext.preferenceKeys) {
+      this.userPreferences.delete(key);
+    }
+
     await this.saveUserPreferences();
   }
 
@@ -236,43 +438,30 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   }
 
   /**
-   * Get all apps that can handle a specific extension
+   * Get all apps that can handle a specific file path
    */
-  getSupportedHandlers(extension: string): FileHandlerInfo[] {
-    const ext = extension.toLowerCase().replace(/^\./, "");
-    const handlers: FileHandlerInfo[] = [];
+  async getSupportedHandlers(filePath: string): Promise<FileHandlerInfo[]> {
+    const fileContext = await this.getFileContext(filePath);
+    const handlers = new Map<string, FileHandlerInfo>();
 
-    // Check all installed apps for file handlers
-    const apps = this.packageManager.getInstalledApps();
-
-    for (const app of apps) {
-      if (app.fileHandlers) {
-        for (const handler of app.fileHandlers) {
-          if (handler.extensions.map((e) => e.toLowerCase()).includes(ext)) {
-            handlers.push({
-              appId: app.id,
-              appName: this.getAppName(app.name),
-              handlerName: handler.name,
-              icon: handler.icon || app.icon,
-            });
-          }
-        }
+    for (const { app, handler } of this.getMatchingHandlers({
+      extension: fileContext.extension,
+      mimeType: fileContext.mimeType,
+      isDirectory: fileContext.isDirectory,
+    })) {
+      if (handlers.has(app.id)) {
+        continue;
       }
+
+      handlers.set(app.id, {
+        appId: app.id,
+        appName: this.getAppName(app.name),
+        handlerName: handler.name,
+        icon: app.icon,
+      });
     }
 
-    // Also add default handler if it exists and isn't already in the list
-    const defaultHandler = this.defaultRegistry.get(ext);
-    if (defaultHandler && !handlers.some((h) => h.appId === defaultHandler)) {
-      const app = this.packageManager.getAppManifest(defaultHandler);
-      if (app) {
-        handlers.push({
-          appId: app.id,
-          appName: this.getAppName(app.name),
-        });
-      }
-    }
-
-    return handlers;
+    return Array.from(handlers.values());
   }
 
   /**
@@ -287,15 +476,42 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       { default: string | undefined; userOverride: string | undefined }
     > = {};
 
-    // Add all default registry entries
-    for (const [ext, appId] of this.defaultRegistry) {
-      result[ext] = {
-        default: appId,
-        userOverride: this.userPreferences.get(ext),
-      };
+    for (const { app, handler } of this.getInstalledFileHandlers()) {
+      if (
+        handler.directories &&
+        !result[FileOpenManager.DIRECTORY_PREFERENCE_KEY]
+      ) {
+        result[FileOpenManager.DIRECTORY_PREFERENCE_KEY] = {
+          default: app.id,
+          userOverride: this.userPreferences.get(
+            FileOpenManager.DIRECTORY_PREFERENCE_KEY,
+          ),
+        };
+      }
+
+      for (const mimeType of handler.mimeTypes ?? []) {
+        const key = this.getMimePreferenceKey(mimeType);
+
+        if (!result[key]) {
+          result[key] = {
+            default: app.id,
+            userOverride: this.userPreferences.get(key),
+          };
+        }
+      }
+
+      for (const extension of handler.extensions ?? []) {
+        const key = this.getExtensionPreferenceKey(extension);
+
+        if (!result[key]) {
+          result[key] = {
+            default: app.id,
+            userOverride: this.userPreferences.get(key),
+          };
+        }
+      }
     }
 
-    // Add any user preferences that aren't in default registry
     for (const [ext, appId] of this.userPreferences) {
       if (!result[ext]) {
         result[ext] = {
@@ -313,21 +529,22 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   async openFile(filePath: string): Promise<FileOpenResult> {
     try {
-      // Resolve masked path to full filesystem path
-      const fullPath = this.fsManager.resolvePath(filePath);
-      const stats = await fs.stat(fullPath);
-      const isDirectory = stats.isDirectory();
-
-      // Get handler
-      const handlerAppId = this.getHandler(filePath, isDirectory);
+      const fileContext = await this.getFileContext(filePath);
+      const { appId: handlerAppId, mimeType } =
+        this.resolveHandler(fileContext);
 
       if (!handlerAppId) {
+        const extension = this.getExtension(filePath);
         return {
           success: false,
           error: `No handler found for ${
-            isDirectory
+            fileContext.isDirectory
               ? "directories"
-              : `extension .${this.getExtension(filePath)}`
+              : mimeType
+                ? `MIME type ${mimeType}`
+                : extension
+                  ? `extension .${extension}`
+                  : "this file"
           }`,
         };
       }
@@ -354,7 +571,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
         for (const viewId of viewIds) {
           this.notifySubscriber(viewId, "opened", {
             path: filePath,
-            isDirectory,
+            isDirectory: fileContext.isDirectory,
             appId: handlerAppId,
           });
         }

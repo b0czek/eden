@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { AppManifest } from "@edenapp/types";
 import * as bundler from "./bundler";
 
 describe("bundler module", () => {
@@ -24,6 +25,18 @@ describe("bundler module", () => {
   });
 
   describe("validateManifest", () => {
+    it("should validate a correct manifest object", async () => {
+      const manifestPath = path.join(sampleAppPath, "manifest.json");
+      const manifest = JSON.parse(
+        await fs.readFile(manifestPath, "utf-8"),
+      ) as AppManifest;
+      const result = bundler.validateManifestObject(manifest);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.manifest?.id).toBe("com.example.hello");
+    });
+
     it("should validate a correct manifest", async () => {
       const manifestPath = path.join(sampleAppPath, "manifest.json");
       const result = await bundler.validateManifest(manifestPath);

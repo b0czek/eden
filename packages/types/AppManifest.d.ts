@@ -90,13 +90,17 @@ export interface FileHandlerConfig {
   name: string;
 
   /** File extensions this handler supports (without dot, e.g., ["txt", "md"]) */
-  extensions: string[];
+  extensions?: string[];
 
-  /** MIME types this handler supports (optional) */
+  /**
+   * MIME types this handler supports.
+   * Supports exact matches (e.g. "application/json") and type wildcards
+   * (e.g. "text/*").
+   */
   mimeTypes?: string[];
 
-  /** Icon for this handler (optional) */
-  icon?: string;
+  /** Whether this handler can open directories */
+  directories?: boolean;
 }
 
 /**

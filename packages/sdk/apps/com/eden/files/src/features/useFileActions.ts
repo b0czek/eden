@@ -1,6 +1,6 @@
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import type { FileHandlerInfo } from "@edenapp/types";
 import { button, type ContextMenuAction } from "@edenapp/tablets";
+import type { FileHandlerInfo } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { t } from "../i18n";
 import type { FileItem } from "../types";
@@ -22,15 +22,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       disabled: true,
     }),
   ];
-
-  const getFileExtension = (name: string) => {
-    const dotIndex = name.lastIndexOf(".");
-    if (dotIndex <= 0 || dotIndex === name.length - 1) {
-      return "";
-    }
-
-    return name.slice(dotIndex + 1).toLowerCase();
-  };
 
   const validateName = (
     name: string,
@@ -216,19 +207,14 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const getOpenWithMenuItems = async (
     item: FileItem,
   ): Promise<ContextMenuAction[]> => {
-    if (!item.isFile) {
+    if (!item.isFile && !item.isDirectory) {
       return [];
-    }
-
-    const extension = getFileExtension(item.name);
-    if (!extension) {
-      return getNoOpenWithOptions();
     }
 
     try {
       const [supportedHandlers] = await Promise.all([
         window.edenAPI.shellCommand("file/get-supported-handlers", {
-          extension,
+          path: item.path,
         }) as Promise<FileHandlerInfo[]>,
       ]);
       const menuItems = supportedHandlers

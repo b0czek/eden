@@ -5,6 +5,7 @@ export {
   extract,
   getInfo,
   validateManifest,
+  validateManifestObject,
   verifyFiles,
 } from "./bundler";
 export type { Compressor } from "./compression";

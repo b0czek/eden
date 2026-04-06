@@ -30,31 +30,14 @@
   "fileHandlers": [
     {
       "name": "Text Files",
-      "extensions": ["txt", "md", "markdown", "log"]
-    },
-    {
-      "name": "JavaScript",
-      "extensions": ["js", "jsx", "mjs", "cjs"]
-    },
-    {
-      "name": "TypeScript",
-      "extensions": ["ts", "tsx", "mts", "cts"]
-    },
-    {
-      "name": "Web Files",
-      "extensions": ["html", "htm", "css", "less"]
-    },
-    {
-      "name": "Data Files",
-      "extensions": ["json", "yaml", "yml", "toml"]
-    },
-    {
-      "name": "Config Files",
-      "extensions": ["ini", "cfg", "conf", "env"]
-    },
-    {
-      "name": "Shell Scripts",
-      "extensions": ["sh", "bash", "zsh", "fish"]
+      "extensions": ["txt", "md", "markdown", "log"],
+      "mimeTypes": [
+        "text/*",
+        "application/javascript",
+        "application/json",
+        "application/xml",
+        "application/x-empty"
+      ]
     }
   ],
   "icon": "icon.svg"

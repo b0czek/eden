@@ -1,10 +1,10 @@
 import {
   button,
+  type ContextMenuAction,
   menu,
   separator,
   submenu,
   title,
-  type ContextMenuAction,
   when,
 } from "@edenapp/tablets";
 import type { Setter } from "solid-js";
@@ -34,7 +34,7 @@ export const useExplorerContextMenus = (
         icon: "play",
       }),
       when(
-        data.item.isFile,
+        data.item.isFile || data.item.isDirectory,
         submenu("open-with", t("files.openWith"), data.openWithItems, {
           icon: "external-link",
         }),
@@ -86,9 +86,10 @@ export const useExplorerContextMenus = (
     e.stopPropagation();
     options.setScrollToSelected(false);
     options.setSelectedItem(item.path);
-    const openWithItems = item.isFile
-      ? await options.getOpenWithMenuItems(item)
-      : [];
+    const openWithItems =
+      item.isFile || item.isDirectory
+        ? await options.getOpenWithMenuItems(item)
+        : [];
     void fileItemMenu.show(
       { item, openWithItems },
       { left: e.clientX, top: e.clientY },

@@ -273,7 +273,10 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     const rawManifest = info.manifest;
 
     // Validate manifest
-    this.validateManifest(rawManifest);
+    const validation = genesisBundler.validateManifestObject(rawManifest);
+    if (!validation.valid) {
+      throw new Error(`Invalid manifest: ${validation.errors.join("; ")}`);
+    }
 
     // Check for reserved app IDs
     if (rawManifest.id === "com.eden") {
@@ -378,30 +381,6 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    */
   getAppManifest(appId: string): RuntimeAppManifest | undefined {
     return this.installedApps.get(appId);
-  }
-
-  /**
-   * Validate app manifest
-   */
-  private validateManifest(manifest: AppManifest): void {
-    if (!manifest.id || !manifest.name || !manifest.version) {
-      throw new Error(
-        "Invalid manifest: missing required fields (id, name, version)",
-      );
-    }
-
-    // At least one of frontend or backend must be defined
-    if (!manifest.frontend?.entry && !manifest.backend?.entry) {
-      throw new Error(
-        "Invalid manifest: must have at least frontend.entry or backend.entry",
-      );
-    }
-
-    if (manifest.backend && !manifest.backend.entry) {
-      throw new Error(
-        "Invalid manifest: backend.entry must be specified when backend is defined",
-      );
-    }
   }
 
   /**

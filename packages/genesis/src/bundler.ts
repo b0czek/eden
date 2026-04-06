@@ -112,56 +112,84 @@ export async function executeBuild(
   }
 }
 
+export function validateManifestObject(manifest: AppManifest): {
+  valid: boolean;
+  errors: string[];
+  manifest?: AppManifest;
+} {
+  const errors: string[] = [];
+
+  // Required fields
+  if (!manifest.id) errors.push("Missing required field: id");
+  if (!manifest.name) errors.push("Missing required field: name");
+  if (!manifest.version) errors.push("Missing required field: version");
+
+  // Validate ID format
+  if (manifest.id && !/^[a-z0-9.-]+$/.test(manifest.id)) {
+    errors.push(
+      "Invalid ID format. Use lowercase letters, numbers, dots, and hyphens only.",
+    );
+  }
+
+  // Backend validation (optional, but ensure entry if provided)
+  if (manifest.backend && !manifest.backend.entry) {
+    errors.push("Missing required field: backend.entry");
+  }
+
+  // Frontend validation (optional, but entry required if frontend exists)
+  if (manifest.frontend && !manifest.frontend.entry) {
+    errors.push("Missing required field: frontend.entry");
+  } else if (
+    manifest.frontend &&
+    !isRemoteEntry(manifest.frontend.entry) &&
+    manifest.frontend.entry.startsWith("http")
+  ) {
+    errors.push("Invalid frontend.entry URL");
+  }
+
+  if (manifest.fileHandlers) {
+    for (const [index, handler] of manifest.fileHandlers.entries()) {
+      if (!handler.name) {
+        errors.push(`Missing required field: fileHandlers[${index}].name`);
+      }
+
+      const hasExtensions =
+        Array.isArray(handler.extensions) && handler.extensions.length > 0;
+      const hasMimeTypes =
+        Array.isArray(handler.mimeTypes) && handler.mimeTypes.length > 0;
+
+      if (!hasExtensions && !hasMimeTypes && !handler.directories) {
+        errors.push(
+          `fileHandlers[${index}] must declare extensions, mimeTypes, or directories`,
+        );
+      }
+    }
+  }
+
+  // Must have at least frontend or backend
+  if (!manifest.frontend && !manifest.backend) {
+    errors.push("App must have at least a frontend or backend entry");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    manifest: errors.length === 0 ? manifest : undefined,
+  };
+}
+
 export async function validateManifest(
   manifestPath: string,
 ): Promise<{ valid: boolean; errors: string[]; manifest?: AppManifest }> {
-  const errors: string[] = [];
-
   try {
     const content = await fs.readFile(manifestPath, "utf-8");
     const manifest: AppManifest = JSON.parse(content);
-
-    // Required fields
-    if (!manifest.id) errors.push("Missing required field: id");
-    if (!manifest.name) errors.push("Missing required field: name");
-    if (!manifest.version) errors.push("Missing required field: version");
-
-    // Validate ID format
-    if (manifest.id && !/^[a-z0-9.-]+$/.test(manifest.id)) {
-      errors.push(
-        "Invalid ID format. Use lowercase letters, numbers, dots, and hyphens only.",
-      );
-    }
-
-    // Backend validation (optional, but ensure entry if provided)
-    if (manifest.backend && !manifest.backend.entry) {
-      errors.push("Missing required field: backend.entry");
-    }
-
-    // Frontend validation (optional, but entry required if frontend exists)
-    if (manifest.frontend && !manifest.frontend.entry) {
-      errors.push("Missing required field: frontend.entry");
-    } else if (
-      manifest.frontend &&
-      !isRemoteEntry(manifest.frontend.entry) &&
-      manifest.frontend.entry.startsWith("http")
-    ) {
-      errors.push("Invalid frontend.entry URL");
-    }
-
-    // Must have at least frontend or backend
-    if (!manifest.frontend && !manifest.backend) {
-      errors.push("App must have at least a frontend or backend entry");
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-      manifest: errors.length === 0 ? manifest : undefined,
-    };
+    return validateManifestObject(manifest);
   } catch (error: unknown) {
-    errors.push(`Failed to read/parse manifest: ${getErrorMessage(error)}`);
-    return { valid: false, errors };
+    return {
+      valid: false,
+      errors: [`Failed to read/parse manifest: ${getErrorMessage(error)}`],
+    };
   }
 }
 

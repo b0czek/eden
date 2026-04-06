@@ -245,35 +245,35 @@ export interface FileCommands {
     response: import("./index").FileOpenResult;
   };
   /**
-   * Get the default handler app for a file extension
+   * Get the default handler app for a file path
    */
   "file/get-handler": {
     args: {
-    extension: string };
+    path: string };
     response: { appId: string | undefined };
   };
   /**
-   * Set user preference for a file extension's default handler
+   * Set user preference for a file path's default handler
    */
   "file/set-default-handler": {
     args: {
-    extension: string;
+    path: string;
     appId: string };
     response: void;
   };
   /**
-   * Remove user preference for a file extension (revert to default)
+   * Remove user preference for a file path (revert to default)
    */
   "file/remove-default-handler": {
-    args: { extension: string };
+    args: { path: string };
     response: void;
   };
   /**
-   * Get all apps that can handle a specific file extension
+   * Get all apps that can handle a specific file path
    */
   "file/get-supported-handlers": {
     args: {
-    extension: string };
+    path: string };
     response: import("./index").FileHandlerInfo[];
   };
   /**

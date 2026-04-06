@@ -37,47 +37,47 @@ export class FileOpenHandler {
   }
 
   /**
-   * Get the default handler app for a file extension
+   * Get the default handler app for a file path
    */
   @EdenHandler("get-handler")
   async handleGetHandler(args: {
-    extension: string;
+    path: string;
   }): Promise<{ appId: string | undefined }> {
-    const { extension } = args;
-    const appId = this.manager.getHandlerForExtension(extension);
+    const { path } = args;
+    const appId = await this.manager.getHandlerForPath(path);
     return { appId };
   }
 
   /**
-   * Set user preference for a file extension's default handler
+   * Set user preference for a file path's default handler
    */
   @EdenHandler("set-default-handler")
   async handleSetDefaultHandler(args: {
-    extension: string;
+    path: string;
     appId: string;
   }): Promise<void> {
-    const { extension, appId } = args;
-    await this.manager.setDefaultHandler(extension, appId);
+    const { path, appId } = args;
+    await this.manager.setDefaultHandler(path, appId);
   }
 
   /**
-   * Remove user preference for a file extension (revert to default)
+   * Remove user preference for a file path (revert to default)
    */
   @EdenHandler("remove-default-handler")
-  async handleRemoveDefaultHandler(args: { extension: string }): Promise<void> {
-    const { extension } = args;
-    await this.manager.removeDefaultHandler(extension);
+  async handleRemoveDefaultHandler(args: { path: string }): Promise<void> {
+    const { path } = args;
+    await this.manager.removeDefaultHandler(path);
   }
 
   /**
-   * Get all apps that can handle a specific file extension
+   * Get all apps that can handle a specific file path
    */
   @EdenHandler("get-supported-handlers")
   async handleGetSupportedHandlers(args: {
-    extension: string;
+    path: string;
   }): Promise<FileHandlerInfo[]> {
-    const { extension } = args;
-    return this.manager.getSupportedHandlers(extension);
+    const { path } = args;
+    return this.manager.getSupportedHandlers(path);
   }
 
   /**
@@ -85,7 +85,7 @@ export class FileOpenHandler {
    */
   @EdenHandler("get-associations")
   async handleGetAssociations(
-    args: Record<string, never>,
+    _args: Record<string, never>,
   ): Promise<
     Record<
       string,
