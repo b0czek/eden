@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/sdk",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Eden Desktop Environment SDK - Build Electron-based desktop environments with modular app support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

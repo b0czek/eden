@@ -1,5 +1,13 @@
 # @edenapp/scripts
 
+## 0.6.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/types@0.6.3
+  - @edenapp/genesis@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.6.3
+
+### Patch Changes
+
+- submenus in ctx menus and open with... in files app
+
 ## 0.6.2
 
 ### Patch Changes
