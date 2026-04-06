@@ -26,7 +26,7 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["fs/*", "db/rw"],
+  "permissions": ["fs/*", "db/rw", "package/read"],
   "fileHandlers": [
     {
       "name": "Directories",

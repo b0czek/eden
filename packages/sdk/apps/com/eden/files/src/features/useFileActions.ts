@@ -1,8 +1,9 @@
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import { button, type ContextMenuAction } from "@edenapp/tablets";
-import type { FileHandlerInfo } from "@edenapp/types";
+import { button, separator, type ContextMenuAction } from "@edenapp/tablets";
+import type { FileHandlerInfo, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
-import { t } from "../i18n";
+import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
+import { locale, t } from "../i18n";
 import type { FileItem } from "../types";
 import { isValidName, joinPath } from "../utils";
 
@@ -17,6 +18,20 @@ interface UseFileActionsOptions {
 }
 
 export const useFileActions = (options: UseFileActionsOptions) => {
+  const getLocalizedAppName = (app: RuntimeAppManifest): string => {
+    if (typeof app.name === "string") {
+      return app.name;
+    }
+
+    const currentLocale = locale();
+    return (
+      app.name[currentLocale] ||
+      app.name.en ||
+      Object.values(app.name)[0] ||
+      app.id
+    );
+  };
+
   const getNoOpenWithOptions = (): ContextMenuAction[] => [
     button("open-with-none", t("files.errors.noAppsAvailable"), () => {}, {
       disabled: true,
@@ -196,6 +211,82 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         options.showError(
           `${t("files.errors.openFailed")}: ${openResult.error}`,
         );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      options.showError(
+        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  };
+
+  const setItemDefaultHandler = async (item: FileItem, appId: string) => {
+    try {
+      await window.edenAPI.shellCommand("file/set-default-handler", {
+        path: item.path,
+        appId,
+      });
+    } catch (error) {
+      options.showError(
+        `${t("files.errors.setDefaultHandlerFailed")}: ${(error as Error).message}`,
+      );
+    }
+  };
+
+  const openItemWithDialog = async (item: FileItem) => {
+    try {
+      const [supportedHandlers, currentHandler, installedApps] =
+        await Promise.all([
+          window.edenAPI.shellCommand("file/get-supported-handlers", {
+            path: item.path,
+          }) as Promise<FileHandlerInfo[]>,
+          window.edenAPI.shellCommand("file/get-handler", {
+            path: item.path,
+          }) as Promise<{ appId?: string }>,
+          window.edenAPI.shellCommand("package/list", {}) as Promise<
+            RuntimeAppManifest[]
+          >,
+        ]);
+
+      const supportedAppIds = new Set(
+        supportedHandlers.map((handler) => handler.appId),
+      );
+
+      const availableApps = installedApps
+        .map((app) => ({
+          appId: app.id,
+          appName: getLocalizedAppName(app),
+          isSuggested: supportedAppIds.has(app.id),
+        }))
+        .sort((left, right) => {
+          if (left.isSuggested !== right.isSuggested) {
+            return left.isSuggested ? -1 : 1;
+          }
+
+          return left.appName.localeCompare(right.appName);
+        });
+
+      const initialAppId =
+        availableApps.find((app) => app.appId === currentHandler.appId)
+          ?.appId || availableApps[0]?.appId;
+
+      const selection = await openOpenWithDialog({
+        dialogs: options.dialogs,
+        itemName: item.name,
+        apps: availableApps,
+        initialAppId,
+      });
+
+      if (!selection) {
+        return;
+      }
+
+      const openSucceeded = await openItemWithApp(item, selection.appId);
+      if (openSucceeded && selection.setAsDefault) {
+        await setItemDefaultHandler(item, selection.appId);
       }
     } catch (error) {
       options.showError(
@@ -232,14 +323,24 @@ export const useFileActions = (options: UseFileActionsOptions) => {
           button(
             `open-with-${handler.appId}`,
             handler.appName,
-            () => openItemWithApp(item, handler.appId),
+            () => {
+              void openItemWithApp(item, handler.appId);
+            },
             {
               icon: { type: "app", appId: handler.appId },
             },
           ),
         );
 
-      return menuItems.length > 0 ? menuItems : getNoOpenWithOptions();
+      const moreItem = button("open-with-more", t("files.moreApps"), () =>
+        openItemWithDialog(item),
+      );
+
+      if (menuItems.length === 0) {
+        return [moreItem];
+      }
+
+      return [...menuItems, separator(), moreItem];
     } catch (error) {
       options.showError(
         `${t("files.errors.openFailed")}: ${(error as Error).message}`,
