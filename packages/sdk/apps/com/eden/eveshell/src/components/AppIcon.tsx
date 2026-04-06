@@ -1,5 +1,4 @@
 import { createResource, Show } from "solid-js";
-import defaultIcon from "../../assets/default-icon.svg";
 import { fetchAppIcon } from "../icon-cache";
 
 interface AppIconProps {
@@ -19,7 +18,7 @@ export default function AppIcon(props: AppIconProps) {
     (appId) => (appId ? fetchAppIcon(appId) : Promise.resolve(undefined)),
   );
 
-  const iconSrc = () => props.icon || fetchedIcon() || defaultIcon;
+  const iconSrc = () => props.icon || fetchedIcon();
 
   return (
     <div

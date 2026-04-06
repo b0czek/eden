@@ -20,6 +20,7 @@ import {
 import { log } from "../logging";
 import { UserManager } from "../user/UserManager";
 import { normalizeAppIds } from "../utils/normalize";
+import { DEFAULT_APP_ICON_DATA_URL } from "./defaultAppIcon";
 import { PackageHandler } from "./PackageHandler";
 
 /**
@@ -443,24 +444,33 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    */
   async getAppIcon(appId: string): Promise<string | undefined> {
     const manifest = this.installedApps.get(appId);
-    if (!manifest?.icon) {
-      return undefined;
-    }
-
     const appPath = this.getAppPath(appId);
-    if (!appPath) {
-      return undefined;
+    if (manifest?.icon && appPath) {
+      const iconDataUrl = await this.readIconDataUrl(
+        path.join(appPath, manifest.icon),
+        manifest.icon,
+      );
+      if (iconDataUrl) {
+        return iconDataUrl;
+      }
+
+      log.warn(`Falling back to default icon for ${appId}`);
     }
 
-    const iconPath = path.join(appPath, manifest.icon);
+    return DEFAULT_APP_ICON_DATA_URL;
+  }
 
+  private async readIconDataUrl(
+    iconPath: string,
+    iconReference: string,
+  ): Promise<string | undefined> {
     try {
       const iconBuffer = await fs.readFile(iconPath);
-      const ext = path.extname(manifest.icon).toLowerCase();
+      const ext = path.extname(iconReference).toLowerCase();
       const mimeType = this.getMimeType(ext);
       return `data:${mimeType};base64,${iconBuffer.toString("base64")}`;
     } catch (error) {
-      log.warn(`Failed to read icon for ${appId}:`, error);
+      log.warn(`Failed to read icon from ${iconPath}:`, error);
       return undefined;
     }
   }
