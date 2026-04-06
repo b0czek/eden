@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "overlay": true,
   "autostart": true,
-  "permissions": ["context-menu/display"],
+  "permissions": ["context-menu/display", "package/read"],
   "build": {
     "command": "npm run build"
   },

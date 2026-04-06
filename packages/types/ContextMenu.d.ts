@@ -156,12 +156,17 @@ export type ContextMenuIconName =
   | "align-center"
   | "align-right";
 
+export type ContextMenuIcon =
+  | ContextMenuIconName
+  | { type: "glyph"; name: ContextMenuIconName }
+  | { type: "app"; appId: string };
+
 export type ContextMenuItem =
   | {
       type: "item";
       id: string;
       label: string;
-      icon?: ContextMenuIconName;
+      icon?: ContextMenuIcon;
       shortcut?: string;
       disabled?: boolean;
       danger?: boolean;

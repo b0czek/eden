@@ -6,6 +6,7 @@ import type {
   WindowSize,
 } from "@edenapp/types";
 import { createPanelRegistry, getContextMenuDom } from "./dom";
+import { ensureMenuAppIcons, getCachedAppIcon } from "./icon-cache";
 import { applyRootPosition, positionSubmenu } from "./positioning";
 import { renderPanel } from "./render";
 import {
@@ -90,6 +91,7 @@ function renderMenuPanel(
 ): void {
   renderPanel(panel, title, items, depth, pathPrefix, {
     getPanelElements,
+    getAppIcon: getCachedAppIcon,
     onOpenSubmenu: ({ entry, itemPath, submenuItems, panelDepth }) => {
       closeSubmenus(panelDepth);
       openSubmenuPath = itemPath;
@@ -182,6 +184,7 @@ async function openMenu(openData: ContextMenuOpenEvent): Promise<void> {
     items: openData.items,
   };
 
+  await ensureMenuAppIcons(openData.items);
   await updateOverlayBounds(true);
   setMenuVisible(true);
   renderMenuPanel(menu, openData.title, openData.items, 0, []);

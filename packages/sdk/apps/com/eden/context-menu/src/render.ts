@@ -1,4 +1,4 @@
-import type { ContextMenuItem } from "@edenapp/types";
+import type { ContextMenuIcon, ContextMenuItem } from "@edenapp/types";
 import type { MenuPanelElements } from "./dom";
 import { resolveIconSvg } from "./icons";
 import { serializePath } from "./submenus";
@@ -12,20 +12,63 @@ type OpenSubmenuArgs = {
 
 type RenderPanelOptions = {
   getPanelElements: (panel: HTMLElement) => MenuPanelElements;
+  getAppIcon: (appId: string) => string | undefined;
   onOpenSubmenu: (args: OpenSubmenuArgs) => void;
   onCloseSubmenusFrom: (fromDepth: number) => void;
   onSelectItem: (itemId: string) => void;
 };
 
 /**
- * Resolve an icon name to SVG content.
+ * Resolve a menu icon into a renderable descriptor.
  * Only allows curated icon names from the allowlist to prevent XSS.
  */
-function resolveIcon(icon?: string): string | null {
+function resolveIcon(
+  icon?: ContextMenuIcon,
+): { type: "glyph"; svg: string } | { type: "app"; appId: string } | null {
   if (!icon) return null;
-  const name = icon.trim();
-  if (!name) return null;
-  return resolveIconSvg(name);
+
+  if (typeof icon === "string") {
+    const name = icon.trim();
+    if (!name) return null;
+    const svg = resolveIconSvg(name);
+    return svg ? { type: "glyph", svg } : null;
+  }
+
+  if (icon.type === "app") {
+    return { type: "app", appId: icon.appId };
+  }
+
+  const svg = resolveIconSvg(icon.name);
+  return svg ? { type: "glyph", svg } : null;
+}
+
+function createItemIcon(
+  item: Extract<ContextMenuItem, { type: "item" }>,
+  getAppIcon: (appId: string) => string | undefined,
+): HTMLSpanElement | null {
+  const resolvedIcon = resolveIcon(item.icon);
+  if (!resolvedIcon) return null;
+
+  if (resolvedIcon.type === "app") {
+    const appIconSrc = getAppIcon(resolvedIcon.appId);
+    if (!appIconSrc) return null;
+
+    const icon = document.createElement("span");
+    icon.className = "context-menu-icon context-menu-app-icon";
+
+    const image = document.createElement("img");
+    image.src = appIconSrc;
+    image.alt = "";
+    image.decoding = "async";
+    icon.appendChild(image);
+
+    return icon;
+  }
+
+  const icon = document.createElement("span");
+  icon.className = "context-menu-icon";
+  icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${resolvedIcon.svg}</svg>`;
+  return icon;
 }
 
 export function renderPanel(
@@ -67,11 +110,8 @@ export function renderPanel(
     if (item.danger) entry.classList.add("context-menu-item-danger");
     if (item.disabled) entry.classList.add("context-menu-item-disabled");
 
-    const iconSvg = resolveIcon(item.icon);
-    if (iconSvg) {
-      const icon = document.createElement("span");
-      icon.className = "context-menu-icon";
-      icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconSvg}</svg>`;
+    const icon = createItemIcon(item, options.getAppIcon);
+    if (icon) {
       entry.appendChild(icon);
     }
 
