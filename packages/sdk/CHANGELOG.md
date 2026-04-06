@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.6.4
+
+### Patch Changes
+
+- fs/resolve command added
+  - @edenapp/types@0.6.4
+  - @edenapp/genesis@0.6.4
+
 ## 0.6.3
 
 ### Patch Changes
