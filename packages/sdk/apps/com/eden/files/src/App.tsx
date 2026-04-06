@@ -1,6 +1,6 @@
-import { DialogHost, createDialogs } from "@edenapp/solid-kit/dialogs";
+import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, onMount } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import FileExplorerHeader from "./components/FileExplorerHeader";
 import FileList from "./components/FileList";
 import { ITEM_SIZES } from "./constants";
@@ -11,6 +11,7 @@ import { useExplorerNavigation } from "./features/useExplorerNavigation";
 import { useFileActions } from "./features/useFileActions";
 import { initLocale, t } from "./i18n";
 import type { DisplayPreferences, FileItem } from "./types";
+import { getParentPath } from "./utils";
 
 const App: Component = () => {
   const dialogs = createDialogs();
@@ -79,6 +80,23 @@ const App: Component = () => {
     setScrollToSelected,
   });
 
+  const openPathInExplorer = async (path: string) => {
+    try {
+      const stats = await window.edenAPI.shellCommand("fs/stat", { path });
+
+      if (stats.isDirectory) {
+        navigateTo(path);
+        return;
+      }
+
+      if (stats.isFile) {
+        navigateTo(getParentPath(path), path);
+      }
+    } catch (error) {
+      showError(`${t("files.errors.openFailed")}: ${(error as Error).message}`);
+    }
+  };
+
   onMount(async () => {
     initLocale();
     try {
@@ -91,6 +109,26 @@ const App: Component = () => {
     } catch (error) {
       console.error("Failed to load display preferences:", error);
     }
+
+    const launchArgs = window.edenAPI.getLaunchArgs();
+    if (launchArgs.length > 0) {
+      void openPathInExplorer(launchArgs[0]);
+    }
+
+    const handleFileOpened = (data: {
+      path: string;
+      isDirectory: boolean;
+      appId: string;
+    }) => {
+      if (data.path) {
+        void openPathInExplorer(data.path);
+      }
+    };
+
+    await window.edenAPI.subscribe("file/opened", handleFileOpened);
+    onCleanup(() => {
+      window.edenAPI.unsubscribe("file/opened", handleFileOpened);
+    });
   });
 
   const handlePreferencesChange = async (
