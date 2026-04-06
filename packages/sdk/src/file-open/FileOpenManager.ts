@@ -527,6 +527,21 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Open a file with its default handler
    */
+  private focusRunningApp(appId: string): void {
+    const viewIds = this.viewManager.getViewsByAppId(appId);
+    const viewId = viewIds.at(-1);
+
+    if (viewId === undefined) {
+      return;
+    }
+
+    this.viewManager.showView(viewId);
+    this.viewManager.focusView(viewId);
+  }
+
+  /**
+   * Open a file with its default handler
+   */
   async openFile(filePath: string): Promise<FileOpenResult> {
     try {
       const fileContext = await this.getFileContext(filePath);
@@ -567,6 +582,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
         ]);
       } else {
         // App already running - notify via event (app is already subscribed)
+        this.focusRunningApp(handlerAppId);
         const viewIds = this.viewManager.getViewsByAppId(handlerAppId);
         for (const viewId of viewIds) {
           this.notifySubscriber(viewId, "opened", {
@@ -617,6 +633,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
         await this.processManager.launchApp(appId, undefined, [filePath]);
       } else {
         // App already running - notify via event (app is already subscribed)
+        this.focusRunningApp(appId);
         const viewIds = this.viewManager.getViewsByAppId(appId);
         for (const viewId of viewIds) {
           this.notifySubscriber(viewId, "opened", {
