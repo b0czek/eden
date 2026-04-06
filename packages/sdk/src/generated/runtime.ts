@@ -46,6 +46,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "fs/mkdir",
   "fs/readdir",
   "fs/stat",
+  "fs/resolve",
   "fs/search",
   "fs/delete",
   "fs/cp",

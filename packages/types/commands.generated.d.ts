@@ -340,6 +340,13 @@ export interface FsCommands {
     response: import("./index").FileStats;
   };
   /**
+   * Resolve an Eden path to the underlying OS path.
+   */
+  "fs/resolve": {
+    args: { path: string };
+    response: { realPath: string };
+  };
+  /**
    * Search for files and directories using glob patterns.
    */
   "fs/search": {

@@ -79,6 +79,15 @@ export class FilesystemHandler {
   }
 
   /**
+   * Resolve an Eden path to the underlying OS path.
+   */
+  @EdenHandler("resolve", { permission: "resolve" })
+  async handleResolve(args: { path: string }): Promise<{ realPath: string }> {
+    const { path: targetPath } = args;
+    return { realPath: this.fsManager.resolvePath(targetPath) };
+  }
+
+  /**
    * Search for files and directories using glob patterns.
    */
   @EdenHandler("search", { permission: "read" })

@@ -70,6 +70,7 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
 - **`backend.entry`** (Optional): Path to the compiled backend JavaScript file.
 - **`permissions`**: Array of permissions the app requires.
   - `fs/*`: Full filesystem access.
+  - `fs/resolve`: Resolve an Eden path to the underlying OS path.
   - `db/rw`: Read/write access to the app's database.
 
 ## interacting with Eden (`window.edenAPI`)
@@ -83,7 +84,12 @@ The primary way to interact is `edenAPI.shellCommand`.
 ```typescript
 // Example: Reading a directory
 const files = await window.edenAPI.shellCommand("fs/readdir", {
-  path: "/home/user/Documents",
+  path: "/Documents",
+});
+
+// Example: Resolving an Eden path for an external integration
+const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
+  path: "/Documents/report.txt",
 });
 
 // Example: Writing to a database
