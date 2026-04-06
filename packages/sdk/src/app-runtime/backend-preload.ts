@@ -153,10 +153,15 @@ const eventSubscriptions: Map<
   Set<(payload: unknown) => void>
 > = new Map();
 
+type PendingCommandResult = CommandResult<CommandName>;
+
 // Pending shell command requests
 const pendingCommands: Map<
   string,
-  { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
+  {
+    resolve: (value: PendingCommandResult) => void;
+    reject: (reason: unknown) => void;
+  }
 > = new Map();
 let commandIdCounter = 0;
 
@@ -197,7 +202,7 @@ function shellCommand<T extends CommandName>(
     pendingCommands.set(commandId, {
       resolve: (value) => {
         clearTimeout(timeout);
-        resolve(value);
+        resolve(value as CommandResult<T>);
       },
       reject: (reason) => {
         clearTimeout(timeout);
@@ -265,7 +270,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
       if (message.error) {
         pending.reject(new Error(message.error));
       } else {
-        pending.resolve(message.result);
+        pending.resolve(message.result as PendingCommandResult);
       }
     }
   } else if (message.type === "shell-event") {

@@ -32,9 +32,9 @@ export interface CommandMetadata {
   methodName: string; // Original method name for metadata lookup
 }
 
-type CommandManager = {
-  constructor: abstract new (...args: never[]) => object;
-};
+interface CommandManager {
+  constructor: object;
+}
 
 @singleton()
 @injectable()

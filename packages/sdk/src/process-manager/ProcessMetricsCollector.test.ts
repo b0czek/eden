@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import type { AppInstance, AppManifest } from "@edenapp/types";
-import { app } from "electron";
+import { app, type UtilityProcess, type WebContentsView } from "electron";
 import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 
 jest.mock("electron", () => ({
@@ -16,6 +16,17 @@ const getAppMetrics = (app as unknown as { getAppMetrics: jest.Mock })
 type CollectorDeps = ConstructorParameters<typeof ProcessMetricsCollector>[0];
 type BackendManagerLike = Pick<CollectorDeps["backendManager"], "getBackend">;
 type ViewManagerLike = Pick<CollectorDeps["viewManager"], "getView">;
+
+const createMockBackend = (pid: number): UtilityProcess =>
+  ({ pid }) as UtilityProcess;
+
+const createMockView = (pid: number): WebContentsView =>
+  ({
+    webContents: {
+      isDestroyed: () => false,
+      getOSProcessId: () => pid,
+    },
+  }) as WebContentsView;
 
 const createApp = (
   appId: string,
@@ -108,15 +119,10 @@ describe("ProcessMetricsCollector", () => {
       const pidByViewId: Record<number, number> = { 10: 111, 20: 222 };
       const pid = pidByViewId[viewId];
       if (!pid) return undefined;
-      return {
-        webContents: {
-          isDestroyed: () => false,
-          getOSProcessId: () => pid,
-        },
-      };
+      return createMockView(pid);
     });
     const getBackend = jest.fn((appId: string) =>
-      appId === "com.eden.visible" ? { pid: 333 } : undefined,
+      appId === "com.eden.visible" ? createMockBackend(333) : undefined,
     );
 
     const collector = createCollector({
@@ -256,12 +262,7 @@ describe("ProcessMetricsCollector", () => {
         getBackend: jest.fn(() => undefined),
       },
       viewManager: {
-        getView: jest.fn(() => ({
-          webContents: {
-            isDestroyed: () => false,
-            getOSProcessId: () => 111,
-          },
-        })),
+        getView: jest.fn(() => createMockView(111)),
       },
       getRunningApps: () => [visibleApp],
     });
