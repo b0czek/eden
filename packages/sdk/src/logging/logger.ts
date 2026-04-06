@@ -44,6 +44,30 @@ interface LogRecord {
   skipCallsite?: boolean;
 }
 
+type StackTraceFrameSkipper = (...args: unknown[]) => unknown;
+
+type V8ErrorConstructor = ErrorConstructor & {
+  captureStackTrace?: (
+    targetObject: object,
+    constructorOpt?: StackTraceFrameSkipper,
+  ) => void;
+};
+
+type RuntimeProcessLike = {
+  type?: string;
+  env?: Record<string, string>;
+  cwd?: () => string;
+};
+
+type RuntimeGlobal = typeof globalThis & {
+  __EDEN_APP_ID__?: string;
+  process?: RuntimeProcessLike;
+  window?: unknown;
+  [key: string]: unknown;
+};
+
+const runtimeGlobal = globalThis as RuntimeGlobal;
+
 let globalContext: LogContext = {};
 
 let config: LoggerConfig = resolveDefaultConfig();
@@ -141,7 +165,7 @@ function mergeContext(context?: LogContext): LogContext {
 
 function getBaseContext(): LogContext {
   const envAppId = getEnvValue("EDEN_APP_ID");
-  const globalAppId = (globalThis as any).__EDEN_APP_ID__ as string | undefined;
+  const globalAppId = runtimeGlobal.__EDEN_APP_ID__;
   return {
     processType: detectProcessType(),
     appId: globalContext.appId ?? envAppId ?? globalAppId,
@@ -152,16 +176,14 @@ function getBaseContext(): LogContext {
 }
 
 function detectProcessType(): string {
-  const processObj = (globalThis as any).process as
-    | { type?: string; env?: Record<string, string>; cwd?: () => string }
-    | undefined;
+  const processObj = runtimeGlobal.process;
   if (processObj) {
     const type = processObj.type;
     if (type === "browser") return "main";
     if (type === "utility") return "backend";
     if (type) return type;
   }
-  if (typeof (globalThis as any).window !== "undefined") return "renderer";
+  if (typeof runtimeGlobal.window !== "undefined") return "renderer";
   return "node";
 }
 
@@ -237,7 +259,8 @@ function formatPrefix(record: {
 
 function captureCallsite(): CallsiteInfo | undefined {
   const err = new Error();
-  (Error as any).captureStackTrace?.(err, captureCallsite);
+  const v8Error = Error as V8ErrorConstructor;
+  v8Error.captureStackTrace?.(err, captureCallsite);
   const stack = err.stack;
   if (!stack) return undefined;
 
@@ -284,9 +307,7 @@ function shortenPath(path: string, mode: LogPathMode): string {
   }
 
   try {
-    const processObj = (globalThis as any).process as
-      | { cwd?: () => string }
-      | undefined;
+    const processObj = runtimeGlobal.process;
     if (processObj?.cwd) {
       const cwd = processObj.cwd();
       if (normalized.startsWith(cwd)) {
@@ -317,13 +338,11 @@ function shortenPath(path: string, mode: LogPathMode): string {
 }
 
 function getEnvValue(key: string): string | undefined {
-  const processObj = (globalThis as any).process as
-    | { env?: Record<string, string> }
-    | undefined;
+  const processObj = runtimeGlobal.process;
   if (processObj?.env?.[key]) {
     return processObj.env[key];
   }
-  const globalValue = (globalThis as any)[key];
+  const globalValue = runtimeGlobal[key];
   if (typeof globalValue === "string") {
     return globalValue;
   }

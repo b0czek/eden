@@ -18,7 +18,14 @@ import {
  * - EDEN_MANIFEST: JSON-stringified app manifest
  */
 
-import type { AppBusAPI, AppBusConnection, EdenAPI } from "@edenapp/types";
+import type {
+  AppBusAPI,
+  AppBusConnection,
+  CommandArgs,
+  CommandName,
+  CommandResult,
+  EdenAPI,
+} from "@edenapp/types";
 
 import type { WorkerGlobal } from "@edenapp/types/worker";
 import {
@@ -27,6 +34,7 @@ import {
   type ShellTransport,
 } from "./common/api-factory";
 import {
+  type AppBusPortData,
   createAppBusState,
   createMessageIdGenerator,
   createPortConnection,
@@ -34,6 +42,22 @@ import {
   handleAppBusPort as handlePortSetup,
   wrapElectronPort,
 } from "./common/port-channel";
+
+type RuntimeMessage = {
+  type: string;
+  commandId?: string;
+  command?: string;
+  args?: unknown;
+  result?: unknown;
+  error?: string;
+  eventName?: string;
+  payload?: unknown;
+  connectionId?: string;
+  role?: "service" | "client";
+  serviceName?: string;
+  targetAppId?: string;
+  sourceAppId?: string;
+};
 
 // Electron utility process extends the Node process with parentPort
 // This is available when running inside utilityProcess.fork()
@@ -124,12 +148,15 @@ if (!parentPort) {
 }
 
 // Event subscriptions
-const eventSubscriptions: Map<string, Set<Function>> = new Map();
+const eventSubscriptions: Map<
+  string,
+  Set<(payload: unknown) => void>
+> = new Map();
 
 // Pending shell command requests
 const pendingCommands: Map<
   string,
-  { resolve: (value: any) => void; reject: (reason: any) => void }
+  { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
 > = new Map();
 let commandIdCounter = 0;
 
@@ -143,10 +170,21 @@ function generateCommandId(): string {
   return `cmd-${appId}-${Date.now()}-${++commandIdCounter}`;
 }
 
+function asCommandArgs(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+
+  return {};
+}
+
 /**
  * Send a shell command to main process and wait for response
  */
-async function shellCommand(command: string, args: any): Promise<any> {
+function shellCommand<T extends CommandName>(
+  command: T,
+  args: CommandArgs<T>,
+): Promise<CommandResult<T>> {
   return new Promise((resolve, reject) => {
     const commandId = generateCommandId();
 
@@ -171,7 +209,7 @@ async function shellCommand(command: string, args: any): Promise<any> {
       type: "shell-command",
       commandId,
       command,
-      args: { ...args, _callerAppId: appId },
+      args: { ...asCommandArgs(args), _callerAppId: appId },
     });
   });
 }
@@ -182,9 +220,7 @@ async function shellCommand(command: string, args: any): Promise<any> {
 
 // Shell transport implementation using internal shellCommand
 const shellTransport: ShellTransport = {
-  exec: (command: string, args: any) => {
-    return shellCommand(command, args);
-  },
+  exec: shellCommand,
 };
 
 /**
@@ -198,7 +234,7 @@ const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
  * AppBus API implementation for utility process
  */
 const appBus: AppBusAPI = createAppBusAPI(
-  { transport: shellTransport, isBackend: true },
+  { transport: shellTransport },
   appBusState,
 );
 
@@ -215,9 +251,13 @@ const hasFrontend = !!manifest.frontend?.entry;
  * Handle messages from main process (via parentPort)
  */
 parentPort.on("message", (event: Electron.MessageEvent) => {
-  const message = event.data;
+  const message = event.data as RuntimeMessage;
 
   if (message.type === "shell-command-response") {
+    if (!message.commandId) {
+      return;
+    }
+
     // Response to a shell command we sent
     const pending = pendingCommands.get(message.commandId);
     if (pending) {
@@ -229,6 +269,10 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
       }
     }
   } else if (message.type === "shell-event") {
+    if (!message.eventName) {
+      return;
+    }
+
     // Event notification from main
     const { eventName, payload } = message;
     const callbacks = eventSubscriptions.get(eventName);
@@ -244,10 +288,20 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
   } else if (message.type === "appbus-port") {
     // AppBus connection port
     const [port] = event.ports;
-    if (port) {
-      handleAppBusPort(port, message);
+    if (port && message.connectionId && message.role && message.serviceName) {
+      handleAppBusPort(port, {
+        connectionId: message.connectionId,
+        role: message.role,
+        serviceName: message.serviceName,
+        targetAppId: message.targetAppId,
+        sourceAppId: message.sourceAppId,
+      });
     }
   } else if (message.type === "appbus-port-closed") {
+    if (!message.connectionId) {
+      return;
+    }
+
     // AppBus connection closed
     handlePortClosed(appBusState, message.connectionId);
   } else if (message.type === "shutdown") {
@@ -276,7 +330,10 @@ function setupFrontendPort(port: Electron.MessagePortMain): void {
 /**
  * Handle AppBus port connections (using shared utility)
  */
-function handleAppBusPort(port: Electron.MessagePortMain, data: any): void {
+function handleAppBusPort(
+  port: Electron.MessagePortMain,
+  data: AppBusPortData,
+): void {
   // Wrap Electron MessagePortMain to IPCPort interface
   const wrappedPort = wrapElectronPort(port);
 
@@ -349,7 +406,11 @@ function getAppAPI(): AppBusConnection {
  * Set up the global worker object
  */
 // For apps with frontend, appAPI will be set in initializeBackend after port is received
-((globalThis as any).worker as WorkerGlobal) = {
+(
+  globalThis as typeof globalThis & {
+    worker?: WorkerGlobal;
+  }
+).worker = {
   edenAPI,
   appBus,
   getAppAPI,

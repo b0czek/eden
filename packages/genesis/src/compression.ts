@@ -5,6 +5,7 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import type { Zstd } from "zstd-codec";
 
 /**
  * Result of streaming compression
@@ -51,7 +52,7 @@ export interface Compressor {
  * - Good for distribution
  */
 export class ZstdCodecCompressor implements Compressor {
-  private zstd: any = null;
+  private zstd: Zstd | null = null;
 
   async initialize(): Promise<void> {
     if (this.zstd) return;
@@ -60,7 +61,7 @@ export class ZstdCodecCompressor implements Compressor {
     const { ZstdCodec } = await import("zstd-codec");
 
     return new Promise((resolve) => {
-      ZstdCodec.run((zstd: any) => {
+      ZstdCodec.run((zstd) => {
         this.zstd = zstd;
         resolve();
       });
@@ -75,10 +76,11 @@ export class ZstdCodecCompressor implements Compressor {
     if (!this.zstd) {
       throw new Error("Compressor not initialized. Call initialize() first.");
     }
+    const zstd = this.zstd;
 
     return new Promise((resolve, reject) => {
       const hash = crypto.createHash("sha256");
-      const simple = new this.zstd.Simple();
+      const simple = new zstd.Simple();
       const readStream = fs.createReadStream(inputPath, {
         highWaterMark: 64 * 1024, // 64KB chunks
       });
@@ -135,9 +137,10 @@ export class ZstdCodecCompressor implements Compressor {
     if (!this.zstd) {
       throw new Error("Compressor not initialized. Call initialize() first.");
     }
+    const zstd = this.zstd;
 
     // Use decompressChunks to handle potential concatenated frames
-    const streaming = new this.zstd.Streaming();
+    const streaming = new zstd.Streaming();
     const decompressed = streaming.decompressChunks([new Uint8Array(data)]);
     return Buffer.from(decompressed);
   }

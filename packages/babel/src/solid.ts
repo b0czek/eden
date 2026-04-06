@@ -39,7 +39,7 @@ export interface EdenI18nHandle<T = Record<string, void>> {
  *
  * @param config Configuration options including resources
  */
-export function setupI18n<T extends Record<string, any> = Record<string, void>>(
+export function setupI18n<T extends object = Record<string, void>>(
   config: EdenI18nConfig = {},
 ): EdenI18nHandle<T> {
   return createRoot(() => {
@@ -49,7 +49,10 @@ export function setupI18n<T extends Record<string, any> = Record<string, void>>(
       return await createEdenI18n(config);
     });
 
-    const t: TranslateFn<T> = ((key: string, args?: Record<string, any>) => {
+    const t: TranslateFn<T> = ((
+      key: string,
+      args?: Record<string, unknown>,
+    ) => {
       const instance = i18nInstance();
       if (!instance) return key;
       return instance.t(key, { lng: locale(), ...args });

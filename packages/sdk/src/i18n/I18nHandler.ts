@@ -1,3 +1,4 @@
+import type { RecursiveObject } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { I18nManager } from "./I18nManager";
 
@@ -13,7 +14,7 @@ export class I18nHandler {
 
   @EdenHandler("get-common")
   handleGetCommon(args: { locale: string }): {
-    translations: Record<string, any>;
+    translations: RecursiveObject<string>;
   } {
     return this.i18nManager.getCommon(args.locale);
   }

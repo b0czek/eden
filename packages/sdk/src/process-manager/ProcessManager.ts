@@ -21,7 +21,7 @@ import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 interface ProcessNamespaceEvents {
   launched: { instance: AppInstance };
   stopped: { appId: string };
-  error: { appId: string; error: any };
+  error: { appId: string; error: unknown };
   exited: { appId: string; code: number };
 }
 
@@ -295,7 +295,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   /**
    * Handle app error
    */
-  private handleAppError(appId: string, error: any): void {
+  private handleAppError(appId: string, error: unknown): void {
     const instance = this.runningApps.get(appId);
     if (instance) {
       instance.state = "error";

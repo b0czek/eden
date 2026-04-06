@@ -7,6 +7,7 @@ import {
   type ShellTransport,
 } from "./common/api-factory";
 import {
+  type AppBusPortData,
   createAppBusState,
   createMessageIdGenerator,
   createPortConnection,
@@ -30,7 +31,10 @@ const pendingBackendRequests: Map<string, PendingRequest> = new Map();
 const generateBackendMessageId = createMessageIdGenerator("backend");
 
 // Event subscription system
-const eventSubscriptions: Map<string, Set<Function>> = new Map();
+const eventSubscriptions: Map<
+  string,
+  Set<(payload: unknown) => void>
+> = new Map();
 
 // Extract appId from process arguments
 // Arguments are passed as --app-id=com.example.app
@@ -58,7 +62,7 @@ if (launchArgsArg) {
 }
 
 // Handle receiving the backend MessagePort
-ipcRenderer.on("backend-port", (event: any) => {
+ipcRenderer.on("backend-port", (event) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
     log.error("Received backend-port event without port");
@@ -82,20 +86,23 @@ ipcRenderer.on("backend-port", (event: any) => {
 });
 
 // Set up unified message listener for shell-message channel
-ipcRenderer.on("shell-message", (_event: any, message: any) => {
-  const { type, payload } = message;
-  const callbacks = eventSubscriptions.get(type);
+ipcRenderer.on(
+  "shell-message",
+  (_event, message: { type: string; payload: unknown }) => {
+    const { type, payload } = message;
+    const callbacks = eventSubscriptions.get(type);
 
-  if (callbacks) {
-    callbacks.forEach((callback) => {
-      try {
-        callback(payload);
-      } catch (err) {
-        log.error(`Error in event listener for ${type}:`, err);
-      }
-    });
-  }
-});
+    if (callbacks) {
+      callbacks.forEach((callback) => {
+        try {
+          callback(payload);
+        } catch (err) {
+          log.error(`Error in event listener for ${type}:`, err);
+        }
+      });
+    }
+  },
+);
 
 // Expose safe API to the app
 contextBridge.exposeInMainWorld("getAppAPI", () => {
@@ -114,7 +121,7 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
 
 // Shell transport implementation using ipcRenderer
 const shellTransport: ShellTransport = {
-  exec: (command: string, args: any) => {
+  exec: (command, args) => {
     return ipcRenderer.invoke("shell-command", command, args);
   },
 };
@@ -133,7 +140,7 @@ contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 const appBusState = createAppBusState("appbus");
 
 // Handle incoming MessagePorts for peer-to-peer channels
-ipcRenderer.on("appbus-port", (event: any, data: any) => {
+ipcRenderer.on("appbus-port", (event, data: AppBusPortData) => {
   const [port] = event.ports as MessagePort[];
   if (!port) {
     log.error("Received appbus-port event without port");
@@ -149,7 +156,7 @@ ipcRenderer.on("appbus-port", (event: any, data: any) => {
 // Handle port closed notification
 ipcRenderer.on(
   "appbus-port-closed",
-  (_event: any, data: { connectionId: string }) => {
+  (_event, data: { connectionId: string }) => {
     handlePortClosed(appBusState, data.connectionId);
   },
 );

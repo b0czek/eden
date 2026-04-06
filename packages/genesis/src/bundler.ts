@@ -17,6 +17,10 @@ const ARCHIVE_FORMAT_VERSION = 1;
 const compressor: Compressor = DEFAULT_COMPRESSOR;
 let isInitialized = false;
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export interface BundleOptions {
   appDirectory: string;
   outputPath?: string;
@@ -100,10 +104,10 @@ export async function executeBuild(
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: `Build failed: ${error.message}`,
+      error: `Build failed: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -155,8 +159,8 @@ export async function validateManifest(
       errors,
       manifest: errors.length === 0 ? manifest : undefined,
     };
-  } catch (error: any) {
-    errors.push(`Failed to read/parse manifest: ${error.message}`);
+  } catch (error: unknown) {
+    errors.push(`Failed to read/parse manifest: ${getErrorMessage(error)}`);
     return { valid: false, errors };
   }
 }
@@ -550,10 +554,10 @@ export async function bundle(options: BundleOptions): Promise<BundleResult> {
       checksum: result.checksum,
       size: result.size,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: `Bundle failed: ${error.message}`,
+      error: `Bundle failed: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -584,10 +588,10 @@ export async function getInfo(edenitePath: string): Promise<{
       manifest: metadata.manifest,
       checksum: metadata.checksum,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: `Failed to read archive: ${error.message}`,
+      error: `Failed to read archive: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -672,10 +676,10 @@ export async function extract(options: ExtractOptions): Promise<{
       success: true,
       manifest: metadata.manifest,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: `Extraction failed: ${error.message}`,
+      error: `Extraction failed: ${getErrorMessage(error)}`,
     };
   }
 }

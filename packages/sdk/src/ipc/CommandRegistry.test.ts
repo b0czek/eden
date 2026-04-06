@@ -28,8 +28,12 @@ describe("CommandRegistry", () => {
       hasGrant: jest.fn(),
     };
     registry = new CommandRegistry(
-      permissionRegistry as any,
-      userManager as any,
+      permissionRegistry as unknown as ConstructorParameters<
+        typeof CommandRegistry
+      >[0],
+      userManager as unknown as ConstructorParameters<
+        typeof CommandRegistry
+      >[1],
     );
 
     warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);

@@ -38,6 +38,15 @@ export class BackendManager extends EventEmitter {
     this.distPath = distPath;
   }
 
+  private getMessageType(message: unknown): string | undefined {
+    if (message && typeof message === "object" && "type" in message) {
+      const type = (message as { type?: unknown }).type;
+      return typeof type === "string" ? type : undefined;
+    }
+
+    return undefined;
+  }
+
   /**
    * Create and start a utility process for an app backend
    */
@@ -98,7 +107,7 @@ export class BackendManager extends EventEmitter {
     }
 
     // Set up backend event handlers
-    backend.on("message", (message: any) => {
+    backend.on("message", (message: unknown) => {
       this.handleBackendMessage(appId, message);
     });
 
@@ -124,15 +133,25 @@ export class BackendManager extends EventEmitter {
           );
         }, 10000);
 
-        const onMessage = (msg: any) => {
-          if (msg.type === "backend-ready") {
+        const onMessage = (msg: unknown) => {
+          const messageType = this.getMessageType(msg);
+          if (messageType === "backend-ready") {
             clearTimeout(timeout);
             backend.removeListener("message", onMessage);
             resolve();
-          } else if (msg.type === "backend-error") {
+          } else if (messageType === "backend-error") {
             clearTimeout(timeout);
             backend.removeListener("message", onMessage);
-            reject(new Error(msg.error));
+            reject(
+              new Error(
+                msg &&
+                  typeof msg === "object" &&
+                  "error" in msg &&
+                  typeof msg.error === "string"
+                  ? msg.error
+                  : "Unknown backend startup error",
+              ),
+            );
           }
         };
 
@@ -158,7 +177,7 @@ export class BackendManager extends EventEmitter {
   /**
    * Send a message to a backend's utility process (for IPC from main)
    */
-  sendMessage(appId: string, message: any): boolean {
+  sendMessage(appId: string, message: unknown): boolean {
     const backend = this.backends.get(appId);
     if (!backend) {
       log.warn(`No backend found for app ${appId}`);
@@ -166,7 +185,10 @@ export class BackendManager extends EventEmitter {
     }
 
     try {
-      log.info(`Sending message to backend ${appId}:`, message.type);
+      log.info(
+        `Sending message to backend ${appId}:`,
+        this.getMessageType(message) ?? "unknown",
+      );
       backend.postMessage(message);
       return true;
     } catch (error) {
@@ -180,7 +202,7 @@ export class BackendManager extends EventEmitter {
    */
   sendPortToBackend(
     appId: string,
-    message: any,
+    message: unknown,
     ports: Electron.MessagePortMain[],
   ): boolean {
     const backend = this.backends.get(appId);
@@ -192,7 +214,7 @@ export class BackendManager extends EventEmitter {
     try {
       log.info(
         `Sending message with ${ports.length} ports to backend ${appId}:`,
-        message.type,
+        this.getMessageType(message) ?? "unknown",
       );
       backend.postMessage(message, ports);
       return true;
@@ -296,7 +318,7 @@ export class BackendManager extends EventEmitter {
   /**
    * Handle messages from backends (for system-level IPC)
    */
-  private handleBackendMessage(appId: string, message: any): void {
+  private handleBackendMessage(appId: string, message: unknown): void {
     // Emit event for IPC bridge to handle
     this.emit("backend-message", {
       appId,

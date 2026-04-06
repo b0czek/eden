@@ -3,6 +3,13 @@ import type { LogLevel } from "./levels";
 import type { CallsiteInfo, LogContext } from "./logger";
 import { logExternal } from "./logger";
 
+interface ConsoleMessageDetails {
+  level?: number | string;
+  message?: string;
+  lineNumber?: number;
+  sourceId?: string;
+}
+
 function mapConsoleLevel(level: number | string): LogLevel {
   if (typeof level === "string") {
     const normalized = level.toLowerCase();
@@ -32,7 +39,7 @@ export function attachWebContentsLogger(
   webContents: WebContents,
   context: LogContext,
 ): void {
-  webContents.on("console-message", (_event, ...args: any[]) => {
+  webContents.on("console-message", (_event, ...args: unknown[]) => {
     const details = args[0];
 
     let level: number | string;
@@ -41,15 +48,16 @@ export function attachWebContentsLogger(
     let sourceId: string | undefined;
 
     if (details && typeof details === "object" && "message" in details) {
-      level = details.level ?? 0;
-      message = details.message ?? "";
-      lineNumber = details.lineNumber;
-      sourceId = details.sourceId;
+      const consoleDetails = details as ConsoleMessageDetails;
+      level = consoleDetails.level ?? 0;
+      message = consoleDetails.message ?? "";
+      lineNumber = consoleDetails.lineNumber;
+      sourceId = consoleDetails.sourceId;
     } else {
       level = typeof details === "number" ? details : 0;
-      message = args[1] ?? "";
-      lineNumber = args[2];
-      sourceId = args[3];
+      message = typeof args[1] === "string" ? args[1] : "";
+      lineNumber = typeof args[2] === "number" ? args[2] : undefined;
+      sourceId = typeof args[3] === "string" ? args[3] : undefined;
     }
 
     const callsite: CallsiteInfo | undefined =

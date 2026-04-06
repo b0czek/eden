@@ -28,6 +28,10 @@ interface BuildCache {
 const PREBUILT_DIR = "dist/apps/prebuilt";
 const BUILD_CACHE_PATH = ".build-cache.json";
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function loadBuildCache(cwd: string): Promise<BuildCache> {
   try {
     const content = await fs.readFile(
@@ -238,9 +242,9 @@ async function buildApp(
 
       console.log(`✅ Copied prebuilt ${manifest.name} (${appSource.id})`);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`❌ Failed to copy ${appSource.id}:`);
-      console.error(`   ${error.message}`);
+      console.error(`   ${getErrorMessage(error)}`);
       return false;
     }
   }

@@ -19,7 +19,7 @@ export {
  * to register their own command handlers under namespaces.
  */
 
-export type CommandHandler<TArgs = any, TResult = any> = (
+export type CommandHandler<TArgs = unknown, TResult = unknown> = (
   args: TArgs,
 ) => Promise<TResult> | TResult;
 
@@ -27,10 +27,14 @@ export interface CommandMetadata {
   namespace: string;
   command: string;
   handler: CommandHandler;
-  target: any; // The instance that owns the handler
+  target: object; // The instance that owns the handler
   permission?: string; // Full permission: "namespace/action"
   methodName: string; // Original method name for metadata lookup
 }
+
+type CommandManager = {
+  constructor: abstract new (...args: never[]) => object;
+};
 
 @singleton()
 @injectable()
@@ -55,7 +59,7 @@ export class CommandRegistry {
     namespace: string,
     command: string,
     handler: CommandHandler,
-    target: any,
+    target: object,
     methodName?: string,
   ): void {
     const fullCommand = `${namespace}/${command}`;
@@ -91,7 +95,7 @@ export class CommandRegistry {
    * Register multiple handlers from a manager instance
    * @param manager - The manager instance to register handlers from
    */
-  registerManager(manager: any): void {
+  registerManager(manager: CommandManager): void {
     const metadata = getManagerMetadata(manager);
     if (!metadata) {
       log.warn("Manager has no command handlers to register");
@@ -99,9 +103,10 @@ export class CommandRegistry {
     }
 
     const { namespace, handlers } = metadata;
+    const managerMethods = manager as Record<string, unknown>;
 
     for (const [command, methodName] of handlers.entries()) {
-      const handler = manager[methodName];
+      const handler = managerMethods[methodName];
       if (typeof handler === "function") {
         this.register(
           namespace,
@@ -124,9 +129,9 @@ export class CommandRegistry {
    * @param appId - Optional app ID for permission checking
    * @returns The command result
    */
-  async execute<TResult = any>(
+  async execute<TResult = unknown>(
     fullCommand: string,
-    args: any,
+    args: unknown,
     appId?: string,
   ): Promise<TResult> {
     const metadata = this.handlers.get(fullCommand);
@@ -170,7 +175,7 @@ export class CommandRegistry {
       }
     }
 
-    return await metadata.handler.call(metadata.target, args);
+    return (await metadata.handler.call(metadata.target, args)) as TResult;
   }
 
   /**

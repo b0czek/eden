@@ -4,17 +4,16 @@ declare module "zstd-codec" {
     decompress(data: Uint8Array): Uint8Array;
   }
 
-  export interface ZstdStream {
-    compress(data: Uint8Array, compressionLevel?: number): Uint8Array;
-    decompress(data: Uint8Array): Uint8Array;
+  export interface ZstdStreaming {
+    decompressChunks(chunks: Uint8Array[]): Uint8Array;
   }
 
   export interface Zstd {
-    Simple: ZstdSimple;
-    Stream: ZstdStream;
+    Simple: new () => ZstdSimple;
+    Streaming: new () => ZstdStreaming;
   }
 
-  export class ZstdCodec {
-    static run(callback: (zstd: Zstd) => void): void;
-  }
+  export const ZstdCodec: {
+    run(callback: (zstd: Zstd) => void): void;
+  };
 }

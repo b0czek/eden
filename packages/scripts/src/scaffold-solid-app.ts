@@ -220,8 +220,13 @@ async function ensureTargetDirectory(
         `Target directory is not empty: ${targetDir}. Use --force to overwrite scaffold files.`,
       );
     }
-  } catch (error: any) {
-    if (error?.code === "ENOENT") {
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return;
     }
     throw error;

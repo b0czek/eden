@@ -57,7 +57,7 @@ export interface IPCMessage {
   target: string;
 
   /** Message payload */
-  payload: any;
+  payload: unknown;
 
   /** Unique message ID for tracking responses */
   messageId: string;
@@ -75,6 +75,10 @@ export interface ViewBounds {
   width: number;
   height: number;
 }
+
+export type RecursiveObject<T> = {
+  [key: string]: T | RecursiveObject<T>;
+};
 
 // Export new command types
 export type {

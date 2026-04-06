@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import type { AppInstance } from "@edenapp/types";
+import type { AppInstance, AppManifest } from "@edenapp/types";
 import { app } from "electron";
 import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 
@@ -12,6 +12,10 @@ jest.mock("electron", () => ({
 
 const getAppMetrics = (app as unknown as { getAppMetrics: jest.Mock })
   .getAppMetrics;
+
+type CollectorDeps = ConstructorParameters<typeof ProcessMetricsCollector>[0];
+type BackendManagerLike = Pick<CollectorDeps["backendManager"], "getBackend">;
+type ViewManagerLike = Pick<CollectorDeps["viewManager"], "getView">;
 
 const createApp = (
   appId: string,
@@ -57,6 +61,17 @@ const metric = (
   ...extra,
 });
 
+const createCollector = (deps: {
+  backendManager: BackendManagerLike;
+  viewManager: ViewManagerLike;
+  getRunningApps: CollectorDeps["getRunningApps"];
+}) =>
+  new ProcessMetricsCollector({
+    backendManager: deps.backendManager as CollectorDeps["backendManager"],
+    viewManager: deps.viewManager as CollectorDeps["viewManager"],
+    getRunningApps: deps.getRunningApps,
+  });
+
 describe("ProcessMetricsCollector", () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -75,7 +90,7 @@ describe("ProcessMetricsCollector", () => {
         version: "1.0.0",
         frontend: { entry: "dist/index.html" },
         permissions: [],
-      } as any,
+      } as AppManifest,
     });
     const hiddenApp = createApp("com.eden.hidden", 20, {
       manifest: {
@@ -85,7 +100,7 @@ describe("ProcessMetricsCollector", () => {
         frontend: { entry: "dist/index.html" },
         overlay: true,
         permissions: [],
-      } as any,
+      } as AppManifest,
     });
 
     const apps = [visibleApp, hiddenApp];
@@ -104,9 +119,13 @@ describe("ProcessMetricsCollector", () => {
       appId === "com.eden.visible" ? { pid: 333 } : undefined,
     );
 
-    const collector = new ProcessMetricsCollector({
-      backendManager: { getBackend } as any,
-      viewManager: { getView } as any,
+    const collector = createCollector({
+      backendManager: {
+        getBackend,
+      },
+      viewManager: {
+        getView,
+      },
       getRunningApps: (showHidden = false) =>
         showHidden
           ? apps
@@ -232,8 +251,10 @@ describe("ProcessMetricsCollector", () => {
   it("can return an immediate cold-start sample without waiting for the first CPU interval", async () => {
     const visibleApp = createApp("com.eden.visible", 10);
 
-    const collector = new ProcessMetricsCollector({
-      backendManager: { getBackend: jest.fn(() => undefined) } as any,
+    const collector = createCollector({
+      backendManager: {
+        getBackend: jest.fn(() => undefined),
+      },
       viewManager: {
         getView: jest.fn(() => ({
           webContents: {
@@ -241,7 +262,7 @@ describe("ProcessMetricsCollector", () => {
             getOSProcessId: () => 111,
           },
         })),
-      } as any,
+      },
       getRunningApps: () => [visibleApp],
     });
 

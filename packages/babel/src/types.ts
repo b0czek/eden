@@ -41,9 +41,11 @@ type FlattenKeys<T, Prefix extends string = ""> = T extends object
  * // = { a: string } & { b: number } = { a: string; b: number }
  * ```
  */
-type UnionToIntersection<U> = (U extends any ? (x: U) => void : never) extends (
-  x: infer I,
-) => void
+type UnionToIntersection<U> = (
+  U extends unknown
+    ? (x: U) => void
+    : never
+) extends (x: infer I) => void
   ? I
   : never;
 

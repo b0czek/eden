@@ -1,3 +1,4 @@
+import type { ViewBounds } from "@edenapp/types";
 import { log } from "../logging";
 
 /**
@@ -161,7 +162,7 @@ import { setupWindowResizing } from "./window-resizing.js";
 
     window.edenAPI.subscribe(
       "view/mode-changed",
-      (data: { mode: "tiled" | "floating"; bounds: any }) => {
+      (data: { mode: "tiled" | "floating"; bounds: ViewBounds }) => {
         const { mode, bounds } = data;
         log.info("View mode changed to:", mode, "with bounds:", bounds);
 

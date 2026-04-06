@@ -39,9 +39,12 @@ const App = () => {
     setSuccess(false);
 
     try {
-      const result = (await window.edenAPI.shellCommand("package/get-info", {
-        path,
-      })) as any as PackageInfoResponse;
+      const result: PackageInfoResponse = await window.edenAPI.shellCommand(
+        "package/get-info",
+        {
+          path,
+        },
+      );
 
       if (result.success && result.manifest) {
         setManifest(result.manifest);
@@ -81,7 +84,7 @@ const App = () => {
 
   const getLocalizedName = (name: AppManifest["name"]): string => {
     if (typeof name === "string") return name;
-    return name["en"] || Object.values(name)[0] || "Unknown App";
+    return name.en || Object.values(name)[0] || "Unknown App";
   };
 
   return (

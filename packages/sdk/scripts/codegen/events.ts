@@ -95,7 +95,7 @@ export function extractEventDeclarations(
             cleanEventName = cleanEventName.slice(1, -1);
           }
 
-          let payloadType = "any";
+          let payloadType = "unknown";
           const typeNode = prop.getTypeNode();
           if (typeNode) {
             payloadType = typeNode.getText();

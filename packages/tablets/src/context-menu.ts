@@ -1,8 +1,11 @@
 import type {
+  CommandArgs,
+  CommandResult,
   ContextMenuItem,
   ContextMenuOpenArgs,
   ContextMenuPosition,
   ContextMenuResult,
+  EventData,
 } from "@edenapp/types";
 
 export type ContextMenuActionItem = Extract<
@@ -38,11 +41,17 @@ export interface EdenContextMenuAPI {
   close: (requestId?: string) => Promise<void>;
 }
 
+type ContextMenuCommand = "context-menu/open" | "context-menu/close";
+type ContextMenuEvent = "context-menu/closed";
+
 type EdenAPITransport = {
-  shellCommand: (command: string, args: any) => Promise<any>;
-  subscribe: (
-    event: string,
-    handler: (payload: any) => void,
+  shellCommand: <T extends ContextMenuCommand>(
+    command: T,
+    args: CommandArgs<T>,
+  ) => Promise<CommandResult<T>>;
+  subscribe: <T extends ContextMenuEvent>(
+    event: T,
+    handler: (payload: EventData<T>) => void,
   ) => Promise<void> | void;
 };
 

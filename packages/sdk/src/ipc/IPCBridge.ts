@@ -27,8 +27,8 @@ export class IPCBridge extends EventEmitter {
   private pendingCommands: Map<
     string,
     {
-      resolve: (value: any) => void;
-      reject: (reason: any) => void;
+      resolve: (value: unknown) => void;
+      reject: (reason: unknown) => void;
       timeout: NodeJS.Timeout;
     }
   > = new Map();
@@ -68,6 +68,14 @@ export class IPCBridge extends EventEmitter {
     return this.mainWindow;
   }
 
+  private asCommandArgs(value: unknown): Record<string, unknown> {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return { ...(value as Record<string, unknown>) };
+    }
+
+    return {};
+  }
+
   /**
    * Setup IPC handlers for renderer processes
    */
@@ -75,14 +83,14 @@ export class IPCBridge extends EventEmitter {
     // Handle shell commands
     ipcMain.handle(
       "shell-command",
-      async (event, command: string, args: any) => {
+      async (event, command: string, args: unknown) => {
         // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
         const isFoundation =
           this.mainWindow?.webContents.id === event.sender.id;
 
         const argsWithContext = {
-          ...args,
+          ...this.asCommandArgs(args),
           _callerAppId: appId,
           _callerWebContentsId: event.sender.id,
           _isFoundation: isFoundation,
@@ -98,33 +106,53 @@ export class IPCBridge extends EventEmitter {
   private setupBackendMessageHandlers(): void {
     this.backendManager.on(
       "backend-message",
-      async ({ appId, message }: { appId: string; message: any }) => {
+      async ({ appId, message }: { appId: string; message: unknown }) => {
+        if (!message || typeof message !== "object" || !("type" in message)) {
+          log.warn(`Unknown backend message from ${appId}:`, message);
+          return;
+        }
+
+        const backendMessage = message as {
+          type: string;
+          command?: string;
+          commandId?: string;
+          args?: unknown;
+        };
+
         // Handle different message types from backend
-        if (message.type === "shell-command") {
+        if (backendMessage.type === "shell-command") {
+          if (!backendMessage.command || !backendMessage.commandId) {
+            log.warn(`Malformed shell-command message from ${appId}:`, message);
+            return;
+          }
+
           // Backend requesting a shell command execution
           try {
             // Inject caller context for backend commands
             const argsWithContext = {
-              ...message.args,
+              ...this.asCommandArgs(backendMessage.args),
               _callerAppId: appId,
             };
 
             const result = await this.handleShellCommand(
-              message.command,
+              backendMessage.command,
               argsWithContext,
               appId,
             );
             // Send response back to backend
-            this.sendBackendResponse(appId, message.commandId, result);
+            this.sendBackendResponse(appId, backendMessage.commandId, result);
           } catch (error) {
             this.backendManager.sendMessage(appId, {
               type: "shell-command-response",
-              commandId: message.commandId,
+              commandId: backendMessage.commandId,
               error: error instanceof Error ? error.message : String(error),
             });
           }
         } else {
-          log.warn(`Unknown backend message type from ${appId}:`, message.type);
+          log.warn(
+            `Unknown backend message type from ${appId}:`,
+            backendMessage.type,
+          );
         }
       },
     );
@@ -136,7 +164,7 @@ export class IPCBridge extends EventEmitter {
   private sendBackendResponse(
     appId: string,
     commandId: string,
-    result: any,
+    result: unknown,
   ): void {
     this.backendManager.sendMessage(appId, {
       type: "shell-command-response",
@@ -150,9 +178,9 @@ export class IPCBridge extends EventEmitter {
    */
   private async handleShellCommand(
     command: string,
-    args: any,
+    args: Record<string, unknown>,
     appId?: string,
-  ): Promise<any> {
+  ): Promise<unknown> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
 

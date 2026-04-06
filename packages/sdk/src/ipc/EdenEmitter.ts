@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import type { EventName } from "@edenapp/types";
+import type { EventData, EventName } from "@edenapp/types";
 import type { IPCBridge } from "./IPCBridge";
 
 /**
@@ -60,7 +60,10 @@ export abstract class EdenEmitter<TEvents> {
     const fullEventName = `${namespace}/${String(event)}` as EventName;
 
     // Broadcast to all subscribed views
-    this.ipcBridge.eventSubscribers.notify(fullEventName, data);
+    this.ipcBridge.eventSubscribers.notify(
+      fullEventName,
+      data as EventData<typeof fullEventName>,
+    );
   }
 
   /**
@@ -91,6 +94,10 @@ export abstract class EdenEmitter<TEvents> {
     const fullEventName = `${namespace}/${String(event)}` as EventName;
 
     // Send to specific view
-    this.ipcBridge.eventSubscribers.notifyView(viewId, fullEventName, data);
+    this.ipcBridge.eventSubscribers.notifyView(
+      viewId,
+      fullEventName,
+      data as EventData<typeof fullEventName>,
+    );
   }
 }

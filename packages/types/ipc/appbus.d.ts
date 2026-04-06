@@ -9,13 +9,13 @@
  * Schema for fire-and-forget messages (send/on/once)
  * Keys are method names, values are the payload types
  */
-export type MessageSchema = Record<string, any>;
+export type MessageSchema = Record<string, unknown>;
 
 /**
  * Schema for request/response (request/handle)
  * Keys are method names, values are { args, result } types
  */
-export type RequestSchema = Record<string, { args: any; result: any }>;
+export type RequestSchema = Record<string, { args: unknown; result: unknown }>;
 
 /**
  * Defines a bidirectional communication protocol between two sides.
@@ -54,16 +54,6 @@ export interface ChannelProtocol {
   /** Requests that host sends, peer handles */
   peerHandles: RequestSchema;
 }
-
-/**
- * Default empty protocol (all any)
- */
-type DefaultProtocol = {
-  hostMessages: MessageSchema;
-  peerMessages: MessageSchema;
-  hostHandles: RequestSchema;
-  peerHandles: RequestSchema;
-};
 
 /**
  * AppBus connection from the HOST perspective (the side that exposes the service).

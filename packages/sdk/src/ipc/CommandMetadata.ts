@@ -3,24 +3,31 @@ export interface ManagerMetadata {
   handlers: Map<string, string>;
 }
 
+type ManagerClass = abstract new (...args: never[]) => object;
+
 /**
  * Metadata storage for manager namespaces and handlers.
  * Kept in a separate module to avoid circular dependencies between decorators
  * and the command registry.
  */
-const MANAGER_METADATA = new Map<any, ManagerMetadata>();
+const MANAGER_METADATA = new Map<ManagerClass, ManagerMetadata>();
 
 /**
  * Get manager metadata (namespace and handlers).
  */
-export function getManagerMetadata(instance: any): ManagerMetadata | undefined {
+export function getManagerMetadata(instance: {
+  constructor: ManagerClass;
+}): ManagerMetadata | undefined {
   return MANAGER_METADATA.get(instance.constructor);
 }
 
 /**
  * Set manager namespace.
  */
-export function setManagerNamespace(target: any, namespace: string): void {
+export function setManagerNamespace(
+  target: ManagerClass,
+  namespace: string,
+): void {
   if (!MANAGER_METADATA.has(target)) {
     MANAGER_METADATA.set(target, {
       namespace,
@@ -35,7 +42,7 @@ export function setManagerNamespace(target: any, namespace: string): void {
  * Add command handler to manager metadata.
  */
 export function addCommandHandler(
-  target: any,
+  target: ManagerClass,
   command: string,
   methodName: string,
 ): void {

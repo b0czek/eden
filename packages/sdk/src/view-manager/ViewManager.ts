@@ -189,7 +189,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     // Electron event listener for view load failure
     viewInfo.view.webContents.on(
       "did-fail-load",
-      (_event: any, errorCode: any, errorDescription: any) => {
+      (_event, errorCode: number, errorDescription: string) => {
         log.error(`View load failed for ${appId}:`, errorDescription);
         this.notify("view-load-failed", {
           viewId: viewInfo.id,
@@ -476,7 +476,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   /**
    * Send message to view's webContents
    */
-  sendToView(viewId: number, channel: string, ...args: any[]): boolean {
+  sendToView(viewId: number, channel: string, ...args: unknown[]): boolean {
     try {
       const viewInfo = requireView(viewId, this.views);
       viewInfo.view.webContents.send(channel, ...args);
@@ -490,7 +490,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   /**
    * Send message to the main window (foundation layer)
    */
-  sendToMainWindow(channel: string, ...args: any[]): boolean {
+  sendToMainWindow(channel: string, ...args: unknown[]): boolean {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       try {
         this.mainWindow.webContents.send(channel, ...args);

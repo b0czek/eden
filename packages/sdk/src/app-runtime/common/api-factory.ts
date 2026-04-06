@@ -1,7 +1,12 @@
 import type {
   AppBusAPI,
   AppBusConnection,
+  CommandArgs,
+  CommandName,
+  CommandResult,
   EdenAPI,
+  EventData,
+  EventName,
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
@@ -12,15 +17,19 @@ import { createPortConnection, waitForPort } from "./port-channel";
  * Interface for sending shell commands to the main process
  */
 export interface ShellTransport {
-  exec(command: string, args: any): Promise<any>;
+  exec<T extends CommandName>(
+    command: T,
+    args: CommandArgs<T>,
+  ): Promise<CommandResult<T>>;
 }
+
+export type EventSubscriptionCallback = (payload: unknown) => void;
 
 /**
  * Configuration for AppBus API
  */
 export interface AppBusConfig {
   transport: ShellTransport;
-  isBackend?: boolean;
 }
 
 /**
@@ -28,15 +37,16 @@ export interface AppBusConfig {
  */
 export function createEdenAPI(
   transport: ShellTransport,
-  eventSubscriptions: Map<string, Set<Function>>,
+  eventSubscriptions: Map<string, Set<EventSubscriptionCallback>>,
   options?: { getLaunchArgs?: () => string[] },
 ): EdenAPI {
   return {
-    shellCommand: (command: string, args: any) => {
-      return transport.exec(command, args);
-    },
+    shellCommand: transport.exec,
 
-    subscribe: async (eventName: string, callback: Function) => {
+    subscribe: async <T extends EventName>(
+      eventName: T,
+      callback: (data: EventData<T>) => void,
+    ) => {
       if (typeof callback !== "function") {
         throw new Error("Callback must be a function");
       }
@@ -48,13 +58,18 @@ export function createEdenAPI(
       if (!eventSubscriptions.has(eventName)) {
         eventSubscriptions.set(eventName, new Set());
       }
-      eventSubscriptions.get(eventName)!.add(callback);
+      eventSubscriptions
+        .get(eventName)!
+        .add(callback as EventSubscriptionCallback);
     },
 
-    unsubscribe: async (eventName: string, callback: Function) => {
+    unsubscribe: async <T extends EventName>(
+      eventName: T,
+      callback: (data: EventData<T>) => void,
+    ) => {
       const callbacks = eventSubscriptions.get(eventName);
       if (callbacks) {
-        callbacks.delete(callback);
+        callbacks.delete(callback as EventSubscriptionCallback);
 
         // If no more callbacks, unregister from backend/main
         if (callbacks.size === 0) {
@@ -84,7 +99,7 @@ export function createAppBusAPI(
   config: AppBusConfig,
   state: AppBusState,
 ): AppBusAPI {
-  const { transport, isBackend } = config;
+  const { transport } = config;
   const {
     registeredServices,
     connectedPorts,
@@ -114,7 +129,6 @@ export function createAppBusAPI(
         serviceName,
         description: options?.description,
         allowedClients: options?.allowedClients,
-        isBackend,
       });
 
       if (!result.success) {
@@ -141,7 +155,6 @@ export function createAppBusAPI(
       const result = await transport.exec("appbus/connect", {
         targetAppId,
         serviceName,
-        isBackend,
       });
 
       if (!result.success) {
@@ -149,6 +162,9 @@ export function createAppBusAPI(
       }
 
       const { connectionId } = result;
+      if (!connectionId) {
+        return { error: "Connection ID was not provided" };
+      }
 
       // Wait for the port to be received via handleAppBusPort
       let port: IPCPort;

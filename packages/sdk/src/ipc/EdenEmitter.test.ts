@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { EdenNamespace } from "./CommandDecorators";
 import { EdenEmitter } from "./EdenEmitter";
+import type { IPCBridge } from "./IPCBridge";
 
 interface TestEvents {
   ping: { value: number };
@@ -17,7 +18,7 @@ describe("EdenEmitter", () => {
 
     const emitter = new NoNamespace({
       eventSubscribers: { notify: jest.fn(), notifyView: jest.fn() },
-    } as any);
+    } as unknown as IPCBridge);
 
     expect(() => emitter.emit()).toThrow(
       /must be decorated with @EdenNamespace/,
@@ -40,7 +41,7 @@ describe("EdenEmitter", () => {
     const notifyView = jest.fn();
     const emitter = new Namespaced({
       eventSubscribers: { notify, notifyView },
-    } as any);
+    } as unknown as IPCBridge);
 
     emitter.emit();
     expect(notify).toHaveBeenCalledWith("test/ping", { value: 42 });

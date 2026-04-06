@@ -25,8 +25,8 @@ import type { IPCPort } from "./ipc-port";
  * Pending request tracking
  */
 export interface PendingRequest {
-  resolve: (value: any) => void;
-  reject: (reason: any) => void;
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
 }
 
 /**
@@ -66,6 +66,14 @@ export interface AppBusState {
   pendingRequests: Map<string, PendingRequest>;
   pendingPortArrivals: Map<string, PendingPortArrival>;
   messageIdGenerator: () => string;
+}
+
+export interface AppBusPortData {
+  connectionId: string;
+  role: "service" | "client";
+  serviceName: string;
+  targetAppId?: string;
+  sourceAppId?: string;
 }
 
 /**
@@ -151,9 +159,10 @@ export function setupClientPort(options: ClientPortOptions): void {
 
   // Set up response handler
   port.on("message", (event) => {
-    const { type, messageId, payload, error } = event.data;
+    const { type } = event.data;
 
-    if (type === "response" && messageId) {
+    if (type === "response") {
+      const { messageId, payload, error } = event.data;
       const pending = pendingRequests.get(messageId);
       if (pending) {
         pendingRequests.delete(messageId);
@@ -187,20 +196,23 @@ export function createPortConnection(
   generateMessageId: () => string,
 ): AppBusConnection {
   // Method-specific listeners for fire-and-forget messages (send → on)
-  const messageListeners: Map<string, Set<(args: any) => void>> = new Map();
+  const messageListeners: Map<string, Set<(args: unknown) => void>> = new Map();
 
   // Method-specific handlers for request/response (request → handle)
-  const requestHandlers: Map<string, (args: any) => any | Promise<any>> =
-    new Map();
+  const requestHandlers: Map<
+    string,
+    (args: unknown) => unknown | Promise<unknown>
+  > = new Map();
 
   // Store the port for later use (cleanup, connectivity checks)
   portStore.set(connectionId, port);
 
   // Set up incoming message handler
   port.on("message", (event) => {
-    const { type, method, payload, messageId } = event.data;
+    const { type } = event.data;
 
     if (type === "message") {
+      const { method, payload } = event.data;
       // Fire-and-forget message - dispatch to on() listeners
       const listeners = messageListeners.get(method);
       if (listeners) {
@@ -213,6 +225,7 @@ export function createPortConnection(
         });
       }
     } else if (type === "request") {
+      const { method, payload, messageId } = event.data;
       // Request expecting response - dispatch to handle() handler
       const handler = requestHandlers.get(method);
       if (handler) {
@@ -247,7 +260,8 @@ export function createPortConnection(
           error: `No handler registered for method '${method}'`,
         });
       }
-    } else if (type === "response" && messageId) {
+    } else if (type === "response") {
+      const { messageId, payload } = event.data;
       // Response to our outgoing request
       const pending = pendingRequests.get(messageId);
       if (pending) {
@@ -265,11 +279,11 @@ export function createPortConnection(
 
   return {
     // Fire-and-forget messaging
-    send: (method: string, args?: any) => {
+    send: (method: string, args?: unknown) => {
       port.postMessage({ type: "message", method, payload: args });
     },
 
-    on: (method: string, callback: (args: any) => void) => {
+    on: (method: string, callback: (args: unknown) => void) => {
       if (typeof callback !== "function") {
         throw new Error("Callback must be a function");
       }
@@ -279,11 +293,11 @@ export function createPortConnection(
       messageListeners.get(method)!.add(callback);
     },
 
-    once: (method: string, callback: (args: any) => void) => {
+    once: (method: string, callback: (args: unknown) => void) => {
       if (typeof callback !== "function") {
         throw new Error("Callback must be a function");
       }
-      const wrapper = (args: any) => {
+      const wrapper = (args: unknown) => {
         // Remove before calling to prevent issues if callback throws
         const listeners = messageListeners.get(method);
         if (listeners) {
@@ -300,7 +314,7 @@ export function createPortConnection(
       messageListeners.get(method)!.add(wrapper);
     },
 
-    off: (method: string, callback: (args: any) => void) => {
+    off: (method: string, callback: (args: unknown) => void) => {
       const listeners = messageListeners.get(method);
       if (listeners) {
         listeners.delete(callback);
@@ -313,9 +327,9 @@ export function createPortConnection(
     // Request/response
     request: (
       method: string,
-      args?: any,
+      args?: unknown,
       timeout: number = 30000,
-    ): Promise<any> => {
+    ): Promise<unknown> => {
       return new Promise((resolve, reject) => {
         const messageId = generateMessageId();
 
@@ -347,7 +361,10 @@ export function createPortConnection(
       });
     },
 
-    handle: (method: string, handler: (args: any) => any | Promise<any>) => {
+    handle: (
+      method: string,
+      handler: (args: unknown) => unknown | Promise<unknown>,
+    ) => {
       if (typeof handler !== "function") {
         throw new Error("Handler must be a function");
       }
@@ -389,13 +406,7 @@ export function createPortConnection(
  */
 export function handleAppBusPort(
   port: IPCPort,
-  data: {
-    connectionId: string;
-    role: "service" | "client";
-    serviceName: string;
-    targetAppId?: string;
-    sourceAppId?: string;
-  },
+  data: AppBusPortData,
   state: AppBusState,
 ): void {
   const { connectionId, role, serviceName, targetAppId, sourceAppId } = data;

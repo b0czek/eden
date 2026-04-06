@@ -1,3 +1,4 @@
+import type { RecursiveObject } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { SettingsManager } from "../settings/SettingsManager";
@@ -9,6 +10,8 @@ const CommonTranslations = {
   en: commonEn,
   pl: commonPl,
 };
+
+export type CommonTranslationsMap = RecursiveObject<string>;
 
 interface I18nNamespaceEvents {
   "locale-changed": { locale: string };
@@ -50,7 +53,7 @@ export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {
     return setting || "en";
   }
 
-  getCommon(locale: string): { translations: Record<string, any> } {
+  getCommon(locale: string): { translations: CommonTranslationsMap } {
     const validLocale = locale as keyof typeof CommonTranslations;
     return {
       translations: CommonTranslations[validLocale] || CommonTranslations.en,

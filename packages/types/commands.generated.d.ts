@@ -385,7 +385,7 @@ export interface I18nCommands {
   "i18n/get-common": {
     args: { locale: string };
     response: {
-    translations: Record<string, any>;
+    translations: import("./index").RecursiveObject<string>;
   };
   };
 }

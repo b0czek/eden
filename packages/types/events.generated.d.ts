@@ -57,7 +57,7 @@ export interface PackageEvents {
 export interface ProcessEvents {
   "process/launched": { instance: import("./index").AppInstance };
   "process/stopped": { appId: string };
-  "process/error": { appId: string; error: any };
+  "process/error": { appId: string; error: unknown };
   "process/exited": { appId: string; code: number };
 }
 

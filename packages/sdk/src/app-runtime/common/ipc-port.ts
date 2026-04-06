@@ -7,14 +7,23 @@ import { log } from "../../logging";
  * - Electron MessagePortMain (backend utility process)
  */
 
+export type PortMessage =
+  | { type: "message"; method: string; payload?: unknown }
+  | { type: "request"; method: string; payload?: unknown; messageId: string }
+  | { type: "response"; messageId: string; payload?: unknown; error?: string };
+
+export interface IPCPortMessageEvent {
+  data: PortMessage;
+}
+
 /**
  * Unified interface for both DOM MessagePort and Electron MessagePortMain
  */
 export interface IPCPort {
-  postMessage(message: any): void;
-  on(event: "message", listener: (event: { data: any }) => void): void;
+  postMessage(message: PortMessage): void;
+  on(event: "message", listener: (event: IPCPortMessageEvent) => void): void;
   on(event: "close", listener: () => void): void;
-  off(event: "message", listener: (event: { data: any }) => void): void;
+  off(event: "message", listener: (event: IPCPortMessageEvent) => void): void;
   off(event: "close", listener: () => void): void;
   start(): void;
   close(): void;
@@ -25,37 +34,58 @@ export interface IPCPort {
  */
 export function wrapDOMPort(port: MessagePort): IPCPort {
   const messageListeners = new Map<
-    (event: { data: any }) => void,
-    (event: MessageEvent) => void
+    (event: IPCPortMessageEvent) => void,
+    (event: MessageEvent<PortMessage>) => void
   >();
   const closeListeners = new Set<() => void>();
 
+  function on(
+    event: "message",
+    listener: (event: IPCPortMessageEvent) => void,
+  ): void;
+  function on(event: "close", listener: () => void): void;
+  function on(
+    event: "message" | "close",
+    listener: ((event: IPCPortMessageEvent) => void) | (() => void),
+  ): void {
+    if (event === "message") {
+      const messageListener = listener as (event: IPCPortMessageEvent) => void;
+      const wrapper = (messageEvent: MessageEvent<PortMessage>) =>
+        messageListener({ data: messageEvent.data });
+      messageListeners.set(messageListener, wrapper);
+      port.addEventListener("message", wrapper);
+      return;
+    }
+
+    closeListeners.add(listener as () => void);
+  }
+
+  function off(
+    event: "message",
+    listener: (event: IPCPortMessageEvent) => void,
+  ): void;
+  function off(event: "close", listener: () => void): void;
+  function off(
+    event: "message" | "close",
+    listener: ((event: IPCPortMessageEvent) => void) | (() => void),
+  ): void {
+    if (event === "message") {
+      const messageListener = listener as (event: IPCPortMessageEvent) => void;
+      const wrapper = messageListeners.get(messageListener);
+      if (wrapper) {
+        port.removeEventListener("message", wrapper);
+        messageListeners.delete(messageListener);
+      }
+      return;
+    }
+
+    closeListeners.delete(listener as () => void);
+  }
+
   return {
-    postMessage: (message: any) => port.postMessage(message),
-
-    on: ((event: string, listener: any) => {
-      if (event === "message") {
-        // Create a wrapper that extracts data from MessageEvent
-        const wrapper = (e: MessageEvent) => listener({ data: e.data });
-        messageListeners.set(listener, wrapper);
-        port.addEventListener("message", wrapper);
-      } else if (event === "close") {
-        closeListeners.add(listener);
-      }
-    }) as IPCPort["on"],
-
-    off: ((event: string, listener: any) => {
-      if (event === "message") {
-        const wrapper = messageListeners.get(listener);
-        if (wrapper) {
-          port.removeEventListener("message", wrapper);
-          messageListeners.delete(listener);
-        }
-      } else if (event === "close") {
-        closeListeners.delete(listener);
-      }
-    }) as IPCPort["off"],
-
+    postMessage: (message: PortMessage) => port.postMessage(message),
+    on,
+    off,
     start: () => port.start(),
     close: () => {
       port.close();

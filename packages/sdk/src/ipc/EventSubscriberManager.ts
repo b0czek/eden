@@ -12,8 +12,10 @@ export class EventSubscriberManager {
   private subscriptions: Map<string, Set<number>> = new Map();
   private backendSubscriptions: Map<string, Set<string>> = new Map();
   private foundationSubscriptions: Map<string, boolean> = new Map();
-  private internalSubscriptions: Map<string, Set<(payload: any) => void>> =
-    new Map();
+  private internalSubscriptions: Map<
+    string,
+    Set<(payload: EventData<EventName>) => void>
+  > = new Map();
   private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
@@ -117,7 +119,7 @@ export class EventSubscriberManager {
     }
     this.internalSubscriptions
       .get(event)!
-      .add(callback as (payload: any) => void);
+      .add(callback as (payload: EventData<EventName>) => void);
     log.info(`Internal subscriber added for event: ${event}`);
   }
 
@@ -192,7 +194,10 @@ export class EventSubscriberManager {
   /**
    * Send event only to subscribed views, backends, and internal callbacks
    */
-  public notify(eventName: string, payload: any): void {
+  public notify<T extends EventName>(
+    eventName: T,
+    payload: EventData<T>,
+  ): void {
     // Notify internal subscribers first
     const internalCallbacks = this.internalSubscriptions.get(eventName);
     if (internalCallbacks) {
@@ -238,7 +243,11 @@ export class EventSubscriberManager {
   /**
    * Send event to a specific subscribed view
    */
-  public notifyView(viewId: number, eventName: string, payload: any): boolean {
+  public notifyView<T extends EventName>(
+    viewId: number,
+    eventName: T,
+    payload: EventData<T>,
+  ): boolean {
     const subscriptions = this.subscriptions.get(eventName);
     if (!subscriptions || !subscriptions.has(viewId)) {
       return false;

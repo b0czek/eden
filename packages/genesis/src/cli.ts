@@ -7,6 +7,18 @@ import * as bundler from "./bundler";
 
 const program = new Command();
 
+interface BuildCommandOptions {
+  output?: string;
+  verbose: boolean;
+  dryRun: boolean;
+  compression: string;
+}
+
+interface ExtractCommandOptions {
+  verbose: boolean;
+  verify?: boolean;
+}
+
 program
   .name("genesis")
   .description("📦 Genesis - Package Eden applications into .edenite format")
@@ -25,7 +37,7 @@ program
     "Zstd compression level (1-22, default: 11)",
     "11",
   )
-  .action(async (appDirectory: string, options: any) => {
+  .action(async (appDirectory: string, options: BuildCommandOptions) => {
     console.log(chalk.bold.blue("\n🌱 Genesis - Creating life...\n"));
 
     const compressionLevel = parseInt(options.compression, 10);
@@ -187,7 +199,11 @@ program
   .option("-v, --verbose", "Verbose output", false)
   .option("--no-verify", "Skip checksum verification")
   .action(
-    async (edeniteFile: string, outputDirectory: string, options: any) => {
+    async (
+      edeniteFile: string,
+      outputDirectory: string,
+      options: ExtractCommandOptions,
+    ) => {
       console.log(chalk.bold.blue("\n📂 Extracting .edenite file...\n"));
 
       const result = await bundler.extract({

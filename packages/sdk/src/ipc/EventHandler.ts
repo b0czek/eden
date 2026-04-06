@@ -26,7 +26,7 @@ export class EventHandler {
     const { eventName, _callerWebContentsId, _callerAppId, _isFoundation } =
       args;
 
-    if (!APP_EVENT_NAMES.includes(eventName as any)) {
+    if (!APP_EVENT_NAMES.includes(eventName)) {
       throw new Error(`Event '${eventName}' is not supported`);
     }
 
@@ -75,6 +75,6 @@ export class EventHandler {
 
   @EdenHandler("exists")
   exists(args: { eventName: string }): boolean {
-    return APP_EVENT_NAMES.includes(args.eventName as any);
+    return APP_EVENT_NAMES.includes(args.eventName);
   }
 }

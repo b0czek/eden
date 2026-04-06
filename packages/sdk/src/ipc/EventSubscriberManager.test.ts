@@ -6,32 +6,47 @@ import { EventSubscriberManager } from "./EventSubscriberManager";
 import type { PermissionRegistry } from "./PermissionRegistry";
 import { registerEventPermission } from "./PermissionRegistry";
 
+type ViewManagerMock = jest.Mocked<
+  Pick<ViewManager, "getViewInfo" | "sendToView" | "sendToMainWindow">
+>;
+type BackendManagerMock = jest.Mocked<Pick<BackendManager, "sendMessage">>;
+type PermissionRegistryMock = jest.Mocked<
+  Pick<PermissionRegistry, "hasPermission">
+>;
+type ViewInfo = NonNullable<ReturnType<ViewManager["getViewInfo"]>>;
+
+const createViewManagerMock = (): ViewManagerMock => ({
+  getViewInfo: jest.fn(),
+  sendToView: jest.fn(),
+  sendToMainWindow: jest.fn(),
+});
+
+const createBackendManagerMock = (): BackendManagerMock => ({
+  sendMessage: jest.fn(),
+});
+
+const createPermissionRegistryMock = (): PermissionRegistryMock => ({
+  hasPermission: jest.fn(),
+});
+
+const createViewInfo = (appId: string = "app.one"): ViewInfo =>
+  ({ appId }) as ViewInfo;
+
+const createManager = (viewManager: ViewManagerMock): EventSubscriberManager =>
+  new EventSubscriberManager(viewManager as unknown as ViewManager);
+
 describe("EventSubscriberManager", () => {
-  let viewManager: jest.Mocked<
-    Pick<ViewManager, "getViewInfo" | "sendToView" | "sendToMainWindow">
-  >;
-  let backendManager: jest.Mocked<Pick<BackendManager, "sendMessage">>;
-  let permissionRegistry: jest.Mocked<
-    Pick<PermissionRegistry, "hasPermission">
-  >;
+  let viewManager: ViewManagerMock;
+  let backendManager: BackendManagerMock;
+  let permissionRegistry: PermissionRegistryMock;
   let logSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    viewManager = {
-      getViewInfo: jest.fn(),
-      sendToView: jest.fn(),
-      sendToMainWindow: jest.fn(),
-    } as any;
-
-    backendManager = {
-      sendMessage: jest.fn(),
-    } as any;
-
-    permissionRegistry = {
-      hasPermission: jest.fn(),
-    } as any;
+    viewManager = createViewManagerMock();
+    backendManager = createBackendManagerMock();
+    permissionRegistry = createPermissionRegistryMock();
 
     logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
     warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -45,7 +60,7 @@ describe("EventSubscriberManager", () => {
   });
 
   it("returns false when subscribing an unknown view", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
+    const manager = createManager(viewManager);
 
     viewManager.getViewInfo.mockReturnValue(undefined);
 
@@ -54,12 +69,14 @@ describe("EventSubscriberManager", () => {
   });
 
   it("enforces event permissions when a registry is set", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
-    manager.setPermissionRegistry(permissionRegistry as any);
+    const manager = createManager(viewManager);
+    manager.setPermissionRegistry(
+      permissionRegistry as unknown as PermissionRegistry,
+    );
 
     registerEventPermission("event/secure", "permissions/secure");
 
-    viewManager.getViewInfo.mockReturnValue({ appId: "app.one" } as any);
+    viewManager.getViewInfo.mockReturnValue(createViewInfo());
     permissionRegistry.hasPermission.mockReturnValue(false);
 
     expect(() => manager.subscribe(1, "event/secure")).toThrow(
@@ -68,74 +85,102 @@ describe("EventSubscriberManager", () => {
   });
 
   it("subscribes/unsubscribes views and sends notifications", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
-    manager.setBackendManager(backendManager as any);
+    const manager = createManager(viewManager);
+    manager.setBackendManager(backendManager as unknown as BackendManager);
 
-    viewManager.getViewInfo.mockReturnValue({ appId: "app.one" } as any);
+    viewManager.getViewInfo.mockReturnValue(createViewInfo());
 
-    expect(manager.subscribe(7, "event/ping")).toBe(true);
-    expect(manager.getSubscribedViews("event/ping")).toEqual([7]);
+    expect(manager.subscribe(7, "settings/changed")).toBe(true);
+    expect(manager.getSubscribedViews("settings/changed")).toEqual([7]);
 
-    manager.subscribeFoundation("event/ping");
-    manager.subscribeBackend("app.backend", "event/ping");
+    manager.subscribeFoundation("settings/changed");
+    manager.subscribeBackend("app.backend", "settings/changed");
 
-    manager.notify("event/ping", { ok: true });
+    manager.notify("settings/changed", {
+      appId: "app.one",
+      key: "general.locale",
+      value: "en",
+    });
 
     expect(viewManager.sendToMainWindow).toHaveBeenCalledWith("shell-message", {
-      type: "event/ping",
-      payload: { ok: true },
+      type: "settings/changed",
+      payload: { appId: "app.one", key: "general.locale", value: "en" },
     });
     expect(viewManager.sendToView).toHaveBeenCalledWith(7, "shell-message", {
-      type: "event/ping",
-      payload: { ok: true },
+      type: "settings/changed",
+      payload: { appId: "app.one", key: "general.locale", value: "en" },
     });
     expect(backendManager.sendMessage).toHaveBeenCalledWith("app.backend", {
       type: "shell-event",
-      eventName: "event/ping",
-      payload: { ok: true },
+      eventName: "settings/changed",
+      payload: { appId: "app.one", key: "general.locale", value: "en" },
     });
 
-    expect(manager.unsubscribe(7, "event/ping")).toBe(true);
-    expect(manager.getSubscribedViews("event/ping")).toEqual([]);
+    expect(manager.unsubscribe(7, "settings/changed")).toBe(true);
+    expect(manager.getSubscribedViews("settings/changed")).toEqual([]);
   });
 
   it("notifies internal subscribers and tolerates callback errors", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
+    const manager = createManager(viewManager);
 
-    const callback = jest.fn();
-    const failing = jest.fn(() => {
-      throw new Error("boom");
+    const callback = jest.fn(
+      (_data: { appId: string; key: string; value: string }) => undefined,
+    );
+    const failing = jest.fn(
+      (_data: { appId: string; key: string; value: string }) => {
+        throw new Error("boom");
+      },
+    );
+
+    manager.subscribeInternal("settings/changed", callback);
+    manager.subscribeInternal("settings/changed", failing);
+
+    manager.notify("settings/changed", {
+      appId: "app.one",
+      key: "general.locale",
+      value: "pl",
     });
 
-    manager.subscribeInternal("event/internal" as any, callback as any);
-    manager.subscribeInternal("event/internal" as any, failing as any);
-
-    manager.notify("event/internal", { data: 1 });
-
-    expect(callback).toHaveBeenCalledWith({ data: 1 });
+    expect(callback).toHaveBeenCalledWith({
+      appId: "app.one",
+      key: "general.locale",
+      value: "pl",
+    });
     expect(errorSpy).toHaveBeenCalled();
   });
 
   it("sends to a specific view only when subscribed", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
-    viewManager.getViewInfo.mockReturnValue({ appId: "app.one" } as any);
+    const manager = createManager(viewManager);
+    viewManager.getViewInfo.mockReturnValue(createViewInfo());
 
-    expect(manager.notifyView(2, "event/one", {})).toBe(false);
+    expect(
+      manager.notifyView(2, "settings/changed", {
+        appId: "app.one",
+        key: "general.locale",
+        value: "en",
+      }),
+    ).toBe(false);
 
-    manager.subscribe(2, "event/one");
-    viewManager.sendToView.mockReturnValue(true as any);
-    expect(manager.notifyView(2, "event/one", { ok: true })).toBe(true);
+    manager.subscribe(2, "settings/changed");
+    viewManager.sendToView.mockReturnValue(true);
+    expect(
+      manager.notifyView(2, "settings/changed", {
+        appId: "app.one",
+        key: "general.locale",
+        value: "en",
+      }),
+    ).toBe(true);
     expect(viewManager.sendToView).toHaveBeenCalledWith(2, "shell-message", {
-      type: "event/one",
-      payload: { ok: true },
+      type: "settings/changed",
+      payload: { appId: "app.one", key: "general.locale", value: "en" },
     });
   });
 
   it("cleans up subscriptions for views and backends", () => {
-    const manager = new EventSubscriberManager(viewManager as any);
-    manager.setBackendManager(backendManager as any);
+    const manager = createManager(viewManager);
+    manager.setBackendManager(backendManager as unknown as BackendManager);
 
-    viewManager.getViewInfo.mockReturnValue({ appId: "app.one" } as any);
+    viewManager.getViewInfo.mockReturnValue(createViewInfo());
 
     manager.subscribe(3, "event/a");
     manager.subscribe(3, "event/b");

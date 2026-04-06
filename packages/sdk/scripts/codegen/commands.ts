@@ -66,7 +66,7 @@ export function extractCommandHandlers(
         }
 
         // Extract return type
-        let returnType = "any";
+        let returnType = "unknown";
         const returnTypeNode = method.getReturnTypeNode();
         if (returnTypeNode) {
           const type = returnTypeNode.getType();

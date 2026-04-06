@@ -49,7 +49,7 @@ export function EdenNamespace(
   namespace: string,
   options?: EdenNamespaceOptions,
 ) {
-  return <T extends { new (...args: any[]): {} }>(target: T) => {
+  return <T extends abstract new (...args: never[]) => object>(target: T) => {
     setManagerNamespace(target, namespace);
     Reflect.defineMetadata("eden:namespace", namespace, target);
 
@@ -94,9 +94,19 @@ export interface EdenHandlerOptions {
 }
 
 export function EdenHandler(command: string, options?: EdenHandlerOptions) {
-  return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+  return (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor,
+  ) => {
     // Register this handler in metadata
-    addCommandHandler(target.constructor, command, propertyKey);
+    addCommandHandler(
+      target.constructor as abstract new (
+        ...args: never[]
+      ) => object,
+      command,
+      String(propertyKey),
+    );
 
     // Store permission metadata if provided
     if (options?.permission) {
