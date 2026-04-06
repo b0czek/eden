@@ -165,6 +165,7 @@ export type ContextMenuItem =
       shortcut?: string;
       disabled?: boolean;
       danger?: boolean;
+      items?: ContextMenuItem[];
     }
   | { type: "separator" }
   | { type: "title"; label: string };

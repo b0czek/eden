@@ -90,6 +90,10 @@ body {
   background: var(--eden-color-surface-hover);
 }
 
+.context-menu-item-open {
+  background: var(--eden-color-surface-hover);
+}
+
 .context-menu-item-danger {
   color: var(--eden-color-danger);
 }
@@ -141,6 +145,26 @@ body {
 .context-menu-shortcut {
   font-size: 12px;
   color: var(--eden-color-text-muted);
+}
+
+.context-menu-submenu-indicator {
+  width: 1em;
+  height: 1em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--eden-color-text-muted);
+  flex-shrink: 0;
+}
+
+.context-menu-submenu-indicator svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.context-menu-item[data-submenu-side="left"] .context-menu-submenu-indicator svg {
+  transform: scaleX(-1);
 }
 
 @keyframes context-menu-fade-in {

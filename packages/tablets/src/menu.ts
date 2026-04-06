@@ -1,5 +1,9 @@
 import type { ContextMenuIconName } from "@edenapp/types";
-import { type ContextMenuAction, contextMenu } from "./context-menu";
+import {
+  type ContextMenuAction,
+  type ContextMenuActionItem,
+  contextMenu,
+} from "./context-menu";
 
 type MenuTitle = { __brand: "title"; text: string };
 export type MenuElement =
@@ -19,6 +23,14 @@ export const button = (
   onSelect: () => void | Promise<void>,
   opts?: { icon?: ContextMenuIconName; danger?: boolean; disabled?: boolean },
 ): ContextMenuAction => ({ type: "item", id, label, onSelect, ...opts });
+
+/** Menu item with nested submenu items */
+export const submenu = (
+  id: string,
+  label: string,
+  items: ContextMenuAction[],
+  opts?: { icon?: ContextMenuIconName; danger?: boolean; disabled?: boolean },
+): ContextMenuActionItem => ({ type: "item", id, label, items, ...opts });
 
 /** Menu separator */
 export const separator = (): ContextMenuAction => ({ type: "separator" });

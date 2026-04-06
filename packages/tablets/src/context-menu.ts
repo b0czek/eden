@@ -8,10 +8,11 @@ import type {
   EventData,
 } from "@edenapp/types";
 
-export type ContextMenuActionItem = Extract<
-  ContextMenuItem,
-  { type: "item" }
+export type ContextMenuActionItem = Omit<
+  Extract<ContextMenuItem, { type: "item" }>,
+  "items"
 > & {
+  items?: ContextMenuAction[];
   onSelect?: () => Promise<void> | void;
 };
 
@@ -117,10 +118,29 @@ const resolvePositionFromEvent = (
   return undefined;
 };
 
+const findActionItemById = (
+  items: ContextMenuAction[],
+  id: string,
+): ContextMenuActionItem | undefined => {
+  for (const item of items) {
+    if (item.type !== "item") continue;
+    if (item.id === id) return item;
+    if (item.items?.length) {
+      const nested = findActionItemById(item.items, id);
+      if (nested) return nested;
+    }
+  }
+
+  return undefined;
+};
+
 const stripAction = (item: ContextMenuAction): ContextMenuItem => {
   if (item.type !== "item") return item;
-  const { onSelect, ...rest } = item;
-  return rest;
+  const { onSelect, items, ...rest } = item;
+  return {
+    ...rest,
+    ...(items?.length ? { items: items.map(stripAction) } : {}),
+  };
 };
 
 const ensureContextMenuSubscribed = async () => {
@@ -160,9 +180,7 @@ const openContextMenu: EdenContextMenuAPI["open"] = async (options) => {
       const run = async () => {
         try {
           if (result.itemId) {
-            const selected = options.items.find(
-              (item) => item.type === "item" && item.id === result.itemId,
-            ) as ContextMenuActionItem | undefined;
+            const selected = findActionItemById(options.items, result.itemId);
             if (selected?.onSelect) {
               await selected.onSelect();
             }
