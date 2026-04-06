@@ -9,6 +9,7 @@ import type {
 import { inject, injectable, singleton } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { FilesystemManager } from "../filesystem";
+import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager";
@@ -47,6 +48,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
+    @inject(I18nManager) private i18nManager: I18nManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
@@ -430,11 +432,14 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Helper to resolve localized app name to string
    */
-  private getAppName(name: string | Record<string, string>): string {
+  private getAppName(
+    name: string | Record<string, string>,
+    locale: string,
+  ): string {
     if (typeof name === "string") {
       return name;
     }
-    return name.en || Object.values(name)[0] || "Unknown App";
+    return name[locale] || name.en || Object.values(name)[0] || "Unknown App";
   }
 
   /**
@@ -443,6 +448,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   async getSupportedHandlers(filePath: string): Promise<FileHandlerInfo[]> {
     const fileContext = await this.getFileContext(filePath);
     const handlers = new Map<string, FileHandlerInfo>();
+    const locale = await this.i18nManager.getLocale();
 
     for (const { app, handler } of this.getMatchingHandlers({
       extension: fileContext.extension,
@@ -455,7 +461,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
 
       handlers.set(app.id, {
         appId: app.id,
-        appName: this.getAppName(app.name),
+        appName: this.getAppName(app.name, locale),
         handlerName: handler.name,
         icon: app.icon,
       });
