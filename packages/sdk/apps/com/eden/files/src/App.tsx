@@ -148,6 +148,7 @@ const App: Component = () => {
   const {
     duplicateItem,
     openItem,
+    getOpenWithMenuItems,
     handleItemClick,
     handleItemDoubleClick,
     promptCreateFolder,
@@ -169,6 +170,7 @@ const App: Component = () => {
   const { handleItemContextMenu, handleBackgroundContextMenu } =
     useExplorerContextMenus({
       openItem,
+      getOpenWithMenuItems,
       promptRename,
       duplicateItem,
       promptDelete,

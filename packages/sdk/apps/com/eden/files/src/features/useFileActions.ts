@@ -1,4 +1,6 @@
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
+import type { FileHandlerInfo } from "@edenapp/types";
+import { button, type ContextMenuAction } from "@edenapp/tablets";
 import type { Accessor, Setter } from "solid-js";
 import { t } from "../i18n";
 import type { FileItem } from "../types";
@@ -15,6 +17,21 @@ interface UseFileActionsOptions {
 }
 
 export const useFileActions = (options: UseFileActionsOptions) => {
+  const getNoOpenWithOptions = (): ContextMenuAction[] => [
+    button("open-with-none", t("files.errors.noAppsAvailable"), () => {}, {
+      disabled: true,
+    }),
+  ];
+
+  const getFileExtension = (name: string) => {
+    const dotIndex = name.lastIndexOf(".");
+    if (dotIndex <= 0 || dotIndex === name.length - 1) {
+      return "";
+    }
+
+    return name.slice(dotIndex + 1).toLowerCase();
+  };
+
   const validateName = (
     name: string,
     invalidMessageKey:
@@ -174,6 +191,74 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       options.showError(
         `${t("files.errors.openFailed")}: ${(error as Error).message}`,
       );
+    }
+  };
+
+  const openItemWithApp = async (item: FileItem, appId: string) => {
+    try {
+      const openResult = await window.edenAPI.shellCommand("file/open-with", {
+        path: item.path,
+        appId,
+      });
+
+      if (!openResult.success) {
+        options.showError(
+          `${t("files.errors.openFailed")}: ${openResult.error}`,
+        );
+      }
+    } catch (error) {
+      options.showError(
+        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
+      );
+    }
+  };
+
+  const getOpenWithMenuItems = async (
+    item: FileItem,
+  ): Promise<ContextMenuAction[]> => {
+    if (!item.isFile) {
+      return [];
+    }
+
+    const extension = getFileExtension(item.name);
+    if (!extension) {
+      return getNoOpenWithOptions();
+    }
+
+    try {
+      const [supportedHandlers] = await Promise.all([
+        window.edenAPI.shellCommand("file/get-supported-handlers", {
+          extension,
+        }) as Promise<FileHandlerInfo[]>,
+      ]);
+      const menuItems = supportedHandlers
+        .map((handler) => ({
+          appId: handler.appId,
+          appName: handler.appName || handler.appId,
+        }))
+        .filter(
+          (handler, index, handlers) =>
+            handlers.findIndex((entry) => entry.appId === handler.appId) ===
+            index,
+        )
+        .sort((a, b) => a.appName.localeCompare(b.appName))
+        .map((handler) =>
+          button(
+            `open-with-${handler.appId}`,
+            handler.appName,
+            () => openItemWithApp(item, handler.appId),
+            {
+              icon: { type: "app", appId: handler.appId },
+            },
+          ),
+        );
+
+      return menuItems.length > 0 ? menuItems : getNoOpenWithOptions();
+    } catch (error) {
+      options.showError(
+        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
+      );
+      return getNoOpenWithOptions();
     }
   };
 
@@ -345,6 +430,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     createFile,
     duplicateItem,
     openItem,
+    getOpenWithMenuItems,
     renameItem,
     deleteItem,
     promptCreateFolder,
