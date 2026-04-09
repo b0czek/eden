@@ -22,7 +22,7 @@
   "dependencies": {},
   "devDependencies": {
     "@edenapp/types": "workspace:*",
-    "typescript": "^5.3.0"
+    "typescript": "^6.0.2"
   },
   "keywords": [
     "eden",
