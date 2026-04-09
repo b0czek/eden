@@ -1,0 +1,4 @@
+{
+  "extends": "../apps/tsconfig.web.solid.json",
+  "include": ["src"]
+}

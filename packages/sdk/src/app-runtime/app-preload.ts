@@ -1,6 +1,9 @@
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
+import type { EdenKeyboardAction, EdenKeyboardAPI } from "@edenapp/types";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
+import { createKeyboardActionController } from "./keyboard/actions";
+import { createKeyboardAutodetection } from "./keyboard/autodetection";
 import {
   createAppBusAPI,
   createEdenAPI,
@@ -35,6 +38,11 @@ const eventSubscriptions: Map<
   string,
   Set<(payload: unknown) => void>
 > = new Map();
+
+const KEYBOARD_FOCUS_CHANNEL = "eden-keyboard:focus-state";
+const KEYBOARD_SEND_ACTION_CHANNEL = "eden-keyboard:send-action";
+const KEYBOARD_HIDE_CHANNEL = "eden-keyboard:hide";
+const KEYBOARD_APPLY_ACTION_CHANNEL = "eden-keyboard:apply-action";
 
 // Extract appId from process arguments
 // Arguments are passed as --app-id=com.example.app
@@ -133,6 +141,14 @@ const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 
+const keyboardAPI: EdenKeyboardAPI = {
+  sendAction: (action) =>
+    ipcRenderer.invoke(KEYBOARD_SEND_ACTION_CHANNEL, action),
+  hide: () => ipcRenderer.invoke(KEYBOARD_HIDE_CHANNEL),
+};
+
+contextBridge.exposeInMainWorld("edenKeyboard", keyboardAPI);
+
 // ===================================================================
 // AppBus - App-to-App Communication System
 // ===================================================================
@@ -166,6 +182,31 @@ contextBridge.exposeInMainWorld(
   "appBus",
   createAppBusAPI({ transport: shellTransport }, appBusState),
 );
+
+const keyboardAutodetection = createKeyboardAutodetection({
+  reportFocusState: (payload) => {
+    ipcRenderer.send(KEYBOARD_FOCUS_CHANNEL, payload);
+  },
+});
+
+const keyboardActionController = createKeyboardActionController(
+  keyboardAutodetection,
+);
+
+const setupKeyboardIntegration = () => {
+  keyboardAutodetection.setup();
+
+  ipcRenderer.on(
+    KEYBOARD_APPLY_ACTION_CHANNEL,
+    (_event, action: EdenKeyboardAction) => {
+      try {
+        keyboardActionController.applyAction(action);
+      } catch (error) {
+        log.error("Failed to apply on-screen keyboard action:", error);
+      }
+    },
+  );
+};
 
 // ===================================================================
 // Universal Zoom Prevention
@@ -204,9 +245,13 @@ const setupZoomPrevention = () => {
 
 // Setup when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", setupZoomPrevention);
+  document.addEventListener("DOMContentLoaded", () => {
+    setupZoomPrevention();
+    setupKeyboardIntegration();
+  });
 } else {
   setupZoomPrevention();
+  setupKeyboardIntegration();
 }
 
 log.info("Universal app preload loaded");

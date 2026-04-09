@@ -56,6 +56,59 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
     ],
   },
   {
+    id: "keyboard",
+    name: {
+      en: "Keyboard",
+      pl: "Klawiatura",
+    },
+    icon: "keyboard",
+    settings: [
+      {
+        key: "keyboard.enabled",
+        label: {
+          en: "Enable On-Screen Keyboard",
+          pl: "Włącz klawiaturę ekranową",
+        },
+        type: "toggle",
+        description: {
+          en: "Show the on-screen keyboard when editable fields receive focus.",
+          pl: "Pokazuj klawiaturę ekranową, gdy pola edycji otrzymują fokus.",
+        },
+        defaultValue: "true",
+      },
+      {
+        key: "keyboard.placementMode",
+        label: {
+          en: "Placement Mode",
+          pl: "Tryb położenia",
+        },
+        type: "select",
+        description: {
+          en: "Choose whether the on-screen keyboard docks to the bottom or stays movable.",
+          pl: "Wybierz, czy klawiatura ekranowa ma być przypięta do dołu, czy pozostać ruchoma.",
+        },
+        options: [
+          { label: { en: "Docked", pl: "Zadokowana" }, value: "docked" },
+          { label: { en: "Floating", pl: "Pływająca" }, value: "floating" },
+        ],
+        defaultValue: "docked",
+      },
+      {
+        key: "keyboard.showNumberRow",
+        label: {
+          en: "Show Number Row",
+          pl: "Pokaż rząd cyfr",
+        },
+        type: "toggle",
+        description: {
+          en: "Keep the number row visible on text layouts.",
+          pl: "Pozostaw widoczny rząd cyfr w układach tekstowych.",
+        },
+        defaultValue: "true",
+      },
+    ],
+  },
+  {
     id: "appearance",
     name: {
       en: "Appearance",

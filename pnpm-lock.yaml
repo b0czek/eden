@@ -150,6 +150,9 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
+      simple-keyboard:
+        specifier: ^3.8.125
+        version: 3.8.125
       tsyringe:
         specifier: ^4.10.0
         version: 4.10.0
@@ -175,6 +178,9 @@ importers:
       lightningcss-cli:
         specifier: ^1.30.2
         version: 1.30.2
+      solid-js:
+        specifier: ^1.9.10
+        version: 1.9.10
       style-dictionary:
         specifier: ^5.1.1
         version: 5.1.1
@@ -190,6 +196,12 @@ importers:
       typescript:
         specifier: ^5.3.0
         version: 5.6.3
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.6(@types/node@20.19.25)(yaml@2.8.2)
+      vite-plugin-solid:
+        specifier: ^2.11.10
+        version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25)(yaml@2.8.2))
 
   packages/sdk/apps/com/eden/calculator:
     dependencies:
@@ -3439,6 +3451,9 @@ packages:
   simple-git-hooks@2.13.1:
     resolution: {integrity: sha512-WszCLXwT4h2k1ufIXAgsbiTOazqqevFCIncOuUBZJ91DdvWcC5+OFkluWRQPrcuSYd8fjq+o2y1QfWqYMoAToQ==}
     hasBin: true
+
+  simple-keyboard@3.8.125:
+    resolution: {integrity: sha512-s4NUVmFtapRkG3ZGpL9iLHEmuMnx4wnQw5pZJJQtqksscSWWN4Yq3bLxeLtf/fJrQHOtHvOT9DkLyKoVFFnGag==}
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
@@ -7212,6 +7227,8 @@ snapshots:
 
   simple-git-hooks@2.13.1: {}
 
+  simple-keyboard@3.8.125: {}
+
   sisteransi@1.0.5: {}
 
   slash@3.0.0: {}
@@ -7593,6 +7610,19 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@20.19.25)(yaml@2.8.2)):
+    dependencies:
+      '@babel/core': 7.28.5
+      '@types/babel__core': 7.20.5
+      babel-preset-solid: 1.9.10(@babel/core@7.28.5)(solid-js@1.9.10)
+      merge-anything: 5.1.7
+      solid-js: 1.9.10
+      solid-refresh: 0.6.3(solid-js@1.9.10)
+      vite: 7.2.6(@types/node@20.19.25)(yaml@2.8.2)
+      vitefu: 1.1.1(vite@7.2.6(@types/node@20.19.25)(yaml@2.8.2))
+    transitivePeerDependencies:
+      - supports-color
+
   vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@24.10.10)(yaml@2.8.2)):
     dependencies:
       '@babel/core': 7.28.5
@@ -7628,6 +7658,19 @@ snapshots:
       fsevents: 2.3.3
       yaml: 2.8.2
 
+  vite@7.2.6(@types/node@20.19.25)(yaml@2.8.2):
+    dependencies:
+      esbuild: 0.25.12
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.6
+      rollup: 4.53.3
+      tinyglobby: 0.2.15
+    optionalDependencies:
+      '@types/node': 20.19.25
+      fsevents: 2.3.3
+      yaml: 2.8.2
+
   vite@7.2.6(@types/node@24.10.10)(yaml@2.8.2):
     dependencies:
       esbuild: 0.25.12
@@ -7648,6 +7691,10 @@ snapshots:
   vitefu@1.1.1(vite@6.4.1(@types/node@24.10.10)(yaml@2.8.2)):
     optionalDependencies:
       vite: 6.4.1(@types/node@24.10.10)(yaml@2.8.2)
+
+  vitefu@1.1.1(vite@7.2.6(@types/node@20.19.25)(yaml@2.8.2)):
+    optionalDependencies:
+      vite: 7.2.6(@types/node@20.19.25)(yaml@2.8.2)
 
   vitefu@1.1.1(vite@7.2.6(@types/node@24.10.10)(yaml@2.8.2)):
     optionalDependencies:

@@ -1,6 +1,7 @@
 // Ambient declarations for renderer globals
 
 import type { AppFrameInjectionMode, CSSInjectionMode } from "./AppManifest";
+import type { EdenKeyboardAPI } from "./keyboard";
 import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 
 export interface EdenFrame {
@@ -59,5 +60,6 @@ declare global {
     getAppAPI: () => AppBusConnection;
 
     edenFrame?: EdenFrame;
+    edenKeyboard: EdenKeyboardAPI;
   }
 }
