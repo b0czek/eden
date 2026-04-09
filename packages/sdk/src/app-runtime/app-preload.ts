@@ -1,5 +1,9 @@
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
-import type { EdenKeyboardAction, EdenKeyboardAPI } from "@edenapp/types";
+import type {
+  EdenKeyboardAction,
+  EdenKeyboardAPI,
+  EdenKeyboardState,
+} from "@edenapp/types";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
 import { createKeyboardActionController } from "./keyboard/actions";
@@ -40,9 +44,12 @@ const eventSubscriptions: Map<
 > = new Map();
 
 const KEYBOARD_FOCUS_CHANNEL = "eden-keyboard:focus-state";
+const KEYBOARD_SHOW_CHANNEL = "eden-keyboard:show";
 const KEYBOARD_SEND_ACTION_CHANNEL = "eden-keyboard:send-action";
 const KEYBOARD_HIDE_CHANNEL = "eden-keyboard:hide";
 const KEYBOARD_APPLY_ACTION_CHANNEL = "eden-keyboard:apply-action";
+const KEYBOARD_STATE_CHANGED_CHANNEL = "eden-keyboard:state-changed";
+const KEYBOARD_GET_STATE_CHANNEL = "eden-keyboard:get-state";
 
 // Extract appId from process arguments
 // Arguments are passed as --app-id=com.example.app
@@ -141,10 +148,46 @@ const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 
+const keyboardStateListeners = new Set<(state: EdenKeyboardState) => void>();
+let currentKeyboardState: EdenKeyboardState = {
+  enabled: true,
+  visible: false,
+  placementMode: "docked",
+  bottomInset: 0,
+  layout: "text",
+  showNumberRow: true,
+};
+
+ipcRenderer.on(KEYBOARD_STATE_CHANGED_CHANNEL, (_event, state) => {
+  currentKeyboardState = state;
+
+  for (const listener of keyboardStateListeners) {
+    try {
+      listener(state);
+    } catch (error) {
+      log.error("Keyboard state listener failed:", error);
+    }
+  }
+});
+
 const keyboardAPI: EdenKeyboardAPI = {
+  show: () => ipcRenderer.invoke(KEYBOARD_SHOW_CHANNEL),
   sendAction: (action) =>
     ipcRenderer.invoke(KEYBOARD_SEND_ACTION_CHANNEL, action),
   hide: () => ipcRenderer.invoke(KEYBOARD_HIDE_CHANNEL),
+  getState: () => ipcRenderer.invoke(KEYBOARD_GET_STATE_CHANNEL),
+  onStateChanged: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    keyboardStateListeners.add(callback);
+    callback(currentKeyboardState);
+
+    return () => {
+      keyboardStateListeners.delete(callback);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld("edenKeyboard", keyboardAPI);

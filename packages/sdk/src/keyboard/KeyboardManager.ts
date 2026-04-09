@@ -24,10 +24,12 @@ import {
 } from "./geometry";
 
 const CHANNEL_FOCUS_STATE = "eden-keyboard:focus-state";
+const CHANNEL_SHOW = "eden-keyboard:show";
 const CHANNEL_SEND_ACTION = "eden-keyboard:send-action";
 const CHANNEL_HIDE = "eden-keyboard:hide";
 const CHANNEL_APPLY_ACTION = "eden-keyboard:apply-action";
 const CHANNEL_STATE_CHANGED = "eden-keyboard:state-changed";
+const CHANNEL_GET_STATE = "eden-keyboard:get-state";
 
 const SETTING_ENABLED = "keyboard.enabled";
 const SETTING_PLACEMENT_MODE = "keyboard.placementMode";
@@ -162,6 +164,10 @@ export class KeyboardManager {
       },
     );
 
+    ipcMain.handle(CHANNEL_SHOW, async () => {
+      return await this.handleShowRequest();
+    });
+
     ipcMain.handle(
       CHANNEL_SEND_ACTION,
       async (event, action: EdenKeyboardAction | undefined) => {
@@ -171,6 +177,10 @@ export class KeyboardManager {
 
     ipcMain.handle(CHANNEL_HIDE, async (event) => {
       return await this.handleHideRequest(event.sender.id);
+    });
+
+    ipcMain.handle(CHANNEL_GET_STATE, async () => {
+      return this.getKeyboardState();
     });
   }
 
@@ -283,13 +293,15 @@ export class KeyboardManager {
     return { success: sent };
   }
 
-  private async handleHideRequest(
-    senderWebContentsId: number,
-  ): Promise<{ success: boolean }> {
-    if (senderWebContentsId !== this.keyboardWindow?.webContents.id) {
-      throw new Error("Only the keyboard window can hide the keyboard");
-    }
+  private async handleShowRequest(): Promise<{ success: boolean }> {
+    this.dismissedTarget = null;
+    await this.showKeyboard();
+    return { success: true };
+  }
 
+  private async handleHideRequest(
+    _senderWebContentsId: number,
+  ): Promise<{ success: boolean }> {
     if (this.currentTarget) {
       this.dismissedTarget = {
         viewId: this.currentTarget.viewId,
@@ -452,14 +464,15 @@ export class KeyboardManager {
   }
 
   private notifyKeyboardStateChanged(): void {
-    if (!this.keyboardWindow || this.keyboardWindow.isDestroyed()) {
-      return;
+    const state = this.getKeyboardState();
+
+    if (this.keyboardWindow && !this.keyboardWindow.isDestroyed()) {
+      this.keyboardWindow.webContents.send(CHANNEL_STATE_CHANGED, state);
     }
 
-    this.keyboardWindow.webContents.send(
-      CHANNEL_STATE_CHANGED,
-      this.getKeyboardState(),
-    );
+    for (const [viewId] of this.viewManager.getAllViews()) {
+      this.viewManager.sendToView(viewId, CHANNEL_STATE_CHANGED, state);
+    }
   }
 
   private updateKeyboardWindowBounds(): void {

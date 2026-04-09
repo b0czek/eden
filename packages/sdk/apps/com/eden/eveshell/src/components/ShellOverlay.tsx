@@ -1,6 +1,7 @@
 import type {
-  AppInstance,
   AppManifest,
+  AppInstance,
+  EdenKeyboardState,
   UserProfile,
   ViewBounds,
   WindowSize,
@@ -13,6 +14,7 @@ import type { AppInfo } from "../types";
 import AllApps from "./AllApps";
 import { openChangePasswordDialog } from "./ChangePasswordDialog";
 import Dock from "./Dock";
+import KeyboardButton from "./KeyboardButton";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
@@ -28,8 +30,24 @@ export default function ShellOverlay() {
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
+  const [keyboardState, setKeyboardState] = createSignal<EdenKeyboardState>({
+    enabled: true,
+    visible: false,
+    placementMode: "docked",
+    bottomInset: 0,
+    layout: "text",
+    showNumberRow: true,
+  });
   const isFullscreen = () => showAllApps() || showChangePassword();
   let lastResizeMode: "dock" | "fullscreen" | null = null;
+
+  const refreshKeyboardState = async () => {
+    try {
+      setKeyboardState(await window.edenKeyboard.getState());
+    } catch (error) {
+      console.error("Failed to load keyboard state:", error);
+    }
+  };
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -223,6 +241,21 @@ export default function ShellOverlay() {
     }
   };
 
+  const handleKeyboardToggle = async () => {
+    try {
+      const state = await window.edenKeyboard.getState();
+      if (state.visible) {
+        await window.edenKeyboard.hide();
+      } else {
+        await window.edenKeyboard.show();
+      }
+    } catch (error) {
+      console.error("Failed to toggle keyboard:", error);
+    } finally {
+      void refreshKeyboardState();
+    }
+  };
+
   createEffect(() => {
     const mode = isFullscreen() ? "fullscreen" : "dock";
     if (mode === lastResizeMode) return;
@@ -278,6 +311,11 @@ export default function ShellOverlay() {
   });
 
   onMount(() => {
+    const unsubscribeKeyboard =
+      window.edenKeyboard.onStateChanged?.((state) => {
+        setKeyboardState(state);
+      }) ?? (() => {});
+
     // Event handlers
     const handleAppLifecycle = () => loadSystemInfo();
 
@@ -293,6 +331,7 @@ export default function ShellOverlay() {
 
     // Register cleanup synchronously (must happen before any async work)
     onCleanup(() => {
+      unsubscribeKeyboard();
       window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
       window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
       window.edenAPI.unsubscribe(
@@ -310,6 +349,7 @@ export default function ShellOverlay() {
       loadSystemInfo();
       loadPinnedApps();
       loadCurrentUser();
+      refreshKeyboardState();
 
       try {
         // Subscribe to events
@@ -348,9 +388,20 @@ export default function ShellOverlay() {
           currentUser={currentUser()}
           onAppClick={handleAppClick}
           onShowAllApps={handleShowAllApps}
+          keyboardVisible={keyboardState().visible}
+          onKeyboardToggle={handleKeyboardToggle}
           userMenu={userContextMenu}
           appMenu={appMenu}
         />
+      </Show>
+
+      <Show when={isFullscreen()}>
+        <div class="shell-overlay-keyboard-fab">
+          <KeyboardButton
+            active={keyboardState().visible}
+            onClick={handleKeyboardToggle}
+          />
+        </div>
       </Show>
 
       <DialogHost dialogs={dialogs} />

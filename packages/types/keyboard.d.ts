@@ -43,7 +43,9 @@ export type EdenKeyboardAction =
   | { type: "enter" };
 
 export interface EdenKeyboardAPI {
+  show(): Promise<{ success: boolean }>;
   sendAction(action: EdenKeyboardAction): Promise<{ success: boolean }>;
   hide(): Promise<{ success: boolean }>;
+  getState(): Promise<EdenKeyboardState>;
   onStateChanged?(callback: (state: EdenKeyboardState) => void): () => void;
 }

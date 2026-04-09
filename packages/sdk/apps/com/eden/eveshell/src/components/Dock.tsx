@@ -6,6 +6,7 @@ import { t } from "../i18n";
 import type { AppInfo } from "../types";
 import AppIcon from "./AppIcon";
 import Clock from "./Clock";
+import KeyboardButton from "./KeyboardButton";
 import UserBadge from "./UserBadge";
 
 interface DockProps {
@@ -14,6 +15,8 @@ interface DockProps {
   currentUser: UserProfile | null;
   onAppClick: (appId: string) => void;
   onShowAllApps: () => void;
+  keyboardVisible: boolean;
+  onKeyboardToggle: () => void | Promise<void>;
   userMenu: Menu<UserProfile | null>;
   appMenu: Menu<AppInfo>;
 }
@@ -137,6 +140,10 @@ export default function Dock(props: DockProps) {
         </div>
       </div>
       <div class="dock-right">
+        <KeyboardButton
+          active={props.keyboardVisible}
+          onClick={props.onKeyboardToggle}
+        />
         <Clock />
       </div>
     </div>
