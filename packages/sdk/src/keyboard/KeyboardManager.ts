@@ -53,6 +53,7 @@ export class KeyboardManager {
   private keyboardWindow: BrowserWindow | null = null;
   private workspaceBounds: ViewBounds | null = null;
   private currentTarget: KeyboardTargetSession | null = null;
+  private persistentVisibility = false;
   private dismissedTarget: Pick<
     KeyboardTargetSession,
     "viewId" | "sessionId"
@@ -106,6 +107,11 @@ export class KeyboardManager {
         if (this.currentTarget?.appId === appId) {
           this.currentTarget = null;
           this.dismissedTarget = null;
+          if (this.persistentVisibility) {
+            void this.refreshKeyboardPresentation();
+            return;
+          }
+
           void this.hideKeyboard();
         }
       },
@@ -143,6 +149,7 @@ export class KeyboardManager {
 
           this.enabled = nextEnabled;
           if (!this.enabled) {
+            this.persistentVisibility = false;
             this.dismissedTarget = null;
             void this.hideKeyboard();
             return;
@@ -225,6 +232,11 @@ export class KeyboardManager {
 
       if (this.currentTarget?.viewId === viewId) {
         this.currentTarget = null;
+        if (this.persistentVisibility) {
+          void this.refreshKeyboardPresentation();
+          return;
+        }
+
         void this.hideKeyboard();
       }
       return;
@@ -294,6 +306,7 @@ export class KeyboardManager {
   }
 
   private async handleShowRequest(): Promise<{ success: boolean }> {
+    this.persistentVisibility = true;
     this.dismissedTarget = null;
     await this.showKeyboard();
     return { success: true };
@@ -302,6 +315,7 @@ export class KeyboardManager {
   private async handleHideRequest(
     _senderWebContentsId: number,
   ): Promise<{ success: boolean }> {
+    this.persistentVisibility = false;
     if (this.currentTarget) {
       this.dismissedTarget = {
         viewId: this.currentTarget.viewId,
