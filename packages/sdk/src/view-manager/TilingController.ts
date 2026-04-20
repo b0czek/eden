@@ -1,6 +1,9 @@
 import type { TilingConfig } from "@edenapp/types";
 import type { Rectangle as Bounds } from "electron";
-import { calculateTileBounds } from "./layoutCalculator";
+import {
+  calculateTileBounds,
+  getSmartTilingCapacity,
+} from "./layoutCalculator";
 import type { ViewInfo, ViewMode } from "./types";
 
 /**
@@ -78,6 +81,8 @@ export class TilingController {
         const safeRows = normalizeCount(rows, 2);
         return safeColumns * safeRows;
       }
+      case "smart":
+        return getSmartTilingCapacity(this.workspaceBounds, this.config);
       case "horizontal": {
         if (columns === undefined) return undefined;
         return normalizeCount(columns, 1);
