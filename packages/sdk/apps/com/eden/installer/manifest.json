@@ -26,6 +26,12 @@
     }
   },
   "permissions": ["package/read", "fs/read"],
+  "fileHandlers": [
+    {
+      "name": "Eden Packages",
+      "extensions": ["edenite"]
+    }
+  ],
   "grants": [{ "scope": "preset", "preset": "package/manage" }],
   "hidden": true
 }
