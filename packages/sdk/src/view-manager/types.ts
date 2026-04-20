@@ -18,6 +18,16 @@ export interface ViewInfo {
   appId: string;
   manifest: AppManifest;
   bounds: Bounds;
+  /**
+   * Whether the user currently wants this view shown.
+   * Capacity-based tiling may still keep it off-screen temporarily.
+   */
+  requestedVisible: boolean;
+  /**
+   * Whether the view is currently displayed on-screen.
+   * This may be false either because the user hid it or because tiling
+   * temporarily removed it to satisfy layout capacity.
+   */
   visible: boolean;
   mode: ViewMode;
   viewType: ViewType; // Type of view: app or overlay

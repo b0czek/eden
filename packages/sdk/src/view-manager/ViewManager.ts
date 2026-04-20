@@ -128,8 +128,49 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   setWorkspaceBounds(bounds: Bounds): void {
     this.tilingController.setWorkspaceBounds(bounds);
     if (this.tilingController.isEnabled()) {
-      this.tilingController.recalculateTiledViews(this.views);
+      const visibilityChanged = this.syncTiledLayout();
+      if (visibilityChanged) {
+        this.reorderViewLayers();
+      }
     }
+  }
+
+  /**
+   * Apply tiling visibility rules in one pass, then recalculate tile bounds.
+   * Returns true when any view visibility changed.
+   */
+  private syncTiledLayout(
+    options: { preferredViewId?: number; excludedViewId?: number } = {},
+  ): boolean {
+    const { toHide, toShow } =
+      this.tilingController.resolveTiledVisibilityChanges(this.views, options);
+
+    let visibilityChanged = false;
+
+    for (const viewId of toHide) {
+      const viewInfo = this.views.get(viewId);
+      if (!viewInfo || !viewInfo.visible) continue;
+
+      viewInfo.visible = false;
+      viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
+
+      if (!viewInfo.view.webContents.isDestroyed()) {
+        viewInfo.view.setBounds(viewInfo.bounds);
+      }
+
+      visibilityChanged = true;
+    }
+
+    for (const viewId of toShow) {
+      const viewInfo = this.views.get(viewId);
+      if (!viewInfo || viewInfo.visible) continue;
+
+      viewInfo.visible = true;
+      visibilityChanged = true;
+    }
+
+    this.tilingController.recalculateTiledViews(this.views);
+    return visibilityChanged;
   }
 
   setWindowSize(windowSize: WindowSize): void {
@@ -209,9 +250,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     // Recalculate all tiles if using tiling and this is a tiled view
     if (viewInfo.mode === "tiled" && this.tilingController.isEnabled()) {
-      this.tilingController.applyTiledCapacity(this.views, viewId, (hideId) =>
-        this.hideView(hideId),
-      );
+      this.syncTiledLayout({ preferredViewId: viewId });
     }
 
     // Add to main window's contentView and maintain proper layering
@@ -244,7 +283,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
       // Recalculate tiles if using tiling and this was an app view
       if (viewInfo.viewType === "app" && this.tilingController.isEnabled()) {
-        this.tilingController.recalculateTiledViews(this.views);
+        const visibilityChanged = this.syncTiledLayout();
+        if (visibilityChanged) {
+          this.reorderViewLayers();
+        }
       }
     } catch (error) {
       const errorMessage =
@@ -367,12 +409,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     const viewInfo = requireView(viewId, this.views);
 
     try {
+      viewInfo.requestedVisible = true;
       viewInfo.visible = true;
 
       if (viewInfo.mode === "tiled") {
-        this.tilingController.applyTiledCapacity(this.views, viewId, (hideId) =>
-          this.hideView(hideId),
-        );
+        this.syncTiledLayout({ preferredViewId: viewId });
         this.reorderViewLayers();
       } else {
         viewInfo.zIndex = this.floatingWindows.getNextZIndex();
@@ -401,11 +442,18 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     const viewInfo = requireView(viewId, this.views);
 
     try {
+      viewInfo.requestedVisible = false;
       viewInfo.visible = false;
       viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
 
       if (viewInfo.mode === "tiled") {
-        this.tilingController.recalculateTiledViews(this.views);
+        const visibilityChanged = this.syncTiledLayout({
+          excludedViewId: viewId,
+        });
+        if (visibilityChanged) {
+          this.reorderViewLayers();
+        }
       }
     } catch (error) {
       const errorMessage =
@@ -552,7 +600,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         viewInfo.view.setBounds(floatingBounds);
 
         if (this.tilingController.isEnabled()) {
-          this.tilingController.recalculateTiledViews(this.views);
+          this.syncTiledLayout();
         }
 
         this.reorderViewLayers();
@@ -567,25 +615,12 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
           viewInfo.tileIndex = this.tilingController.getNextTileIndex(
             this.views.values(),
           );
-          const visibleCount = this.tilingController.getVisibleTiledCount(
-            this.views.values(),
-          );
-          const tileBounds = this.tilingController.calculateTileBounds(
-            viewInfo.tileIndex,
-            visibleCount,
-          );
-          viewInfo.bounds = tileBounds;
           viewInfo.mode = "tiled";
-          viewInfo.view.setBounds(tileBounds);
-          this.tilingController.applyTiledCapacity(
-            this.views,
-            viewId,
-            (hideId) => this.hideView(hideId),
-          );
+          this.syncTiledLayout({ preferredViewId: viewId });
           this.reorderViewLayers();
           this.notifySubscriber(viewId, "mode-changed", {
             mode: "tiled",
-            bounds: tileBounds,
+            bounds: viewInfo.bounds,
           });
         } else {
           const bounds = { ...this.tilingController.getWorkspaceBounds() };

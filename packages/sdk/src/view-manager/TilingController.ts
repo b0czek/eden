@@ -97,71 +97,121 @@ export class TilingController {
   }
 
   /**
-   * Determine which tiled app views should be hidden to respect capacity.
-   * Returns a list of view IDs to hide (oldest focus first).
+   * Resolve which tiled app views should change visibility to match the
+   * current capacity without needlessly swapping already visible views.
    */
-  enforceTiledCapacity(
+  resolveTiledVisibilityChanges(
     views: Map<number, ViewInfo>,
-    preferredViewId?: number,
-  ): number[] {
-    if (!this.isEnabled()) return [];
+    options: {
+      preferredViewId?: number;
+      excludedViewId?: number;
+    } = {},
+  ): { toHide: number[]; toShow: number[] } {
+    if (!this.isEnabled()) return { toHide: [], toShow: [] };
 
-    const capacity = this.getTiledCapacity();
-    if (capacity === undefined) return [];
+    const capacity = this.getTiledCapacity() ?? Number.POSITIVE_INFINITY;
 
-    const visibleTiledApps = Array.from(views.values()).filter(
+    const { preferredViewId, excludedViewId } = options;
+
+    const tiledApps = Array.from(views.values()).filter(
       (view) =>
-        view.viewType === "app" && view.mode === "tiled" && view.visible,
+        view.viewType === "app" &&
+        view.mode === "tiled" &&
+        view.id !== excludedViewId,
+    );
+    const requestedTiledApps = tiledApps.filter(
+      (view) => view.requestedVisible,
+    );
+    const visibleTiledApps = tiledApps.filter((view) => view.visible);
+    const hiddenRequestedTiledApps = requestedTiledApps.filter(
+      (view) => !view.visible,
     );
 
-    if (visibleTiledApps.length <= capacity) return [];
+    const desiredVisibleIds = new Set(
+      requestedTiledApps.filter((view) => view.visible).map((view) => view.id),
+    );
 
-    const candidates = visibleTiledApps
+    const removalCandidates = visibleTiledApps
       .filter((view) => view.id !== preferredViewId)
-      .sort((a, b) => (a.lastFocusedAt ?? 0) - (b.lastFocusedAt ?? 0));
+      .sort((a, b) => {
+        const focusDelta = (a.lastFocusedAt ?? 0) - (b.lastFocusedAt ?? 0);
+        if (focusDelta !== 0) return focusDelta;
 
-    let remaining = visibleTiledApps.length;
-    const toHide: number[] = [];
+        const tileDelta =
+          (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.tileIndex ?? Number.MAX_SAFE_INTEGER);
+        if (tileDelta !== 0) return tileDelta;
 
-    for (const candidate of candidates) {
-      if (remaining <= capacity) break;
-      toHide.push(candidate.id);
-      remaining -= 1;
-    }
+        return a.id - b.id;
+      });
 
-    if (remaining > capacity && preferredViewId !== undefined) {
-      const preferred = views.get(preferredViewId);
-      if (
-        preferred?.visible &&
-        preferred.mode === "tiled" &&
-        preferred.viewType === "app"
-      ) {
-        toHide.push(preferredViewId);
+    const popOldestVisible = (): boolean => {
+      for (const candidate of removalCandidates) {
+        if (!desiredVisibleIds.has(candidate.id)) {
+          continue;
+        }
+        desiredVisibleIds.delete(candidate.id);
+        return true;
+      }
+      return false;
+    };
+
+    const preferredView =
+      preferredViewId !== undefined ? views.get(preferredViewId) : undefined;
+    const preferredIsTiledApp =
+      preferredView?.viewType === "app" &&
+      preferredView.mode === "tiled" &&
+      preferredView.requestedVisible &&
+      preferredView.id !== excludedViewId;
+    const preferredAlreadyVisible =
+      preferredViewId !== undefined && desiredVisibleIds.has(preferredViewId);
+
+    if (
+      preferredViewId !== undefined &&
+      preferredIsTiledApp &&
+      !preferredAlreadyVisible
+    ) {
+      while (desiredVisibleIds.size >= capacity && popOldestVisible()) {
+        // Make room for the preferred tiled view before adding it back.
+      }
+      if (desiredVisibleIds.size < capacity) {
+        desiredVisibleIds.add(preferredViewId);
       }
     }
 
-    return toHide;
-  }
-
-  /**
-   * Apply capacity rules and recalculate tiles when no views were hidden.
-   * Returns true if any views were hidden.
-   */
-  applyTiledCapacity(
-    views: Map<number, ViewInfo>,
-    preferredViewId: number | undefined,
-    hideView: (viewId: number) => void,
-  ): boolean {
-    const toHide = this.enforceTiledCapacity(views, preferredViewId);
-    if (toHide.length > 0) {
-      for (const viewId of toHide) {
-        hideView(viewId);
-      }
-      return true;
+    while (desiredVisibleIds.size > capacity && popOldestVisible()) {
+      // Trim overflow without disturbing the preferred view when possible.
     }
 
-    this.recalculateTiledViews(views);
-    return false;
+    const additionCandidates = hiddenRequestedTiledApps
+      .filter((view) => view.id !== preferredViewId)
+      .sort((a, b) => {
+        const focusDelta = (b.lastFocusedAt ?? 0) - (a.lastFocusedAt ?? 0);
+        if (focusDelta !== 0) return focusDelta;
+
+        const tileDelta =
+          (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.tileIndex ?? Number.MAX_SAFE_INTEGER);
+        if (tileDelta !== 0) return tileDelta;
+
+        return a.id - b.id;
+      });
+
+    for (const candidate of additionCandidates) {
+      if (desiredVisibleIds.size >= capacity) {
+        break;
+      }
+      desiredVisibleIds.add(candidate.id);
+    }
+
+    return {
+      toHide: visibleTiledApps
+        .filter((view) => !desiredVisibleIds.has(view.id))
+        .map((view) => view.id),
+      toShow: hiddenRequestedTiledApps
+        .filter((view) => desiredVisibleIds.has(view.id))
+        .map((view) => view.id),
+    };
   }
 
   /**
