@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/solid-kit",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "High-level SolidJS UI primitives for Eden apps",
   "type": "module",
   "main": "src/index.ts",

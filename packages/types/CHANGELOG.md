@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.7.0
+
+### Minor Changes
+
+- fileopen using mimetypes, open with, smart layout grid
+
 ## 0.6.5
 
 ## 0.6.4
