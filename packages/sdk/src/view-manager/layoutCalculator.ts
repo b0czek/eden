@@ -194,8 +194,11 @@ function getSmartGridDimensions(params: {
   const { available, visibleCount, gap, minTileWidth, minTileHeight } = params;
 
   let bestFeasible: GridDimensions | null = null;
+  let bestFeasibleEmptyCells = Number.POSITIVE_INFINITY;
+  let bestFeasibleAspectScore = Number.POSITIVE_INFINITY;
   let bestFallback: GridDimensions = { rows: visibleCount, columns: 1 };
   let bestFallbackScore = Number.NEGATIVE_INFINITY;
+  const targetAspectRatio = getTargetAspectRatio(minTileWidth, minTileHeight);
 
   for (let columns = 1; columns <= visibleCount; columns += 1) {
     const rows = Math.ceil(visibleCount / columns);
@@ -208,7 +211,20 @@ function getSmartGridDimensions(params: {
       minTileHeight > 0 ? tileHeight / minTileHeight : Number.POSITIVE_INFINITY;
 
     if (widthRatio >= 1 && heightRatio >= 1) {
-      bestFeasible = { rows, columns };
+      const emptyCells = rows * columns - visibleCount;
+      const aspectScore = Math.abs(
+        Math.log(tileWidth / tileHeight / targetAspectRatio),
+      );
+
+      if (
+        emptyCells < bestFeasibleEmptyCells ||
+        (emptyCells === bestFeasibleEmptyCells &&
+          aspectScore < bestFeasibleAspectScore)
+      ) {
+        bestFeasible = { rows, columns };
+        bestFeasibleEmptyCells = emptyCells;
+        bestFeasibleAspectScore = aspectScore;
+      }
       continue;
     }
 

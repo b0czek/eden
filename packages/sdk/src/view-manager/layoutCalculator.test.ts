@@ -185,6 +185,29 @@ describe("calculateTileBounds", () => {
     });
   });
 
+  it("prefers a filled 2x2 smart grid over a sparse 3x2 layout", () => {
+    const workspace = { x: 0, y: 0, width: 2368, height: 1000 };
+    const bounds = calculateTileBounds({
+      workspace,
+      tileIndex: 3,
+      visibleCount: 4,
+      config: {
+        mode: "smart",
+        minTileWidth: 600,
+        minTileHeight: 400,
+        gap: 0,
+        padding: 0,
+      },
+    });
+
+    expect(bounds).toEqual({
+      x: 1184,
+      y: 500,
+      width: 1184,
+      height: 500,
+    });
+  });
+
   it("limits smart tiling capacity to one when two apps cannot meet minimum size", () => {
     const workspace = { x: 0, y: 0, width: 760, height: 900 };
 
