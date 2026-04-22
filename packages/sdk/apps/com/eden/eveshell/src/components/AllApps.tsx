@@ -37,21 +37,6 @@ export default function AllApps(props: AllAppsProps) {
   async function handleTileClick(appId: string) {
     handleClose();
 
-    // Show all running apps when clicking a tile
-    const runningAppIds = props.apps
-      .filter((app) => app.isRunning)
-      .map((app) => app.id);
-    for (const runningAppId of runningAppIds) {
-      try {
-        await window.edenAPI.shellCommand("view/set-view-visibility", {
-          appId: runningAppId,
-          visible: true,
-        });
-      } catch (error) {
-        console.error(`Failed to set visibility for ${runningAppId}:`, error);
-      }
-    }
-
     await props.onAppClick(appId);
   }
 
