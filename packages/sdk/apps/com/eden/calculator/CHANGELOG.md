@@ -1,5 +1,11 @@
 # com.eden.example.calculator
 
+## 2.1.6
+
+### Patch Changes
+
+- @edenapp/babel@0.7.1
+
 ## 2.1.5
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.7.1
+
+### Patch Changes
+
+- add default window mdoe
+
 ## 0.7.0
 
 ### Minor Changes
