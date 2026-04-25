@@ -181,4 +181,49 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
       toShow: [3],
     });
   });
+
+  describe("TilingController.determineViewMode", () => {
+    it("uses defaultMode when an app supports both modes", () => {
+      const controller = new TilingController({
+        mode: "grid",
+        rows: 1,
+        columns: 1,
+        gap: 0,
+        padding: 0,
+      });
+
+      expect(
+        controller.determineViewMode({
+          mode: "both",
+          defaultMode: "floating",
+        }),
+      ).toBe("floating");
+    });
+
+    it("falls back to tiling state when defaultMode is not set", () => {
+      const tiledController = new TilingController({
+        mode: "grid",
+        rows: 1,
+        columns: 1,
+        gap: 0,
+        padding: 0,
+      });
+      const floatingController = new TilingController({
+        mode: "none",
+        gap: 0,
+        padding: 0,
+      });
+
+      expect(
+        tiledController.determineViewMode({
+          mode: "both",
+        }),
+      ).toBe("tiled");
+      expect(
+        floatingController.determineViewMode({
+          mode: "both",
+        }),
+      ).toBe("floating");
+    });
+  });
 });

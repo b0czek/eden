@@ -59,6 +59,13 @@ export class TilingController {
     return this.config.mode !== "none";
   }
 
+  private normalizeCount(value: number | undefined, fallback: number): number {
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      return fallback;
+    }
+    return Math.max(1, Math.floor(value));
+  }
+
   /**
    * Get the maximum number of visible tiled views allowed by configuration.
    * Returns undefined when capacity is unlimited for the current mode.
@@ -68,28 +75,21 @@ export class TilingController {
 
     const { mode, columns, rows } = this.config;
 
-    const normalizeCount = (value: number | undefined, fallback: number) => {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return fallback;
-      }
-      return Math.max(1, Math.floor(value));
-    };
-
     switch (mode) {
       case "grid": {
-        const safeColumns = normalizeCount(columns, 2);
-        const safeRows = normalizeCount(rows, 2);
+        const safeColumns = this.normalizeCount(columns, 2);
+        const safeRows = this.normalizeCount(rows, 2);
         return safeColumns * safeRows;
       }
       case "smart":
         return getSmartTilingCapacity(this.workspaceBounds, this.config);
       case "horizontal": {
         if (columns === undefined) return undefined;
-        return normalizeCount(columns, 1);
+        return this.normalizeCount(columns, 1);
       }
       case "vertical": {
         if (rows === undefined) return undefined;
-        return normalizeCount(rows, 1);
+        return this.normalizeCount(rows, 1);
       }
       default:
         return undefined;
@@ -282,7 +282,9 @@ export class TilingController {
   /**
    * Determine view mode based on manifest window config and tiling state
    */
-  determineViewMode(windowMode?: "floating" | "tiled" | "both"): ViewMode {
+  determineViewMode(windowConfig?: WindowConfig): ViewMode {
+    const windowMode = windowConfig?.mode;
+
     // If no window config mode specified
     if (!windowMode) {
       return this.isEnabled() ? "tiled" : "floating";
@@ -295,6 +297,10 @@ export class TilingController {
       case "tiled":
         return "tiled";
       case "both":
+        if (windowConfig.defaultMode) {
+          return windowConfig.defaultMode;
+        }
+
         // If app supports both, prefer tiled if tiling is enabled
         return this.isEnabled() ? "tiled" : "floating";
       default:

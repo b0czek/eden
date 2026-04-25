@@ -257,7 +257,7 @@ export class ViewCreator {
     // Determine view mode
     const viewMode: ViewMode = isOverlay
       ? "floating"
-      : this.tilingController.determineViewMode(windowConfig?.mode);
+      : this.tilingController.determineViewMode(windowConfig);
 
     // Calculate bounds and Z-index based on view type and mode
     const { viewBounds, tileIndex, zIndex } = this.calculateViewBounds(
