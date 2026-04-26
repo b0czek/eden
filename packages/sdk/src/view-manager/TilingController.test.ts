@@ -9,12 +9,23 @@ function createTiledView(
     tileIndex: number;
     lastFocusedAt?: number;
     requestedVisible?: boolean;
+    minSize?: { width: number; height: number };
+    maxSize?: { width: number; height: number };
   },
 ): ViewInfo {
   return {
     id,
     appId: `app-${id}`,
-    manifest: {} as AppManifest,
+    manifest: {
+      window:
+        options.minSize || options.maxSize
+          ? {
+              mode: "tiled",
+              minSize: options.minSize,
+              maxSize: options.maxSize,
+            }
+          : undefined,
+    } as AppManifest,
     bounds: { x: 0, y: 0, width: 100, height: 100 },
     requestedVisible: options.requestedVisible ?? options.visible,
     visible: options.visible,
@@ -22,7 +33,12 @@ function createTiledView(
     viewType: "app",
     tileIndex: options.tileIndex,
     lastFocusedAt: options.lastFocusedAt,
-    view: {} as ViewInfo["view"],
+    view: {
+      webContents: {
+        isDestroyed: () => false,
+      },
+      setBounds: jest.fn(),
+    } as unknown as ViewInfo["view"],
   };
 }
 
@@ -182,48 +198,198 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
     });
   });
 
-  describe("TilingController.determineViewMode", () => {
-    it("uses defaultMode when an app supports both modes", () => {
-      const controller = new TilingController({
+  it("respects per-app minSize in grid mode", () => {
+    const controller = new TilingController(
+      {
         mode: "grid",
         rows: 1,
-        columns: 1,
+        columns: 2,
         gap: 0,
         padding: 0,
-      });
-
-      expect(
-        controller.determineViewMode({
-          mode: "both",
-          defaultMode: "floating",
+      },
+      { x: 0, y: 0, width: 800, height: 600 },
+    );
+    const views = new Map<number, ViewInfo>([
+      [
+        1,
+        createTiledView(1, {
+          visible: true,
+          tileIndex: 0,
+          lastFocusedAt: 10,
+          minSize: { width: 600, height: 400 },
         }),
-      ).toBe("floating");
+      ],
+      [
+        2,
+        createTiledView(2, {
+          visible: false,
+          tileIndex: 1,
+          lastFocusedAt: 20,
+          requestedVisible: true,
+        }),
+      ],
+    ]);
+
+    expect(
+      controller.resolveTiledVisibilityChanges(views, { preferredViewId: 2 }),
+    ).toEqual({
+      toHide: [1],
+      toShow: [2],
+    });
+  });
+
+  it("respects per-app minSize in horizontal mode", () => {
+    const controller = new TilingController(
+      {
+        mode: "horizontal",
+        columns: 2,
+        gap: 0,
+        padding: 0,
+      },
+      { x: 0, y: 0, width: 800, height: 600 },
+    );
+    const views = new Map<number, ViewInfo>([
+      [
+        1,
+        createTiledView(1, {
+          visible: true,
+          tileIndex: 0,
+          lastFocusedAt: 10,
+          minSize: { width: 600, height: 400 },
+        }),
+      ],
+      [
+        2,
+        createTiledView(2, {
+          visible: false,
+          tileIndex: 1,
+          lastFocusedAt: 20,
+          requestedVisible: true,
+        }),
+      ],
+    ]);
+
+    expect(
+      controller.resolveTiledVisibilityChanges(views, { preferredViewId: 2 }),
+    ).toEqual({
+      toHide: [1],
+      toShow: [2],
+    });
+  });
+
+  it("drops smart layout to a single visible app when another split would violate minSize", () => {
+    const controller = new TilingController(
+      {
+        mode: "smart",
+        minTileWidth: 300,
+        minTileHeight: 250,
+        gap: 10,
+        padding: 0,
+      },
+      { x: 0, y: 0, width: 1200, height: 800 },
+    );
+    const views = new Map<number, ViewInfo>([
+      [
+        1,
+        createTiledView(1, {
+          visible: true,
+          tileIndex: 0,
+          lastFocusedAt: 10,
+          minSize: { width: 1000, height: 700 },
+        }),
+      ],
+      [
+        2,
+        createTiledView(2, {
+          visible: false,
+          tileIndex: 1,
+          lastFocusedAt: 20,
+          requestedVisible: true,
+        }),
+      ],
+    ]);
+
+    expect(
+      controller.resolveTiledVisibilityChanges(views, { preferredViewId: 2 }),
+    ).toEqual({
+      toHide: [1],
+      toShow: [2],
+    });
+  });
+});
+
+describe("TilingController.determineViewMode", () => {
+  it("uses defaultMode when an app supports both modes", () => {
+    const controller = new TilingController({
+      mode: "grid",
+      rows: 1,
+      columns: 1,
+      gap: 0,
+      padding: 0,
     });
 
-    it("falls back to tiling state when defaultMode is not set", () => {
-      const tiledController = new TilingController({
-        mode: "grid",
-        rows: 1,
-        columns: 1,
-        gap: 0,
-        padding: 0,
-      });
-      const floatingController = new TilingController({
-        mode: "none",
-        gap: 0,
-        padding: 0,
-      });
+    expect(
+      controller.determineViewMode({
+        mode: "both",
+        defaultMode: "floating",
+      }),
+    ).toBe("floating");
+  });
 
-      expect(
-        tiledController.determineViewMode({
-          mode: "both",
-        }),
-      ).toBe("tiled");
-      expect(
-        floatingController.determineViewMode({
-          mode: "both",
-        }),
-      ).toBe("floating");
+  it("falls back to tiling state when defaultMode is not set", () => {
+    const tiledController = new TilingController({
+      mode: "grid",
+      rows: 1,
+      columns: 1,
+      gap: 0,
+      padding: 0,
     });
+    const floatingController = new TilingController({
+      mode: "none",
+      gap: 0,
+      padding: 0,
+    });
+
+    expect(
+      tiledController.determineViewMode({
+        mode: "both",
+      }),
+    ).toBe("tiled");
+    expect(
+      floatingController.determineViewMode({
+        mode: "both",
+      }),
+    ).toBe("floating");
+  });
+});
+
+describe("TilingController.recalculateTiledViews", () => {
+  it("centers tiled apps within their cell when maxSize is smaller than the tile", () => {
+    const controller = new TilingController(
+      {
+        mode: "smart",
+        minTileWidth: 300,
+        minTileHeight: 250,
+        gap: 0,
+        padding: 0,
+      },
+      { x: 0, y: 0, width: 1200, height: 800 },
+    );
+    const view = createTiledView(1, {
+      visible: true,
+      tileIndex: 0,
+      maxSize: { width: 600, height: 400 },
+    });
+    const views = new Map<number, ViewInfo>([[1, view]]);
+
+    controller.recalculateTiledViews(views);
+
+    expect(view.bounds).toEqual({
+      x: 300,
+      y: 200,
+      width: 600,
+      height: 400,
+    });
+    expect(view.view.setBounds).toHaveBeenCalledWith(view.bounds);
   });
 });
