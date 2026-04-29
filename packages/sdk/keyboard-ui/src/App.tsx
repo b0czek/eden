@@ -16,11 +16,11 @@ const buildTextRows = (
   showNumberRow: boolean,
 ): { default: string[]; shift: string[] } => {
   const defaultRows = showNumberRow
-    ? ["1 2 3 4 5 6 7 8 9 0 {bksp} {close}"]
-    : ["q w e r t y u i o p {bksp} {close}"];
+    ? ["1 2 3 4 5 6 7 8 9 0"]
+    : ["q w e r t y u i o p"];
   const shiftRows = showNumberRow
-    ? ["! @ # $ % ^ & * ( ) {bksp} {close}"]
-    : ["Q W E R T Y U I O P {bksp} {close}"];
+    ? ["! @ # $ % ^ & * ( )"]
+    : ["Q W E R T Y U I O P"];
 
   if (showNumberRow) {
     defaultRows.push("q w e r t y u i o p");
@@ -31,15 +31,15 @@ const buildTextRows = (
     return {
       default: [
         ...defaultRows,
-        "a s d f g h j k l @ {enter}",
-        "{shift} z x c v b n m . _ -",
-        "{space}",
+        "a s d f g h j k l @",
+        "{shift} z x c v b n m _ - {bksp}",
+        ". {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
-        "A S D F G H J K L @ {enter}",
-        "{shift} Z X C V B N M . _ -",
-        "{space}",
+        "A S D F G H J K L @",
+        "{shift} Z X C V B N M _ - {bksp}",
+        ". {space} , {enter}",
       ],
     };
   }
@@ -48,15 +48,15 @@ const buildTextRows = (
     return {
       default: [
         ...defaultRows,
-        "a s d f g h j k l / {enter}",
-        "{shift} z x c v b n m . - /",
-        "{space}",
+        "a s d f g h j k l /",
+        "{shift} z x c v b n m - / {bksp}",
+        ". {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
-        "A S D F G H J K L / {enter}",
-        "{shift} Z X C V B N M . - /",
-        "{space}",
+        "A S D F G H J K L /",
+        "{shift} Z X C V B N M - / {bksp}",
+        ". {space} , {enter}",
       ],
     };
   }
@@ -64,15 +64,15 @@ const buildTextRows = (
   return {
     default: [
       ...defaultRows,
-      "a s d f g h j k l {enter}",
-      "{shift} z x c v b n m , .",
-      "{space}",
+      "a s d f g h j k l",
+      "{shift} z x c v b n m {bksp}",
+      ", {space} . {enter}",
     ],
     shift: [
       ...shiftRows,
-      "A S D F G H J K L {enter}",
-      "{shift} Z X C V B N M < >",
-      "{space}",
+      "A S D F G H J K L",
+      "{shift} Z X C V B N M {bksp}",
+      "< {space} > {enter}",
     ],
   };
 };
@@ -234,7 +234,11 @@ export default function App() {
   });
 
   return (
-    <div class="keyboard-shell" data-placement={keyboardState().placementMode}>
+    <div
+      class="keyboard-shell"
+      data-layout={keyboardState().layout}
+      data-placement={keyboardState().placementMode}
+    >
       <div class="keyboard-drag-handle" role="presentation" aria-hidden="true">
         drag
       </div>
