@@ -98,39 +98,40 @@ const buildLayout = (
   return buildTextRows(layout, showNumberRow);
 };
 
-const getEnterLabel = (state: EdenKeyboardState): string => {
-  const enterKeyHint = state.target?.enterKeyHint;
-  if (enterKeyHint) {
-    return enterKeyHint.charAt(0).toUpperCase() + enterKeyHint.slice(1);
-  }
+type ShiftState = "default" | "shift" | "caps";
 
-  if (state.layout === "url") {
-    return "Go";
-  }
+const SHIFT_ICON =
+  "<svg class='keyboard-shift-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M14 3 25 14.2h-6v10.8H9V14.2H3L14 3Z'/></svg>";
 
-  if (state.target?.inputType === "search") {
-    return "Search";
-  }
-
-  return state.target?.multiline ? "Return" : "Enter";
-};
-
-const getDisplay = (state: EdenKeyboardState) => ({
-  "{bksp}": "Bksp",
-  "{close}": "Hide",
-  "{enter}": getEnterLabel(state),
-  "{shift}": "Shift",
-  "{space}": "Space",
+const getDisplay = () => ({
+  "{bksp}": "⌫",
+  "{close}": "×",
+  "{enter}": "↵",
+  "{shift}": SHIFT_ICON,
+  "{space}": "␣",
 });
+
+const getLayoutName = (shiftState: ShiftState): "default" | "shift" =>
+  shiftState === "default" ? "default" : "shift";
+
+const getButtonTheme = (shiftState: ShiftState) => {
+  if (shiftState === "caps") {
+    return [{ class: "hg-button-locked", buttons: "{shift}" }];
+  }
+
+  if (shiftState === "shift") {
+    return [{ class: "hg-button-active", buttons: "{shift}" }];
+  }
+
+  return [];
+};
 
 const supportsShift = (layout: EdenKeyboardLayout): boolean =>
   layout !== "number" && layout !== "tel";
 
 export default function App() {
   let keyboard: Keyboard | undefined;
-  const [layoutName, setLayoutName] = createSignal<"default" | "shift">(
-    "default",
-  );
+  const [shiftState, setShiftState] = createSignal<ShiftState>("default");
   const [keyboardState, setKeyboardState] = createSignal<EdenKeyboardState>(
     DEFAULT_KEYBOARD_STATE,
   );
@@ -140,7 +141,17 @@ export default function App() {
       return;
     }
 
-    setLayoutName(layoutName() === "default" ? "shift" : "default");
+    setShiftState((current) => {
+      if (current === "default") {
+        return "shift";
+      }
+
+      if (current === "shift") {
+        return "caps";
+      }
+
+      return "default";
+    });
   };
 
   const sendText = async (text: string) => {
@@ -169,8 +180,8 @@ export default function App() {
         return;
       default:
         await sendText(button);
-        if (layoutName() === "shift" && supportsShift(keyboardState().layout)) {
-          setLayoutName("default");
+        if (shiftState() === "shift" && supportsShift(keyboardState().layout)) {
+          setShiftState("default");
         }
     }
   };
@@ -181,8 +192,9 @@ export default function App() {
         keyboardState().layout,
         keyboardState().showNumberRow,
       ),
-      layoutName: layoutName(),
-      display: getDisplay(keyboardState()),
+      layoutName: getLayoutName(shiftState()),
+      display: getDisplay(),
+      buttonTheme: getButtonTheme(shiftState()),
       theme: "hg-theme-default eden-osk-theme",
       physicalKeyboardHighlight: false,
       useButtonTag: true,
@@ -194,7 +206,7 @@ export default function App() {
     const unsubscribe = window.edenKeyboard.onStateChanged?.((state) => {
       setKeyboardState(state);
       if (!supportsShift(state.layout)) {
-        setLayoutName("default");
+        setShiftState("default");
       }
     });
 
@@ -209,14 +221,15 @@ export default function App() {
 
   createEffect(() => {
     const state = keyboardState();
-    const nextLayoutName = supportsShift(state.layout)
-      ? layoutName()
+    const nextShiftState = supportsShift(state.layout)
+      ? shiftState()
       : "default";
 
     keyboard?.setOptions({
       layout: buildLayout(state.layout, state.showNumberRow),
-      layoutName: nextLayoutName,
-      display: getDisplay(state),
+      layoutName: getLayoutName(nextShiftState),
+      display: getDisplay(),
+      buttonTheme: getButtonTheme(nextShiftState),
     });
   });
 

@@ -263,6 +263,10 @@ importers:
         version: 2.11.10(solid-js@1.9.10)(vite@7.2.6(@types/node@24.10.10)(yaml@2.8.2))
 
   packages/sdk/apps/com/eden/eveshell:
+    dependencies:
+      solid-icons:
+        specifier: ^1.1.0
+        version: 1.1.0(solid-js@1.9.10)
     devDependencies:
       '@edenapp/babel':
         specifier: workspace:*
