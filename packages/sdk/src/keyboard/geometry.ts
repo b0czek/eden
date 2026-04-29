@@ -8,8 +8,50 @@ import type {
 const KEYBOARD_TOP_MARGIN = 16;
 const KEYBOARD_BOTTOM_MARGIN = 16;
 const DOCKED_HORIZONTAL_MARGIN = 16;
-const DOCKED_MIN_WIDTH = 420;
-const DOCKED_MAX_WIDTH_PER_HEIGHT = 3.4;
+const KEYBOARD_DESIRED_WIDTH = 960;
+const KEYBOARD_MIN_WIDTH = 420;
+const KEYBOARD_ROW_HEIGHT = 48;
+const KEYBOARD_ROW_GAP = 6;
+const KEYBOARD_VERTICAL_PADDING = 20;
+const FLOATING_HANDLE_HEIGHT = 30;
+const FLOATING_HANDLE_GAP = 8;
+
+export type KeyboardGeometryOptions = {
+  rowCount: number;
+  scale: number;
+};
+
+const clampScale = (scale: number): number => {
+  if (!Number.isFinite(scale)) {
+    return 1;
+  }
+
+  return Math.max(0.5, Math.min(scale, 2));
+};
+
+const calculateKeyboardSize = (
+  availableWidth: number,
+  { rowCount, scale }: KeyboardGeometryOptions,
+  extraHeight = 0,
+): Pick<ViewBounds, "width" | "height"> => {
+  const boundedScale = clampScale(scale);
+  const safeRowCount = Math.max(1, rowCount);
+  const desiredWidth = Math.round(KEYBOARD_DESIRED_WIDTH * boundedScale);
+  const minWidth = Math.round(KEYBOARD_MIN_WIDTH * boundedScale);
+  const width = Math.max(
+    Math.min(minWidth, availableWidth),
+    Math.min(availableWidth, desiredWidth),
+  );
+  const height = Math.round(
+    (safeRowCount * KEYBOARD_ROW_HEIGHT +
+      (safeRowCount - 1) * KEYBOARD_ROW_GAP +
+      KEYBOARD_VERTICAL_PADDING +
+      extraHeight) *
+      boundedScale,
+  );
+
+  return { width, height };
+};
 
 export const resolveWorkspaceBounds = (
   contentBounds: ViewBounds,
@@ -28,20 +70,13 @@ export const resolveWorkspaceBounds = (
 export const calculateDockedKeyboardBounds = (
   contentBounds: ViewBounds,
   _workspaceBounds: ViewBounds | null,
+  options: KeyboardGeometryOptions,
 ): ViewBounds => {
-  const height = Math.max(
-    220,
-    Math.min(Math.round(contentBounds.height * 0.36), 320),
-  );
-  const maxAvailableWidth = Math.max(
-    DOCKED_MIN_WIDTH,
+  const availableWidth = Math.max(
+    1,
     contentBounds.width - DOCKED_HORIZONTAL_MARGIN * 2,
   );
-  const proportionalWidth = Math.round(height * DOCKED_MAX_WIDTH_PER_HEIGHT);
-  const width = Math.min(
-    maxAvailableWidth,
-    Math.max(DOCKED_MIN_WIDTH, proportionalWidth),
-  );
+  const { width, height } = calculateKeyboardSize(availableWidth, options);
   const x = contentBounds.x + Math.round((contentBounds.width - width) / 2);
   const y = contentBounds.y + contentBounds.height - height;
 
@@ -51,10 +86,15 @@ export const calculateDockedKeyboardBounds = (
 export const calculateDefaultFloatingKeyboardBounds = (
   contentBounds: ViewBounds,
   workspaceBounds: ViewBounds | null,
+  options: KeyboardGeometryOptions,
 ): ViewBounds => {
   const bounds = resolveWorkspaceBounds(contentBounds, workspaceBounds);
-  const width = Math.max(420, Math.min(bounds.width - 24, 1080));
-  const height = Math.max(220, Math.min(Math.round(bounds.height * 0.32), 280));
+  const availableWidth = Math.max(1, bounds.width - 24);
+  const { width, height } = calculateKeyboardSize(
+    availableWidth,
+    options,
+    FLOATING_HANDLE_HEIGHT + FLOATING_HANDLE_GAP,
+  );
   const x = contentBounds.x + bounds.x + Math.round((bounds.width - width) / 2);
   const y = contentBounds.y + bounds.y + bounds.height - height - 12;
 

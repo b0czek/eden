@@ -34,9 +34,11 @@ const CHANNEL_GET_STATE = "eden-keyboard:get-state";
 const SETTING_ENABLED = "keyboard.enabled";
 const SETTING_PLACEMENT_MODE = "keyboard.placementMode";
 const SETTING_SHOW_NUMBER_ROW = "keyboard.showNumberRow";
+const SETTING_INTERFACE_SCALE = "general.interfaceScale";
 const DEFAULT_ENABLED = true;
 const DEFAULT_PLACEMENT_MODE: EdenKeyboardPlacementMode = "docked";
 const DEFAULT_SHOW_NUMBER_ROW = true;
+const DEFAULT_INTERFACE_SCALE = 1;
 
 type KeyboardTargetSession = {
   appId: string;
@@ -62,6 +64,7 @@ export class KeyboardManager {
   private enabled = DEFAULT_ENABLED;
   private placementMode: EdenKeyboardPlacementMode = DEFAULT_PLACEMENT_MODE;
   private showNumberRow = DEFAULT_SHOW_NUMBER_ROW;
+  private interfaceScale = DEFAULT_INTERFACE_SCALE;
   private readonly keyboardFrontendPath = path.join(
     __dirname,
     "../keyboard-ui/index.html",
@@ -137,7 +140,19 @@ export class KeyboardManager {
 
         if (data.key === SETTING_SHOW_NUMBER_ROW) {
           this.showNumberRow = data.value !== "false";
-          this.notifyKeyboardStateChanged();
+          void this.refreshKeyboardPresentation();
+          return;
+        }
+
+        if (data.key === SETTING_INTERFACE_SCALE) {
+          const nextScale = this.parseInterfaceScale(data.value);
+          if (nextScale === this.interfaceScale) {
+            return;
+          }
+
+          this.interfaceScale = nextScale;
+          this.applyKeyboardWindowScale();
+          void this.refreshKeyboardPresentation();
           return;
         }
 
@@ -379,6 +394,7 @@ export class KeyboardManager {
     keyboardWindow.setVisibleOnAllWorkspaces(true, {
       visibleOnFullScreen: true,
     });
+    keyboardWindow.webContents.setZoomFactor(this.interfaceScale);
     keyboardWindow.setMovable(this.placementMode === "floating");
     keyboardWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     keyboardWindow.webContents.on("did-finish-load", () => {
@@ -424,7 +440,11 @@ export class KeyboardManager {
       width: 1280,
       height: 800,
     };
-    return calculateDockedKeyboardBounds(contentBounds, this.workspaceBounds);
+    return calculateDockedKeyboardBounds(
+      contentBounds,
+      this.workspaceBounds,
+      this.getKeyboardGeometryOptions(),
+    );
   }
 
   private calculateDefaultFloatingKeyboardBounds(): ViewBounds {
@@ -437,6 +457,7 @@ export class KeyboardManager {
     return calculateDefaultFloatingKeyboardBounds(
       contentBounds,
       this.workspaceBounds,
+      this.getKeyboardGeometryOptions(),
     );
   }
 
@@ -445,7 +466,16 @@ export class KeyboardManager {
       return this.calculateDockedKeyboardBounds();
     }
 
-    return this.floatingBounds ?? this.calculateDefaultFloatingKeyboardBounds();
+    const defaultBounds = this.calculateDefaultFloatingKeyboardBounds();
+    if (!this.floatingBounds) {
+      return defaultBounds;
+    }
+
+    return {
+      ...this.floatingBounds,
+      width: defaultBounds.width,
+      height: defaultBounds.height,
+    };
   }
 
   private getKeyboardInsetState(): EdenKeyboardInsetState {
@@ -463,6 +493,30 @@ export class KeyboardManager {
 
   private getKeyboardLayout(target?: EdenKeyboardTarget): EdenKeyboardLayout {
     return calculateKeyboardLayout(target);
+  }
+
+  private getKeyboardRowCount(): number {
+    const layout = this.getKeyboardLayout(this.currentTarget?.target);
+    if (layout === "number" || layout === "tel") {
+      return 4;
+    }
+
+    return this.showNumberRow ? 5 : 4;
+  }
+
+  private getKeyboardGeometryOptions(): { rowCount: number; scale: number } {
+    return {
+      rowCount: this.getKeyboardRowCount(),
+      scale: this.interfaceScale,
+    };
+  }
+
+  private applyKeyboardWindowScale(): void {
+    if (!this.keyboardWindow || this.keyboardWindow.isDestroyed()) {
+      return;
+    }
+
+    this.keyboardWindow.webContents.setZoomFactor(this.interfaceScale);
   }
 
   private getKeyboardState(): EdenKeyboardState {
@@ -601,15 +655,28 @@ export class KeyboardManager {
 
   private async initializeSettings(): Promise<void> {
     try {
-      const [enabled, placementMode, showNumberRow] = await Promise.all([
-        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_ENABLED),
-        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_PLACEMENT_MODE),
-        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_SHOW_NUMBER_ROW),
-      ]);
+      const [enabled, placementMode, showNumberRow, interfaceScale] =
+        await Promise.all([
+          this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_ENABLED),
+          this.settingsManager.get(
+            EDEN_SETTINGS_APP_ID,
+            SETTING_PLACEMENT_MODE,
+          ),
+          this.settingsManager.get(
+            EDEN_SETTINGS_APP_ID,
+            SETTING_SHOW_NUMBER_ROW,
+          ),
+          this.settingsManager.get(
+            EDEN_SETTINGS_APP_ID,
+            SETTING_INTERFACE_SCALE,
+          ),
+        ]);
 
       this.enabled = enabled !== "false";
       this.placementMode = this.parsePlacementMode(placementMode);
       this.showNumberRow = showNumberRow !== "false";
+      this.interfaceScale = this.parseInterfaceScale(interfaceScale);
+      this.applyKeyboardWindowScale();
       await this.refreshKeyboardPresentation();
     } catch (error) {
       log.error("Failed to initialize keyboard settings:", error);
@@ -620,5 +687,14 @@ export class KeyboardManager {
     value: string | undefined,
   ): EdenKeyboardPlacementMode {
     return value === "floating" ? "floating" : DEFAULT_PLACEMENT_MODE;
+  }
+
+  private parseInterfaceScale(value: string | undefined): number {
+    const scale = Number.parseFloat(value ?? "");
+    if (!Number.isFinite(scale)) {
+      return DEFAULT_INTERFACE_SCALE;
+    }
+
+    return Math.max(0.5, Math.min(scale, 2));
   }
 }
