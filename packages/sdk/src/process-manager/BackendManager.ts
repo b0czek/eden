@@ -185,7 +185,7 @@ export class BackendManager extends EventEmitter {
     }
 
     try {
-      log.info(
+      log.debug(
         `Sending message to backend ${appId}:`,
         this.getMessageType(message) ?? "unknown",
       );
