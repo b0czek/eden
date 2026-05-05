@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.7.3
+
+### Patch Changes
+
+- Pipe app backend stdout and stderr into Eden's main console output.
+  - @edenapp/types@0.7.3
+  - @edenapp/genesis@0.7.3
+
 ## 0.7.2
 
 ### Patch Changes
