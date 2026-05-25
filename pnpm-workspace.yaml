@@ -3,6 +3,13 @@ packages:
   - genesis
   - packages/sdk/apps/**/*
 
+allowBuilds:
+  electron: true
+  esbuild: true
+  lightningcss-cli: true
+  simple-git-hooks: true
+  sqlite3: true
+
 onlyBuiltDependencies:
   - electron
   - esbuild
