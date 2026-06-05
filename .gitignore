@@ -25,6 +25,8 @@ npm-debug.log*
 
 # Eden runtime
 eden-apps/
+packages/sdk/.eden-dev/
+packages/sdk/.eden-hot-reload/
 *.edenite
 
 # TypeScript

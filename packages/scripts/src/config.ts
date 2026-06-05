@@ -50,6 +50,7 @@ export interface EdenBuildConfig {
   hotReload?: {
     enabled: boolean;
     debounce: number;
+    stateDirectory?: string;
   };
   /** Users to seed on first run */
   users?: EdenUserConfig[];
