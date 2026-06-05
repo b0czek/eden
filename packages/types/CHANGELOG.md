@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.8.0
+
+### Minor Changes
+
+- Release 0.8.0.
+
 ## 0.7.3
 
 ## 0.7.2
