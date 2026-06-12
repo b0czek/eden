@@ -12,6 +12,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { buildSeedConfig } from "./config";
+import { resolveConsumerPackageJson } from "./package-resolution";
 
 export interface CopyAssetsOptions {
   sdkPath?: string;
@@ -39,7 +40,7 @@ async function resolveSdkDistPath(sdkPath?: string): Promise<string> {
 
   // Try to resolve from node_modules
   try {
-    const sdkPackagePath = require.resolve("@edenapp/sdk/package.json");
+    const sdkPackagePath = resolveConsumerPackageJson("@edenapp/sdk");
     const sdkDir = path.dirname(sdkPackagePath);
     const distPath = path.join(sdkDir, "dist");
     try {
