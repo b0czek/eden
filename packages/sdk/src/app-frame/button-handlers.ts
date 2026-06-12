@@ -17,7 +17,6 @@ export async function minimizeAppFrameView(): Promise<void> {
 
 export async function toggleAppFrameViewMode(): Promise<void> {
   await window.edenAPI.shellCommand("view/toggle-mode", {});
-  log.info("View mode toggled");
 }
 
 /**

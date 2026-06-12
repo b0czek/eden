@@ -76,10 +76,6 @@ export function setupWindowResizing(
       const initialBounds = window.edenFrame?._internal.bounds;
       if (initialBounds && initialBounds.x !== undefined) {
         currentBoundsRef.current = { ...initialBounds };
-        log.info(
-          "Initialized currentBounds from edenFrame._internal.bounds:",
-          currentBoundsRef.current,
-        );
       } else {
         log.warn("Cannot start resize - currentBounds not initialized!");
         return;
@@ -125,23 +121,10 @@ export function setupWindowResizing(
   };
 
   const moveResize = (e: MouseEvent | TouchEvent): void => {
-    log.info(
-      "moveResize called, isResizing:",
-      isResizing,
-      "event type:",
-      e.type,
-    );
-
     e.preventDefault();
     e.stopPropagation();
 
     if (!isResizing || !resizeStartBounds) {
-      log.info(
-        "moveResize returning early - isResizing:",
-        isResizing,
-        "resizeStartBounds:",
-        resizeStartBounds,
-      );
       return;
     }
 
@@ -149,11 +132,6 @@ export function setupWindowResizing(
     const coords = getScreenCoords(e);
     const deltaX = coords.x - startX;
     const deltaY = coords.y - startY;
-
-    log.info("moveResize coords:", coords, "delta:", {
-      deltaX,
-      deltaY,
-    });
 
     let newWidth = resizeStartBounds.width + deltaX;
     let newHeight = resizeStartBounds.height + deltaY;
@@ -178,8 +156,6 @@ export function setupWindowResizing(
       width: Math.round(newWidth),
       height: Math.round(newHeight),
     };
-
-    log.info("moveResize newBounds:", newBounds);
 
     // Update tracked bounds immediately for next move calculation
     currentBoundsRef.current = newBounds;
@@ -221,10 +197,6 @@ export function setupWindowResizing(
     // For touch resize, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
-      log.info(
-        "Updated edenFrame._internal.bounds after touch resize:",
-        window.edenFrame?._internal.bounds,
-      );
     }
 
     // Stop global resize tracking in main process (for mouse events)
@@ -252,8 +224,6 @@ export function setupWindowResizing(
   document.addEventListener("touchend", endResize, { passive: false });
   document.addEventListener("touchcancel", endResize, { passive: false });
 
-  log.info("Resize event listeners registered");
-
   return () => {
     if (resizeHandle.parentNode) {
       resizeHandle.parentNode.removeChild(resizeHandle);
@@ -272,6 +242,5 @@ export function setupWindowResizing(
     if (rafId) {
       cancelAnimationFrame(rafId);
     }
-    log.info("Resize event listeners removed");
   };
 }

@@ -82,7 +82,6 @@ export function setupWindowDragging(
     const initialBounds = window.edenFrame?._internal.bounds;
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      log.info(currentBoundsRef.current);
     } else if (!currentBoundsRef.current) {
       log.warn("Cannot start drag - currentBounds not initialized!");
       return;
@@ -198,10 +197,6 @@ export function setupWindowDragging(
     // For touch drag, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
       window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
-      log.info(
-        "Updated edenFrame._internal.bounds after touch drag:",
-        window.edenFrame?._internal.bounds,
-      );
     }
 
     // Stop global drag tracking in main process (for mouse events)
@@ -231,8 +226,6 @@ export function setupWindowDragging(
   document.addEventListener("touchend", endDrag, { passive: false });
   document.addEventListener("touchcancel", endDrag, { passive: false });
 
-  log.info("Drag event listeners registered");
-
   return () => {
     dragSource.removeEventListener("mousedown", startDrag as EventListener);
     dragSource.removeEventListener("touchstart", startDrag as EventListener);
@@ -246,6 +239,5 @@ export function setupWindowDragging(
     if (rafId) {
       cancelAnimationFrame(rafId);
     }
-    log.info("Drag event listeners removed");
   };
 }
