@@ -6,7 +6,10 @@
  */
 
 import { Command } from "commander";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { buildApps, buildSdkApps } from "./build-apps";
+import { buildSeedConfig } from "./config";
 import { copyAssets } from "./copy-assets";
 import { devWatch } from "./dev-watch";
 import {
@@ -85,6 +88,43 @@ program
   });
 
 program
+  .command("seed")
+  .description("Generate eden-seed.json from an Eden config")
+  .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
+  .option("-o, --output <path>", "Output directory", "dist")
+  .action(async (options) => {
+    try {
+      const cwd = process.cwd();
+      const configPath = path.isAbsolute(options.config)
+        ? options.config
+        : path.join(cwd, options.config);
+      const outputDir = path.isAbsolute(options.output)
+        ? options.output
+        : path.join(cwd, options.output);
+      const seedConfig = await buildSeedConfig(configPath);
+
+      await fs.mkdir(outputDir, { recursive: true });
+      const seedPath = path.join(outputDir, "eden-seed.json");
+
+      if (seedConfig) {
+        await fs.writeFile(
+          seedPath,
+          JSON.stringify(seedConfig, null, 2),
+          "utf-8",
+        );
+        console.log(`✅ Generated seed config: ${seedPath}`);
+        return;
+      }
+
+      await fs.rm(seedPath, { force: true });
+      console.log("ℹ️  No seed config entries to write");
+    } catch (error) {
+      console.error("Seed generation failed:", error);
+      process.exit(1);
+    }
+  });
+
+program
   .command("scaffold-solid")
   .description("Scaffold a minimal renderer-only Solid Eden app")
   .argument("<app-id>", "App ID (for example: com.eden.my-app)")
@@ -115,12 +155,16 @@ program
   .description("Start hot-reload development server for apps")
   .option("-c, --config <path>", "Path to eden.config.json", "eden.config.json")
   .option(
+    "--sdk-source-path <path>",
+    "Path to the SDK source tree for builtin app development",
+  )
+  .option(
     "--sdk-path <path>",
     "Path to @edenapp/sdk (auto-detected if installed)",
   )
   .action(async (options) => {
     try {
-      await devWatch(options.config, options.sdkPath);
+      await devWatch(options.config, options.sdkSourcePath ?? options.sdkPath);
     } catch (error) {
       console.error("Watch failed:", error);
       process.exit(1);

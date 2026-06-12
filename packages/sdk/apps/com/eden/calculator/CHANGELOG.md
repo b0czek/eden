@@ -1,5 +1,12 @@
 # com.eden.example.calculator
 
+## 2.1.9
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/babel@0.8.0
+
 ## 2.1.8
 
 ### Patch Changes

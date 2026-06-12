@@ -55,6 +55,22 @@ export interface EdenConfig {
   };
   tiling?: TilingConfig;
   development?: boolean;
+  hotReload?: {
+    /**
+     * Enable frontend hot reload support in development.
+     * Defaults to true when development is true, otherwise false.
+     */
+    enabled?: boolean;
+
+    /** Debounce delay for reacting to dev server state changes. */
+    debounce?: number;
+
+    /**
+     * Directory containing enabled.json and servers.json.
+     * Relative paths resolve from the process working directory.
+     */
+    stateDirectory?: string;
+  };
 
   /** App ID used for login UI when no user is active */
   loginAppId?: string;

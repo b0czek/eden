@@ -1,11 +1,19 @@
+import { randomUUID } from "node:crypto";
+import * as fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import * as path from "node:path";
 import type {
   AppInstance,
   EdenConfig,
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
-import { randomUUID } from "crypto";
 import { inject, injectable, singleton } from "tsyringe";
 import { AppChannelManager } from "../appbus/AppChannelManager";
+import {
+  getHotReloadServersPath,
+  isHotReloadConfigured,
+  loadHotReloadServerState,
+} from "../hotreload-config";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
@@ -38,6 +46,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private processHandler: ProcessHandler;
   private processMetrics: ProcessMetricsCollector;
   private loginAppId?: string;
+  private hotReloadUrls: Map<string, string | undefined> = new Map();
+  private hotReloadWatcher?: fs.FSWatcher;
+  private hotReloadDebounceTimer?: NodeJS.Timeout;
 
   constructor(
     @inject(BackendManager) private backendManager: BackendManager,
@@ -46,11 +57,11 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
     @inject(UserManager) private userManager: UserManager,
-    @inject("EdenConfig") config: EdenConfig,
+    @inject("EdenConfig") private config: EdenConfig,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
-    this.loginAppId = config.loginAppId;
+    this.loginAppId = this.config.loginAppId;
     this.processMetrics = new ProcessMetricsCollector({
       backendManager: this.backendManager,
       viewManager: this.viewManager,
@@ -59,6 +70,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
     this.setupEventHandlers();
     this.setupUserAccessHandlers();
+    this.setupHotReloadWatcher();
 
     // Create and register handler
     this.processHandler = new ProcessHandler(this);
@@ -118,6 +130,86 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         }
       },
     );
+  }
+
+  private setupHotReloadWatcher(): void {
+    if (!isHotReloadConfigured(this.config)) {
+      return;
+    }
+
+    const serversPath = getHotReloadServersPath(this.config);
+    const stateDirectory = path.dirname(serversPath);
+    const debounceMs = Math.max(this.config.hotReload?.debounce ?? 300, 50);
+
+    void fsp.mkdir(stateDirectory, { recursive: true }).then(() => {
+      this.hotReloadWatcher = fs.watch(
+        stateDirectory,
+        (eventType, filename) => {
+          if (eventType !== "rename" && eventType !== "change") {
+            return;
+          }
+          if (filename && filename.toString() !== path.basename(serversPath)) {
+            return;
+          }
+
+          if (this.hotReloadDebounceTimer) {
+            clearTimeout(this.hotReloadDebounceTimer);
+          }
+          this.hotReloadDebounceTimer = setTimeout(() => {
+            void this.handleHotReloadStateChanged();
+          }, debounceMs);
+        },
+      );
+
+      void this.handleHotReloadStateChanged();
+      log.info(`Watching hot reload state: ${serversPath}`);
+    });
+  }
+
+  private async handleHotReloadStateChanged(): Promise<void> {
+    const state = await loadHotReloadServerState(this.config);
+    const appIds = new Set([
+      ...this.hotReloadUrls.keys(),
+      ...Object.keys(state.apps),
+    ]);
+    const nextUrls = new Map<string, string | undefined>();
+
+    for (const appId of appIds) {
+      const appState = state.apps[appId];
+      nextUrls.set(
+        appId,
+        appState?.status === "ready" ? appState.url : undefined,
+      );
+    }
+
+    const changedAppIds = Array.from(appIds).filter(
+      (appId) => this.hotReloadUrls.get(appId) !== nextUrls.get(appId),
+    );
+
+    this.hotReloadUrls = nextUrls;
+
+    for (const appId of changedAppIds) {
+      await this.refreshHotReloadApp(appId);
+    }
+  }
+
+  private async refreshHotReloadApp(appId: string): Promise<void> {
+    try {
+      await this.packageManager.reloadApp(appId);
+    } catch (error) {
+      log.warn(`Failed to refresh hot reload manifest for ${appId}:`, error);
+      return;
+    }
+
+    if (!this.runningApps.has(appId)) {
+      return;
+    }
+
+    try {
+      await this.reloadApp(appId);
+    } catch (error) {
+      log.error(`Failed to reload hot reload app ${appId}:`, error);
+    }
   }
 
   /**
@@ -321,7 +413,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     if (instance.viewId !== -1) {
       try {
         this.viewManager.removeView(instance.viewId);
-      } catch (e) {
+      } catch (_e) {
         // View may already be removed
       }
     }
@@ -336,6 +428,11 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Shutdown all apps
    */
   async shutdown(): Promise<void> {
+    this.hotReloadWatcher?.close();
+    if (this.hotReloadDebounceTimer) {
+      clearTimeout(this.hotReloadDebounceTimer);
+    }
+
     const runningAppIds = Array.from(this.runningApps.keys());
 
     log.info(`Stopping ${runningAppIds.length} running app(s)...`);
