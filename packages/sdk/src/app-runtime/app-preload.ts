@@ -198,8 +198,6 @@ const setupZoomPrevention = () => {
     },
     { passive: false, capture: true },
   );
-
-  log.info("Zoom prevention enabled");
 };
 
 // Setup when DOM is ready
@@ -208,5 +206,3 @@ if (document.readyState === "loading") {
 } else {
   setupZoomPrevention();
 }
-
-log.info("Universal app preload loaded");
