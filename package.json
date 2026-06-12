@@ -2,6 +2,7 @@
   "name": "@edenapp/eden",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@11.1.2",
   "description": "Eden Desktop Environment",
   "scripts": {
     "build": "pnpm run build:packages && pnpm install --config.confirmModulesPurge=false",
