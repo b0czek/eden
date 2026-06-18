@@ -83,12 +83,14 @@ button,
 }
 
 .eden-osk-theme .hg-row {
+  display: flex;
   justify-content: center;
   margin-bottom: 6px;
 }
 
 .eden-osk-theme .hg-button {
   flex: 1 1 0;
+  width: 0;
   min-width: 0;
   height: 48px;
   border: none;
@@ -102,7 +104,11 @@ button,
 }
 
 .eden-osk-theme .hg-button.hg-standardBtn {
-  width: auto;
+  width: 0;
+  max-width: none;
+}
+
+.eden-osk-theme .hg-button.hg-standardBtn[data-skbtn] {
   max-width: none;
 }
 
