@@ -81,6 +81,7 @@ export class BackendManager extends EventEmitter {
       [`--launch-args=${JSON.stringify(launchArgs || [])}`],
       {
         serviceName: `eden-backend-${appId}`,
+        stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
           EDEN_APP_ID: appId,
@@ -90,6 +91,8 @@ export class BackendManager extends EventEmitter {
         },
       },
     );
+
+    this.pipeBackendOutput(backend);
 
     // Only create frontend<->backend MessageChannel if app has a frontend
     const hasFrontend = !!manifest.frontend?.entry;
@@ -185,7 +188,7 @@ export class BackendManager extends EventEmitter {
     }
 
     try {
-      log.info(
+      log.debug(
         `Sending message to backend ${appId}:`,
         this.getMessageType(message) ?? "unknown",
       );
@@ -323,6 +326,16 @@ export class BackendManager extends EventEmitter {
     this.emit("backend-message", {
       appId,
       message,
+    });
+  }
+
+  private pipeBackendOutput(backend: UtilityProcess): void {
+    backend.stdout?.on("data", (chunk: Buffer | string) => {
+      process.stdout.write(chunk);
+    });
+
+    backend.stderr?.on("data", (chunk: Buffer | string) => {
+      process.stderr.write(chunk);
     });
   }
 

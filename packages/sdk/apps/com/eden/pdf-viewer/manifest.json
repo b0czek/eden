@@ -1,0 +1,41 @@
+{
+  "id": "com.eden.pdf-viewer",
+  "name": {
+    "en": "PDF Viewer",
+    "pl": "Przeglądarka PDF"
+  },
+  "version": "1.0.0",
+  "description": "View PDF documents",
+  "build": {
+    "command": "pnpm run build",
+    "cwd": "."
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultMode": "tiled",
+    "defaultSize": {
+      "width": 980,
+      "height": 720
+    },
+    "minSize": {
+      "width": 560,
+      "height": 420
+    },
+    "resizable": true,
+    "movable": true,
+    "showTitle": true
+  },
+  "permissions": ["fs/read"],
+  "fileHandlers": [
+    {
+      "name": "PDF Documents",
+      "extensions": ["pdf"],
+      "mimeTypes": ["application/pdf"]
+    }
+  ],
+  "icon": "icon.svg",
+  "hidden": false
+}

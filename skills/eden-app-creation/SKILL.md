@@ -78,6 +78,17 @@ The current app-creation baseline creates:
 - `src/index.tsx`
 - `src/App.tsx`
 
+For SDK repo apps, use the built-in shared tsconfigs instead of duplicating compiler settings in each package. Solid web apps should generally have:
+
+```json
+{
+  "extends": "../../../tsconfig.web.solid.json",
+  "include": ["src"]
+}
+```
+
+Other built-in options live under `packages/sdk/apps/`, including `tsconfig.web.json` for non-Solid renderer apps and `tsconfig.backend.json` for backend app code. Adjust the relative path when the app is nested more deeply, such as example frontend/backend packages.
+
 It is intentionally minimal:
 
 - renderer-only

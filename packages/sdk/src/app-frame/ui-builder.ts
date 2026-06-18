@@ -1,4 +1,3 @@
-import { log } from "../logging";
 /**
  * App Frame UI Builder
  *
@@ -49,17 +48,14 @@ export function injectOverlay(
   callback?: () => void,
 ): void {
   const inject = () => {
-    log.info("injectOverlay called, body exists:", !!document.body);
     if (document.body) {
       document.body.insertBefore(overlay, document.body.firstChild);
       document.body.classList.add("eden-framed");
-      log.info("Overlay injected into body");
 
       if (callback) {
         callback();
       }
     } else {
-      log.info("Body not ready, retrying...");
       setTimeout(inject, 10);
     }
   };

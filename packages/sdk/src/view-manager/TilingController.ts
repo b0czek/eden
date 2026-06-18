@@ -1,6 +1,9 @@
-import type { TilingConfig } from "@edenapp/types";
+import type { TilingConfig, WindowConfig } from "@edenapp/types";
 import type { Rectangle as Bounds } from "electron";
-import { calculateTileBounds } from "./layoutCalculator";
+import {
+  calculateTileBounds,
+  getSmartTilingCapacity,
+} from "./layoutCalculator";
 import type { ViewInfo, ViewMode } from "./types";
 
 /**
@@ -56,6 +59,134 @@ export class TilingController {
     return this.config.mode !== "none";
   }
 
+  private normalizeCount(value: number | undefined, fallback: number): number {
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      return fallback;
+    }
+    return Math.max(1, Math.floor(value));
+  }
+
+  private getEffectiveSmartConstraints(views: Iterable<ViewInfo>): {
+    minTileWidth: number;
+    minTileHeight: number;
+  } {
+    const baseMinTileWidth = Math.max(1, this.config.minTileWidth ?? 600);
+    const baseMinTileHeight = Math.max(1, this.config.minTileHeight ?? 400);
+
+    let minTileWidth = baseMinTileWidth;
+    let minTileHeight = baseMinTileHeight;
+
+    for (const view of views) {
+      if (view.mode !== "tiled" || view.viewType !== "app") continue;
+
+      minTileWidth = Math.max(
+        minTileWidth,
+        view.manifest.window?.minSize?.width ?? 0,
+      );
+      minTileHeight = Math.max(
+        minTileHeight,
+        view.manifest.window?.minSize?.height ?? 0,
+      );
+    }
+
+    return { minTileWidth, minTileHeight };
+  }
+
+  private getEffectiveConfig(views: Iterable<ViewInfo>): TilingConfig {
+    if (this.config.mode !== "smart") {
+      return this.config;
+    }
+
+    return {
+      ...this.config,
+      ...this.getEffectiveSmartConstraints(views),
+    };
+  }
+
+  private getSortedVisibleTiledViews(visibleViews: ViewInfo[]): ViewInfo[] {
+    return [...visibleViews].sort(
+      (a, b) =>
+        (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
+        (b.tileIndex ?? Number.MAX_SAFE_INTEGER),
+    );
+  }
+
+  private calculateVisibleSetBounds(
+    visibleViews: ViewInfo[],
+  ): Map<number, Bounds> {
+    const sortedVisibleViews = this.getSortedVisibleTiledViews(visibleViews);
+    const visibleCount = sortedVisibleViews.length;
+    const config = this.getEffectiveConfig(sortedVisibleViews);
+    const boundsByViewId = new Map<number, Bounds>();
+
+    sortedVisibleViews.forEach((view, index) => {
+      const bounds = this.constrainTiledBounds(
+        calculateTileBounds({
+          workspace: this.workspaceBounds,
+          tileIndex: index,
+          visibleCount,
+          config,
+        }),
+        view,
+      );
+      boundsByViewId.set(view.id, bounds);
+    });
+
+    return boundsByViewId;
+  }
+
+  private canFitVisibleSet(visibleViews: ViewInfo[]): boolean {
+    if (!this.isEnabled()) return true;
+
+    if (visibleViews.length === 0) {
+      return true;
+    }
+
+    const capacity = this.getTiledCapacity();
+    if (capacity !== undefined && visibleViews.length > capacity) {
+      return false;
+    }
+
+    const boundsByViewId = this.calculateVisibleSetBounds(visibleViews);
+
+    return visibleViews.every((view) => {
+      const bounds = boundsByViewId.get(view.id);
+      if (!bounds) {
+        return false;
+      }
+
+      const minWidth = view.manifest.window?.minSize?.width ?? 0;
+      const minHeight = view.manifest.window?.minSize?.height ?? 0;
+
+      return bounds.width >= minWidth && bounds.height >= minHeight;
+    });
+  }
+
+  private constrainTiledBounds(bounds: Bounds, view: ViewInfo): Bounds {
+    const maxWidth = view.manifest.window?.maxSize?.width;
+    const maxHeight = view.manifest.window?.maxSize?.height;
+
+    const width =
+      typeof maxWidth === "number" && maxWidth > 0
+        ? Math.min(bounds.width, maxWidth)
+        : bounds.width;
+    const height =
+      typeof maxHeight === "number" && maxHeight > 0
+        ? Math.min(bounds.height, maxHeight)
+        : bounds.height;
+
+    if (width === bounds.width && height === bounds.height) {
+      return bounds;
+    }
+
+    return {
+      x: bounds.x + (bounds.width - width) / 2,
+      y: bounds.y + (bounds.height - height) / 2,
+      width,
+      height,
+    };
+  }
+
   /**
    * Get the maximum number of visible tiled views allowed by configuration.
    * Returns undefined when capacity is unlimited for the current mode.
@@ -65,26 +196,21 @@ export class TilingController {
 
     const { mode, columns, rows } = this.config;
 
-    const normalizeCount = (value: number | undefined, fallback: number) => {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return fallback;
-      }
-      return Math.max(1, Math.floor(value));
-    };
-
     switch (mode) {
       case "grid": {
-        const safeColumns = normalizeCount(columns, 2);
-        const safeRows = normalizeCount(rows, 2);
+        const safeColumns = this.normalizeCount(columns, 2);
+        const safeRows = this.normalizeCount(rows, 2);
         return safeColumns * safeRows;
       }
+      case "smart":
+        return getSmartTilingCapacity(this.workspaceBounds, this.config);
       case "horizontal": {
         if (columns === undefined) return undefined;
-        return normalizeCount(columns, 1);
+        return this.normalizeCount(columns, 1);
       }
       case "vertical": {
         if (rows === undefined) return undefined;
-        return normalizeCount(rows, 1);
+        return this.normalizeCount(rows, 1);
       }
       default:
         return undefined;
@@ -92,71 +218,125 @@ export class TilingController {
   }
 
   /**
-   * Determine which tiled app views should be hidden to respect capacity.
-   * Returns a list of view IDs to hide (oldest focus first).
+   * Resolve which tiled app views should change visibility to match the
+   * current capacity without needlessly swapping already visible views.
    */
-  enforceTiledCapacity(
+  resolveTiledVisibilityChanges(
     views: Map<number, ViewInfo>,
-    preferredViewId?: number,
-  ): number[] {
-    if (!this.isEnabled()) return [];
+    options: {
+      preferredViewId?: number;
+      excludedViewId?: number;
+    } = {},
+  ): { toHide: number[]; toShow: number[] } {
+    if (!this.isEnabled()) return { toHide: [], toShow: [] };
 
-    const capacity = this.getTiledCapacity();
-    if (capacity === undefined) return [];
+    const { preferredViewId, excludedViewId } = options;
 
-    const visibleTiledApps = Array.from(views.values()).filter(
+    const tiledApps = Array.from(views.values()).filter(
       (view) =>
-        view.viewType === "app" && view.mode === "tiled" && view.visible,
+        view.viewType === "app" &&
+        view.mode === "tiled" &&
+        view.id !== excludedViewId,
+    );
+    const requestedTiledApps = tiledApps.filter(
+      (view) => view.requestedVisible,
+    );
+    const visibleTiledApps = tiledApps.filter((view) => view.visible);
+    const hiddenRequestedTiledApps = requestedTiledApps.filter(
+      (view) => !view.visible,
+    );
+    const tiledAppById = new Map(tiledApps.map((view) => [view.id, view]));
+
+    const desiredVisibleIds = new Set(
+      requestedTiledApps.filter((view) => view.visible).map((view) => view.id),
     );
 
-    if (visibleTiledApps.length <= capacity) return [];
+    const canFitDesiredSet = (): boolean =>
+      this.canFitVisibleSet(
+        Array.from(desiredVisibleIds)
+          .map((viewId) => tiledAppById.get(viewId))
+          .filter((view): view is ViewInfo => view !== undefined),
+      );
 
-    const candidates = visibleTiledApps
+    const removalCandidates = visibleTiledApps
       .filter((view) => view.id !== preferredViewId)
-      .sort((a, b) => (a.lastFocusedAt ?? 0) - (b.lastFocusedAt ?? 0));
+      .sort((a, b) => {
+        const focusDelta = (a.lastFocusedAt ?? 0) - (b.lastFocusedAt ?? 0);
+        if (focusDelta !== 0) return focusDelta;
 
-    let remaining = visibleTiledApps.length;
-    const toHide: number[] = [];
+        const tileDelta =
+          (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.tileIndex ?? Number.MAX_SAFE_INTEGER);
+        if (tileDelta !== 0) return tileDelta;
 
-    for (const candidate of candidates) {
-      if (remaining <= capacity) break;
-      toHide.push(candidate.id);
-      remaining -= 1;
-    }
+        return a.id - b.id;
+      });
 
-    if (remaining > capacity && preferredViewId !== undefined) {
-      const preferred = views.get(preferredViewId);
-      if (
-        preferred?.visible &&
-        preferred.mode === "tiled" &&
-        preferred.viewType === "app"
-      ) {
-        toHide.push(preferredViewId);
+    const popOldestVisible = (): boolean => {
+      for (const candidate of removalCandidates) {
+        if (!desiredVisibleIds.has(candidate.id)) {
+          continue;
+        }
+        desiredVisibleIds.delete(candidate.id);
+        return true;
+      }
+      return false;
+    };
+
+    const preferredView =
+      preferredViewId !== undefined ? views.get(preferredViewId) : undefined;
+    const preferredIsTiledApp =
+      preferredView?.viewType === "app" &&
+      preferredView.mode === "tiled" &&
+      preferredView.requestedVisible &&
+      preferredView.id !== excludedViewId;
+    const preferredAlreadyVisible =
+      preferredViewId !== undefined && desiredVisibleIds.has(preferredViewId);
+
+    if (
+      preferredViewId !== undefined &&
+      preferredIsTiledApp &&
+      !preferredAlreadyVisible
+    ) {
+      desiredVisibleIds.add(preferredViewId);
+      while (!canFitDesiredSet() && popOldestVisible()) {
+        // Make room for the preferred tiled view before adding it back.
       }
     }
 
-    return toHide;
-  }
-
-  /**
-   * Apply capacity rules and recalculate tiles when no views were hidden.
-   * Returns true if any views were hidden.
-   */
-  applyTiledCapacity(
-    views: Map<number, ViewInfo>,
-    preferredViewId: number | undefined,
-    hideView: (viewId: number) => void,
-  ): boolean {
-    const toHide = this.enforceTiledCapacity(views, preferredViewId);
-    if (toHide.length > 0) {
-      for (const viewId of toHide) {
-        hideView(viewId);
-      }
-      return true;
+    while (!canFitDesiredSet() && popOldestVisible()) {
+      // Trim overflow without disturbing the preferred view when possible.
     }
 
-    this.recalculateTiledViews(views);
-    return false;
+    const additionCandidates = hiddenRequestedTiledApps
+      .filter((view) => view.id !== preferredViewId)
+      .sort((a, b) => {
+        const focusDelta = (b.lastFocusedAt ?? 0) - (a.lastFocusedAt ?? 0);
+        if (focusDelta !== 0) return focusDelta;
+
+        const tileDelta =
+          (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.tileIndex ?? Number.MAX_SAFE_INTEGER);
+        if (tileDelta !== 0) return tileDelta;
+
+        return a.id - b.id;
+      });
+
+    for (const candidate of additionCandidates) {
+      desiredVisibleIds.add(candidate.id);
+      if (!canFitDesiredSet()) {
+        desiredVisibleIds.delete(candidate.id);
+      }
+    }
+
+    return {
+      toHide: visibleTiledApps
+        .filter((view) => !desiredVisibleIds.has(view.id))
+        .map((view) => view.id),
+      toShow: hiddenRequestedTiledApps
+        .filter((view) => desiredVisibleIds.has(view.id))
+        .map((view) => view.id),
+    };
   }
 
   /**
@@ -164,12 +344,16 @@ export class TilingController {
    * @param tileIndex - Index of the tile to calculate
    * @param visibleCount - Total number of visible tiled views
    */
-  calculateTileBounds(tileIndex: number, visibleCount: number): Bounds {
+  calculateTileBounds(
+    tileIndex: number,
+    visibleCount: number,
+    views: Iterable<ViewInfo> = [],
+  ): Bounds {
     return calculateTileBounds({
       workspace: this.workspaceBounds,
       tileIndex,
       visibleCount,
-      config: this.config,
+      config: this.getEffectiveConfig(views),
     });
   }
 
@@ -206,14 +390,19 @@ export class TilingController {
     if (!this.isEnabled()) return;
 
     // Get visible tiled views sorted by tile index
-    const visibleViews = Array.from(views.entries())
-      .filter(([_, info]) => info.visible && info.mode === "tiled")
-      .sort((a, b) => (a[1].tileIndex || 0) - (b[1].tileIndex || 0));
+    const visibleViews = this.getSortedVisibleTiledViews(
+      Array.from(views.values()).filter(
+        (info) => info.visible && info.mode === "tiled",
+      ),
+    );
+    const boundsByViewId = this.calculateVisibleSetBounds(visibleViews);
 
-    const visibleCount = visibleViews.length;
+    visibleViews.forEach((info, index) => {
+      const bounds = boundsByViewId.get(info.id);
+      if (!bounds) {
+        return;
+      }
 
-    visibleViews.forEach(([, info], index) => {
-      const bounds = this.calculateTileBounds(index, visibleCount);
       info.tileIndex = index;
       info.bounds = bounds;
 
@@ -227,7 +416,9 @@ export class TilingController {
   /**
    * Determine view mode based on manifest window config and tiling state
    */
-  determineViewMode(windowMode?: "floating" | "tiled" | "both"): ViewMode {
+  determineViewMode(windowConfig?: WindowConfig): ViewMode {
+    const windowMode = windowConfig?.mode;
+
     // If no window config mode specified
     if (!windowMode) {
       return this.isEnabled() ? "tiled" : "floating";
@@ -240,6 +431,10 @@ export class TilingController {
       case "tiled":
         return "tiled";
       case "both":
+        if (windowConfig.defaultMode) {
+          return windowConfig.defaultMode;
+        }
+
         // If app supports both, prefer tiled if tiling is enabled
         return this.isEnabled() ? "tiled" : "floating";
       default:

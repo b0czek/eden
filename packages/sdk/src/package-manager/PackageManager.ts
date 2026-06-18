@@ -11,6 +11,12 @@ import { inject, injectable, singleton } from "tsyringe";
 import { FilesystemManager } from "../filesystem";
 import { normalizeGrantPresets } from "../grants/GrantPresets";
 import {
+  getHotReloadDevUrl,
+  isHotReloadConfigured,
+  isHotReloadEnabled,
+  toggleHotReload,
+} from "../hotreload-config";
+import {
   CommandRegistry,
   EdenEmitter,
   EdenNamespace,
@@ -45,7 +51,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject("appsDirectory") private readonly appsDirectory: string,
     @inject("distPath") distPath: string,
-    @inject("EdenConfig") config: EdenConfig,
+    @inject("EdenConfig") private readonly config: EdenConfig,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(PermissionRegistry)
     private readonly permissionRegistry: PermissionRegistry,
@@ -55,8 +61,8 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   ) {
     super(ipcBridge);
     this.prebuiltAppsDirectory = path.join(distPath, "apps", "prebuilt");
-    this.coreApps = normalizeAppIds(config.coreApps);
-    this.restrictedApps = normalizeAppIds(config.restrictedApps);
+    this.coreApps = normalizeAppIds(this.config.coreApps);
+    this.restrictedApps = normalizeAppIds(this.config.restrictedApps);
 
     // Create and register handler
     this.packageHandler = new PackageHandler(this);
@@ -76,6 +82,27 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       isCore: this.coreApps.has(manifest.id),
       isRestricted: this.restrictedApps.has(manifest.id),
       resolvedGrants: normalizeGrantPresets(manifest.grants, manifest.id),
+    };
+  }
+
+  private async applyHotReloadEntry(
+    manifest: AppManifest,
+  ): Promise<AppManifest> {
+    if (!isHotReloadConfigured(this.config) || !manifest.frontend?.entry) {
+      return manifest;
+    }
+
+    const devUrl = await getHotReloadDevUrl(manifest.id, this.config);
+    if (!devUrl) {
+      return manifest;
+    }
+
+    return {
+      ...manifest,
+      frontend: {
+        ...manifest.frontend,
+        entry: devUrl,
+      },
     };
   }
 
@@ -128,41 +155,16 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               "manifest.json",
             );
             const manifestContent = await fs.readFile(manifestPath, "utf-8");
-            const rawManifest: AppManifest = JSON.parse(manifestContent);
-
-            // Check for dev manifest (dev server running)
-            // Look in source apps directory, not dist
-            const devManifestPath = path.join(
-              __dirname,
-              "../../../apps", // Go up to project root, then into apps
-              ...entry.name.split("."),
-              ".dev-manifest.json",
+            const rawManifest = await this.applyHotReloadEntry(
+              JSON.parse(manifestContent) as AppManifest,
             );
-
-            try {
-              const devManifestContent = await fs.readFile(
-                devManifestPath,
-                "utf-8",
-              );
-              const devManifest = JSON.parse(devManifestContent);
-
-              if (
-                devManifest.devMode &&
-                devManifest.devUrl &&
-                rawManifest.frontend
-              ) {
-                // Override frontend entry with dev server URL
-                rawManifest.frontend.entry = devManifest.devUrl;
-                log.info(
-                  `Loaded prebuilt app: ${rawManifest.id} (dev mode: ${devManifest.devUrl})`,
-                );
-              } else {
-                log.info(`Loaded prebuilt app: ${rawManifest.id}`);
-              }
-            } catch {
-              // No dev manifest, use production build
-              log.info(`Loaded prebuilt app: ${rawManifest.id}`);
-            }
+            log.info(
+              `Loaded prebuilt app: ${rawManifest.id}${
+                rawManifest.frontend?.entry.startsWith("http")
+                  ? ` (hot reload: ${rawManifest.frontend.entry})`
+                  : ""
+              }`,
+            );
 
             const runtimeManifest = this.toRuntimeManifest(rawManifest, true);
             this.installedApps.set(runtimeManifest.id, runtimeManifest);
@@ -201,7 +203,9 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
               "manifest.json",
             );
             const manifestContent = await fs.readFile(manifestPath, "utf-8");
-            const rawManifest: AppManifest = JSON.parse(manifestContent);
+            const rawManifest = await this.applyHotReloadEntry(
+              JSON.parse(manifestContent) as AppManifest,
+            );
             const runtimeManifest = this.toRuntimeManifest(rawManifest, false);
 
             this.installedApps.set(runtimeManifest.id, runtimeManifest);
@@ -419,7 +423,9 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
     const manifestPath = path.join(appPath, "manifest.json");
     const manifestContent = await fs.readFile(manifestPath, "utf-8");
-    const rawManifest: AppManifest = JSON.parse(manifestContent);
+    const rawManifest = await this.applyHotReloadEntry(
+      JSON.parse(manifestContent) as AppManifest,
+    );
 
     // Convert to runtime manifest, preserving prebuilt status
     const runtimeManifest = this.toRuntimeManifest(
@@ -437,6 +443,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
     // Notify about the reload (ProcessManager should handle restarting)
     this.notify("installed", { manifest: runtimeManifest });
+  }
+
+  async isHotReloadEnabled(appId: string): Promise<boolean> {
+    return isHotReloadEnabled(appId, this.config);
+  }
+
+  async toggleHotReload(appId: string): Promise<boolean> {
+    return toggleHotReload(appId, this.config);
   }
 
   /**

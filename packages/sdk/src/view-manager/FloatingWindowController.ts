@@ -11,6 +11,7 @@ type ViewCollection = () => Iterable<ViewInfo>;
  */
 export class FloatingWindowController {
   private static readonly MIN_GRABBABLE_WIDTH = 100;
+  private static readonly MIN_GRABBABLE_HEIGHT = 100;
   private static readonly CASCADE_OFFSET = 30;
 
   constructor(
@@ -152,10 +153,21 @@ export class FloatingWindowController {
   }
 
   private constrainBounds(bounds: Bounds): Bounds {
-    const { x: workX, y: workY, width: workWidth } = this.getWorkspaceBounds();
+    const {
+      x: workX,
+      y: workY,
+      width: workWidth,
+      height: workHeight,
+    } = this.getWorkspaceBounds();
     const constrainedBounds = { ...bounds };
 
     constrainedBounds.y = Math.max(workY, constrainedBounds.y);
+
+    const maxY = Math.max(
+      workY,
+      workY + workHeight - FloatingWindowController.MIN_GRABBABLE_HEIGHT,
+    );
+    constrainedBounds.y = Math.min(constrainedBounds.y, maxY);
 
     const maxX =
       workX + workWidth - FloatingWindowController.MIN_GRABBABLE_WIDTH;

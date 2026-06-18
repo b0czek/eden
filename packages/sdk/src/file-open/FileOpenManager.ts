@@ -232,7 +232,9 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       handler: FileHandlerConfig;
     }> = [];
 
-    for (const app of this.packageManager.getInstalledApps()) {
+    for (const app of this.packageManager.getInstalledApps({
+      showHidden: true,
+    })) {
       for (const handler of app.fileHandlers ?? []) {
         handlers.push({ app, handler });
       }

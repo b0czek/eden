@@ -1,5 +1,4 @@
 import type { ViewBounds } from "@edenapp/types";
-import { log } from "../logging";
 
 /**
  * Eden App Frame Injector
@@ -27,8 +26,6 @@ import { setupWindowDragging } from "./window-dragging.js";
 import { setupWindowResizing } from "./window-resizing.js";
 
 (() => {
-  log.info("Injection script started");
-
   // Initialize edenFrame object if not exists
   if (!window.edenFrame) {
     window.edenFrame = {
@@ -85,7 +82,6 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Check if already injected
   if (window.edenFrame._internal.injected) {
-    log.info("Already injected, skipping");
     return;
   }
   window.edenFrame._internal.injected = true;
@@ -164,7 +160,6 @@ import { setupWindowResizing } from "./window-resizing.js";
       "view/mode-changed",
       (data: { mode: "tiled" | "floating"; bounds: ViewBounds }) => {
         const { mode, bounds } = data;
-        log.info("View mode changed to:", mode, "with bounds:", bounds);
 
         // Update window mode and bounds
         window.edenFrame!._internal.currentMode = mode;
@@ -177,15 +172,12 @@ import { setupWindowResizing } from "./window-resizing.js";
         setupFloatingWindowControls();
       },
     );
-    log.info("Subscribed to view/mode-changed");
   };
 
   const setupFloatingWindowControls = (): void => {
     const windowMode = window.edenFrame!._internal.currentMode;
     const windowConfig = window.edenFrame!._internal.config;
     const initialBounds = window.edenFrame!._internal.bounds;
-
-    log.info("Window mode:", initialBounds);
 
     // Clean up previous controls if they exist (crucial for mode switching)
     if (cleanupDrag) {
@@ -206,7 +198,6 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Initialize current bounds from the actual bounds set by ViewManager
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
-      log.info("Initialized bounds from backend:", currentBoundsRef.current);
     } else if (windowConfig.defaultSize) {
       // Fallback to config if no initial bounds provided
       const workspaceX = 0;
@@ -221,15 +212,11 @@ import { setupWindowResizing } from "./window-resizing.js";
         width: windowConfig.defaultSize.width || 800,
         height: windowConfig.defaultSize.height || 600,
       };
-
-      log.info("Initialized bounds from config:", currentBoundsRef.current);
     }
 
     // Check if dragging is allowed
     const isMovable = windowConfig.movable !== false; // default true
     const isResizable = windowConfig.resizable !== false; // default true
-
-    log.info("Movable:", isMovable, "Resizable:", isResizable);
 
     // Setup window dragging
     if (isMovable) {
@@ -254,25 +241,6 @@ import { setupWindowResizing } from "./window-resizing.js";
     currentBoundsRef.current = { ...newBounds };
     window.edenFrame!._internal.bounds = { ...newBounds };
   });
-  log.info("Subscribed to view/bounds-updated");
-
-  // Add global touch handler to diagnose issues
-  document.addEventListener(
-    "touchstart",
-    (e) => {
-      log.info("Global touchstart on:", e.target);
-    },
-    { passive: false, capture: true },
-  );
-
-  document.addEventListener(
-    "touchcancel",
-    (e) => {
-      log.info("Global touchcancel on:", e.target);
-      log.info("Stack trace:", new Error().stack);
-    },
-    { capture: true },
-  );
 
   // Inject overlay and setup handlers
   if (overlay) {

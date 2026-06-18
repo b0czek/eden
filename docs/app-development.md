@@ -54,6 +54,7 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
   },
   "window": {
     "mode": "both",
+    "defaultMode": "floating",
     "defaultSize": { "width": 800, "height": 600 },
     "minSize": { "width": 400, "height": 300 },
     "resizable": true,
@@ -68,6 +69,8 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
 - **`id`**: Unique identifier (reverse domain notation recommended).
 - **`frontend.entry`**: Path to the built HTML file relative to the app root.
 - **`backend.entry`** (Optional): Path to the compiled backend JavaScript file.
+- **`window.mode`**: Supported window modes: `floating`, `tiled`, or `both`.
+- **`window.defaultMode`** (Optional): Initial mode to use when `window.mode` is `both`.
 - **`permissions`**: Array of permissions the app requires.
   - `fs/*`: Full filesystem access.
   - `fs/resolve`: Resolve an Eden path to the underlying OS path.

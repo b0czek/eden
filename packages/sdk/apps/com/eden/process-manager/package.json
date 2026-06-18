@@ -1,6 +1,6 @@
 {
   "name": "com.eden.process-manager",
-  "version": "1.0.4",
+  "version": "1.0.9",
   "private": true,
   "type": "module",
   "scripts": {

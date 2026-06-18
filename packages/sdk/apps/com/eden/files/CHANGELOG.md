@@ -1,5 +1,46 @@
 # com.eden.files
 
+## 1.0.9
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/babel@0.8.0
+  - @edenapp/tablets@0.8.0
+  - @edenapp/solid-kit@0.8.0
+
+## 1.0.8
+
+### Patch Changes
+
+- @edenapp/babel@0.7.3
+- @edenapp/tablets@0.7.3
+- @edenapp/solid-kit@0.7.3
+
+## 1.0.7
+
+### Patch Changes
+
+- @edenapp/babel@0.7.2
+- @edenapp/tablets@0.7.2
+- @edenapp/solid-kit@0.7.2
+
+## 1.0.6
+
+### Patch Changes
+
+- @edenapp/babel@0.7.1
+- @edenapp/tablets@0.7.1
+- @edenapp/solid-kit@0.7.1
+
+## 1.0.5
+
+### Patch Changes
+
+- @edenapp/babel@0.7.0
+- @edenapp/tablets@0.7.0
+- @edenapp/solid-kit@0.7.0
+
 ## 1.0.4
 
 ### Patch Changes

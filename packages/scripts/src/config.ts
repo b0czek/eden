@@ -5,6 +5,7 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { resolveConsumerPackageJson } from "./package-resolution";
 import type {
   EdenSeedConfig,
   EdenSeedSettings,
@@ -50,6 +51,7 @@ export interface EdenBuildConfig {
   hotReload?: {
     enabled: boolean;
     debounce: number;
+    stateDirectory?: string;
   };
   /** Users to seed on first run */
   users?: EdenUserConfig[];
@@ -154,7 +156,7 @@ export async function resolveSdkAppsPath(
 
   // Try to resolve from node_modules
   try {
-    const sdkPackagePath = require.resolve("@edenapp/sdk/package.json");
+    const sdkPackagePath = resolveConsumerPackageJson("@edenapp/sdk");
     const sdkDir = path.dirname(sdkPackagePath);
     const appsPath = path.join(sdkDir, "dist", "apps", "prebuilt");
     try {

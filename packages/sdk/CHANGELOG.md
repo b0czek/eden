@@ -1,5 +1,54 @@
 # @edenapp/sdk
 
+## 0.8.0
+
+### Minor Changes
+
+- Release 0.8.0.
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/types@0.8.0
+  - @edenapp/genesis@0.8.0
+
+## 0.7.3
+
+### Patch Changes
+
+- Pipe app backend stdout and stderr into Eden's main console output.
+  - @edenapp/types@0.7.3
+  - @edenapp/genesis@0.7.3
+
+## 0.7.2
+
+### Patch Changes
+
+- make tiling layout respect app's window minimum size
+  - @edenapp/types@0.7.2
+  - @edenapp/genesis@0.7.2
+
+## 0.7.1
+
+### Patch Changes
+
+- add default window mdoe
+- Updated dependencies
+  - @edenapp/types@0.7.1
+  - @edenapp/genesis@0.7.1
+
+## 0.7.0
+
+### Minor Changes
+
+- fileopen using mimetypes, open with, smart layout grid
+
+### Patch Changes
+
+- Updated dependencies
+  - @edenapp/types@0.7.0
+  - @edenapp/genesis@0.7.0
+
 ## 0.6.5
 
 ### Patch Changes

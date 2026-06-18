@@ -223,12 +223,9 @@ export class ViewCreator {
 
     if (this.tilingController.isEnabled()) {
       const tileIndex = this.tilingController.getNextTileIndex(existingViews);
-      const visibleCount =
-        this.tilingController.getVisibleTiledCount(existingViews) + 1;
-      const viewBounds = this.tilingController.calculateTileBounds(
-        tileIndex,
-        visibleCount,
-      );
+      const viewBounds = bounds || {
+        ...this.tilingController.getWorkspaceBounds(),
+      };
       return { viewBounds, tileIndex, zIndex: undefined };
     }
 
@@ -260,7 +257,7 @@ export class ViewCreator {
     // Determine view mode
     const viewMode: ViewMode = isOverlay
       ? "floating"
-      : this.tilingController.determineViewMode(windowConfig?.mode);
+      : this.tilingController.determineViewMode(windowConfig);
 
     // Calculate bounds and Z-index based on view type and mode
     const { viewBounds, tileIndex, zIndex } = this.calculateViewBounds(
@@ -328,7 +325,7 @@ export class ViewCreator {
           manifest.name,
           viewMode,
           windowConfig,
-          viewBounds,
+          view.getBounds(),
         ).catch((err) => {
           log.error(`Failed to inject app frame for ${appId}:`, err);
         });
@@ -342,6 +339,7 @@ export class ViewCreator {
       appId,
       manifest,
       bounds: viewBounds,
+      requestedVisible: true,
       visible: true,
       mode: viewMode,
       viewType,

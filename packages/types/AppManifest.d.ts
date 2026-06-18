@@ -38,6 +38,12 @@ export interface WindowConfig {
   /** Window display modes supported by the app */
   mode: WindowMode;
 
+  /**
+   * Preferred initial mode when the app supports both floating and tiled.
+   * If omitted, Eden prefers tiled when tiling is enabled, otherwise floating.
+   */
+  defaultMode?: Exclude<WindowMode, "both">;
+
   /** Default window size for floating mode */
   defaultSize?: {
     width: number;

@@ -250,11 +250,39 @@ function formatPrefix(record: {
     parts.push(record.context.source);
   }
   if (record.callsite) {
-    const file = shortenPath(record.callsite.file, config.pathMode);
+    const pathMode = resolvePathModeForRecord(record.context, record.callsite);
+    const file = shortenPath(record.callsite.file, pathMode);
     parts.push(`${file}:${record.callsite.line}`);
   }
 
   return `[${parts.join("] [")}]`;
+}
+
+function resolvePathModeForRecord(
+  context: LogContext | undefined,
+  callsite: CallsiteInfo,
+): LogPathMode {
+  // SDK logs are intentionally concise: show only the filename for callsites.
+  // We treat anything explicitly tagged as sdk (or coming from the sdk package) as "SDK specific".
+  const source = (context?.source ?? "").toLowerCase();
+  if (
+    source === "sdk" ||
+    source.startsWith("sdk/") ||
+    source.startsWith("sdk:")
+  ) {
+    return "file";
+  }
+
+  const normalized = callsite.file.replace(/\\/g, "/");
+  if (
+    normalized.includes("/packages/sdk/") ||
+    normalized.includes("/sdk/src/") ||
+    normalized.includes("/sdk/dist/")
+  ) {
+    return "file";
+  }
+
+  return config.pathMode;
 }
 
 function captureCallsite(): CallsiteInfo | undefined {
@@ -297,8 +325,15 @@ function captureCallsite(): CallsiteInfo | undefined {
 function shortenPath(path: string, mode: LogPathMode): string {
   if (mode === "full") return path;
   if (mode === "file") {
-    const cleaned = path.replace(/^[^:]*[\\/]/, "");
-    return cleaned || path;
+    // Handle file:// URLs, Windows drives, and regular paths.
+    let normalized = path;
+    if (normalized.startsWith("file://")) {
+      normalized = normalized.slice("file://".length);
+    }
+    normalized = normalized.replace(/\\/g, "/");
+    const withoutQuery = normalized.split(/[?#]/, 1)[0] ?? normalized;
+    const segments = withoutQuery.split("/").filter(Boolean);
+    return segments.length ? segments[segments.length - 1]! : path;
   }
 
   let normalized = path;

@@ -1,5 +1,27 @@
 # @edenapp/types
 
+## 0.8.0
+
+### Minor Changes
+
+- Release 0.8.0.
+
+## 0.7.3
+
+## 0.7.2
+
+## 0.7.1
+
+### Patch Changes
+
+- add default window mdoe
+
+## 0.7.0
+
+### Minor Changes
+
+- fileopen using mimetypes, open with, smart layout grid
+
 ## 0.6.5
 
 ## 0.6.4
