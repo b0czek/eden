@@ -46,6 +46,8 @@ export interface EdenKeyboardAPI {
   show(): Promise<{ success: boolean }>;
   sendAction(action: EdenKeyboardAction): Promise<{ success: boolean }>;
   hide(): Promise<{ success: boolean }>;
+  startDrag(startX: number, startY: number): Promise<{ success: boolean }>;
+  endDrag(): Promise<{ success: boolean }>;
   getState(): Promise<EdenKeyboardState>;
   onStateChanged?(callback: (state: EdenKeyboardState) => void): () => void;
 }

@@ -13,8 +13,6 @@ const KEYBOARD_MIN_WIDTH = 420;
 const KEYBOARD_ROW_HEIGHT = 48;
 const KEYBOARD_ROW_GAP = 6;
 const KEYBOARD_VERTICAL_PADDING = 20;
-const FLOATING_HANDLE_HEIGHT = 30;
-const FLOATING_HANDLE_GAP = 8;
 
 export type KeyboardGeometryOptions = {
   rowCount: number;
@@ -90,11 +88,7 @@ export const calculateDefaultFloatingKeyboardBounds = (
 ): ViewBounds => {
   const bounds = resolveWorkspaceBounds(contentBounds, workspaceBounds);
   const availableWidth = Math.max(1, bounds.width - 24);
-  const { width, height } = calculateKeyboardSize(
-    availableWidth,
-    options,
-    FLOATING_HANDLE_HEIGHT + FLOATING_HANDLE_GAP,
-  );
+  const { width, height } = calculateKeyboardSize(availableWidth, options);
   const x = contentBounds.x + bounds.x + Math.round((bounds.width - width) / 2);
   const y = contentBounds.y + bounds.y + bounds.height - height - 12;
 

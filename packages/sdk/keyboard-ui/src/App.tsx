@@ -33,13 +33,13 @@ const buildTextRows = (
         "@ # $ & * ( ) ' \" /",
         "- + = _ : ; ! ? %",
         "[ ] { } < > \\ | {bksp}",
-        "{letters} , {space} . {enter}",
+        "{letters} {drag} , {space} . {enter}",
       ]
     : [
         "1 2 3 4 5 6 7 8 9 0",
         "@ # $ & * ( ) ' \" /",
         "- + = _ : ; ! ? {bksp}",
-        "{letters} , {space} . {enter}",
+        "{letters} {drag} , {space} . {enter}",
       ];
 
   const emailSymbols = showNumberRow
@@ -48,13 +48,13 @@ const buildTextRows = (
         "@ # $ _ & - + ( ) /",
         "* \" ' : ; ! ? %",
         "[ ] { } < > \\ | {bksp}",
-        "{letters} . {space} , {enter}",
+        "{letters} {drag} . {space} , {enter}",
       ]
     : [
         "1 2 3 4 5 6 7 8 9 0",
         "@ # $ _ & - + ( ) /",
         "* \" ' : ; ! ? {bksp}",
-        "{letters} . {space} , {enter}",
+        "{letters} {drag} . {space} , {enter}",
       ];
 
   const urlSymbols = showNumberRow
@@ -63,13 +63,13 @@ const buildTextRows = (
         "/ : . - _ ~ ? & = +",
         "# % @ ! ' \" ( )",
         "[ ] { } < > \\ | {bksp}",
-        "{letters} / {space} . {enter}",
+        "{letters} {drag} / {space} . {enter}",
       ]
     : [
         "1 2 3 4 5 6 7 8 9 0",
         "/ : . - _ ~ ? & = +",
         "# % @ ! ' \" ( ) {bksp}",
-        "{letters} / {space} . {enter}",
+        "{letters} {drag} / {space} . {enter}",
       ];
 
   if (layout === "email") {
@@ -78,13 +78,13 @@ const buildTextRows = (
         ...defaultRows,
         "a s d f g h j k l @",
         "{shift} z x c v b n m _ - {bksp}",
-        "{symbols} . {space} , {enter}",
+        "{symbols} {drag} . {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
         "A S D F G H J K L @",
         "{shift} Z X C V B N M _ - {bksp}",
-        "{symbols} . {space} , {enter}",
+        "{symbols} {drag} . {space} , {enter}",
       ],
       symbols: emailSymbols,
     };
@@ -96,13 +96,13 @@ const buildTextRows = (
         ...defaultRows,
         "a s d f g h j k l /",
         "{shift} z x c v b n m - / {bksp}",
-        "{symbols} . {space} , {enter}",
+        "{symbols} {drag} . {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
         "A S D F G H J K L /",
         "{shift} Z X C V B N M - / {bksp}",
-        "{symbols} . {space} , {enter}",
+        "{symbols} {drag} . {space} , {enter}",
       ],
       symbols: urlSymbols,
     };
@@ -113,13 +113,13 @@ const buildTextRows = (
       ...defaultRows,
       "a s d f g h j k l",
       "{shift} z x c v b n m {bksp}",
-      "{symbols} , {space} . {enter}",
+      "{symbols} {drag} , {space} . {enter}",
     ],
     shift: [
       ...shiftRows,
       "A S D F G H J K L",
       "{shift} Z X C V B N M {bksp}",
-      "{symbols} < {space} > {enter}",
+      "{symbols} {drag} < {space} > {enter}",
     ],
     symbols: textSymbols,
   };
@@ -158,9 +158,13 @@ const BACKSPACE_ICON =
 const ENTER_ICON =
   "<svg class='keyboard-action-icon keyboard-enter-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M23 6v7a5 5 0 0 1-5 5H6'/><path d='m10 14-4 4 4 4'/></svg>";
 
+const DRAG_ICON =
+  "<svg class='keyboard-drag-icon' viewBox='0 0 28 28' aria-hidden='true'><circle cx='10' cy='8' r='1.7'/><circle cx='18' cy='8' r='1.7'/><circle cx='10' cy='14' r='1.7'/><circle cx='18' cy='14' r='1.7'/><circle cx='10' cy='20' r='1.7'/><circle cx='18' cy='20' r='1.7'/></svg>";
+
 const getDisplay = () => ({
   "{bksp}": BACKSPACE_ICON,
   "{close}": "×",
+  "{drag}": DRAG_ICON,
   "{enter}": ENTER_ICON,
   "{letters}": "ABC",
   "{shift}": SHIFT_ICON,
@@ -251,6 +255,8 @@ export default function App() {
       case "{letters}":
         setKeyboardLayer("letters");
         return;
+      case "{drag}":
+        return;
       case "{bksp}":
         await window.edenKeyboard.sendAction({ type: "backspace" });
         return;
@@ -266,6 +272,30 @@ export default function App() {
           setShiftState("default");
         }
     }
+  };
+
+  const handleDragPointerDown = (event: PointerEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest('.hg-button[data-skbtn="{drag}"]')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    target.setPointerCapture?.(event.pointerId);
+
+    void window.edenKeyboard.startDrag(event.screenX, event.screenY);
+
+    const endDrag = () => {
+      target.releasePointerCapture?.(event.pointerId);
+      void window.edenKeyboard.endDrag();
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+    };
+
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
   };
 
   onMount(() => {
@@ -285,6 +315,8 @@ export default function App() {
       },
     });
 
+    document.addEventListener("pointerdown", handleDragPointerDown, true);
+
     const unsubscribe = window.edenKeyboard.onStateChanged?.((state) => {
       setKeyboardState(state);
       if (!supportsShift(state.layout)) {
@@ -294,6 +326,7 @@ export default function App() {
     });
 
     onCleanup(() => {
+      document.removeEventListener("pointerdown", handleDragPointerDown, true);
       unsubscribe?.();
     });
   });
@@ -325,9 +358,6 @@ export default function App() {
       data-layout={keyboardState().layout}
       data-placement={keyboardState().placementMode}
     >
-      <div class="keyboard-drag-handle" role="presentation" aria-hidden="true">
-        drag
-      </div>
       <div class="keyboard-body">
         <div class="simple-keyboard" />
       </div>

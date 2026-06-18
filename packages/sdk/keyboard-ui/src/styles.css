@@ -42,30 +42,6 @@ button,
   border-radius: 20px;
 }
 
-.keyboard-drag-handle {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 84px;
-  height: 30px;
-  padding: 0 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  line-height: 1;
-  letter-spacing: 0.24em;
-  cursor: grab;
-  -webkit-app-region: drag;
-}
-
-.keyboard-shell[data-placement="docked"] .keyboard-drag-handle {
-  display: none;
-}
-
 .keyboard-body {
   flex: 1;
   min-height: 0;
@@ -141,6 +117,7 @@ button,
 .eden-osk-theme .hg-button[data-skbtn="{shift}"],
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
 .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{drag}"],
 .eden-osk-theme .hg-button[data-skbtn="{letters}"],
 .eden-osk-theme .hg-button[data-skbtn="{symbols}"],
 .eden-osk-theme .hg-button[data-skbtn="{enter}"] {
@@ -166,6 +143,7 @@ button,
 
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
 .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{drag}"],
 .eden-osk-theme .hg-button[data-skbtn="{enter}"],
 .eden-osk-theme .hg-button[data-skbtn="{letters}"],
 .eden-osk-theme .hg-button[data-skbtn="{shift}"],
@@ -180,6 +158,31 @@ button,
   background: rgba(255, 255, 255, 0.13);
   font-size: 14px;
   letter-spacing: 0.02em;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{drag}"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: grab;
+}
+
+.keyboard-shell[data-placement="docked"]
+  .eden-osk-theme
+  .hg-button[data-skbtn="{drag}"] {
+  display: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{drag}"]:active {
+  background: rgba(255, 255, 255, 0.1);
+  transform: none;
+}
+
+.eden-osk-theme .keyboard-drag-icon {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+  opacity: 0.82;
+  pointer-events: none;
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{close}"] {

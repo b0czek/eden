@@ -16,6 +16,7 @@ import { IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { EDEN_SETTINGS_APP_ID, SettingsManager } from "../settings";
 import { ViewManager } from "../view-manager";
+import { MouseTracker } from "../view-manager/MouseTracker";
 import {
   calculateDefaultFloatingKeyboardBounds,
   calculateDockedKeyboardBounds,
@@ -27,6 +28,8 @@ const CHANNEL_FOCUS_STATE = "eden-keyboard:focus-state";
 const CHANNEL_SHOW = "eden-keyboard:show";
 const CHANNEL_SEND_ACTION = "eden-keyboard:send-action";
 const CHANNEL_HIDE = "eden-keyboard:hide";
+const CHANNEL_START_DRAG = "eden-keyboard:start-drag";
+const CHANNEL_END_DRAG = "eden-keyboard:end-drag";
 const CHANNEL_APPLY_ACTION = "eden-keyboard:apply-action";
 const CHANNEL_STATE_CHANGED = "eden-keyboard:state-changed";
 const CHANNEL_GET_STATE = "eden-keyboard:get-state";
@@ -48,6 +51,12 @@ type KeyboardTargetSession = {
   targetBounds?: EdenKeyboardFocusState["targetBounds"];
 };
 
+type KeyboardDragState = {
+  startX: number;
+  startY: number;
+  startBounds: ViewBounds;
+};
+
 @singleton()
 @injectable()
 export class KeyboardManager {
@@ -65,6 +74,8 @@ export class KeyboardManager {
   private placementMode: EdenKeyboardPlacementMode = DEFAULT_PLACEMENT_MODE;
   private showNumberRow = DEFAULT_SHOW_NUMBER_ROW;
   private interfaceScale = DEFAULT_INTERFACE_SCALE;
+  private dragState: KeyboardDragState | null = null;
+  private readonly mouseTracker = new MouseTracker(8);
   private readonly keyboardFrontendPath = path.join(
     __dirname,
     "../keyboard-ui/index.html",
@@ -199,6 +210,20 @@ export class KeyboardManager {
 
     ipcMain.handle(CHANNEL_HIDE, async (event) => {
       return await this.handleHideRequest(event.sender.id);
+    });
+
+    ipcMain.handle(
+      CHANNEL_START_DRAG,
+      async (
+        event,
+        payload: { startX?: number; startY?: number } | undefined,
+      ) => {
+        return await this.handleStartDragRequest(event.sender.id, payload);
+      },
+    );
+
+    ipcMain.handle(CHANNEL_END_DRAG, async (event) => {
+      return await this.handleEndDragRequest(event.sender.id);
     });
 
     ipcMain.handle(CHANNEL_GET_STATE, async () => {
@@ -342,6 +367,79 @@ export class KeyboardManager {
     return { success: true };
   }
 
+  private ensureKeyboardRequest(senderWebContentsId: number): boolean {
+    return senderWebContentsId === this.keyboardWindow?.webContents.id;
+  }
+
+  private async handleStartDragRequest(
+    senderWebContentsId: number,
+    payload: { startX?: number; startY?: number } | undefined,
+  ): Promise<{ success: boolean }> {
+    if (!this.ensureKeyboardRequest(senderWebContentsId)) {
+      throw new Error("Only the keyboard window can start keyboard drag");
+    }
+
+    if (
+      this.placementMode !== "floating" ||
+      !this.keyboardWindow ||
+      this.keyboardWindow.isDestroyed() ||
+      !payload ||
+      typeof payload.startX !== "number" ||
+      typeof payload.startY !== "number" ||
+      !Number.isFinite(payload.startX) ||
+      !Number.isFinite(payload.startY)
+    ) {
+      return { success: false };
+    }
+
+    const startX = payload.startX;
+    const startY = payload.startY;
+
+    this.endKeyboardDrag();
+    this.dragState = {
+      startX,
+      startY,
+      startBounds: this.keyboardWindow.getBounds(),
+    };
+
+    this.mouseTracker.subscribe("keyboard-drag", (position) => {
+      if (
+        !this.dragState ||
+        !this.keyboardWindow ||
+        this.keyboardWindow.isDestroyed()
+      ) {
+        return;
+      }
+
+      const nextBounds = {
+        ...this.dragState.startBounds,
+        x: this.dragState.startBounds.x + position.x - this.dragState.startX,
+        y: this.dragState.startBounds.y + position.y - this.dragState.startY,
+      };
+
+      this.keyboardWindow.setBounds(nextBounds);
+      this.floatingBounds = nextBounds;
+    });
+
+    return { success: true };
+  }
+
+  private async handleEndDragRequest(
+    senderWebContentsId: number,
+  ): Promise<{ success: boolean }> {
+    if (!this.ensureKeyboardRequest(senderWebContentsId)) {
+      throw new Error("Only the keyboard window can end keyboard drag");
+    }
+
+    this.endKeyboardDrag();
+    return { success: true };
+  }
+
+  private endKeyboardDrag(): void {
+    this.mouseTracker.unsubscribe("keyboard-drag");
+    this.dragState = null;
+  }
+
   private ensureKeyboardWindow(): BrowserWindow | undefined {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return undefined;
@@ -402,6 +500,7 @@ export class KeyboardManager {
     });
     keyboardWindow.on("closed", () => {
       if (this.keyboardWindow === keyboardWindow) {
+        this.endKeyboardDrag();
         this.keyboardWindow = null;
       }
     });
@@ -648,7 +747,11 @@ export class KeyboardManager {
   destroy(): void {
     ipcMain.removeHandler(CHANNEL_SEND_ACTION);
     ipcMain.removeHandler(CHANNEL_HIDE);
+    ipcMain.removeHandler(CHANNEL_START_DRAG);
+    ipcMain.removeHandler(CHANNEL_END_DRAG);
     ipcMain.removeAllListeners(CHANNEL_FOCUS_STATE);
+    this.endKeyboardDrag();
+    this.mouseTracker.dispose();
     this.viewManager.setKeyboardPresentationLift(0);
     this.destroyKeyboardWindow();
   }
