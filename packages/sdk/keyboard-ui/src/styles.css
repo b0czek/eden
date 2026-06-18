@@ -190,13 +190,32 @@ button,
   font-size: 0;
 }
 
-.eden-osk-theme .keyboard-shift-icon {
+.eden-osk-theme .hg-button[data-skbtn="{bksp}"] span,
+.eden-osk-theme .hg-button[data-skbtn="{enter}"] span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+}
+
+.eden-osk-theme .keyboard-action-icon {
   width: 100%;
   height: 100%;
   fill: transparent;
   stroke: currentColor;
+  stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.8px;
+  stroke-width: 2.5px;
+}
+
+.eden-osk-theme .keyboard-backspace-icon {
+  width: 29px;
+  height: 29px;
+}
+
+.eden-osk-theme .keyboard-enter-icon {
+  width: 28px;
+  height: 28px;
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-active {

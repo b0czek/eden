@@ -101,14 +101,20 @@ const buildLayout = (
 type ShiftState = "default" | "shift" | "caps";
 
 const SHIFT_ICON =
-  "<svg class='keyboard-shift-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M14 3 25 14.2h-6v10.8H9V14.2H3L14 3Z'/></svg>";
+  "<svg class='keyboard-action-icon keyboard-shift-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M14 3 25 14.2h-6v10.8H9V14.2H3L14 3Z'/></svg>";
+
+const BACKSPACE_ICON =
+  "<svg class='keyboard-action-icon keyboard-backspace-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M11 7h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H11L3 14l8-7Z'/><path d='m14 11 6 6m0-6-6 6'/></svg>";
+
+const ENTER_ICON =
+  "<svg class='keyboard-action-icon keyboard-enter-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M23 6v7a5 5 0 0 1-5 5H6'/><path d='m10 14-4 4 4 4'/></svg>";
 
 const getDisplay = () => ({
-  "{bksp}": "⌫",
+  "{bksp}": BACKSPACE_ICON,
   "{close}": "×",
-  "{enter}": "↵",
+  "{enter}": ENTER_ICON,
   "{shift}": SHIFT_ICON,
-  "{space}": "␣",
+  "{space}": "<span class='keyboard-space-label' aria-hidden='true'></span>",
 });
 
 const getLayoutName = (shiftState: ShiftState): "default" | "shift" =>
