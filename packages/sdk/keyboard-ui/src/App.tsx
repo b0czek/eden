@@ -14,7 +14,7 @@ const DEFAULT_KEYBOARD_STATE: EdenKeyboardState = {
 const buildTextRows = (
   layout: EdenKeyboardLayout,
   showNumberRow: boolean,
-): { default: string[]; shift: string[] } => {
+): { default: string[]; shift: string[]; symbols: string[] } => {
   const defaultRows = showNumberRow
     ? ["1 2 3 4 5 6 7 8 9 0"]
     : ["q w e r t y u i o p"];
@@ -27,20 +27,66 @@ const buildTextRows = (
     shiftRows.push("Q W E R T Y U I O P");
   }
 
+  const textSymbols = showNumberRow
+    ? [
+        "1 2 3 4 5 6 7 8 9 0",
+        "@ # $ & * ( ) ' \" /",
+        "- + = _ : ; ! ? %",
+        "[ ] { } < > \\ | {bksp}",
+        "{letters} , {space} . {enter}",
+      ]
+    : [
+        "1 2 3 4 5 6 7 8 9 0",
+        "@ # $ & * ( ) ' \" /",
+        "- + = _ : ; ! ? {bksp}",
+        "{letters} , {space} . {enter}",
+      ];
+
+  const emailSymbols = showNumberRow
+    ? [
+        "1 2 3 4 5 6 7 8 9 0",
+        "@ # $ _ & - + ( ) /",
+        "* \" ' : ; ! ? %",
+        "[ ] { } < > \\ | {bksp}",
+        "{letters} . {space} , {enter}",
+      ]
+    : [
+        "1 2 3 4 5 6 7 8 9 0",
+        "@ # $ _ & - + ( ) /",
+        "* \" ' : ; ! ? {bksp}",
+        "{letters} . {space} , {enter}",
+      ];
+
+  const urlSymbols = showNumberRow
+    ? [
+        "1 2 3 4 5 6 7 8 9 0",
+        "/ : . - _ ~ ? & = +",
+        "# % @ ! ' \" ( )",
+        "[ ] { } < > \\ | {bksp}",
+        "{letters} / {space} . {enter}",
+      ]
+    : [
+        "1 2 3 4 5 6 7 8 9 0",
+        "/ : . - _ ~ ? & = +",
+        "# % @ ! ' \" ( ) {bksp}",
+        "{letters} / {space} . {enter}",
+      ];
+
   if (layout === "email") {
     return {
       default: [
         ...defaultRows,
         "a s d f g h j k l @",
         "{shift} z x c v b n m _ - {bksp}",
-        ". {space} , {enter}",
+        "{symbols} . {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
         "A S D F G H J K L @",
         "{shift} Z X C V B N M _ - {bksp}",
-        ". {space} , {enter}",
+        "{symbols} . {space} , {enter}",
       ],
+      symbols: emailSymbols,
     };
   }
 
@@ -50,14 +96,15 @@ const buildTextRows = (
         ...defaultRows,
         "a s d f g h j k l /",
         "{shift} z x c v b n m - / {bksp}",
-        ". {space} , {enter}",
+        "{symbols} . {space} , {enter}",
       ],
       shift: [
         ...shiftRows,
         "A S D F G H J K L /",
         "{shift} Z X C V B N M - / {bksp}",
-        ". {space} , {enter}",
+        "{symbols} . {space} , {enter}",
       ],
+      symbols: urlSymbols,
     };
   }
 
@@ -66,21 +113,22 @@ const buildTextRows = (
       ...defaultRows,
       "a s d f g h j k l",
       "{shift} z x c v b n m {bksp}",
-      ", {space} . {enter}",
+      "{symbols} , {space} . {enter}",
     ],
     shift: [
       ...shiftRows,
       "A S D F G H J K L",
       "{shift} Z X C V B N M {bksp}",
-      "< {space} > {enter}",
+      "{symbols} < {space} > {enter}",
     ],
+    symbols: textSymbols,
   };
 };
 
 const buildLayout = (
   layout: EdenKeyboardLayout,
   showNumberRow: boolean,
-): { default: string[]; shift: string[] } => {
+): { default: string[]; shift: string[]; symbols?: string[] } => {
   if (layout === "number") {
     return {
       default: ["1 2 3 {bksp}", "4 5 6 {close}", "7 8 9", ". 0 - {enter}"],
@@ -99,6 +147,7 @@ const buildLayout = (
 };
 
 type ShiftState = "default" | "shift" | "caps";
+type KeyboardLayer = "letters" | "symbols";
 
 const SHIFT_ICON =
   "<svg class='keyboard-action-icon keyboard-shift-icon' viewBox='0 0 28 28' aria-hidden='true'><path d='M14 3 25 14.2h-6v10.8H9V14.2H3L14 3Z'/></svg>";
@@ -113,23 +162,41 @@ const getDisplay = () => ({
   "{bksp}": BACKSPACE_ICON,
   "{close}": "×",
   "{enter}": ENTER_ICON,
+  "{letters}": "ABC",
   "{shift}": SHIFT_ICON,
   "{space}": "<span class='keyboard-space-label' aria-hidden='true'></span>",
+  "{symbols}": "?123",
 });
 
-const getLayoutName = (shiftState: ShiftState): "default" | "shift" =>
-  shiftState === "default" ? "default" : "shift";
+const getLayoutName = (
+  shiftState: ShiftState,
+  keyboardLayer: KeyboardLayer,
+): "default" | "shift" | "symbols" =>
+  keyboardLayer === "symbols"
+    ? "symbols"
+    : shiftState === "default"
+      ? "default"
+      : "shift";
 
-const getButtonTheme = (shiftState: ShiftState) => {
+const getButtonTheme = (
+  shiftState: ShiftState,
+  keyboardLayer: KeyboardLayer,
+) => {
+  const theme = [];
+
   if (shiftState === "caps") {
-    return [{ class: "hg-button-locked", buttons: "{shift}" }];
+    theme.push({ class: "hg-button-locked", buttons: "{shift}" });
   }
 
   if (shiftState === "shift") {
-    return [{ class: "hg-button-active", buttons: "{shift}" }];
+    theme.push({ class: "hg-button-active", buttons: "{shift}" });
   }
 
-  return [];
+  if (keyboardLayer === "symbols") {
+    theme.push({ class: "hg-button-active", buttons: "{letters}" });
+  }
+
+  return theme;
 };
 
 const supportsShift = (layout: EdenKeyboardLayout): boolean =>
@@ -137,6 +204,8 @@ const supportsShift = (layout: EdenKeyboardLayout): boolean =>
 
 export default function App() {
   let keyboard: Keyboard | undefined;
+  const [keyboardLayer, setKeyboardLayer] =
+    createSignal<KeyboardLayer>("letters");
   const [shiftState, setShiftState] = createSignal<ShiftState>("default");
   const [keyboardState, setKeyboardState] = createSignal<EdenKeyboardState>(
     DEFAULT_KEYBOARD_STATE,
@@ -175,6 +244,13 @@ export default function App() {
       case "{shift}":
         toggleShift();
         return;
+      case "{symbols}":
+        setKeyboardLayer("symbols");
+        setShiftState("default");
+        return;
+      case "{letters}":
+        setKeyboardLayer("letters");
+        return;
       case "{bksp}":
         await window.edenKeyboard.sendAction({ type: "backspace" });
         return;
@@ -198,9 +274,9 @@ export default function App() {
         keyboardState().layout,
         keyboardState().showNumberRow,
       ),
-      layoutName: getLayoutName(shiftState()),
+      layoutName: getLayoutName(shiftState(), keyboardLayer()),
       display: getDisplay(),
-      buttonTheme: getButtonTheme(shiftState()),
+      buttonTheme: getButtonTheme(shiftState(), keyboardLayer()),
       theme: "hg-theme-default eden-osk-theme",
       physicalKeyboardHighlight: false,
       useButtonTag: true,
@@ -213,6 +289,7 @@ export default function App() {
       setKeyboardState(state);
       if (!supportsShift(state.layout)) {
         setShiftState("default");
+        setKeyboardLayer("letters");
       }
     });
 
@@ -230,12 +307,15 @@ export default function App() {
     const nextShiftState = supportsShift(state.layout)
       ? shiftState()
       : "default";
+    const nextKeyboardLayer = supportsShift(state.layout)
+      ? keyboardLayer()
+      : "letters";
 
     keyboard?.setOptions({
       layout: buildLayout(state.layout, state.showNumberRow),
-      layoutName: getLayoutName(nextShiftState),
+      layoutName: getLayoutName(nextShiftState, nextKeyboardLayer),
       display: getDisplay(),
-      buttonTheme: getButtonTheme(nextShiftState),
+      buttonTheme: getButtonTheme(nextShiftState, nextKeyboardLayer),
     });
   });
 

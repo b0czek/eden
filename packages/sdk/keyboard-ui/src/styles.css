@@ -141,6 +141,8 @@ button,
 .eden-osk-theme .hg-button[data-skbtn="{shift}"],
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
 .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"],
 .eden-osk-theme .hg-button[data-skbtn="{enter}"] {
   flex: 1 1 0;
 }
@@ -165,10 +167,19 @@ button,
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
 .eden-osk-theme .hg-button[data-skbtn="{close}"],
 .eden-osk-theme .hg-button[data-skbtn="{enter}"],
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
 .eden-osk-theme .hg-button[data-skbtn="{shift}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"],
 .eden-osk-theme .hg-button[data-skbtn="{space}"] {
   font-size: 22px;
   font-weight: 600;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"] {
+  background: rgba(255, 255, 255, 0.13);
+  font-size: 14px;
+  letter-spacing: 0.02em;
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{close}"] {
