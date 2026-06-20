@@ -177,6 +177,13 @@ button,
   transform: none;
 }
 
+.eden-osk-theme .hg-button[data-skbtn="{spacer}"] {
+  visibility: hidden;
+  pointer-events: none;
+  background: transparent;
+  box-shadow: none;
+}
+
 .eden-osk-theme .keyboard-drag-icon {
   width: 28px;
   height: 28px;

@@ -1,4 +1,8 @@
-import type { EdenKeyboardLayout, EdenKeyboardState } from "@edenapp/types";
+import type {
+  EdenKeyboardLayout,
+  EdenKeyboardPlacementMode,
+  EdenKeyboardState,
+} from "@edenapp/types";
 import Keyboard from "simple-keyboard";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
@@ -125,21 +129,51 @@ const buildTextRows = (
   };
 };
 
+const compactBottomTrailingKey = (
+  placementMode: EdenKeyboardPlacementMode,
+): "{spacer}" | "{drag}" =>
+  placementMode === "floating" ? "{drag}" : "{spacer}";
+
 const buildLayout = (
   layout: EdenKeyboardLayout,
   showNumberRow: boolean,
+  placementMode: EdenKeyboardPlacementMode = "docked",
 ): { default: string[]; shift: string[]; symbols?: string[] } => {
   if (layout === "number") {
+    const trailing = compactBottomTrailingKey(placementMode);
+
     return {
-      default: ["1 2 3 {bksp}", "4 5 6 {close}", "7 8 9", ". 0 - {enter}"],
-      shift: ["1 2 3 {bksp}", "4 5 6 {close}", "7 8 9", ". 0 - {enter}"],
+      default: [
+        "1 2 3 {bksp}",
+        "4 5 6 {close}",
+        "7 8 9 {enter}",
+        `. 0 - ${trailing}`,
+      ],
+      shift: [
+        "1 2 3 {bksp}",
+        "4 5 6 {close}",
+        "7 8 9 {enter}",
+        `. 0 - ${trailing}`,
+      ],
     };
   }
 
   if (layout === "tel") {
+    const trailing = compactBottomTrailingKey(placementMode);
+
     return {
-      default: ["1 2 3 {bksp}", "4 5 6 {close}", "7 8 9", "* 0 # + {enter}"],
-      shift: ["1 2 3 {bksp}", "4 5 6 {close}", "7 8 9", "* 0 # + {enter}"],
+      default: [
+        "1 2 3 {bksp}",
+        "4 5 6 {close}",
+        "7 8 9 {enter}",
+        `* 0 # + ${trailing}`,
+      ],
+      shift: [
+        "1 2 3 {bksp}",
+        "4 5 6 {close}",
+        "7 8 9 {enter}",
+        `* 0 # + ${trailing}`,
+      ],
     };
   }
 
@@ -257,6 +291,8 @@ export default function App() {
         return;
       case "{drag}":
         return;
+      case "{spacer}":
+        return;
       case "{bksp}":
         await window.edenKeyboard.sendAction({ type: "backspace" });
         return;
@@ -303,6 +339,7 @@ export default function App() {
       layout: buildLayout(
         keyboardState().layout,
         keyboardState().showNumberRow,
+        keyboardState().placementMode,
       ),
       layoutName: getLayoutName(shiftState(), keyboardLayer()),
       display: getDisplay(),
@@ -345,7 +382,11 @@ export default function App() {
       : "letters";
 
     keyboard?.setOptions({
-      layout: buildLayout(state.layout, state.showNumberRow),
+      layout: buildLayout(
+        state.layout,
+        state.showNumberRow,
+        state.placementMode,
+      ),
       layoutName: getLayoutName(nextShiftState, nextKeyboardLayer),
       display: getDisplay(),
       buttonTheme: getButtonTheme(nextShiftState, nextKeyboardLayer),

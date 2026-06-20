@@ -22,6 +22,8 @@ import {
   calculateDockedKeyboardBounds,
   calculateDockedKeyboardLift,
   calculateKeyboardLayout,
+  KEYBOARD_COMPACT_DESIRED_WIDTH,
+  KEYBOARD_COMPACT_MIN_WIDTH,
 } from "./geometry";
 
 const CHANNEL_FOCUS_STATE = "eden-keyboard:focus-state";
@@ -629,10 +631,24 @@ export class KeyboardManager {
     return this.showNumberRow ? 5 : 4;
   }
 
-  private getKeyboardGeometryOptions(): { rowCount: number; scale: number } {
+  private getKeyboardGeometryOptions(): {
+    rowCount: number;
+    scale: number;
+    desiredWidth?: number;
+    minWidth?: number;
+  } {
+    const layout = this.getKeyboardLayout(this.currentTarget?.target);
+    const isCompactLayout = layout === "number" || layout === "tel";
+
     return {
       rowCount: this.getKeyboardRowCount(),
       scale: this.interfaceScale,
+      ...(isCompactLayout
+        ? {
+            desiredWidth: KEYBOARD_COMPACT_DESIRED_WIDTH,
+            minWidth: KEYBOARD_COMPACT_MIN_WIDTH,
+          }
+        : {}),
     };
   }
 

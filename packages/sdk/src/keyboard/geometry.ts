@@ -10,6 +10,8 @@ const KEYBOARD_BOTTOM_MARGIN = 16;
 const DOCKED_HORIZONTAL_MARGIN = 16;
 const KEYBOARD_DESIRED_WIDTH = 960;
 const KEYBOARD_MIN_WIDTH = 420;
+export const KEYBOARD_COMPACT_DESIRED_WIDTH = 360;
+export const KEYBOARD_COMPACT_MIN_WIDTH = 320;
 const KEYBOARD_ROW_HEIGHT = 48;
 const KEYBOARD_ROW_GAP = 6;
 const KEYBOARD_VERTICAL_PADDING = 20;
@@ -17,6 +19,8 @@ const KEYBOARD_VERTICAL_PADDING = 20;
 export type KeyboardGeometryOptions = {
   rowCount: number;
   scale: number;
+  desiredWidth?: number;
+  minWidth?: number;
 };
 
 const clampScale = (scale: number): number => {
@@ -29,16 +33,18 @@ const clampScale = (scale: number): number => {
 
 const calculateKeyboardSize = (
   availableWidth: number,
-  { rowCount, scale }: KeyboardGeometryOptions,
+  { rowCount, scale, desiredWidth, minWidth }: KeyboardGeometryOptions,
   extraHeight = 0,
 ): Pick<ViewBounds, "width" | "height"> => {
   const boundedScale = clampScale(scale);
   const safeRowCount = Math.max(1, rowCount);
-  const desiredWidth = Math.round(KEYBOARD_DESIRED_WIDTH * boundedScale);
-  const minWidth = Math.round(KEYBOARD_MIN_WIDTH * boundedScale);
+  const baseDesiredWidth = desiredWidth ?? KEYBOARD_DESIRED_WIDTH;
+  const baseMinWidth = minWidth ?? KEYBOARD_MIN_WIDTH;
+  const scaledDesiredWidth = Math.round(baseDesiredWidth * boundedScale);
+  const scaledMinWidth = Math.round(baseMinWidth * boundedScale);
   const width = Math.max(
-    Math.min(minWidth, availableWidth),
-    Math.min(availableWidth, desiredWidth),
+    Math.min(scaledMinWidth, availableWidth),
+    Math.min(availableWidth, scaledDesiredWidth),
   );
   const height = Math.round(
     (safeRowCount * KEYBOARD_ROW_HEIGHT +
