@@ -107,7 +107,10 @@ export class KeyboardManager {
       "view/global-bounds-changed",
       ({ workspaceBounds }) => {
         this.workspaceBounds = workspaceBounds;
-        if (this.isKeyboardVisible() && this.placementMode === "docked") {
+        if (
+          this.isKeyboardVisible() &&
+          this.getEffectivePlacementMode() === "docked"
+        ) {
           this.refreshKeyboardPresentation().catch((error) => {
             log.error("Failed to reposition keyboard overlay:", error);
           });
@@ -233,13 +236,19 @@ export class KeyboardManager {
 
   private attachMainWindowTracking(window: BrowserWindow): void {
     window.on("move", () => {
-      if (this.isKeyboardVisible() && this.placementMode === "docked") {
+      if (
+        this.isKeyboardVisible() &&
+        this.getEffectivePlacementMode() === "docked"
+      ) {
         void this.refreshKeyboardPresentation();
       }
     });
 
     window.on("resize", () => {
-      if (this.isKeyboardVisible() && this.placementMode === "docked") {
+      if (
+        this.isKeyboardVisible() &&
+        this.getEffectivePlacementMode() === "docked"
+      ) {
         void this.refreshKeyboardPresentation();
       }
     });
@@ -346,6 +355,15 @@ export class KeyboardManager {
   }
 
   private async handleShowRequest(): Promise<{ success: boolean }> {
+    if (
+      this.isKeyboardVisible() &&
+      this.placementMode === "docked" &&
+      this.keyboardWindow &&
+      !this.keyboardWindow.isDestroyed()
+    ) {
+      this.floatingBounds = this.keyboardWindow.getBounds();
+    }
+
     this.persistentVisibility = true;
     this.dismissedTarget = null;
     await this.showKeyboard();
@@ -380,7 +398,7 @@ export class KeyboardManager {
     }
 
     if (
-      this.placementMode !== "floating" ||
+      this.getEffectivePlacementMode() !== "floating" ||
       !this.keyboardWindow ||
       this.keyboardWindow.isDestroyed() ||
       !payload ||
@@ -493,7 +511,7 @@ export class KeyboardManager {
       visibleOnFullScreen: true,
     });
     keyboardWindow.webContents.setZoomFactor(this.interfaceScale);
-    keyboardWindow.setMovable(this.placementMode === "floating");
+    keyboardWindow.setMovable(this.getEffectivePlacementMode() === "floating");
     keyboardWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     keyboardWindow.webContents.on("did-finish-load", () => {
       this.notifyKeyboardStateChanged();
@@ -506,7 +524,7 @@ export class KeyboardManager {
     });
     keyboardWindow.on("move", () => {
       if (
-        this.placementMode !== "floating" ||
+        this.getEffectivePlacementMode() !== "floating" ||
         !this.keyboardWindow ||
         this.keyboardWindow.isDestroyed()
       ) {
@@ -560,8 +578,16 @@ export class KeyboardManager {
     );
   }
 
+  private getEffectivePlacementMode(): EdenKeyboardPlacementMode {
+    if (this.persistentVisibility) {
+      return "floating";
+    }
+
+    return this.placementMode;
+  }
+
   private getKeyboardBounds(): ViewBounds {
-    if (this.placementMode === "docked") {
+    if (this.getEffectivePlacementMode() === "docked") {
       return this.calculateDockedKeyboardBounds();
     }
 
@@ -578,13 +604,13 @@ export class KeyboardManager {
   }
 
   private getKeyboardInsetState(): EdenKeyboardInsetState {
+    const placementMode = this.getEffectivePlacementMode();
+
     return {
       visible: this.isKeyboardVisible(),
-      placementMode: this.placementMode,
+      placementMode,
       bottomInset:
-        this.enabled &&
-        this.placementMode === "docked" &&
-        this.isKeyboardVisible()
+        this.enabled && placementMode === "docked" && this.isKeyboardVisible()
           ? this.calculateDockedKeyboardBounds().height
           : 0,
     };
@@ -653,7 +679,7 @@ export class KeyboardManager {
   private updateWorkspacePresentation(): void {
     if (
       !this.enabled ||
-      this.placementMode !== "docked" ||
+      this.getEffectivePlacementMode() !== "docked" ||
       !this.isKeyboardVisible()
     ) {
       this.viewManager.setKeyboardPresentationLift(0);
@@ -693,7 +719,9 @@ export class KeyboardManager {
   private async refreshKeyboardPresentation(): Promise<void> {
     const keyboardWindow = this.ensureKeyboardWindow();
     if (keyboardWindow) {
-      keyboardWindow.setMovable(this.placementMode === "floating");
+      keyboardWindow.setMovable(
+        this.getEffectivePlacementMode() === "floating",
+      );
       this.updateKeyboardWindowBounds();
     }
 
@@ -713,7 +741,7 @@ export class KeyboardManager {
       return;
     }
 
-    keyboardWindow.setMovable(this.placementMode === "floating");
+    keyboardWindow.setMovable(this.getEffectivePlacementMode() === "floating");
     this.updateKeyboardWindowBounds();
     if (!keyboardWindow.isVisible()) {
       keyboardWindow.showInactive();
