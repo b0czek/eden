@@ -115,18 +115,6 @@ export const calculateKeyboardLayout = (
     return "number";
   }
 
-  if (inputMode === "tel" || inputType === "tel") {
-    return "tel";
-  }
-
-  if (inputType === "email") {
-    return "email";
-  }
-
-  if (inputType === "url") {
-    return "url";
-  }
-
   return "text";
 };
 

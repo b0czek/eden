@@ -624,7 +624,7 @@ export class KeyboardManager {
 
   private getKeyboardRowCount(): number {
     const layout = this.getKeyboardLayout(this.currentTarget?.target);
-    if (layout === "number" || layout === "tel") {
+    if (layout === "number") {
       return 4;
     }
 
@@ -638,7 +638,7 @@ export class KeyboardManager {
     minWidth?: number;
   } {
     const layout = this.getKeyboardLayout(this.currentTarget?.target);
-    const isCompactLayout = layout === "number" || layout === "tel";
+    const isCompactLayout = layout === "number";
 
     return {
       rowCount: this.getKeyboardRowCount(),

@@ -1,6 +1,6 @@
 export type EdenKeyboardPlacementMode = "docked" | "floating";
 
-export type EdenKeyboardLayout = "text" | "number" | "tel" | "email" | "url";
+export type EdenKeyboardLayout = "text" | "number";
 
 export interface EdenKeyboardTargetBounds {
   x: number;

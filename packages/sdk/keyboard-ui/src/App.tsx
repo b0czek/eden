@@ -15,8 +15,7 @@ const DEFAULT_KEYBOARD_STATE: EdenKeyboardState = {
   showNumberRow: true,
 };
 
-const buildTextRows = (
-  layout: EdenKeyboardLayout,
+const buildTextLayout = (
   showNumberRow: boolean,
 ): { default: string[]; shift: string[]; symbols: string[] } => {
   const defaultRows = showNumberRow
@@ -31,7 +30,7 @@ const buildTextRows = (
     shiftRows.push("Q W E R T Y U I O P");
   }
 
-  const textSymbols = showNumberRow
+  const symbols = showNumberRow
     ? [
         "1 2 3 4 5 6 7 8 9 0",
         "@ # $ & * ( ) ' \" /",
@@ -46,72 +45,6 @@ const buildTextRows = (
         "{letters} {drag} , {space} . {enter}",
       ];
 
-  const emailSymbols = showNumberRow
-    ? [
-        "1 2 3 4 5 6 7 8 9 0",
-        "@ # $ _ & - + ( ) /",
-        "* \" ' : ; ! ? %",
-        "[ ] { } < > \\ | {bksp}",
-        "{letters} {drag} . {space} , {enter}",
-      ]
-    : [
-        "1 2 3 4 5 6 7 8 9 0",
-        "@ # $ _ & - + ( ) /",
-        "* \" ' : ; ! ? {bksp}",
-        "{letters} {drag} . {space} , {enter}",
-      ];
-
-  const urlSymbols = showNumberRow
-    ? [
-        "1 2 3 4 5 6 7 8 9 0",
-        "/ : . - _ ~ ? & = +",
-        "# % @ ! ' \" ( )",
-        "[ ] { } < > \\ | {bksp}",
-        "{letters} {drag} / {space} . {enter}",
-      ]
-    : [
-        "1 2 3 4 5 6 7 8 9 0",
-        "/ : . - _ ~ ? & = +",
-        "# % @ ! ' \" ( ) {bksp}",
-        "{letters} {drag} / {space} . {enter}",
-      ];
-
-  if (layout === "email") {
-    return {
-      default: [
-        ...defaultRows,
-        "a s d f g h j k l @",
-        "{shift} z x c v b n m _ - {bksp}",
-        "{symbols} {drag} . {space} , {enter}",
-      ],
-      shift: [
-        ...shiftRows,
-        "A S D F G H J K L @",
-        "{shift} Z X C V B N M _ - {bksp}",
-        "{symbols} {drag} . {space} , {enter}",
-      ],
-      symbols: emailSymbols,
-    };
-  }
-
-  if (layout === "url") {
-    return {
-      default: [
-        ...defaultRows,
-        "a s d f g h j k l /",
-        "{shift} z x c v b n m - / {bksp}",
-        "{symbols} {drag} . {space} , {enter}",
-      ],
-      shift: [
-        ...shiftRows,
-        "A S D F G H J K L /",
-        "{shift} Z X C V B N M - / {bksp}",
-        "{symbols} {drag} . {space} , {enter}",
-      ],
-      symbols: urlSymbols,
-    };
-  }
-
   return {
     default: [
       ...defaultRows,
@@ -125,7 +58,7 @@ const buildTextRows = (
       "{shift} Z X C V B N M {bksp}",
       "{symbols} {drag} < {space} > {enter}",
     ],
-    symbols: textSymbols,
+    symbols,
   };
 };
 
@@ -158,26 +91,7 @@ const buildLayout = (
     };
   }
 
-  if (layout === "tel") {
-    const trailing = compactBottomTrailingKey(placementMode);
-
-    return {
-      default: [
-        "1 2 3 {bksp}",
-        "4 5 6 {close}",
-        "7 8 9 {enter}",
-        `* 0 # + ${trailing}`,
-      ],
-      shift: [
-        "1 2 3 {bksp}",
-        "4 5 6 {close}",
-        "7 8 9 {enter}",
-        `* 0 # + ${trailing}`,
-      ],
-    };
-  }
-
-  return buildTextRows(layout, showNumberRow);
+  return buildTextLayout(showNumberRow);
 };
 
 type ShiftState = "default" | "shift" | "caps";
@@ -238,7 +152,7 @@ const getButtonTheme = (
 };
 
 const supportsShift = (layout: EdenKeyboardLayout): boolean =>
-  layout !== "number" && layout !== "tel";
+  layout !== "number";
 
 export default function App() {
   let keyboard: Keyboard | undefined;
