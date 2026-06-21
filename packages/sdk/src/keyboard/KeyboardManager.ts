@@ -42,10 +42,12 @@ const CHANNEL_STATE_CHANGED = "eden-keyboard:state-changed";
 const CHANNEL_GET_STATE = "eden-keyboard:get-state";
 
 const SETTING_ENABLED = "keyboard.enabled";
+const SETTING_AUTO_SHOW_ON_FOCUS = "keyboard.autoShowOnFocus";
 const SETTING_PLACEMENT_MODE = "keyboard.placementMode";
 const SETTING_SHOW_NUMBER_ROW = "keyboard.showNumberRow";
 const SETTING_INTERFACE_SCALE = "general.interfaceScale";
 const DEFAULT_ENABLED = true;
+const DEFAULT_AUTO_SHOW_ON_FOCUS = true;
 const DEFAULT_PLACEMENT_MODE: EdenKeyboardPlacementMode = "docked";
 const DEFAULT_SHOW_NUMBER_ROW = true;
 const DEFAULT_INTERFACE_SCALE = 1;
@@ -81,6 +83,7 @@ export class KeyboardManager {
   > | null = null;
   private floatingBounds: ViewBounds | null = null;
   private enabled = DEFAULT_ENABLED;
+  private autoShowOnFocus = DEFAULT_AUTO_SHOW_ON_FOCUS;
   private placementMode: EdenKeyboardPlacementMode = DEFAULT_PLACEMENT_MODE;
   private showNumberRow = DEFAULT_SHOW_NUMBER_ROW;
   private interfaceScale = DEFAULT_INTERFACE_SCALE;
@@ -194,7 +197,29 @@ export class KeyboardManager {
             return;
           }
 
-          if (this.currentTarget) {
+          if (this.currentTarget && this.autoShowOnFocus) {
+            void this.showKeyboard();
+          }
+          return;
+        }
+
+        if (data.key === SETTING_AUTO_SHOW_ON_FOCUS) {
+          const nextAutoShowOnFocus = data.value !== "false";
+          if (nextAutoShowOnFocus === this.autoShowOnFocus) {
+            return;
+          }
+
+          this.autoShowOnFocus = nextAutoShowOnFocus;
+          if (
+            !this.autoShowOnFocus &&
+            this.isKeyboardVisible() &&
+            !this.persistentVisibility
+          ) {
+            void this.hideKeyboard();
+            return;
+          }
+
+          if (this.autoShowOnFocus && this.enabled && this.currentTarget) {
             void this.showKeyboard();
           }
         }
@@ -310,7 +335,7 @@ export class KeyboardManager {
       placementMode: payload.placementMode,
     };
 
-    if (!this.enabled) {
+    if (!this.enabled || !this.autoShowOnFocus) {
       return;
     }
 
@@ -366,6 +391,10 @@ export class KeyboardManager {
   }
 
   private async handleShowRequest(): Promise<{ success: boolean }> {
+    if (!this.enabled) {
+      return { success: false };
+    }
+
     if (
       this.isKeyboardVisible() &&
       this.placementMode === "docked" &&
@@ -916,24 +945,25 @@ export class KeyboardManager {
 
   private async initializeSettings(): Promise<void> {
     try {
-      const [enabled, placementMode, showNumberRow, interfaceScale] =
-        await Promise.all([
-          this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_ENABLED),
-          this.settingsManager.get(
-            EDEN_SETTINGS_APP_ID,
-            SETTING_PLACEMENT_MODE,
-          ),
-          this.settingsManager.get(
-            EDEN_SETTINGS_APP_ID,
-            SETTING_SHOW_NUMBER_ROW,
-          ),
-          this.settingsManager.get(
-            EDEN_SETTINGS_APP_ID,
-            SETTING_INTERFACE_SCALE,
-          ),
-        ]);
+      const [
+        enabled,
+        autoShowOnFocus,
+        placementMode,
+        showNumberRow,
+        interfaceScale,
+      ] = await Promise.all([
+        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_ENABLED),
+        this.settingsManager.get(
+          EDEN_SETTINGS_APP_ID,
+          SETTING_AUTO_SHOW_ON_FOCUS,
+        ),
+        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_PLACEMENT_MODE),
+        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_SHOW_NUMBER_ROW),
+        this.settingsManager.get(EDEN_SETTINGS_APP_ID, SETTING_INTERFACE_SCALE),
+      ]);
 
       this.enabled = enabled !== "false";
+      this.autoShowOnFocus = autoShowOnFocus !== "false";
       this.placementMode = this.parsePlacementMode(placementMode);
       this.showNumberRow = showNumberRow !== "false";
       this.interfaceScale = this.parseInterfaceScale(interfaceScale);

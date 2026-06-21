@@ -71,6 +71,19 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
         },
         type: "toggle",
         description: {
+          en: "Allow the on-screen keyboard to be shown from the shell and app controls.",
+          pl: "Zezwalaj na wyświetlanie klawiatury ekranowej z poziomu powłoki i kontrolek aplikacji.",
+        },
+        defaultValue: "true",
+      },
+      {
+        key: "keyboard.autoShowOnFocus",
+        label: {
+          en: "Show Automatically on Focus",
+          pl: "Pokazuj automatycznie po fokusie",
+        },
+        type: "toggle",
+        description: {
           en: "Show the on-screen keyboard when editable fields receive focus.",
           pl: "Pokazuj klawiaturę ekranową, gdy pola edycji otrzymują fokus.",
         },

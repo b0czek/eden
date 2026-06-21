@@ -1,6 +1,6 @@
 import type { EdenKeyboardState } from "@edenapp/types";
 import { BiSolidKeyboard } from "solid-icons/bi";
-import { createSignal, onCleanup, onMount } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import "./KeyboardButton.css";
 
 export interface KeyboardButtonProps {
@@ -63,16 +63,18 @@ export function KeyboardButton(props: KeyboardButtonProps) {
   });
 
   return (
-    <button
-      type="button"
-      class={`eden-btn eden-btn-ghost eden-btn-icon eden-keyboard-button ${props.class ?? ""}`}
-      classList={{ active: keyboardState().visible }}
-      onClick={() => void handleToggle()}
-      onPointerDown={handlePointerDown}
-      title={props.label}
-      aria-label={props.label}
-    >
-      <BiSolidKeyboard />
-    </button>
+    <Show when={keyboardState().enabled}>
+      <button
+        type="button"
+        class={`eden-btn eden-btn-ghost eden-btn-icon eden-keyboard-button ${props.class ?? ""}`}
+        classList={{ active: keyboardState().visible }}
+        onClick={() => void handleToggle()}
+        onPointerDown={handlePointerDown}
+        title={props.label}
+        aria-label={props.label}
+      >
+        <BiSolidKeyboard />
+      </button>
+    </Show>
   );
 }
