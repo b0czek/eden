@@ -1,11 +1,11 @@
 /**
  * Eden CSS - Design Tokens
- *
+ * 
  * ⚠️  AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY
- *
+ * 
  * This file is generated from src/edencss/tokens.json
  * Run `npm run tokens:build` to regenerate
- *
+ * 
  * These CSS custom properties define the visual language of Eden.
  * They can be used in any app or component.
  */
@@ -73,12 +73,8 @@
   --eden-glass-medium: blur(18px) saturate(140%);
   --eden-glass-strong: blur(26px) saturate(160%);
   --eden-glass-ultra: blur(34px) saturate(170%);
-  --eden-font-family-base:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
-    Cantarell, sans-serif;
-  --eden-font-family-mono:
-    "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New",
-    monospace;
+  --eden-font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --eden-font-family-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
   --eden-font-size-xs: 10px;
   --eden-font-size-sm: 11px;
   --eden-font-size-base: 13px;

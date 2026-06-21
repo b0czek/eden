@@ -425,7 +425,7 @@ async function findAllApps(dir: string): Promise<string[]> {
 export async function buildSdkApps(
   options: BuildSdkAppsOptions,
 ): Promise<void> {
-  const { appsDir, outputDir, force = false } = options;
+  const { appsDir, outputDir } = options;
 
   console.log("🔨 Building SDK apps...\n");
 

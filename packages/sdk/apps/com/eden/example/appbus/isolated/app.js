@@ -59,7 +59,7 @@ class IsolatedApp {
       try {
         const pingResult = await this.connection.request("ping", {});
         this.addMessage(`Connected to ${pingResult.from}!`, "system");
-      } catch (err) {
+      } catch {
         this.addMessage("Connected (ping failed)", "system");
       }
 

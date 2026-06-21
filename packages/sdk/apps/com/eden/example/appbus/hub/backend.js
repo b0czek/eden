@@ -33,7 +33,7 @@ worker.appBus.exposeService(
     });
 
     // Handle join request
-    connection.handle("join", ({ clientId, nickname }) => {
+    connection.handle("join", ({ nickname }) => {
       clients.set(clientAppId, { connection, nickname });
       console.log(`[Hub] Client joined: ${nickname} (${clientAppId})`);
 
@@ -50,7 +50,7 @@ worker.appBus.exposeService(
     });
 
     // Handle send-message request
-    connection.handle("send-message", ({ clientId, message }) => {
+    connection.handle("send-message", ({ message }) => {
       const client = clients.get(clientAppId);
       if (!client) {
         return { success: false, error: "Not joined" };
@@ -74,7 +74,7 @@ worker.appBus.exposeService(
     });
 
     // Handle leave request
-    connection.handle("leave", ({ clientId }) => {
+    connection.handle("leave", () => {
       const client = clients.get(clientAppId);
       if (client) {
         clients.delete(clientAppId);

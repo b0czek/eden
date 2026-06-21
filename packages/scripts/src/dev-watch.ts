@@ -305,7 +305,7 @@ async function startServer(options: {
       console.warn(`⚠️  Skipping hot reload for ${appId}: missing dev script`);
       return;
     }
-  } catch (error) {
+  } catch {
     console.warn(
       `⚠️  Skipping hot reload for ${appId}: cannot read ${packageJsonPath}`,
     );

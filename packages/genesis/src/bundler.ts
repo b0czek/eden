@@ -393,7 +393,7 @@ async function createArchive(
       cwd: appDirectory,
       gzip: false,
       portable: true,
-      filter: (entryPath, stat) => {
+      filter: (entryPath, _stat) => {
         if (verbose && progressBar) {
           processedFiles++;
           progressBar.update(processedFiles);
