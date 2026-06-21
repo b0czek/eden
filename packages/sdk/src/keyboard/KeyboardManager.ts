@@ -2,15 +2,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
   EdenKeyboardAction,
+  EdenKeyboardDragInput,
+  EdenKeyboardDragPoint,
   EdenKeyboardFocusState,
   EdenKeyboardInsetState,
   EdenKeyboardLayout,
   EdenKeyboardPlacementMode,
+  EdenKeyboardStartDragRequest,
   EdenKeyboardState,
   EdenKeyboardTarget,
+  EdenKeyboardUpdateDragRequest,
   ViewBounds,
 } from "@edenapp/types";
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, screen } from "electron";
 import { delay, inject, injectable, singleton } from "tsyringe";
 import { IPCBridge } from "../ipc";
 import { log } from "../logging";
@@ -31,6 +35,7 @@ const CHANNEL_SHOW = "eden-keyboard:show";
 const CHANNEL_SEND_ACTION = "eden-keyboard:send-action";
 const CHANNEL_HIDE = "eden-keyboard:hide";
 const CHANNEL_START_DRAG = "eden-keyboard:start-drag";
+const CHANNEL_UPDATE_DRAG = "eden-keyboard:update-drag";
 const CHANNEL_END_DRAG = "eden-keyboard:end-drag";
 const CHANNEL_APPLY_ACTION = "eden-keyboard:apply-action";
 const CHANNEL_STATE_CHANGED = "eden-keyboard:state-changed";
@@ -54,9 +59,11 @@ type KeyboardTargetSession = {
 };
 
 type KeyboardDragState = {
-  startX: number;
-  startY: number;
+  input: EdenKeyboardDragInput;
+  startPoint: { x: number; y: number };
   startBounds: ViewBounds;
+  lastX?: number;
+  lastY?: number;
 };
 
 @singleton()
@@ -219,11 +226,15 @@ export class KeyboardManager {
 
     ipcMain.handle(
       CHANNEL_START_DRAG,
-      async (
-        event,
-        payload: { startX?: number; startY?: number } | undefined,
-      ) => {
+      async (event, payload: EdenKeyboardStartDragRequest | undefined) => {
         return await this.handleStartDragRequest(event.sender.id, payload);
+      },
+    );
+
+    ipcMain.on(
+      CHANNEL_UPDATE_DRAG,
+      (event, payload: EdenKeyboardUpdateDragRequest | undefined) => {
+        this.handleUpdateDragRequest(event.sender.id, payload);
       },
     );
 
@@ -393,7 +404,7 @@ export class KeyboardManager {
 
   private async handleStartDragRequest(
     senderWebContentsId: number,
-    payload: { startX?: number; startY?: number } | undefined,
+    payload: EdenKeyboardStartDragRequest | undefined,
   ): Promise<{ success: boolean }> {
     if (!this.ensureKeyboardRequest(senderWebContentsId)) {
       throw new Error("Only the keyboard window can start keyboard drag");
@@ -404,44 +415,134 @@ export class KeyboardManager {
       !this.keyboardWindow ||
       this.keyboardWindow.isDestroyed() ||
       !payload ||
-      typeof payload.startX !== "number" ||
-      typeof payload.startY !== "number" ||
-      !Number.isFinite(payload.startX) ||
-      !Number.isFinite(payload.startY)
+      !this.isValidDragInput(payload.input) ||
+      !this.isValidDragPoint(payload.point)
     ) {
       return { success: false };
     }
 
-    const startX = payload.startX;
-    const startY = payload.startY;
+    const startPoint = this.resolveDragPoint(payload.point);
 
     this.endKeyboardDrag();
     this.dragState = {
-      startX,
-      startY,
+      input: payload.input,
+      startPoint,
       startBounds: this.keyboardWindow.getBounds(),
     };
 
-    this.mouseTracker.subscribe("keyboard-drag", (position) => {
-      if (
-        !this.dragState ||
-        !this.keyboardWindow ||
-        this.keyboardWindow.isDestroyed()
-      ) {
-        return;
-      }
-
-      const nextBounds = {
-        ...this.dragState.startBounds,
-        x: this.dragState.startBounds.x + position.x - this.dragState.startX,
-        y: this.dragState.startBounds.y + position.y - this.dragState.startY,
-      };
-
-      this.keyboardWindow.setBounds(nextBounds);
-      this.floatingBounds = nextBounds;
-    });
+    if (payload.input === "system-cursor") {
+      this.mouseTracker.subscribe("keyboard-drag", (position) => {
+        this.applyKeyboardDragPosition(position.x, position.y);
+      });
+    }
 
     return { success: true };
+  }
+
+  private handleUpdateDragRequest(
+    senderWebContentsId: number,
+    payload: EdenKeyboardUpdateDragRequest | undefined,
+  ): void {
+    if (!this.ensureKeyboardRequest(senderWebContentsId)) {
+      return;
+    }
+
+    if (!this.dragState || !payload || !this.isValidDragPoint(payload.point)) {
+      return;
+    }
+
+    if (this.dragState.input !== "renderer-events") {
+      return;
+    }
+
+    const point = this.resolveDragPoint(payload.point);
+    this.applyKeyboardDragPosition(point.x, point.y);
+  }
+
+  private isValidDragInput(
+    input: EdenKeyboardStartDragRequest["input"] | undefined,
+  ): input is EdenKeyboardDragInput {
+    return input === "system-cursor" || input === "renderer-events";
+  }
+
+  private isValidDragPoint(
+    point: EdenKeyboardStartDragRequest["point"] | undefined,
+  ): point is EdenKeyboardDragPoint {
+    if (
+      !point ||
+      typeof point.x !== "number" ||
+      typeof point.y !== "number" ||
+      !Number.isFinite(point.x) ||
+      !Number.isFinite(point.y)
+    ) {
+      return false;
+    }
+
+    return point.space === "screen" || point.space === "keyboard-client";
+  }
+
+  private resolveDragPoint(point: EdenKeyboardDragPoint): {
+    x: number;
+    y: number;
+  } {
+    if (point.space === "screen") {
+      return { x: point.x, y: point.y };
+    }
+
+    if (!this.keyboardWindow || this.keyboardWindow.isDestroyed()) {
+      return { x: point.x, y: point.y };
+    }
+
+    const bounds = this.keyboardWindow.getBounds();
+    return {
+      x: bounds.x + Math.round(point.x * this.interfaceScale),
+      y: bounds.y + Math.round(point.y * this.interfaceScale),
+    };
+  }
+
+  private applyKeyboardDragPosition(screenX: number, screenY: number): void {
+    if (
+      !this.dragState ||
+      !this.keyboardWindow ||
+      this.keyboardWindow.isDestroyed()
+    ) {
+      return;
+    }
+
+    const nextBounds = {
+      ...this.dragState.startBounds,
+      x: Math.round(
+        this.dragState.startBounds.x + screenX - this.dragState.startPoint.x,
+      ),
+      y: Math.round(
+        this.dragState.startBounds.y + screenY - this.dragState.startPoint.y,
+      ),
+    };
+    const constrainedBounds = this.constrainFloatingBounds(nextBounds);
+    const nextX = constrainedBounds.x;
+    const nextY = constrainedBounds.y;
+
+    if (this.dragState.lastX === nextX && this.dragState.lastY === nextY) {
+      return;
+    }
+
+    this.dragState.lastX = nextX;
+    this.dragState.lastY = nextY;
+    this.keyboardWindow.setBounds(constrainedBounds);
+    this.floatingBounds = constrainedBounds;
+  }
+
+  private constrainFloatingBounds(bounds: ViewBounds): ViewBounds {
+    const display = screen.getDisplayMatching(bounds);
+    const area = display.workArea;
+    const maxX = area.x + Math.max(0, area.width - bounds.width);
+    const maxY = area.y + Math.max(0, area.height - bounds.height);
+
+    return {
+      ...bounds,
+      x: Math.min(Math.max(bounds.x, area.x), maxX),
+      y: Math.min(Math.max(bounds.y, area.y), maxY),
+    };
   }
 
   private async handleEndDragRequest(
@@ -457,6 +558,15 @@ export class KeyboardManager {
 
   private endKeyboardDrag(): void {
     this.mouseTracker.unsubscribe("keyboard-drag");
+
+    if (
+      this.dragState &&
+      this.keyboardWindow &&
+      !this.keyboardWindow.isDestroyed()
+    ) {
+      this.floatingBounds = this.keyboardWindow.getBounds();
+    }
+
     this.dragState = null;
   }
 
@@ -526,6 +636,7 @@ export class KeyboardManager {
     });
     keyboardWindow.on("move", () => {
       if (
+        this.dragState ||
         this.getEffectivePlacementMode() !== "floating" ||
         !this.keyboardWindow ||
         this.keyboardWindow.isDestroyed()
@@ -792,6 +903,7 @@ export class KeyboardManager {
     ipcMain.removeHandler(CHANNEL_SEND_ACTION);
     ipcMain.removeHandler(CHANNEL_HIDE);
     ipcMain.removeHandler(CHANNEL_START_DRAG);
+    ipcMain.removeAllListeners(CHANNEL_UPDATE_DRAG);
     ipcMain.removeHandler(CHANNEL_END_DRAG);
     ipcMain.removeAllListeners(CHANNEL_FOCUS_STATE);
     this.endKeyboardDrag();

@@ -33,8 +33,11 @@ contextBridge.exposeInMainWorld("edenKeyboard", {
   hide: () => {
     return ipcRenderer.invoke("eden-keyboard:hide");
   },
-  startDrag: (startX, startY) => {
-    return ipcRenderer.invoke("eden-keyboard:start-drag", { startX, startY });
+  startDrag: (request) => {
+    return ipcRenderer.invoke("eden-keyboard:start-drag", request);
+  },
+  updateDrag: (request) => {
+    ipcRenderer.send("eden-keyboard:update-drag", request);
   },
   endDrag: () => {
     return ipcRenderer.invoke("eden-keyboard:end-drag");

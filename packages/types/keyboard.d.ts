@@ -42,11 +42,29 @@ export type EdenKeyboardAction =
   | { type: "backspace" }
   | { type: "enter" };
 
+export type EdenKeyboardDragPoint =
+  | { space: "screen"; x: number; y: number }
+  | { space: "keyboard-client"; x: number; y: number };
+
+export type EdenKeyboardDragInput = "system-cursor" | "renderer-events";
+
+export interface EdenKeyboardStartDragRequest {
+  point: EdenKeyboardDragPoint;
+  input: EdenKeyboardDragInput;
+}
+
+export interface EdenKeyboardUpdateDragRequest {
+  point: EdenKeyboardDragPoint;
+}
+
 export interface EdenKeyboardAPI {
   show(): Promise<{ success: boolean }>;
   sendAction(action: EdenKeyboardAction): Promise<{ success: boolean }>;
   hide(): Promise<{ success: boolean }>;
-  startDrag(startX: number, startY: number): Promise<{ success: boolean }>;
+  startDrag(
+    request: EdenKeyboardStartDragRequest,
+  ): Promise<{ success: boolean }>;
+  updateDrag(request: EdenKeyboardUpdateDragRequest): void;
   endDrag(): Promise<{ success: boolean }>;
   getState(): Promise<EdenKeyboardState>;
   onStateChanged?(callback: (state: EdenKeyboardState) => void): () => void;

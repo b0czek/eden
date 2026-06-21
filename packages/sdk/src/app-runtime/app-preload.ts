@@ -176,6 +176,7 @@ const keyboardAPI: EdenKeyboardAPI = {
     ipcRenderer.invoke(KEYBOARD_SEND_ACTION_CHANNEL, action),
   hide: () => ipcRenderer.invoke(KEYBOARD_HIDE_CHANNEL),
   startDrag: () => Promise.resolve({ success: false }),
+  updateDrag: () => {},
   endDrag: () => Promise.resolve({ success: false }),
   getState: () => ipcRenderer.invoke(KEYBOARD_GET_STATE_CHANNEL),
   onStateChanged: (callback) => {
