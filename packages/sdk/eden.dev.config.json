@@ -17,6 +17,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.file-picker",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.settings",
       "source": "builtin"
     },
@@ -33,7 +37,8 @@
     "com.eden": {
       "autostart.com.eden.eveshell": "true",
       "autostart.com.eden.toaster": "true",
-      "autostart.com.eden.context-menu": "true"
+      "autostart.com.eden.context-menu": "true",
+      "autostart.com.eden.file-picker": "true"
     }
   },
   "hotReload": {
