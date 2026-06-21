@@ -1,12 +1,12 @@
+import { KeyboardButton } from "@edenapp/solid-kit";
+import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
-  AppManifest,
   AppInstance,
+  AppManifest,
   UserProfile,
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
-import { DialogHost, createDialogs } from "@edenapp/solid-kit/dialogs";
-import { KeyboardButton } from "@edenapp/solid-kit";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
 import { getLocalizedValue, initLocale, locale, t } from "../i18n";

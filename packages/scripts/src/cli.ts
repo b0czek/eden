@@ -1,13 +1,14 @@
 #!/usr/bin/env node
+
 /**
  * Eden Build CLI
  *
  * Build tools for Eden projects
  */
 
-import { Command } from "commander";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { Command } from "commander";
 import { buildApps, buildSdkApps } from "./build-apps";
 import { buildSeedConfig } from "./config";
 import { copyAssets } from "./copy-assets";

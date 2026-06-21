@@ -1,5 +1,5 @@
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import { button, separator, type ContextMenuAction } from "@edenapp/tablets";
+import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
 import type { FileHandlerInfo, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";

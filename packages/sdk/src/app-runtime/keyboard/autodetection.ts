@@ -3,12 +3,12 @@ import type {
   EdenKeyboardTarget,
 } from "@edenapp/types";
 import {
+  type EditableElement,
   getEditableElementBounds,
   getKeyboardAutodetectionMode,
   getKeyboardFocusPlacementMode,
   getKeyboardTarget,
   isEditableElement,
-  type EditableElement,
 } from "./editable-target";
 
 interface KeyboardAutodetectionOptions {

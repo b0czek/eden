@@ -1,6 +1,6 @@
 import type { AppManifest, SettingsCategory } from "@edenapp/types";
-import { FiCode, FiImage, FiPackage, FiSettings } from "solid-icons/fi";
 import { BiSolidKeyboard } from "solid-icons/bi";
+import { FiCode, FiImage, FiPackage, FiSettings } from "solid-icons/fi";
 import { VsPulse, VsSymbolColor } from "solid-icons/vs";
 import { type Accessor, type Component, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../i18n";

@@ -3,8 +3,8 @@ import { createStore, reconcile } from "solid-js/store";
 import { initLocale, t } from "../i18n";
 import { getAppGroupKey, getChildProcesses, normalizeSnapshot } from "./model";
 import {
-  EMPTY_SNAPSHOT,
   type AppIcons,
+  EMPTY_SNAPSHOT,
   type ExpandedGroups,
   type ProcessMetricsState,
   type TrackedAppProcessMetrics,

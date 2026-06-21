@@ -1,5 +1,4 @@
-import type { Component } from "solid-js";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import pdfiumWasmUrl from "@embedpdf/pdfium/pdfium.wasm?url";
 import EmbedPDF, {
   type DocumentManagerCapability,
   type DocumentManagerPlugin,
@@ -7,7 +6,8 @@ import EmbedPDF, {
   type PluginRegistry,
   ZoomMode,
 } from "@embedpdf/snippet";
-import pdfiumWasmUrl from "@embedpdf/pdfium/pdfium.wasm?url";
+import type { Component } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import appIconUrl from "../icon.svg?url";
 
 interface FileOpenedEvent {

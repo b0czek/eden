@@ -1,13 +1,11 @@
-import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import type {
   EdenKeyboardAction,
   EdenKeyboardAPI,
   EdenKeyboardState,
 } from "@edenapp/types";
+import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
-import { createKeyboardActionController } from "./keyboard/actions";
-import { createKeyboardAutodetection } from "./keyboard/autodetection";
 import {
   createAppBusAPI,
   createEdenAPI,
@@ -23,6 +21,8 @@ import {
   type PendingRequest,
   wrapDOMPort,
 } from "./common/port-channel";
+import { createKeyboardActionController } from "./keyboard/actions";
+import { createKeyboardAutodetection } from "./keyboard/autodetection";
 
 // Per-app state
 let appId: string | null = null;

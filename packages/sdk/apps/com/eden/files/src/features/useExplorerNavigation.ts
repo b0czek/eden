@@ -1,5 +1,5 @@
-import { createEffect, createSignal } from "solid-js";
 import type { Setter } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { t } from "../i18n";
 import type { FileItem } from "../types";
 import { getParentPath, joinPath } from "../utils";

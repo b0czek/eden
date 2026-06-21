@@ -178,7 +178,9 @@ body {
   display: block;
 }
 
-.context-menu-item[data-submenu-side="left"] .context-menu-submenu-indicator svg {
+.context-menu-item[data-submenu-side="left"]
+  .context-menu-submenu-indicator
+  svg {
   transform: scaleX(-1);
 }
 

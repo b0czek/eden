@@ -5,12 +5,12 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { resolveConsumerPackageJson } from "./package-resolution";
 import type {
   EdenSeedConfig,
   EdenSeedSettings,
   EdenUserConfig,
 } from "@edenapp/types";
+import { resolveConsumerPackageJson } from "./package-resolution";
 
 /**
  * App source from Eden's builtin library
