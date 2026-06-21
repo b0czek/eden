@@ -13,10 +13,11 @@ interface FileListProps {
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
+  selectedItems?: string[];
   scrollToSelected?: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
-  onItemClick: (item: FileItem) => void;
+  onItemClick: (item: FileItem, event?: MouseEvent | KeyboardEvent) => void;
   onItemDoubleClick: (item: FileItem) => void;
   onItemContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onBackgroundContextMenu?: (e: MouseEvent) => void;
@@ -28,6 +29,14 @@ interface FileListProps {
 const FileList: Component<FileListProps> = (props) => {
   const fileRefs: Map<string, HTMLDivElement> = new Map();
   let containerRef: HTMLDivElement | undefined;
+
+  const isItemSelected = (item: FileItem) => {
+    const selectedItems = props.selectedItems;
+    if (selectedItems) {
+      return selectedItems.includes(item.path);
+    }
+    return props.selectedItem === item.path;
+  };
 
   createEffect(() => {
     // Track items to re-run when list updates
@@ -182,7 +191,7 @@ const FileList: Component<FileListProps> = (props) => {
               <FileItemComponent
                 ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
                 item={item}
-                isSelected={props.selectedItem === item.path}
+                isSelected={isItemSelected(item)}
                 viewStyle={props.viewStyle}
                 itemSize={props.itemSize}
                 labels={props.labels}

@@ -14,7 +14,7 @@ interface FileItemComponentProps {
   isSelected: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
-  onClick: (item: FileItem) => void;
+  onClick: (item: FileItem, event: MouseEvent) => void;
   onDoubleClick: (item: FileItem) => void;
   onContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onDelete?: (item: FileItem, e: MouseEvent) => void;
@@ -44,7 +44,7 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       <button
         type="button"
         class="file-item-main"
-        onClick={() => props.onClick(props.item)}
+        onClick={(event) => props.onClick(props.item, event)}
         onDblClick={() => props.onDoubleClick(props.item)}
         onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >

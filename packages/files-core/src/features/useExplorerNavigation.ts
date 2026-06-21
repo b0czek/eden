@@ -99,6 +99,17 @@ export const useExplorerNavigation = (
     }
   };
 
+  const resetNavigation = (path: string, selectedItem?: string) => {
+    setNavigationHistory([path]);
+    setHistoryIndex(0);
+    loadDirectory(path);
+
+    if (selectedItem) {
+      options.setScrollToSelected(true);
+      options.setSelectedItem(selectedItem);
+    }
+  };
+
   const goBack = () => {
     const index = historyIndex();
     if (index > 0) {
@@ -151,6 +162,7 @@ export const useExplorerNavigation = (
     historyIndex,
     loadDirectory,
     navigateTo,
+    resetNavigation,
     goBack,
     goForward,
     goUp,
