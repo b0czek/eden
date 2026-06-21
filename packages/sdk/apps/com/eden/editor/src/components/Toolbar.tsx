@@ -22,9 +22,29 @@ function SaveIcon() {
   );
 }
 
+function OpenIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <title>{t("editor.openFile")}</title>
+      <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2"></path>
+      <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2l1-7H2l1 7"></path>
+    </svg>
+  );
+}
+
 interface ToolbarProps {
   activeTab: EditorTab | undefined;
   isSaving: boolean;
+  onOpen: () => void;
   onSave: () => void;
 }
 
@@ -36,6 +56,14 @@ export function Toolbar(props: ToolbarProps) {
         <span class="file-language">{props.activeTab?.language}</span>
       </div>
       <div class="toolbar-actions">
+        <button
+          type="button"
+          class="eden-btn eden-btn-sm"
+          onClick={props.onOpen}
+          title={`${t("editor.openFile")} (Ctrl+O)`}
+        >
+          <OpenIcon />
+        </button>
         <button
           type="button"
           class="eden-btn eden-btn-sm"

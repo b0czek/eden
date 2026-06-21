@@ -35,7 +35,11 @@ function ShortcutItem(props: ShortcutItemProps) {
 
 import { t } from "../i18n";
 
-export function WelcomeScreen() {
+interface WelcomeScreenProps {
+  onOpen: () => void;
+}
+
+export function WelcomeScreen(props: WelcomeScreenProps) {
   return (
     <div class="welcome-content">
       <div class="empty-state-icon">
@@ -43,7 +47,18 @@ export function WelcomeScreen() {
       </div>
       <h1>{t("editor.title")}</h1>
       <p>{t("editor.welcome")}</p>
+      <button
+        type="button"
+        class="eden-btn eden-btn-primary eden-btn-md"
+        onClick={props.onOpen}
+      >
+        {t("editor.openFile")}
+      </button>
       <div class="welcome-shortcuts">
+        <ShortcutItem
+          shortcut="Ctrl+O"
+          description={t("editor.openShortcut")}
+        />
         <ShortcutItem
           shortcut="Ctrl+S"
           description={t("editor.saveShortcut")}

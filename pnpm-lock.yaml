@@ -255,6 +255,9 @@ importers:
 
   packages/sdk/apps/com/eden/editor:
     dependencies:
+      '@edenapp/tablets':
+        specifier: workspace:*
+        version: link:../../../../../tablets
       monaco-editor:
         specifier: ^0.52.2
         version: 0.52.2

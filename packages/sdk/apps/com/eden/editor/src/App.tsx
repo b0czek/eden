@@ -1,3 +1,4 @@
+import { filePicker } from "@edenapp/tablets";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
@@ -66,6 +67,10 @@ const App: Component = () => {
         e.preventDefault();
         saveFile();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+        e.preventDefault();
+        void openFileFromPicker();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "w") {
         e.preventDefault();
         const active = activeTabId();
@@ -87,6 +92,56 @@ const App: Component = () => {
     console.log("File opened:", data);
     if (!data.isDirectory) {
       openFile(data.path);
+    }
+  };
+
+  const openFileFromPicker = async () => {
+    try {
+      setError(null);
+      const path = await filePicker.openFile({
+        title: t("editor.openFile"),
+        filters: [
+          {
+            name: t("editor.textFiles"),
+            extensions: [
+              "txt",
+              "md",
+              "markdown",
+              "log",
+              "js",
+              "jsx",
+              "mjs",
+              "cjs",
+              "ts",
+              "tsx",
+              "mts",
+              "cts",
+              "html",
+              "htm",
+              "css",
+              "less",
+              "json",
+              "yaml",
+              "yml",
+              "toml",
+              "ini",
+              "cfg",
+              "conf",
+              "env",
+              "sh",
+              "bash",
+              "zsh",
+              "fish",
+            ],
+          },
+        ],
+      });
+
+      if (path) {
+        await openFile(path);
+      }
+    } catch (err) {
+      setError(t("editor.failedToLoad", { message: (err as Error).message }));
     }
   };
 
@@ -207,6 +262,7 @@ const App: Component = () => {
         <Toolbar
           activeTab={activeTab()}
           isSaving={isSaving()}
+          onOpen={openFileFromPicker}
           onSave={saveFile}
         />
       </Show>
@@ -218,7 +274,7 @@ const App: Component = () => {
       </Show>
 
       <Show when={tabs().length === 0}>
-        <WelcomeScreen />
+        <WelcomeScreen onOpen={openFileFromPicker} />
       </Show>
 
       <Show when={tabs().length > 0}>
