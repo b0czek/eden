@@ -252,7 +252,12 @@ export class ViewCreator {
     const viewType: ViewType = isOverlay ? "overlay" : "app";
     // Note: createView is only called when manifest.frontend exists
     // (ProcessManager validates this before calling)
-    const frontendEntry = manifest.frontend!.entry;
+    const frontendEntry = manifest.frontend?.entry;
+    if (!frontendEntry) {
+      throw new Error(
+        `Cannot create view for ${appId}: missing frontend entry`,
+      );
+    }
 
     // Determine view mode
     const viewMode: ViewMode = isOverlay

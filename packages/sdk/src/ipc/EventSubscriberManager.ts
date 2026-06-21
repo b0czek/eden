@@ -65,7 +65,7 @@ export class EventSubscriberManager {
       this.subscriptions.set(eventName, new Set());
     }
 
-    this.subscriptions.get(eventName)!.add(viewId);
+    this.subscriptions.get(eventName)?.add(viewId);
     log.info(
       `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
     );
@@ -101,7 +101,7 @@ export class EventSubscriberManager {
       this.backendSubscriptions.set(eventName, new Set());
     }
 
-    this.backendSubscriptions.get(eventName)!.add(appId);
+    this.backendSubscriptions.get(eventName)?.add(appId);
     log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
     return true;
   }
@@ -118,8 +118,8 @@ export class EventSubscriberManager {
       this.internalSubscriptions.set(event, new Set());
     }
     this.internalSubscriptions
-      .get(event)!
-      .add(callback as (payload: EventData<EventName>) => void);
+      .get(event)
+      ?.add(callback as (payload: EventData<EventName>) => void);
     log.info(`Internal subscriber added for event: ${event}`);
   }
 

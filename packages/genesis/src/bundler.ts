@@ -520,7 +520,13 @@ export async function bundle(options: BundleOptions): Promise<BundleResult> {
       };
     }
 
-    const manifest = validation.manifest!;
+    const manifest = validation.manifest;
+    if (!manifest) {
+      return {
+        success: false,
+        error: "Manifest validation succeeded but manifest is missing",
+      };
+    }
 
     if (verbose) {
       console.log(`✓ Manifest valid: ${manifest.name} v${manifest.version}`);

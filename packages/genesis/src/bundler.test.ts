@@ -69,10 +69,13 @@ describe("bundler module", () => {
       const validation = await bundler.validateManifest(manifestPath);
 
       expect(validation.valid).toBe(true);
+      if (!validation.manifest) {
+        throw new Error("Expected manifest after valid validation");
+      }
 
       const result = await bundler.verifyFiles(
         sampleAppPath,
-        validation.manifest!,
+        validation.manifest,
       );
 
       expect(result.valid).toBe(true);

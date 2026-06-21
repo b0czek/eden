@@ -59,8 +59,8 @@ export function createEdenAPI(
         eventSubscriptions.set(eventName, new Set());
       }
       eventSubscriptions
-        .get(eventName)!
-        .add(callback as EventSubscriptionCallback);
+        .get(eventName)
+        ?.add(callback as EventSubscriptionCallback);
     },
 
     unsubscribe: async <T extends EventName>(

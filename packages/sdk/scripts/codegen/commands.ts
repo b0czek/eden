@@ -126,7 +126,7 @@ export function groupCommandsByNamespace(
         commands: [],
       });
     }
-    namespaceMap.get(cmd.namespace)!.commands.push({
+    namespaceMap.get(cmd.namespace)?.commands.push({
       command: cmd.command,
       argsType: cmd.argsType,
       returnType: cmd.returnType,

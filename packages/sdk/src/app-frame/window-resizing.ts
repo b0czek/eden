@@ -5,7 +5,11 @@ import { log } from "../logging";
  * Handles resizing for floating windows
  */
 
-import { getScreenCoords } from "./utils.js";
+import {
+  getEdenFrameInternal,
+  getScreenCoords,
+  syncEdenFrameBounds,
+} from "./utils.js";
 
 interface Bounds {
   x: number;
@@ -71,11 +75,14 @@ export function setupWindowResizing(
   };
 
   const startResize = (e: MouseEvent | TouchEvent): void => {
+    let currentBounds = currentBoundsRef.current;
+
     // Initialize current bounds if not set
-    if (!currentBoundsRef.current) {
-      const initialBounds = window.edenFrame?._internal.bounds;
+    if (!currentBounds) {
+      const initialBounds = getEdenFrameInternal()?.bounds;
       if (initialBounds && initialBounds.x !== undefined) {
-        currentBoundsRef.current = { ...initialBounds };
+        currentBounds = { ...initialBounds };
+        currentBoundsRef.current = currentBounds;
       } else {
         log.warn("Cannot start resize - currentBounds not initialized!");
         return;
@@ -89,7 +96,7 @@ export function setupWindowResizing(
     const coords = getScreenCoords(e);
     startX = coords.x;
     startY = coords.y;
-    resizeStartBounds = { ...currentBoundsRef.current };
+    resizeStartBounds = { ...currentBounds };
 
     e.preventDefault();
     e.stopPropagation();
@@ -164,7 +171,7 @@ export function setupWindowResizing(
     pendingBounds = newBounds;
   };
 
-  const endResize = (e?: MouseEvent | TouchEvent): void => {
+  const endResize = (_e?: MouseEvent | TouchEvent): void => {
     if (!isResizing) {
       return;
     }
@@ -189,14 +196,14 @@ export function setupWindowResizing(
           .catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
-        window.edenFrame!._internal.bounds = { ...pendingBounds };
+        syncEdenFrameBounds(pendingBounds);
         pendingBounds = null;
       }
     }
 
     // For touch resize, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
-      window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
+      syncEdenFrameBounds(currentBoundsRef.current);
     }
 
     // Stop global resize tracking in main process (for mouse events)

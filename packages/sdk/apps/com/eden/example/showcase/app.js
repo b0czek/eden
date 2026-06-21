@@ -72,9 +72,9 @@ function animateProgress() {
   );
 
   progressBars.forEach((bar) => {
-    const target = parseInt(bar.getAttribute("data-target"));
+    const target = parseInt(bar.getAttribute("data-target"), 10);
     setTimeout(() => {
-      bar.style.width = target + "%";
+      bar.style.width = `${target}%`;
     }, 100);
   });
 }
@@ -83,7 +83,7 @@ function animateProgress() {
 function setupSliders() {
   document.querySelectorAll(".eden-slider").forEach((slider) => {
     const display = slider.nextElementSibling;
-    if (display && display.classList.contains("slider-value")) {
+    if (display?.classList.contains("slider-value")) {
       slider.addEventListener("input", (e) => {
         display.textContent = e.target.value;
       });

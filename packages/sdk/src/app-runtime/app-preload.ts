@@ -28,7 +28,7 @@ import { createKeyboardAutodetection } from "./keyboard/autodetection";
 let appId: string | null = null;
 
 // MessagePort for direct frontend<->backend communication
-let backendPort: MessagePort | null = null;
+let _backendPort: MessagePort | null = null;
 let backendConnection: AppBusConnection | null = null;
 
 // Pending requests waiting for responses (for backend communication)
@@ -84,7 +84,7 @@ ipcRenderer.on("backend-port", (event) => {
     return;
   }
 
-  backendPort = port;
+  _backendPort = port;
   log.info(`Backend port received for app ${appId}`);
 
   // Wrap DOM MessagePort to IPCPort interface

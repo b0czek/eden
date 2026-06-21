@@ -11,7 +11,7 @@ if (titleArg) {
     // Set immediately
     try {
       document.title = title;
-    } catch (e) {}
+    } catch (_e) {}
 
     // Also ensure it sticks after DOM load
     window.addEventListener("DOMContentLoaded", () => {

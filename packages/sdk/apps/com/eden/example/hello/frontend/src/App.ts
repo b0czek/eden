@@ -177,7 +177,10 @@ class HelloApp {
       this.statusDiv.scrollTop = this.statusDiv.scrollHeight;
 
       while (this.statusDiv.children.length > 20) {
-        this.statusDiv.removeChild(this.statusDiv.firstChild!);
+        const firstChild = this.statusDiv.firstChild;
+        if (firstChild) {
+          this.statusDiv.removeChild(firstChild);
+        }
       }
     }
   }

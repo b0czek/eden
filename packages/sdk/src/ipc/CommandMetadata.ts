@@ -27,14 +27,16 @@ export function getManagerMetadata(
  * Set manager namespace.
  */
 export function setManagerNamespace(target: object, namespace: string): void {
-  if (!MANAGER_METADATA.has(target)) {
-    MANAGER_METADATA.set(target, {
-      namespace,
-      handlers: new Map(),
-    });
-  } else {
-    MANAGER_METADATA.get(target)!.namespace = namespace;
+  const existing = MANAGER_METADATA.get(target);
+  if (existing) {
+    existing.namespace = namespace;
+    return;
   }
+
+  MANAGER_METADATA.set(target, {
+    namespace,
+    handlers: new Map(),
+  });
 }
 
 /**
@@ -45,13 +47,14 @@ export function addCommandHandler(
   command: string,
   methodName: string,
 ): void {
-  if (!MANAGER_METADATA.has(target)) {
-    MANAGER_METADATA.set(target, {
+  let metadata = MANAGER_METADATA.get(target);
+  if (!metadata) {
+    metadata = {
       namespace: "",
       handlers: new Map(),
-    });
+    };
+    MANAGER_METADATA.set(target, metadata);
   }
 
-  const metadata = MANAGER_METADATA.get(target)!;
   metadata.handlers.set(command, methodName);
 }

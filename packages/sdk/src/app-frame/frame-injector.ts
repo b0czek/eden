@@ -22,6 +22,7 @@ import {
   setTitle,
   setupDarkMode,
 } from "./ui-builder.js";
+import { syncEdenFrameBounds } from "./utils.js";
 import { setupWindowDragging } from "./window-dragging.js";
 import { setupWindowResizing } from "./window-resizing.js";
 
@@ -29,7 +30,7 @@ import { setupWindowResizing } from "./window-resizing.js";
   // Initialize edenFrame object if not exists
   if (!window.edenFrame) {
     window.edenFrame = {
-      setTitle: (title: string) => {
+      setTitle: (_title: string) => {
         /* will be set later */
       },
       resetTitle: () => {
@@ -159,12 +160,17 @@ import { setupWindowResizing } from "./window-resizing.js";
     window.edenAPI.subscribe(
       "view/mode-changed",
       (data: { mode: "tiled" | "floating"; bounds: ViewBounds }) => {
+        const edenFrame = window.edenFrame;
+        if (!edenFrame) {
+          return;
+        }
+
         const { mode, bounds } = data;
 
         // Update window mode and bounds
-        window.edenFrame!._internal.currentMode = mode;
+        edenFrame._internal.currentMode = mode;
         if (bounds && bounds.x !== undefined) {
-          window.edenFrame!._internal.bounds = bounds;
+          edenFrame._internal.bounds = bounds;
           currentBoundsRef.current = { ...bounds };
         }
 
@@ -175,9 +181,14 @@ import { setupWindowResizing } from "./window-resizing.js";
   };
 
   const setupFloatingWindowControls = (): void => {
-    const windowMode = window.edenFrame!._internal.currentMode;
-    const windowConfig = window.edenFrame!._internal.config;
-    const initialBounds = window.edenFrame!._internal.bounds;
+    const edenFrame = window.edenFrame;
+    if (!edenFrame) {
+      return;
+    }
+
+    const windowMode = edenFrame._internal.currentMode;
+    const windowConfig = edenFrame._internal.config;
+    const initialBounds = edenFrame._internal.bounds;
 
     // Clean up previous controls if they exist (crucial for mode switching)
     if (cleanupDrag) {
@@ -239,7 +250,7 @@ import { setupWindowResizing } from "./window-resizing.js";
   // This keeps currentBounds in sync even when main process is controlling movement
   window.edenAPI.subscribe("view/bounds-updated", (newBounds) => {
     currentBoundsRef.current = { ...newBounds };
-    window.edenFrame!._internal.bounds = { ...newBounds };
+    syncEdenFrameBounds(newBounds);
   });
 
   // Inject overlay and setup handlers

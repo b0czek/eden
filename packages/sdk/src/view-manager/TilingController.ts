@@ -362,11 +362,17 @@ export class TilingController {
    * @param views - Iterable of view information
    */
   getNextTileIndex(views: Iterable<ViewInfo>): number {
-    const indices = Array.from(views)
-      .filter(
-        (v) => v.visible && v.mode === "tiled" && v.tileIndex !== undefined,
-      )
-      .map((v) => v.tileIndex!);
+    const indices: number[] = [];
+
+    for (const view of views) {
+      if (
+        view.visible &&
+        view.mode === "tiled" &&
+        view.tileIndex !== undefined
+      ) {
+        indices.push(view.tileIndex);
+      }
+    }
 
     if (indices.length === 0) return 0;
     return Math.max(...indices) + 1;

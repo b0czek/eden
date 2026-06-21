@@ -110,7 +110,10 @@ const App = () => {
           <button
             type="button"
             class="eden-btn eden-btn-secondary"
-            onClick={() => loadPackage(packagePath()!)}
+            onClick={() => {
+              const path = packagePath();
+              if (path) loadPackage(path);
+            }}
           >
             Retry
           </button>

@@ -126,7 +126,6 @@ function calculateBounds(): ViewBounds {
       x = CONFIG.marginX;
       y = ws.height - height - CONFIG.marginY;
       break;
-    case "bottom-right":
     default:
       x = ws.width - width - CONFIG.marginX;
       y = ws.height - height - CONFIG.marginY;
@@ -167,7 +166,8 @@ function showNextPendingToast(): void {
   if (!hasRoomForToast()) return;
 
   // Get the oldest pending notification (FIFO)
-  const notification = pendingQueue.shift()!;
+  const notification = pendingQueue.shift();
+  if (!notification) return;
   displayToast(notification);
 }
 

@@ -41,5 +41,5 @@ export function generateRuntimeCode(
 
   lines.push("] as const;");
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

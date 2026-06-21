@@ -1,8 +1,8 @@
 import "reflect-metadata";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import { app, BrowserWindow } from "electron";
-import * as fs from "fs";
-import * as path from "path";
 import { container } from "tsyringe";
 import { AppChannelManager } from "./appbus";
 import { AppearanceManager } from "./appearance/AppearanceManager";

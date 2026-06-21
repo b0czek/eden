@@ -131,7 +131,7 @@ export function groupEventsByNamespace(
         events: [],
       });
     }
-    eventNamespaceMap.get(evt.namespace)!.events.push({
+    eventNamespaceMap.get(evt.namespace)?.events.push({
       eventName: evt.eventName,
       payloadType: evt.payloadType,
       docs: evt.docs,

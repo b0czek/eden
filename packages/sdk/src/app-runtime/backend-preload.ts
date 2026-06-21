@@ -63,9 +63,17 @@ type RuntimeMessage = {
 // This is available when running inside utilityProcess.fork()
 // We use Electron's types which should be available
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} must be set`);
+  }
+  return value;
+}
+
 // Get app info from environment
-const appId = process.env.EDEN_APP_ID!;
-const backendEntry = process.env.EDEN_BACKEND_ENTRY!;
+const appId = requireEnv("EDEN_APP_ID");
+const backendEntry = requireEnv("EDEN_BACKEND_ENTRY");
 const manifest = JSON.parse(process.env.EDEN_MANIFEST || "{}");
 
 setLogContext({ appId });
@@ -138,7 +146,7 @@ if (launchArgsArg) {
 }
 
 // Port for direct frontend<->backend communication (received from main)
-let frontendPort: Electron.MessagePortMain | null = null;
+let _frontendPort: Electron.MessagePortMain | null = null;
 
 // Port for IPC with main process (process.parentPort)
 const parentPort = process.parentPort;
@@ -210,7 +218,7 @@ function shellCommand<T extends CommandName>(
       },
     });
 
-    parentPort!.postMessage({
+    parentPort?.postMessage({
       type: "shell-command",
       commandId,
       command,
@@ -355,10 +363,10 @@ async function loadBackendEntry(): Promise<void> {
     log.info(`Backend loaded successfully`);
 
     // Signal to main that we're ready
-    parentPort!.postMessage({ type: "backend-ready" });
+    parentPort?.postMessage({ type: "backend-ready" });
   } catch (error) {
     log.error(`Failed to load backend:`, error);
-    parentPort!.postMessage({
+    parentPort?.postMessage({
       type: "backend-error",
       error: error instanceof Error ? error.message : String(error),
     });
@@ -377,7 +385,7 @@ async function initializeBackend(): Promise<void> {
         if (event.data.type === "init-port") {
           const [port] = event.ports;
           if (port) {
-            frontendPort = port;
+            _frontendPort = port;
             setupFrontendPort(port);
             log.info(`Frontend port initialized`);
           }

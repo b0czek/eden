@@ -46,14 +46,6 @@ export class DbManager {
   }
 
   /**
-   * Extract app ID from a namespaced key
-   */
-  private extractAppId(namespacedKey: string): string {
-    const colonIndex = namespacedKey.indexOf(":");
-    return colonIndex > 0 ? namespacedKey.substring(0, colonIndex) : "";
-  }
-
-  /**
    * Extract the original key from a namespaced key
    */
   private extractKey(namespacedKey: string): string {

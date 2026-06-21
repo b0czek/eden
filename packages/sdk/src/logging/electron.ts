@@ -29,7 +29,6 @@ function mapConsoleLevel(level: number | string): LogLevel {
       return "error";
     case 4:
       return "debug";
-    case 1:
     default:
       return "info";
   }

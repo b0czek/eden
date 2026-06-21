@@ -18,7 +18,7 @@ const helloGrantId = "say-hello";
 let messageCount = 0;
 
 // Get the typed appAPI connection (Backend = Host)
-const appAPI = worker!.getAppAPI() as HostConnection<HelloProtocol>;
+const appAPI = worker?.getAppAPI() as HostConnection<HelloProtocol>;
 
 // Register request handlers - fully typed!
 appAPI.handle("ping", (_payload) => {
@@ -39,7 +39,7 @@ appAPI.handle("get-status", (_payload) => {
 
 appAPI.handle("hello", async (payload) => {
   const grant = `app/${appId}/${helloGrantId}`;
-  const result = await worker!.edenAPI.shellCommand("user/has-grant", {
+  const result = await worker?.edenAPI.shellCommand("user/has-grant", {
     grant,
   });
   if (!result?.allowed) {

@@ -4,6 +4,21 @@
  * Shared utility functions for the app frame
  */
 
+type EdenFrameInternal = NonNullable<Window["edenFrame"]>["_internal"];
+
+export function getEdenFrameInternal(): EdenFrameInternal | undefined {
+  return window.edenFrame?._internal;
+}
+
+export function syncEdenFrameBounds(bounds: EdenFrameInternal["bounds"]): void {
+  const edenFrame = window.edenFrame;
+  if (!edenFrame) {
+    return;
+  }
+
+  edenFrame._internal.bounds = { ...bounds };
+}
+
 /**
  * Get screen coordinates from mouse or touch event
  * @param e - The event
@@ -27,7 +42,7 @@ export function getScreenCoords(e: MouseEvent | TouchEvent): {
     }
     // Fallback: calculate from clientX/clientY + view bounds position
     // Use currentBounds which has the actual view position
-    const currentBounds = window.edenFrame?._internal.bounds;
+    const currentBounds = getEdenFrameInternal()?.bounds;
     if (currentBounds) {
       return {
         x: currentBounds.x + touch.clientX,

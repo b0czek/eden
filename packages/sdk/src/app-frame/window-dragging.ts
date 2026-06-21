@@ -5,7 +5,11 @@ import { log } from "../logging";
  * Handles dragging for floating windows
  */
 
-import { getScreenCoords } from "./utils";
+import {
+  getEdenFrameInternal,
+  getScreenCoords,
+  syncEdenFrameBounds,
+} from "./utils";
 
 /**
  * Setup window dragging for floating windows
@@ -79,7 +83,7 @@ export function setupWindowDragging(
     }
 
     // ALWAYS refresh currentBounds at start to handle case where mouse drag updated position
-    const initialBounds = window.edenFrame?._internal.bounds;
+    const initialBounds = getEdenFrameInternal()?.bounds;
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
     } else if (!currentBoundsRef.current) {
@@ -189,14 +193,14 @@ export function setupWindowDragging(
           .catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
-        window.edenFrame!._internal.bounds = { ...pendingBounds };
+        syncEdenFrameBounds(pendingBounds);
         pendingBounds = null;
       }
     }
 
     // For touch drag, ensure edenFrame._internal.bounds is updated with final position
     if (isTouch && currentBoundsRef.current) {
-      window.edenFrame!._internal.bounds = { ...currentBoundsRef.current };
+      syncEdenFrameBounds(currentBoundsRef.current);
     }
 
     // Stop global drag tracking in main process (for mouse events)

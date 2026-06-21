@@ -290,7 +290,7 @@ export function createPortConnection(
       if (!messageListeners.has(method)) {
         messageListeners.set(method, new Set());
       }
-      messageListeners.get(method)!.add(callback);
+      messageListeners.get(method)?.add(callback);
     },
 
     once: (method: string, callback: (args: unknown) => void) => {
@@ -311,7 +311,7 @@ export function createPortConnection(
       if (!messageListeners.has(method)) {
         messageListeners.set(method, new Set());
       }
-      messageListeners.get(method)!.add(wrapper);
+      messageListeners.get(method)?.add(wrapper);
     },
 
     off: (method: string, callback: (args: unknown) => void) => {

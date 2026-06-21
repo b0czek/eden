@@ -214,7 +214,6 @@ function consoleForLevel(level: LogLevel): (...args: unknown[]) => void {
     case "error":
     case "fatal":
       return useLiveConsole ? console.error.bind(console) : baseConsole.error;
-    case "info":
     default:
       return useLiveConsole ? console.log.bind(console) : baseConsole.info;
   }
@@ -333,7 +332,7 @@ function shortenPath(path: string, mode: LogPathMode): string {
     normalized = normalized.replace(/\\/g, "/");
     const withoutQuery = normalized.split(/[?#]/, 1)[0] ?? normalized;
     const segments = withoutQuery.split("/").filter(Boolean);
-    return segments.length ? segments[segments.length - 1]! : path;
+    return segments.length ? (segments.at(-1) ?? path) : path;
   }
 
   let normalized = path;

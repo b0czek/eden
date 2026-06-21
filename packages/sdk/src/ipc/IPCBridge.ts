@@ -1,6 +1,6 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { type BrowserWindow, ipcMain } from "electron";
-import { EventEmitter } from "events";
 import { delay, inject, injectable, singleton } from "tsyringe";
 import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";

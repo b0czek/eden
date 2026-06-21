@@ -114,5 +114,5 @@ export function getAppName(
     return readable.charAt(0).toUpperCase() + readable.slice(1);
   }
 
-  return name[locale] || name["en"] || Object.values(name)[0] || "App";
+  return name[locale] || name.en || Object.values(name)[0] || "App";
 }

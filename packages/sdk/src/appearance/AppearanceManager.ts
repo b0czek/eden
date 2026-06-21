@@ -55,12 +55,20 @@ const WALLPAPER_PRESETS: WallpaperPreset[] = [
   },
 ];
 
+function getDefaultWallpaperPreset(): WallpaperPreset {
+  const preset = WALLPAPER_PRESETS.find((p) => p.id === "eden-default");
+  if (!preset) {
+    throw new Error("Default wallpaper preset not found");
+  }
+  return preset;
+}
+
+const DEFAULT_WALLPAPER_PRESET = getDefaultWallpaperPreset();
+
 @singleton()
 @EdenNamespace("appearance")
 export class AppearanceManager extends EdenEmitter<AppearanceEvents> {
-  private currentWallpaper: WallpaperPreset = WALLPAPER_PRESETS.find(
-    (p) => p.id === "eden-default",
-  )!;
+  private currentWallpaper: WallpaperPreset = DEFAULT_WALLPAPER_PRESET;
   private handler: AppearanceHandler;
 
   constructor(
@@ -121,9 +129,7 @@ export class AppearanceManager extends EdenEmitter<AppearanceEvents> {
   private resolveWallpaper(config: WallpaperConfig): WallpaperPreset {
     if (config.type === "preset") {
       const preset = WALLPAPER_PRESETS.find((p) => p.id === config.id);
-      return preset
-        ? preset
-        : WALLPAPER_PRESETS.find((p) => p.id === "eden-default")!;
+      return preset ? preset : DEFAULT_WALLPAPER_PRESET;
     } else if (config.type === "custom") {
       return {
         id: "custom",
@@ -132,6 +138,6 @@ export class AppearanceManager extends EdenEmitter<AppearanceEvents> {
         value: config.value,
       };
     }
-    return WALLPAPER_PRESETS.find((p) => p.id === "eden-default")!;
+    return DEFAULT_WALLPAPER_PRESET;
   }
 }

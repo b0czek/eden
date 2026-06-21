@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "node:fs";
 
 /**
  * Cached file reader for non-changing files.
@@ -17,7 +17,10 @@ class CachedFileReader {
     const cacheKey = `${filePath}:${encoding}`;
 
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) {
+        return cached;
+      }
     }
 
     const content = fs.readFileSync(filePath, encoding);
@@ -39,7 +42,10 @@ class CachedFileReader {
     const cacheKey = `${filePath}:${encoding}`;
 
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) {
+        return cached;
+      }
     }
 
     const content = await fs.promises.readFile(filePath, encoding);

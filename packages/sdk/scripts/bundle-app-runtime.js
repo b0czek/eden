@@ -8,8 +8,8 @@
  */
 
 const esbuild = require("esbuild");
-const path = require("path");
-const fs = require("fs");
+const path = require("node:path");
+const fs = require("node:fs");
 
 const srcDir = path.join(__dirname, "../src/app-runtime");
 const distDir = path.join(__dirname, "../dist/app-runtime");
@@ -24,14 +24,14 @@ async function bundle() {
     console.log("🔍 Type-checking app-runtime TypeScript files...");
 
     // Run TypeScript compiler for type checking (no emit)
-    const { execSync } = require("child_process");
+    const { execSync } = require("node:child_process");
     try {
       execSync("npx tsc --noEmit -p src/app-runtime/tsconfig.json", {
         stdio: "inherit",
         cwd: path.join(__dirname, ".."),
       });
       console.log("✅ Type checking passed\n");
-    } catch (error) {
+    } catch (_error) {
       console.error("❌ Type checking failed");
       process.exit(1);
     }

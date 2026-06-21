@@ -99,12 +99,13 @@ const App = () => {
   });
 
   const handleLogin = async () => {
-    if (!selectedUsername() || !password() || submitting()) return;
+    const username = selectedUsername();
+    if (!username || !password() || submitting()) return;
     setSubmitting(true);
     setError(null);
     try {
       const result = await window.edenAPI.shellCommand("user/login", {
-        username: selectedUsername()!,
+        username,
         password: password(),
       });
       if (!result.success) {
@@ -186,8 +187,6 @@ const App = () => {
                               setError(null);
                             }
                           }}
-                          role="button"
-                          tabIndex={0}
                         >
                           <div class="eden-avatar eden-avatar-md">
                             {getInitials(user.name)}
