@@ -391,9 +391,7 @@ const App: Component = () => {
     }
   };
 
-  const cancelPicker = () => {
-    void resolvePicker({ reason: "cancel" });
-  };
+  const cancelPicker = () => resolvePicker({ reason: "cancel" });
 
   const appendDefaultExtension = (name: string) => {
     const option = selectedFilterOption();
@@ -581,7 +579,7 @@ const App: Component = () => {
     if (window.edenFrame) {
       window.edenFrame.close = async () => {
         if (activeRequest()) {
-          cancelPicker();
+          await cancelPicker();
         }
       };
     }
@@ -604,7 +602,7 @@ const App: Component = () => {
       if (!activeRequest()) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        cancelPicker();
+        void cancelPicker();
       }
     };
 

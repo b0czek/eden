@@ -176,4 +176,43 @@ describe("FilePickerManager", () => {
       "warning",
     );
   });
+
+  it("allows a new picker after the display provider cancels the active request", () => {
+    const { eventSubscribers, manager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const first = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    expect(
+      manager.resolvePicker(
+        { requestId: first.requestId, reason: "cancel" },
+        { appId: "com.eden.file-picker", webContentsId: 100 },
+      ),
+    ).toEqual({ success: true });
+
+    const second = manager.openPicker(
+      { mode: "save", suggestedName: "report.md" },
+      { appId: "com.eden.notes", webContentsId: 201 },
+    );
+
+    expect(second.requestId).not.toBe(first.requestId);
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId: first.requestId, reason: "cancel" },
+    );
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      21,
+      "file-picker/opened",
+      expect.objectContaining({
+        picker: expect.objectContaining({ requestId: second.requestId }),
+      }),
+    );
+  });
 });
