@@ -13,6 +13,7 @@ export const en = {
     currentUser: "Current",
     changePassword: "Change password",
     toggleKeyboard: "Toggle keyboard",
+    dock: "Dock",
     currentPassword: "Current password",
     newPassword: "New password",
     confirmPassword: "Confirm new password",

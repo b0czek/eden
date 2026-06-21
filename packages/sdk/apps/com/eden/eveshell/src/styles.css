@@ -263,6 +263,11 @@ body {
   transition: all var(--eden-transition-base);
   position: relative;
   min-width: 44px;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
 }
 
 .app-icon:hover {
@@ -379,6 +384,28 @@ body {
   padding: var(--eden-space-md);
   border-radius: var(--eden-radius-lg);
   aspect-ratio: 1 / 1;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.all-apps-backdrop {
+  position: absolute;
+  inset: 0;
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.eden-modal-overlay .eden-modal {
+  position: relative;
+  z-index: 1;
 }
 
 .all-apps-tile.running {

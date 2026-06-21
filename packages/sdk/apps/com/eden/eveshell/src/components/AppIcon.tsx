@@ -20,13 +20,8 @@ export default function AppIcon(props: AppIconProps) {
 
   const iconSrc = () => props.icon || fetchedIcon();
 
-  return (
-    <div
-      class="app-icon"
-      onClick={props.onClick}
-      onContextMenu={props.onContextMenu}
-      title={props.appName}
-    >
+  const iconContent = (
+    <>
       <div class="icon-container">
         <img src={iconSrc()} alt={props.appName} draggable={false} />
         <Show when={props.isRunning}>
@@ -34,6 +29,28 @@ export default function AppIcon(props: AppIconProps) {
         </Show>
       </div>
       <div class="app-name">{props.appName}</div>
-    </div>
+    </>
+  );
+
+  return (
+    <Show
+      when={props.onClick || props.onContextMenu}
+      fallback={
+        <div class="app-icon" title={props.appName}>
+          {iconContent}
+        </div>
+      }
+    >
+      <button
+        type="button"
+        class="app-icon"
+        classList={{ running: props.isRunning }}
+        onClick={props.onClick}
+        onContextMenu={props.onContextMenu}
+        title={props.appName}
+      >
+        {iconContent}
+      </button>
+    </Show>
   );
 }

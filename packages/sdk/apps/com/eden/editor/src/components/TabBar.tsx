@@ -9,14 +9,24 @@ interface TabBarProps {
 }
 
 export function TabBar(props: TabBarProps) {
+  const handleTabKeyDown = (tab: EditorTab, e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      props.onTabClick(tab);
+    }
+  };
+
   return (
-    <div class="editor-tabs">
+    <div class="editor-tabs" role="tablist">
       <For each={props.tabs}>
         {(tab) => (
           <div
             class={`editor-tab ${props.activeTabId === tab.id ? "active" : ""} ${tab.isModified ? "modified" : ""}`}
-            onClick={() => props.onTabClick(tab)}
             role="tab"
+            tabIndex={props.activeTabId === tab.id ? 0 : -1}
+            aria-selected={props.activeTabId === tab.id}
+            onClick={() => props.onTabClick(tab)}
+            onKeyDown={(e) => handleTabKeyDown(tab, e)}
           >
             <span class="tab-name">{tab.name}</span>
             <button

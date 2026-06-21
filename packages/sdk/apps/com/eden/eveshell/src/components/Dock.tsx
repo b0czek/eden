@@ -40,7 +40,7 @@ export default function Dock(props: DockProps) {
 
     containerRef.classList.add("magnify-active");
 
-    const icons = containerRef.querySelectorAll<HTMLDivElement>(".app-icon");
+    const icons = containerRef.querySelectorAll<HTMLElement>(".app-icon");
     icons.forEach((icon) => {
       const iconBox = icon.querySelector<HTMLDivElement>(".icon-container");
       if (!iconBox) return;
@@ -61,7 +61,7 @@ export default function Dock(props: DockProps) {
   function handleMouseLeave() {
     if (!containerRef) return;
     containerRef.classList.remove("magnify-active");
-    const appIcons = containerRef.querySelectorAll<HTMLDivElement>(".app-icon");
+    const appIcons = containerRef.querySelectorAll<HTMLElement>(".app-icon");
     appIcons.forEach((icon) => {
       const iconBox = icon.querySelector<HTMLDivElement>(".icon-container");
       if (iconBox) {
@@ -86,6 +86,8 @@ export default function Dock(props: DockProps) {
         <div
           class="app-icons magnify"
           ref={containerRef}
+          role="toolbar"
+          aria-label={t("shell.dock")}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
