@@ -16,6 +16,7 @@ import { attachWebContentsLogger } from "../logging/electron";
 import { SettingsManager } from "../settings/SettingsManager";
 import { DevToolsController } from "./DevToolsController";
 import { FloatingWindowController } from "./FloatingWindowController";
+import { PresentationController } from "./PresentationController";
 import { ScaleController } from "./ScaleController";
 import { TilingController } from "./TilingController";
 import type { ViewInfo, ViewMode } from "./types";
@@ -58,6 +59,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   // Specialized modules
   private readonly tilingController: TilingController;
   private readonly floatingWindows: FloatingWindowController;
+  private readonly presentationController: PresentationController;
   private readonly viewCreator: ViewCreator;
   private readonly devToolsController: DevToolsController;
   private readonly scaleController: ScaleController;
@@ -80,6 +82,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     this.tilingController = new TilingController(tilingConfig);
     this.devToolsController = new DevToolsController();
+    this.presentationController = new PresentationController();
     this.scaleController = new ScaleController(
       settingsManager,
       getViews,
@@ -170,6 +173,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
 
     this.tilingController.recalculateTiledViews(this.views);
+    this.reapplyPresentedBounds();
     return visibilityChanged;
   }
 
@@ -335,8 +339,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         bounds,
         windowConfig,
       );
-      viewInfo.view.setBounds(finalBounds);
       viewInfo.bounds = finalBounds;
+      this.applyPresentedBounds(viewInfo, finalBounds);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -499,21 +503,21 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       for (const info of tiledViews) {
         if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
-          info.view.setBounds(info.bounds);
+          this.applyPresentedBounds(info);
         }
       }
 
       for (const info of floatingAppViews) {
         if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
-          info.view.setBounds(info.bounds);
+          this.applyPresentedBounds(info);
         }
       }
 
       for (const info of overlayViews) {
         if (isViewAlive(info.view)) {
           this.mainWindow.contentView.addChildView(info.view);
-          info.view.setBounds(info.bounds);
+          this.applyPresentedBounds(info);
         }
       }
     } catch (error) {
@@ -597,7 +601,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         viewInfo.bounds = floatingBounds;
         viewInfo.zIndex = this.floatingWindows.getNextZIndex();
         viewInfo.mode = "floating";
-        viewInfo.view.setBounds(floatingBounds);
+        this.applyPresentedBounds(viewInfo, floatingBounds);
 
         if (this.tilingController.isEnabled()) {
           this.syncTiledLayout();
@@ -626,7 +630,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
           const bounds = { ...this.tilingController.getWorkspaceBounds() };
           viewInfo.bounds = bounds;
           viewInfo.mode = "tiled";
-          viewInfo.view.setBounds(bounds);
+          this.applyPresentedBounds(viewInfo, bounds);
           this.reorderViewLayers();
           this.notifySubscriber(viewId, "mode-changed", {
             mode: "tiled",
@@ -658,5 +662,34 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    */
   setInterfaceScale(scale: number): void {
     this.scaleController.setScale(scale);
+  }
+
+  setKeyboardPresentationLift(lift: number): void {
+    if (!this.presentationController.setViewLift(lift)) {
+      return;
+    }
+
+    this.reapplyPresentedBounds();
+  }
+
+  getKeyboardPresentationLift(): number {
+    return this.presentationController.getViewLift();
+  }
+
+  private applyPresentedBounds(
+    viewInfo: ViewInfo,
+    bounds = viewInfo.bounds,
+  ): void {
+    viewInfo.view.setBounds(this.presentationController.applyToBounds(bounds));
+  }
+
+  private reapplyPresentedBounds(): void {
+    for (const info of this.views.values()) {
+      if (!info.visible || !isViewAlive(info.view)) {
+        continue;
+      }
+
+      this.applyPresentedBounds(info);
+    }
   }
 }

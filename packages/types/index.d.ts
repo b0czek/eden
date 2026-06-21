@@ -12,6 +12,7 @@ export * from "./global";
 export * from "./worker";
 
 export * from "./ipc";
+export * from "./keyboard";
 
 /**
  * App Instance Interface

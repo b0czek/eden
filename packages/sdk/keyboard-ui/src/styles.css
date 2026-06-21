@@ -1,0 +1,319 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button,
+.hg-button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.keyboard-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  background:
+    linear-gradient(180deg, rgba(25, 30, 38, 0.94), rgba(12, 15, 20, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.keyboard-shell[data-placement="docked"] {
+  gap: 10px;
+  padding: 10px 16px 14px;
+  border-radius: 20px;
+}
+
+.keyboard-body {
+  flex: 1;
+  min-height: 0;
+  -webkit-app-region: no-drag;
+}
+
+.eden-osk-theme.simple-keyboard {
+  --keyboard-standard-key-width: calc((100% - 45px) / 10);
+  --keyboard-action-key-width: calc(var(--keyboard-standard-key-width) * 1.5);
+
+  max-width: 100%;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.keyboard-shell[data-layout="number"] .eden-osk-theme.simple-keyboard {
+  --keyboard-standard-key-width: calc((100% - 15px) / 4);
+  --keyboard-action-key-width: var(--keyboard-standard-key-width);
+}
+
+.eden-osk-theme .hg-rows {
+  gap: 6px;
+}
+
+.eden-osk-theme .hg-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.eden-osk-theme .hg-button {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  height: 48px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  font-size: 16px;
+  font-weight: 500;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.eden-osk-theme .hg-button.hg-standardBtn {
+  flex: 0 0 var(--keyboard-standard-key-width);
+  width: var(--keyboard-standard-key-width);
+  max-width: none;
+}
+
+.eden-osk-theme .hg-button.hg-standardBtn[data-skbtn] {
+  max-width: none;
+}
+
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="q"]),
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="Q"]) {
+  padding: 0;
+}
+
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="q"])::before,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="q"])::after,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="Q"])::before,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="Q"])::after {
+  flex: 0.5 1 0;
+  content: "";
+}
+
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="a"]),
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="A"]) {
+  padding: 0;
+}
+
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="a"])::before,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="a"])::after,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="A"])::before,
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="A"])::after {
+  flex: 1 1 0;
+  content: "";
+}
+
+.keyboard-shell[data-layout="text"] .eden-osk-theme .hg-button[data-skbtn="{space}"] {
+  flex: 0 0 calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  width: calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  max-width: none;
+}
+
+.keyboard-shell[data-layout="text"][data-placement="floating"]
+  .eden-osk-theme
+  .hg-button[data-skbtn="{space}"] {
+  flex: 0 0 calc((var(--keyboard-standard-key-width) * 3.5) + 11px);
+  width: calc((var(--keyboard-standard-key-width) * 3.5) + 11px);
+}
+
+.keyboard-shell[data-layout="number"] .eden-osk-theme .hg-button[data-skbtn="{space}"] {
+  flex: 0 0 calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  width: calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  max-width: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"],
+.eden-osk-theme .hg-button[data-skbtn="{bksp}"],
+.keyboard-shell[data-layout="number"] .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{enter}"] {
+  flex: 0 0 var(--keyboard-action-key-width);
+  width: var(--keyboard-action-key-width);
+  max-width: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn=","],
+.eden-osk-theme .hg-button[data-skbtn="."],
+.eden-osk-theme .hg-button[data-skbtn="<"],
+.eden-osk-theme .hg-button[data-skbtn=">"],
+.eden-osk-theme .hg-button[data-skbtn="{drag}"],
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
+.keyboard-shell[data-layout="text"] .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"] {
+  flex: 0 0 var(--keyboard-standard-key-width);
+  width: var(--keyboard-standard-key-width);
+  max-width: none;
+}
+
+.eden-osk-theme .hg-row:has(.hg-button[data-skbtn="{space}"]) {
+  padding: 0;
+}
+
+.eden-osk-theme .hg-button:active {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(1px);
+}
+
+.eden-osk-theme .hg-button.hg-functionBtn {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{bksp}"],
+.eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{drag}"],
+.eden-osk-theme .hg-button[data-skbtn="{enter}"],
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
+.eden-osk-theme .hg-button[data-skbtn="{shift}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"],
+.eden-osk-theme .hg-button[data-skbtn="{space}"] {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{letters}"],
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"] {
+  background: rgba(255, 255, 255, 0.13);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+.keyboard-shell[data-placement="floating"] {
+  touch-action: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{drag}"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: grab;
+  touch-action: none;
+}
+
+.keyboard-shell[data-placement="docked"]
+  .eden-osk-theme
+  .hg-button[data-skbtn="{drag}"] {
+  display: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{drag}"]:active {
+  background: rgba(255, 255, 255, 0.1);
+  transform: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{spacer}"] {
+  visibility: hidden;
+  pointer-events: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.eden-osk-theme .keyboard-drag-icon {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{close}"] {
+  background: rgba(162, 56, 39, 0.78);
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 26px;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{enter}"] {
+  background: rgba(49, 97, 162, 0.85);
+  font-size: 24px;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"] {
+  position: relative;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"] span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{bksp}"] span,
+.eden-osk-theme .hg-button[data-skbtn="{enter}"] span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+}
+
+.eden-osk-theme .keyboard-action-icon {
+  width: 100%;
+  height: 100%;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5px;
+}
+
+.eden-osk-theme .keyboard-backspace-icon {
+  width: 29px;
+  height: 29px;
+}
+
+.eden-osk-theme .keyboard-enter-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-active {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-locked {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-active
+  .keyboard-shift-icon,
+.eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-locked
+  .keyboard-shift-icon {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-locked::after {
+  position: absolute;
+  right: 50%;
+  bottom: 9px;
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+  transform: translateX(50%);
+}
+
+.eden-osk-theme .hg-button[data-skbtn="{space}"] {
+  max-width: none;
+}

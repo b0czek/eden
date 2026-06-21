@@ -1,5 +1,6 @@
 import type { Menu } from "@edenapp/tablets";
 import type { UserProfile } from "@edenapp/types";
+import { KeyboardButton } from "@edenapp/solid-kit";
 import { createSignal, For, onMount, Show } from "solid-js";
 import appsViewIcon from "../../assets/apps-grid-icon.svg";
 import { t } from "../i18n";
@@ -137,6 +138,7 @@ export default function Dock(props: DockProps) {
         </div>
       </div>
       <div class="dock-right">
+        <KeyboardButton label={t("shell.toggleKeyboard")} />
         <Clock />
       </div>
     </div>

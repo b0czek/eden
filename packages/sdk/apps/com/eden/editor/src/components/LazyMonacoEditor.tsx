@@ -99,7 +99,11 @@ export function LazyMonacoEditor(props: LazyMonacoEditorProps) {
   });
 
   return (
-    <div class="editor-container" ref={containerRef}>
+    <div
+      class="editor-container"
+      data-eden-keyboard="floating"
+      ref={containerRef}
+    >
       <Show when={isLoading()}>
         <div class="monaco-loading">
           <div class="monaco-loading-spinner"></div>

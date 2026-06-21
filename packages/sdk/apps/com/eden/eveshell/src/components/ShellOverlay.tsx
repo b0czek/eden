@@ -1,14 +1,15 @@
 import type {
-  AppInstance,
   AppManifest,
+  AppInstance,
   UserProfile,
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
 import { DialogHost, createDialogs } from "@edenapp/solid-kit/dialogs";
+import { KeyboardButton } from "@edenapp/solid-kit";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
-import { getLocalizedValue, initLocale, locale } from "../i18n";
+import { getLocalizedValue, initLocale, locale, t } from "../i18n";
 import type { AppInfo } from "../types";
 import AllApps from "./AllApps";
 import { openChangePasswordDialog } from "./ChangePasswordDialog";
@@ -351,6 +352,12 @@ export default function ShellOverlay() {
           userMenu={userContextMenu}
           appMenu={appMenu}
         />
+      </Show>
+
+      <Show when={isFullscreen()}>
+        <div class="shell-overlay-keyboard-fab">
+          <KeyboardButton label={t("shell.toggleKeyboard")} />
+        </div>
       </Show>
 
       <DialogHost dialogs={dialogs} />
