@@ -49,6 +49,9 @@ button,
 }
 
 .eden-osk-theme.simple-keyboard {
+  --keyboard-standard-key-width: calc((100% - 45px) / 10);
+  --keyboard-action-key-width: calc(var(--keyboard-standard-key-width) * 1.5);
+
   max-width: 100%;
   background: transparent;
   -webkit-app-region: no-drag;
@@ -80,7 +83,8 @@ button,
 }
 
 .eden-osk-theme .hg-button.hg-standardBtn {
-  width: 0;
+  flex: 0 0 var(--keyboard-standard-key-width);
+  width: var(--keyboard-standard-key-width);
   max-width: none;
 }
 
@@ -114,30 +118,35 @@ button,
   content: "";
 }
 
+.eden-osk-theme .hg-button[data-skbtn="{space}"] {
+  flex: 0 0 calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  width: calc((var(--keyboard-standard-key-width) * 4) + 15px);
+  max-width: none;
+}
+
 .eden-osk-theme .hg-button[data-skbtn="{shift}"],
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
 .eden-osk-theme .hg-button[data-skbtn="{close}"],
+.eden-osk-theme .hg-button[data-skbtn="{enter}"] {
+  flex: 0 0 var(--keyboard-action-key-width);
+  width: var(--keyboard-action-key-width);
+  max-width: none;
+}
+
+.eden-osk-theme .hg-button[data-skbtn=","],
+.eden-osk-theme .hg-button[data-skbtn="."],
+.eden-osk-theme .hg-button[data-skbtn="<"],
+.eden-osk-theme .hg-button[data-skbtn=">"],
 .eden-osk-theme .hg-button[data-skbtn="{drag}"],
 .eden-osk-theme .hg-button[data-skbtn="{letters}"],
-.eden-osk-theme .hg-button[data-skbtn="{symbols}"],
-.eden-osk-theme .hg-button[data-skbtn="{enter}"] {
-  flex: 1 1 0;
-}
-
-.eden-osk-theme .hg-button[data-skbtn="{space}"] {
-  flex: 4 1 0;
-}
-
-.keyboard-shell[data-layout="text"] .eden-osk-theme .hg-button[data-skbtn="{space}"] {
-  flex: 5 1 0;
-}
-
-.keyboard-shell[data-layout="text"] .eden-osk-theme .hg-button[data-skbtn="{enter}"] {
-  flex: 1.6 1 0;
+.eden-osk-theme .hg-button[data-skbtn="{symbols}"] {
+  flex: 0 0 var(--keyboard-standard-key-width);
+  width: var(--keyboard-standard-key-width);
+  max-width: none;
 }
 
 .eden-osk-theme .hg-row:has(.hg-button[data-skbtn="{space}"]) {
-  padding: 0 calc((100% - 55px) / 6);
+  padding: 0;
 }
 
 .eden-osk-theme .hg-button:active {
