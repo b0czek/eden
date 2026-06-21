@@ -1,3 +1,4 @@
+import { filePicker } from "@edenapp/tablets";
 import pdfiumWasmUrl from "@embedpdf/pdfium/pdfium.wasm?url";
 import EmbedPDF, {
   type DocumentManagerCapability,
@@ -135,6 +136,24 @@ const App: Component = () => {
     }
   };
 
+  const openPdfFromPicker = async () => {
+    try {
+      const path = await filePicker.openFile({
+        title: "Open PDF",
+        filters: [{ name: "PDF Documents", extensions: ["pdf"] }],
+      });
+
+      if (path) {
+        openPdf(path);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to open PDF.";
+      setState({ status: "error", message });
+      window.edenFrame?.setTitle("PDF Viewer");
+    }
+  };
+
   onMount(() => {
     if (viewerHost) {
       viewer = EmbedPDF.init({
@@ -202,6 +221,16 @@ const App: Component = () => {
     <main class="pdf-viewer">
       <div ref={viewerHost} class="pdf-viewer__embed" />
 
+      <Show when={state().status === "ready"}>
+        <button
+          type="button"
+          class="eden-btn eden-btn-sm pdf-viewer__open-button"
+          onClick={openPdfFromPicker}
+        >
+          Open PDF
+        </button>
+      </Show>
+
       <Show when={state().status === "empty"}>
         <section class="pdf-viewer__state">
           <div class="pdf-viewer__message">
@@ -209,7 +238,14 @@ const App: Component = () => {
               <img src={appIconUrl} alt="" aria-hidden="true" />
             </div>
             <h1>PDF Viewer</h1>
-            <p>Open a PDF from Files.</p>
+            <p>Open a PDF to start reading.</p>
+            <button
+              type="button"
+              class="eden-btn eden-btn-primary eden-btn-md"
+              onClick={openPdfFromPicker}
+            >
+              Open PDF
+            </button>
           </div>
         </section>
       </Show>
@@ -234,6 +270,13 @@ const App: Component = () => {
             </div>
             <h1>Unable to Open PDF</h1>
             <p>{currentError()}</p>
+            <button
+              type="button"
+              class="eden-btn eden-btn-primary eden-btn-md"
+              onClick={openPdfFromPicker}
+            >
+              Open PDF
+            </button>
           </div>
         </section>
       </Show>

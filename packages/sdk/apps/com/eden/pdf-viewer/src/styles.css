@@ -24,6 +24,14 @@ body,
   background: var(--eden-color-bg-primary);
 }
 
+.pdf-viewer__open-button {
+  position: absolute;
+  top: var(--eden-space-md);
+  right: var(--eden-space-md);
+  z-index: 2;
+  box-shadow: var(--eden-shadow-sm);
+}
+
 .pdf-viewer__state {
   position: absolute;
   inset: 0;

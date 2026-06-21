@@ -437,6 +437,9 @@ importers:
 
   packages/sdk/apps/com/eden/pdf-viewer:
     dependencies:
+      '@edenapp/tablets':
+        specifier: workspace:*
+        version: link:../../../../../tablets
       '@embedpdf/pdfium':
         specifier: ^2.14.3
         version: 2.14.3

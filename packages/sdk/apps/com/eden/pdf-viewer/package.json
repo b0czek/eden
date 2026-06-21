@@ -10,6 +10,7 @@
   "dependencies": {
     "@embedpdf/pdfium": "^2.14.3",
     "@embedpdf/snippet": "^2.14.3",
+    "@edenapp/tablets": "workspace:*",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
