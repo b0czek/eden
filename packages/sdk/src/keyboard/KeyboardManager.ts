@@ -931,6 +931,8 @@ export class KeyboardManager {
   }
 
   destroy(): void {
+    ipcMain.removeHandler(CHANNEL_SHOW);
+    ipcMain.removeHandler(CHANNEL_GET_STATE);
     ipcMain.removeHandler(CHANNEL_SEND_ACTION);
     ipcMain.removeHandler(CHANNEL_HIDE);
     ipcMain.removeHandler(CHANNEL_START_DRAG);
