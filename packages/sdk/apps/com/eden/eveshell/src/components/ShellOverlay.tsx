@@ -40,6 +40,7 @@ export default function ShellOverlay() {
   });
   const isFullscreen = () => showAllApps() || showChangePassword();
   let lastResizeMode: "dock" | "fullscreen" | null = null;
+  let keyboardVisibleAtPointerDown: boolean | null = null;
 
   const refreshKeyboardState = async () => {
     try {
@@ -243,8 +244,11 @@ export default function ShellOverlay() {
 
   const handleKeyboardToggle = async () => {
     try {
-      const state = await window.edenKeyboard.getState();
-      if (state.visible) {
+      const shouldHide =
+        keyboardVisibleAtPointerDown ?? keyboardState().visible;
+      keyboardVisibleAtPointerDown = null;
+
+      if (shouldHide) {
         await window.edenKeyboard.hide();
       } else {
         await window.edenKeyboard.show();
@@ -254,6 +258,10 @@ export default function ShellOverlay() {
     } finally {
       void refreshKeyboardState();
     }
+  };
+
+  const handleKeyboardButtonPointerDown = () => {
+    keyboardVisibleAtPointerDown = keyboardState().visible;
   };
 
   createEffect(() => {
@@ -390,6 +398,7 @@ export default function ShellOverlay() {
           onShowAllApps={handleShowAllApps}
           keyboardVisible={keyboardState().visible}
           onKeyboardToggle={handleKeyboardToggle}
+          onKeyboardButtonPointerDown={handleKeyboardButtonPointerDown}
           userMenu={userContextMenu}
           appMenu={appMenu}
         />
@@ -400,6 +409,7 @@ export default function ShellOverlay() {
           <KeyboardButton
             active={keyboardState().visible}
             onClick={handleKeyboardToggle}
+            onPointerDown={handleKeyboardButtonPointerDown}
           />
         </div>
       </Show>

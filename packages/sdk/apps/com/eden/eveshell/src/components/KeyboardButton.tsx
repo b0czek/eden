@@ -4,6 +4,7 @@ import { t } from "../i18n";
 interface KeyboardButtonProps {
   active: boolean;
   onClick: () => void | Promise<void>;
+  onPointerDown?: () => void;
 }
 
 export default function KeyboardButton(props: KeyboardButtonProps) {
@@ -15,6 +16,7 @@ export default function KeyboardButton(props: KeyboardButtonProps) {
       class="eden-btn eden-btn-ghost eden-btn-icon shell-keyboard-button"
       classList={{ active: props.active }}
       onClick={() => void props.onClick()}
+      onPointerDown={props.onPointerDown}
       title={label()}
       aria-label={label()}
     >

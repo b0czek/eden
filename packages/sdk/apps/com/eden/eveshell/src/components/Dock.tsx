@@ -17,6 +17,7 @@ interface DockProps {
   onShowAllApps: () => void;
   keyboardVisible: boolean;
   onKeyboardToggle: () => void | Promise<void>;
+  onKeyboardButtonPointerDown: () => void;
   userMenu: Menu<UserProfile | null>;
   appMenu: Menu<AppInfo>;
 }
@@ -143,6 +144,7 @@ export default function Dock(props: DockProps) {
         <KeyboardButton
           active={props.keyboardVisible}
           onClick={props.onKeyboardToggle}
+          onPointerDown={props.onKeyboardButtonPointerDown}
         />
         <Clock />
       </div>

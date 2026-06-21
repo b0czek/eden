@@ -288,10 +288,6 @@ export class KeyboardManager {
     }
 
     if (!payload.visible) {
-      if (this.dismissedTarget?.viewId === viewId) {
-        this.dismissedTarget = null;
-      }
-
       if (this.currentTarget?.viewId === viewId) {
         this.currentTarget = null;
         if (this.persistentVisibility) {

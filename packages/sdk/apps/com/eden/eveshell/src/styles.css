@@ -209,9 +209,9 @@ body {
 
 .shell-overlay-keyboard-fab {
   position: absolute;
-  top: var(--eden-space-lg);
+  bottom: var(--eden-space-lg);
   right: var(--eden-space-lg);
-  z-index: 3;
+  z-index: calc(var(--eden-z-modal) + 1);
 }
 
 .app-icons {
