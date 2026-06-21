@@ -22,6 +22,7 @@ export interface EdenKeyboardFocusState {
   sessionId: number;
   target?: EdenKeyboardTarget;
   targetBounds?: EdenKeyboardTargetBounds;
+  placementMode?: EdenKeyboardPlacementMode;
 }
 
 export interface EdenKeyboardInsetState {

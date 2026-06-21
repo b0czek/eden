@@ -1,4 +1,5 @@
 import type {
+  EdenKeyboardPlacementMode,
   EdenKeyboardTarget,
   EdenKeyboardTargetBounds,
 } from "@edenapp/types";
@@ -7,6 +8,8 @@ export type EditableElement =
   | HTMLInputElement
   | HTMLTextAreaElement
   | HTMLElement;
+
+export type KeyboardAutodetectionMode = "auto" | "manual" | "floating";
 
 const SUPPORTED_INPUT_TYPES = new Set([
   "text",
@@ -25,6 +28,40 @@ const isSupportedInput = (element: HTMLInputElement): boolean => {
 
   const type = (element.type || "text").toLowerCase();
   return SUPPORTED_INPUT_TYPES.has(type);
+};
+
+const getKeyboardAutodetectionAttribute = (
+  element: EditableElement,
+): string | null => {
+  const owner = element.closest("[data-eden-keyboard]");
+  if (!(owner instanceof HTMLElement)) {
+    return null;
+  }
+
+  return owner.dataset.edenKeyboard?.trim().toLowerCase() ?? null;
+};
+
+export const getKeyboardAutodetectionMode = (
+  element: EditableElement,
+): KeyboardAutodetectionMode => {
+  const attribute = getKeyboardAutodetectionAttribute(element);
+  if (attribute === "manual") {
+    return "manual";
+  }
+
+  if (attribute === "floating") {
+    return "floating";
+  }
+
+  return "auto";
+};
+
+export const getKeyboardFocusPlacementMode = (
+  element: EditableElement,
+): EdenKeyboardPlacementMode | undefined => {
+  return getKeyboardAutodetectionMode(element) === "floating"
+    ? "floating"
+    : undefined;
 };
 
 export const isEditableElement = (

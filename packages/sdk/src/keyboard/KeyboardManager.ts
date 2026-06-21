@@ -56,6 +56,7 @@ type KeyboardTargetSession = {
   sessionId: number;
   target?: EdenKeyboardTarget;
   targetBounds?: EdenKeyboardFocusState["targetBounds"];
+  placementMode?: EdenKeyboardPlacementMode;
 };
 
 type KeyboardDragState = {
@@ -306,6 +307,7 @@ export class KeyboardManager {
       sessionId: payload.sessionId,
       target: payload.target,
       targetBounds: payload.targetBounds,
+      placementMode: payload.placementMode,
     };
 
     if (!this.enabled) {
@@ -690,6 +692,10 @@ export class KeyboardManager {
   private getEffectivePlacementMode(): EdenKeyboardPlacementMode {
     if (this.persistentVisibility) {
       return "floating";
+    }
+
+    if (this.currentTarget?.placementMode) {
+      return this.currentTarget.placementMode;
     }
 
     return this.placementMode;

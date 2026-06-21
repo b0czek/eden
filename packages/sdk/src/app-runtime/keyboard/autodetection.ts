@@ -4,6 +4,8 @@ import type {
 } from "@edenapp/types";
 import {
   getEditableElementBounds,
+  getKeyboardAutodetectionMode,
+  getKeyboardFocusPlacementMode,
   getKeyboardTarget,
   isEditableElement,
   type EditableElement,
@@ -46,6 +48,9 @@ export const createKeyboardAutodetection = ({
     if (visible && activeKeyboardTarget && activeEditableElement) {
       payload.target = activeKeyboardTarget;
       payload.targetBounds = getEditableElementBounds(activeEditableElement);
+      payload.placementMode = getKeyboardFocusPlacementMode(
+        activeEditableElement,
+      );
     }
 
     reportFocusState(payload);
@@ -107,6 +112,11 @@ export const createKeyboardAutodetection = ({
   };
 
   const setActiveEditableElement = (element: EditableElement): void => {
+    if (getKeyboardAutodetectionMode(element) === "manual") {
+      clearActiveEditableElement();
+      return;
+    }
+
     const isSameElement = activeEditableElement === element;
     activeEditableElement = element;
     activeKeyboardTarget = getKeyboardTarget(element);
@@ -186,6 +196,10 @@ export const createKeyboardAutodetection = ({
       "focusin",
       (event) => {
         if (!isEditableElement(event.target)) {
+          return;
+        }
+
+        if (getKeyboardAutodetectionMode(event.target) === "manual") {
           return;
         }
 
