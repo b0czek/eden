@@ -289,6 +289,29 @@ export interface FileCommands {
 }
 
 /**
+ * FilePickerCommands - Commands for the "file-picker" namespace
+ */
+export interface FilePickerCommands {
+  "file-picker/register-display": {
+    args: { };
+    response: { success: boolean };
+  };
+  "file-picker/open": {
+    args: import("./index").FilePickerOpenArgs & { };
+    response: { requestId: string };
+  };
+  "file-picker/resolve": {
+    args: import("./index").FilePickerResult & { };
+    response: { success: boolean };
+  };
+  "file-picker/close": {
+    args: {
+    requestId?: string };
+    response: { success: boolean };
+  };
+}
+
+/**
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
@@ -925,4 +948,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}

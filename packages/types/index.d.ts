@@ -173,6 +173,7 @@ export interface Notification {
 }
 
 export * from "./ContextMenu";
+export * from "./FilePicker";
 
 export interface WallpaperPreset {
   id: string;

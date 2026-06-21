@@ -9,6 +9,7 @@ import { AppearanceManager } from "./appearance/AppearanceManager";
 import { ContextMenuManager } from "./context-menu";
 import { DbManager } from "./db";
 import { FileOpenManager } from "./file-open";
+import { FilePickerManager } from "./file-picker";
 import { FilesystemManager } from "./filesystem";
 import { I18nManager } from "./i18n/I18nManager";
 import { CommandRegistry, IPCBridge } from "./ipc";
@@ -145,6 +146,7 @@ export class Eden {
     container.resolve(SystemHandler);
     container.resolve(NotificationManager);
     container.resolve(ContextMenuManager);
+    container.resolve(FilePickerManager);
     container.resolve(DbManager);
     container.resolve(AppearanceManager);
   }

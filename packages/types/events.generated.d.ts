@@ -29,6 +29,14 @@ export interface FileEvents {
 }
 
 /**
+ * FilePickerEvents - Events for the "file-picker" namespace
+ */
+export interface FilePickerEvents {
+  "file-picker/opened": { picker: import("./index").FilePickerOpenEvent };
+  "file-picker/closed": import("./index").FilePickerResult;
+}
+
+/**
  * I18nEvents - Events for the "i18n" namespace
  */
 export interface I18nEvents {
@@ -101,4 +109,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}

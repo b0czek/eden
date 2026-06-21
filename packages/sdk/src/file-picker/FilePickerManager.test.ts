@@ -1,0 +1,179 @@
+import "reflect-metadata";
+
+import type { ViewBounds } from "@edenapp/types";
+import type { CommandRegistry, IPCBridge } from "../ipc";
+import type { NotificationManager } from "../notification";
+import type { ViewManager } from "../view-manager";
+import { FilePickerManager } from "./FilePickerManager";
+
+type CommandRegistryMock = jest.Mocked<
+  Pick<CommandRegistry, "registerManager">
+>;
+type EventSubscribersMock = {
+  notify: jest.Mock;
+  notifyView: jest.Mock;
+};
+type ViewManagerMock = jest.Mocked<
+  Pick<
+    ViewManager,
+    "focusView" | "getViewIdByWebContentsId" | "getViewInfo" | "showView"
+  >
+>;
+type NotificationManagerMock = jest.Mocked<
+  Pick<NotificationManager, "pushNotification">
+>;
+type ViewInfo = NonNullable<ReturnType<ViewManager["getViewInfo"]>>;
+
+const openerBounds: ViewBounds = {
+  x: 120,
+  y: 80,
+  width: 640,
+  height: 420,
+};
+
+const createViewInfo = (bounds: ViewBounds): ViewInfo =>
+  ({ bounds }) as ViewInfo;
+
+const createManager = () => {
+  const eventSubscribers: EventSubscribersMock = {
+    notify: jest.fn(),
+    notifyView: jest.fn(),
+  };
+  const ipcBridge = { eventSubscribers } as unknown as IPCBridge;
+  const commandRegistry: CommandRegistryMock = {
+    registerManager: jest.fn(),
+  };
+  const viewManager: ViewManagerMock = {
+    focusView: jest.fn(),
+    getViewIdByWebContentsId: jest.fn((webContentsId: number) => {
+      if (webContentsId === 100) return 10;
+      if (webContentsId === 200) return 20;
+      if (webContentsId === 201) return 21;
+      return undefined;
+    }),
+    getViewInfo: jest.fn((viewId: number) => {
+      if (viewId === 20) {
+        return createViewInfo(openerBounds);
+      }
+      return createViewInfo({ x: 0, y: 0, width: 0, height: 0 });
+    }),
+    showView: jest.fn(),
+  };
+  const notificationManager: NotificationManagerMock = {
+    pushNotification: jest.fn(),
+  };
+
+  const manager = new FilePickerManager(
+    ipcBridge,
+    commandRegistry as unknown as CommandRegistry,
+    viewManager as unknown as ViewManager,
+    notificationManager as unknown as NotificationManager,
+  );
+
+  return {
+    commandRegistry,
+    eventSubscribers,
+    manager,
+    notificationManager,
+    viewManager,
+  };
+};
+
+describe("FilePickerManager", () => {
+  let logSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it("opens and resolves a picker through the display provider and opener", () => {
+    const { eventSubscribers, manager, viewManager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+
+    const { requestId } = manager.openPicker(
+      {
+        mode: "open",
+        selection: "file",
+        filters: [{ name: "Text", extensions: ["txt", "md"] }],
+      },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      10,
+      "file-picker/opened",
+      {
+        picker: expect.objectContaining({
+          requestId,
+          mode: "open",
+          opener: {
+            appId: "com.eden.editor",
+            viewId: 20,
+            bounds: openerBounds,
+          },
+        }),
+      },
+    );
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/opened",
+      expect.any(Object),
+    );
+    expect(viewManager.showView).toHaveBeenCalledWith(10);
+    expect(viewManager.focusView).toHaveBeenCalledWith(10);
+
+    expect(
+      manager.resolvePicker(
+        { requestId, reason: "select", path: "/Documents/readme.md" },
+        { appId: "com.eden.file-picker", webContentsId: 100 },
+      ),
+    ).toEqual({ success: true });
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      10,
+      "file-picker/closed",
+      { requestId, reason: "select", path: "/Documents/readme.md" },
+    );
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId, reason: "select", path: "/Documents/readme.md" },
+    );
+  });
+
+  it("rejects a second request while a picker is active and pushes a toast", () => {
+    const { manager, notificationManager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    manager.openPicker(
+      { mode: "open" },
+      {
+        appId: "com.eden.editor",
+        webContentsId: 200,
+      },
+    );
+
+    expect(() =>
+      manager.openPicker(
+        { mode: "save", suggestedName: "report.md" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).toThrow(/File picker is busy/);
+    expect(notificationManager.pushNotification).toHaveBeenCalledWith(
+      "File picker is busy",
+      "Resolve the current file picker before opening another.",
+      5000,
+      "warning",
+    );
+  });
+});
