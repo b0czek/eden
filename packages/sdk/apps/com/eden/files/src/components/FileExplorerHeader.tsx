@@ -35,6 +35,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
       <div class="header-content">
         <div class="toolbar-left">
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoBack}
             disabled={props.historyIndex === 0}
@@ -43,6 +44,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             <FaSolidArrowLeft />
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoForward}
             disabled={props.historyIndex >= props.historyLength - 1}
@@ -51,6 +53,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             <FaSolidArrowRight />
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
             disabled={props.currentPath === "/"}
@@ -68,6 +71,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
 
         <div class="toolbar-right">
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFolder}
             title={t("files.newFolder")}
@@ -75,6 +79,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             <FaSolidFolderPlus />
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onNewFile}
             title={t("files.newFile")}
@@ -82,6 +87,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             <FaSolidFileMedical />
           </button>
           <button
+            type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onOpenDisplayOptions}
             title={t("common.settings")}

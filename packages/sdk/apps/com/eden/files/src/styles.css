@@ -65,6 +65,11 @@ body {
   display: flex;
   align-items: center;
   gap: var(--eden-space-sm);
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   background: var(--eden-color-bg-glass-medium);
   backdrop-filter: var(--eden-glass-medium);
   border: 1px solid var(--eden-color-border-light);
@@ -168,6 +173,13 @@ body {
   display: flex;
   align-items: center;
   gap: var(--eden-space-md);
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
   padding: var(--eden-space-md) var(--eden-space-lg);
   cursor: pointer;
   transition: all var(--eden-transition-base);
@@ -386,6 +398,18 @@ body {
   animation: eden-fade-in 0.3s ease-out;
 }
 
+.file-item-main {
+  display: contents;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+}
+
 /* ===== Display Options Dropdown (Eden CSS Overrides) ===== */
 .display-options-position {
   align-items: flex-start;
@@ -393,7 +417,20 @@ body {
   padding: var(--eden-space-lg);
 }
 
+.display-options-backdrop {
+  position: absolute;
+  inset: 0;
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
 .display-options-popover {
+  position: relative;
+  z-index: 1;
   margin-top: 60px;
   margin-right: var(--eden-space-md);
   width: 280px;
@@ -401,6 +438,19 @@ body {
   overflow-y: auto;
   animation: eden-scale-in var(--eden-duration-fast)
     var(--eden-transition-ease-out);
+}
+
+.display-options-fieldset {
+  border: none;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.display-options-fieldset legend.eden-form-label {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--eden-space-sm);
 }
 
 .open-with-dialog {

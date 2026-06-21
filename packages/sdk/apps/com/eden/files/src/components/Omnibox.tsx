@@ -179,12 +179,25 @@ const Omnibox: Component<OmniboxProps> = (props) => {
     setInputValue("");
   };
 
+  const handleOmniboxKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleOmniboxClick();
+    }
+  };
+
   return (
     <div class="omnibox-container" ref={containerRef}>
       <Show
         when={isEditing()}
         fallback={
-          <div class="omnibox-display" onClick={handleOmniboxClick}>
+          <button
+            type="button"
+            class="omnibox-display"
+            onClick={handleOmniboxClick}
+            onKeyDown={handleOmniboxKeyDown}
+            aria-label="Edit path"
+          >
             <div class="breadcrumb-display">
               <For each={props.breadcrumbs}>
                 {(crumb, index) => (
@@ -199,7 +212,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                 )}
               </For>
             </div>
-          </div>
+          </button>
         }
       >
         <div class="omnibox-input-container">
@@ -219,7 +232,8 @@ const Omnibox: Component<OmniboxProps> = (props) => {
           <div class="omnibox-suggestions eden-glass-strong">
             <For each={suggestions()}>
               {(suggestion, index) => (
-                <div
+                <button
+                  type="button"
                   class={`suggestion-item ${
                     index() === selectedIndex() ? "selected" : ""
                   }`}
@@ -229,7 +243,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                   <span class="suggestion-icon">{suggestion.icon}</span>
                   <span class="suggestion-name">{suggestion.name}</span>
                   <span class="suggestion-path">{suggestion.path}</span>
-                </div>
+                </button>
               )}
             </For>
           </div>

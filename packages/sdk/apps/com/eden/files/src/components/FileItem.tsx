@@ -34,30 +34,36 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         "list-view": props.viewStyle === "list",
         [`size-${props.itemSize}`]: true,
       }}
-      onClick={() => props.onClick(props.item)}
-      onDblClick={() => props.onDoubleClick(props.item)}
-      onContextMenu={(e) => props.onContextMenu(props.item, e)}
     >
-      <div class="file-icon">{getFileIcon(props.item)}</div>
-      <div class="file-name">{props.item.name}</div>
+      <button
+        type="button"
+        class="file-item-main"
+        onClick={() => props.onClick(props.item)}
+        onDblClick={() => props.onDoubleClick(props.item)}
+        onContextMenu={(e) => props.onContextMenu(props.item, e)}
+      >
+        <div class="file-icon">{getFileIcon(props.item)}</div>
+        <div class="file-name">{props.item.name}</div>
 
-      {props.viewStyle === "list" && (
-        <>
-          <div class="file-size">
-            {props.item.isFile ? formatFileSize(props.item.size) : "—"}
+        {props.viewStyle === "list" && (
+          <>
+            <div class="file-size">
+              {props.item.isFile ? formatFileSize(props.item.size) : "—"}
+            </div>
+            <div class="file-modified">{formatDate(props.item.modified)}</div>
+          </>
+        )}
+
+        {props.viewStyle === "grid" && (
+          <div class="file-meta">
+            {props.item.isFile ? formatFileSize(props.item.size) : "Folder"}
           </div>
-          <div class="file-modified">{formatDate(props.item.modified)}</div>
-        </>
-      )}
-
-      {props.viewStyle === "grid" && (
-        <div class="file-meta">
-          {props.item.isFile ? formatFileSize(props.item.size) : "Folder"}
-        </div>
-      )}
+        )}
+      </button>
 
       <div class="file-item-actions">
         <button
+          type="button"
           class="eden-btn eden-btn-danger eden-btn-xs file-action-btn"
           onClick={(e) => props.onDelete(props.item, e)}
           title="Delete"
