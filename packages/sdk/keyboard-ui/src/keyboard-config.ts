@@ -37,13 +37,13 @@ const buildTextLayout = (
         "@ # $ & * ( ) ' \" /",
         "- + = _ : ; ! ? %",
         "[ ] { } < > \\ | {bksp}",
-        "{letters} {drag} , {space} . {enter}",
+        "{letters} {drag} , {space} . {close} {enter}",
       ]
     : [
         "1 2 3 4 5 6 7 8 9 0",
         "@ # $ & * ( ) ' \" /",
         "- + = _ : ; ! ? {bksp}",
-        "{letters} {drag} , {space} . {enter}",
+        "{letters} {drag} , {space} . {close} {enter}",
       ];
 
   return {
@@ -51,13 +51,13 @@ const buildTextLayout = (
       ...defaultRows,
       "a s d f g h j k l",
       "{shift} z x c v b n m {bksp}",
-      "{symbols} {drag} , {space} . {enter}",
+      "{symbols} {drag} , {space} . {close} {enter}",
     ],
     shift: [
       ...shiftRows,
       "A S D F G H J K L",
       "{shift} Z X C V B N M {bksp}",
-      "{symbols} {drag} < {space} > {enter}",
+      "{symbols} {drag} < {space} > {close} {enter}",
     ],
     symbols,
   };
