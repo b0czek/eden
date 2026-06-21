@@ -536,23 +536,14 @@ const App: Component = () => {
     }
   };
 
-  const beginDrag = (event: MouseEvent) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest("[data-no-drag]")) return;
-    if (event.button !== 0) return;
-
-    event.preventDefault();
-    void window.edenAPI.shellCommand("view/start-drag", {
-      startX: event.screenX,
-      startY: event.screenY,
-    });
-
-    const endDrag = () => {
-      void window.edenAPI.shellCommand("view/end-drag", {});
-      window.removeEventListener("mouseup", endDrag);
-    };
-    window.addEventListener("mouseup", endDrag);
-  };
+  createEffect(() => {
+    const request = activeRequest();
+    if (request) {
+      window.edenFrame?.setTitle(getPickerTitle(request));
+    } else {
+      window.edenFrame?.resetTitle();
+    }
+  });
 
   const selectedSummary = createMemo(() => {
     const request = activeRequest();
@@ -586,6 +577,14 @@ const App: Component = () => {
 
   onMount(() => {
     initLocale();
+
+    if (window.edenFrame) {
+      window.edenFrame.close = async () => {
+        if (activeRequest()) {
+          cancelPicker();
+        }
+      };
+    }
 
     const handleOpened = (data: { picker: FilePickerOpenEvent }) => {
       void openPicker(data.picker);
@@ -636,27 +635,6 @@ const App: Component = () => {
     <Show when={activeRequest()}>
       {(request) => (
         <div class="file-picker-window">
-          <div
-            class="file-picker-titlebar"
-            role="toolbar"
-            aria-label={getPickerTitle(request())}
-            onMouseDown={beginDrag}
-          >
-            <div>
-              <div class="file-picker-title">{getPickerTitle(request())}</div>
-              <div class="file-picker-subtitle">{request().opener.appId}</div>
-            </div>
-            <button
-              type="button"
-              class="eden-btn eden-btn-sm eden-btn-square"
-              data-no-drag
-              onClick={cancelPicker}
-              aria-label={t("common.close")}
-            >
-              x
-            </button>
-          </div>
-
           <div class="file-explorer file-picker-explorer">
             <FileExplorerHeader
               labels={getExplorerLabels()}

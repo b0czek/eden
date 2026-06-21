@@ -24,9 +24,10 @@
       "x": 0,
       "y": 0
     },
+    "showMinimize": false,
     "injections": {
       "css": "full",
-      "appFrame": false
+      "appFrame": true
     }
   },
   "permissions": ["file-picker/display", "fs/*", "db/rw"],

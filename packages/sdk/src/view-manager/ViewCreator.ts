@@ -323,7 +323,7 @@ export class ViewCreator {
         });
       }
 
-      if (viewType === "app" && this.shouldInjectAppFrame(windowConfig)) {
+      if (this.shouldInjectAppFrame(windowConfig)) {
         this.injectAppFrame(
           view,
           appId,
