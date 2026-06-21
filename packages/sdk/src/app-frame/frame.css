@@ -2,7 +2,7 @@
 
 /* Squircle container styling */
 html {
-  background: transparent !important;
+  background: transparent;
   height: 100%;
   /* Ensure shadows aren't clipped by html bounds if we want them, 
        but for a frameless window filling the view, we typically clip. 
@@ -34,7 +34,7 @@ body {
   box-sizing: border-box;
 
   /* Ensure body background is transparent to prevent canvas propagation */
-  background-color: transparent !important;
+  background-color: transparent;
 }
 
 /* Paint background on a layer that DOES NOT propagate to canvas, allowing clip-path to work */
