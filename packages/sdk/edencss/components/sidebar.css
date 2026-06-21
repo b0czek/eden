@@ -103,6 +103,29 @@
   user-select: none;
 }
 
+button.eden-sidebar-item {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  border: none;
+  outline: none;
+}
+
+button.eden-sidebar-item.eden-sidebar-item-selected,
+button.eden-sidebar-item.eden-sidebar-item-selected:hover {
+  background: var(--eden-color-surface-active);
+  color: var(--eden-color-text-primary);
+}
+
+button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
+    .eden-sidebar-item-disabled
+  ) {
+  background: var(--eden-color-bg-glass-medium);
+  color: var(--eden-color-text-primary);
+}
+
 .eden-sidebar-item:hover {
   background: var(--eden-color-bg-glass-medium);
   color: var(--eden-color-text-primary);
@@ -110,7 +133,6 @@
 
 .eden-sidebar-item-selected {
   background: var(--eden-color-surface-active);
-  border: 1px solid var(--eden-color-accent-primary);
   color: var(--eden-color-text-primary);
 }
 

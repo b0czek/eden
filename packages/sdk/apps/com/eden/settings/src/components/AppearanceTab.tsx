@@ -11,7 +11,8 @@ const WallpaperGrid: Component<{
   <div class="wallpaper-grid">
     <For each={props.options}>
       {(option) => (
-        <div
+        <button
+          type="button"
           class={`wallpaper-item ${
             props.activeId === option.id
               ? "wallpaper-item-active"
@@ -23,7 +24,7 @@ const WallpaperGrid: Component<{
           onClick={() => props.onSelect(option)}
         >
           {option.name}
-        </div>
+        </button>
       )}
     </For>
   </div>

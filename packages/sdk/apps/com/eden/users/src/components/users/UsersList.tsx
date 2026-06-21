@@ -35,7 +35,8 @@ const UsersList = (props: UsersListProps) => (
     <div class="eden-list">
       <For each={props.users}>
         {(user) => (
-          <div
+          <button
+            type="button"
             class="eden-list-item eden-list-item-interactive"
             onClick={() => props.onSelect(user.username)}
           >
@@ -63,7 +64,7 @@ const UsersList = (props: UsersListProps) => (
             <div class="eden-list-item-meta">
               <FiChevronRight />
             </div>
-          </div>
+          </button>
         )}
       </For>
     </div>

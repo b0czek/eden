@@ -49,7 +49,8 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
         <div class="eden-sidebar-items">
           <For each={props.edenSchema()}>
             {(category) => (
-              <div
+              <button
+                type="button"
                 class={`eden-sidebar-item ${isSelected("eden", category.id)}`}
                 onClick={() => props.onSelectEdenCategory(category)}
               >
@@ -59,7 +60,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
                 <span class="eden-sidebar-item-text">
                   {getLocalizedValue(category.name, locale())}
                 </span>
-              </div>
+              </button>
             )}
           </For>
         </div>
@@ -87,7 +88,8 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
           >
             <For each={props.apps()}>
               {(app) => (
-                <div
+                <button
+                  type="button"
                   class={`eden-sidebar-item ${isSelected("app", app.id)}`}
                   onClick={() => props.onSelectApp(app)}
                 >
@@ -102,7 +104,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
                   <span class="eden-sidebar-item-text">
                     {getLocalizedValue(app.name, locale())}
                   </span>
-                </div>
+                </button>
               )}
             </For>
           </Show>

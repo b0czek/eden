@@ -246,7 +246,8 @@ const AppsTab: Component = () => {
             <div class="eden-list">
               <For each={sortedApps()}>
                 {(app) => (
-                  <div
+                  <button
+                    type="button"
                     class="eden-list-item eden-list-item-interactive"
                     onClick={() => setSelectedAppId(app.id)}
                   >
@@ -287,7 +288,7 @@ const AppsTab: Component = () => {
                     <div class="eden-list-item-meta">
                       <FiChevronRight />
                     </div>
-                  </div>
+                  </button>
                 )}
               </For>
             </div>

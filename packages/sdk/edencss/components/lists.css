@@ -54,6 +54,33 @@
   user-select: none;
 }
 
+button.eden-list-item {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--eden-color-border-light);
+  outline: none;
+}
+
+button.eden-list-item:last-child {
+  border-bottom: none;
+}
+
+button.eden-list-item.eden-list-item-active,
+button.eden-list-item.eden-list-item-active:hover {
+  background: var(--eden-color-surface-active);
+}
+
+button.eden-list-item:hover:not(.eden-list-item-active):not(
+    .eden-list-item-disabled
+  ) {
+  background: var(--eden-color-surface-hover);
+}
+
 .eden-list-item-disabled {
   opacity: 0.5;
   cursor: not-allowed;

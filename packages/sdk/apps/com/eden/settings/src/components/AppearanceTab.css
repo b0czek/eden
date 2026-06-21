@@ -10,10 +10,14 @@
 }
 
 .wallpaper-item {
+  width: 100%;
   height: calc(5 * var(--eden-space-md));
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  appearance: none;
+  font: inherit;
+  text-align: center;
   padding-bottom: var(--eden-space-sm);
   border-radius: var(--eden-radius-sm);
   box-shadow: var(--eden-shadow-sm);
