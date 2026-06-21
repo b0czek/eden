@@ -77,6 +77,9 @@ export interface WindowConfig {
   /** Whether to show the title in the title bar (default: true) */
   showTitle?: boolean;
 
+  /** Whether to show the minimize button in the title bar (default: true) */
+  showMinimize?: boolean;
+
   /** Controls which Eden runtime helpers are injected into the app */
   injections?: WindowInjectionOptions;
 

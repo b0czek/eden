@@ -20,6 +20,7 @@ export interface EdenFrame {
     config: {
       mode?: "tiled" | "floating" | "both";
       showTitle?: boolean;
+      showMinimize?: boolean;
       defaultSize?: { width: number; height: number };
       defaultPosition?: { x: number; y: number };
       movable?: boolean;

@@ -17,6 +17,7 @@ export function createOverlay(
 
   const supportsToggle = windowConfig.mode === "both";
   const showTitle = windowConfig.showTitle !== false; // Default to true if not specified
+  const showMinimize = windowConfig.showMinimize !== false; // Default to true if not specified
 
   // Create toggle button HTML if supported
   const toggleButtonHtml = supportsToggle
@@ -26,11 +27,15 @@ export function createOverlay(
   // Create title HTML if showTitle is true
   const titleHtml = showTitle ? `<div id="eden-app-frame-title">App</div>` : "";
 
+  const minimizeButtonHtml = showMinimize
+    ? `<button class="eden-app-frame-button minimize" id="eden-minimize-btn" title="Minimize">−</button>`
+    : "";
+
   overlay.innerHTML = `
     ${titleHtml}
     <div id="eden-app-frame-controls">
       ${toggleButtonHtml}
-      <button class="eden-app-frame-button minimize" id="eden-minimize-btn" title="Minimize">−</button>
+      ${minimizeButtonHtml}
       <button class="eden-app-frame-button close" id="eden-close-btn" title="Close">×</button>
     </div>
   `;
