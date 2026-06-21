@@ -13,8 +13,12 @@ function setupTabs() {
     tabs.forEach((tab, index) => {
       tab.addEventListener("click", () => {
         // Remove active class from all tabs and panels
-        tabs.forEach((t) => t.classList.remove("eden-tab-active"));
-        panels.forEach((p) => p.classList.remove("eden-tab-panel-active"));
+        tabs.forEach((t) => {
+          t.classList.remove("eden-tab-active");
+        });
+        panels.forEach((p) => {
+          p.classList.remove("eden-tab-panel-active");
+        });
 
         // Add active class to clicked tab and corresponding panel
         tab.classList.add("eden-tab-active");

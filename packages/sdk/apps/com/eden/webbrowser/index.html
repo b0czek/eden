@@ -128,7 +128,7 @@
     });
 
     document.getElementById('reload').addEventListener('click', () => {
-      frame.src = frame.src;
+      loadUrl(history[historyIndex], false);
     });
 
     updateButtons();
