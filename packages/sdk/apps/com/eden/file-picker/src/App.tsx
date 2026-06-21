@@ -18,6 +18,7 @@ import type {
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
+import { waitForEdenFrame } from "@edenapp/tablets";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -573,16 +574,27 @@ const App: Component = () => {
     return selectedPaths().length > 0;
   });
 
+  const handleFrameClose = async () => {
+    const request = activeRequest();
+    if (!request) {
+      await updateOverlayBounds(false, null);
+      return;
+    }
+
+    await cancelPicker();
+    if (activeRequest()?.requestId === request.requestId) {
+      await window.edenAPI.shellCommand("file-picker/close", {
+        requestId: request.requestId,
+      });
+    }
+  };
+
   onMount(() => {
     initLocale();
 
-    if (window.edenFrame) {
-      window.edenFrame.close = async () => {
-        if (activeRequest()) {
-          await cancelPicker();
-        }
-      };
-    }
+    void waitForEdenFrame().then((frame) => {
+      frame.close = handleFrameClose;
+    });
 
     const handleOpened = (data: { picker: FilePickerOpenEvent }) => {
       void openPicker(data.picker);

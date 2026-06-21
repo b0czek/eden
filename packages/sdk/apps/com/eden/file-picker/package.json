@@ -10,6 +10,7 @@
   "dependencies": {
     "@edenapp/babel": "workspace:*",
     "@edenapp/files-core": "workspace:*",
+    "@edenapp/tablets": "workspace:*",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
