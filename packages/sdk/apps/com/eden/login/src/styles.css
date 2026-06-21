@@ -25,6 +25,10 @@ body {
   width: min(720px, 92vw);
 }
 
+.login-header {
+  align-items: flex-start;
+}
+
 .user-error {
   color: var(--eden-color-danger);
 }

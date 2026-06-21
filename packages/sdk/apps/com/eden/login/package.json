@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@edenapp/babel": "workspace:*",
+    "@edenapp/solid-kit": "workspace:*",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {

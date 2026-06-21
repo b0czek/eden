@@ -12,6 +12,7 @@ import { FileOpenManager } from "./file-open";
 import { FilesystemManager } from "./filesystem";
 import { I18nManager } from "./i18n/I18nManager";
 import { CommandRegistry, IPCBridge } from "./ipc";
+import { KeyboardManager } from "./keyboard/KeyboardManager";
 import { log } from "./logging";
 import { attachWebContentsLogger } from "./logging/electron";
 import { NotificationManager } from "./notification";
@@ -44,6 +45,7 @@ export class Eden {
   private fileOpenManager!: FileOpenManager;
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
+  private keyboardManager!: KeyboardManager;
 
   constructor(config: EdenConfig = {}) {
     this.config = {
@@ -138,6 +140,7 @@ export class Eden {
     this.processManager = container.resolve(ProcessManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
     this.autostartManager = container.resolve(AutostartManager);
+    this.keyboardManager = container.resolve(KeyboardManager);
 
     container.resolve(SystemHandler);
     container.resolve(NotificationManager);
@@ -185,6 +188,7 @@ export class Eden {
     // Set managers to use this window
     this.viewManager.setMainWindow(this.mainWindow);
     this.ipcBridge.setMainWindow(this.mainWindow);
+    this.keyboardManager.setMainWindow(this.mainWindow);
 
     // Load the foundation layer (not eveshell!)
     const foundationPath = path.join(
@@ -243,6 +247,7 @@ export class Eden {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Cleanup IPC bridge
+      this.keyboardManager.destroy();
       this.ipcBridge.destroy();
 
       log.info("Eden shutdown complete");

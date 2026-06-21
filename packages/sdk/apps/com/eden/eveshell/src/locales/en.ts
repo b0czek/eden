@@ -12,6 +12,7 @@ export const en = {
     logout: "Log out",
     currentUser: "Current",
     changePassword: "Change password",
+    toggleKeyboard: "Toggle keyboard",
     currentPassword: "Current password",
     newPassword: "New password",
     confirmPassword: "Confirm new password",
