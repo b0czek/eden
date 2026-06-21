@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/types",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "TypeScript type definitions for the Eden platform",
   "types": "index.d.ts",
   "author": "Dariusz Majnert",

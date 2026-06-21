@@ -1,5 +1,17 @@
 # @edenapp/sdk
 
+## 0.9.0
+
+### Minor Changes
+
+- Add on-screen keyboard with text and number layouts, focus autodetection, and shell integration.
+- Accessibility fixes across Eden apps, Biome lint cleanup, and flat EdenCSS sidebar/list selection styling.
+
+### Patch Changes
+
+- @edenapp/types@0.9.0
+- @edenapp/genesis@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
