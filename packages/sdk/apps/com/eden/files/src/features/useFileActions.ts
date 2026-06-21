@@ -1,11 +1,10 @@
+import { type FileItem, isValidName, joinPath } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
 import type { FileHandlerInfo, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
 import { locale, t } from "../i18n";
-import type { FileItem } from "../types";
-import { isValidName, joinPath } from "../utils";
 
 interface UseFileActionsOptions {
   currentPath: Accessor<string>;

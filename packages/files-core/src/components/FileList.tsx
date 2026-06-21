@@ -1,10 +1,15 @@
 import type { Component } from "solid-js";
 import { createEffect, For, Show } from "solid-js";
-import { t } from "../i18n";
-import type { FileItem, ItemSize, ViewStyle } from "../types";
+import type {
+  FileExplorerLabels,
+  FileItem,
+  ItemSize,
+  ViewStyle,
+} from "../types";
 import FileItemComponent from "./FileItem";
 
 interface FileListProps {
+  labels: FileExplorerLabels;
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
@@ -13,10 +18,10 @@ interface FileListProps {
   itemSize: ItemSize;
   onItemClick: (item: FileItem) => void;
   onItemDoubleClick: (item: FileItem) => void;
-  onItemContextMenu: (item: FileItem, e: MouseEvent) => void;
-  onBackgroundContextMenu: (e: MouseEvent) => void;
-  onItemDelete: (item: FileItem, e: MouseEvent) => void;
-  onItemDeleteShortcut: (item: FileItem) => void;
+  onItemContextMenu?: (item: FileItem, e: MouseEvent) => void;
+  onBackgroundContextMenu?: (e: MouseEvent) => void;
+  onItemDelete?: (item: FileItem, e: MouseEvent) => void;
+  onItemDeleteShortcut?: (item: FileItem) => void;
   onBack?: () => void;
 }
 
@@ -74,7 +79,7 @@ const FileList: Component<FileListProps> = (props) => {
       }
 
       if (e.key === "Delete") {
-        if (selected) {
+        if (selected && props.onItemDeleteShortcut) {
           const item = items.find((i) => i.path === selected);
           if (item) {
             e.preventDefault();
@@ -155,14 +160,14 @@ const FileList: Component<FileListProps> = (props) => {
       onContextMenu={props.onBackgroundContextMenu}
     >
       <Show when={props.loading}>
-        <div class="loading-message">{t("common.loading")}</div>
+        <div class="loading-message">{props.labels.loading}</div>
       </Show>
 
       <Show when={!props.loading && props.items.length === 0}>
         <div class="empty-state">
           <div class="empty-icon">📂</div>
-          <div class="empty-message">{t("files.empty")}</div>
-          <div class="empty-hint">{t("files.emptyHint")}</div>
+          <div class="empty-message">{props.labels.empty}</div>
+          <div class="empty-hint">{props.labels.emptyHint}</div>
         </div>
       </Show>
 
@@ -180,6 +185,7 @@ const FileList: Component<FileListProps> = (props) => {
                 isSelected={props.selectedItem === item.path}
                 viewStyle={props.viewStyle}
                 itemSize={props.itemSize}
+                labels={props.labels}
                 onClick={props.onItemClick}
                 onDoubleClick={props.onItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
@@ -193,4 +199,5 @@ const FileList: Component<FileListProps> = (props) => {
   );
 };
 
+export { FileList };
 export default FileList;

@@ -7,15 +7,11 @@ import {
   FaSolidFolderPlus,
 } from "solid-icons/fa";
 import type { Component } from "solid-js";
-import { t } from "../i18n";
+import type { Breadcrumb, FileExplorerLabels } from "../types";
 import Omnibox from "./Omnibox";
 
-interface Breadcrumb {
-  name: string;
-  path: string;
-}
-
 interface FileExplorerHeaderProps {
+  labels: FileExplorerLabels;
   currentPath: string;
   historyIndex: number;
   historyLength: number;
@@ -24,9 +20,9 @@ interface FileExplorerHeaderProps {
   onGoForward: () => void;
   onGoUp: () => void;
   onNavigate: (path: string) => void;
-  onNewFolder: () => void;
-  onNewFile: () => void;
-  onOpenDisplayOptions: () => void;
+  onNewFolder?: () => void;
+  onNewFile?: () => void;
+  onOpenDisplayOptions?: () => void;
 }
 
 const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
@@ -39,7 +35,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoBack}
             disabled={props.historyIndex === 0}
-            title={t("files.goBack")}
+            title={props.labels.goBack}
           >
             <FaSolidArrowLeft />
           </button>
@@ -48,7 +44,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoForward}
             disabled={props.historyIndex >= props.historyLength - 1}
-            title={t("files.goForward")}
+            title={props.labels.goForward}
           >
             <FaSolidArrowRight />
           </button>
@@ -57,47 +53,55 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
             disabled={props.currentPath === "/"}
-            title={t("files.goUp")}
+            title={props.labels.goUp}
           >
             <FaSolidArrowUp />
           </button>
         </div>
 
         <Omnibox
+          labels={props.labels}
           currentPath={props.currentPath}
           breadcrumbs={props.breadcrumbs}
           onNavigate={props.onNavigate}
         />
 
         <div class="toolbar-right">
-          <button
-            type="button"
-            class="eden-btn eden-btn-sm eden-btn-square"
-            onClick={props.onNewFolder}
-            title={t("files.newFolder")}
-          >
-            <FaSolidFolderPlus />
-          </button>
-          <button
-            type="button"
-            class="eden-btn eden-btn-sm eden-btn-square"
-            onClick={props.onNewFile}
-            title={t("files.newFile")}
-          >
-            <FaSolidFileMedical />
-          </button>
-          <button
-            type="button"
-            class="eden-btn eden-btn-sm eden-btn-square"
-            onClick={props.onOpenDisplayOptions}
-            title={t("common.settings")}
-          >
-            <FaSolidEllipsis />
-          </button>
+          {props.onNewFolder && (
+            <button
+              type="button"
+              class="eden-btn eden-btn-sm eden-btn-square"
+              onClick={props.onNewFolder}
+              title={props.labels.newFolder}
+            >
+              <FaSolidFolderPlus />
+            </button>
+          )}
+          {props.onNewFile && (
+            <button
+              type="button"
+              class="eden-btn eden-btn-sm eden-btn-square"
+              onClick={props.onNewFile}
+              title={props.labels.newFile}
+            >
+              <FaSolidFileMedical />
+            </button>
+          )}
+          {props.onOpenDisplayOptions && (
+            <button
+              type="button"
+              class="eden-btn eden-btn-sm eden-btn-square"
+              onClick={props.onOpenDisplayOptions}
+              title={props.labels.settings}
+            >
+              <FaSolidEllipsis />
+            </button>
+          )}
         </div>
       </div>
     </header>
   );
 };
 
+export { FileExplorerHeader };
 export default FileExplorerHeader;

@@ -1,17 +1,23 @@
 import type { Component } from "solid-js";
-import type { FileItem, ItemSize, ViewStyle } from "../types";
+import type {
+  FileExplorerLabels,
+  FileItem,
+  ItemSize,
+  ViewStyle,
+} from "../types";
 import { formatFileSize, getFileIcon } from "../utils";
 
 interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
+  labels: FileExplorerLabels;
   item: FileItem;
   isSelected: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
   onClick: (item: FileItem) => void;
   onDoubleClick: (item: FileItem) => void;
-  onContextMenu: (item: FileItem, e: MouseEvent) => void;
-  onDelete: (item: FileItem, e: MouseEvent) => void;
+  onContextMenu?: (item: FileItem, e: MouseEvent) => void;
+  onDelete?: (item: FileItem, e: MouseEvent) => void;
 }
 
 const FileItemComponent: Component<FileItemComponentProps> = (props) => {
@@ -40,7 +46,7 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         class="file-item-main"
         onClick={() => props.onClick(props.item)}
         onDblClick={() => props.onDoubleClick(props.item)}
-        onContextMenu={(e) => props.onContextMenu(props.item, e)}
+        onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >
         <div class="file-icon">{getFileIcon(props.item)}</div>
         <div class="file-name">{props.item.name}</div>
@@ -56,23 +62,28 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
 
         {props.viewStyle === "grid" && (
           <div class="file-meta">
-            {props.item.isFile ? formatFileSize(props.item.size) : "Folder"}
+            {props.item.isFile
+              ? formatFileSize(props.item.size)
+              : props.labels.folder}
           </div>
         )}
       </button>
 
-      <div class="file-item-actions">
-        <button
-          type="button"
-          class="eden-btn eden-btn-danger eden-btn-xs file-action-btn"
-          onClick={(e) => props.onDelete(props.item, e)}
-          title="Delete"
-        >
-          ×
-        </button>
-      </div>
+      {props.onDelete && (
+        <div class="file-item-actions">
+          <button
+            type="button"
+            class="eden-btn eden-btn-danger eden-btn-xs file-action-btn"
+            onClick={(e) => props.onDelete?.(props.item, e)}
+            title={props.labels.delete}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
+export { FileItemComponent };
 export default FileItemComponent;
