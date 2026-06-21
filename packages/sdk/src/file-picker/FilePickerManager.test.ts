@@ -12,6 +12,7 @@ type CommandRegistryMock = jest.Mocked<
 type EventSubscribersMock = {
   notify: jest.Mock;
   notifyView: jest.Mock;
+  subscribeInternal: jest.Mock;
 };
 type ViewManagerMock = jest.Mocked<
   Pick<
@@ -31,13 +32,32 @@ const openerBounds: ViewBounds = {
   height: 420,
 };
 
-const createViewInfo = (bounds: ViewBounds): ViewInfo =>
-  ({ bounds }) as ViewInfo;
+const createViewInfo = (bounds: ViewBounds, isDestroyed = false): ViewInfo =>
+  ({
+    bounds,
+    view: {
+      webContents: {
+        isDestroyed: jest.fn(() => isDestroyed),
+      },
+    },
+  }) as unknown as ViewInfo;
 
 const createManager = () => {
+  const internalSubscriptions = new Map<
+    string,
+    Array<(payload: never) => void>
+  >();
   const eventSubscribers: EventSubscribersMock = {
     notify: jest.fn(),
     notifyView: jest.fn(),
+    subscribeInternal: jest.fn(
+      (event: string, callback: (payload: never) => void) => {
+        internalSubscriptions.set(event, [
+          ...(internalSubscriptions.get(event) ?? []),
+          callback,
+        ]);
+      },
+    ),
   };
   const ipcBridge = { eventSubscribers } as unknown as IPCBridge;
   const commandRegistry: CommandRegistryMock = {
@@ -76,6 +96,11 @@ const createManager = () => {
     manager,
     notificationManager,
     viewManager,
+    emitInternal: (event: string, payload: never) => {
+      for (const callback of internalSubscriptions.get(event) ?? []) {
+        callback(payload);
+      }
+    },
   };
 };
 
@@ -175,6 +200,151 @@ describe("FilePickerManager", () => {
       5000,
       "warning",
     );
+  });
+
+  it("allows the display provider to close the active picker", () => {
+    const { eventSubscribers, manager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const { requestId } = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    expect(
+      manager.closePicker(requestId, {
+        appId: "com.eden.file-picker",
+        webContentsId: 100,
+      }),
+    ).toEqual({ success: true });
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId, reason: "close" },
+    );
+    expect(() =>
+      manager.openPicker(
+        { mode: "open" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).not.toThrow();
+  });
+
+  it("clears orphaned active requests when the display provider re-registers", () => {
+    const { eventSubscribers, manager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const { requestId } = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId, reason: "close" },
+    );
+    expect(() =>
+      manager.openPicker(
+        { mode: "save", suggestedName: "report.md" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).not.toThrow();
+  });
+
+  it("prunes orphaned active requests when the display provider view is gone", () => {
+    const { manager, notificationManager, viewManager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    viewManager.getViewInfo.mockImplementation((viewId: number) => {
+      if (viewId === 10) return undefined;
+      if (viewId === 20) return createViewInfo(openerBounds);
+      return createViewInfo({ x: 0, y: 0, width: 0, height: 0 });
+    });
+
+    expect(() =>
+      manager.openPicker(
+        { mode: "save", suggestedName: "report.md" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).toThrow(/display provider is not registered/);
+    expect(notificationManager.pushNotification).not.toHaveBeenCalled();
+  });
+
+  it("closes the active picker when the opener app stops", () => {
+    const { emitInternal, eventSubscribers, manager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const { requestId } = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    emitInternal("process/stopped", { appId: "com.eden.editor" } as never);
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      10,
+      "file-picker/closed",
+      { requestId, reason: "close" },
+    );
+    expect(() =>
+      manager.openPicker(
+        { mode: "open" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).not.toThrow();
+  });
+
+  it("clears the display provider when the picker app stops", () => {
+    const { emitInternal, eventSubscribers, manager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const { requestId } = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    emitInternal("process/stopped", {
+      appId: "com.eden.file-picker",
+    } as never);
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId, reason: "close" },
+    );
+    expect(() =>
+      manager.openPicker(
+        { mode: "open" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).toThrow(/display provider is not registered/);
   });
 
   it("allows a new picker after the display provider cancels the active request", () => {

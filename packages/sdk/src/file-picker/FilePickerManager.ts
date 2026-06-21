@@ -54,16 +54,69 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
 
     this.handler = new FilePickerHandler(this);
     commandRegistry.registerManager(this.handler);
+    this.ipcBridge.eventSubscribers.subscribeInternal(
+      "process/stopped",
+      ({ appId }) => {
+        this.handleAppStopped(appId);
+      },
+    );
   }
 
   private generateId(): string {
     return `file-picker-${Date.now()}-${++this.idCounter}`;
   }
 
+  private isViewAlive(viewId: number): boolean {
+    const viewInfo = this.viewManager.getViewInfo(viewId);
+    return Boolean(viewInfo && !viewInfo.view.webContents.isDestroyed());
+  }
+
+  private closeActiveRequest(reason: FilePickerResult["reason"]): void {
+    if (!this.activeRequest) return;
+
+    const { requestId, opener } = this.activeRequest;
+    this.activeRequest = null;
+    this.notifyFilePicker("closed", { requestId, reason }, opener.viewId);
+  }
+
+  private pruneStaleState(): void {
+    if (
+      this.displayProvider &&
+      !this.isViewAlive(this.displayProvider.viewId)
+    ) {
+      this.displayProvider = null;
+      this.closeActiveRequest("close");
+      return;
+    }
+
+    if (
+      this.activeRequest &&
+      !this.isViewAlive(this.activeRequest.opener.viewId)
+    ) {
+      this.closeActiveRequest("close");
+    }
+  }
+
+  private handleAppStopped(appId: string): void {
+    if (this.displayProvider?.appId === appId) {
+      this.displayProvider = null;
+      this.closeActiveRequest("close");
+      return;
+    }
+
+    if (this.activeRequest?.opener.appId === appId) {
+      this.closeActiveRequest("close");
+    }
+  }
+
   registerDisplayProvider(caller: FilePickerCaller): { success: boolean } {
     const viewId = this.resolveCallerViewId(caller.webContentsId);
     if (viewId === undefined || !caller.appId) {
       throw new Error("File picker display provider must be a valid view");
+    }
+
+    if (this.activeRequest) {
+      this.closeActiveRequest("close");
     }
 
     this.displayProvider = { appId: caller.appId, viewId };
@@ -128,6 +181,8 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     args: FilePickerOpenArgs,
     caller?: FilePickerCaller,
   ): { requestId: string } {
+    this.pruneStaleState();
+
     const callerAppId = caller?.appId;
     if (!callerAppId) {
       throw new Error("Caller app ID is required to open file pickers");
@@ -203,6 +258,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     requestId: string | undefined,
     caller?: FilePickerCaller,
   ): { success: boolean } {
+    this.pruneStaleState();
     if (!this.activeRequest) return { success: false };
 
     const targetId = requestId ?? this.activeRequest.requestId;
@@ -212,6 +268,11 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
 
     if (!caller?.appId) {
       throw new Error("Caller app ID is required to close file pickers");
+    }
+
+    if (this.isDisplayProvider(caller)) {
+      this.closeActiveRequest("close");
+      return { success: true };
     }
 
     if (!this.isCallerAuthorized(caller, this.activeRequest.opener)) {
