@@ -21,18 +21,21 @@ export interface HelloProtocol extends ChannelProtocol {
   };
 
   // Messages sent by frontend, received by backend
-  peerMessages: {};
+  peerMessages: Record<string, never>;
 
   // Requests that frontend sends, backend handles
   hostHandles: {
-    ping: { args: {}; result: { timestamp: number; messageCount: number } };
+    ping: {
+      args: Record<string, never>;
+      result: { timestamp: number; messageCount: number };
+    };
     "get-status": {
-      args: {};
+      args: Record<string, never>;
       result: { status: string; uptime: number; messageCount: number };
     };
     hello: { args: { message: string }; result: { message: string } };
   };
 
   // Requests that backend sends, frontend handles (none in this app)
-  peerHandles: {};
+  peerHandles: Record<string, never>;
 }
