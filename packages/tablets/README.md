@@ -1,10 +1,11 @@
 # @edenapp/tablets
 
-Tiny context menu toolkit for Eden renderer apps. It provides a small runtime helper and menu builder so apps can open Eden’s system context menu without wiring IPC directly.
+Tiny renderer toolkit for Eden apps. It provides runtime helpers for Eden’s system context menu and file picker without wiring IPC directly.
 
 ## What it does
 
 - Provides `contextMenu` runtime helper for opening/closing menus.
+- Provides `filePicker` async helpers for opening and saving file paths.
 - Provides menu builder helpers (`menu`, `button`, `title`, `separator`, `when`).
 
 ## Install
@@ -51,4 +52,20 @@ void appMenu.show(
 
 // Close the active menu
 void contextMenu.close();
+```
+
+## File picker
+
+```ts
+import { filePicker } from "@edenapp/tablets";
+
+const path = await filePicker.openFile({
+  title: "Open Markdown",
+  filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+});
+
+const savePath = await filePicker.saveFile({
+  suggestedName: "notes.md",
+  filters: [{ name: "Markdown", extensions: ["md"] }],
+});
 ```
