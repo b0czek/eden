@@ -8,9 +8,6 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "solid-icons": "^1.1.0"
-  },
   "devDependencies": {
     "@edenapp/babel": "workspace:*",
     "@edenapp/solid-kit": "workspace:*",

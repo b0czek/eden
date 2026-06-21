@@ -8,5 +8,6 @@ export const en = {
     signingIn: "Signing in...",
     loginFailed: "Login failed.",
     failedToLoadUsers: "Failed to load users.",
+    toggleKeyboard: "Toggle keyboard",
   },
 } as const;

@@ -1,3 +1,4 @@
+import { KeyboardButton } from "@edenapp/solid-kit";
 import type { UserProfile, ViewBounds, WindowSize } from "@edenapp/types";
 import {
   createEffect,
@@ -123,13 +124,16 @@ const App = () => {
     <div class="login-root eden-flex eden-flex-center">
       <div class="login-card eden-glass-strong eden-rounded-xl eden-p-lg">
         <div class="eden-flex eden-flex-col eden-gap-md">
-          <header class="eden-flex eden-flex-col eden-gap-xs">
-            <h2 class="eden-text-2xl eden-font-semibold">
-              {t("login.signIn")}
-            </h2>
-            <p class="eden-text-sm eden-text-secondary">
-              {t("login.subtitle")}
-            </p>
+          <header class="login-header eden-flex eden-flex-between eden-gap-md">
+            <div class="eden-flex eden-flex-col eden-gap-xs">
+              <h2 class="eden-text-2xl eden-font-semibold">
+                {t("login.signIn")}
+              </h2>
+              <p class="eden-text-sm eden-text-secondary">
+                {t("login.subtitle")}
+              </p>
+            </div>
+            <KeyboardButton label={t("login.toggleKeyboard")} />
           </header>
 
           <Show

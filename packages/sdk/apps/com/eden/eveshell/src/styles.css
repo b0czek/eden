@@ -184,29 +184,6 @@ body {
   );
 }
 
-.shell-keyboard-button {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  padding: 0;
-  border-radius: var(--eden-radius-lg);
-  color: var(--eden-color-text-primary);
-}
-
-.shell-keyboard-button svg {
-  width: 20px;
-  height: 20px;
-}
-
-.shell-keyboard-button:hover {
-  background: var(--eden-color-surface-hover);
-}
-
-.shell-keyboard-button.active {
-  background: var(--eden-color-surface-active);
-  color: var(--eden-color-text-primary);
-}
-
 .shell-overlay-keyboard-fab {
   position: absolute;
   bottom: var(--eden-space-lg);
