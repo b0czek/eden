@@ -227,7 +227,7 @@ const App: Component = () => {
     openItem,
     getOpenWithMenuItems,
     handleItemClick,
-    handleItemDoubleClick,
+    handleItemActivate,
     promptCreateFolder,
     promptCreateFile,
     promptRename,
@@ -288,7 +288,7 @@ const App: Component = () => {
         viewStyle={displayPreferences().viewStyle}
         itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
-        onItemDoubleClick={handleItemDoubleClick}
+        onItemActivate={handleItemActivate}
         onItemContextMenu={handleItemContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
         onItemDelete={handleDeleteClick}

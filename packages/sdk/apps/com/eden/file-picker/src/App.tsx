@@ -455,6 +455,12 @@ const App: Component = () => {
     event?: MouseEvent | KeyboardEvent,
   ) => {
     setError(null);
+
+    if (item.isDirectory) {
+      navigateTo(item.path);
+      return;
+    }
+
     if (!canSelectItem(item)) {
       if (activeRequest()?.mode === "save" && item.isFile) {
         setFileName(item.name);
@@ -487,7 +493,7 @@ const App: Component = () => {
     }
   };
 
-  const handleItemDoubleClick = (item: FileItem) => {
+  const handleItemActivate = (item: FileItem) => {
     if (item.isDirectory) {
       navigateTo(item.path);
       return;
@@ -678,7 +684,7 @@ const App: Component = () => {
               viewStyle={displayPreferences().viewStyle}
               itemSize={displayPreferences().itemSize}
               onItemClick={handleItemClick}
-              onItemDoubleClick={handleItemDoubleClick}
+              onItemActivate={handleItemActivate}
               onBack={goBack}
             />
           </div>

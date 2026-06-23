@@ -18,7 +18,7 @@ interface FileListProps {
   viewStyle: ViewStyle;
   itemSize: ItemSize;
   onItemClick: (item: FileItem, event?: MouseEvent | KeyboardEvent) => void;
-  onItemDoubleClick: (item: FileItem) => void;
+  onItemActivate: (item: FileItem) => void;
   onItemContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onBackgroundContextMenu?: (e: MouseEvent) => void;
   onItemDelete?: (item: FileItem, e: MouseEvent) => void;
@@ -73,7 +73,7 @@ const FileList: Component<FileListProps> = (props) => {
           e.preventDefault();
           const item = items.find((i) => i.path === selected);
           if (item) {
-            props.onItemDoubleClick(item);
+            props.onItemActivate(item);
           }
         }
         return;
@@ -196,7 +196,6 @@ const FileList: Component<FileListProps> = (props) => {
                 itemSize={props.itemSize}
                 labels={props.labels}
                 onClick={props.onItemClick}
-                onDoubleClick={props.onItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
                 onDelete={props.onItemDelete}
               />

@@ -496,9 +496,10 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const handleItemClick = (item: FileItem) => {
     options.setScrollToSelected(false);
     options.setSelectedItem(item.path);
+    void openItem(item);
   };
 
-  const handleItemDoubleClick = async (item: FileItem) => {
+  const handleItemActivate = async (item: FileItem) => {
     await openItem(item);
   };
 
@@ -522,7 +523,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     promptCreateFolder,
     promptCreateFile,
     handleItemClick,
-    handleItemDoubleClick,
+    handleItemActivate,
     promptRename,
     promptDelete,
     handleDeleteClick,
