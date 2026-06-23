@@ -158,6 +158,12 @@ export interface SearchResult {
  */
 export type NotificationType = "info" | "success" | "warning" | "danger";
 
+export interface NotificationAction {
+  id: string;
+  label: string;
+  dismissOnClick?: boolean;
+}
+
 /**
  * Notification data structure
  */
@@ -170,6 +176,7 @@ export interface Notification {
   createdAt: number;
   /** Notification type for styling (default: info) */
   type?: NotificationType;
+  actions?: NotificationAction[];
 }
 
 export * from "./ContextMenu";

@@ -11,6 +11,7 @@ import {
   joinPath,
   useExplorerNavigation,
 } from "@edenapp/files-core";
+import { waitForEdenFrame } from "@edenapp/tablets";
 import type {
   FilePickerFilter,
   FilePickerOpenEvent,
@@ -18,7 +19,6 @@ import type {
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
-import { waitForEdenFrame } from "@edenapp/tablets";
 import type { Component } from "solid-js";
 import {
   createEffect,

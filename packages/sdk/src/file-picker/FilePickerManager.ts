@@ -34,6 +34,8 @@ interface DisplayProvider {
   viewId: number;
 }
 
+const FORCE_OPEN_ACTION_ID = "force-open-file-picker";
+
 @singleton()
 @injectable()
 @EdenNamespace("file-picker")
@@ -168,12 +170,23 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     return callerViewId === this.displayProvider.viewId;
   }
 
-  private notifyBusy(): void {
+  private notifyBusy(args: FilePickerOpenArgs, caller: FilePickerCaller): void {
     this.notificationManager.pushNotification(
       "File picker is busy",
       "Resolve the current file picker before opening another.",
-      5000,
+      0,
       "warning",
+      [
+        {
+          id: FORCE_OPEN_ACTION_ID,
+          label: "Force open",
+        },
+      ],
+      {
+        [FORCE_OPEN_ACTION_ID]: () => {
+          this.forceOpenPicker(args, caller);
+        },
+      },
     );
   }
 
@@ -199,7 +212,9 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       throw new Error("File picker display provider is not registered");
     }
     if (this.activeRequest) {
-      this.notifyBusy();
+      const blockedArgs = { ...args };
+      const blockedCaller = { ...(caller ?? {}) };
+      this.notifyBusy(blockedArgs, blockedCaller);
       throw new Error(
         "File picker is busy. Resolve the current file picker before opening another.",
       );
@@ -230,6 +245,19 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     log.info(`File picker opened (${requestId})`);
 
     return { requestId };
+  }
+
+  private forceOpenPicker(
+    args: FilePickerOpenArgs,
+    caller: FilePickerCaller,
+  ): { requestId: string } {
+    this.pruneStaleState();
+
+    if (this.activeRequest) {
+      this.closeActiveRequest("close");
+    }
+
+    return this.openPicker(args, caller);
   }
 
   resolvePicker(

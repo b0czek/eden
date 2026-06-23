@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "overlay": true,
   "autostart": true,
+  "permissions": ["notification/display"],
   "build": {
     "command": "npm run build"
   },

@@ -445,6 +445,13 @@ export interface EventCommands {
  */
 export interface NotificationCommands {
   /**
+   * Register the notification display provider.
+   */
+  "notification/register-display": {
+    args: { };
+    response: { success: boolean };
+  };
+  /**
    * Push a new notification to subscribers.
    */
   "notification/push": {
@@ -452,8 +459,26 @@ export interface NotificationCommands {
     title: string;
     message: string;
     timeout?: number;
-    type?: import("./index").NotificationType };
+    type?: import("./index").NotificationType;
+    actions?: import("./index").NotificationAction[] };
     response: import("./index").Notification;
+  };
+  /**
+   * Report a notification action click from the toaster.
+   */
+  "notification/action-clicked": {
+    args: {
+    notificationId: string;
+    actionId: string };
+    response: { success: boolean };
+  };
+  /**
+   * Report a notification dismissal from the toaster.
+   */
+  "notification/dismissed": {
+    args: {
+    notificationId: string };
+    response: { success: boolean };
   };
 }
 

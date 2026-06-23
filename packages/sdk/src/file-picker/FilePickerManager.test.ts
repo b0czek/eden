@@ -1,6 +1,8 @@
 import "reflect-metadata";
 
-import type { ViewBounds } from "@edenapp/types";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { NotificationAction, ViewBounds } from "@edenapp/types";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { NotificationManager } from "../notification";
 import type { ViewManager } from "../view-manager";
@@ -197,8 +199,70 @@ describe("FilePickerManager", () => {
     expect(notificationManager.pushNotification).toHaveBeenCalledWith(
       "File picker is busy",
       "Resolve the current file picker before opening another.",
-      5000,
+      0,
       "warning",
+      [
+        expect.objectContaining({
+          id: "force-open-file-picker",
+          label: "Force open",
+        }),
+      ],
+      expect.objectContaining({
+        "force-open-file-picker": expect.any(Function),
+      }),
+    );
+  });
+
+  it("force opens the blocked request from a busy toast action", () => {
+    const { eventSubscribers, manager, notificationManager } = createManager();
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.file-picker",
+      webContentsId: 100,
+    });
+    const first = manager.openPicker(
+      { mode: "open" },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    expect(() =>
+      manager.openPicker(
+        { mode: "save", suggestedName: "report.md" },
+        { appId: "com.eden.notes", webContentsId: 201 },
+      ),
+    ).toThrow(/File picker is busy/);
+
+    const actions = notificationManager.pushNotification.mock.calls[0]?.[4] as
+      | NotificationAction[]
+      | undefined;
+    expect(actions?.[0]).toEqual({
+      id: "force-open-file-picker",
+      label: "Force open",
+    });
+    const callbacks = notificationManager.pushNotification.mock.calls[0]?.[5];
+    const callback = callbacks?.["force-open-file-picker"];
+    if (!callback) throw new Error("Expected force-open callback");
+
+    callback({} as never);
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "file-picker/closed",
+      { requestId: first.requestId, reason: "close" },
+    );
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      21,
+      "file-picker/opened",
+      expect.objectContaining({
+        picker: expect.objectContaining({
+          mode: "save",
+          suggestedName: "report.md",
+          opener: expect.objectContaining({
+            appId: "com.eden.notes",
+            viewId: 21,
+          }),
+        }),
+      }),
     );
   });
 

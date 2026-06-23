@@ -49,6 +49,10 @@ export interface I18nEvents {
 export interface NotificationEvents {
   "notification/added": { notification: import("./index").Notification };
   "notification/removed": { id: string };
+  "notification/action-clicked": {
+    notificationId: string;
+    actionId: string;
+  };
 }
 
 /**
