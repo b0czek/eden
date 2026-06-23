@@ -43,3 +43,19 @@ export interface ViewCreationOptions {
   backgroundThrottling?: boolean;
   additionalArguments?: string[];
 }
+
+/**
+ * Compare overlays from bottom to top.
+ * Manifest priority defines the stack group; z-index controls recency within it.
+ */
+export function compareOverlayViews(a: ViewInfo, b: ViewInfo): number {
+  const priorityDifference =
+    (a.manifest.window?.overlayPriority ?? 0) -
+    (b.manifest.window?.overlayPriority ?? 0);
+  if (priorityDifference !== 0) return priorityDifference;
+
+  const zIndexDifference = (a.zIndex ?? 0) - (b.zIndex ?? 0);
+  if (zIndexDifference !== 0) return zIndexDifference;
+
+  return a.id - b.id;
+}

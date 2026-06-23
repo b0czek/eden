@@ -21,6 +21,7 @@ export interface EdenFrame {
       mode?: "tiled" | "floating" | "both";
       showTitle?: boolean;
       showMinimize?: boolean;
+      overlayPriority?: number;
       defaultSize?: { width: number; height: number };
       defaultPosition?: { x: number; y: number };
       movable?: boolean;

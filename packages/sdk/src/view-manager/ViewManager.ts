@@ -19,7 +19,7 @@ import { FloatingWindowController } from "./FloatingWindowController";
 import { PresentationController } from "./PresentationController";
 import { ScaleController } from "./ScaleController";
 import { TilingController } from "./TilingController";
-import type { ViewInfo, ViewMode } from "./types";
+import { compareOverlayViews, type ViewInfo, type ViewMode } from "./types";
 import { ViewCreator } from "./ViewCreator";
 import { ViewHandler } from "./ViewHandler";
 import {
@@ -490,7 +490,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
       const overlayViews = Array.from(this.views.values())
         .filter((v) => v.viewType === "overlay" && v.visible)
-        .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+        .sort(compareOverlayViews);
 
       // Remove all views
       for (const info of this.views.values()) {

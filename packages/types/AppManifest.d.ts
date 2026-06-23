@@ -80,6 +80,13 @@ export interface WindowConfig {
   /** Whether to show the minimize button in the title bar (default: true) */
   showMinimize?: boolean;
 
+  /**
+   * Stacking priority for overlay windows (default: 0).
+   * Higher-priority overlays are displayed above lower-priority overlays.
+   * Within the same priority, normal view recency controls ordering.
+   */
+  overlayPriority?: number;
+
   /** Controls which Eden runtime helpers are injected into the app */
   injections?: WindowInjectionOptions;
 

@@ -13,6 +13,7 @@
   },
   "window": {
     "mode": "floating",
+    "overlayPriority": 100,
     "defaultSize": {
       "width": 0,
       "height": 0
