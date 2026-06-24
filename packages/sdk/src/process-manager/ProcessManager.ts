@@ -8,6 +8,7 @@ import type {
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
+import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import {
   getHotReloadServersPath,
@@ -54,6 +55,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(BackendManager) private backendManager: BackendManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
     @inject(UserManager) private userManager: UserManager,
@@ -224,7 +226,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`User cannot launch app ${appId}`);
     }
 
-    const manifest = this.packageManager.getAppManifest(appId);
+    const manifest = this.appCatalog.get(appId);
     if (!manifest) {
       throw new Error(`App ${appId} is not installed`);
     }
@@ -242,7 +244,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     // Get the correct install path
-    const installPath = this.packageManager.getAppPath(appId);
+    const installPath = this.appCatalog.getPath(appId);
     if (!installPath) {
       throw new Error(`App path not found for ${appId}`);
     }

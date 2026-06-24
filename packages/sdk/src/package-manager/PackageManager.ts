@@ -6,8 +6,9 @@ import type {
   EdenConfig,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import fg from "fast-glob";
 import { inject, injectable, singleton } from "tsyringe";
+import { AppCatalog } from "../app-registry";
+import { AppRegistry } from "../app-registry/AppRegistry";
 import { FilesystemManager } from "../filesystem";
 import { normalizeGrantPresets } from "../grants/GrantPresets";
 import {
@@ -24,9 +25,7 @@ import {
   PermissionRegistry,
 } from "../ipc";
 import { log } from "../logging";
-import { UserManager } from "../user/UserManager";
 import { normalizeAppIds } from "../utils/normalize";
-import { DEFAULT_APP_ICON_DATA_URL } from "./defaultAppIcon";
 import { PackageHandler } from "./PackageHandler";
 
 /**
@@ -42,7 +41,6 @@ interface PackageNamespaceEvents {
 @EdenNamespace("package")
 export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private prebuiltAppsDirectory: string;
-  private installedApps: Map<string, RuntimeAppManifest> = new Map();
   private packageHandler: PackageHandler;
   private coreApps: Set<string>;
   private restrictedApps: Set<string>;
@@ -57,7 +55,8 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     private readonly permissionRegistry: PermissionRegistry,
     @inject(FilesystemManager)
     private readonly filesystemManager: FilesystemManager,
-    @inject(UserManager) private readonly userManager: UserManager,
+    @inject(AppRegistry) private readonly appRegistry: AppRegistry,
+    @inject(AppCatalog) private readonly appCatalog: AppCatalog,
   ) {
     super(ipcBridge);
     this.prebuiltAppsDirectory = path.join(distPath, "apps", "prebuilt");
@@ -65,7 +64,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     this.restrictedApps = normalizeAppIds(this.config.restrictedApps);
 
     // Create and register handler
-    this.packageHandler = new PackageHandler(this);
+    this.packageHandler = new PackageHandler(this, appCatalog);
     commandRegistry.registerManager(this.packageHandler);
   }
 
@@ -119,10 +118,8 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Load installed apps
     await this.loadInstalledApps();
 
-    const prebuiltCount = Array.from(this.installedApps.values()).filter(
-      (app) => app.isPrebuilt,
-    ).length;
-    const installedCount = this.installedApps.size - prebuiltCount;
+    const prebuiltCount = this.appCatalog.prebuilt().length;
+    const installedCount = this.appCatalog.installed().length;
 
     log.info(
       `PackageManager initialized. Found ${prebuiltCount} prebuilt apps and ${installedCount} installed apps.`,
@@ -167,7 +164,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
             );
 
             const runtimeManifest = this.toRuntimeManifest(rawManifest, true);
-            this.installedApps.set(runtimeManifest.id, runtimeManifest);
+            this.appRegistry.register(runtimeManifest);
 
             // Register app permissions
             this.permissionRegistry.registerApp(
@@ -208,7 +205,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
             );
             const runtimeManifest = this.toRuntimeManifest(rawManifest, false);
 
-            this.installedApps.set(runtimeManifest.id, runtimeManifest);
+            this.appRegistry.register(runtimeManifest);
 
             // Register app permissions
             this.permissionRegistry.registerApp(
@@ -292,7 +289,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     }
 
     // Check if already installed
-    if (this.installedApps.has(rawManifest.id)) {
+    if (this.appCatalog.has(rawManifest.id)) {
       throw new Error(
         `App ${rawManifest.id} is already installed.\n` +
           `Please uninstall the existing version first.`,
@@ -315,7 +312,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
     // Convert to runtime manifest and register
     const runtimeManifest = this.toRuntimeManifest(rawManifest, false);
-    this.installedApps.set(runtimeManifest.id, runtimeManifest);
+    this.appRegistry.register(runtimeManifest);
     this.permissionRegistry.registerApp(
       runtimeManifest.id,
       runtimeManifest.permissions,
@@ -331,7 +328,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    * Uninstall an app
    */
   async uninstallApp(appId: string): Promise<boolean> {
-    const manifest = this.installedApps.get(appId);
+    const manifest = this.appCatalog.get(appId);
     if (!manifest) {
       return false;
     }
@@ -348,7 +345,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     await fs.rm(appPath, { recursive: true, force: true });
 
     // Unregister
-    this.installedApps.delete(appId);
+    this.appRegistry.unregister(appId);
 
     this.notify("uninstalled", { appId });
 
@@ -356,67 +353,17 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   }
 
   /**
-   * Get list of installed apps.
-   * @param options.showHidden - If true, includes overlay apps and daemons (hidden by default)
-   * @param options.showRestricted - If true, includes apps the current user cannot launch (hidden by default)
-   */
-  getInstalledApps(
-    options: { showHidden?: boolean; showRestricted?: boolean } = {},
-  ): RuntimeAppManifest[] {
-    const { showHidden = false, showRestricted = false } = options;
-    const apps = Array.from(this.installedApps.values());
-    return apps.filter((app) => {
-      // Filter by visibility
-      if (!showHidden) {
-        const isHidden = app.hidden !== undefined ? app.hidden : app.overlay;
-        if (isHidden || !app.frontend?.entry) {
-          return false;
-        }
-      }
-      // Filter by user grants
-      if (!showRestricted && !this.userManager.canLaunchApp(app.id)) {
-        return false;
-      }
-      return true;
-    });
-  }
-
-  /**
-   * Get manifest for an app
-   */
-  getAppManifest(appId: string): RuntimeAppManifest | undefined {
-    return this.installedApps.get(appId);
-  }
-
-  /**
-   * Get the installation path for an app
-   */
-  getAppPath(appId: string): string | undefined {
-    const manifest = this.installedApps.get(appId);
-    if (!manifest) {
-      return undefined;
-    }
-
-    // Return the appropriate path based on whether it's prebuilt
-    if (manifest.isPrebuilt) {
-      return path.join(this.prebuiltAppsDirectory, appId);
-    } else {
-      return path.join(this.appsDirectory, appId);
-    }
-  }
-
-  /**
    * Reload an app (for hot reload support)
    * This will notify that the app has been updated
    */
   async reloadApp(appId: string): Promise<void> {
-    const manifest = this.installedApps.get(appId);
+    const manifest = this.appCatalog.get(appId);
     if (!manifest) {
       throw new Error(`App ${appId} not found`);
     }
 
     // Reload the manifest from disk
-    const appPath = this.getAppPath(appId);
+    const appPath = this.appCatalog.getPath(appId);
     if (!appPath) {
       throw new Error(`App path not found for ${appId}`);
     }
@@ -434,7 +381,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     );
 
     // Update in-memory manifest
-    this.installedApps.set(appId, runtimeManifest);
+    this.appRegistry.register(runtimeManifest);
     this.permissionRegistry.registerApp(
       runtimeManifest.id,
       runtimeManifest.permissions,
@@ -451,84 +398,5 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   async toggleHotReload(appId: string): Promise<boolean> {
     return toggleHotReload(appId, this.config);
-  }
-
-  /**
-   * Get the app icon as a base64 data URL
-   */
-  async getAppIcon(appId: string): Promise<string | undefined> {
-    const manifest = this.installedApps.get(appId);
-    const appPath = this.getAppPath(appId);
-    if (manifest?.icon && appPath) {
-      const iconDataUrl = await this.readIconDataUrl(
-        path.join(appPath, manifest.icon),
-        manifest.icon,
-      );
-      if (iconDataUrl) {
-        return iconDataUrl;
-      }
-
-      log.warn(`Falling back to default icon for ${appId}`);
-    }
-
-    return DEFAULT_APP_ICON_DATA_URL;
-  }
-
-  private async readIconDataUrl(
-    iconPath: string,
-    iconReference: string,
-  ): Promise<string | undefined> {
-    try {
-      const iconBuffer = await fs.readFile(iconPath);
-      const ext = path.extname(iconReference).toLowerCase();
-      const mimeType = this.getMimeType(ext);
-      return `data:${mimeType};base64,${iconBuffer.toString("base64")}`;
-    } catch (error) {
-      log.warn(`Failed to read icon from ${iconPath}:`, error);
-      return undefined;
-    }
-  }
-
-  /**
-   * Get MIME type for an image file extension
-   */
-  private getMimeType(ext: string): string {
-    const mimeTypes: Record<string, string> = {
-      ".png": "image/png",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".svg": "image/svg+xml",
-      ".gif": "image/gif",
-      ".webp": "image/webp",
-      ".ico": "image/x-icon",
-    };
-    return mimeTypes[ext] || "application/octet-stream";
-  }
-
-  /**
-   * Get the size of an installed app in bytes
-   */
-  async getAppSize(appId: string): Promise<number | undefined> {
-    const appPath = this.getAppPath(appId);
-    if (!appPath) {
-      return undefined;
-    }
-
-    try {
-      return await this.getDirectorySize(appPath);
-    } catch (error) {
-      log.warn(`Failed to calculate size for ${appId}:`, error);
-      return undefined;
-    }
-  }
-
-  private async getDirectorySize(targetPath: string): Promise<number> {
-    const files = await fg("**/*", {
-      cwd: targetPath,
-      stats: true,
-      followSymbolicLinks: false,
-      onlyFiles: true,
-    });
-    return files.reduce((sum, file) => sum + (file.stats?.size ?? 0), 0);
   }
 }

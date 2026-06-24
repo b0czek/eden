@@ -8,11 +8,11 @@ import type {
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
 import { WASMagic } from "wasmagic";
+import { AppCatalog } from "../app-registry";
 import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { PackageManager } from "../package-manager";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
 import { FileOpenHandler } from "./FileOpenHandler";
@@ -44,7 +44,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
 
   constructor(
     @inject("userDirectory") userDirectory: string,
-    @inject(PackageManager) private packageManager: PackageManager,
+    @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
@@ -232,9 +232,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       handler: FileHandlerConfig;
     }> = [];
 
-    for (const app of this.packageManager.getInstalledApps({
-      showHidden: true,
-    })) {
+    for (const app of this.appCatalog.list({ showHidden: true })) {
       for (const handler of app.fileHandlers ?? []) {
         handlers.push({ app, handler });
       }
@@ -346,10 +344,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   private resolveUserPreference(preferenceKeys: string[]): string | undefined {
     for (const key of preferenceKeys) {
       const preferredAppId = this.userPreferences.get(key);
-      if (
-        preferredAppId &&
-        this.packageManager.getAppManifest(preferredAppId)
-      ) {
+      if (preferredAppId && this.appCatalog.has(preferredAppId)) {
         return preferredAppId;
       }
     }
@@ -573,7 +568,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       }
 
       // Check if app is installed
-      const manifest = this.packageManager.getAppManifest(handlerAppId);
+      const manifest = this.appCatalog.get(handlerAppId);
       if (!manifest) {
         return {
           success: false,
@@ -626,7 +621,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       const isDirectory = stats.isDirectory();
 
       // Check if app is installed
-      const manifest = this.packageManager.getAppManifest(appId);
+      const manifest = this.appCatalog.get(appId);
       if (!manifest) {
         return {
           success: false,
