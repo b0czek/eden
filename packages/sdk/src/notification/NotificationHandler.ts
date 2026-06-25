@@ -8,11 +8,7 @@ import type { NotificationManager } from "./NotificationManager";
 
 @EdenNamespace("notification")
 export class NotificationHandler {
-  private notificationManager: NotificationManager;
-
-  constructor(notificationManager: NotificationManager) {
-    this.notificationManager = notificationManager;
-  }
+  constructor(private notificationManager: NotificationManager) {}
 
   /**
    * Register the notification display provider.

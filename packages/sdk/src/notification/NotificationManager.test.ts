@@ -24,7 +24,16 @@ const createManager = () => {
       if (webContentsId === 200) return 20;
       return undefined;
     }),
-  } as unknown as jest.Mocked<Pick<ViewManager, "getViewIdByWebContentsId">>;
+    getViewInfo: jest.fn(() => ({
+      view: {
+        webContents: {
+          isDestroyed: jest.fn(() => false),
+        },
+      },
+    })),
+  } as unknown as jest.Mocked<
+    Pick<ViewManager, "getViewIdByWebContentsId" | "getViewInfo">
+  >;
 
   const manager = new NotificationManager(
     ipcBridge,

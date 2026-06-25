@@ -6,7 +6,7 @@ import type {
 import { inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { ViewManager } from "../view-manager";
+import { DisplayProviderRegistry, ViewManager } from "../view-manager";
 import { NotificationHandler } from "./NotificationHandler";
 
 /**
@@ -37,18 +37,13 @@ interface NotificationCaller {
   webContentsId?: number;
 }
 
-interface DisplayProvider {
-  appId: string;
-  viewId: number;
-}
-
 @singleton()
 @injectable()
 @EdenNamespace("notification")
 export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents> {
   private notificationHandler: NotificationHandler;
   private idCounter: number = 0;
-  private displayProvider: DisplayProvider | null = null;
+  private displayProviders: DisplayProviderRegistry;
   private activeNotifications = new Map<string, ActiveNotification>();
 
   constructor(
@@ -58,6 +53,10 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
   ) {
     super(ipcBridge);
 
+    this.displayProviders = new DisplayProviderRegistry(
+      this.viewManager,
+      "Notification",
+    );
     // Create and register handler
     this.notificationHandler = new NotificationHandler(this);
     commandRegistry.registerManager(this.notificationHandler);
@@ -70,41 +69,18 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     return `notif-${Date.now()}-${++this.idCounter}`;
   }
 
-  private resolveCallerViewId(webContentsId?: number): number | undefined {
-    if (webContentsId === undefined) return undefined;
-    const viewId = this.viewManager.getViewIdByWebContentsId(webContentsId);
-    if (viewId === undefined) {
-      log.warn(
-        `Notification caller view not found for webContents ${webContentsId}`,
-      );
-    }
-    return viewId;
-  }
-
-  registerDisplayProvider(caller: NotificationCaller): { success: boolean } {
-    const viewId = this.resolveCallerViewId(caller.webContentsId);
-    if (viewId === undefined || !caller.appId) {
-      throw new Error("Notification display provider must be a valid view");
-    }
-
-    this.displayProvider = { appId: caller.appId, viewId };
-    log.info(`Notification display provider registered: ${caller.appId}`);
-    return { success: true };
-  }
-
   private notifyNotification<K extends keyof NotificationNamespaceEvents>(
     event: K,
     payload: NotificationNamespaceEvents[K],
   ): void {
-    if (this.displayProvider) {
-      this.notifySubscriber(this.displayProvider.viewId, event, payload);
+    const provider = this.displayProviders.getProvider();
+    if (provider) {
+      this.notifySubscriber(provider.viewId, event, payload);
     }
   }
 
-  private isDisplayProvider(caller: NotificationCaller): boolean {
-    if (!this.displayProvider || !caller.appId) return false;
-    const callerViewId = this.resolveCallerViewId(caller.webContentsId);
-    return callerViewId === this.displayProvider.viewId;
+  registerDisplayProvider(caller: NotificationCaller): { success: boolean } {
+    return this.displayProviders.register(caller);
   }
 
   /**
@@ -124,7 +100,9 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     caller?: NotificationCaller,
   ): Notification {
     const id = this.generateId();
-    const sourceViewId = this.resolveCallerViewId(caller?.webContentsId);
+    const sourceViewId = this.displayProviders.resolveCallerViewId(
+      caller?.webContentsId,
+    );
     const notification: Notification = {
       id,
       title,
@@ -148,7 +126,7 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     actionId: string,
     caller?: NotificationCaller,
   ): Promise<{ success: boolean }> {
-    if (!this.isDisplayProvider(caller ?? {})) {
+    if (!this.displayProviders.isProvider(caller ?? {})) {
       throw new Error(
         "Only the notification display provider can report actions",
       );
@@ -179,7 +157,7 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     notificationId: string,
     caller?: NotificationCaller,
   ): { success: boolean } {
-    if (!this.isDisplayProvider(caller ?? {})) {
+    if (!this.displayProviders.isProvider(caller ?? {})) {
       throw new Error(
         "Only the notification display provider can report dismissals",
       );
