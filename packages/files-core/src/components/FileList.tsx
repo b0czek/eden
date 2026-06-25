@@ -19,6 +19,8 @@ interface FileListProps {
   itemSize: ItemSize;
   onItemClick: (item: FileItem, event?: MouseEvent | KeyboardEvent) => void;
   onItemActivate: (item: FileItem) => void;
+  activateOnSingleClick: boolean;
+  canActivateOnClick?: (item: FileItem) => boolean;
   onItemContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onBackgroundContextMenu?: (e: MouseEvent) => void;
   onItemDelete?: (item: FileItem, e: MouseEvent) => void;
@@ -36,6 +38,29 @@ const FileList: Component<FileListProps> = (props) => {
       return selectedItems.includes(item.path);
     }
     return props.selectedItem === item.path;
+  };
+
+  const canActivateOnClick = (item: FileItem) =>
+    props.canActivateOnClick?.(item) ?? true;
+
+  const handleItemClick = (
+    item: FileItem,
+    event: MouseEvent,
+    pointerType: string | undefined,
+  ) => {
+    props.onItemClick(item, event);
+    if (
+      canActivateOnClick(item) &&
+      (pointerType === "touch" || props.activateOnSingleClick)
+    ) {
+      props.onItemActivate(item);
+    }
+  };
+
+  const handleItemDoubleClick = (item: FileItem) => {
+    if (!props.activateOnSingleClick && canActivateOnClick(item)) {
+      props.onItemActivate(item);
+    }
   };
 
   createEffect(() => {
@@ -195,7 +220,8 @@ const FileList: Component<FileListProps> = (props) => {
                 viewStyle={props.viewStyle}
                 itemSize={props.itemSize}
                 labels={props.labels}
-                onClick={props.onItemClick}
+                onClick={handleItemClick}
+                onDoubleClick={handleItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
                 onDelete={props.onItemDelete}
               />

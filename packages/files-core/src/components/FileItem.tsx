@@ -14,12 +14,19 @@ interface FileItemComponentProps {
   isSelected: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
-  onClick: (item: FileItem, event: MouseEvent) => void;
+  onClick: (
+    item: FileItem,
+    event: MouseEvent,
+    pointerType: string | undefined,
+  ) => void;
+  onDoubleClick: (item: FileItem) => void;
   onContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onDelete?: (item: FileItem, e: MouseEvent) => void;
 }
 
 const FileItemComponent: Component<FileItemComponentProps> = (props) => {
+  let pointerType: string | undefined;
+
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
@@ -43,7 +50,11 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       <button
         type="button"
         class="file-item-main"
-        onClick={(event) => props.onClick(props.item, event)}
+        onPointerDown={(event) => {
+          pointerType = event.pointerType;
+        }}
+        onClick={(event) => props.onClick(props.item, event, pointerType)}
+        onDblClick={() => props.onDoubleClick(props.item)}
         onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >
         <div class="file-icon">{getFileIcon(props.item)}</div>

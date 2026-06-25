@@ -496,7 +496,6 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const handleItemClick = (item: FileItem) => {
     options.setScrollToSelected(false);
     options.setSelectedItem(item.path);
-    void openItem(item);
   };
 
   const handleItemActivate = async (item: FileItem) => {

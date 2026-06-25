@@ -2,6 +2,7 @@ import {
   buildBreadcrumbs,
   DisplayOptionsModal,
   type DisplayPreferences,
+  FILES_APP_ID,
   FileExplorerHeader,
   type FileExplorerLabels,
   type FileItem,
@@ -10,6 +11,7 @@ import {
   isValidName,
   joinPath,
   useExplorerNavigation,
+  useFileActivationPreference,
 } from "@edenapp/files-core";
 import { waitForEdenFrame } from "@edenapp/tablets";
 import type {
@@ -145,6 +147,7 @@ const getPickerTitle = (request: FilePickerOpenEvent) => {
 };
 
 const App: Component = () => {
+  const openWithSingleClick = useFileActivationPreference(FILES_APP_ID);
   const [activeRequest, setActiveRequest] =
     createSignal<FilePickerOpenEvent | null>(null);
   const [windowSize, setWindowSize] = createSignal<WindowSize | null>(null);
@@ -455,11 +458,8 @@ const App: Component = () => {
     event?: MouseEvent | KeyboardEvent,
   ) => {
     setError(null);
-
-    if (item.isDirectory) {
-      navigateTo(item.path);
-      return;
-    }
+    setSelectedItem(item.path);
+    setScrollToSelected(false);
 
     if (!canSelectItem(item)) {
       if (activeRequest()?.mode === "save" && item.isFile) {
@@ -474,9 +474,6 @@ const App: Component = () => {
         ("ctrlKey" in event || "metaKey" in event) &&
         (event.ctrlKey || event.metaKey),
     );
-
-    setSelectedItem(item.path);
-    setScrollToSelected(false);
 
     if (isToggle) {
       setSelectedPaths((current) =>
@@ -685,6 +682,8 @@ const App: Component = () => {
               itemSize={displayPreferences().itemSize}
               onItemClick={handleItemClick}
               onItemActivate={handleItemActivate}
+              activateOnSingleClick={openWithSingleClick()}
+              canActivateOnClick={(item) => item.isDirectory}
               onBack={goBack}
             />
           </div>

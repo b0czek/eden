@@ -9,6 +9,7 @@ import {
   getParentPath,
   ITEM_SIZES,
   useExplorerNavigation,
+  useFileActivationPreference,
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type { Component } from "solid-js";
@@ -52,6 +53,7 @@ const getExplorerLabels = (): FileExplorerLabels => ({
 
 const App: Component = () => {
   const dialogs = createDialogs();
+  const openWithSingleClick = useFileActivationPreference();
 
   const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
   const [scrollToSelected, setScrollToSelected] = createSignal(false);
@@ -289,6 +291,7 @@ const App: Component = () => {
         itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
         onItemActivate={handleItemActivate}
+        activateOnSingleClick={openWithSingleClick()}
         onItemContextMenu={handleItemContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
         onItemDelete={handleDeleteClick}
