@@ -3,6 +3,7 @@ import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
 import { delay, inject, singleton } from "tsyringe";
+import { AppCatalog } from "../app-registry";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { UserManager } from "../user/UserManager";
@@ -41,6 +42,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
     @inject(delay(() => UserManager)) private userManager: UserManager,
+    @inject(AppCatalog) private appCatalog: AppCatalog,
   ) {
     super(ipcBridge);
 
@@ -79,9 +81,8 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     const namespacedKey = this.getAppKey(appId, key);
     const value = await this.keyv.get(namespacedKey);
 
-    // If no value found and this is com.eden, check for default
-    if (value === undefined && appId === EDEN_SETTINGS_APP_ID) {
-      return this.getEdenDefault(key);
+    if (value === undefined) {
+      return this.getDefault(appId, key);
     }
 
     if (value !== undefined && typeof value !== "string") {
@@ -101,7 +102,6 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     const namespacedKey = this.getAppKey(appId, key);
     await this.keyv.set(namespacedKey, value);
 
-    // Notify subscribers of the change
     this.notify("changed", { appId, key, value });
   }
 
@@ -210,14 +210,8 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   /**
    * Get the default value for an Eden setting key
    */
-  private getEdenDefault(key: string): string | undefined {
-    for (const category of EDEN_SETTINGS_SCHEMA) {
-      const setting = category.settings.find((s) => s.key === key);
-      if (setting) {
-        return setting.defaultValue;
-      }
-    }
-    return undefined;
+  private getDefault(appId: string, key: string): string | undefined {
+    return this.getSettingDefinition(appId, key)?.defaultValue;
   }
 
   /**
@@ -246,6 +240,47 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   // ===================================================================
   // Access Control Methods
   // ===================================================================
+
+  private getSettingDefinition(appId: string, key: string) {
+    const schema =
+      appId === EDEN_SETTINGS_APP_ID
+        ? EDEN_SETTINGS_SCHEMA
+        : this.appCatalog.get(appId)?.settings;
+
+    for (const category of schema ?? []) {
+      const setting = category.settings.find(
+        (candidate) => candidate.key === key,
+      );
+      if (setting) return setting;
+    }
+    return undefined;
+  }
+
+  canRead(ownerAppId: string, key: string, readerAppId: string): boolean {
+    if (ownerAppId === readerAppId) return true;
+    return (
+      this.getSettingDefinition(ownerAppId, key)?.sharedWith?.includes(
+        readerAppId,
+      ) ?? false
+    );
+  }
+
+  assertReadableBy(ownerAppId: string, key: string, readerAppId: string): void {
+    if (ownerAppId === readerAppId) {
+      return;
+    }
+
+    const setting = this.getSettingDefinition(ownerAppId, key);
+    if (!setting) {
+      throw new Error(
+        `Setting "${key}" does not exist for app "${ownerAppId}"`,
+      );
+    }
+    if (!this.canRead(ownerAppId, key, readerAppId)) {
+      throw new Error("Caller is not allowed to read this setting");
+    }
+    this.assertAccess(ownerAppId, key);
+  }
 
   /**
    * Resolve the grant key for a setting.

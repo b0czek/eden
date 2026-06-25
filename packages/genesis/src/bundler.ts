@@ -166,6 +166,37 @@ export function validateManifestObject(manifest: AppManifest): {
     }
   }
 
+  if (manifest.settings) {
+    for (const [categoryIndex, category] of manifest.settings.entries()) {
+      for (const [settingIndex, setting] of category.settings.entries()) {
+        if (setting.sharedWith === undefined) continue;
+        if (!Array.isArray(setting.sharedWith)) {
+          errors.push(
+            `settings[${categoryIndex}].settings[${settingIndex}].sharedWith must be an array`,
+          );
+          continue;
+        }
+
+        const seenReaders = new Set<string>();
+        for (const [readerIndex, readerAppId] of setting.sharedWith.entries()) {
+          const field =
+            `settings[${categoryIndex}].settings[${settingIndex}]` +
+            `.sharedWith[${readerIndex}]`;
+
+          if (!/^[a-z0-9.-]+$/.test(readerAppId)) {
+            errors.push(`${field} must be a valid app ID`);
+          } else if (readerAppId === manifest.id) {
+            errors.push(`${field} cannot reference the owning app`);
+          } else if (seenReaders.has(readerAppId)) {
+            errors.push(`${field} duplicates app ID "${readerAppId}"`);
+          }
+
+          seenReaders.add(readerAppId);
+        }
+      }
+    }
+  }
+
   // Must have at least frontend or backend
   if (!manifest.frontend && !manifest.backend) {
     errors.push("App must have at least a frontend or backend entry");

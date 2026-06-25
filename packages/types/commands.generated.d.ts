@@ -619,7 +619,8 @@ export interface SettingsCommands {
    */
   "settings/get": {
     args: {
-    key: string };
+    key: string;
+    appId?: string };
     response: { value: string | undefined };
   };
   /**

@@ -157,6 +157,8 @@ export interface SettingDefinition {
   description?: string | Record<string, string>;
   /** Grant key used for access control */
   grant?: string;
+  /** App IDs allowed to read this setting from the owner's namespace */
+  sharedWith?: string[];
   /** Input type */
   type: SettingType;
   /** Default value (as string, will be parsed based on type) */
