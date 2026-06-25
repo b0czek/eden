@@ -9,6 +9,10 @@
 // Command names array
 export const COMMAND_NAMES: readonly string[] = [
   "system/info",
+  "associations/get",
+  "associations/set",
+  "associations/remove",
+  "associations/list",
   "appbus/register",
   "appbus/unregister",
   "appbus/list",

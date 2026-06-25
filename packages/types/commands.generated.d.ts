@@ -20,6 +20,34 @@ export interface SystemCommands {
 }
 
 /**
+ * AssociationsCommands - Commands for the "associations" namespace
+ */
+export interface AssociationsCommands {
+  "associations/get": {
+    args: { key: string };
+    response: { association: import("./index").AppAssociation | undefined };
+  };
+  "associations/set": {
+    args: {
+    key: string;
+    appId: string;
+    kind: string;
+    label?: string };
+    response: { success: boolean };
+  };
+  "associations/remove": {
+    args: { key: string };
+    response: { success: boolean };
+  };
+  "associations/list": {
+    args: { kindPrefix?: string };
+    response: {
+    associations: Record<string, import("./index").AppAssociation>;
+  };
+  };
+}
+
+/**
  * AppbusCommands - Commands for the "appbus" namespace
  */
 export interface AppbusCommands {
@@ -974,4 +1002,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}

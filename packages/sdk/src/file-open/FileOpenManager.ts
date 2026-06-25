@@ -8,6 +8,7 @@ import type {
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
 import { WASMagic } from "wasmagic";
+import { AppAssociationManager } from "../app-associations";
 import { AppCatalog } from "../app-registry";
 import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
@@ -33,17 +34,16 @@ interface FileNamespaceEvents {
 @injectable()
 @EdenNamespace("file")
 export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
-  private preferencesPath: string;
   private fileOpenHandler: FileOpenHandler;
   private mimeDetectorPromise?: Promise<WASMagic>;
 
-  // User override preferences (file type key -> app ID)
-  private userPreferences: Map<string, string> = new Map();
   private static readonly DIRECTORY_PREFERENCE_KEY = "directory";
+  private static readonly DIRECTORY_ASSOCIATION_KEY = "file:directory";
   private static readonly MIME_DETECTION_BYTES = 8192;
 
   constructor(
-    @inject("userDirectory") userDirectory: string,
+    @inject(AppAssociationManager)
+    private appAssociationManager: AppAssociationManager,
     @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(ViewManager) private viewManager: ViewManager,
@@ -53,7 +53,6 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
-    this.preferencesPath = path.join(userDirectory, "file-associations.json");
 
     // Create and register handler
     this.fileOpenHandler = new FileOpenHandler(this);
@@ -64,33 +63,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    * Initialize with user preferences loaded from disk
    */
   async initialize(): Promise<void> {
-    await this.loadUserPreferences();
-    log.info(
-      `FileOpenManager initialized with ${this.userPreferences.size} user preferences`,
-    );
-  }
-
-  /**
-   * Load user preferences from disk
-   */
-  private async loadUserPreferences(): Promise<void> {
-    try {
-      const content = await fs.readFile(this.preferencesPath, "utf-8");
-      const prefs = JSON.parse(content) as Record<string, string>;
-      this.userPreferences = new Map(Object.entries(prefs));
-    } catch {
-      // File doesn't exist or is invalid, start with empty preferences
-      this.userPreferences = new Map();
-    }
-  }
-
-  /**
-   * Save user preferences to disk
-   */
-  private async saveUserPreferences(): Promise<void> {
-    const prefs = Object.fromEntries(this.userPreferences);
-    await fs.mkdir(path.dirname(this.preferencesPath), { recursive: true });
-    await fs.writeFile(this.preferencesPath, JSON.stringify(prefs, null, 2));
+    log.info("FileOpenManager initialized");
   }
 
   /**
@@ -111,14 +84,40 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    * Normalize the internal preference key for a MIME type
    */
   private getMimePreferenceKey(mimeType: string): string {
-    return `mime:${this.normalizeMimeType(mimeType)}`;
+    return `file:mime:${this.normalizeMimeType(mimeType)}`;
   }
 
   /**
    * Normalize the internal preference key for a file extension
    */
   private getExtensionPreferenceKey(extension: string): string {
-    return `ext:${this.normalizeExtension(extension)}`;
+    return `file:ext:${this.normalizeExtension(extension)}`;
+  }
+
+  private getPublicPreferenceKey(preferenceKey: string): string {
+    if (preferenceKey === FileOpenManager.DIRECTORY_ASSOCIATION_KEY) {
+      return FileOpenManager.DIRECTORY_PREFERENCE_KEY;
+    }
+    if (preferenceKey.startsWith("file:mime:")) {
+      return `mime:${preferenceKey.slice("file:mime:".length)}`;
+    }
+    if (preferenceKey.startsWith("file:ext:")) {
+      return `ext:${preferenceKey.slice("file:ext:".length)}`;
+    }
+    return preferenceKey;
+  }
+
+  private getAssociationKind(preferenceKey: string): string {
+    if (preferenceKey === FileOpenManager.DIRECTORY_ASSOCIATION_KEY) {
+      return "file.directory";
+    }
+    if (preferenceKey.startsWith("file:mime:")) {
+      return "file.mime";
+    }
+    if (preferenceKey.startsWith("file:ext:")) {
+      return "file.extension";
+    }
+    return "file";
   }
 
   /**
@@ -150,8 +149,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
         isDirectory: true,
         extension: undefined,
         mimeType: undefined,
-        preferenceKeys: [FileOpenManager.DIRECTORY_PREFERENCE_KEY],
-        canonicalPreferenceKey: FileOpenManager.DIRECTORY_PREFERENCE_KEY,
+        preferenceKeys: [FileOpenManager.DIRECTORY_ASSOCIATION_KEY],
+        canonicalPreferenceKey: FileOpenManager.DIRECTORY_ASSOCIATION_KEY,
       };
     }
 
@@ -165,7 +164,6 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
 
     if (extension) {
       preferenceKeys.push(this.getExtensionPreferenceKey(extension));
-      preferenceKeys.push(extension);
     }
 
     return {
@@ -343,7 +341,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
    */
   private resolveUserPreference(preferenceKeys: string[]): string | undefined {
     for (const key of preferenceKeys) {
-      const preferredAppId = this.userPreferences.get(key);
+      const preferredAppId = this.appAssociationManager.get(key)?.appId;
       if (preferredAppId && this.appCatalog.has(preferredAppId)) {
         return preferredAppId;
       }
@@ -406,11 +404,13 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     }
 
     for (const key of fileContext.preferenceKeys) {
-      this.userPreferences.delete(key);
+      await this.appAssociationManager.remove(key);
     }
 
-    this.userPreferences.set(preferenceKey, appId);
-    await this.saveUserPreferences();
+    await this.appAssociationManager.set(preferenceKey, {
+      appId,
+      kind: this.getAssociationKind(preferenceKey),
+    });
   }
 
   /**
@@ -420,10 +420,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     const fileContext = await this.getFileContext(filePath);
 
     for (const key of fileContext.preferenceKeys) {
-      this.userPreferences.delete(key);
+      await this.appAssociationManager.remove(key);
     }
-
-    await this.saveUserPreferences();
   }
 
   /**
@@ -486,40 +484,45 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       ) {
         result[FileOpenManager.DIRECTORY_PREFERENCE_KEY] = {
           default: app.id,
-          userOverride: this.userPreferences.get(
-            FileOpenManager.DIRECTORY_PREFERENCE_KEY,
-          ),
+          userOverride: this.appAssociationManager.get(
+            FileOpenManager.DIRECTORY_ASSOCIATION_KEY,
+          )?.appId,
         };
       }
 
       for (const mimeType of handler.mimeTypes ?? []) {
         const key = this.getMimePreferenceKey(mimeType);
+        const publicKey = this.getPublicPreferenceKey(key);
 
-        if (!result[key]) {
-          result[key] = {
+        if (!result[publicKey]) {
+          result[publicKey] = {
             default: app.id,
-            userOverride: this.userPreferences.get(key),
+            userOverride: this.appAssociationManager.get(key)?.appId,
           };
         }
       }
 
       for (const extension of handler.extensions ?? []) {
         const key = this.getExtensionPreferenceKey(extension);
+        const publicKey = this.getPublicPreferenceKey(key);
 
-        if (!result[key]) {
-          result[key] = {
+        if (!result[publicKey]) {
+          result[publicKey] = {
             default: app.id,
-            userOverride: this.userPreferences.get(key),
+            userOverride: this.appAssociationManager.get(key)?.appId,
           };
         }
       }
     }
 
-    for (const [ext, appId] of this.userPreferences) {
-      if (!result[ext]) {
-        result[ext] = {
+    for (const [key, association] of Object.entries(
+      this.appAssociationManager.list({ kindPrefix: "file." }),
+    )) {
+      const publicKey = this.getPublicPreferenceKey(key);
+      if (!result[publicKey]) {
+        result[publicKey] = {
           default: undefined,
-          userOverride: appId,
+          userOverride: association.appId,
         };
       }
     }

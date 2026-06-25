@@ -13,6 +13,7 @@ export {
   setLogContext,
 } from "./logging";
 // Re-export core managers for library usage
+export { AppAssociationManager } from "./app-associations";
 export { PackageManager } from "./package-manager";
 export { BackendManager, ProcessManager } from "./process-manager";
 export { UserManager } from "./user";
