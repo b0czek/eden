@@ -132,13 +132,12 @@ export function setupWindowDragging(
   };
 
   const moveDrag = (e: MouseEvent | TouchEvent) => {
-    // Prevent default immediately
-    e.preventDefault();
-    e.stopPropagation();
-
     if (!isDragging || !dragStartBounds) {
       return;
     }
+
+    e.preventDefault();
+    e.stopPropagation();
 
     // Get current coordinates
     const coords = getScreenCoords(e);
