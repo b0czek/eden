@@ -198,6 +198,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
     const appId = this.requireCallerAppId(args._callerAppId);
     const viewId = this.getViewIdByAppId(appId);
     this.viewManager.setViewBounds(viewId, args.bounds);
+    this.notifySubscriber(viewId, "bounds-updated", args.bounds);
     return { success: true };
   }
 
