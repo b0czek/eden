@@ -622,14 +622,14 @@ const App: Component = () => {
     };
 
     void (async () => {
-      await window.edenAPI.shellCommand("file-picker/register-display", {});
-      await updateOverlayBounds(false, null);
       await window.edenAPI.subscribe("file-picker/opened", handleOpened);
       await window.edenAPI.subscribe("file-picker/closed", handleClosed);
       await window.edenAPI.subscribe(
         "view/global-bounds-changed",
         handleBoundsChanged,
       );
+      await window.edenAPI.shellCommand("file-picker/register-display", {});
+      await updateOverlayBounds(false, null);
     })();
 
     window.addEventListener("keydown", handleKeyDown);

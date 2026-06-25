@@ -37,8 +37,7 @@
     "com.eden": {
       "autostart.com.eden.eveshell": "true",
       "autostart.com.eden.toaster": "true",
-      "autostart.com.eden.context-menu": "true",
-      "autostart.com.eden.file-picker": "true"
+      "autostart.com.eden.context-menu": "true"
     }
   },
   "hotReload": {

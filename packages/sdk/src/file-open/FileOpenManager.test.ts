@@ -6,10 +6,10 @@ import * as path from "node:path";
 import type { RuntimeAppManifest } from "@edenapp/types";
 import { AppAssociationManager } from "../app-associations";
 import type { AppCatalog } from "../app-registry";
-import type { CommandRegistry, IPCBridge } from "../ipc";
-import type { I18nManager } from "../i18n/I18nManager";
-import type { ProcessManager } from "../process-manager";
 import type { FilesystemManager } from "../filesystem";
+import type { I18nManager } from "../i18n/I18nManager";
+import type { CommandRegistry, IPCBridge } from "../ipc";
+import type { ProcessManager } from "../process-manager";
 import type { ViewManager } from "../view-manager";
 import { FileOpenManager } from "./FileOpenManager";
 
@@ -29,16 +29,18 @@ const createManager = async () => {
   const commandRegistry = {
     registerManager: jest.fn(),
   } as unknown as CommandRegistry;
-  const appAssociationManager = new AppAssociationManager(
-    userDirectory,
-    commandRegistry,
-  );
-  await appAssociationManager.initialize();
-
   const appCatalog = {
+    getLaunchable: jest.fn(),
     has: jest.fn((appId: string) => appId === filesApp.id),
     list: jest.fn(() => [filesApp]),
   } as unknown as AppCatalog;
+  const appAssociationManager = new AppAssociationManager(
+    userDirectory,
+    commandRegistry,
+    appCatalog,
+  );
+  await appAssociationManager.initialize();
+
   const ipcBridge = {
     eventSubscribers: { notifyView: jest.fn() },
   } as unknown as IPCBridge;

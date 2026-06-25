@@ -5,10 +5,19 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { AppAssociationManager } from "../app-associations";
+import {
+  CommandRegistry,
+  EdenEmitter,
+  EdenNamespace,
+  IPCBridge,
+  PermissionRegistry,
+} from "../ipc";
 import { log } from "../logging";
 import { NotificationManager } from "../notification";
-import { ViewManager } from "../view-manager";
+import { IdleProcessStopper, ProcessManager } from "../process-manager";
+import { DisplayProviderRegistry, ViewManager } from "../view-manager";
+import { isViewAlive } from "../view-manager/viewLifecycle";
 import { FilePickerHandler } from "./FilePickerHandler";
 
 interface FilePickerNamespaceEvents {
@@ -29,12 +38,11 @@ interface FilePickerRequestContext {
   };
 }
 
-interface DisplayProvider {
-  appId: string;
-  viewId: number;
-}
-
 const FORCE_OPEN_ACTION_ID = "force-open-file-picker";
+const IDLE_STOP_DELAY_MS = 10_000;
+const FILE_PICKER_PROVIDER_ASSOCIATION = "provider:file-picker";
+const FILE_PICKER_DISPLAY_PERMISSION = "file-picker/display";
+const PROVIDER_REGISTRATION_TIMEOUT_MS = 5_000;
 
 @singleton()
 @injectable()
@@ -43,7 +51,8 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
   private handler: FilePickerHandler;
   private idCounter = 0;
   private activeRequest: FilePickerRequestContext | null = null;
-  private displayProvider: DisplayProvider | null = null;
+  private displayProviders: DisplayProviderRegistry;
+  private idleProviderStopper: IdleProcessStopper;
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
@@ -51,9 +60,23 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(NotificationManager)
     private notificationManager: NotificationManager,
+    @inject(ProcessManager) private processManager: ProcessManager,
+    @inject(AppAssociationManager)
+    private appAssociationManager: AppAssociationManager,
+    @inject(PermissionRegistry)
+    private permissionRegistry: PermissionRegistry,
   ) {
     super(ipcBridge);
 
+    this.displayProviders = new DisplayProviderRegistry(
+      this.viewManager,
+      "File picker",
+    );
+    this.idleProviderStopper = new IdleProcessStopper(
+      this.processManager,
+      IDLE_STOP_DELAY_MS,
+      "file picker provider",
+    );
     this.handler = new FilePickerHandler(this);
     commandRegistry.registerManager(this.handler);
     this.ipcBridge.eventSubscribers.subscribeInternal(
@@ -68,40 +91,36 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     return `file-picker-${Date.now()}-${++this.idCounter}`;
   }
 
-  private isViewAlive(viewId: number): boolean {
-    const viewInfo = this.viewManager.getViewInfo(viewId);
-    return Boolean(viewInfo && !viewInfo.view.webContents.isDestroyed());
-  }
-
   private closeActiveRequest(reason: FilePickerResult["reason"]): void {
     if (!this.activeRequest) return;
 
     const { requestId, opener } = this.activeRequest;
     this.activeRequest = null;
     this.notifyFilePicker("closed", { requestId, reason }, opener.viewId);
+    this.idleProviderStopper.schedule();
   }
 
   private pruneStaleState(): void {
-    if (
-      this.displayProvider &&
-      !this.isViewAlive(this.displayProvider.viewId)
-    ) {
-      this.displayProvider = null;
+    const provider = this.displayProviders.getProvider();
+    if (this.displayProviders.clearIfStale()) {
+      this.idleProviderStopper.clearTarget(provider?.appId);
       this.closeActiveRequest("close");
       return;
     }
 
     if (
       this.activeRequest &&
-      !this.isViewAlive(this.activeRequest.opener.viewId)
+      !isViewAlive(
+        this.viewManager.getViewInfo(this.activeRequest.opener.viewId)?.view,
+      )
     ) {
       this.closeActiveRequest("close");
     }
   }
 
   private handleAppStopped(appId: string): void {
-    if (this.displayProvider?.appId === appId) {
-      this.displayProvider = null;
+    if (this.displayProviders.clearIfAppStopped(appId)) {
+      this.idleProviderStopper.clearTarget(appId);
       this.closeActiveRequest("close");
       return;
     }
@@ -112,18 +131,15 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
   }
 
   registerDisplayProvider(caller: FilePickerCaller): { success: boolean } {
-    const viewId = this.resolveCallerViewId(caller.webContentsId);
-    if (viewId === undefined || !caller.appId) {
-      throw new Error("File picker display provider must be a valid view");
-    }
-
     if (this.activeRequest) {
       this.closeActiveRequest("close");
     }
 
-    this.displayProvider = { appId: caller.appId, viewId };
-    log.info(`File picker display provider registered: ${caller.appId}`);
-    return { success: true };
+    const result = this.displayProviders.register(caller);
+    if (result.success && caller.appId) {
+      this.idleProviderStopper.setTarget(caller.appId);
+    }
+    return result;
   }
 
   private notifyFilePicker<K extends keyof FilePickerNamespaceEvents>(
@@ -131,24 +147,14 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     payload: FilePickerNamespaceEvents[K],
     openerViewId?: number,
   ): void {
-    if (this.displayProvider) {
-      this.notifySubscriber(this.displayProvider.viewId, event, payload);
+    const provider = this.displayProviders.getProvider();
+    if (provider) {
+      this.notifySubscriber(provider.viewId, event, payload);
     }
 
     if (openerViewId !== undefined) {
       this.notifySubscriber(openerViewId, event, payload);
     }
-  }
-
-  private resolveCallerViewId(webContentsId?: number): number | undefined {
-    if (webContentsId === undefined) return undefined;
-    const viewId = this.viewManager.getViewIdByWebContentsId(webContentsId);
-    if (viewId === undefined) {
-      log.warn(
-        `File picker caller view not found for webContents ${webContentsId}`,
-      );
-    }
-    return viewId;
   }
 
   private getViewBounds(viewId: number): ViewBounds | undefined {
@@ -160,14 +166,10 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     caller: FilePickerCaller,
     opener: FilePickerRequestContext["opener"],
   ): boolean {
-    const callerViewId = this.resolveCallerViewId(caller.webContentsId);
+    const callerViewId = this.displayProviders.resolveCallerViewId(
+      caller.webContentsId,
+    );
     return callerViewId !== undefined && callerViewId === opener.viewId;
-  }
-
-  private isDisplayProvider(caller: FilePickerCaller): boolean {
-    if (!this.displayProvider || !caller.appId) return false;
-    const callerViewId = this.resolveCallerViewId(caller.webContentsId);
-    return callerViewId === this.displayProvider.viewId;
   }
 
   private notifyBusy(args: FilePickerOpenArgs, caller: FilePickerCaller): void {
@@ -183,17 +185,51 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
         },
       ],
       {
-        [FORCE_OPEN_ACTION_ID]: () => {
-          this.forceOpenPicker(args, caller);
+        [FORCE_OPEN_ACTION_ID]: async () => {
+          await this.forceOpenPicker(args, caller);
         },
       },
     );
   }
 
-  openPicker(
+  private async ensureDisplayProvider(): Promise<void> {
+    if (this.displayProviders.getProvider()) {
+      return;
+    }
+
+    const providers = this.appAssociationManager.resolve(
+      FILE_PICKER_PROVIDER_ASSOCIATION,
+      (app) =>
+        this.permissionRegistry.hasPermission(
+          app.id,
+          FILE_PICKER_DISPLAY_PERMISSION,
+        ),
+    );
+    if (providers.length === 0) {
+      throw new Error(
+        "No file picker display provider is installed or permitted",
+      );
+    }
+    if (providers.length > 1) {
+      throw new Error(
+        `Multiple file picker display providers are available: ${providers
+          .map((provider) => provider.appId)
+          .join(", ")}`,
+      );
+    }
+
+    const [provider] = providers;
+    await this.processManager.ensureAppRunning(provider.appId);
+    await this.displayProviders.waitFor(
+      provider.appId,
+      PROVIDER_REGISTRATION_TIMEOUT_MS,
+    );
+  }
+
+  async openPicker(
     args: FilePickerOpenArgs,
     caller?: FilePickerCaller,
-  ): { requestId: string } {
+  ): Promise<{ requestId: string }> {
     this.pruneStaleState();
 
     const callerAppId = caller?.appId;
@@ -201,14 +237,21 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       throw new Error("Caller app ID is required to open file pickers");
     }
 
-    const callerViewId = this.resolveCallerViewId(caller?.webContentsId);
+    const callerViewId = this.displayProviders.resolveCallerViewId(
+      caller?.webContentsId,
+    );
     if (callerViewId === undefined) {
       throw new Error("File pickers can only be opened from a renderer view");
     }
-    if (this.displayProvider && callerViewId === this.displayProvider.viewId) {
+    const currentProvider = this.displayProviders.getProvider();
+    if (currentProvider && callerViewId === currentProvider.viewId) {
       throw new Error("Display provider cannot open file pickers");
     }
-    if (!this.displayProvider) {
+    if (!currentProvider) {
+      await this.ensureDisplayProvider();
+    }
+    const provider = this.displayProviders.getProvider();
+    if (!provider) {
       throw new Error("File picker display provider is not registered");
     }
     if (this.activeRequest) {
@@ -219,6 +262,8 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
         "File picker is busy. Resolve the current file picker before opening another.",
       );
     }
+
+    this.idleProviderStopper.cancel();
 
     const requestId = this.generateId();
     this.activeRequest = {
@@ -240,31 +285,31 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     };
 
     this.notifyFilePicker("opened", { picker }, callerViewId);
-    this.viewManager.showView(this.displayProvider.viewId);
-    this.viewManager.focusView(this.displayProvider.viewId);
+    this.viewManager.showView(provider.viewId);
+    this.viewManager.focusView(provider.viewId);
     log.info(`File picker opened (${requestId})`);
 
     return { requestId };
   }
 
-  private forceOpenPicker(
+  private async forceOpenPicker(
     args: FilePickerOpenArgs,
     caller: FilePickerCaller,
-  ): { requestId: string } {
+  ): Promise<{ requestId: string }> {
     this.pruneStaleState();
 
     if (this.activeRequest) {
       this.closeActiveRequest("close");
     }
 
-    return this.openPicker(args, caller);
+    return await this.openPicker(args, caller);
   }
 
   resolvePicker(
     result: FilePickerResult,
     caller?: FilePickerCaller,
   ): { success: boolean } {
-    if (!this.isDisplayProvider(caller ?? {})) {
+    if (!this.displayProviders.isProvider(caller ?? {})) {
       throw new Error("Only the display provider can resolve file pickers");
     }
 
@@ -279,6 +324,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     this.activeRequest = null;
 
     this.notifyFilePicker("closed", result, openerViewId);
+    this.idleProviderStopper.schedule();
     return { success: true };
   }
 
@@ -298,7 +344,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       throw new Error("Caller app ID is required to close file pickers");
     }
 
-    if (this.isDisplayProvider(caller)) {
+    if (this.displayProviders.isProvider(caller)) {
       this.closeActiveRequest("close");
       return { success: true };
     }
@@ -318,6 +364,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       { requestId: targetId, reason: "close" },
       openerViewId,
     );
+    this.idleProviderStopper.schedule();
     return { success: true };
   }
 }

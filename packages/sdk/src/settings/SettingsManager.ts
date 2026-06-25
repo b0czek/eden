@@ -42,7 +42,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
     @inject(delay(() => UserManager)) private userManager: UserManager,
-    @inject(AppCatalog) private appCatalog: AppCatalog,
+    @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
   ) {
     super(ipcBridge);
 

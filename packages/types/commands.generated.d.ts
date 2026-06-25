@@ -25,7 +25,9 @@ export interface SystemCommands {
 export interface AssociationsCommands {
   "associations/get": {
     args: { key: string };
-    response: { association: import("./index").AppAssociation | undefined };
+    response: {
+    association: import("./index").AppAssociation | undefined;
+  };
   };
   "associations/set": {
     args: {

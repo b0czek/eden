@@ -1,7 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AppAssociation, AppAssociationStore } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import type {
+  AppAssociation,
+  AppAssociationStore,
+  RuntimeAppManifest,
+} from "@edenapp/types";
+import { delay, inject, injectable, singleton } from "tsyringe";
+import { AppCatalog } from "../app-registry";
 import { CommandRegistry, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import { AppAssociationHandler } from "./AppAssociationHandler";
@@ -23,6 +28,7 @@ export class AppAssociationManager {
   constructor(
     @inject("userDirectory") userDirectory: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
   ) {
     this.associationsPath = path.join(userDirectory, "app-associations.json");
     this.handler = new AppAssociationHandler(this);
@@ -59,6 +65,27 @@ export class AppAssociationManager {
   get(key: string): AppAssociation | undefined {
     const association = this.associations.get(key);
     return association ? { ...association } : undefined;
+  }
+
+  resolve(
+    key: string,
+    matches: (app: RuntimeAppManifest) => boolean,
+  ): AppAssociation[] {
+    const association = this.get(key);
+    if (association) {
+      const app = this.appCatalog.getLaunchable(association.appId);
+      if (app && matches(app)) {
+        return [association];
+      }
+    }
+
+    return this.appCatalog
+      .list({ showHidden: true })
+      .filter(matches)
+      .map((app) => ({
+        appId: app.id,
+        kind: "provider",
+      }));
   }
 
   async set(key: string, association: AppAssociation): Promise<void> {
