@@ -232,31 +232,6 @@
   color: var(--eden-color-text-secondary);
 }
 
-.welcome-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--eden-space-sm);
-  margin-top: var(--eden-space-lg);
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: var(--eden-space-md);
-  font-size: var(--eden-font-size-sm);
-  color: var(--eden-color-text-secondary);
-}
-
-.shortcut-key {
-  padding: var(--eden-space-xs) var(--eden-space-sm);
-  background: var(--eden-color-bg-glass-strong);
-  border: 1px solid var(--eden-color-border-light);
-  border-radius: var(--eden-radius-sm);
-  font-family: var(--eden-font-mono);
-  font-size: var(--eden-font-size-xs);
-  color: var(--eden-color-text-primary);
-}
-
 /* ===== Monaco Lazy Loading ===== */
 .monaco-loading {
   position: absolute;

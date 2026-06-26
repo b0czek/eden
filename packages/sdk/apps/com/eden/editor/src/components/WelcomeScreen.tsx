@@ -19,20 +19,6 @@ function DocumentIcon() {
   );
 }
 
-interface ShortcutItemProps {
-  shortcut: string;
-  description: string;
-}
-
-function ShortcutItem(props: ShortcutItemProps) {
-  return (
-    <div class="shortcut-item">
-      <span class="shortcut-key">{props.shortcut}</span>
-      <span>{props.description}</span>
-    </div>
-  );
-}
-
 import { t } from "../i18n";
 
 interface WelcomeScreenProps {
@@ -54,20 +40,6 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
       >
         {t("editor.openFile")}
       </button>
-      <div class="welcome-shortcuts">
-        <ShortcutItem
-          shortcut="Ctrl+O"
-          description={t("editor.openShortcut")}
-        />
-        <ShortcutItem
-          shortcut="Ctrl+S"
-          description={t("editor.saveShortcut")}
-        />
-        <ShortcutItem
-          shortcut="Ctrl+W"
-          description={t("editor.closeTabShortcut")}
-        />
-      </div>
     </div>
   );
 }
