@@ -1,12 +1,13 @@
 import type { Setter } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
-import { t } from "../i18n";
 import type { FileItem } from "../types";
 import { getParentPath, joinPath } from "../utils";
 
 interface UseExplorerNavigationOptions {
+  initialPath?: string;
   sortItems: (items: FileItem[]) => FileItem[];
   onLoadError: (message: string) => void;
+  getLoadDirectoryErrorMessage?: (error: Error) => string;
   setSelectedItem: Setter<string | null>;
   setScrollToSelected: Setter<boolean>;
 }
@@ -14,11 +15,12 @@ interface UseExplorerNavigationOptions {
 export const useExplorerNavigation = (
   options: UseExplorerNavigationOptions,
 ) => {
-  const [currentPath, setCurrentPath] = createSignal("/");
+  const initialPath = options.initialPath ?? "/";
+  const [currentPath, setCurrentPath] = createSignal(initialPath);
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [navigationHistory, setNavigationHistory] = createSignal<string[]>([
-    "/",
+    initialPath,
   ]);
   const [historyIndex, setHistoryIndex] = createSignal(0);
 
@@ -62,8 +64,11 @@ export const useExplorerNavigation = (
       setItems(options.sortItems(itemsWithStats));
     } catch (error) {
       console.error("Error loading directory:", error);
+      const loadError =
+        error instanceof Error ? error : new Error(String(error));
       options.onLoadError(
-        `${t("files.errors.loadDirectoryFailed")}: ${(error as Error).message}`,
+        options.getLoadDirectoryErrorMessage?.(loadError) ??
+          `Failed to load directory: ${loadError.message}`,
       );
     } finally {
       setLoading(false);
@@ -86,6 +91,17 @@ export const useExplorerNavigation = (
       setHistoryIndex(index + 1);
     }
 
+    loadDirectory(path);
+
+    if (selectedItem) {
+      options.setScrollToSelected(true);
+      options.setSelectedItem(selectedItem);
+    }
+  };
+
+  const resetNavigation = (path: string, selectedItem?: string) => {
+    setNavigationHistory([path]);
+    setHistoryIndex(0);
     loadDirectory(path);
 
     if (selectedItem) {
@@ -146,6 +162,7 @@ export const useExplorerNavigation = (
     historyIndex,
     loadDirectory,
     navigateTo,
+    resetNavigation,
     goBack,
     goForward,
     goUp,

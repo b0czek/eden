@@ -1,4 +1,5 @@
 import type { AppManifest, RuntimeAppManifest } from "@edenapp/types";
+import type { AppCatalog } from "../app-registry";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import type { PackageManager } from "./PackageManager";
@@ -6,7 +7,10 @@ import type { PackageManager } from "./PackageManager";
 export class PackageHandler {
   private packageManager: PackageManager;
 
-  constructor(packageManager: PackageManager) {
+  constructor(
+    packageManager: PackageManager,
+    private appCatalog: AppCatalog,
+  ) {
     this.packageManager = packageManager;
   }
 
@@ -41,7 +45,7 @@ export class PackageHandler {
     showHidden?: boolean;
     showRestricted?: boolean;
   }): Promise<RuntimeAppManifest[]> {
-    return this.packageManager.getInstalledApps({
+    return this.appCatalog.list({
       showHidden: args.showHidden,
       showRestricted: args.showRestricted,
     });
@@ -80,7 +84,7 @@ export class PackageHandler {
     appId: string;
   }): Promise<{ icon: string | undefined }> {
     const { appId } = args;
-    const icon = await this.packageManager.getAppIcon(appId);
+    const icon = await this.appCatalog.getIcon(appId);
     return { icon };
   }
 
@@ -103,7 +107,7 @@ export class PackageHandler {
     appId: string;
   }): Promise<{ size: number | undefined }> {
     const { appId } = args;
-    const size = await this.packageManager.getAppSize(appId);
+    const size = await this.appCatalog.getSize(appId);
     return { size };
   }
 }

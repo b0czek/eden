@@ -7,7 +7,7 @@ import type {
 import { inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { ViewManager } from "../view-manager";
+import { DisplayProviderRegistry, ViewManager } from "../view-manager";
 import { ContextMenuHandler } from "./ContextMenuHandler";
 
 interface ContextMenuNamespaceEvents {
@@ -28,11 +28,6 @@ interface ContextMenuRequestContext {
   };
 }
 
-interface DisplayProvider {
-  appId: string;
-  viewId: number;
-}
-
 @singleton()
 @injectable()
 @EdenNamespace("context-menu")
@@ -40,7 +35,7 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
   private handler: ContextMenuHandler;
   private idCounter = 0;
   private activeRequest: ContextMenuRequestContext | null = null;
-  private displayProvider: DisplayProvider | null = null;
+  private displayProviders: DisplayProviderRegistry;
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
@@ -49,6 +44,10 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
   ) {
     super(ipcBridge);
 
+    this.displayProviders = new DisplayProviderRegistry(
+      this.viewManager,
+      "Context menu",
+    );
     this.handler = new ContextMenuHandler(this);
     commandRegistry.registerManager(this.handler);
   }
@@ -57,20 +56,8 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
     return `ctx-${Date.now()}-${++this.idCounter}`;
   }
 
-  /**
-   * Register the display provider (context menu renderer app).
-   * Only the display provider receives all context menu events.
-   * Permission-gated via handler.
-   */
   registerDisplayProvider(caller: ContextMenuCaller): { success: boolean } {
-    const viewId = this.resolveCallerViewId(caller.webContentsId);
-    if (viewId === undefined || !caller.appId) {
-      throw new Error("Display provider must be a valid view");
-    }
-
-    this.displayProvider = { appId: caller.appId, viewId };
-    log.info(`Context menu display provider registered: ${caller.appId}`);
-    return { success: true };
+    return this.displayProviders.register(caller);
   }
 
   /**
@@ -82,8 +69,9 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
     openerViewId?: number,
   ): void {
     // Notify display provider (if registered)
-    if (this.displayProvider) {
-      this.notifySubscriber(this.displayProvider.viewId, event, payload);
+    const provider = this.displayProviders.getProvider();
+    if (provider) {
+      this.notifySubscriber(provider.viewId, event, payload);
     }
 
     // Notify opener
@@ -125,23 +113,14 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
     };
   }
 
-  private resolveCallerViewId(webContentsId?: number): number | undefined {
-    if (webContentsId === undefined) return undefined;
-    const viewId = this.viewManager.getViewIdByWebContentsId(webContentsId);
-    if (viewId === undefined) {
-      log.warn(
-        `Context menu caller view not found for webContents ${webContentsId}`,
-      );
-    }
-    return viewId;
-  }
-
   private isCallerAuthorized(
     caller: ContextMenuCaller,
     opener: ContextMenuRequestContext["opener"],
   ): boolean {
     if (opener.viewId !== undefined) {
-      const callerViewId = this.resolveCallerViewId(caller.webContentsId);
+      const callerViewId = this.displayProviders.resolveCallerViewId(
+        caller.webContentsId,
+      );
       return callerViewId !== undefined && callerViewId === opener.viewId;
     }
 
@@ -157,11 +136,14 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
       throw new Error("Caller app ID is required to open context menus");
     }
 
-    const callerViewId = this.resolveCallerViewId(caller?.webContentsId);
+    const callerViewId = this.displayProviders.resolveCallerViewId(
+      caller?.webContentsId,
+    );
     if (callerViewId === undefined) {
       throw new Error("Context menus can only be opened from a renderer view");
     }
-    if (this.displayProvider && callerViewId === this.displayProvider.viewId) {
+    const provider = this.displayProviders.getProvider();
+    if (provider && callerViewId === provider.viewId) {
       throw new Error("Display provider cannot open context menus");
     }
     const requestId = this.generateId();

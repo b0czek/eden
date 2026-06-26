@@ -128,12 +128,12 @@ export function setupWindowResizing(
   };
 
   const moveResize = (e: MouseEvent | TouchEvent): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
     if (!isResizing || !resizeStartBounds) {
       return;
     }
+
+    e.preventDefault();
+    e.stopPropagation();
 
     // Get current coordinates
     const coords = getScreenCoords(e);

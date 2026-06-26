@@ -61,6 +61,49 @@ describe("bundler module", () => {
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
+
+    it("validates shared setting readers", () => {
+      const baseManifest: AppManifest = {
+        id: "com.example.owner",
+        name: "Owner",
+        version: "1.0.0",
+        frontend: { entry: "dist/index.html" },
+        settings: [
+          {
+            id: "behavior",
+            name: "Behavior",
+            settings: [
+              {
+                key: "singleClick",
+                label: "Single click",
+                type: "toggle",
+                sharedWith: ["com.example.reader"],
+              },
+            ],
+          },
+        ],
+      };
+
+      expect(bundler.validateManifestObject(baseManifest).valid).toBe(true);
+
+      const invalidReaders = [
+        ["com.example.owner"],
+        ["com.example.reader", "com.example.reader"],
+        ["*"],
+        ["Invalid App"],
+        "com.example.reader",
+      ];
+
+      for (const sharedWith of invalidReaders) {
+        const manifest = structuredClone(baseManifest);
+        const setting = manifest.settings?.[0]?.settings[0];
+        if (!setting) {
+          throw new Error("Expected test setting");
+        }
+        setting.sharedWith = sharedWith as unknown as string[];
+        expect(bundler.validateManifestObject(manifest).valid).toBe(false);
+      }
+    });
   });
 
   describe("verifyFiles", () => {

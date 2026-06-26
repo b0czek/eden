@@ -25,9 +25,16 @@ export class SettingsHandler {
   @EdenHandler("get", { permission: "rw" })
   async handleGet(args: {
     key: string;
+    appId?: string;
     _callerAppId: string;
   }): Promise<{ value: string | undefined }> {
-    const value = await this.settingsManager.get(args._callerAppId, args.key);
+    const ownerAppId = args.appId ?? args._callerAppId;
+    this.settingsManager.assertReadableBy(
+      ownerAppId,
+      args.key,
+      args._callerAppId,
+    );
+    const value = await this.settingsManager.get(ownerAppId, args.key);
     return { value };
   }
 

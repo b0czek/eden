@@ -1,3 +1,4 @@
+import { filePicker } from "@edenapp/tablets";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
@@ -66,6 +67,10 @@ const App: Component = () => {
         e.preventDefault();
         saveFile();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+        e.preventDefault();
+        void openFileFromPicker();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "w") {
         e.preventDefault();
         const active = activeTabId();
@@ -87,6 +92,21 @@ const App: Component = () => {
     console.log("File opened:", data);
     if (!data.isDirectory) {
       openFile(data.path);
+    }
+  };
+
+  const openFileFromPicker = async () => {
+    try {
+      setError(null);
+      const path = await filePicker.openFile({
+        title: t("editor.openFile"),
+      });
+
+      if (path) {
+        await openFile(path);
+      }
+    } catch (err) {
+      setError(t("editor.failedToLoad", { message: (err as Error).message }));
     }
   };
 
@@ -196,17 +216,20 @@ const App: Component = () => {
 
   return (
     <div class="editor-app">
-      <TabBar
-        tabs={tabs()}
-        activeTabId={activeTabId()}
-        onTabClick={switchToTab}
-        onTabClose={closeTab}
-      />
+      <Show when={tabs().length > 0}>
+        <TabBar
+          tabs={tabs()}
+          activeTabId={activeTabId()}
+          onTabClick={switchToTab}
+          onTabClose={closeTab}
+        />
+      </Show>
 
       <Show when={activeTab()}>
         <Toolbar
           activeTab={activeTab()}
           isSaving={isSaving()}
+          onOpen={openFileFromPicker}
           onSave={saveFile}
         />
       </Show>
@@ -218,7 +241,7 @@ const App: Component = () => {
       </Show>
 
       <Show when={tabs().length === 0}>
-        <WelcomeScreen />
+        <WelcomeScreen onOpen={openFileFromPicker} />
       </Show>
 
       <Show when={tabs().length > 0}>

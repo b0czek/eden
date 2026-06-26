@@ -8,6 +8,7 @@ import type {
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
+import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import {
   getHotReloadServersPath,
@@ -54,6 +55,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(BackendManager) private backendManager: BackendManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
     @inject(UserManager) private userManager: UserManager,
@@ -224,7 +226,15 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       throw new Error(`User cannot launch app ${appId}`);
     }
 
-    const manifest = this.packageManager.getAppManifest(appId);
+    return await this.launchAppInternal(appId, bounds, launchArgs);
+  }
+
+  private async launchAppInternal(
+    appId: string,
+    bounds?: { x: number; y: number; width: number; height: number },
+    launchArgs?: string[],
+  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+    const manifest = this.appCatalog.get(appId);
     if (!manifest) {
       throw new Error(`App ${appId} is not installed`);
     }
@@ -242,7 +252,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     // Get the correct install path
-    const installPath = this.packageManager.getAppPath(appId);
+    const installPath = this.appCatalog.getPath(appId);
     if (!installPath) {
       throw new Error(`App path not found for ${appId}`);
     }
@@ -298,6 +308,27 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       log.error(`Failed to launch app ${appId}:`, error);
       throw error;
     }
+  }
+
+  async ensureAppRunning(
+    appId: string,
+    options: {
+      bounds?: { x: number; y: number; width: number; height: number };
+      launchArgs?: string[];
+    } = {},
+  ): Promise<AppInstance> {
+    const existing = this.runningApps.get(appId);
+    if (existing) {
+      return existing;
+    }
+
+    await this.launchApp(appId, options.bounds, options.launchArgs);
+
+    const launched = this.runningApps.get(appId);
+    if (!launched) {
+      throw new Error(`App ${appId} failed to start`);
+    }
+    return launched;
   }
 
   /**

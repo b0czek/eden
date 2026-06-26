@@ -7,10 +7,10 @@ import {
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import { ITEM_SIZES } from "../constants";
-import { t } from "../i18n";
-import type { DisplayPreferences, SortBy } from "../types";
+import type { DisplayPreferences, FileExplorerLabels, SortBy } from "../types";
 
 interface DisplayOptionsModalProps {
+  labels: FileExplorerLabels;
   show: boolean;
   preferences: DisplayPreferences;
   onClose: () => void;
@@ -42,22 +42,22 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
         <button
           type="button"
           class="display-options-backdrop"
-          aria-label={t("common.close")}
+          aria-label={props.labels.close}
           onClick={props.onClose}
         />
         <div
           class="eden-popover display-options-popover"
           role="dialog"
           aria-modal="true"
-          aria-label={t("files.displayOptions")}
+          aria-label={props.labels.displayOptions}
         >
           <div class="eden-flex-between eden-gap-md">
-            <h3 class="eden-popover-title">{t("files.displayOptions")}</h3>
+            <h3 class="eden-popover-title">{props.labels.displayOptions}</h3>
             <button
               type="button"
               class="eden-modal-close"
               onClick={props.onClose}
-              aria-label="Close"
+              aria-label={props.labels.close}
             >
               ×
             </button>
@@ -69,7 +69,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
           >
             {/* View Style Section */}
             <fieldset class="eden-form-group display-options-fieldset">
-              <legend class="eden-form-label">{t("files.viewStyle")}</legend>
+              <legend class="eden-form-label">{props.labels.viewStyle}</legend>
               <div class="eden-btn-group">
                 <button
                   type="button"
@@ -79,7 +79,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   }}
                   onClick={() => updatePreference("viewStyle", "grid")}
                 >
-                  <FaSolidGrip /> {t("files.grid")}
+                  <FaSolidGrip /> {props.labels.grid}
                 </button>
                 <button
                   type="button"
@@ -89,7 +89,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   }}
                   onClick={() => updatePreference("viewStyle", "list")}
                 >
-                  <FaSolidList /> {t("files.list")}
+                  <FaSolidList /> {props.labels.list}
                 </button>
               </div>
             </fieldset>
@@ -97,9 +97,9 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
             {/* Item Size Section */}
             <div class="eden-form-group">
               <label class="eden-form-label" for="display-item-size">
-                {t("files.displaySize")}:{" "}
+                {props.labels.displaySize}:{" "}
                 <span class="eden-badge">
-                  {t(`files.${props.preferences.itemSize}`)}
+                  {props.labels[props.preferences.itemSize]}
                 </span>
               </label>
               <div
@@ -107,7 +107,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                 style={{ "align-items": "center" }}
               >
                 <span class="eden-text-xs eden-text-muted">
-                  {t("files.tiny")}
+                  {props.labels.tiny}
                 </span>
                 <input
                   id="display-item-size"
@@ -122,7 +122,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   class="eden-slider"
                 />
                 <span class="eden-text-xs eden-text-muted">
-                  {t("files.huge")}
+                  {props.labels.huge}
                 </span>
               </div>
             </div>
@@ -130,7 +130,7 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
             {/* Sort Options Section */}
             <div class="eden-form-group">
               <label class="eden-form-label" for="display-sort-by">
-                {t("files.sortBy")}
+                {props.labels.sortBy}
               </label>
               <div class="eden-flex eden-gap-sm">
                 <select
@@ -142,9 +142,9 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   }
                   style={{ flex: "1" }}
                 >
-                  <option value="name">{t("common.name")}</option>
-                  <option value="size">{t("common.size")}</option>
-                  <option value="modified">{t("files.modified")}</option>
+                  <option value="name">{props.labels.name}</option>
+                  <option value="size">{props.labels.size}</option>
+                  <option value="modified">{props.labels.modified}</option>
                 </select>
 
                 <button
@@ -158,8 +158,8 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
                   }
                   title={
                     props.preferences.sortOrder === "asc"
-                      ? t("files.ascending")
-                      : t("files.descending")
+                      ? props.labels.ascending
+                      : props.labels.descending
                   }
                 >
                   {props.preferences.sortOrder === "asc" ? (
@@ -177,4 +177,5 @@ const DisplayOptionsModal: Component<DisplayOptionsModalProps> = (props) => {
   );
 };
 
+export { DisplayOptionsModal };
 export default DisplayOptionsModal;

@@ -193,13 +193,12 @@
 .empty-state-icon {
   width: 64px;
   height: 64px;
-  border-radius: var(--eden-radius-xl);
-  background: var(--eden-color-bg-glass-medium);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--eden-font-size-3xl);
-  color: var(--eden-color-text-muted);
+}
+
+.empty-state-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* ===== Editor Container ===== */
@@ -230,31 +229,6 @@
 .welcome-content p {
   font-size: var(--eden-font-size-md);
   color: var(--eden-color-text-secondary);
-}
-
-.welcome-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--eden-space-sm);
-  margin-top: var(--eden-space-lg);
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: var(--eden-space-md);
-  font-size: var(--eden-font-size-sm);
-  color: var(--eden-color-text-secondary);
-}
-
-.shortcut-key {
-  padding: var(--eden-space-xs) var(--eden-space-sm);
-  background: var(--eden-color-bg-glass-strong);
-  border: 1px solid var(--eden-color-border-light);
-  border-radius: var(--eden-radius-sm);
-  font-family: var(--eden-font-mono);
-  font-size: var(--eden-font-size-xs);
-  color: var(--eden-color-text-primary);
 }
 
 /* ===== Monaco Lazy Loading ===== */

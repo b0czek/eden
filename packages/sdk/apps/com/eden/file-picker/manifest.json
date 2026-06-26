@@ -1,0 +1,35 @@
+{
+  "id": "com.eden.file-picker",
+  "name": {
+    "en": "File Picker",
+    "pl": "Wybór Pliku"
+  },
+  "version": "1.0.0",
+  "description": "Overlay file picker for Eden apps",
+  "overlay": true,
+  "autostart": false,
+  "build": {
+    "command": "pnpm run build"
+  },
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 0,
+      "height": 0
+    },
+    "defaultPosition": {
+      "x": 0,
+      "y": 0
+    },
+    "showMinimize": false,
+    "injections": {
+      "css": "full",
+      "appFrame": true
+    }
+  },
+  "permissions": ["file-picker/display", "fs/*", "db/rw", "settings/rw"],
+  "icon": "icon.svg"
+}

@@ -1,9 +1,12 @@
 export const en = {
   editor: {
     title: "Text Editor",
-    welcome: "Open a file from the Files app to start editing",
+    welcome: "Open a file to start editing",
+    openFile: "Open File",
+    openShortcut: "Open file",
     saveShortcut: "Save file",
     closeTabShortcut: "Close tab",
+    textFiles: "Text Files",
     failedToLoad: "Failed to load file: {message}",
     failedToSave: "Failed to save file: {message}",
   },

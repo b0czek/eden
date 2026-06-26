@@ -1,20 +1,59 @@
+import {
+  buildBreadcrumbs,
+  DisplayOptionsModal,
+  type DisplayPreferences,
+  FileExplorerHeader,
+  type FileExplorerLabels,
+  type FileItem,
+  FileList,
+  getParentPath,
+  ITEM_SIZES,
+  useExplorerNavigation,
+  useFileActivationPreference,
+} from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
-import FileExplorerHeader from "./components/FileExplorerHeader";
-import FileList from "./components/FileList";
-import { ITEM_SIZES } from "./constants";
-import DisplayOptionsModal from "./dialogs/DisplayOptionsModal";
-import { buildBreadcrumbs } from "./features/breadcrumbs";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
-import { useExplorerNavigation } from "./features/useExplorerNavigation";
 import { useFileActions } from "./features/useFileActions";
 import { initLocale, t } from "./i18n";
-import type { DisplayPreferences, FileItem } from "./types";
-import { getParentPath } from "./utils";
+
+const getExplorerLabels = (): FileExplorerLabels => ({
+  goBack: t("files.goBack"),
+  goForward: t("files.goForward"),
+  goUp: t("files.goUp"),
+  newFolder: t("files.newFolder"),
+  newFile: t("files.newFile"),
+  settings: t("common.settings"),
+  editPath: t("files.editPath"),
+  searchPlaceholder: t("files.searchPlaceholder"),
+  loading: t("common.loading"),
+  empty: t("files.empty"),
+  emptyHint: t("files.emptyHint"),
+  folder: t("files.folder"),
+  delete: t("common.delete"),
+  close: t("common.close"),
+  displayOptions: t("files.displayOptions"),
+  viewStyle: t("files.viewStyle"),
+  grid: t("files.grid"),
+  list: t("files.list"),
+  displaySize: t("files.displaySize"),
+  tiny: t("files.tiny"),
+  small: t("files.small"),
+  medium: t("files.medium"),
+  large: t("files.large"),
+  huge: t("files.huge"),
+  sortBy: t("files.sortBy"),
+  name: t("common.name"),
+  size: t("common.size"),
+  modified: t("files.modified"),
+  ascending: t("files.ascending"),
+  descending: t("files.descending"),
+});
 
 const App: Component = () => {
   const dialogs = createDialogs();
+  const openWithSingleClick = useFileActivationPreference();
 
   const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
   const [scrollToSelected, setScrollToSelected] = createSignal(false);
@@ -76,6 +115,8 @@ const App: Component = () => {
   } = useExplorerNavigation({
     sortItems,
     onLoadError: showError,
+    getLoadDirectoryErrorMessage: (error) =>
+      `${t("files.errors.loadDirectoryFailed")}: ${error.message}`,
     setSelectedItem,
     setScrollToSelected,
   });
@@ -188,7 +229,7 @@ const App: Component = () => {
     openItem,
     getOpenWithMenuItems,
     handleItemClick,
-    handleItemDoubleClick,
+    handleItemActivate,
     promptCreateFolder,
     promptCreateFile,
     promptRename,
@@ -222,6 +263,7 @@ const App: Component = () => {
   return (
     <div class="file-explorer">
       <FileExplorerHeader
+        labels={getExplorerLabels()}
         currentPath={currentPath()}
         historyIndex={historyIndex()}
         historyLength={navigationHistory().length}
@@ -240,6 +282,7 @@ const App: Component = () => {
       />
 
       <FileList
+        labels={getExplorerLabels()}
         loading={loading()}
         items={items()}
         selectedItem={selectedItem()}
@@ -247,7 +290,8 @@ const App: Component = () => {
         viewStyle={displayPreferences().viewStyle}
         itemSize={displayPreferences().itemSize}
         onItemClick={handleItemClick}
-        onItemDoubleClick={handleItemDoubleClick}
+        onItemActivate={handleItemActivate}
+        activateOnSingleClick={openWithSingleClick()}
         onItemContextMenu={handleItemContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
         onItemDelete={handleDeleteClick}
@@ -258,6 +302,7 @@ const App: Component = () => {
       <DialogHost dialogs={dialogs} />
 
       <DisplayOptionsModal
+        labels={getExplorerLabels()}
         show={showDisplayOptionsModal()}
         preferences={displayPreferences()}
         onClose={() => setShowDisplayOptionsModal(false)}

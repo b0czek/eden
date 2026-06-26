@@ -1,11 +1,7 @@
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import type { Breadcrumb, FileExplorerLabels } from "../types";
 import { getParentPath } from "../utils";
-
-interface Breadcrumb {
-  name: string;
-  path: string;
-}
 
 interface Suggestion {
   type: "path" | "file" | "folder";
@@ -15,6 +11,7 @@ interface Suggestion {
 }
 
 interface OmniboxProps {
+  labels: FileExplorerLabels;
   currentPath: string;
   breadcrumbs: Breadcrumb[];
   onNavigate: (path: string, selectedItem?: string) => void;
@@ -196,7 +193,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
             class="omnibox-display"
             onClick={handleOmniboxClick}
             onKeyDown={handleOmniboxKeyDown}
-            aria-label="Edit path"
+            aria-label={props.labels.editPath}
           >
             <div class="breadcrumb-display">
               <For each={props.breadcrumbs}>
@@ -223,7 +220,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
             value={inputValue()}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Type a path or search..."
+            placeholder={props.labels.searchPlaceholder}
           />
           {isLoading() && <span class="omnibox-loading">⏳</span>}
         </div>
@@ -253,4 +250,5 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   );
 };
 
+export { Omnibox };
 export default Omnibox;

@@ -20,6 +20,36 @@ export interface SystemCommands {
 }
 
 /**
+ * AssociationsCommands - Commands for the "associations" namespace
+ */
+export interface AssociationsCommands {
+  "associations/get": {
+    args: { key: string };
+    response: {
+    association: import("./index").AppAssociation | undefined;
+  };
+  };
+  "associations/set": {
+    args: {
+    key: string;
+    appId: string;
+    kind: string;
+    label?: string };
+    response: { success: boolean };
+  };
+  "associations/remove": {
+    args: { key: string };
+    response: { success: boolean };
+  };
+  "associations/list": {
+    args: { kindPrefix?: string };
+    response: {
+    associations: Record<string, import("./index").AppAssociation>;
+  };
+  };
+}
+
+/**
  * AppbusCommands - Commands for the "appbus" namespace
  */
 export interface AppbusCommands {
@@ -289,6 +319,29 @@ export interface FileCommands {
 }
 
 /**
+ * FilePickerCommands - Commands for the "file-picker" namespace
+ */
+export interface FilePickerCommands {
+  "file-picker/register-display": {
+    args: { };
+    response: { success: boolean };
+  };
+  "file-picker/open": {
+    args: import("./index").FilePickerOpenArgs & { };
+    response: { requestId: string };
+  };
+  "file-picker/resolve": {
+    args: import("./index").FilePickerResult & { };
+    response: { success: boolean };
+  };
+  "file-picker/close": {
+    args: {
+    requestId?: string };
+    response: { success: boolean };
+  };
+}
+
+/**
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
@@ -422,6 +475,13 @@ export interface EventCommands {
  */
 export interface NotificationCommands {
   /**
+   * Register the notification display provider.
+   */
+  "notification/register-display": {
+    args: { };
+    response: { success: boolean };
+  };
+  /**
    * Push a new notification to subscribers.
    */
   "notification/push": {
@@ -429,8 +489,26 @@ export interface NotificationCommands {
     title: string;
     message: string;
     timeout?: number;
-    type?: import("./index").NotificationType };
+    type?: import("./index").NotificationType;
+    actions?: import("./index").NotificationAction[] };
     response: import("./index").Notification;
+  };
+  /**
+   * Report a notification action click from the toaster.
+   */
+  "notification/action-clicked": {
+    args: {
+    notificationId: string;
+    actionId: string };
+    response: { success: boolean };
+  };
+  /**
+   * Report a notification dismissal from the toaster.
+   */
+  "notification/dismissed": {
+    args: {
+    notificationId: string };
+    response: { success: boolean };
   };
 }
 
@@ -571,7 +649,8 @@ export interface SettingsCommands {
    */
   "settings/get": {
     args: {
-    key: string };
+    key: string;
+    appId?: string };
     response: { value: string | undefined };
   };
   /**
@@ -925,4 +1004,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}

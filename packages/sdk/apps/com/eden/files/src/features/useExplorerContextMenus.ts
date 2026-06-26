@@ -1,3 +1,4 @@
+import type { FileItem } from "@edenapp/files-core";
 import {
   button,
   type ContextMenuAction,
@@ -9,7 +10,6 @@ import {
 } from "@edenapp/tablets";
 import type { Setter } from "solid-js";
 import { t } from "../i18n";
-import type { FileItem } from "../types";
 
 interface UseExplorerContextMenusOptions {
   openItem: (item: FileItem) => Promise<void>;

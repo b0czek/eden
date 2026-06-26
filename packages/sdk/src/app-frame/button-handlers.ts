@@ -27,7 +27,7 @@ export function setupCloseButton(): void {
   if (!closeBtn) return;
 
   closeBtn.addEventListener("click", () => {
-    closeAppFrameView().catch(log.error);
+    window.edenFrame?.close().catch(log.error);
   });
 }
 

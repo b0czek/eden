@@ -26,7 +26,32 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["fs/*", "db/rw", "package/read"],
+  "permissions": ["fs/*", "db/rw", "package/read", "settings/rw"],
+  "settings": [
+    {
+      "id": "behavior",
+      "name": {
+        "en": "Behavior",
+        "pl": "Zachowanie"
+      },
+      "settings": [
+        {
+          "key": "openItemsWithSingleClick",
+          "label": {
+            "en": "Open items with a single click",
+            "pl": "Otwieraj elementy pojedynczym kliknięciem"
+          },
+          "description": {
+            "en": "Use one click instead of two to open files and navigate folders.",
+            "pl": "Używaj jednego kliknięcia zamiast dwóch do otwierania plików i przechodzenia do folderów."
+          },
+          "type": "toggle",
+          "defaultValue": "false",
+          "sharedWith": ["com.eden.file-picker"]
+        }
+      ]
+    }
+  ],
   "fileHandlers": [
     {
       "name": "Directories",

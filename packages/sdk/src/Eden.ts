@@ -4,11 +4,13 @@ import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import { app, BrowserWindow } from "electron";
 import { container } from "tsyringe";
+import { AppAssociationManager } from "./app-associations";
 import { AppChannelManager } from "./appbus";
 import { AppearanceManager } from "./appearance/AppearanceManager";
 import { ContextMenuManager } from "./context-menu";
 import { DbManager } from "./db";
 import { FileOpenManager } from "./file-open";
+import { FilePickerManager } from "./file-picker";
 import { FilesystemManager } from "./filesystem";
 import { I18nManager } from "./i18n/I18nManager";
 import { CommandRegistry, IPCBridge } from "./ipc";
@@ -43,6 +45,7 @@ export class Eden {
   private packageManager!: PackageManager;
   private processManager!: ProcessManager;
   private fileOpenManager!: FileOpenManager;
+  private appAssociationManager!: AppAssociationManager;
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
   private keyboardManager!: KeyboardManager;
@@ -114,6 +117,7 @@ export class Eden {
     await container.resolve(AppearanceManager).initialize();
 
     // Initialize file open manager (load user preferences)
+    await this.appAssociationManager.initialize();
     await this.fileOpenManager.initialize();
 
     // Create main window
@@ -138,6 +142,7 @@ export class Eden {
 
     this.packageManager = container.resolve(PackageManager);
     this.processManager = container.resolve(ProcessManager);
+    this.appAssociationManager = container.resolve(AppAssociationManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
     this.autostartManager = container.resolve(AutostartManager);
     this.keyboardManager = container.resolve(KeyboardManager);
@@ -145,6 +150,7 @@ export class Eden {
     container.resolve(SystemHandler);
     container.resolve(NotificationManager);
     container.resolve(ContextMenuManager);
+    container.resolve(FilePickerManager);
     container.resolve(DbManager);
     container.resolve(AppearanceManager);
   }

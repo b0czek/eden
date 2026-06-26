@@ -171,6 +171,14 @@ function showNextPendingToast(): void {
   displayToast(notification);
 }
 
+function reportNotificationDismissed(notificationId: string): void {
+  void window.edenAPI
+    .shellCommand("notification/dismissed", { notificationId })
+    .catch((error) => {
+      console.error(`Toast dismissal failed: ${notificationId}`, error);
+    });
+}
+
 /**
  * Dismiss a toast locally
  */
@@ -186,6 +194,7 @@ function dismissToast(id: string): void {
   // Remove immediately
   toast.element.remove();
   visibleToasts.delete(id);
+  reportNotificationDismissed(id);
   updateDismissAllButton();
   updateOverlayBounds();
 
@@ -197,6 +206,9 @@ function dismissToast(id: string): void {
  * Dismiss all visible toasts and clear pending queue
  */
 function dismissAllToasts(): void {
+  for (const notification of pendingQueue) {
+    reportNotificationDismissed(notification.id);
+  }
   // Clear pending queue
   pendingQueue.length = 0;
 
@@ -206,6 +218,7 @@ function dismissAllToasts(): void {
       clearTimeout(toast.timeoutId);
     }
     toast.element.remove();
+    reportNotificationDismissed(toast.id);
   }
   visibleToasts.clear();
   updateDismissAllButton();
@@ -331,6 +344,7 @@ function createToastElement(notification: Notification): HTMLElement {
   const toast = document.createElement("div");
   const type = notification.type || "info";
   const isPersistent = !notification.timeout || notification.timeout <= 0;
+  const actions = notification.actions ?? [];
   toast.className = `toast eden-card-glass toast-${type}${
     isPersistent ? " toast-persistent" : ""
   }`;
@@ -352,6 +366,18 @@ function createToastElement(notification: Notification): HTMLElement {
       <div class="toast-content">
         <div class="toast-title">${escapeHtml(notification.title)}</div>
         <div class="toast-message">${escapeHtml(notification.message)}</div>
+        ${
+          actions.length > 0
+            ? `<div class="toast-actions">${actions
+                .map(
+                  (action) =>
+                    `<button class="eden-btn eden-btn-md toast-action" data-action-id="${escapeHtml(
+                      action.id,
+                    )}">${escapeHtml(action.label)}</button>`,
+                )
+                .join("")}</div>`
+            : ""
+        }
       </div>
       <button class="toast-dismiss" aria-label="Dismiss">×</button>
     </div>
@@ -364,6 +390,26 @@ function createToastElement(notification: Notification): HTMLElement {
     e.stopPropagation();
     dismissToast(notification.id);
   });
+
+  for (const action of actions) {
+    const actionButton = toast.querySelector(
+      `.toast-action[data-action-id="${CSS.escape(action.id)}"]`,
+    );
+    actionButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void window.edenAPI
+        .shellCommand("notification/action-clicked", {
+          notificationId: notification.id,
+          actionId: action.id,
+        })
+        .catch((error) => {
+          console.error(`Toast action failed: ${action.id}`, error);
+        });
+      if (action.dismissOnClick !== false) {
+        dismissToast(notification.id);
+      }
+    });
+  }
 
   // Pause on hover (only for non-persistent)
   if (!isPersistent) {
@@ -446,6 +492,9 @@ async function init(): Promise<void> {
 
   // Fetch initial window size
   await fetchWindowSize();
+
+  // Register as the display provider for notifications
+  await window.edenAPI.shellCommand("notification/register-display", {});
 
   // Subscribe to notification events
   window.edenAPI.subscribe("notification/added", handleToastAdded);

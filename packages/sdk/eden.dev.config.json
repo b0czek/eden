@@ -17,6 +17,10 @@
       "source": "builtin"
     },
     {
+      "id": "com.eden.file-picker",
+      "source": "builtin"
+    },
+    {
       "id": "com.eden.settings",
       "source": "builtin"
     },

@@ -399,7 +399,12 @@ body {
 }
 
 .file-item-main {
-  display: contents;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
   appearance: none;
   border: none;
   background: transparent;
@@ -408,6 +413,12 @@ body {
   cursor: pointer;
   padding: 0;
   text-align: inherit;
+}
+
+.file-item.list-view .file-item-main {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--item-gap-list, var(--eden-space-lg));
 }
 
 /* ===== Display Options Dropdown (Eden CSS Overrides) ===== */
@@ -549,9 +560,8 @@ body {
 .file-item.list-view {
   flex-direction: row;
   align-items: center;
-  padding: var(--item-padding-list, var(--eden-space-md) var(--eden-space-lg));
+  padding: 0;
   border-radius: var(--eden-radius-md);
-  gap: var(--item-gap-list, var(--eden-space-lg));
 }
 
 .file-item.list-view .file-icon {
@@ -687,7 +697,15 @@ body {
 
 /* Apply CSS variables to elements */
 .file-item {
+  padding: 0;
+}
+
+.file-item-main {
   padding: var(--item-padding);
+}
+
+.file-item.list-view .file-item-main {
+  padding: var(--item-padding-list, var(--eden-space-md) var(--eden-space-lg));
 }
 
 .file-item .file-icon {

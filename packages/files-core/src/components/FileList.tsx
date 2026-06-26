@@ -1,28 +1,67 @@
 import type { Component } from "solid-js";
 import { createEffect, For, Show } from "solid-js";
-import { t } from "../i18n";
-import type { FileItem, ItemSize, ViewStyle } from "../types";
+import type {
+  FileExplorerLabels,
+  FileItem,
+  ItemSize,
+  ViewStyle,
+} from "../types";
 import FileItemComponent from "./FileItem";
 
 interface FileListProps {
+  labels: FileExplorerLabels;
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
+  selectedItems?: string[];
   scrollToSelected?: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
-  onItemClick: (item: FileItem) => void;
-  onItemDoubleClick: (item: FileItem) => void;
-  onItemContextMenu: (item: FileItem, e: MouseEvent) => void;
-  onBackgroundContextMenu: (e: MouseEvent) => void;
-  onItemDelete: (item: FileItem, e: MouseEvent) => void;
-  onItemDeleteShortcut: (item: FileItem) => void;
+  onItemClick: (item: FileItem, event?: MouseEvent | KeyboardEvent) => void;
+  onItemActivate: (item: FileItem) => void;
+  activateOnSingleClick: boolean;
+  canActivateOnClick?: (item: FileItem) => boolean;
+  onItemContextMenu?: (item: FileItem, e: MouseEvent) => void;
+  onBackgroundContextMenu?: (e: MouseEvent) => void;
+  onItemDelete?: (item: FileItem, e: MouseEvent) => void;
+  onItemDeleteShortcut?: (item: FileItem) => void;
   onBack?: () => void;
 }
 
 const FileList: Component<FileListProps> = (props) => {
   const fileRefs: Map<string, HTMLDivElement> = new Map();
   let containerRef: HTMLDivElement | undefined;
+
+  const isItemSelected = (item: FileItem) => {
+    const selectedItems = props.selectedItems;
+    if (selectedItems) {
+      return selectedItems.includes(item.path);
+    }
+    return props.selectedItem === item.path;
+  };
+
+  const canActivateOnClick = (item: FileItem) =>
+    props.canActivateOnClick?.(item) ?? true;
+
+  const handleItemClick = (
+    item: FileItem,
+    event: MouseEvent,
+    pointerType: string | undefined,
+  ) => {
+    props.onItemClick(item, event);
+    if (
+      canActivateOnClick(item) &&
+      (pointerType === "touch" || props.activateOnSingleClick)
+    ) {
+      props.onItemActivate(item);
+    }
+  };
+
+  const handleItemDoubleClick = (item: FileItem) => {
+    if (!props.activateOnSingleClick && canActivateOnClick(item)) {
+      props.onItemActivate(item);
+    }
+  };
 
   createEffect(() => {
     // Track items to re-run when list updates
@@ -59,7 +98,7 @@ const FileList: Component<FileListProps> = (props) => {
           e.preventDefault();
           const item = items.find((i) => i.path === selected);
           if (item) {
-            props.onItemDoubleClick(item);
+            props.onItemActivate(item);
           }
         }
         return;
@@ -74,7 +113,7 @@ const FileList: Component<FileListProps> = (props) => {
       }
 
       if (e.key === "Delete") {
-        if (selected) {
+        if (selected && props.onItemDeleteShortcut) {
           const item = items.find((i) => i.path === selected);
           if (item) {
             e.preventDefault();
@@ -155,14 +194,14 @@ const FileList: Component<FileListProps> = (props) => {
       onContextMenu={props.onBackgroundContextMenu}
     >
       <Show when={props.loading}>
-        <div class="loading-message">{t("common.loading")}</div>
+        <div class="loading-message">{props.labels.loading}</div>
       </Show>
 
       <Show when={!props.loading && props.items.length === 0}>
         <div class="empty-state">
           <div class="empty-icon">📂</div>
-          <div class="empty-message">{t("files.empty")}</div>
-          <div class="empty-hint">{t("files.emptyHint")}</div>
+          <div class="empty-message">{props.labels.empty}</div>
+          <div class="empty-hint">{props.labels.emptyHint}</div>
         </div>
       </Show>
 
@@ -177,11 +216,12 @@ const FileList: Component<FileListProps> = (props) => {
               <FileItemComponent
                 ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
                 item={item}
-                isSelected={props.selectedItem === item.path}
+                isSelected={isItemSelected(item)}
                 viewStyle={props.viewStyle}
                 itemSize={props.itemSize}
-                onClick={props.onItemClick}
-                onDoubleClick={props.onItemDoubleClick}
+                labels={props.labels}
+                onClick={handleItemClick}
+                onDoubleClick={handleItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
                 onDelete={props.onItemDelete}
               />
@@ -193,4 +233,5 @@ const FileList: Component<FileListProps> = (props) => {
   );
 };
 
+export { FileList };
 export default FileList;
