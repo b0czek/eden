@@ -48,23 +48,21 @@ body,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--eden-space-lg);
+  gap: var(--eden-space-xl);
   max-width: 24rem;
 }
 
 .pdf-viewer__message h1 {
   margin: 0;
-  font-size: var(--eden-font-size-xl);
+  font-size: var(--eden-font-size-2xl);
   font-weight: var(--eden-font-weight-semibold);
-  line-height: var(--eden-font-line-height-tight);
+  color: var(--eden-color-text-primary);
 }
 
 .pdf-viewer__message p {
-  margin: 0;
   max-width: 20rem;
-  color: var(--eden-color-text-muted);
-  font-size: var(--eden-font-size-sm);
-  line-height: var(--eden-font-line-height-normal);
+  font-size: var(--eden-font-size-md);
+  color: var(--eden-color-text-secondary);
   overflow-wrap: anywhere;
 }
 
