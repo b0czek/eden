@@ -216,12 +216,14 @@ const App: Component = () => {
 
   return (
     <div class="editor-app">
-      <TabBar
-        tabs={tabs()}
-        activeTabId={activeTabId()}
-        onTabClick={switchToTab}
-        onTabClose={closeTab}
-      />
+      <Show when={tabs().length > 0}>
+        <TabBar
+          tabs={tabs()}
+          activeTabId={activeTabId()}
+          onTabClick={switchToTab}
+          onTabClose={closeTab}
+        />
+      </Show>
 
       <Show when={activeTab()}>
         <Toolbar
