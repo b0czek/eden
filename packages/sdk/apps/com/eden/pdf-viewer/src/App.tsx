@@ -10,6 +10,7 @@ import EmbedPDF, {
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import appIconUrl from "../icon.svg?url";
+import { initLocale, t } from "./i18n";
 
 interface FileOpenedEvent {
   path: string;
@@ -24,7 +25,7 @@ type ViewerState =
   | { status: "error"; path?: string; message: string };
 
 function getFileName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? "PDF Viewer";
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? t("pdfViewer.title");
 }
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -46,7 +47,7 @@ async function getDocumentManager(
   const documentManager = plugin?.provides();
 
   if (!documentManager) {
-    throw new Error("PDF viewer document manager is unavailable.");
+    throw new Error(t("pdfViewer.unavailable"));
   }
 
   return documentManager;
@@ -72,7 +73,7 @@ const App: Component = () => {
 
   const openPdfNow = async (path: string, version: number) => {
     if (!registryPromise) {
-      throw new Error("PDF viewer is not initialized.");
+      throw new Error(t("pdfViewer.notInitialized"));
     }
 
     const documentManager = await getDocumentManager(registryPromise);
@@ -124,9 +125,9 @@ const App: Component = () => {
         }
 
         const message =
-          error instanceof Error ? error.message : "Failed to open PDF.";
+          error instanceof Error ? error.message : t("pdfViewer.failedToOpen");
         setState({ status: "error", path, message });
-        window.edenFrame?.setTitle("PDF Viewer");
+        window.edenFrame?.setTitle(t("pdfViewer.title"));
       });
   };
 
@@ -139,8 +140,8 @@ const App: Component = () => {
   const openPdfFromPicker = async () => {
     try {
       const path = await filePicker.openFile({
-        title: "Open PDF",
-        filters: [{ name: "PDF Documents", extensions: ["pdf"] }],
+        title: t("pdfViewer.openPdf"),
+        filters: [{ name: t("pdfViewer.pdfDocuments"), extensions: ["pdf"] }],
       });
 
       if (path) {
@@ -148,13 +149,15 @@ const App: Component = () => {
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to open PDF.";
+        error instanceof Error ? error.message : t("pdfViewer.failedToOpen");
       setState({ status: "error", message });
-      window.edenFrame?.setTitle("PDF Viewer");
+      window.edenFrame?.setTitle(t("pdfViewer.title"));
     }
   };
 
   onMount(() => {
+    initLocale();
+
     if (viewerHost) {
       viewer = EmbedPDF.init({
         type: "container",
@@ -227,7 +230,7 @@ const App: Component = () => {
           class="eden-btn eden-btn-sm pdf-viewer__open-button"
           onClick={openPdfFromPicker}
         >
-          Open PDF
+          {t("pdfViewer.openPdf")}
         </button>
       </Show>
 
@@ -237,14 +240,14 @@ const App: Component = () => {
             <div class="pdf-viewer__icon">
               <img src={appIconUrl} alt="" aria-hidden="true" />
             </div>
-            <h1>PDF Viewer</h1>
-            <p>Open a PDF to start reading.</p>
+            <h1>{t("pdfViewer.title")}</h1>
+            <p>{t("pdfViewer.welcome")}</p>
             <button
               type="button"
               class="eden-btn eden-btn-primary eden-btn-md"
               onClick={openPdfFromPicker}
             >
-              Open PDF
+              {t("pdfViewer.openPdf")}
             </button>
           </div>
         </section>
@@ -256,7 +259,7 @@ const App: Component = () => {
             <div class="pdf-viewer__icon pdf-viewer__icon--loading">
               <img src={appIconUrl} alt="" aria-hidden="true" />
             </div>
-            <h1>Loading PDF</h1>
+            <h1>{t("pdfViewer.loading")}</h1>
             <p>{currentPath()}</p>
           </div>
         </section>
@@ -268,14 +271,14 @@ const App: Component = () => {
             <div class="pdf-viewer__icon pdf-viewer__icon--error">
               <img src={appIconUrl} alt="" aria-hidden="true" />
             </div>
-            <h1>Unable to Open PDF</h1>
+            <h1>{t("pdfViewer.unableToOpen")}</h1>
             <p>{currentError()}</p>
             <button
               type="button"
               class="eden-btn eden-btn-primary eden-btn-md"
               onClick={openPdfFromPicker}
             >
-              Open PDF
+              {t("pdfViewer.openPdf")}
             </button>
           </div>
         </section>
