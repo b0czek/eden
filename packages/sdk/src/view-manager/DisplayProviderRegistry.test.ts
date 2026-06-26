@@ -1,8 +1,8 @@
 import "reflect-metadata";
 
-import type { ViewManager } from "./ViewManager";
 import { DisplayProviderRegistry } from "./DisplayProviderRegistry";
-import { ViewInfo } from "./types";
+import type { ViewInfo } from "./types";
+import type { ViewManager } from "./ViewManager";
 
 type ViewManagerMock = jest.Mocked<
   Pick<ViewManager, "getViewIdByWebContentsId" | "getViewInfo">

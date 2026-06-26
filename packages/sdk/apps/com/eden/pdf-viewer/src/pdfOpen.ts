@@ -1,8 +1,8 @@
 import { filePicker } from "@edenapp/tablets";
-import {
-  type DocumentManagerCapability,
-  type DocumentManagerPlugin,
-  type PluginRegistry,
+import type {
+  DocumentManagerCapability,
+  DocumentManagerPlugin,
+  PluginRegistry,
 } from "@embedpdf/snippet";
 import { t } from "./i18n";
 

@@ -5,7 +5,7 @@ export * from "./components/Omnibox";
 export * from "./constants";
 export * from "./dialogs/DisplayOptionsModal";
 export * from "./features/breadcrumbs";
-export * from "./features/useFileActivationPreference";
 export * from "./features/useExplorerNavigation";
+export * from "./features/useFileActivationPreference";
 export * from "./types";
 export * from "./utils";

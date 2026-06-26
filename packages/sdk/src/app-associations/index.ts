@@ -1,2 +1,2 @@
-export { AppAssociationManager } from "./AppAssociationManager";
 export type { AppAssociationListOptions } from "./AppAssociationManager";
+export { AppAssociationManager } from "./AppAssociationManager";
