@@ -1,5 +1,12 @@
 # @edenapp/scripts
 
+## 0.10.0
+
+### Patch Changes
+
+- @edenapp/types@0.10.0
+- @edenapp/genesis@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
