@@ -100,41 +100,6 @@ const App: Component = () => {
       setError(null);
       const path = await filePicker.openFile({
         title: t("editor.openFile"),
-        filters: [
-          {
-            name: t("editor.textFiles"),
-            extensions: [
-              "txt",
-              "md",
-              "markdown",
-              "log",
-              "js",
-              "jsx",
-              "mjs",
-              "cjs",
-              "ts",
-              "tsx",
-              "mts",
-              "cts",
-              "html",
-              "htm",
-              "css",
-              "less",
-              "json",
-              "yaml",
-              "yml",
-              "toml",
-              "ini",
-              "cfg",
-              "conf",
-              "env",
-              "sh",
-              "bash",
-              "zsh",
-              "fish",
-            ],
-          },
-        ],
       });
 
       if (path) {
