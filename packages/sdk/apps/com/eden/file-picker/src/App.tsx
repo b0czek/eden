@@ -547,19 +547,6 @@ const App: Component = () => {
     }
   });
 
-  const selectedSummary = createMemo(() => {
-    const request = activeRequest();
-    if (!request) return "";
-    if (request.mode === "save") return currentPath();
-    if (request.selection === "directory" && selectedPaths().length === 0) {
-      return t("filePicker.currentFolder");
-    }
-    if (selectedPaths().length > 1) {
-      return t("filePicker.selectedCount", { count: selectedPaths().length });
-    }
-    return selectedPaths()[0] ?? "";
-  });
-
   const confirmLabel = createMemo(() => {
     const request = activeRequest();
     if (!request) return t("filePicker.open");
@@ -693,60 +680,63 @@ const App: Component = () => {
               {(message) => <div class="file-picker-error">{message()}</div>}
             </Show>
 
-            <div class="file-picker-footer-grid">
-              <Show when={request().mode === "save"}>
-                <label class="file-picker-field">
-                  <span>{t("filePicker.fileName")}</span>
-                  <input
-                    class="eden-input"
-                    value={fileName()}
-                    onInput={(event) => setFileName(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        confirmSelection();
+            <div class="file-picker-footer-row">
+              <div class="file-picker-footer-grid">
+                <Show when={request().mode === "save"}>
+                  <label class="file-picker-field">
+                    <span>{t("filePicker.fileName")}</span>
+                    <input
+                      class="eden-input"
+                      value={fileName()}
+                      onInput={(event) =>
+                        setFileName(event.currentTarget.value)
                       }
-                    }}
-                  />
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          confirmSelection();
+                        }
+                      }}
+                    />
+                  </label>
+                </Show>
+
+                <label class="file-picker-field">
+                  <span>{t("filePicker.fileType")}</span>
+                  <select
+                    class="eden-select"
+                    value={filterIndex()}
+                    onChange={(event) =>
+                      setFilterIndex(Number(event.currentTarget.value))
+                    }
+                  >
+                    <For each={filterOptions()}>
+                      {(option, index) => (
+                        <option value={index()}>{option.label}</option>
+                      )}
+                    </For>
+                  </select>
                 </label>
-              </Show>
+              </div>
 
-              <label class="file-picker-field">
-                <span>{t("filePicker.fileType")}</span>
-                <select
-                  class="eden-select"
-                  value={filterIndex()}
-                  onChange={(event) =>
-                    setFilterIndex(Number(event.currentTarget.value))
-                  }
-                >
-                  <For each={filterOptions()}>
-                    {(option, index) => (
-                      <option value={index()}>{option.label}</option>
-                    )}
-                  </For>
-                </select>
-              </label>
-            </div>
-
-            <div class="file-picker-actions">
-              <div class="file-picker-selection">{selectedSummary()}</div>
-              <div class="file-picker-buttons">
-                <button
-                  type="button"
-                  class="eden-btn eden-btn-secondary eden-btn-md"
-                  onClick={cancelPicker}
-                >
-                  {t("common.cancel")}
-                </button>
-                <button
-                  type="button"
-                  class="eden-btn eden-btn-primary eden-btn-md"
-                  disabled={!canConfirm()}
-                  onClick={confirmSelection}
-                >
-                  {confirmLabel()}
-                </button>
+              <div class="file-picker-actions">
+                <div class="file-picker-buttons">
+                  <button
+                    type="button"
+                    class="eden-btn eden-btn-secondary eden-btn-md"
+                    onClick={cancelPicker}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    class="eden-btn eden-btn-primary eden-btn-md"
+                    disabled={!canConfirm()}
+                    onClick={confirmSelection}
+                  >
+                    {confirmLabel()}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

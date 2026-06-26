@@ -40,10 +40,22 @@ body {
 }
 
 .file-picker-footer-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  display: flex;
   gap: var(--eden-space-md);
   align-items: end;
+  min-width: 0;
+  width: 100%;
+}
+
+.file-picker-footer-grid .file-picker-field {
+  flex: 1 1 220px;
+}
+
+.file-picker-footer-row {
+  display: flex;
+  gap: var(--eden-space-md);
+  align-items: end;
+  width: 100%;
 }
 
 .file-picker-field {
@@ -64,18 +76,10 @@ body {
 .file-picker-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--eden-space-md);
-}
-
-.file-picker-selection {
+  justify-content: flex-end;
+  gap: var(--eden-space-sm);
   min-width: 0;
-  color: var(--eden-color-text-muted);
-  font-family: var(--eden-font-family-mono);
-  font-size: var(--eden-font-size-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .file-picker-buttons {
@@ -107,7 +111,13 @@ body {
 
 @media (max-width: 620px) {
   .file-picker-footer-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-picker-footer-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .file-picker-actions {
