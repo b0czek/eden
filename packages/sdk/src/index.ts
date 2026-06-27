@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 // Re-export the Eden library
 
 export { EdenConfig } from "@edenapp/types";
