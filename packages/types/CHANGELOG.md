@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.10.1
+
+### Patch Changes
+
+- fix reflect import
+
 ## 0.10.0
 
 ## 0.9.0

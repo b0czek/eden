@@ -1,5 +1,11 @@
 # @edenapp/files-core
 
+## 0.10.1
+
+### Patch Changes
+
+- fix reflect import
+
 ## 0.10.0
 
 ### Minor Changes

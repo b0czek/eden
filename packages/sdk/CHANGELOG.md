@@ -1,5 +1,14 @@
 # @edenapp/sdk
 
+## 0.10.1
+
+### Patch Changes
+
+- fix reflect import
+- Updated dependencies
+  - @edenapp/genesis@0.10.1
+  - @edenapp/types@0.10.1
+
 ## 0.10.0
 
 ### Minor Changes
