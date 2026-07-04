@@ -1,13 +1,12 @@
-import { KeyboardButton } from "@edenapp/solid-kit";
+import { createOverlayLayout, KeyboardButton } from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   AppInstance,
   AppManifest,
   UserProfile,
-  ViewBounds,
   WindowSize,
 } from "@edenapp/types";
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
 import { getLocalizedValue, initLocale, locale, t } from "../i18n";
 import type { AppInfo } from "../types";
@@ -16,7 +15,7 @@ import { openChangePasswordDialog } from "./ChangePasswordDialog";
 import Dock from "./Dock";
 
 // Constants
-const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in pixels
+const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in CSS pixels
 
 // Database key for persisting pinned dock apps
 const PINNED_DOCK_APPS_KEY = "pinned-dock-apps";
@@ -30,7 +29,7 @@ export default function ShellOverlay() {
   const [showChangePassword, setShowChangePassword] = createSignal(false);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
   const isFullscreen = () => showAllApps() || showChangePassword();
-  let lastResizeMode: "dock" | "fullscreen" | null = null;
+  let overlayElement: HTMLDivElement | undefined;
 
   // Load pinned apps from database
   const loadPinnedApps = async () => {
@@ -154,41 +153,30 @@ export default function ShellOverlay() {
   const calculateBounds = (
     mode: "dock" | "fullscreen",
     windowSize: WindowSize,
+    scale: number,
   ) => {
+    const scaledDockHeight = Math.round(DOCK_HEIGHT * scale);
+
     return mode === "fullscreen"
       ? { x: 0, y: 0, width: windowSize.width, height: windowSize.height }
       : {
           x: 0,
-          y: windowSize.height - DOCK_HEIGHT,
+          y: windowSize.height - scaledDockHeight,
           width: windowSize.width,
-          height: DOCK_HEIGHT,
+          height: scaledDockHeight,
         };
   };
 
-  // Helper function to update overlay bounds via API
-  const updateOverlayBounds = async (bounds: ViewBounds) => {
-    try {
-      await window.edenAPI.shellCommand("view/update-bounds", {
-        bounds,
-      });
-    } catch (error) {
-      console.error("Failed to update overlay bounds:", error);
-    }
-  };
-
-  const requestResize = async (mode: "dock" | "fullscreen") => {
-    try {
-      // Get current window bounds
-      const windowSize = await window.edenAPI.shellCommand(
-        "view/window-size",
-        {},
-      );
-      const bounds = calculateBounds(mode, windowSize);
-      await updateOverlayBounds(bounds);
-    } catch (error) {
-      console.error("Failed to resize overlay:", error);
-    }
-  };
+  createOverlayLayout({
+    element: () => overlayElement,
+    dependencies: [() => isFullscreen()],
+    deriveBounds: ({ windowSize, scale }) =>
+      calculateBounds(
+        isFullscreen() ? "fullscreen" : "dock",
+        windowSize,
+        scale,
+      ),
+  });
 
   const handleAppClick = async (appId: string) => {
     const isRunning = runningApps().some((app) => app.manifest.id === appId);
@@ -223,13 +211,6 @@ export default function ShellOverlay() {
       loadSystemInfo();
     }
   };
-
-  createEffect(() => {
-    const mode = isFullscreen() ? "fullscreen" : "dock";
-    if (mode === lastResizeMode) return;
-    lastResizeMode = mode;
-    void requestResize(mode);
-  });
 
   const handleStopApp = async (appId: string) => {
     try {
@@ -282,24 +263,10 @@ export default function ShellOverlay() {
     // Event handlers
     const handleAppLifecycle = () => loadSystemInfo();
 
-    const handleBoundsChange = (data: {
-      workspaceBounds: ViewBounds;
-      windowSize: WindowSize;
-    }) => {
-      const { windowSize } = data;
-      const mode = isFullscreen() ? "fullscreen" : "dock";
-      const bounds = calculateBounds(mode, windowSize);
-      updateOverlayBounds(bounds);
-    };
-
     // Register cleanup synchronously (must happen before any async work)
     onCleanup(() => {
       window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
       window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
-      window.edenAPI.unsubscribe(
-        "view/global-bounds-changed",
-        handleBoundsChange,
-      );
     });
 
     // Async initialization
@@ -316,10 +283,6 @@ export default function ShellOverlay() {
         // Subscribe to events
         await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
         await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
-        await window.edenAPI.subscribe(
-          "view/global-bounds-changed",
-          handleBoundsChange,
-        );
       } catch (error) {
         console.error("Failed to subscribe to events:", error);
       }
@@ -328,6 +291,7 @@ export default function ShellOverlay() {
 
   return (
     <div
+      ref={overlayElement}
       class="shell-overlay"
       data-mode={isFullscreen() ? "fullscreen" : "dock"}
     >

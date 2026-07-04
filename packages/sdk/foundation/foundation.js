@@ -10,6 +10,17 @@
     return;
   }
 
+  const BASE_DOCK_HEIGHT = 72;
+  let interfaceScale = 1;
+
+  function getScaledDockHeight() {
+    return Math.round(BASE_DOCK_HEIGHT * interfaceScale);
+  }
+
+  function applyDockReservation() {
+    workspace.style.paddingBottom = `${getScaledDockHeight()}px`;
+  }
+
   // Prevent zoom shortcuts in foundation layer
   document.addEventListener("keydown", (event) => {
     if (
@@ -38,11 +49,12 @@
    */
   function reportWorkspaceBounds() {
     const rect = workspace.getBoundingClientRect();
+    const dockHeight = getScaledDockHeight();
     const bounds = {
       x: Math.round(rect.left),
       y: Math.round(rect.top),
       width: Math.round(rect.width),
-      height: Math.round(rect.height) - 72,
+      height: Math.max(0, Math.round(rect.height) - dockHeight),
     };
 
     // Get window size from body
@@ -59,6 +71,13 @@
       });
   }
 
+  function updateInterfaceScale(scale) {
+    if (!Number.isFinite(scale)) return;
+    interfaceScale = scale;
+    applyDockReservation();
+    reportWorkspaceBounds();
+  }
+
   /**
    * Handle global mouseup events
    * Cleanup for any active drag/resize operations happening in app views
@@ -68,6 +87,26 @@
       console.error("Failed to send global-mouseup:", error);
     });
   }
+
+  applyDockReservation();
+
+  window.edenAPI
+    .shellCommand("view/get-interface-scale", {})
+    .then((result) => {
+      updateInterfaceScale(result.scale);
+    })
+    .catch((error) => {
+      console.error("Failed to load interface scale:", error);
+      reportWorkspaceBounds();
+    });
+
+  window.edenAPI
+    .subscribe("view/interface-scale-changed", ({ scale }) => {
+      updateInterfaceScale(scale);
+    })
+    .catch((error) => {
+      console.error("Failed to subscribe to interface scale changes:", error);
+    });
 
   // Initial workspace bounds report
   reportWorkspaceBounds();

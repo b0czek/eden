@@ -100,6 +100,7 @@ export interface ViewEvents {
     workspaceBounds: import("./index").ViewBounds;
     windowSize: import("./index").WindowSize;
   };
+  "view/interface-scale-changed": { scale: number };
   "view/view-loaded": { viewId: number; appId: string; overlay: boolean };
   "view/view-load-failed": {
     viewId: number;

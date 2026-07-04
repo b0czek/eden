@@ -28,6 +28,7 @@
       "x": 40,
       "y": 700
     },
+    "scaling": "auto",
     "injections": {
       "css": "full",
       "appFrame": false

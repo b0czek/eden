@@ -20,14 +20,17 @@ export class ScaleController {
   private currentScale: number = 1.0;
   private readonly getViews: () => Iterable<ViewInfo>;
   private readonly settingsManager: SettingsManager;
+  private readonly notifyScaleChanged: (scale: number) => void;
 
   constructor(
     settingsManager: SettingsManager,
     getViews: () => Iterable<ViewInfo>,
     ipcBridge: IPCBridge,
+    notifyScaleChanged: (scale: number) => void = () => {},
   ) {
     this.settingsManager = settingsManager;
     this.getViews = getViews;
+    this.notifyScaleChanged = notifyScaleChanged;
 
     // Listen for interface scale setting changes
     ipcBridge.eventSubscribers.subscribeInternal("settings/changed", (data) => {
@@ -87,6 +90,8 @@ export class ScaleController {
     for (const viewInfo of this.getViews()) {
       this.applyToView(viewInfo);
     }
+
+    this.notifyScaleChanged(scale);
   }
 
   /**

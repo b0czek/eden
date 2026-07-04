@@ -34,6 +34,7 @@ import {
  * Events emitted by the ViewManager
  */
 interface ViewManagerEvents {
+  "interface-scale-changed": { scale: number };
   "view-loaded": { viewId: number; appId: string; overlay: boolean };
   "view-load-failed": {
     viewId: number;
@@ -87,6 +88,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       settingsManager,
       getViews,
       ipcBridge,
+      (scale) => this.notify("interface-scale-changed", { scale }),
     );
 
     this.floatingWindows = new FloatingWindowController(
