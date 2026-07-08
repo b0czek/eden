@@ -1,8 +1,9 @@
-import { exec } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import * as crypto from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 import type { AppManifest } from "@edenapp/types";
 import cliProgress from "cli-progress";
@@ -63,8 +64,100 @@ function isRemoteEntry(entry?: string): boolean {
   return !!entry && /^https?:\/\//i.test(entry);
 }
 
-function calculateChecksum(data: Buffer): string {
-  return crypto.createHash("sha256").update(data).digest("hex");
+async function readArchiveMetadata(edenitePath: string): Promise<{
+  metadata: ArchiveMetadata;
+  payloadOffset: number;
+}> {
+  const file = await fs.open(edenitePath, "r");
+
+  try {
+    const lengthBuffer = Buffer.alloc(4);
+    const { bytesRead } = await file.read(lengthBuffer, 0, 4, 0);
+    if (bytesRead !== 4) {
+      throw new Error("Invalid .edenite file: missing metadata length");
+    }
+
+    const metadataLength = lengthBuffer.readUInt32BE(0);
+    const metadataBuffer = Buffer.alloc(metadataLength);
+    const metadataRead = await file.read(metadataBuffer, 0, metadataLength, 4);
+    if (metadataRead.bytesRead !== metadataLength) {
+      throw new Error("Invalid .edenite file: incomplete metadata");
+    }
+
+    return {
+      metadata: JSON.parse(metadataBuffer.toString("utf-8")),
+      payloadOffset: 4 + metadataLength,
+    };
+  } finally {
+    await file.close();
+  }
+}
+
+async function calculateFileChecksum(
+  filePath: string,
+  start: number,
+): Promise<string> {
+  const hash = crypto.createHash("sha256");
+  const stream = createReadStream(filePath, { start });
+
+  return new Promise((resolve, reject) => {
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+async function extractWithSystemZstd(
+  edenitePath: string,
+  payloadOffset: number,
+  outputDirectory: string,
+): Promise<void> {
+  const zstd = spawn("zstd", ["-dc"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+  zstd.stderr.setEncoding("utf-8");
+  zstd.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+
+  const compressedStream = createReadStream(edenitePath, {
+    start: payloadOffset,
+  });
+  const tarStream = tar.extract({ cwd: outputDirectory });
+
+  const zstdExit = new Promise<void>((resolve, reject) => {
+    zstd.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") {
+        reject(
+          new Error(
+            "System zstd executable not found. Install zstd to extract .edenite archives.",
+          ),
+        );
+        return;
+      }
+
+      reject(error);
+    });
+    zstd.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(
+          new Error(
+            `zstd decompression failed with exit code ${code}: ${stderr.trim()}`,
+          ),
+        );
+      }
+    });
+  });
+
+  await Promise.all([
+    pipeline(compressedStream, zstd.stdin),
+    pipeline(zstd.stdout, tarStream),
+    zstdExit,
+  ]);
 }
 
 export async function executeBuild(
@@ -634,19 +727,7 @@ export async function getInfo(edenitePath: string): Promise<{
   checksum?: string;
 }> {
   try {
-    await initCompressor();
-
-    // Read the .edenite file
-    const data = await fs.readFile(edenitePath);
-
-    // Read metadata length (first 4 bytes)
-    const metadataLength = data.readUInt32BE(0);
-
-    // Read metadata
-    const metadataBuffer = data.subarray(4, 4 + metadataLength);
-    const metadata: ArchiveMetadata = JSON.parse(
-      metadataBuffer.toString("utf-8"),
-    );
+    const { metadata } = await readArchiveMetadata(edenitePath);
 
     return {
       success: true,
@@ -674,33 +755,21 @@ export async function extract(options: ExtractOptions): Promise<{
   } = options;
 
   try {
-    await initCompressor();
-
     if (verbose) console.log(`📂 Extracting: ${edenitePath}`);
 
-    // Read the .edenite file
-    const data = await fs.readFile(edenitePath);
-
-    // Read metadata length (first 4 bytes)
-    const metadataLength = data.readUInt32BE(0);
-
-    // Read metadata
-    const metadataBuffer = data.subarray(4, 4 + metadataLength);
-    const metadata: ArchiveMetadata = JSON.parse(
-      metadataBuffer.toString("utf-8"),
-    );
+    const { metadata, payloadOffset } = await readArchiveMetadata(edenitePath);
 
     if (verbose) {
       console.log(`✓ Archive format version: ${metadata.version}`);
       console.log(`✓ Created: ${metadata.created}`);
     }
 
-    // Read compressed data
-    const compressedData = data.subarray(4 + metadataLength);
-
     // Verify checksum if requested
     if (verifyChecksum) {
-      const actualChecksum = calculateChecksum(Buffer.from(compressedData));
+      const actualChecksum = await calculateFileChecksum(
+        edenitePath,
+        payloadOffset,
+      );
       if (actualChecksum !== metadata.checksum) {
         return {
           success: false,
@@ -712,26 +781,8 @@ export async function extract(options: ExtractOptions): Promise<{
 
     if (verbose) console.log("🗜️  Decompressing...");
 
-    // Decompress with configured compressor
-    const decompressedBuffer = await compressor.decompress(
-      Buffer.from(compressedData),
-    );
-
-    // Write to temporary tar file
-    const tempTarPath = path.join(outputDirectory, `temp-${Date.now()}.tar`);
     await fs.mkdir(outputDirectory, { recursive: true });
-    await fs.writeFile(tempTarPath, decompressedBuffer);
-
-    if (verbose) console.log("📦 Extracting TAR archive...");
-
-    // Extract TAR
-    await tar.extract({
-      file: tempTarPath,
-      cwd: outputDirectory,
-    });
-
-    // Clean up temp tar file
-    await fs.unlink(tempTarPath);
+    await extractWithSystemZstd(edenitePath, payloadOffset, outputDirectory);
 
     if (verbose) {
       console.log(`✓ Extracted to: ${outputDirectory}`);
