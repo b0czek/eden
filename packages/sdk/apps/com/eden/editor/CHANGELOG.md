@@ -1,5 +1,11 @@
 # com.eden.editor
 
+## 1.0.3
+
+### Patch Changes
+
+- @edenapp/tablets@0.10.2
+
 ## 1.0.2
 
 ### Patch Changes

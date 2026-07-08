@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.10.2
+
+### Patch Changes
+
+- eveshell now scales with interface scale
+  - @edenapp/types@0.10.2
+  - @edenapp/genesis@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes
