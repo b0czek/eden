@@ -46,7 +46,7 @@
   box-shadow: var(--eden-shadow-xl);
 }
 
-.eden-card-elevated:hover {
+.eden-card-elevated.eden-card-interactive:hover {
   transform: translateY(-2px);
   box-shadow: var(--eden-shadow-2xl);
 }

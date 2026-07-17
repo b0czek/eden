@@ -40,6 +40,13 @@
   box-shadow: var(--eden-shadow-md);
 }
 
+.eden-btn:disabled:hover,
+.eden-btn[data-disabled]:hover {
+  transform: none;
+  filter: none;
+  box-shadow: var(--eden-shadow-sm);
+}
+
 .eden-btn:active {
   transform: translateY(0);
   box-shadow: var(--eden-shadow-sm);

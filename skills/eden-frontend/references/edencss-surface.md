@@ -22,6 +22,7 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 - `./components/lists.css`
 - `./components/tabs.css`
 - `./components/sidebar.css`
+- `./components/kit.css`
 
 ### CSS Files Imported By `index.ts`
 
@@ -35,11 +36,12 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 - `./components/progress.css`
 - `./components/lists.css`
 - `./components/tabs.css`
+- `./components/avatar.css`
+- `./components/sidebar.css`
+- `./components/kit.css`
 
 ### Present In `eden.css` But Not Imported By `index.ts`
 
-- `./components/avatar.css`
-- `./components/sidebar.css`
 
 ## Token Groups
 
@@ -57,12 +59,12 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 
 - `--eden-duration-fast`, `--eden-duration-instant`, `--eden-duration-normal`, `--eden-duration-slow`, `--eden-duration-slower`
 
-### `font` (21)
+### `font` (19)
 
-- `--eden-font-family-base`, `--eden-font-family-mono`, `--eden-font-letter-spacing-normal`, `--eden-font-letter-spacing-tight`, `--eden-font-letter-spacing-wide`, `--eden-font-line-height-normal`
-- `--eden-font-line-height-relaxed`, `--eden-font-line-height-tight`, `--eden-font-size-2xl`, `--eden-font-size-3xl`, `--eden-font-size-4xl`, `--eden-font-size-base`
-- `--eden-font-size-lg`, `--eden-font-size-md`, `--eden-font-size-sm`, `--eden-font-size-xl`, `--eden-font-size-xs`, `--eden-font-weight-bold`
-- `--eden-font-weight-medium`, `--eden-font-weight-normal`, `--eden-font-weight-semibold`
+- `--eden-font-letter-spacing-normal`, `--eden-font-letter-spacing-tight`, `--eden-font-letter-spacing-wide`, `--eden-font-line-height-normal`, `--eden-font-line-height-relaxed`, `--eden-font-line-height-tight`
+- `--eden-font-size-2xl`, `--eden-font-size-3xl`, `--eden-font-size-4xl`, `--eden-font-size-base`, `--eden-font-size-lg`, `--eden-font-size-md`
+- `--eden-font-size-sm`, `--eden-font-size-xl`, `--eden-font-size-xs`, `--eden-font-weight-bold`, `--eden-font-weight-medium`, `--eden-font-weight-normal`
+- `--eden-font-weight-semibold`
 
 ### `glass` (4)
 
@@ -230,7 +232,7 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 
 - `eden-fab`
 
-### `cards.css` (22)
+### `cards.css` (23)
 
 #### Base Card
 
@@ -242,7 +244,7 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 
 #### Elevated Card
 
-- `eden-card-elevated`
+- `eden-card-elevated`, `eden-card-interactive`
 
 #### Interactive Card
 
@@ -329,6 +331,23 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 #### Checkbox Group
 
 - `eden-checkbox-group`, `eden-checkbox-option`, `eden-checkbox-option-label`
+
+### `kit.css` (70)
+
+#### Ungrouped
+
+- `eden-text-field`, `eden-select-root`, `eden-checkbox-root`, `eden-switch`, `eden-radio-group`, `eden-slider`
+- `eden-form-label`, `eden-form-help`, `eden-form-error`, `eden-btn-icon`, `eden-btn-group-vertical`, `eden-btn`
+- `eden-fab-xs`, `eden-fab-sm`, `eden-fab-lg`, `eden-fab-xl`, `eden-select`, `eden-select-value`
+- `eden-select-icon`, `eden-select-arrow`, `eden-select-sm`, `eden-select-lg`, `eden-select-content`, `eden-select-listbox`
+- `eden-select-item`, `eden-select-item-indicator`, `eden-select-item-label`, `eden-select-section`, `eden-select-item-description`, `eden-radio-option`
+- `eden-checkbox-control`, `eden-switch-control`, `eden-radio-control`, `eden-checkbox-indicator`, `eden-switch-thumb`, `eden-radio-indicator`
+- `eden-radio-group-horizontal`, `eden-radio-option-label`, `eden-slider-track`, `eden-slider-fill`, `eden-slider-thumb`, `eden-slider-vertical`
+- `eden-progress-track`, `eden-progress-fill`, `eden-progress-label`, `eden-progress-value-label`, `eden-tab`, `eden-tab-panel`
+- `eden-tab-indicator`, `eden-modal-overlay`, `eden-modal`, `eden-modal-description`, `eden-tooltip-trigger`, `eden-tooltip`
+- `eden-tooltip-arrow`, `eden-popover-arrow`, `eden-popover`, `eden-badge-secondary`, `eden-avatar-fallback`, `eden-alert`
+- `eden-alert-title`, `eden-alert-description`, `eden-alert-info`, `eden-alert-success`, `eden-alert-warning`, `eden-alert-danger`
+- `eden-checkbox-input`, `eden-switch-input`, `eden-radio-input`, `eden-slider-input`
 
 ### `lists.css` (16)
 
@@ -492,11 +511,11 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 
 ### `eden-*` Class Names Used In Non-Example Apps But Not Defined By Shared EdenCSS
 
-- `eden-alert`, `eden-alert-warning`, `eden-badge-mono`, `eden-badge-secondary`, `eden-bg-danger-transparent`, `eden-blur-sm`
-- `eden-border-danger`, `eden-btn-icon`, `eden-card-outlined`, `eden-dialog-form`, `eden-dialog-prompt`, `eden-flex-end`
-- `eden-flex-start`, `eden-flex-wrap`, `eden-font-mono`, `eden-h-full`, `eden-loading-spinner`, `eden-mb-lg`
-- `eden-mb-md`, `eden-mb-sm`, `eden-mb-xs`, `eden-mr-sm`, `eden-mt-auto`, `eden-mt-lg`
-- `eden-mt-md`, `eden-mt-xl`, `eden-mt-xs`, `eden-pt-lg`, `eden-self-start`, `eden-text-center`
-- `eden-text-danger`, `eden-tracking-wide`, `eden-uppercase`, `eden-w-full`
+- `eden-badge-mono`, `eden-bg-danger-transparent`, `eden-blur-sm`, `eden-border-danger`, `eden-card-outlined`, `eden-dialog-form`
+- `eden-dialog-prompt`, `eden-flex-end`, `eden-flex-start`, `eden-flex-wrap`, `eden-font-mono`, `eden-h-full`
+- `eden-keyboard-button`, `eden-loading-spinner`, `eden-mb-lg`, `eden-mb-md`, `eden-mb-sm`, `eden-mb-xs`
+- `eden-mr-sm`, `eden-mt-auto`, `eden-mt-lg`, `eden-mt-md`, `eden-mt-xl`, `eden-mt-xs`
+- `eden-pdf`, `eden-popover-anchor`, `eden-pt-lg`, `eden-self-start`, `eden-text-center`, `eden-text-danger`
+- `eden-tracking-wide`, `eden-uppercase`, `eden-w-full`
 
 Treat these as app-local helpers, stale assumptions, or classes that require local CSS instead of shared EdenCSS.

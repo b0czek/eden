@@ -1,6 +1,6 @@
+import { Button, Dialog, TextField } from "@edenapp/solid-kit";
 import type { Component } from "solid-js";
 import { createSignal } from "solid-js";
-import Modal from "../components/Modal";
 import { t } from "../i18n";
 
 interface CreateUserDialogProps {
@@ -28,9 +28,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
       name: trimmedName,
       password: password(),
     });
-    if (success) {
-      reset();
-    }
+    if (success) reset();
   };
 
   const handleClose = () => {
@@ -38,62 +36,71 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
     reset();
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleCreate();
-    if (e.key === "Escape") handleClose();
-  };
-
   return (
-    <Modal
-      show={props.show}
-      onClose={handleClose}
-      title={t("settings.users.addUser")}
-      size="sm"
-      footer={
-        <>
-          <button type="button" class="eden-btn" onClick={handleClose}>
-            {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            class="eden-btn eden-btn-primary"
-            onClick={handleCreate}
-            disabled={!name().trim() || !password()}
-          >
-            {t("settings.users.create")}
-          </button>
-        </>
-      }
+    <Dialog
+      open={props.show}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
     >
-      <div class="eden-form-group">
-        <label class="eden-form-label" for="create-user-name">
-          {t("settings.users.userName")}
-        </label>
-        <input
-          id="create-user-name"
-          type="text"
-          class="eden-input"
-          placeholder={t("settings.users.userName")}
-          value={name()}
-          onInput={(e) => setName(e.currentTarget.value)}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      <div class="eden-form-group">
-        <label class="eden-form-label" for="create-user-password">
-          {t("common.password")}
-        </label>
-        <input
-          id="create-user-password"
-          type="password"
-          class="eden-input"
-          placeholder={t("common.password")}
-          value={password()}
-          onInput={(e) => setPassword(e.currentTarget.value)}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-    </Modal>
+      <Dialog.Portal>
+        <Dialog.Overlay />
+        <Dialog.Content size="sm">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreate();
+            }}
+          >
+            <div class="eden-modal-header">
+              <Dialog.Title>{t("settings.users.addUser")}</Dialog.Title>
+              <Dialog.CloseButton aria-label={t("common.close")}>
+                ×
+              </Dialog.CloseButton>
+            </div>
+            <div class="eden-modal-body eden-flex-col eden-gap-md">
+              <TextField>
+                <TextField.Label for="create-user-name">
+                  {t("settings.users.userName")}
+                </TextField.Label>
+                <TextField.Input
+                  id="create-user-name"
+                  type="text"
+                  placeholder={t("settings.users.userName")}
+                  value={name()}
+                  onInput={(event) => setName(event.currentTarget.value)}
+                  autofocus
+                />
+              </TextField>
+              <TextField>
+                <TextField.Label for="create-user-password">
+                  {t("common.password")}
+                </TextField.Label>
+                <TextField.Input
+                  id="create-user-password"
+                  type="password"
+                  placeholder={t("common.password")}
+                  value={password()}
+                  onInput={(event) => setPassword(event.currentTarget.value)}
+                />
+              </TextField>
+            </div>
+            <div class="eden-modal-footer">
+              <Button type="button" variant="ghost" onClick={handleClose}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={!name().trim() || !password()}
+              >
+                {t("settings.users.create")}
+              </Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog>
   );
 };
 

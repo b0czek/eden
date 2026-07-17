@@ -1,3 +1,4 @@
+import { Switch } from "@edenapp/solid-kit";
 import type { ResolvedGrant, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor } from "solid-js";
 import { For, Show } from "solid-js";
@@ -27,6 +28,19 @@ interface GrantsEasyModeProps {
   appGrantApps: Accessor<RuntimeAppManifest[]>;
   updateGrants: (updater: (grants: Set<string>) => Set<string>) => void;
 }
+
+const GrantSwitch = (props: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  ariaLabel: string;
+}) => (
+  <Switch checked={props.checked} onChange={props.onChange}>
+    <Switch.Input aria-label={props.ariaLabel} />
+    <Switch.Control>
+      <Switch.Thumb />
+    </Switch.Control>
+  </Switch>
+);
 
 const GrantsEasyMode = (props: GrantsEasyModeProps) => {
   const appGrants = () =>
@@ -60,6 +74,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
       >
         {/* Allow All Toggles */}
         <div class="eden-list">
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */}
           <label class="eden-list-item eden-list-item-interactive eden-flex-between">
             <div class="eden-list-item-content">
               <span class="eden-list-item-title">
@@ -69,13 +84,12 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                 {t("settings.users.allowAllAppsDescription")}
               </span>
             </div>
-            <input
-              type="checkbox"
-              class="eden-toggle"
+            <GrantSwitch
               checked={props.allowAllApps}
-              onChange={(e) =>
+              ariaLabel={t("settings.users.allowAllApps")}
+              onChange={(checked) =>
                 props.updateGrants((grants) => {
-                  if (e.currentTarget.checked) {
+                  if (checked) {
                     grants.add("apps/launch/*");
                     for (const perm of grants) {
                       if (
@@ -94,6 +108,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
             />
           </label>
 
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */}
           <label class="eden-list-item eden-list-item-interactive eden-flex-between">
             <div class="eden-list-item-content">
               <span class="eden-list-item-title">
@@ -103,13 +118,12 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                 {t("settings.users.allowAllSettingsDescription")}
               </span>
             </div>
-            <input
-              type="checkbox"
-              class="eden-toggle"
+            <GrantSwitch
               checked={props.allowAllSettings}
-              onChange={(e) =>
+              ariaLabel={t("settings.users.allowAllSettings")}
+              onChange={(checked) =>
                 props.updateGrants((grants) => {
-                  if (e.currentTarget.checked) {
+                  if (checked) {
                     grants.add("settings/*");
                     for (const perm of grants) {
                       if (
@@ -138,19 +152,19 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
             <div class="eden-list eden-scrollbar">
               <For each={props.grantableApps}>
                 {(app) => (
+                  /* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */
                   <label class="eden-list-item eden-list-item-interactive eden-flex-between">
                     <span class="eden-list-item-title">
                       {getLocalizedValue(app.name, locale())}
                     </span>
-                    <input
-                      type="checkbox"
-                      class="eden-toggle"
+                    <GrantSwitch
                       checked={appGrants().has(buildAppGrant(app.id))}
-                      onChange={(e) =>
+                      ariaLabel={getLocalizedValue(app.name, locale())}
+                      onChange={(checked) =>
                         props.updateGrants((grants) => {
                           const perm = buildAppGrant(app.id);
                           grants.delete("apps/launch/*");
-                          if (e.currentTarget.checked) {
+                          if (checked) {
                             grants.add(perm);
                           } else {
                             grants.delete(perm);
@@ -178,6 +192,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                   {(grant) => {
                     const grantId = getGrantId(grant);
                     return (
+                      /* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */
                       <label class="eden-list-item eden-list-item-interactive eden-flex-between">
                         <div class="eden-list-item-content">
                           <span class="eden-list-item-title">
@@ -189,21 +204,23 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                             </span>
                           </Show>
                         </div>
-                        <input
-                          type="checkbox"
-                          class="eden-toggle"
+                        <GrantSwitch
                           checked={
                             grantId
                               ? hasPresetGrant(props.grants, grantId)
                               : false
                           }
-                          onChange={(e) =>
+                          ariaLabel={getLocalizedValue(
+                            getGrantLabel(grant),
+                            locale(),
+                          )}
+                          onChange={(checked) =>
                             props.updateGrants((grants) => {
                               if (!grantId) {
                                 return grants;
                               }
                               const perm = buildPresetGrant(grantId);
-                              if (e.currentTarget.checked) {
+                              if (checked) {
                                 grants.add(perm);
                               } else {
                                 grants.delete(perm);
@@ -237,6 +254,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                     <div class="eden-list eden-scrollbar">
                       <For each={getAppScopedGrants(app)}>
                         {(grant) => (
+                          /* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */
                           <label class="eden-list-item eden-list-item-interactive eden-flex-between">
                             <div class="eden-list-item-content">
                               <span class="eden-list-item-title">
@@ -254,16 +272,18 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                                 </span>
                               </Show>
                             </div>
-                            <input
-                              type="checkbox"
-                              class="eden-toggle"
+                            <GrantSwitch
                               checked={hasAppFeatureGrant(
                                 props.grants,
                                 app.id,
                                 getGrantId(grant),
                                 getGrantScope(grant),
                               )}
-                              onChange={(e) =>
+                              ariaLabel={getLocalizedValue(
+                                getGrantLabel(grant),
+                                locale(),
+                              )}
+                              onChange={(checked) =>
                                 props.updateGrants((grants) => {
                                   const scope = getGrantScope(grant);
                                   const perm = getAppGrantKey(
@@ -278,7 +298,7 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
                                     grants.delete("app/*");
                                     grants.delete(`app/${app.id}/*`);
                                   }
-                                  if (e.currentTarget.checked) {
+                                  if (checked) {
                                     grants.add(perm);
                                   } else {
                                     grants.delete(perm);
@@ -307,22 +327,22 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
             <div class="eden-list eden-scrollbar">
               <For each={props.settingsOptions}>
                 {(option) => (
+                  /* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */
                   <label class="eden-list-item eden-list-item-interactive eden-flex-between">
                     <span class="eden-list-item-title">{option.label}</span>
-                    <input
-                      type="checkbox"
-                      class="eden-toggle"
+                    <GrantSwitch
                       checked={settingGrants().has(
                         buildSettingGrant(option.appId, option.id),
                       )}
-                      onChange={(e) =>
+                      ariaLabel={option.label}
+                      onChange={(checked) =>
                         props.updateGrants((grants) => {
                           const perm = buildSettingGrant(
                             option.appId,
                             option.id,
                           );
                           grants.delete("settings/*");
-                          if (e.currentTarget.checked) {
+                          if (checked) {
                             grants.add(perm);
                           } else {
                             grants.delete(perm);

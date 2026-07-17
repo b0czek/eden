@@ -1,3 +1,4 @@
+import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   AppManifest,
   RuntimeAppManifest,
@@ -31,6 +32,7 @@ interface UsersTabProps {
 }
 
 export default function UsersTab(props: UsersTabProps) {
+  const dialogs = createDialogs();
   const [users, setUsers] = createSignal<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
   const [defaultUsername, setDefaultUsername] = createSignal<string | null>(
@@ -225,7 +227,14 @@ export default function UsersTab(props: UsersTabProps) {
   };
 
   const handleDeleteUser = async (username: string) => {
-    if (!confirm(t("settings.users.deleteConfirm"))) return;
+    const confirmed = await dialogs.confirm({
+      title: t("settings.users.delete"),
+      message: t("settings.users.deleteConfirm"),
+      tone: "danger",
+      confirmLabel: t("settings.users.delete"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!confirmed) return;
     try {
       await window.edenAPI.shellCommand("user/delete", { username });
       await loadUsers();
@@ -330,6 +339,7 @@ export default function UsersTab(props: UsersTabProps) {
         onClose={() => setPasswordModalUser(null)}
         onSave={handlePasswordSave}
       />
+      <DialogHost dialogs={dialogs} />
     </div>
   );
 }

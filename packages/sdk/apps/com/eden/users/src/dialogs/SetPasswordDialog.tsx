@@ -1,7 +1,7 @@
+import { Alert, Button, Dialog, TextField } from "@edenapp/solid-kit";
 import type { UserProfile } from "@edenapp/types";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
-import Modal from "../components/Modal";
 import { t } from "../i18n";
 
 interface SetPasswordDialogProps {
@@ -29,23 +29,14 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
 
   const handleSave = async () => {
     const user = props.user;
-    if (!user) return;
-    if (!password() || !confirmPassword()) return;
+    if (!user || !password() || !confirmPassword()) return;
     if (password() !== confirmPassword()) {
       setError(t("settings.users.passwordMismatch"));
       return;
     }
     const success = await props.onSave(user.username, password());
-    if (success) {
-      handleClose();
-      return;
-    }
-    setError(t("settings.users.passwordUpdateFailed"));
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") handleClose();
+    if (success) handleClose();
+    else setError(t("settings.users.passwordUpdateFailed"));
   };
 
   const canSave = () =>
@@ -54,67 +45,75 @@ const SetPasswordDialog: Component<SetPasswordDialogProps> = (props) => {
     password() === confirmPassword();
 
   return (
-    <Modal
-      show={props.show}
-      onClose={handleClose}
-      title={t("settings.users.setPassword")}
-      size="sm"
-      footer={
-        <>
-          <button type="button" class="eden-btn" onClick={handleClose}>
-            {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            class="eden-btn eden-btn-primary"
-            onClick={handleSave}
-            disabled={!canSave()}
-          >
-            {t("settings.users.savePassword")}
-          </button>
-        </>
-      }
+    <Dialog
+      open={props.show}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
     >
-      <div class="eden-form-group">
-        <label class="eden-form-label" for="set-password-new">
-          {t("settings.users.newPassword")}
-        </label>
-        <input
-          id="set-password-new"
-          type="password"
-          class="eden-input"
-          placeholder={t("settings.users.newPassword")}
-          value={password()}
-          onInput={(e) => {
-            setPassword(e.currentTarget.value);
-            setError(null);
-          }}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      <div class="eden-form-group">
-        <label class="eden-form-label" for="set-password-confirm">
-          {t("settings.users.confirmPassword")}
-        </label>
-        <input
-          id="set-password-confirm"
-          type="password"
-          class="eden-input"
-          placeholder={t("settings.users.confirmPassword")}
-          value={confirmPassword()}
-          onInput={(e) => {
-            setConfirmPassword(e.currentTarget.value);
-            setError(null);
-          }}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      <Show when={error()}>
-        <div class="eden-text-xs" style={{ color: "var(--eden-color-danger)" }}>
-          {error()}
-        </div>
-      </Show>
-    </Modal>
+      <Dialog.Portal>
+        <Dialog.Overlay />
+        <Dialog.Content size="sm">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSave();
+            }}
+          >
+            <div class="eden-modal-header">
+              <Dialog.Title>{t("settings.users.setPassword")}</Dialog.Title>
+              <Dialog.CloseButton aria-label={t("common.close")}>
+                ×
+              </Dialog.CloseButton>
+            </div>
+            <div class="eden-modal-body eden-flex-col eden-gap-md">
+              <TextField>
+                <TextField.Label for="set-password-new">
+                  {t("settings.users.newPassword")}
+                </TextField.Label>
+                <TextField.Input
+                  id="set-password-new"
+                  type="password"
+                  placeholder={t("settings.users.newPassword")}
+                  value={password()}
+                  onInput={(event) => {
+                    setPassword(event.currentTarget.value);
+                    setError(null);
+                  }}
+                  autofocus
+                />
+              </TextField>
+              <TextField>
+                <TextField.Label for="set-password-confirm">
+                  {t("settings.users.confirmPassword")}
+                </TextField.Label>
+                <TextField.Input
+                  id="set-password-confirm"
+                  type="password"
+                  placeholder={t("settings.users.confirmPassword")}
+                  value={confirmPassword()}
+                  onInput={(event) => {
+                    setConfirmPassword(event.currentTarget.value);
+                    setError(null);
+                  }}
+                />
+              </TextField>
+              <Show when={error()}>
+                <Alert tone="danger">{error()}</Alert>
+              </Show>
+            </div>
+            <div class="eden-modal-footer">
+              <Button type="button" variant="ghost" onClick={handleClose}>
+                {t("common.cancel")}
+              </Button>
+              <Button variant="primary" type="submit" disabled={!canSave()}>
+                {t("settings.users.savePassword")}
+              </Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog>
   );
 };
 

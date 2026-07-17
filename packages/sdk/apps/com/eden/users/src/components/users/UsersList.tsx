@@ -1,3 +1,4 @@
+import { Avatar, Badge, Button, List } from "@edenapp/solid-kit";
 import type { UserProfile } from "@edenapp/types";
 import { FiChevronRight, FiPlus } from "solid-icons/fi";
 import { For, Show } from "solid-js";
@@ -21,53 +22,52 @@ const UsersList = (props: UsersListProps) => (
   <>
     <div class="settings-section eden-flex eden-items-center eden-flex-between">
       <h2 class="settings-section-title">{t("settings.users.title")}</h2>
-      <button
-        type="button"
-        class="eden-btn eden-btn-ghost eden-btn-sm"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={props.onCreate}
         aria-label={t("settings.users.addUser")}
         title={t("settings.users.addUser")}
       >
         <FiPlus />
-      </button>
+      </Button>
     </div>
 
-    <div class="eden-list">
+    <List>
       <For each={props.users}>
         {(user) => (
-          <button
+          <List.Item
+            as="button"
             type="button"
-            class="eden-list-item eden-list-item-interactive"
+            interactive
             onClick={() => props.onSelect(user.username)}
           >
-            <div class="eden-avatar eden-avatar-md">
-              {getInitials(user.name)}
-            </div>
+            <Avatar size="md">{getInitials(user.name)}</Avatar>
 
-            <div class="eden-list-item-content">
-              <div class="eden-list-item-title">{user.name}</div>
-              <div class="eden-list-item-description">{user.role}</div>
-            </div>
+            <List.Content>
+              <List.Title>{user.name}</List.Title>
+              <List.Description>{user.role}</List.Description>
+            </List.Content>
 
             <Show when={props.currentUser?.username === user.username}>
-              <span class="eden-badge eden-badge-sm eden-badge-primary">
+              <Badge size="sm" variant="primary">
                 {t("settings.users.current")}
-              </span>
+              </Badge>
             </Show>
 
             <Show when={props.defaultUsername === user.username}>
-              <span class="eden-badge eden-badge-sm eden-badge-secondary">
+              <Badge size="sm" variant="secondary">
                 {t("settings.users.autoLogin")}
-              </span>
+              </Badge>
             </Show>
 
-            <div class="eden-list-item-meta">
+            <List.Meta>
               <FiChevronRight />
-            </div>
-          </button>
+            </List.Meta>
+          </List.Item>
         )}
       </For>
-    </div>
+    </List>
   </>
 );
 

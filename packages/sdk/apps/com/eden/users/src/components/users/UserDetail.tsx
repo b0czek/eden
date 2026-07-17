@@ -1,10 +1,11 @@
+import { Card, Switch, Tabs } from "@edenapp/solid-kit";
 import type {
   ResolvedGrant,
   RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { FaSolidCode, FaSolidList } from "solid-icons/fa";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 import {
   canLaunchApp,
   getGrantId,
@@ -123,7 +124,7 @@ const UserDetail = (props: UserDetailProps) => {
   });
 
   return (
-    <div class="eden-card eden-card-glass eden-flex-col eden-gap-md">
+    <Card variant="glass" class="eden-flex-col eden-gap-md">
       <UserDetailHeader
         user={props.user}
         isCurrent={isCurrent()}
@@ -133,7 +134,8 @@ const UserDetail = (props: UserDetailProps) => {
         onSetPassword={() => props.onOpenPasswordModal(props.user)}
       />
 
-      <div class="eden-card-body eden-flex-col eden-gap-lg">
+      <Card.Body class="eden-flex-col eden-gap-lg">
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: The nested Kobalte Switch.Input is the row control. */}
         <label class="eden-list-item eden-list-item-interactive eden-flex-between">
           <div class="eden-list-item-content">
             <span class="eden-list-item-title">
@@ -143,69 +145,66 @@ const UserDetail = (props: UserDetailProps) => {
               {t("settings.users.autoLoginDescription")}
             </span>
           </div>
-          <input
-            type="checkbox"
-            class="eden-toggle"
+          <Switch
             checked={props.isDefaultUser}
-            onChange={(e) =>
-              props.onToggleDefaultUser(
-                props.user.username,
-                e.currentTarget.checked,
-              )
+            onChange={(enabled) =>
+              props.onToggleDefaultUser(props.user.username, enabled)
             }
-          />
+          >
+            <Switch.Input aria-label={t("settings.users.autoLogin")} />
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch>
         </label>
 
-        <div class="eden-tabs">
-          <div class="eden-tab-list">
-            <button
-              type="button"
-              class={`eden-tab eden-flex-center eden-gap-md ${
-                mode() === "easy" ? "eden-tab-active" : ""
-              }`}
+        <Tabs
+          value={mode()}
+          onChange={(value) => setMode(value as "easy" | "raw")}
+        >
+          <Tabs.List>
+            <Tabs.Trigger
+              value="easy"
+              class="eden-flex-center eden-gap-md"
               style={{ flex: 1 }}
-              onClick={() => setMode("easy")}
             >
               <FaSolidList />
               <span>{t("settings.users.modeEasy")}</span>
-            </button>
-            <button
-              type="button"
-              class={`eden-tab eden-flex-center eden-gap-md ${
-                mode() === "raw" ? "eden-tab-active" : ""
-              }`}
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="raw"
+              class="eden-flex-center eden-gap-md"
               style={{ flex: 1 }}
-              onClick={() => setMode("raw")}
             >
               <FaSolidCode />
               <span>{t("settings.users.modeRaw")}</span>
-            </button>
-          </div>
-        </div>
+            </Tabs.Trigger>
+          </Tabs.List>
 
-        <Show when={mode() === "easy"}>
-          <GrantsEasyMode
-            grants={props.user.grants ?? []}
-            isVendor={isVendor()}
-            allowAllApps={allowAllApps()}
-            allowAllSettings={allowAllSettings()}
-            grantableApps={grantableApps()}
-            settingsOptions={props.settingsOptions}
-            systemGrants={systemGrants}
-            appGrantApps={appGrantApps}
-            updateGrants={updateGrants}
-          />
-        </Show>
+          <Tabs.Content value="easy">
+            <GrantsEasyMode
+              grants={props.user.grants ?? []}
+              isVendor={isVendor()}
+              allowAllApps={allowAllApps()}
+              allowAllSettings={allowAllSettings()}
+              grantableApps={grantableApps()}
+              settingsOptions={props.settingsOptions}
+              systemGrants={systemGrants}
+              appGrantApps={appGrantApps}
+              updateGrants={updateGrants}
+            />
+          </Tabs.Content>
 
-        <Show when={mode() === "raw"}>
-          <GrantsRawMode
-            rawGrantText={rawGrantText}
-            onTextChange={setRawGrantText}
-            onSave={handleSaveRaw}
-          />
-        </Show>
-      </div>
-    </div>
+          <Tabs.Content value="raw">
+            <GrantsRawMode
+              rawGrantText={rawGrantText}
+              onTextChange={setRawGrantText}
+              onSave={handleSaveRaw}
+            />
+          </Tabs.Content>
+        </Tabs>
+      </Card.Body>
+    </Card>
   );
 };
 

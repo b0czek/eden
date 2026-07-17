@@ -1,24 +1,17 @@
 import type { Accessor, Component, Setter } from "solid-js";
-import { createEffect, onCleanup } from "solid-js";
+import { createEffect } from "solid-js";
+import { Dialog } from "../kobalte.js";
 import { getDialogRuntime } from "./runtimeRegistry.js";
 import type { DialogRequest } from "./runtimeTypes.js";
-import type {
-  CustomDialogRenderContext,
-  DialogController,
-  DialogSize,
-} from "./types.js";
+import type { CustomDialogRenderContext, DialogController } from "./types.js";
 
 /** Props for the dialogs host component. */
 export interface DialogHostProps {
   /** Controller returned by `createDialogs()`. */
   dialogs: DialogController;
+  /** Accessible label for the built-in close button. Defaults to `"Close"`. */
+  closeLabel?: string;
 }
-
-const sizeClass = (size: DialogSize) => {
-  if (size === "sm") return "eden-modal-sm";
-  if (size === "lg") return "eden-modal-lg";
-  return "";
-};
 
 /** Renders local dialog overlays for a dialogs controller instance. */
 export const DialogHost: Component<DialogHostProps> = (props) => {
@@ -32,7 +25,6 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
 
   let primaryActionRef: HTMLButtonElement | undefined;
   let initialFocusRef: HTMLElement | undefined;
-  let modalRef: HTMLDivElement | undefined;
 
   const createRenderContext = (
     dialog: DialogRequest,
@@ -57,120 +49,92 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
     const current = dialogs.active();
     if (!current) return;
 
-    modalRef = undefined;
     primaryActionRef = undefined;
     initialFocusRef = undefined;
-
-    const previousActive = document.activeElement as HTMLElement | null;
-
-    queueMicrotask(() => {
-      const focusTarget = initialFocusRef ?? primaryActionRef;
-      focusTarget?.focus?.();
-
-      if (
-        current.selectInitialFocusText &&
-        focusTarget &&
-        "select" in focusTarget &&
-        typeof focusTarget.select === "function"
-      ) {
-        focusTarget.select();
-      }
-    });
-
-    onCleanup(() => {
-      previousActive?.focus?.();
-    });
-  });
-
-  createEffect(() => {
-    const current = dialogs.active();
-    if (!current) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation();
-
-      if (e.key === "Escape" && current.dismissOnEscape) {
-        e.preventDefault();
-        dialogs.cancel();
-        return;
-      }
-
-      if (e.key === "Enter" && current.onEnter === "submit") {
-        const target = e.target as HTMLElement | null;
-        if (target?.tagName === "TEXTAREA") {
-          return;
-        }
-
-        e.preventDefault();
-        dialogs.submit();
-      }
-    };
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (!current.dismissOnBackdrop) return;
-
-      const target = e.target as Node | null;
-      if (!target || !modalRef) return;
-
-      if (!modalRef.contains(target)) {
-        dialogs.cancel();
-      }
-    };
-
-    document.addEventListener("mousedown", handleMouseDown, true);
-    document.addEventListener("keydown", handleKeyDown, true);
-    onCleanup(() => {
-      document.removeEventListener("mousedown", handleMouseDown, true);
-      document.removeEventListener("keydown", handleKeyDown, true);
-      modalRef = undefined;
-    });
   });
 
   return (
-    <>
-      {dialogs.active() && (
-        <div class="eden-modal-overlay">
-          {(() => {
-            const dialog = dialogs.active();
-            if (!dialog) {
-              return null;
-            }
+    <Dialog
+      open={Boolean(dialogs.active())}
+      onOpenChange={(open) => {
+        if (!open && dialogs.active()) dialogs.cancel();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay />
+        {(() => {
+          const dialog = dialogs.active();
+          if (!dialog) return null;
+          const renderContext = createRenderContext(dialog);
 
-            const renderContext = createRenderContext(dialog);
-
-            return (
-              <div
-                ref={modalRef}
-                class={`eden-modal ${sizeClass(dialog.size)}`}
-                role="dialog"
-                aria-modal="true"
-              >
-                <div class="eden-modal-header">
-                  <h3 class="eden-modal-title">{dialog.title}</h3>
-                  <button
-                    type="button"
-                    class="eden-modal-close"
-                    onClick={() => dialogs.cancel()}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div class="eden-modal-body">
-                  {dialog.message != null && <div>{dialog.message}</div>}
-                  {dialog.render?.(renderContext)}
-                </div>
-
-                {dialog.footer && (
-                  <div class="eden-modal-footer">
-                    {dialog.footer(renderContext)}
-                  </div>
-                )}
+          return (
+            <Dialog.Content
+              size={dialog.size}
+              onEscapeKeyDown={(event) => {
+                if (!dialog.dismissOnEscape) {
+                  event.preventDefault();
+                  return;
+                }
+                dialogs.cancel();
+              }}
+              onInteractOutside={(event) => {
+                if (!dialog.dismissOnBackdrop) {
+                  event.preventDefault();
+                  return;
+                }
+                dialogs.cancel();
+              }}
+              onKeyDown={(event: KeyboardEvent) => {
+                if (event.key !== "Enter" || dialog.onEnter !== "submit") {
+                  return;
+                }
+                if (
+                  (event.target as HTMLElement | null)?.tagName === "TEXTAREA"
+                ) {
+                  return;
+                }
+                event.preventDefault();
+                dialogs.submit();
+              }}
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                queueMicrotask(() => {
+                  const focusTarget = initialFocusRef ?? primaryActionRef;
+                  focusTarget?.focus?.();
+                  if (
+                    dialog.selectInitialFocusText &&
+                    focusTarget &&
+                    "select" in focusTarget &&
+                    typeof focusTarget.select === "function"
+                  ) {
+                    focusTarget.select();
+                  }
+                });
+              }}
+            >
+              <div class="eden-modal-header">
+                <Dialog.Title>{dialog.title}</Dialog.Title>
+                <Dialog.CloseButton aria-label={props.closeLabel ?? "Close"}>
+                  ×
+                </Dialog.CloseButton>
               </div>
-            );
-          })()}
-        </div>
-      )}
-    </>
+
+              <div class="eden-modal-body">
+                {dialog.message != null && (
+                  <Dialog.Description>{dialog.message}</Dialog.Description>
+                )}
+                {dialog.render?.(renderContext)}
+              </div>
+
+              {dialog.footer && (
+                <div class="eden-modal-footer">
+                  {dialog.footer(renderContext)}
+                </div>
+              )}
+            </Dialog.Content>
+          );
+        })()}
+      </Dialog.Portal>
+    </Dialog>
   );
 };

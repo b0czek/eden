@@ -1,0 +1,463 @@
+/**
+ * Eden semantic kit additions.
+ *
+ * These selectors intentionally target both Eden classes and Kobalte's
+ * state attributes. Kobalte remains unstyled; EdenCSS owns the visual layer.
+ */
+
+/* Shared states and form-control layout */
+.eden-text-field,
+.eden-select-root,
+.eden-checkbox-root,
+.eden-switch,
+.eden-radio-group,
+.eden-slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.eden-form-label {
+  color: var(--eden-color-text-primary);
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+}
+
+.eden-form-help,
+.eden-form-error {
+  font-size: var(--eden-font-size-sm);
+}
+
+.eden-form-help {
+  color: var(--eden-color-text-muted);
+}
+
+.eden-form-error {
+  color: var(--eden-color-danger);
+}
+
+/* Button additions */
+.eden-btn-icon {
+  width: var(--eden-space-xl);
+  min-width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
+  padding: 0;
+}
+
+.eden-btn-group-vertical {
+  flex-direction: column;
+}
+
+.eden-btn-group-vertical .eden-btn {
+  width: 100%;
+  border-radius: 0;
+  border-right: 1px solid var(--eden-color-border-light);
+}
+
+.eden-btn-group-vertical .eden-btn:first-child {
+  border-radius: var(--eden-radius-md) var(--eden-radius-md) 0 0;
+}
+
+.eden-btn-group-vertical .eden-btn:last-child {
+  border-radius: 0 0 var(--eden-radius-md) var(--eden-radius-md);
+}
+
+.eden-fab-xs,
+.eden-fab-sm,
+.eden-fab-lg,
+.eden-fab-xl {
+  width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
+}
+
+.eden-fab-sm {
+  width: 44px;
+  height: 44px;
+}
+.eden-fab-lg {
+  width: 64px;
+  height: 64px;
+}
+.eden-fab-xl {
+  width: 76px;
+  height: 76px;
+}
+
+/* Select */
+.eden-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  text-align: left;
+}
+
+.eden-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eden-select-icon,
+.eden-select-arrow {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--eden-space-sm);
+}
+
+.eden-select-sm {
+  min-height: 34px;
+  padding: var(--eden-space-sm) var(--eden-space-md);
+}
+.eden-select-lg {
+  min-height: 50px;
+  padding: var(--eden-space-lg) var(--eden-space-xl);
+}
+
+.eden-select-content {
+  z-index: var(--eden-z-dropdown);
+  min-width: var(--kb-popper-anchor-width);
+  padding: var(--eden-space-xs);
+  border: 1px solid var(--eden-color-border-medium);
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+  box-shadow: var(--eden-shadow-xl);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-select-listbox {
+  max-height: 280px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.eden-select-item {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  min-height: 36px;
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  border-radius: var(--eden-radius-sm);
+  color: var(--eden-color-text-secondary);
+  cursor: pointer;
+  outline: none;
+}
+
+.eden-select-item[data-highlighted] {
+  background: var(--eden-color-surface-hover);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-select-item[data-selected] {
+  background: var(--eden-color-surface-active);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-select-item[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eden-select-item-indicator {
+  margin-left: auto;
+  color: var(--eden-color-accent-primary);
+}
+.eden-select-item-label {
+  flex: 1;
+}
+.eden-select-section {
+  padding: var(--eden-space-xs);
+}
+.eden-select-item-description {
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-xs);
+}
+
+/* Checkbox, switch, and radio */
+.eden-checkbox-root,
+.eden-switch,
+.eden-radio-option {
+  position: relative;
+  align-items: center;
+  flex-direction: row;
+}
+
+.eden-checkbox-control,
+.eden-switch-control,
+.eden-radio-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--eden-color-border-medium);
+  border-radius: var(--eden-radius-xs);
+  background: var(--eden-color-bg-glass-medium);
+  color: white;
+  outline: none;
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+}
+
+.eden-checkbox-control:focus-visible,
+.eden-switch-control:focus-visible,
+.eden-radio-control:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary);
+  outline-offset: 2px;
+}
+
+.eden-checkbox-control[data-checked],
+.eden-checkbox-control[data-indeterminate],
+.eden-radio-control[data-checked] {
+  border-color: var(--eden-color-accent-primary);
+  background: var(--eden-color-accent-primary);
+}
+
+.eden-checkbox-control[data-disabled],
+.eden-switch-control[data-disabled],
+.eden-radio-control[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eden-checkbox-indicator {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.eden-switch-control {
+  width: 48px;
+  height: 26px;
+  border-radius: 999px;
+}
+
+.eden-switch-control[data-checked] {
+  background: var(--eden-color-accent-primary);
+  border-color: var(--eden-color-accent-primary);
+}
+.eden-switch-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--eden-color-text-secondary);
+  box-shadow: var(--eden-shadow-sm);
+  transform: translateX(-10px);
+  transition:
+    transform var(--eden-transition-base),
+    background var(--eden-transition-base);
+}
+.eden-switch-thumb[data-checked] {
+  background: white;
+  transform: translateX(10px);
+}
+
+.eden-radio-control {
+  border-radius: 50%;
+}
+.eden-radio-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+}
+.eden-radio-group-horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.eden-radio-option-label {
+  color: var(--eden-color-text-secondary);
+}
+
+/* Slider */
+.eden-slider {
+  width: 100%;
+}
+.eden-slider-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--eden-color-bg-glass-medium);
+}
+.eden-slider-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--eden-color-accent-primary);
+}
+.eden-slider-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--eden-color-accent-primary);
+  background: var(--eden-color-surface-primary);
+  box-shadow: var(--eden-shadow-md);
+  outline: none;
+}
+.eden-slider-thumb:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary);
+  outline-offset: 2px;
+}
+.eden-slider-thumb[data-disabled] {
+  opacity: 0.5;
+}
+.eden-slider-vertical {
+  width: 20px;
+  height: 160px;
+}
+.eden-slider-vertical .eden-slider-track {
+  width: 6px;
+  height: 100%;
+}
+
+/* Progress compound parts */
+.eden-progress-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.eden-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--eden-color-accent-blue),
+    var(--eden-color-accent-blue-dark)
+  );
+  transition: width var(--eden-duration-slow) var(--eden-transition-ease-out);
+  box-shadow: 0 0 10px rgba(82, 163, 255, 0.5);
+}
+.eden-progress-label,
+.eden-progress-value-label {
+  color: var(--eden-color-text-secondary);
+  font-size: var(--eden-font-size-sm);
+}
+
+/* Tabs */
+.eden-tab[data-selected] {
+  background: var(--eden-color-surface-elevated);
+  color: var(--eden-color-text-primary);
+  box-shadow: var(--eden-shadow-sm);
+}
+.eden-tab[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.eden-tab-panel {
+  outline: none;
+}
+.eden-tab-indicator {
+  background: var(--eden-color-accent-primary);
+}
+
+/* Dialog, tooltip, and popover parts */
+.eden-modal-overlay[data-expanded] {
+  animation: eden-fade-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
+}
+.eden-modal[data-expanded] {
+  animation: eden-scale-in var(--eden-duration-normal)
+    var(--eden-transition-ease-out);
+}
+.eden-modal[data-closed] {
+  pointer-events: none;
+}
+.eden-modal-description {
+  margin: 0 0 var(--eden-space-md);
+  color: var(--eden-color-text-secondary);
+}
+.eden-tooltip-trigger[data-disabled],
+.eden-btn[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.eden-tooltip {
+  z-index: var(--eden-z-tooltip);
+}
+.eden-tooltip-arrow,
+.eden-popover-arrow {
+  fill: var(--eden-color-surface-secondary);
+}
+.eden-popover {
+  z-index: var(--eden-z-popover);
+}
+.eden-popover[data-expanded],
+.eden-select-content[data-expanded] {
+  animation: eden-scale-in var(--eden-duration-fast)
+    var(--eden-transition-ease-out);
+}
+
+/* Semantic catalog gaps */
+.eden-badge-secondary {
+  background: var(--eden-color-surface-tertiary);
+  border-color: var(--eden-color-border-medium);
+  color: var(--eden-color-text-primary);
+}
+.eden-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.eden-alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xs);
+  padding: var(--eden-space-md);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-bg-glass-medium);
+  color: var(--eden-color-text-secondary);
+}
+.eden-alert-title {
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+}
+.eden-alert-description {
+  font-size: var(--eden-font-size-sm);
+}
+.eden-alert-info {
+  border-color: var(--eden-color-info);
+}
+.eden-alert-success {
+  border-color: var(--eden-color-success);
+}
+.eden-alert-warning {
+  border-color: var(--eden-color-warning);
+  background: rgba(255, 217, 61, 0.1);
+}
+.eden-alert-danger {
+  border-color: var(--eden-color-danger);
+  background: var(--eden-color-danger-bg);
+}
+
+/* Kobalte may render visually-hidden inputs; keep native Eden classes intact. */
+.eden-checkbox-input,
+.eden-switch-input,
+.eden-radio-input,
+.eden-slider-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  html body *[class],
+  html body *[class]::before,
+  html body *[class]::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+}
