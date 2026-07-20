@@ -436,3 +436,19 @@
   animation: eden-scale-in var(--eden-duration-normal)
     var(--eden-transition-ease-out);
 }
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  html body *[class],
+  html body *[class]::before,
+  html body *[class]::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+}
+

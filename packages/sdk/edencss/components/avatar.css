@@ -37,6 +37,14 @@
   stroke-width: 1.5;
 }
 
+.eden-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 /* ===== Avatar Sizes ===== */
 .eden-avatar-xs {
   width: calc(var(--eden-space-md) + var(--eden-space-xs));

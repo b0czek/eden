@@ -11,4 +11,3 @@ import "./components/lists.css";
 import "./components/tabs.css";
 import "./components/avatar.css";
 import "./components/sidebar.css";
-import "./components/kit.css";

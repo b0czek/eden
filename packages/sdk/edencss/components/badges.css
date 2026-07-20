@@ -54,6 +54,12 @@
   color: var(--eden-color-info);
 }
 
+.eden-badge-secondary {
+  background: var(--eden-color-surface-tertiary);
+  border-color: var(--eden-color-border-medium);
+  color: var(--eden-color-text-primary);
+}
+
 /* ===== Badge Sizes ===== */
 .eden-badge-sm {
   font-size: 9px;
@@ -178,4 +184,43 @@
   100% {
     transform: scale(1);
   }
+}
+
+/* ===== Alert ===== */
+.eden-alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xs);
+  padding: var(--eden-space-md);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-bg-glass-medium);
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-alert-title {
+  font-weight: var(--eden-font-weight-semibold);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-alert-description {
+  font-size: var(--eden-font-size-sm);
+}
+
+.eden-alert-info {
+  border-color: var(--eden-color-info);
+}
+
+.eden-alert-success {
+  border-color: var(--eden-color-success);
+}
+
+.eden-alert-warning {
+  border-color: var(--eden-color-warning);
+  background: rgba(255, 217, 61, 0.1);
+}
+
+.eden-alert-danger {
+  border-color: var(--eden-color-danger);
+  background: var(--eden-color-danger-bg);
 }

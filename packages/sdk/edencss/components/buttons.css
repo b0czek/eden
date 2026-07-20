@@ -57,10 +57,19 @@
   outline-offset: 2px;
 }
 
-.eden-btn:disabled {
+.eden-btn:disabled,
+.eden-btn[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ===== Icon Button ===== */
+.eden-btn-icon {
+  width: var(--eden-space-xl);
+  min-width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
+  padding: 0;
 }
 
 /* ===== Button Variants ===== */
@@ -200,6 +209,24 @@
   border-right: none;
 }
 
+.eden-btn-group-vertical {
+  flex-direction: column;
+}
+
+.eden-btn-group-vertical .eden-btn {
+  width: 100%;
+  border-radius: 0;
+  border-right: 1px solid var(--eden-color-border-light);
+}
+
+.eden-btn-group-vertical .eden-btn:first-child {
+  border-radius: var(--eden-radius-md) var(--eden-radius-md) 0 0;
+}
+
+.eden-btn-group-vertical .eden-btn:last-child {
+  border-radius: 0 0 var(--eden-radius-md) var(--eden-radius-md);
+}
+
 /* ===== Floating Action Button ===== */
 .eden-fab {
   position: fixed;
@@ -233,4 +260,27 @@
 
 .eden-fab:active {
   transform: scale(1);
+}
+
+.eden-fab-xs,
+.eden-fab-sm,
+.eden-fab-lg,
+.eden-fab-xl {
+  width: var(--eden-space-xl);
+  height: var(--eden-space-xl);
+}
+
+.eden-fab-sm {
+  width: 44px;
+  height: 44px;
+}
+
+.eden-fab-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.eden-fab-xl {
+  width: 76px;
+  height: 76px;
 }

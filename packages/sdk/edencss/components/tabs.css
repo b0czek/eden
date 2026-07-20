@@ -51,7 +51,8 @@
   color: var(--eden-color-text-primary);
 }
 
-.eden-tab-active {
+.eden-tab-active,
+.eden-tab[data-selected] {
   background: var(--eden-color-surface-elevated);
   color: var(--eden-color-text-primary);
   box-shadow: var(--eden-shadow-sm);
@@ -62,7 +63,8 @@
   outline-offset: 2px;
 }
 
-.eden-tab:disabled {
+.eden-tab:disabled,
+.eden-tab[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -74,12 +76,17 @@
 
 .eden-tab-panel {
   display: none;
+  outline: none;
   animation: eden-fade-in var(--eden-duration-normal)
     var(--eden-transition-ease-out);
 }
 
 .eden-tab-panel-active {
   display: block;
+}
+
+.eden-tab-indicator {
+  background: var(--eden-color-accent-primary);
 }
 
 /* ===== Underline Tabs ===== */
