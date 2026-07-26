@@ -8,7 +8,8 @@
     "dist",
     "edencss",
     "foundation",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:keyboard-ui && pnpm run build:apps && pnpm run copy-assets",

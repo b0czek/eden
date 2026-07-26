@@ -1,3 +1,4 @@
+import { fileIcons } from "./fileIcons";
 import type { FileItem } from "./types";
 
 export const joinPath = (...parts: string[]) => {
@@ -24,21 +25,21 @@ export const formatFileSize = (bytes: number) => {
 };
 
 export const getFileIcon = (item: FileItem) => {
-  if (item.isDirectory) return "📁";
+  if (item.isDirectory) return fileIcons.folder;
 
   const ext = item.name.split(".").pop()?.toLowerCase() || "";
   const iconMap: Record<string, string> = {
-    txt: "📄",
-    md: "📝",
-    js: "📜",
-    json: "📋",
-    html: "🌐",
-    css: "🎨",
-    png: "🖼️",
-    jpg: "🖼️",
-    pdf: "📕",
-    zip: "📦",
+    txt: fileIcons.document,
+    md: fileIcons.markdown,
+    js: fileIcons.script,
+    json: fileIcons.clipboard,
+    html: fileIcons.globe,
+    css: fileIcons.palette,
+    png: fileIcons.image,
+    jpg: fileIcons.image,
+    pdf: fileIcons.pdf,
+    zip: fileIcons.archive,
   };
 
-  return iconMap[ext] || "📄";
+  return iconMap[ext] || fileIcons.document;
 };

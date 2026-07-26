@@ -145,7 +145,10 @@ body {
 }
 
 .omnibox-loading {
-  font-size: 14px;
+  display: block;
+  width: var(--eden-font-size-md);
+  height: var(--eden-font-size-md);
+  font-size: var(--eden-font-size-md);
   animation: spin 1s linear infinite;
 }
 
@@ -196,7 +199,10 @@ body {
 }
 
 .suggestion-icon {
-  font-size: 18px;
+  display: block;
+  width: var(--eden-font-size-xl);
+  height: var(--eden-font-size-xl);
+  font-size: var(--eden-font-size-xl);
   flex-shrink: 0;
 }
 
@@ -267,6 +273,14 @@ body {
   font-size: 48px;
   margin-bottom: var(--eden-space-sm);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.file-graphic {
+  display: block;
+  width: 1em;
+  height: 1em;
+  margin-inline: auto;
+  object-fit: contain;
 }
 
 .file-name {
@@ -341,7 +355,9 @@ body {
 }
 
 .empty-icon {
-  font-size: 64px;
+  width: var(--eden-layout-icon-size-lg);
+  height: var(--eden-layout-icon-size-lg);
+  font-size: var(--eden-layout-icon-size-lg);
   margin-bottom: var(--eden-space-lg);
   opacity: 0.5;
 }

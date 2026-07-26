@@ -6,6 +6,7 @@ import type {
   ViewStyle,
 } from "../types";
 import { formatFileSize, getFileIcon } from "../utils";
+import FileGraphic from "./FileGraphic";
 
 interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
@@ -57,7 +58,9 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         onDblClick={() => props.onDoubleClick(props.item)}
         onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >
-        <div class="file-icon">{getFileIcon(props.item)}</div>
+        <div class="file-icon">
+          <FileGraphic src={getFileIcon(props.item)} />
+        </div>
         <div class="file-name">{props.item.name}</div>
 
         {props.viewStyle === "list" && (

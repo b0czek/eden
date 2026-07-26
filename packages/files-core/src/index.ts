@@ -1,4 +1,5 @@
 export * from "./components/FileExplorerHeader";
+export * from "./components/FileGraphic";
 export * from "./components/FileItem";
 export * from "./components/FileList";
 export * from "./components/Omnibox";
@@ -7,5 +8,6 @@ export * from "./dialogs/DisplayOptionsModal";
 export * from "./features/breadcrumbs";
 export * from "./features/useExplorerNavigation";
 export * from "./features/useFileActivationPreference";
+export * from "./fileIcons";
 export * from "./types";
 export * from "./utils";

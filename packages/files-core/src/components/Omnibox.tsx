@@ -1,7 +1,10 @@
+import { FaSolidSpinner } from "solid-icons/fa";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { fileIcons } from "../fileIcons";
 import type { Breadcrumb, FileExplorerLabels } from "../types";
 import { getParentPath } from "../utils";
+import FileGraphic from "./FileGraphic";
 
 interface Suggestion {
   type: "path" | "file" | "folder";
@@ -53,7 +56,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         // Add icons on frontend based on type
         const resultsWithIcons = results.map((r) => ({
           ...r,
-          icon: r.type === "folder" ? "📁" : "📄",
+          icon: r.type === "folder" ? fileIcons.folder : fileIcons.document,
         }));
 
         setSuggestions(resultsWithIcons);
@@ -69,7 +72,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         // Add icons on frontend based on type
         const resultsWithIcons = results.map((r) => ({
           ...r,
-          icon: r.type === "folder" ? "📁" : "📄",
+          icon: r.type === "folder" ? fileIcons.folder : fileIcons.document,
         }));
 
         setSuggestions(resultsWithIcons);
@@ -222,7 +225,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
             onKeyDown={handleKeyDown}
             placeholder={props.labels.searchPlaceholder}
           />
-          {isLoading() && <span class="omnibox-loading">⏳</span>}
+          {isLoading() && <FaSolidSpinner class="omnibox-loading" />}
         </div>
 
         <Show when={suggestions().length > 0}>
@@ -237,7 +240,9 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                   onClick={() => handleSuggestionClick(suggestion)}
                   onMouseEnter={() => setSelectedIndex(index())}
                 >
-                  <span class="suggestion-icon">{suggestion.icon}</span>
+                  <span class="suggestion-icon">
+                    <FileGraphic src={suggestion.icon} />
+                  </span>
                   <span class="suggestion-name">{suggestion.name}</span>
                   <span class="suggestion-path">{suggestion.path}</span>
                 </button>

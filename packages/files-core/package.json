@@ -18,7 +18,9 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc --noEmit",
+    "generate:icons": "node scripts/generate-noto-icons.mjs",
+    "prepare": "pnpm run generate:icons",
+    "build": "pnpm run generate:icons && tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
@@ -29,6 +31,8 @@
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
+    "@iconify-json/noto": "^1.2.7",
+    "@iconify/utils": "^3.1.4",
     "typescript": "^5.3.0"
   },
   "keywords": [

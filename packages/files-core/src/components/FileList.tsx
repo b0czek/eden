@@ -1,11 +1,13 @@
 import type { Component } from "solid-js";
 import { createEffect, For, Show } from "solid-js";
+import { fileIcons } from "../fileIcons";
 import type {
   FileExplorerLabels,
   FileItem,
   ItemSize,
   ViewStyle,
 } from "../types";
+import FileGraphic from "./FileGraphic";
 import FileItemComponent from "./FileItem";
 
 interface FileListProps {
@@ -199,7 +201,9 @@ const FileList: Component<FileListProps> = (props) => {
 
       <Show when={!props.loading && props.items.length === 0}>
         <div class="empty-state">
-          <div class="empty-icon">📂</div>
+          <div class="empty-icon">
+            <FileGraphic src={fileIcons.openFolder} />
+          </div>
           <div class="empty-message">{props.labels.empty}</div>
           <div class="empty-hint">{props.labels.emptyHint}</div>
         </div>

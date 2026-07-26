@@ -16,7 +16,7 @@
     "test": "pnpm -r --if-present run test",
     "typecheck": "bash ./scripts/ci-typecheck.sh",
     "lint-staged": "lint-staged",
-    "prepare": "simple-git-hooks",
+    "prepare": "pnpm --filter @edenapp/files-core run prepare && simple-git-hooks",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm run build && changeset publish"
