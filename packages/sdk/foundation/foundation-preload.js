@@ -6,7 +6,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Check for title argument
 const titleArg = process.argv.find((arg) => arg.startsWith("--window-title="));
 if (titleArg) {
-  const title = titleArg.split("=")[1];
+  const title = titleArg.slice("--window-title=".length);
   if (title) {
     // Set immediately
     try {

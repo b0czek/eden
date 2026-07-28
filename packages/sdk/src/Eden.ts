@@ -7,6 +7,7 @@ import { container } from "tsyringe";
 import { AppAssociationManager } from "./app-associations";
 import { AppChannelManager } from "./appbus";
 import { AppearanceManager } from "./appearance/AppearanceManager";
+import { BrandingManager } from "./branding";
 import { ContextMenuManager } from "./context-menu";
 import { DbManager } from "./db";
 import { FileOpenManager } from "./file-open";
@@ -39,6 +40,7 @@ export class Eden {
   private userDirectory: string;
   private distPath: string;
   private config: EdenConfig;
+  private brandingManager: BrandingManager;
   private managersInitialized = false;
 
   // New components
@@ -77,6 +79,9 @@ export class Eden {
     container.registerInstance("appsDirectory", this.appsDirectory);
     container.registerInstance("distPath", this.distPath);
     container.registerInstance("userDirectory", this.userDirectory);
+    container.registerInstance("appPath", app.getAppPath());
+
+    this.brandingManager = container.resolve(BrandingManager);
 
     container.resolve(CommandRegistry);
 
@@ -169,18 +174,22 @@ export class Eden {
    */
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
+    const title = this.brandingManager.getWindowTitle(windowConfig.title);
+    const icon = this.brandingManager.getWindowIconPath();
+
     this.mainWindow = new BrowserWindow({
       width: windowConfig.width || 1280,
       height: windowConfig.height || 800,
       minWidth: Math.max(windowConfig.minWidth || 800, 800),
       minHeight: Math.max(windowConfig.minHeight || 600, 600),
-      title: windowConfig.title || "Eden",
+      title,
+      icon,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
         preload: path.join(this.distPath, "foundation/foundation-preload.js"),
-        additionalArguments: [`--window-title=${windowConfig.title || "Eden"}`],
+        additionalArguments: [`--window-title=${title}`],
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,

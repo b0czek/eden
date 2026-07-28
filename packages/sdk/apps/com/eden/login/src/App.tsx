@@ -1,5 +1,10 @@
 import { KeyboardButton } from "@edenapp/solid-kit";
-import type { UserProfile, ViewBounds, WindowSize } from "@edenapp/types";
+import type {
+  EdenBrandingInfo,
+  UserProfile,
+  ViewBounds,
+  WindowSize,
+} from "@edenapp/types";
 import {
   createEffect,
   createSignal,
@@ -25,6 +30,9 @@ const App = () => {
   const [error, setError] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [submitting, setSubmitting] = createSignal(false);
+  const [branding, setBranding] = createSignal<EdenBrandingInfo>({
+    name: "Eden",
+  });
 
   const updateViewBounds = async (data: { windowSize: WindowSize }) => {
     const { windowSize } = data;
@@ -57,6 +65,14 @@ const App = () => {
     }
   };
 
+  const loadBranding = async () => {
+    try {
+      setBranding(await window.edenAPI.shellCommand("system/branding", {}));
+    } catch (error) {
+      console.error("Failed to load product branding:", error);
+    }
+  };
+
   onMount(() => {
     onCleanup(() => {
       window.edenAPI.unsubscribe(
@@ -67,7 +83,7 @@ const App = () => {
 
     (async () => {
       await initLocale();
-      loadUsers();
+      await Promise.all([loadBranding(), loadUsers()]);
 
       // Set initial bounds
       try {
@@ -125,6 +141,18 @@ const App = () => {
     <div class="login-root eden-flex eden-flex-center">
       <div class="login-card eden-glass-strong eden-rounded-xl eden-p-lg">
         <div class="eden-flex eden-flex-col eden-gap-md">
+          <Show when={branding().logoDataUrl}>
+            {(logoDataUrl) => (
+              <div class="login-brand eden-flex-center">
+                <img
+                  class="login-brand-logo"
+                  src={logoDataUrl()}
+                  alt={branding().name}
+                />
+              </div>
+            )}
+          </Show>
+
           <header class="login-header eden-flex eden-flex-between eden-gap-md">
             <div class="eden-flex eden-flex-col eden-gap-xs">
               <h2 class="eden-text-2xl eden-font-semibold">

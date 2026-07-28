@@ -7,6 +7,7 @@ import { getLocalizedValue, locale, t } from "../i18n";
 import type { SelectedItem } from "../types";
 
 interface SettingsSidebarProps {
+  brandName: Accessor<string>;
   edenSchema: Accessor<SettingsCategory[]>;
   apps: Accessor<AppManifest[]>;
   appIcons: Accessor<Record<string, string>>;
@@ -43,9 +44,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
   return (
     <aside class="eden-sidebar">
       <div class="eden-sidebar-section">
-        <div class="eden-sidebar-section-title">
-          {t("settings.sidebar.eden")}
-        </div>
+        <div class="eden-sidebar-section-title">{props.brandName()}</div>
         <div class="eden-sidebar-items">
           <For each={props.edenSchema()}>
             {(category) => (

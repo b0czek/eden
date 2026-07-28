@@ -46,6 +46,13 @@ pnpm dev
 
 This will build and launch the example Eden desktop environment with hot reload enabled.
 
+### Branding a Consumer
+
+Consumers can supply their own product name, login logo, and main-window icon
+through `new Eden({ branding: ... })`. See the
+[consumer branding guide](docs/branding.md) for asset rules and packaging
+considerations.
+
 ### Building an App
 
 An Eden app is a web application (frontend-only or full-stack with Node.js backend) that runs within the Eden desktop environment. Apps are defined by a `manifest.json` file and can be packaged into `.edenite` archives.
@@ -60,6 +67,7 @@ genesis build ./my-app -o ./dist/my-app.edenite
 - **[App Development Guide](docs/app-development.md)**: Learn how to build Eden apps
 - **[IPC Architecture](docs/ipc-architecture.md)**: Deep dive into Eden's IPC system
 - **[Localizing Apps](docs/localizing-apps.md)**: Add i18n support to your Eden app
+- **[Consumer Branding](docs/branding.md)**: Configure product names, login logos, and window icons
 - **[User Management](docs/users.md)**: Users, roles, grants, and sessions
 - **[Genesis README](packages/genesis/README.md)**: App bundling and packaging
 - **[EdenCSS Documentation](packages/sdk/edencss/README.md)**: Design system reference

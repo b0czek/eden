@@ -1,7 +1,6 @@
 export const pl = {
   settings: {
     sidebar: {
-      eden: "Eden",
       applications: "Aplikacje",
       noAppsWithSettings: "Brak aplikacji z ustawieniami",
     },

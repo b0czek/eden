@@ -22,12 +22,22 @@ const App: Component = () => {
     {},
   );
   const [loading, setLoading] = createSignal(true);
+  const [brandName, setBrandName] = createSignal("Eden");
 
   onMount(async () => {
     await initLocale();
-    await Promise.all([loadEdenSchema(), loadApps()]);
+    await Promise.all([loadBranding(), loadEdenSchema(), loadApps()]);
     setLoading(false);
   });
+
+  const loadBranding = async () => {
+    try {
+      const branding = await window.edenAPI.shellCommand("system/branding", {});
+      setBrandName(branding.name);
+    } catch (error) {
+      console.error("Failed to load product branding:", error);
+    }
+  };
 
   const loadEdenSchema = async () => {
     try {
@@ -198,6 +208,7 @@ const App: Component = () => {
   return (
     <div class="settings-app">
       <SettingsSidebar
+        brandName={brandName}
         edenSchema={edenSchema}
         apps={apps}
         appIcons={appIcons}

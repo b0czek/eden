@@ -25,6 +25,17 @@ body {
   width: min(720px, 92vw);
 }
 
+.login-brand {
+  width: 100%;
+}
+
+.login-brand-logo {
+  display: block;
+  max-width: min(240px, 60%);
+  max-height: 64px;
+  object-fit: contain;
+}
+
 .login-header {
   align-items: flex-start;
 }

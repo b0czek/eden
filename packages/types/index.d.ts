@@ -2,6 +2,7 @@ import { AppManifest } from "./AppManifest";
 
 export * from "./EdenConfig";
 export * from "./EdenSeedConfig";
+export * from "./Branding";
 export * from "./User";
 
 export * from "./AppManifest";

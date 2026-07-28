@@ -42,9 +42,26 @@ export interface TilingConfig {
   padding?: number;
 }
 
+/**
+ * Consumer-controlled product branding.
+ *
+ * Relative asset paths resolve from Electron's application directory.
+ */
+export interface EdenBrandingConfig {
+  /** Product name shown by SDK-owned user interfaces. */
+  name: string;
+
+  /** Logo shown by SDK-owned user interfaces. */
+  logoPath?: string;
+
+  /** Icon used for the main Electron window. */
+  iconPath?: string;
+}
+
 export interface EdenConfig {
   appsDirectory?: string;
   userDirectory?: string;
+  branding?: EdenBrandingConfig;
   window?: {
     width?: number;
     height?: number;

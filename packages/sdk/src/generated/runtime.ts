@@ -9,6 +9,7 @@
 // Command names array
 export const COMMAND_NAMES: readonly string[] = [
   "system/info",
+  "system/branding",
   "associations/get",
   "associations/set",
   "associations/remove",

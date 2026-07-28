@@ -17,6 +17,13 @@ export interface SystemCommands {
     args: Record<string, never>;
     response: import("./index").SystemInfo;
   };
+  /**
+   * Get consumer-controlled product branding for SDK-owned interfaces.
+   */
+  "system/branding": {
+    args: Record<string, never>;
+    response: import("./index").EdenBrandingInfo;
+  };
 }
 
 /**
