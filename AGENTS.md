@@ -13,8 +13,12 @@ When building an app you should strive to minimize the custom css - use [edencss
 
 Main-process code must not hardcode app IDs or assume a specific app implements a system capability. Resolve configured providers through `AppAssociationManager`, using declared capability permissions such as `file-picker/display` to discover defaults when no valid association exists.
 
+Managers must use the existing internal subscription mechanism (`EdenEmitter.on(...)`) for lifecycle notifications. Never introduce a one-off listener registration method, callback array, or `onBefore...` API for a single event emission. Add a typed manager event and subscribe to it instead. If an operation requires awaited, transactional coordination rather than a notification, model that as an explicit manager operation rather than disguising it as an event listener.
+
 # Docs
 
 - [App Development](docs/app-development.md)
 - [IPC](docs/ipc-architecture.md)
+- [Adding Settings](docs/settings.md)
+- [Processes and Daemons](docs/processes-and-daemons.md)
 - [Localizing Apps](docs/localizing-apps.md)

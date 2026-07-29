@@ -90,6 +90,10 @@ directly.
 - `session/changed` is published after the new authorization and filesystem
   context has been committed. Autostart reacts to it by launching either the
   configured session apps or login provider.
+- Frontend-bearing processes are owned by an opaque session ID and are stopped
+  before that session is replaced. See
+  [Sessions and Autostart](processes-and-daemons.md#sessions-and-autostart) for
+  process ownership across session transitions.
 
 ## User Management (Vendor-Only)
 
