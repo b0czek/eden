@@ -4,9 +4,9 @@ import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
 import { delay, inject, singleton } from "tsyringe";
 import { AppCatalog } from "../app-registry";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { SessionContext } from "../session/SessionContext";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import { SettingsHandler } from "./SettingsHandler";
 /**
@@ -41,8 +41,8 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
-    @inject(delay(() => SessionContext)) private sessionContext: SessionContext,
     @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
+    @inject(ExecutionContext) private executionContext: ExecutionContext,
   ) {
     super(ipcBridge);
 
@@ -103,6 +103,10 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     await this.keyv.set(namespacedKey, value);
 
     this.notify("changed", { appId, key, value });
+  }
+
+  async delete(appId: string, key: string): Promise<void> {
+    await this.keyv.delete(this.getAppKey(appId, key));
   }
 
   /**
@@ -305,7 +309,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   assertAccess(appId: string, key: string): void {
     const grantKey = this.resolveGrantKey(appId, key);
-    if (!this.sessionContext.canAccessSetting(appId, grantKey)) {
+    if (!this.canAccessSetting(appId, grantKey)) {
       throw new Error("User does not have grant to access this setting");
     }
   }
@@ -315,14 +319,11 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   filterAllowedKeys(appId: string, keys: string[]): string[] {
     if (appId !== EDEN_SETTINGS_APP_ID) {
-      return this.sessionContext.getAllowedSettingKeys(appId, keys);
+      return keys.filter((key) => this.canAccessSetting(appId, key));
     }
     return keys.filter((key) => {
       const grantKey = this.resolveGrantKey(EDEN_SETTINGS_APP_ID, key);
-      return this.sessionContext.canAccessSetting(
-        EDEN_SETTINGS_APP_ID,
-        grantKey,
-      );
+      return this.canAccessSetting(EDEN_SETTINGS_APP_ID, grantKey);
     });
   }
 
@@ -335,18 +336,19 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
         ...category,
         settings: category.settings.filter((setting) => {
           const grantKey = setting.grant ?? setting.key;
-          return this.sessionContext.canAccessSetting(
-            EDEN_SETTINGS_APP_ID,
-            grantKey,
-          );
+          return this.canAccessSetting(EDEN_SETTINGS_APP_ID, grantKey);
         }),
       }))
       .filter((category) => {
         if (category.view && category.grant) {
-          return this.sessionContext.hasGrant(category.grant);
+          return this.executionContext.hasGrant(category.grant);
         }
         // For regular categories, must have at least one setting
         return category.settings.length > 0;
       });
+  }
+
+  private canAccessSetting(appId: string, key: string): boolean {
+    return this.executionContext.hasGrant(`settings/${appId}/${key}`);
   }
 }

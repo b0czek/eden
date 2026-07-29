@@ -1,8 +1,9 @@
 import type { EdenConfig } from "@edenapp/types";
 import { delay, inject, injectable, singleton } from "tsyringe";
+import { ExecutionContext } from "../execution";
 import { loadHotReloadAppsState } from "../hotreload-config";
 import { log } from "../logging";
-import { SessionContext } from "../session";
+import { SessionContext } from "../session/SessionContext";
 import { SessionManager } from "../session/SessionManager";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
@@ -22,6 +23,7 @@ export class AutostartManager {
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SettingsManager) private settingsManager: SettingsManager,
     @inject(SessionContext) private sessionContext: SessionContext,
+    @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject(delay(() => SessionManager)) sessionManager: SessionManager,
   ) {
     // Start the appropriate environment after a committed session transition.
@@ -100,31 +102,37 @@ export class AutostartManager {
   }
 
   private async launchSessionApps(): Promise<void> {
-    if (!this.sessionContext.getCurrentUser()) {
+    const currentUser = this.sessionContext.getCurrentUser();
+    if (!currentUser) {
       return;
     }
 
-    try {
-      const settings = await this.loadAutostartSettings();
-      const enabledApps = Array.from(settings.entries())
-        .filter(([, enabled]) => enabled)
-        .map(([appId]) => appId);
-
-      for (const appId of enabledApps) {
-        if (this.processManager.getAppInstance(appId)) {
-          continue;
-        }
-
+    await this.executionContext.run(
+      { principal: { kind: "user", profile: currentUser } },
+      async () => {
         try {
-          await this.processManager.launchApp(appId);
-          log.info(`Autostart app launched: ${appId}`);
+          const settings = await this.loadAutostartSettings();
+          const enabledApps = Array.from(settings.entries())
+            .filter(([, enabled]) => enabled)
+            .map(([appId]) => appId);
+
+          for (const appId of enabledApps) {
+            if (this.processManager.getAppInstance(appId)) {
+              continue;
+            }
+
+            try {
+              await this.processManager.launchApp(appId);
+              log.info(`Autostart app launched: ${appId}`);
+            } catch (error) {
+              log.error(`Failed to launch autostart app ${appId}:`, error);
+            }
+          }
         } catch (error) {
-          log.error(`Failed to launch autostart app ${appId}:`, error);
+          log.warn("Failed to load autostart settings:", error);
         }
-      }
-    } catch (error) {
-      log.warn("Failed to load autostart settings:", error);
-    }
+      },
+    );
   }
 
   private async launchLoginApp(): Promise<void> {

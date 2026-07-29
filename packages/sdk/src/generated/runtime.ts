@@ -140,6 +140,7 @@ export const APP_EVENT_NAMES: readonly string[] = [
   "package/uninstalled",
   "process/launched",
   "process/stopped",
+  "process/reloading",
   "process/error",
   "process/exited",
   "session/changed",

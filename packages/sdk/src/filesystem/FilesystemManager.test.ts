@@ -4,8 +4,8 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
+import type { ExecutionContext } from "../execution";
 import type { CommandRegistry } from "../ipc";
-import type { SessionContext } from "../session";
 import { FilesystemManager } from "./FilesystemManager";
 
 describe("FilesystemManager user roots", () => {
@@ -29,8 +29,9 @@ describe("FilesystemManager user roots", () => {
       root,
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       {
-        getCurrentUser: () => currentUser,
-      } as unknown as SessionContext,
+        getPrincipal: () =>
+          currentUser ? { kind: "user", profile: currentUser } : undefined,
+      } as unknown as ExecutionContext,
     );
   });
 
@@ -53,6 +54,46 @@ describe("FilesystemManager user roots", () => {
     );
   });
 
+  it("maps system daemons to userDirectory", async () => {
+    const executionContext = {
+      getPrincipal: () => ({ kind: "system" as const }),
+    } as unknown as ExecutionContext;
+    manager = new FilesystemManager(
+      root,
+      { registerManager: jest.fn() } as unknown as CommandRegistry,
+      executionContext,
+    );
+
+    await expect(manager.resolvePath("/state.json")).resolves.toBe(
+      path.join(root, "state.json"),
+    );
+  });
+
+  it("maps user daemons to the configured home of their fixed account", async () => {
+    const daemonUser = {
+      ...createUser(),
+      username: "service-account",
+      homeDirectory: "services/stateful-daemon",
+    };
+    await fs.mkdir(path.join(root, daemonUser.homeDirectory), {
+      recursive: true,
+    });
+    manager = new FilesystemManager(
+      root,
+      { registerManager: jest.fn() } as unknown as CommandRegistry,
+      {
+        getPrincipal: () => ({
+          kind: "user" as const,
+          profile: daemonUser,
+        }),
+      } as unknown as ExecutionContext,
+    );
+
+    await expect(manager.resolvePath("/state.json")).resolves.toBe(
+      path.join(root, daemonUser.homeDirectory, "state.json"),
+    );
+  });
+
   it("maps virtual root to a configured relative home", async () => {
     await fs.mkdir(path.join(root, "teams", "operators"), {
       recursive: true,
@@ -67,10 +108,10 @@ describe("FilesystemManager user roots", () => {
     );
   });
 
-  it("denies access without an active session", async () => {
+  it("denies access without an execution principal", async () => {
     currentUser = null;
     await expect(manager.resolvePath("/")).rejects.toThrow(
-      "No active user session",
+      "Caller has no filesystem execution principal",
     );
   });
 

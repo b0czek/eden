@@ -4,6 +4,7 @@ import type {
   ProcessMetricsSnapshot,
   ViewBounds,
 } from "@edenapp/types";
+import type { ExecutionContext } from "../execution";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { ProcessManager } from "./ProcessManager";
 
@@ -11,7 +12,10 @@ import type { ProcessManager } from "./ProcessManager";
 export class ProcessHandler {
   private processManager: ProcessManager;
 
-  constructor(processManager: ProcessManager) {
+  constructor(
+    processManager: ProcessManager,
+    private executionContext: ExecutionContext,
+  ) {
     this.processManager = processManager;
   }
 
@@ -35,6 +39,7 @@ export class ProcessHandler {
   @EdenHandler("stop", { permission: "manage" })
   async handleStopApp(args: { appId: string }): Promise<{ success: boolean }> {
     const { appId } = args;
+    this.assertCanStop(appId);
     await this.processManager.stopApp(appId);
     return { success: true };
   }
@@ -85,5 +90,24 @@ export class ProcessHandler {
       args.pollingTimeoutMs,
       args.waitForAccurateCpu,
     );
+  }
+
+  private assertCanStop(appId: string): void {
+    const target = this.processManager.getAppInstance(appId);
+    if (!target) return;
+
+    const caller = this.executionContext.getPrincipal();
+    if (caller?.kind === "system") return;
+    if (caller?.kind === "user") {
+      if (caller.profile.role === "vendor") return;
+      if (
+        target.principal.kind === "user" &&
+        target.principal.username === caller.profile.username
+      ) {
+        return;
+      }
+    }
+
+    throw new Error(`User cannot stop process ${appId}`);
   }
 }

@@ -183,14 +183,6 @@ function generateCommandId(): string {
   return `cmd-${appId}-${Date.now()}-${++commandIdCounter}`;
 }
 
-function asCommandArgs(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return { ...(value as Record<string, unknown>) };
-  }
-
-  return {};
-}
-
 /**
  * Send a shell command to main process and wait for response
  */
@@ -222,7 +214,7 @@ function shellCommand<T extends CommandName>(
       type: "shell-command",
       commandId,
       command,
-      args: { ...asCommandArgs(args), _callerAppId: appId },
+      args,
     });
   });
 }

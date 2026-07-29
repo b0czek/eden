@@ -3,16 +3,82 @@ import "reflect-metadata";
 import { ProcessManager } from "./ProcessManager";
 
 describe("ProcessManager session cleanup", () => {
+  it("launches backend-only apps as ordinary session processes", async () => {
+    const manager = Object.create(ProcessManager.prototype) as ProcessManager;
+    Object.assign(manager, {
+      appCatalog: {
+        get: () => ({
+          id: "app.backend",
+          backend: { entry: "backend.js" },
+        }),
+      },
+      config: { development: false },
+      executionContext: { canLaunchApp: () => true },
+      sessionContext: {
+        getCurrentUser: () => ({ username: "operator" }),
+        getSessionId: () => "s1",
+      },
+    });
+    const launch = jest
+      .spyOn(
+        manager as unknown as {
+          launchAppInternal: (...args: unknown[]) => Promise<{
+            success: boolean;
+            instanceId: string;
+            appId: string;
+          }>;
+        },
+        "launchAppInternal",
+      )
+      .mockResolvedValue({
+        success: true,
+        instanceId: "instance",
+        appId: "app.backend",
+      });
+
+    await expect(manager.launchApp("app.backend")).resolves.toMatchObject({
+      appId: "app.backend",
+    });
+    expect(launch).toHaveBeenCalledWith("app.backend", undefined, undefined, {
+      owner: { kind: "session", sessionId: "s1", username: "operator" },
+      principal: { kind: "user", username: "operator" },
+    });
+  });
+
   it("attempts to stop every app and reports aggregate failure", async () => {
     const manager = Object.create(ProcessManager.prototype) as ProcessManager;
     Object.assign(manager, {
       runningApps: new Map([
-        ["app.one", {}],
-        ["app.two", {}],
-        ["app.three", {}],
+        [
+          "app.one",
+          {
+            manifest: { id: "app.one" },
+            owner: { kind: "session", sessionId: "s1" },
+          },
+        ],
+        [
+          "app.two",
+          {
+            manifest: { id: "app.two" },
+            owner: { kind: "session", sessionId: "s1" },
+          },
+        ],
+        [
+          "app.three",
+          {
+            manifest: { id: "app.three" },
+            owner: { kind: "session", sessionId: "s1" },
+          },
+        ],
       ]),
+      sessionContext: { getSessionId: () => "s1" },
     });
-    const stopApp = jest.spyOn(manager, "stopApp");
+    const stopApp = jest.spyOn(
+      manager as unknown as {
+        stopApp: (appId: string) => Promise<void>;
+      },
+      "stopApp",
+    );
     stopApp.mockImplementation(async (appId) => {
       if (appId === "app.two") throw new Error("stop failed");
     });
@@ -25,5 +91,38 @@ describe("ProcessManager session cleanup", () => {
       "app.two",
       "app.three",
     ]);
+  });
+
+  it("leaves system-owned daemons running", async () => {
+    const manager = Object.create(ProcessManager.prototype) as ProcessManager;
+    Object.assign(manager, {
+      runningApps: new Map([
+        [
+          "app.session",
+          {
+            manifest: { id: "app.session" },
+            owner: { kind: "session", sessionId: "s1" },
+          },
+        ],
+        [
+          "app.daemon",
+          { manifest: { id: "app.daemon" }, owner: { kind: "system" } },
+        ],
+      ]),
+      sessionContext: { getSessionId: () => "s1" },
+    });
+    const stop = jest
+      .spyOn(
+        manager as unknown as {
+          stopApp: (appId: string) => Promise<void>;
+        },
+        "stopApp",
+      )
+      .mockResolvedValue(undefined);
+
+    await manager.stopSessionApps();
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledWith("app.session");
   });
 });
