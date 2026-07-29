@@ -28,8 +28,10 @@ import {
 } from "./process-manager";
 import { SystemHandler } from "./SystemHandler";
 import { seedDatabase } from "./seed";
+import { SessionManager } from "./session";
 import { SettingsManager } from "./settings";
 import { UserManager } from "./user";
+import { UserHandler } from "./user/UserHandler";
 import { ViewManager } from "./view-manager";
 
 export class Eden {
@@ -50,6 +52,7 @@ export class Eden {
   private appAssociationManager!: AppAssociationManager;
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
+  private sessionManager!: SessionManager;
   private keyboardManager!: KeyboardManager;
 
   constructor(config: EdenConfig = {}) {
@@ -114,6 +117,7 @@ export class Eden {
     this.initializeManagers();
 
     await this.userManager.initialize();
+    await this.sessionManager.initialize();
 
     // Initialize package manager
     await this.packageManager.initialize();
@@ -147,6 +151,10 @@ export class Eden {
 
     this.packageManager = container.resolve(PackageManager);
     this.processManager = container.resolve(ProcessManager);
+    this.sessionManager = container.resolve(SessionManager);
+    container
+      .resolve(CommandRegistry)
+      .registerManager(new UserHandler(this.userManager, this.sessionManager));
     this.appAssociationManager = container.resolve(AppAssociationManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
     this.autostartManager = container.resolve(AutostartManager);

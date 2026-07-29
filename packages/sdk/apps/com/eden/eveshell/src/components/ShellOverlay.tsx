@@ -142,7 +142,10 @@ export default function ShellOverlay() {
 
   const loadCurrentUser = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("user/get-current", {});
+      const result = await window.edenAPI.shellCommand(
+        "session/get-current",
+        {},
+      );
       setCurrentUser(result.user ?? null);
     } catch (error) {
       console.error("Failed to load current user:", error);
@@ -235,7 +238,7 @@ export default function ShellOverlay() {
 
   const handleLogout = async () => {
     try {
-      await window.edenAPI.shellCommand("user/logout", {});
+      await window.edenAPI.shellCommand("session/logout", {});
     } catch (error) {
       console.error("Failed to log out:", error);
     }

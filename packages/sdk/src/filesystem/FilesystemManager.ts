@@ -5,7 +5,7 @@ import fg from "fast-glob";
 import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
-import { UserManager } from "../user";
+import { SessionContext } from "../session";
 import {
   assertExistingPathWithin,
   assertPathWithin,
@@ -27,7 +27,7 @@ export class FilesystemManager {
   constructor(
     @inject("userDirectory") baseDir: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => UserManager)) private userManager: UserManager,
+    @inject(delay(() => SessionContext)) private sessionContext: SessionContext,
   ) {
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
@@ -97,7 +97,7 @@ export class FilesystemManager {
   }
 
   private getEffectiveRoot(): string {
-    const user = this.userManager.getCurrentUser();
+    const user = this.sessionContext.getCurrentUser();
     if (!user) {
       throw new Error("No active user session");
     }

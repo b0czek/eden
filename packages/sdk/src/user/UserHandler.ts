@@ -1,13 +1,17 @@
 import type { UserProfile, UserRole } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import type { SessionManager } from "../session";
 import type { UserManager } from "./UserManager";
 
 @EdenNamespace("user")
 export class UserHandler {
-  constructor(private userManager: UserManager) {}
+  constructor(
+    private userManager: UserManager,
+    private sessionManager: SessionManager,
+  ) {}
 
   private assertVendor(): void {
-    const user = this.userManager.getCurrentUser();
+    const user = this.sessionManager.getCurrentUser();
     if (!user || user.role !== "vendor") {
       throw new Error("Vendor account required");
     }
@@ -20,42 +24,6 @@ export class UserHandler {
   async handleList(): Promise<{ users: UserProfile[] }> {
     const users = await this.userManager.listUsers();
     return { users };
-  }
-
-  /**
-   * Return the current logged-in user.
-   */
-  @EdenHandler("get-current", { permission: "identity" })
-  async handleGetCurrent(): Promise<{ user: UserProfile | null }> {
-    return { user: this.userManager.getCurrentUser() };
-  }
-
-  /**
-   * Authenticate a user and establish a session.
-   */
-  @EdenHandler("login", { permission: "session" })
-  async handleLogin(args: {
-    username: string;
-    password: string;
-  }): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    try {
-      const user = await this.userManager.login(args.username, args.password);
-      return { success: true, user };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Login failed",
-      };
-    }
-  }
-
-  /**
-   * End the current session.
-   */
-  @EdenHandler("logout", { permission: "session" })
-  async handleLogout(): Promise<{ success: boolean }> {
-    await this.userManager.logout();
-    return { success: true };
   }
 
   /**
@@ -88,6 +56,7 @@ export class UserHandler {
   }): Promise<{ user: UserProfile }> {
     this.assertVendor();
     const user = await this.userManager.updateUser(args);
+    this.sessionManager.synchronizeUser(user);
     return { user };
   }
 
@@ -112,7 +81,11 @@ export class UserHandler {
     password: string;
   }): Promise<{ success: boolean }> {
     this.assertVendor();
-    await this.userManager.setPassword(args.username, args.password);
+    const user = await this.userManager.setPassword(
+      args.username,
+      args.password,
+    );
+    this.sessionManager.synchronizeUser(user);
     return { success: true };
   }
 
@@ -125,10 +98,16 @@ export class UserHandler {
     newPassword: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      await this.userManager.changePassword(
+      const currentUser = this.sessionManager.getCurrentUser();
+      if (!currentUser) {
+        throw new Error("No active user session");
+      }
+      const user = await this.userManager.changePassword(
+        currentUser.username,
         args.currentPassword,
         args.newPassword,
       );
+      this.sessionManager.synchronizeUser(user);
       return { success: true };
     } catch (error) {
       return {
@@ -144,7 +123,7 @@ export class UserHandler {
    */
   @EdenHandler("has-grant", { permission: "grants" })
   async handleHasGrant(args: { grant: string }): Promise<{ allowed: boolean }> {
-    return { allowed: this.userManager.hasGrant(args.grant) };
+    return { allowed: this.sessionManager.hasGrant(args.grant) };
   }
 
   /**

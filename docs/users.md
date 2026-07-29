@@ -72,17 +72,24 @@ directly.
 
 ## Sessions and Identity
 
-- Login/logout and password changes are handled through `user/*` IPC commands.
+- `SessionManager` owns the active identity and commits a new session only after
+  all apps from the previous session have stopped.
+- `UserManager` owns account storage, authentication, grants, and passwords.
 - Key commands:
   - `user/list` (all user profiles)
-  - `user/login`, `user/logout` (session control)
-  - `user/get-current` (current user profile)
+  - `session/login`, `session/logout` (session control)
+  - `session/get-current` (current user profile)
   - `user/change-password` (current user only)
   - `user/has-grant` (grant check)
 - App-level permissions gate these handlers:
-  - `user/session` for login/logout/change-password
-  - `user/identity` for list/get-current
+  - `session/manage` for login/logout
+  - `session/read` for get-current
+  - `user/session` for change-password
+  - `user/identity` for list
   - `user/grants` for has-grant
+- `session/changed` is published after the new authorization and filesystem
+  context has been committed. Autostart reacts to it by launching either the
+  configured session apps or login provider.
 
 ## User Management (Vendor-Only)
 

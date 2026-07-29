@@ -57,7 +57,10 @@ export default function UsersTab(props: UsersTabProps) {
 
   const loadCurrentUser = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("user/get-current", {});
+      const result = await window.edenAPI.shellCommand(
+        "session/get-current",
+        {},
+      );
       setCurrentUser(result.user ?? null);
     } catch (error) {
       console.error("Failed to load current user:", error);

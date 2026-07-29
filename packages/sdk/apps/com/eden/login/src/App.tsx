@@ -120,7 +120,7 @@ const App = () => {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await window.edenAPI.shellCommand("user/login", {
+      const result = await window.edenAPI.shellCommand("session/login", {
         username,
         password: password(),
       });

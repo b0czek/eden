@@ -74,21 +74,21 @@ export interface ProcessEvents {
 }
 
 /**
- * SettingsEvents - Events for the "settings" namespace
+ * SessionEvents - Events for the "session" namespace
  */
-export interface SettingsEvents {
-  "settings/changed": { appId: string; key: string; value: string };
-}
-
-/**
- * UserEvents - Events for the "user" namespace
- */
-export interface UserEvents {
-  "user/changed": {
+export interface SessionEvents {
+  "session/changed": {
     currentUser: import("./index").UserProfile | null;
     previousUsername: string | null;
     reason: "login" | "logout" | "system";
   };
+}
+
+/**
+ * SettingsEvents - Events for the "settings" namespace
+ */
+export interface SettingsEvents {
+  "settings/changed": { appId: string; key: string; value: string };
 }
 
 /**
@@ -114,4 +114,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, ViewEvents {}

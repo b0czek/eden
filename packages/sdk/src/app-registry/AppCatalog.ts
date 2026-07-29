@@ -4,7 +4,7 @@ import type { RuntimeAppManifest } from "@edenapp/types";
 import fg from "fast-glob";
 import { inject, injectable, singleton } from "tsyringe";
 import { log } from "../logging";
-import { UserManager } from "../user/UserManager";
+import { SessionContext } from "../session";
 import { AppRegistry } from "./AppRegistry";
 import { DEFAULT_APP_ICON_DATA_URL } from "./defaultAppIcon";
 
@@ -18,7 +18,7 @@ export interface AppCatalogListOptions {
 export class AppCatalog {
   constructor(
     @inject(AppRegistry) private appRegistry: AppRegistry,
-    @inject(UserManager) private userManager: UserManager,
+    @inject(SessionContext) private sessionContext: SessionContext,
     @inject("appsDirectory") private appsDirectory: string,
     @inject("distPath") private distPath: string,
   ) {}
@@ -91,7 +91,7 @@ export class AppCatalog {
 
   getLaunchable(appId: string): RuntimeAppManifest | undefined {
     const app = this.get(appId);
-    return app && this.userManager.canLaunchApp(appId) ? app : undefined;
+    return app && this.sessionContext.canLaunchApp(appId) ? app : undefined;
   }
 
   list(options: AppCatalogListOptions = {}): RuntimeAppManifest[] {
@@ -103,7 +103,7 @@ export class AppCatalog {
         if (isHidden || !app.frontend?.entry) return false;
       }
 
-      return showRestricted || this.userManager.canLaunchApp(app.id);
+      return showRestricted || this.sessionContext.canLaunchApp(app.id);
     });
   }
 

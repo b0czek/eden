@@ -34,7 +34,7 @@ const createManager = () => {
       get: (appId: string) =>
         appId === ownerManifest.id ? ownerManifest : undefined,
     },
-    userManager: {
+    sessionContext: {
       canAccessSetting: () => true,
     },
     keyv: {

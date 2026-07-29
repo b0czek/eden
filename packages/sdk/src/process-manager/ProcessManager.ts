@@ -18,7 +18,7 @@ import {
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
-import { UserManager } from "../user/UserManager";
+import { SessionContext } from "../session";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
 import { ProcessHandler } from "./ProcessHandler";
@@ -58,7 +58,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
-    @inject(UserManager) private userManager: UserManager,
+    @inject(SessionContext) private sessionContext: SessionContext,
     @inject("EdenConfig") private config: EdenConfig,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
@@ -71,7 +71,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     this.setupEventHandlers();
-    this.setupUserAccessHandlers();
     this.setupHotReloadWatcher();
 
     // Create and register handler
@@ -120,12 +119,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         }
       },
     );
-  }
-
-  private setupUserAccessHandlers(): void {
-    // SessionManager should own this ordering once session coordination is split
-    // out of UserManager.
-    this.userManager.onBeforeSessionChange(() => this.stopSessionApps());
   }
 
   private setupHotReloadWatcher(): void {
@@ -216,7 +209,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    if (!this.isLoginApp(appId) && !this.userManager.canLaunchApp(appId)) {
+    if (!this.isLoginApp(appId) && !this.sessionContext.canLaunchApp(appId)) {
       throw new Error(`User cannot launch app ${appId}`);
     }
 
@@ -502,10 +495,22 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     log.info(`App ${appId} reloaded successfully`);
   }
 
-  private async stopSessionApps(): Promise<void> {
+  async stopSessionApps(): Promise<void> {
     const running = Array.from(this.runningApps.keys());
+    const errors: unknown[] = [];
     for (const appId of running) {
-      await this.stopApp(appId);
+      try {
+        await this.stopApp(appId);
+      } catch (error) {
+        // A process may exit on its own after the snapshot was taken.
+        if (this.runningApps.has(appId)) {
+          errors.push(error);
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "Failed to stop all session apps");
     }
   }
 

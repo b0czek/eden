@@ -8,13 +8,13 @@ type PermissionRegistryLike = {
   getRequiredGrantKeys: jest.Mock<string[], [string, string]>;
 };
 
-type UserManagerLike = {
+type SessionContextLike = {
   hasGrant: jest.Mock<boolean, [string]>;
 };
 
 describe("CommandRegistry", () => {
   let permissionRegistry: PermissionRegistryLike;
-  let userManager: UserManagerLike;
+  let sessionContext: SessionContextLike;
   let registry: CommandRegistry;
   let warnSpy: jest.SpyInstance;
   let logSpy: jest.SpyInstance;
@@ -24,14 +24,14 @@ describe("CommandRegistry", () => {
       hasPermission: jest.fn(),
       getRequiredGrantKeys: jest.fn(),
     };
-    userManager = {
+    sessionContext = {
       hasGrant: jest.fn(),
     };
     registry = new CommandRegistry(
       permissionRegistry as unknown as ConstructorParameters<
         typeof CommandRegistry
       >[0],
-      userManager as unknown as ConstructorParameters<
+      sessionContext as unknown as ConstructorParameters<
         typeof CommandRegistry
       >[1],
     );
@@ -114,13 +114,13 @@ describe("CommandRegistry", () => {
     permissionRegistry.getRequiredGrantKeys.mockReturnValue([
       "preset/files/read",
     ]);
-    userManager.hasGrant.mockReturnValue(false);
+    sessionContext.hasGrant.mockReturnValue(false);
 
     await expect(registry.execute("files/read", {}, "app.one")).rejects.toThrow(
       "Grant denied: preset/files/read required for files/read",
     );
 
-    userManager.hasGrant.mockReturnValue(true);
+    sessionContext.hasGrant.mockReturnValue(true);
 
     await expect(registry.execute("files/read", {}, "app.one")).resolves.toBe(
       "secured",

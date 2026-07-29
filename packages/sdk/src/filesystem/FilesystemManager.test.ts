@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import type { CommandRegistry } from "../ipc";
-import type { UserManager } from "../user";
+import type { SessionContext } from "../session";
 import { FilesystemManager } from "./FilesystemManager";
 
 describe("FilesystemManager user roots", () => {
@@ -30,7 +30,7 @@ describe("FilesystemManager user roots", () => {
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       {
         getCurrentUser: () => currentUser,
-      } as unknown as UserManager,
+      } as unknown as SessionContext,
     );
   });
 

@@ -1,15 +1,9 @@
 import { randomBytes } from "node:crypto";
 import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
-import { delay, inject, singleton } from "tsyringe";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { inject, singleton } from "tsyringe";
 import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
-import {
-  defaultGrantsForRole,
-  matchesGrants,
-  normalizeGrants,
-} from "./UserGrants";
-import { UserHandler } from "./UserHandler";
+import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
 import {
   ensureHomeDirectory,
   normalizeHomeDirectory,
@@ -17,40 +11,20 @@ import {
 import { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 
-interface UserNamespaceEvents {
-  changed: {
-    currentUser: UserProfile | null;
-    previousUsername: string | null;
-    reason: "login" | "logout" | "system";
-  };
-}
-
 @singleton()
-@EdenNamespace("user")
-export class UserManager extends EdenEmitter<UserNamespaceEvents> {
+export class UserManager {
   private store: UserStore;
-  private handler: UserHandler;
   private initialized = false;
-  private currentUser: StoredUser | null = null;
   private defaultUsername: string | null = null;
-  private coreApps: Set<string>;
   private restrictedApps: Set<string>;
-  private beforeSessionChangeHandlers = new Set<() => Promise<void>>();
 
   constructor(
-    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("EdenConfig") config: EdenConfig,
     @inject("appsDirectory") appsDirectory: string,
     @inject("userDirectory") private userDirectory: string,
   ) {
-    super(ipcBridge);
     this.store = new UserStore(appsDirectory);
-    this.coreApps = normalizeAppIds(config.coreApps);
     this.restrictedApps = normalizeAppIds(config.restrictedApps);
-
-    this.handler = new UserHandler(this);
-    commandRegistry.registerManager(this.handler);
   }
 
   async initialize(): Promise<void> {
@@ -58,12 +32,6 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     this.initialized = true;
 
     await this.loadDefaultUsername();
-
-    await this.tryAutoLoginDefaultUser();
-  }
-
-  getCurrentUser(): UserProfile | null {
-    return this.currentUser ? this.toPublicUser(this.currentUser) : null;
   }
 
   async listUsers(): Promise<UserProfile[]> {
@@ -174,10 +142,6 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
 
     await this.store.saveUserRecord(user);
 
-    if (this.currentUser?.username === user.username) {
-      await this.setCurrentUser(user, "system");
-    }
-
     return this.toPublicUser(user);
   }
 
@@ -187,31 +151,25 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       throw new Error("Vendor account cannot be deleted");
     }
 
-    if (this.currentUser?.username === username) {
-      await this.setCurrentUser(null, "logout");
-    }
-
     await this.store.deleteUserRecord(username);
   }
 
-  async setPassword(username: string, password: string): Promise<void> {
+  async setPassword(username: string, password: string): Promise<UserProfile> {
     const user = await this.requireUserRecord(username);
     const { passwordHash, passwordSalt } = await hashPassword(password);
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
     await this.store.saveUserRecord(user);
+    return this.toPublicUser(user);
   }
 
   async changePassword(
+    username: string,
     currentPassword: string,
     newPassword: string,
-  ): Promise<void> {
-    if (!this.currentUser) {
-      throw new Error("No active user session");
-    }
-
-    const user = await this.requireUserRecord(this.currentUser.username);
+  ): Promise<UserProfile> {
+    const user = await this.requireUserRecord(username);
     const valid = await verifyPassword(
       currentPassword,
       user.passwordSalt,
@@ -226,13 +184,10 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
     await this.store.saveUserRecord(user);
-
-    if (this.currentUser?.username === user.username) {
-      await this.setCurrentUser(user, "system");
-    }
+    return this.toPublicUser(user);
   }
 
-  async login(username: string, password: string): Promise<UserProfile> {
+  async authenticate(username: string, password: string): Promise<UserProfile> {
     const user = await this.requireUserRecord(username);
 
     if (
@@ -241,49 +196,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       throw new Error("Invalid credentials");
     }
 
-    await this.setCurrentUser(user, "login");
     return this.toPublicUser(user);
-  }
-
-  async logout(): Promise<void> {
-    await this.setCurrentUser(null, "logout");
-  }
-
-  /**
-   * Temporary lifecycle bridge until a SessionManager owns session transitions.
-   */
-  onBeforeSessionChange(handler: () => Promise<void>): () => void {
-    this.beforeSessionChangeHandlers.add(handler);
-    return () => this.beforeSessionChangeHandlers.delete(handler);
-  }
-
-  hasGrant(grant: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    const grants = this.currentUser.grants;
-    return matchesGrants(grants, grant);
-  }
-
-  canLaunchApp(appId: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    if (this.restrictedApps.has(appId)) return false;
-    if (this.coreApps.has(appId)) return true;
-    return matchesGrants(this.currentUser.grants, `apps/launch/${appId}`);
-  }
-
-  getAllowedApps(appIds: string[]): string[] {
-    return appIds.filter((appId) => this.canLaunchApp(appId));
-  }
-
-  canAccessSetting(appId: string, key: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    return matchesGrants(this.currentUser.grants, `settings/${appId}/${key}`);
-  }
-
-  getAllowedSettingKeys(appId: string, keys: string[]): string[] {
-    return keys.filter((key) => this.canAccessSetting(appId, key));
   }
 
   getDefaultUsername(): string | null {
@@ -304,26 +217,6 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
 
     this.defaultUsername = username;
     await this.store.setDefaultUsername(username);
-  }
-
-  private async setCurrentUser(
-    user: StoredUser | null,
-    reason: UserNamespaceEvents["changed"]["reason"],
-  ): Promise<void> {
-    const previousUsername = this.currentUser?.username ?? null;
-    const nextUsername = user?.username ?? null;
-    if (previousUsername !== nextUsername) {
-      for (const handler of this.beforeSessionChangeHandlers) {
-        await handler();
-      }
-    }
-    this.currentUser = user;
-
-    this.notify("changed", {
-      currentUser: user ? this.toPublicUser(user) : null,
-      previousUsername,
-      reason,
-    });
   }
 
   private normalizeUsername(
@@ -365,11 +258,10 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     this.defaultUsername = await this.store.getDefaultUsername();
   }
 
-  private async tryAutoLoginDefaultUser(): Promise<void> {
-    if (!this.defaultUsername) return;
+  async getDefaultUser(): Promise<UserProfile | null> {
+    if (!this.defaultUsername) return null;
     const user = await this.store.getUserRecord(this.defaultUsername);
-    if (!user) return;
-    await this.setCurrentUser(user, "system");
+    return user ? this.toPublicUser(user) : null;
   }
 
   private normalizeUserGrants(role: UserRole, grants: string[]): string[] {
