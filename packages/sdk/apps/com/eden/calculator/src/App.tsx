@@ -451,7 +451,10 @@ const App: Component = () => {
           class="eden-btn eden-btn-secondary"
           onClick={deleteLast}
         >
-          ⌫
+          <svg class="backspace-icon" viewBox="0 0 28 28" aria-hidden="true">
+            <path d="M11 7h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H11L3 14l8-7Z" />
+            <path d="m14 11 6 6m0-6-6 6" />
+          </svg>
         </button>
         <button
           type="button"

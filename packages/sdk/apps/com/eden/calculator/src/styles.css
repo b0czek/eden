@@ -97,6 +97,16 @@ body {
   transform: scale(0.96);
 }
 
+.backspace-icon {
+  width: 24px;
+  height: 24px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2px;
+}
+
 /* Number button styling */
 .num-btn {
   background: var(--eden-color-surface-tertiary);
