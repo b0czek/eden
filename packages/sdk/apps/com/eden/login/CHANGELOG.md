@@ -1,5 +1,12 @@
 # com.eden.login
 
+## 1.0.14
+
+### Patch Changes
+
+- @edenapp/babel@0.11.0
+- @edenapp/solid-kit@0.11.0
+
 ## 1.0.13
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # com.eden.pdf-viewer
 
+## 1.0.4
+
+### Patch Changes
+
+- @edenapp/babel@0.11.0
+- @edenapp/tablets@0.11.0
+
 ## 1.0.3
 
 ### Patch Changes

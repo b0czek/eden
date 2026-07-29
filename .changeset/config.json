@@ -5,6 +5,7 @@
   "fixed": [
     [
       "@edenapp/sdk",
+      "@edenapp/dev-host",
       "@edenapp/scripts",
       "@edenapp/types",
       "@edenapp/genesis",
@@ -15,7 +16,7 @@
   ],
   "linked": [],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "master",
   "updateInternalDependencies": "patch",
   "ignore": ["@edenapp/example"]
 }

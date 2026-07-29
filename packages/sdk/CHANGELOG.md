@@ -1,5 +1,20 @@
 # @edenapp/sdk
 
+## 0.11.0
+
+### Minor Changes
+
+- 826e23c: Add consumer-controlled product branding for SDK-owned interfaces and the
+  main Electron window.
+- 0c50cbc: Add a cached standalone Eden development host and `eden-build dev` source-app workflow.
+
+### Patch Changes
+
+- Updated dependencies [826e23c]
+- Updated dependencies [0c50cbc]
+  - @edenapp/types@0.11.0
+  - @edenapp/genesis@0.11.0
+
 ## 0.10.2
 
 ### Patch Changes
