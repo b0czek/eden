@@ -6,7 +6,7 @@ import { delay, inject, singleton } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { SessionContext } from "../session";
+import { SessionContext } from "../session/SessionContext";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import { SettingsHandler } from "./SettingsHandler";
 /**

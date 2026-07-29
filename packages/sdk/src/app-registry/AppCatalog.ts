@@ -4,7 +4,7 @@ import type { RuntimeAppManifest } from "@edenapp/types";
 import fg from "fast-glob";
 import { inject, injectable, singleton } from "tsyringe";
 import { log } from "../logging";
-import { SessionContext } from "../session";
+import { SessionContext } from "../session/SessionContext";
 import { AppRegistry } from "./AppRegistry";
 import { DEFAULT_APP_ICON_DATA_URL } from "./defaultAppIcon";
 

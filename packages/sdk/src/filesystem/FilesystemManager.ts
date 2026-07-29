@@ -5,7 +5,7 @@ import fg from "fast-glob";
 import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
-import { SessionContext } from "../session";
+import { SessionContext } from "../session/SessionContext";
 import {
   assertExistingPathWithin,
   assertPathWithin,
