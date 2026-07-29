@@ -18,7 +18,6 @@ type CommandRegistryMock = jest.Mocked<
 type EventSubscribersMock = {
   notify: jest.Mock;
   notifyView: jest.Mock;
-  subscribeInternal: jest.Mock;
 };
 type ViewManagerMock = jest.Mocked<
   Pick<
@@ -30,7 +29,7 @@ type NotificationManagerMock = jest.Mocked<
   Pick<NotificationManager, "pushNotification">
 >;
 type ProcessManagerMock = jest.Mocked<
-  Pick<ProcessManager, "ensureAppRunning" | "getAppInstance" | "stopApp">
+  Pick<ProcessManager, "ensureAppRunning" | "getAppInstance" | "on" | "stopApp">
 >;
 type AppAssociationManagerMock = jest.Mocked<
   Pick<AppAssociationManager, "resolve">
@@ -74,21 +73,9 @@ const providerManifest = (
   }) as RuntimeAppManifest;
 
 const createManager = () => {
-  const internalSubscriptions = new Map<
-    string,
-    Array<(payload: never) => void>
-  >();
   const eventSubscribers: EventSubscribersMock = {
     notify: jest.fn(),
     notifyView: jest.fn(),
-    subscribeInternal: jest.fn(
-      (event: string, callback: (payload: never) => void) => {
-        internalSubscriptions.set(event, [
-          ...(internalSubscriptions.get(event) ?? []),
-          callback,
-        ]);
-      },
-    ),
   };
   const ipcBridge = { eventSubscribers } as unknown as IPCBridge;
   const commandRegistry: CommandRegistryMock = {
@@ -119,6 +106,7 @@ const createManager = () => {
         ({}) as Awaited<ReturnType<ProcessManager["ensureAppRunning"]>>,
     ),
     getAppInstance: jest.fn((_appId: string) => ({}) as never),
+    on: jest.fn(),
     stopApp: jest.fn(async (_appId: string) => undefined),
   };
   const appAssociationManager: AppAssociationManagerMock = {
@@ -153,9 +141,10 @@ const createManager = () => {
     permissionRegistry,
     viewManager,
     emitInternal: (event: string, payload: never) => {
-      for (const callback of internalSubscriptions.get(event) ?? []) {
-        callback(payload);
-      }
+      const listener = processManager.on.mock.calls.find(
+        ([registeredEvent]) => registeredEvent === event,
+      )?.[1];
+      listener?.(payload);
     },
   };
 };
@@ -522,7 +511,7 @@ describe("FilePickerManager", () => {
       { appId: "com.eden.editor", webContentsId: 200 },
     );
 
-    emitInternal("process/stopped", { appId: "com.eden.editor" } as never);
+    emitInternal("stopped", { appId: "com.eden.editor" } as never);
 
     expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
       10,
@@ -551,7 +540,7 @@ describe("FilePickerManager", () => {
       { appId: "com.eden.editor", webContentsId: 200 },
     );
 
-    emitInternal("process/stopped", {
+    emitInternal("stopped", {
       appId: "com.eden.file-picker",
     } as never);
 
@@ -696,7 +685,7 @@ describe("FilePickerManager", () => {
         { appId: "com.eden.file-picker", webContentsId: 100 },
       );
 
-      emitInternal("process/stopped", {
+      emitInternal("stopped", {
         appId: "com.eden.file-picker",
       } as never);
       jest.advanceTimersByTime(10_000);

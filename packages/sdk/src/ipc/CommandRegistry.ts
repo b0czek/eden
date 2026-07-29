@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { delay, inject, injectable, singleton } from "tsyringe";
 import { log } from "../logging";
-import type { UserManager } from "../user/UserManager";
+import type { SessionContext } from "../session";
 import { getManagerMetadata } from "./CommandMetadata";
 import { PermissionRegistry } from "./PermissionRegistry";
 
@@ -43,8 +43,8 @@ export class CommandRegistry {
 
   constructor(
     @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry,
-    @inject(delay(() => require("../user/UserManager").UserManager))
-    private userManager: UserManager,
+    @inject(delay(() => require("../session/SessionContext").SessionContext))
+    private sessionContext: SessionContext,
   ) {}
 
   /**
@@ -164,7 +164,7 @@ export class CommandRegistry {
 
         // Check if user has any of the grants that would unlock this permission
         const hasGrant = requiredGrantKeys.some((grantKey) =>
-          this.userManager.hasGrant(grantKey),
+          this.sessionContext.hasGrant(grantKey),
         );
 
         if (!hasGrant) {

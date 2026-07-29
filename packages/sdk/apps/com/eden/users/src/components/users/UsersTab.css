@@ -78,3 +78,15 @@
 .raw-grants-textarea {
   min-height: calc(25 * var(--eden-space-md));
 }
+
+.user-filesystem-location-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--eden-space-sm);
+}
+
+.user-filesystem-location-path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--eden-font-family-mono);
+}

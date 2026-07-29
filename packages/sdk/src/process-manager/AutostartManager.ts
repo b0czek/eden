@@ -1,10 +1,9 @@
 import type { EdenConfig } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
-import { IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { SessionContext, SessionManager } from "../session";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
-import { UserManager } from "../user/UserManager";
 import { ProcessManager } from "./ProcessManager";
 /**
  * AutostartManager handles launching applications when Eden starts
@@ -20,36 +19,33 @@ export class AutostartManager {
     @inject("EdenConfig") private config: EdenConfig,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SettingsManager) private settingsManager: SettingsManager,
-    @inject(UserManager) private userManager: UserManager,
-    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(SessionContext) private sessionContext: SessionContext,
+    @inject(SessionManager) sessionManager: SessionManager,
   ) {
-    // Subscribe directly to user/changed event
-    ipcBridge.eventSubscribers.subscribeInternal(
-      "user/changed",
-      ({ currentUser, previousUsername }) => {
-        const currentUsername = currentUser?.username ?? null;
-        if (currentUsername === previousUsername) {
-          // Same user, grants may have changed but no session reset
-          return;
-        }
+    // Start the appropriate environment after a committed session transition.
+    sessionManager.on("changed", ({ currentUser, previousUsername }) => {
+      const currentUsername = currentUser?.username ?? null;
+      if (currentUsername === previousUsername) {
+        // Same user, grants may have changed but no session reset
+        return;
+      }
 
-        if (!this.ready) {
-          return;
-        }
+      if (!this.ready) {
+        return;
+      }
 
-        if (currentUsername) {
-          void this.queueSessionLaunch();
-        } else {
-          void this.queueLoginLaunch();
-        }
-      },
-    );
+      if (currentUsername) {
+        void this.queueSessionLaunch();
+      } else {
+        void this.queueLoginLaunch();
+      }
+    });
   }
 
   onFoundationReady(): void {
     if (this.ready) return;
     this.ready = true;
-    if (this.userManager.getCurrentUser()) {
+    if (this.sessionContext.getCurrentUser()) {
       void this.queueSessionLaunch();
     } else {
       void this.queueLoginLaunch();
@@ -87,7 +83,7 @@ export class AutostartManager {
   }
 
   private async launchSessionApps(): Promise<void> {
-    if (!this.userManager.getCurrentUser()) {
+    if (!this.sessionContext.getCurrentUser()) {
       return;
     }
 
@@ -115,7 +111,7 @@ export class AutostartManager {
   }
 
   private async launchLoginApp(): Promise<void> {
-    if (this.userManager.getCurrentUser()) {
+    if (this.sessionContext.getCurrentUser()) {
       return;
     }
 

@@ -18,7 +18,7 @@ import {
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
-import { UserManager } from "../user/UserManager";
+import { SessionContext } from "../session";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
 import { ProcessHandler } from "./ProcessHandler";
@@ -58,7 +58,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(AppCatalog) private appCatalog: AppCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
-    @inject(UserManager) private userManager: UserManager,
+    @inject(SessionContext) private sessionContext: SessionContext,
     @inject("EdenConfig") private config: EdenConfig,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
   ) {
@@ -71,7 +71,6 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     this.setupEventHandlers();
-    this.setupUserAccessHandlers();
     this.setupHotReloadWatcher();
 
     // Create and register handler
@@ -96,42 +95,26 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     // Transfer backend port to frontend when view loads
-    // Subscribe via ipcBridge since ViewManager emits via EdenEmitter
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "view/view-loaded",
-      ({ viewId, appId }) => {
-        log.info(`View loaded for app ${appId}`);
+    this.viewManager.on("view-loaded", ({ viewId, appId }) => {
+      log.info(`View loaded for app ${appId}`);
 
-        // If app has a backend, transfer the port to the frontend
-        const backendPort = this.backendManager.getFrontendPort(appId);
-        if (backendPort) {
-          const viewInfo = this.viewManager.getViewInfo(viewId);
-          if (viewInfo) {
-            log.info(
-              `Transferring backend port to view ${viewId} for app ${appId}`,
-            );
-            viewInfo.view.webContents.postMessage("backend-port", {}, [
-              backendPort,
-            ]);
-            // Port has been transferred
-          }
-        } else {
-          log.info(`No backend port for app ${appId} (may be frontend-only)`);
+      // If app has a backend, transfer the port to the frontend
+      const backendPort = this.backendManager.getFrontendPort(appId);
+      if (backendPort) {
+        const viewInfo = this.viewManager.getViewInfo(viewId);
+        if (viewInfo) {
+          log.info(
+            `Transferring backend port to view ${viewId} for app ${appId}`,
+          );
+          viewInfo.view.webContents.postMessage("backend-port", {}, [
+            backendPort,
+          ]);
+          // Port has been transferred
         }
-      },
-    );
-  }
-
-  private setupUserAccessHandlers(): void {
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "user/changed",
-      async ({ currentUser, previousUsername }) => {
-        const currentUsername = currentUser?.username ?? null;
-        if (currentUsername !== previousUsername) {
-          await this.stopSessionApps();
-        }
-      },
-    );
+      } else {
+        log.info(`No backend port for app ${appId} (may be frontend-only)`);
+      }
+    });
   }
 
   private setupHotReloadWatcher(): void {
@@ -222,7 +205,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    if (!this.isLoginApp(appId) && !this.userManager.canLaunchApp(appId)) {
+    if (!this.isLoginApp(appId) && !this.sessionContext.canLaunchApp(appId)) {
       throw new Error(`User cannot launch app ${appId}`);
     }
 
@@ -508,14 +491,22 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     log.info(`App ${appId} reloaded successfully`);
   }
 
-  private async stopSessionApps(): Promise<void> {
+  async stopSessionApps(): Promise<void> {
     const running = Array.from(this.runningApps.keys());
+    const errors: unknown[] = [];
     for (const appId of running) {
       try {
         await this.stopApp(appId);
       } catch (error) {
-        log.error(`Failed to stop session app ${appId}:`, error);
+        // A process may exit on its own after the snapshot was taken.
+        if (this.runningApps.has(appId)) {
+          errors.push(error);
+        }
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "Failed to stop all session apps");
     }
   }
 

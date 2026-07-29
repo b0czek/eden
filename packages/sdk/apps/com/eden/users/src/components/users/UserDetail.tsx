@@ -12,6 +12,7 @@ import {
   getResolvedGrants,
 } from "../../grants";
 import { getLocalizedValue, locale, t } from "../../i18n";
+import FilesystemLocationField from "./FilesystemLocationField";
 import GrantsEasyMode from "./GrantsEasyMode";
 import GrantsRawMode from "./GrantsRawMode";
 import type { SettingsOption } from "./types";
@@ -27,6 +28,10 @@ interface UserDetailProps {
   onDelete: (username: string) => void;
   onOpenPasswordModal: (user: UserProfile) => void;
   onToggleDefaultUser: (username: string, enabled: boolean) => void;
+  onSaveHomeDirectory: (
+    username: string,
+    homeDirectory: string,
+  ) => Promise<boolean>;
   updateGrants: (
     username: string,
     updater: (grants: Set<string>) => Set<string>,
@@ -36,10 +41,21 @@ interface UserDetailProps {
 const UserDetail = (props: UserDetailProps) => {
   const [mode, setMode] = createSignal<"easy" | "raw">("easy");
   const [rawGrantText, setRawGrantText] = createSignal("");
+  const [homeDirectory, setHomeDirectory] = createSignal("");
+  const [homeDirectoryError, setHomeDirectoryError] = createSignal(false);
+  let displayedUsername: string | undefined;
+  let lastSavedHomeDirectory = "";
+  let homeDirectorySaveQueue = Promise.resolve();
 
   // Sync raw text when user changes
   createEffect(() => {
     setRawGrantText((props.user.grants || []).join("\n"));
+    if (displayedUsername !== props.user.username) {
+      displayedUsername = props.user.username;
+      lastSavedHomeDirectory = props.user.homeDirectory ?? "";
+      setHomeDirectory(lastSavedHomeDirectory);
+      setHomeDirectoryError(false);
+    }
   });
 
   const handleSaveRaw = () => {
@@ -65,6 +81,32 @@ const UserDetail = (props: UserDetailProps) => {
       }
       return updater(grants);
     });
+  };
+
+  const saveHomeDirectory = (value: string) => {
+    const username = props.user.username;
+    const nextHomeDirectory = value.trim();
+    if (nextHomeDirectory === lastSavedHomeDirectory) return;
+
+    homeDirectorySaveQueue = homeDirectorySaveQueue.then(async () => {
+      const success = await props.onSaveHomeDirectory(
+        username,
+        nextHomeDirectory,
+      );
+      if (displayedUsername !== username) return;
+
+      if (success) {
+        lastSavedHomeDirectory = nextHomeDirectory;
+      }
+      if (homeDirectory().trim() === nextHomeDirectory) {
+        setHomeDirectoryError(!success);
+      }
+    });
+  };
+
+  const updateHomeDirectory = (value: string) => {
+    setHomeDirectory(value);
+    setHomeDirectoryError(false);
   };
 
   const isCurrent = () => props.currentUser?.username === props.user.username;
@@ -134,6 +176,42 @@ const UserDetail = (props: UserDetailProps) => {
       />
 
       <div class="eden-card-body eden-flex-col eden-gap-lg">
+        <Show
+          when={!isVendor()}
+          fallback={
+            <div class="eden-info-card">
+              <div class="eden-info-card-content">
+                <p class="eden-info-card-title">
+                  {t("settings.users.filesystemLocation")}
+                </p>
+                <p class="eden-info-card-description">
+                  {t("settings.users.vendorFilesystemDescription")}
+                </p>
+              </div>
+            </div>
+          }
+        >
+          <div class="eden-form-group">
+            <label class="eden-form-label" for="user-filesystem-location">
+              {t("settings.users.filesystemLocation")}
+            </label>
+            <FilesystemLocationField
+              id="user-filesystem-location"
+              value={homeDirectory()}
+              onInput={updateHomeDirectory}
+              onCommit={saveHomeDirectory}
+            />
+            <span class="eden-form-help">
+              {t("settings.users.filesystemLocationHelp")}
+            </span>
+            <Show when={homeDirectoryError()}>
+              <span class="eden-form-error">
+                {t("settings.users.filesystemLocationUpdateFailed")}
+              </span>
+            </Show>
+          </div>
+        </Show>
+
         <label class="eden-list-item eden-list-item-interactive eden-flex-between">
           <div class="eden-list-item-content">
             <span class="eden-list-item-title">

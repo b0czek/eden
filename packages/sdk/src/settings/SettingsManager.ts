@@ -6,7 +6,7 @@ import { delay, inject, singleton } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { UserManager } from "../user/UserManager";
+import { SessionContext } from "../session";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import { SettingsHandler } from "./SettingsHandler";
 /**
@@ -41,7 +41,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
-    @inject(delay(() => UserManager)) private userManager: UserManager,
+    @inject(delay(() => SessionContext)) private sessionContext: SessionContext,
     @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
   ) {
     super(ipcBridge);
@@ -305,7 +305,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   assertAccess(appId: string, key: string): void {
     const grantKey = this.resolveGrantKey(appId, key);
-    if (!this.userManager.canAccessSetting(appId, grantKey)) {
+    if (!this.sessionContext.canAccessSetting(appId, grantKey)) {
       throw new Error("User does not have grant to access this setting");
     }
   }
@@ -315,11 +315,14 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
    */
   filterAllowedKeys(appId: string, keys: string[]): string[] {
     if (appId !== EDEN_SETTINGS_APP_ID) {
-      return this.userManager.getAllowedSettingKeys(appId, keys);
+      return this.sessionContext.getAllowedSettingKeys(appId, keys);
     }
     return keys.filter((key) => {
       const grantKey = this.resolveGrantKey(EDEN_SETTINGS_APP_ID, key);
-      return this.userManager.canAccessSetting(EDEN_SETTINGS_APP_ID, grantKey);
+      return this.sessionContext.canAccessSetting(
+        EDEN_SETTINGS_APP_ID,
+        grantKey,
+      );
     });
   }
 
@@ -332,7 +335,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
         ...category,
         settings: category.settings.filter((setting) => {
           const grantKey = setting.grant ?? setting.key;
-          return this.userManager.canAccessSetting(
+          return this.sessionContext.canAccessSetting(
             EDEN_SETTINGS_APP_ID,
             grantKey,
           );
@@ -340,7 +343,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
       }))
       .filter((category) => {
         if (category.view && category.grant) {
-          return this.userManager.hasGrant(category.grant);
+          return this.sessionContext.hasGrant(category.grant);
         }
         // For regular categories, must have at least one setting
         return category.settings.length > 0;

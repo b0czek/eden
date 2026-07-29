@@ -12,10 +12,6 @@ export class EventSubscriberManager {
   private subscriptions: Map<string, Set<number>> = new Map();
   private backendSubscriptions: Map<string, Set<string>> = new Map();
   private foundationSubscriptions: Map<string, boolean> = new Map();
-  private internalSubscriptions: Map<
-    string,
-    Set<(payload: EventData<EventName>) => void>
-  > = new Map();
   private permissionRegistry?: PermissionRegistry;
 
   constructor(viewManager: ViewManager) {
@@ -107,23 +103,6 @@ export class EventSubscriberManager {
   }
 
   /**
-   * Subscribe an internal callback (for managers) to an event
-   * Unlike view subscriptions, these are in-process callbacks
-   */
-  public subscribeInternal<T extends EventName>(
-    event: T,
-    callback: (data: EventData<T>) => void,
-  ): void {
-    if (!this.internalSubscriptions.has(event)) {
-      this.internalSubscriptions.set(event, new Set());
-    }
-    this.internalSubscriptions
-      .get(event)
-      ?.add(callback as (payload: EventData<EventName>) => void);
-    log.info(`Internal subscriber added for event: ${event}`);
-  }
-
-  /**
    * Unsubscribe a view from an event
    */
   public unsubscribe(viewId: number, eventName: string): boolean {
@@ -191,25 +170,11 @@ export class EventSubscriberManager {
     return subscriptions ? Array.from(subscriptions) : [];
   }
 
-  /**
-   * Send event only to subscribed views, backends, and internal callbacks
-   */
+  /** Send an event to subscribed external consumers. */
   public notify<T extends EventName>(
     eventName: T,
     payload: EventData<T>,
   ): void {
-    // Notify internal subscribers first
-    const internalCallbacks = this.internalSubscriptions.get(eventName);
-    if (internalCallbacks) {
-      for (const callback of internalCallbacks) {
-        try {
-          callback(payload);
-        } catch (error) {
-          log.error(`Error in internal subscriber for ${eventName}:`, error);
-        }
-      }
-    }
-
     // Notify foundation if subscribed
     if (this.foundationSubscriptions.has(eventName)) {
       this.viewManager.sendToMainWindow("shell-message", {

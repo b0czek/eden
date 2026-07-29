@@ -230,7 +230,8 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     virtualPath: string,
   ): Promise<{ success: boolean; manifest?: AppManifest; error?: string }> {
     try {
-      const resolvedPath = this.filesystemManager.resolvePath(virtualPath);
+      const resolvedPath =
+        await this.filesystemManager.resolvePath(virtualPath);
       return await genesisBundler.getInfo(resolvedPath);
     } catch (error) {
       return {
@@ -244,7 +245,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    * Install an app from a .edenite file
    */
   async installApp(virtualPath: string): Promise<RuntimeAppManifest> {
-    const edenitePath = this.filesystemManager.resolvePath(virtualPath);
+    const edenitePath = await this.filesystemManager.resolvePath(virtualPath);
 
     // Check if file exists
     try {

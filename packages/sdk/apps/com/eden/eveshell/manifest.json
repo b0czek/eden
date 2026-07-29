@@ -7,6 +7,8 @@
     "db/rw",
     "user/identity",
     "user/session",
+    "session/read",
+    "session/manage",
     "package/read",
     "process/read",
     "process/manage",

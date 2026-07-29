@@ -16,8 +16,8 @@ import type {
 } from "@edenapp/types";
 import { BrowserWindow, ipcMain, screen } from "electron";
 import { delay, inject, injectable, singleton } from "tsyringe";
-import { IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { ProcessManager } from "../process-manager";
 import { EDEN_SETTINGS_APP_ID, SettingsManager } from "../settings";
 import { ViewManager } from "../view-manager";
 import { MouseTracker } from "../view-manager/MouseTracker";
@@ -99,8 +99,9 @@ export class KeyboardManager {
   );
 
   constructor(
-    @inject(IPCBridge) private readonly ipcBridge: IPCBridge,
     @inject(ViewManager) private readonly viewManager: ViewManager,
+    @inject(delay(() => ProcessManager))
+    private readonly processManager: ProcessManager,
     @inject(delay(() => SettingsManager))
     private readonly settingsManager: SettingsManager,
   ) {
@@ -116,115 +117,106 @@ export class KeyboardManager {
   }
 
   private setupEventSubscriptions(): void {
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "view/global-bounds-changed",
-      ({ workspaceBounds }) => {
-        this.workspaceBounds = workspaceBounds;
-        if (
-          this.isKeyboardVisible() &&
-          this.getEffectivePlacementMode() === "docked"
-        ) {
-          this.refreshKeyboardPresentation().catch((error) => {
-            log.error("Failed to reposition keyboard overlay:", error);
-          });
-        }
-      },
-    );
+    this.viewManager.on("global-bounds-changed", ({ workspaceBounds }) => {
+      this.workspaceBounds = workspaceBounds;
+      if (
+        this.isKeyboardVisible() &&
+        this.getEffectivePlacementMode() === "docked"
+      ) {
+        this.refreshKeyboardPresentation().catch((error) => {
+          log.error("Failed to reposition keyboard overlay:", error);
+        });
+      }
+    });
 
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "process/stopped",
-      ({ appId }) => {
-        if (this.currentTarget?.appId === appId) {
-          this.currentTarget = null;
+    this.processManager.on("stopped", ({ appId }) => {
+      if (this.currentTarget?.appId === appId) {
+        this.currentTarget = null;
+        this.dismissedTarget = null;
+        if (this.persistentVisibility) {
+          void this.refreshKeyboardPresentation();
+          return;
+        }
+
+        void this.hideKeyboard();
+      }
+    });
+
+    this.settingsManager.on("changed", (data) => {
+      if (data.appId !== EDEN_SETTINGS_APP_ID) {
+        return;
+      }
+
+      if (data.key === SETTING_PLACEMENT_MODE) {
+        const nextMode = this.parsePlacementMode(data.value);
+        if (nextMode === this.placementMode) {
+          return;
+        }
+
+        this.placementMode = nextMode;
+        void this.refreshKeyboardPresentation();
+        return;
+      }
+
+      if (data.key === SETTING_SHOW_NUMBER_ROW) {
+        this.showNumberRow = data.value !== "false";
+        void this.refreshKeyboardPresentation();
+        return;
+      }
+
+      if (data.key === SETTING_INTERFACE_SCALE) {
+        const nextScale = this.parseInterfaceScale(data.value);
+        if (nextScale === this.interfaceScale) {
+          return;
+        }
+
+        this.interfaceScale = nextScale;
+        this.applyKeyboardWindowScale();
+        void this.refreshKeyboardPresentation();
+        return;
+      }
+
+      if (data.key === SETTING_ENABLED) {
+        const nextEnabled = data.value !== "false";
+        if (nextEnabled === this.enabled) {
+          return;
+        }
+
+        this.enabled = nextEnabled;
+        if (!this.enabled) {
+          this.persistentVisibility = false;
           this.dismissedTarget = null;
-          if (this.persistentVisibility) {
-            void this.refreshKeyboardPresentation();
-            return;
-          }
-
           void this.hideKeyboard();
-        }
-      },
-    );
-
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "settings/changed",
-      (data) => {
-        if (data.appId !== EDEN_SETTINGS_APP_ID) {
           return;
         }
 
-        if (data.key === SETTING_PLACEMENT_MODE) {
-          const nextMode = this.parsePlacementMode(data.value);
-          if (nextMode === this.placementMode) {
-            return;
-          }
+        if (this.currentTarget && this.autoShowOnFocus) {
+          void this.showKeyboard();
+        }
+        return;
+      }
 
-          this.placementMode = nextMode;
-          void this.refreshKeyboardPresentation();
+      if (data.key === SETTING_AUTO_SHOW_ON_FOCUS) {
+        const nextAutoShowOnFocus = data.value !== "false";
+        if (nextAutoShowOnFocus === this.autoShowOnFocus) {
           return;
         }
 
-        if (data.key === SETTING_SHOW_NUMBER_ROW) {
-          this.showNumberRow = data.value !== "false";
-          void this.refreshKeyboardPresentation();
+        this.autoShowOnFocus = nextAutoShowOnFocus;
+        if (
+          !this.autoShowOnFocus &&
+          this.isKeyboardVisible() &&
+          !this.persistentVisibility
+        ) {
+          void this.hideKeyboard();
           return;
         }
 
-        if (data.key === SETTING_INTERFACE_SCALE) {
-          const nextScale = this.parseInterfaceScale(data.value);
-          if (nextScale === this.interfaceScale) {
-            return;
-          }
-
-          this.interfaceScale = nextScale;
-          this.applyKeyboardWindowScale();
-          void this.refreshKeyboardPresentation();
-          return;
+        if (this.autoShowOnFocus && this.enabled && this.currentTarget) {
+          void this.showKeyboard();
         }
-
-        if (data.key === SETTING_ENABLED) {
-          const nextEnabled = data.value !== "false";
-          if (nextEnabled === this.enabled) {
-            return;
-          }
-
-          this.enabled = nextEnabled;
-          if (!this.enabled) {
-            this.persistentVisibility = false;
-            this.dismissedTarget = null;
-            void this.hideKeyboard();
-            return;
-          }
-
-          if (this.currentTarget && this.autoShowOnFocus) {
-            void this.showKeyboard();
-          }
-          return;
-        }
-
-        if (data.key === SETTING_AUTO_SHOW_ON_FOCUS) {
-          const nextAutoShowOnFocus = data.value !== "false";
-          if (nextAutoShowOnFocus === this.autoShowOnFocus) {
-            return;
-          }
-
-          this.autoShowOnFocus = nextAutoShowOnFocus;
-          if (
-            !this.autoShowOnFocus &&
-            this.isKeyboardVisible() &&
-            !this.persistentVisibility
-          ) {
-            void this.hideKeyboard();
-            return;
-          }
-
-          if (this.autoShowOnFocus && this.enabled && this.currentTarget) {
-            void this.showKeyboard();
-          }
-        }
-      },
-    );
+      }
+    });
   }
 
   private setupIPCHandlers(): void {

@@ -81,6 +81,11 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
 
 Eden apps run in a sandboxed environment but can interact with the system via the global `edenAPI` object. This API provides secure access to system features based on the requested permissions.
 
+Filesystem paths are virtual. `/` maps to the active user's configured home
+directory, or to the configured `userDirectory` root when the user has no home
+restriction. Vendor users always use the root. Applications should persist and
+exchange virtual paths rather than resolved host paths.
+
 ### Shell Commands
 
 The primary way to interact is `edenAPI.shellCommand`.

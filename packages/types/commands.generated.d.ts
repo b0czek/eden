@@ -648,6 +648,26 @@ export interface ProcessCommands {
 }
 
 /**
+ * SessionCommands - Commands for the "session" namespace
+ */
+export interface SessionCommands {
+  "session/get-current": {
+    args: Record<string, never>;
+    response: { user: import("./index").UserProfile | null };
+  };
+  "session/login": {
+    args: {
+    username: string;
+    password: string };
+    response: { success: boolean; user?: import("./index").UserProfile; error?: string };
+  };
+  "session/logout": {
+    args: Record<string, never>;
+    response: { success: boolean };
+  };
+}
+
+/**
  * SettingsCommands - Commands for the "settings" namespace
  */
 export interface SettingsCommands {
@@ -764,29 +784,6 @@ export interface UserCommands {
     response: { users: import("./index").UserProfile[] };
   };
   /**
-   * Return the current logged-in user.
-   */
-  "user/get-current": {
-    args: Record<string, never>;
-    response: { user: import("./index").UserProfile | null };
-  };
-  /**
-   * Authenticate a user and establish a session.
-   */
-  "user/login": {
-    args: {
-    username: string;
-    password: string };
-    response: { success: boolean; user?: import("./index").UserProfile; error?: string };
-  };
-  /**
-   * End the current session.
-   */
-  "user/logout": {
-    args: Record<string, never>;
-    response: { success: boolean };
-  };
-  /**
    * Create a new user.
    */
   "user/create": {
@@ -795,7 +792,8 @@ export interface UserCommands {
     name: string;
     role?: import("./index").UserRole;
     password: string;
-    grants?: string[] };
+    grants?: string[];
+    homeDirectory?: string };
     response: { user: import("./index").UserProfile };
   };
   /**
@@ -806,7 +804,8 @@ export interface UserCommands {
     username: string;
     name?: string;
     role?: import("./index").UserRole;
-    grants?: string[] };
+    grants?: string[];
+    homeDirectory?: string | null };
     response: { user: import("./index").UserProfile };
   };
   /**
@@ -1011,4 +1010,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}

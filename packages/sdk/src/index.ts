@@ -18,6 +18,7 @@ export {
 } from "./logging";
 export { PackageManager } from "./package-manager";
 export { BackendManager, ProcessManager } from "./process-manager";
+export { SessionManager } from "./session";
 export { UserManager } from "./user";
 // Window management exports
 export { ViewManager } from "./view-manager";

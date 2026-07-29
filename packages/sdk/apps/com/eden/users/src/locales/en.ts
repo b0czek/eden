@@ -32,6 +32,18 @@ export const en = {
       appGrants: "App grants",
       systemGrants: "System grants",
       rawWarning: "Caution: modifying raw grants can break application access.",
+      filesystemLocation: "Filesystem location",
+      filesystemLocationPlaceholder:
+        "Relative path, for example teams/operators",
+      filesystemLocationHelp:
+        "Limits this user's filesystem access to this folder. Leave blank for the shared root; users may share the same location.",
+      filesystemLocationUpdateFailed:
+        "Failed to update the filesystem location",
+      filesystemLocationPickerFailed: "Failed to open the folder picker",
+      filesystemLocationPickerTitle: "Choose filesystem location",
+      chooseLocation: "Choose folder",
+      vendorFilesystemDescription:
+        "Vendor users always have access to the full filesystem root.",
     },
   },
 } as const;

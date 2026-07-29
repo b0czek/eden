@@ -2,9 +2,16 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
 import fg from "fast-glob";
-import { inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, singleton } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
+import { SessionContext } from "../session";
+import {
+  assertExistingPathWithin,
+  assertPathWithin,
+  normalizeHomeDirectory,
+  resolveHomeDirectory,
+} from "../user/UserHomeDirectory";
 import { FilesystemHandler } from "./FilesystemHandler";
 /**
  * FilesystemManager
@@ -20,6 +27,7 @@ export class FilesystemManager {
   constructor(
     @inject("userDirectory") baseDir: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(delay(() => SessionContext)) private sessionContext: SessionContext,
   ) {
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
@@ -43,19 +51,13 @@ export class FilesystemManager {
    * @returns The resolved absolute path (e.g., "/home/user/.eden/file.json")
    * @throws Error if the path attempts to escape the base directory
    */
-  resolvePath(targetPath: string): string {
-    // Prevent directory traversal
-    const safePath = path.normalize(targetPath).replace(/^(\.\.[\\/])+/, "");
-    // Remove leading slashes to ensure path.join works correctly
-    const relativePath = safePath.replace(/^[\\/]+/, "");
-    const resolved = path.join(this.baseDir, relativePath);
+  async resolvePath(targetPath: string): Promise<string> {
+    const effectiveRoot = this.getEffectiveRoot();
+    const relativePath = targetPath.replace(/^[\\/]+/, "");
+    const resolved = path.resolve(effectiveRoot, relativePath);
 
-    // Double check it's still inside baseDir
-    if (!resolved.startsWith(this.baseDir)) {
-      throw new Error(
-        `Access denied: Path '${targetPath}' resolves to '${resolved}', which is outside of base directory '${this.baseDir}'`,
-      );
-    }
+    assertPathWithin(effectiveRoot, resolved, `Path '${targetPath}'`);
+    await assertExistingPathWithin(effectiveRoot, resolved);
     return resolved;
   }
 
@@ -66,16 +68,18 @@ export class FilesystemManager {
    * @returns The masked path relative to the base directory
    * @throws Error if the path is outside the base directory
    */
-  toMaskedPath(absolutePath: string): string {
+  async toMaskedPath(absolutePath: string): Promise<string> {
+    const effectiveRoot = this.getEffectiveRoot();
     const normalizedAbsolute = path.resolve(absolutePath);
 
-    if (!normalizedAbsolute.startsWith(this.baseDir)) {
-      throw new Error(
-        `Path '${absolutePath}' is outside of base directory '${this.baseDir}'`,
-      );
-    }
+    assertPathWithin(
+      effectiveRoot,
+      normalizedAbsolute,
+      `Path '${absolutePath}'`,
+    );
+    await assertExistingPathWithin(effectiveRoot, normalizedAbsolute);
 
-    const relativePath = normalizedAbsolute.slice(this.baseDir.length);
+    const relativePath = normalizedAbsolute.slice(effectiveRoot.length);
     // Ensure it starts with /
     return relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
   }
@@ -83,13 +87,31 @@ export class FilesystemManager {
   /**
    * Check if a path is within the allowed base directory
    */
-  isPathAllowed(targetPath: string): boolean {
+  async isPathAllowed(targetPath: string): Promise<boolean> {
     try {
-      this.resolvePath(targetPath);
+      await this.resolvePath(targetPath);
       return true;
     } catch {
       return false;
     }
+  }
+
+  private getEffectiveRoot(): string {
+    const user = this.sessionContext.getCurrentUser();
+    if (!user) {
+      throw new Error("No active user session");
+    }
+
+    if (user.role === "vendor") {
+      return this.baseDir;
+    }
+
+    const homeDirectory = normalizeHomeDirectory(user.homeDirectory);
+    if (!homeDirectory) {
+      return this.baseDir;
+    }
+
+    return resolveHomeDirectory(this.baseDir, homeDirectory);
   }
 
   // =====================
@@ -103,7 +125,7 @@ export class FilesystemManager {
     targetPath: string,
     encoding: BufferEncoding = "utf-8",
   ): Promise<string> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
     return await fs.readFile(fullPath, encoding);
   }
 
@@ -115,7 +137,7 @@ export class FilesystemManager {
     content: string,
     encoding: BufferEncoding = "utf-8",
   ): Promise<void> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
     // Ensure directory exists
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content, encoding);
@@ -126,7 +148,7 @@ export class FilesystemManager {
    */
   async exists(targetPath: string): Promise<boolean> {
     try {
-      const fullPath = this.resolvePath(targetPath);
+      const fullPath = await this.resolvePath(targetPath);
       await fs.access(fullPath);
       return true;
     } catch {
@@ -138,7 +160,7 @@ export class FilesystemManager {
    * Create a directory and any necessary parent directories.
    */
   async mkdir(targetPath: string): Promise<void> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
     await fs.mkdir(fullPath, { recursive: true });
   }
 
@@ -146,7 +168,7 @@ export class FilesystemManager {
    * List contents of a directory.
    */
   async readdir(targetPath: string): Promise<string[]> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
     return await fs.readdir(fullPath);
   }
 
@@ -154,7 +176,7 @@ export class FilesystemManager {
    * Get file or directory statistics.
    */
   async stat(targetPath: string): Promise<FileStats> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
     const stats = await fs.stat(fullPath);
     return {
       isFile: stats.isFile(),
@@ -172,7 +194,7 @@ export class FilesystemManager {
     pattern: string,
     limit: number = 10,
   ): Promise<SearchResult[]> {
-    const fullPath = this.resolvePath(basePath);
+    const fullPath = await this.resolvePath(basePath);
 
     // Create glob pattern
     // If pattern is empty, match everything
@@ -185,6 +207,7 @@ export class FilesystemManager {
         deep: 3, // Limit depth for performance
         suppressErrors: true,
         stats: true,
+        followSymbolicLinks: false,
       });
 
       const results: SearchResult[] = [];
@@ -214,7 +237,7 @@ export class FilesystemManager {
    * For directories, removes recursively.
    */
   async delete(targetPath: string): Promise<void> {
-    const fullPath = this.resolvePath(targetPath);
+    const fullPath = await this.resolvePath(targetPath);
 
     // Check if it exists and get stats
     const stats = await fs.stat(fullPath);
@@ -232,8 +255,8 @@ export class FilesystemManager {
    * Copy a file or directory to another location.
    */
   async copy(fromPath: string, toPath: string): Promise<void> {
-    const fullFromPath = this.resolvePath(fromPath);
-    const fullToPath = this.resolvePath(toPath);
+    const fullFromPath = await this.resolvePath(fromPath);
+    const fullToPath = await this.resolvePath(toPath);
 
     await fs.mkdir(path.dirname(fullToPath), { recursive: true });
     await fs.cp(fullFromPath, fullToPath, {
@@ -248,8 +271,8 @@ export class FilesystemManager {
    * Falls back to copy+delete when rename crosses filesystem boundaries.
    */
   async move(fromPath: string, toPath: string): Promise<void> {
-    const fullFromPath = this.resolvePath(fromPath);
-    const fullToPath = this.resolvePath(toPath);
+    const fullFromPath = await this.resolvePath(fromPath);
+    const fullToPath = await this.resolvePath(toPath);
 
     await fs.mkdir(path.dirname(fullToPath), { recursive: true });
 

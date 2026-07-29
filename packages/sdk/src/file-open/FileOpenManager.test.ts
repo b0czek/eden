@@ -50,7 +50,9 @@ const createManager = async () => {
     appCatalog,
     {} as ProcessManager,
     {} as ViewManager,
-    { resolvePath: (filePath: string) => filePath } as FilesystemManager,
+    {
+      resolvePath: async (filePath: string) => filePath,
+    } as unknown as FilesystemManager,
     { getLocale: jest.fn(async () => "en") } as unknown as I18nManager,
     ipcBridge,
     commandRegistry,

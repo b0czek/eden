@@ -34,6 +34,7 @@ import {
  * Events emitted by the ViewManager
  */
 interface ViewManagerEvents {
+  "bounds-updated": ViewBounds;
   "interface-scale-changed": { scale: number };
   "view-loaded": { viewId: number; appId: string; overlay: boolean };
   "view-load-failed": {
@@ -43,6 +44,10 @@ interface ViewManagerEvents {
     errorDescription: string;
   };
   "mode-changed": { mode: "floating" | "tiled"; bounds: ViewBounds };
+  "global-bounds-changed": {
+    workspaceBounds: ViewBounds;
+    windowSize: WindowSize;
+  };
 }
 
 /**
@@ -87,7 +92,6 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     this.scaleController = new ScaleController(
       settingsManager,
       getViews,
-      ipcBridge,
       (scale) => this.notify("interface-scale-changed", { scale }),
     );
 
@@ -104,7 +108,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     );
 
     // Create and register handler
-    this.viewHandler = new ViewHandler(this, ipcBridge);
+    this.viewHandler = new ViewHandler(this);
     commandRegistry.registerManager(this.viewHandler);
   }
 
@@ -125,6 +129,15 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    */
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
+  }
+
+  updateGlobalBounds(bounds: ViewBounds, windowSize: WindowSize): void {
+    this.setWorkspaceBounds(bounds);
+    this.setWindowSize(windowSize);
+    this.notify("global-bounds-changed", {
+      workspaceBounds: bounds,
+      windowSize,
+    });
   }
 
   /**
@@ -307,9 +320,24 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   /**
    * Update view bounds
    */
-  setViewBounds(viewId: number, bounds: Bounds): void {
+  setViewBounds(
+    viewId: number,
+    bounds: Bounds,
+    options: { notify?: boolean } = {},
+  ): void {
     const viewInfo = requireView(viewId, this.views);
+    this.applyViewBounds(viewId, viewInfo, bounds);
 
+    if (options.notify) {
+      this.notifySubscriber(viewId, "bounds-updated", bounds);
+    }
+  }
+
+  private applyViewBounds(
+    viewId: number,
+    viewInfo: ViewInfo,
+    bounds: Bounds,
+  ): void {
     // If this is an overlay view, set bounds directly without constraints
     if (viewInfo.viewType === "overlay") {
       try {

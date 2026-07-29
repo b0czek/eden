@@ -60,6 +60,7 @@ export interface EdenBrandingConfig {
 
 export interface EdenConfig {
   appsDirectory?: string;
+  /** Root directory backing Eden's managed virtual filesystem. */
   userDirectory?: string;
   branding?: EdenBrandingConfig;
   window?: {

@@ -26,6 +26,11 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["user/identity", "user/manage", "package/read"],
+  "permissions": [
+    "user/identity",
+    "user/manage",
+    "session/read",
+    "package/read"
+  ],
   "icon": "icon.svg"
 }

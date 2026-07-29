@@ -120,35 +120,6 @@ describe("EventSubscriberManager", () => {
     expect(manager.getSubscribedViews("settings/changed")).toEqual([]);
   });
 
-  it("notifies internal subscribers and tolerates callback errors", () => {
-    const manager = createManager(viewManager);
-
-    const callback = jest.fn(
-      (_data: { appId: string; key: string; value: string }) => undefined,
-    );
-    const failing = jest.fn(
-      (_data: { appId: string; key: string; value: string }) => {
-        throw new Error("boom");
-      },
-    );
-
-    manager.subscribeInternal("settings/changed", callback);
-    manager.subscribeInternal("settings/changed", failing);
-
-    manager.notify("settings/changed", {
-      appId: "app.one",
-      key: "general.locale",
-      value: "pl",
-    });
-
-    expect(callback).toHaveBeenCalledWith({
-      appId: "app.one",
-      key: "general.locale",
-      value: "pl",
-    });
-    expect(errorSpy).toHaveBeenCalled();
-  });
-
   it("sends to a specific view only when subscribed", () => {
     const manager = createManager(viewManager);
     viewManager.getViewInfo.mockReturnValue(createViewInfo());

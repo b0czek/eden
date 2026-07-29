@@ -17,21 +17,15 @@ const createController = (
   let settingsChangedCallback: SettingsChangedCallback | undefined;
   const settingsManager = {
     get: jest.fn().mockResolvedValue(null),
-  };
-  const ipcBridge = {
-    eventSubscribers: {
-      subscribeInternal: jest.fn(
-        (_event: string, callback: SettingsChangedCallback) => {
-          settingsChangedCallback = callback;
-        },
-      ),
-    },
+    on: jest.fn((_event: string, callback: SettingsChangedCallback) => {
+      settingsChangedCallback = callback;
+      return jest.fn();
+    }),
   };
 
   const controller = new ScaleController(
     settingsManager as never,
     () => views,
-    ipcBridge as never,
     notifyScaleChanged,
   );
 

@@ -6,7 +6,6 @@
  */
 
 import type { AppManifest } from "@edenapp/types";
-import type { IPCBridge } from "../ipc";
 import { log } from "../logging";
 import {
   EDEN_SETTINGS_APP_ID,
@@ -25,7 +24,6 @@ export class ScaleController {
   constructor(
     settingsManager: SettingsManager,
     getViews: () => Iterable<ViewInfo>,
-    ipcBridge: IPCBridge,
     notifyScaleChanged: (scale: number) => void = () => {},
   ) {
     this.settingsManager = settingsManager;
@@ -33,7 +31,7 @@ export class ScaleController {
     this.notifyScaleChanged = notifyScaleChanged;
 
     // Listen for interface scale setting changes
-    ipcBridge.eventSubscribers.subscribeInternal("settings/changed", (data) => {
+    settingsManager.on("changed", (data) => {
       if (data.key === INTERFACE_SCALE_KEY) {
         const scale = parseFloat(data.value);
         if (!Number.isNaN(scale)) {
