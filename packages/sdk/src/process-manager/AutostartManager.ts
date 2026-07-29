@@ -1,8 +1,7 @@
 import type { EdenConfig } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
-import { IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { SessionContext } from "../session";
+import { SessionContext, SessionManager } from "../session";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
 import { ProcessManager } from "./ProcessManager";
@@ -21,29 +20,26 @@ export class AutostartManager {
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SettingsManager) private settingsManager: SettingsManager,
     @inject(SessionContext) private sessionContext: SessionContext,
-    @inject(IPCBridge) ipcBridge: IPCBridge,
+    @inject(SessionManager) sessionManager: SessionManager,
   ) {
     // Start the appropriate environment after a committed session transition.
-    ipcBridge.eventSubscribers.subscribeInternal(
-      "session/changed",
-      ({ currentUser, previousUsername }) => {
-        const currentUsername = currentUser?.username ?? null;
-        if (currentUsername === previousUsername) {
-          // Same user, grants may have changed but no session reset
-          return;
-        }
+    sessionManager.on("changed", ({ currentUser, previousUsername }) => {
+      const currentUsername = currentUser?.username ?? null;
+      if (currentUsername === previousUsername) {
+        // Same user, grants may have changed but no session reset
+        return;
+      }
 
-        if (!this.ready) {
-          return;
-        }
+      if (!this.ready) {
+        return;
+      }
 
-        if (currentUsername) {
-          void this.queueSessionLaunch();
-        } else {
-          void this.queueLoginLaunch();
-        }
-      },
-    );
+      if (currentUsername) {
+        void this.queueSessionLaunch();
+      } else {
+        void this.queueLoginLaunch();
+      }
+    });
   }
 
   onFoundationReady(): void {

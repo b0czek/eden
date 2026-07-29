@@ -95,30 +95,26 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     // Transfer backend port to frontend when view loads
-    // Subscribe via ipcBridge since ViewManager emits via EdenEmitter
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "view/view-loaded",
-      ({ viewId, appId }) => {
-        log.info(`View loaded for app ${appId}`);
+    this.viewManager.on("view-loaded", ({ viewId, appId }) => {
+      log.info(`View loaded for app ${appId}`);
 
-        // If app has a backend, transfer the port to the frontend
-        const backendPort = this.backendManager.getFrontendPort(appId);
-        if (backendPort) {
-          const viewInfo = this.viewManager.getViewInfo(viewId);
-          if (viewInfo) {
-            log.info(
-              `Transferring backend port to view ${viewId} for app ${appId}`,
-            );
-            viewInfo.view.webContents.postMessage("backend-port", {}, [
-              backendPort,
-            ]);
-            // Port has been transferred
-          }
-        } else {
-          log.info(`No backend port for app ${appId} (may be frontend-only)`);
+      // If app has a backend, transfer the port to the frontend
+      const backendPort = this.backendManager.getFrontendPort(appId);
+      if (backendPort) {
+        const viewInfo = this.viewManager.getViewInfo(viewId);
+        if (viewInfo) {
+          log.info(
+            `Transferring backend port to view ${viewId} for app ${appId}`,
+          );
+          viewInfo.view.webContents.postMessage("backend-port", {}, [
+            backendPort,
+          ]);
+          // Port has been transferred
         }
-      },
-    );
+      } else {
+        log.info(`No backend port for app ${appId} (may be frontend-only)`);
+      }
+    });
   }
 
   private setupHotReloadWatcher(): void {

@@ -96,10 +96,6 @@ export interface SettingsEvents {
  */
 export interface ViewEvents {
   "view/bounds-updated": import("./index").ViewBounds;
-  "view/global-bounds-changed": {
-    workspaceBounds: import("./index").ViewBounds;
-    windowSize: import("./index").WindowSize;
-  };
   "view/interface-scale-changed": { scale: number };
   "view/view-loaded": { viewId: number; appId: string; overlay: boolean };
   "view/view-load-failed": {
@@ -109,6 +105,10 @@ export interface ViewEvents {
     errorDescription: string;
   };
   "view/mode-changed": { mode: "floating" | "tiled"; bounds: import("./index").ViewBounds };
+  "view/global-bounds-changed": {
+    workspaceBounds: import("./index").ViewBounds;
+    windowSize: import("./index").WindowSize;
+  };
 }
 
 /**

@@ -43,6 +43,10 @@ interface ViewManagerEvents {
     errorDescription: string;
   };
   "mode-changed": { mode: "floating" | "tiled"; bounds: ViewBounds };
+  "global-bounds-changed": {
+    workspaceBounds: ViewBounds;
+    windowSize: WindowSize;
+  };
 }
 
 /**
@@ -87,7 +91,6 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     this.scaleController = new ScaleController(
       settingsManager,
       getViews,
-      ipcBridge,
       (scale) => this.notify("interface-scale-changed", { scale }),
     );
 
@@ -125,6 +128,15 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
    */
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
+  }
+
+  updateGlobalBounds(bounds: ViewBounds, windowSize: WindowSize): void {
+    this.setWorkspaceBounds(bounds);
+    this.setWindowSize(windowSize);
+    this.notify("global-bounds-changed", {
+      workspaceBounds: bounds,
+      windowSize,
+    });
   }
 
   /**

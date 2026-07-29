@@ -35,14 +35,11 @@ export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {
     commandRegistry.registerManager(this.i18nHandler);
 
     // Listen for locale changes
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "settings/changed",
-      (data) => {
-        if (data.key === "general.locale") {
-          this.notify("locale-changed", { locale: data.value });
-        }
-      },
-    );
+    this.settingsManager.on("changed", (data) => {
+      if (data.key === "general.locale") {
+        this.notify("locale-changed", { locale: data.value });
+      }
+    });
   }
 
   async getLocale(): Promise<string> {

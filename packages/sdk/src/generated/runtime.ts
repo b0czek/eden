@@ -145,9 +145,9 @@ export const APP_EVENT_NAMES: readonly string[] = [
   "session/changed",
   "settings/changed",
   "view/bounds-updated",
-  "view/global-bounds-changed",
   "view/interface-scale-changed",
   "view/view-loaded",
   "view/view-load-failed",
   "view/mode-changed",
+  "view/global-bounds-changed",
 ] as const;

@@ -14,10 +14,6 @@ import type { ViewManager } from "./ViewManager";
  */
 interface ViewHandlerEvents {
   "bounds-updated": ViewBounds;
-  "global-bounds-changed": {
-    workspaceBounds: ViewBounds;
-    windowSize: WindowSize;
-  };
 }
 
 @EdenNamespace("view")
@@ -291,14 +287,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   }): Promise<{ success: boolean }> {
     const { bounds, windowSize } = args;
 
-    this.viewManager.setWorkspaceBounds(bounds);
-
-    this.viewManager.setWindowSize(windowSize);
-
-    this.notify("global-bounds-changed", {
-      workspaceBounds: bounds,
-      windowSize,
-    });
+    this.viewManager.updateGlobalBounds(bounds, windowSize);
 
     return { success: true };
   }

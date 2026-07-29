@@ -79,12 +79,9 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     );
     this.handler = new FilePickerHandler(this);
     commandRegistry.registerManager(this.handler);
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "process/stopped",
-      ({ appId }) => {
-        this.handleAppStopped(appId);
-      },
-    );
+    this.processManager.on("stopped", ({ appId }) => {
+      this.handleAppStopped(appId);
+    });
   }
 
   private generateId(): string {
