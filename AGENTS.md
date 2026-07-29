@@ -2,6 +2,8 @@
 
 Eden is an electron environment that strives to provide os-like experience for the user. This means it allows the user to run applications in a sandboxed environment, with access to the file system, network, and other system resources.
 
+For every completed task that affects publishable packages, add or update an appropriate Changesets entry.
+
 # Apps
 
 Eden apps are sandboxed electron applications that run in WebContentsView. They communicate with main process through shell commands, and other apps through appbus.
