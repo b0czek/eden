@@ -9,6 +9,7 @@ export const en = {
       noDescription: "No description provided",
       systemComponent: "System Component",
       builtin: "Built-in",
+      development: "Development",
       autostart: "Autostart",
       hotReload: "Hot Reload",
       userInstalled: "User Installed",

@@ -1,0 +1,21 @@
+{
+  "name": "@edenapp/dev-host",
+  "version": "0.10.2",
+  "description": "Version-matched standalone development host for Eden apps",
+  "bin": {
+    "eden-dev-host": "bin/eden-dev-host.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "@edenapp/sdk": "workspace:*",
+    "electron": "^40.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/dev-host"
+  }
+}

@@ -14,6 +14,7 @@ const manifest = (
     version: "1.0.0",
     frontend: { entry: "dist/index.html" },
     isPrebuilt: false,
+    isDevelopment: false,
     isCore: false,
     isRestricted: false,
     resolvedGrants: [],
@@ -56,5 +57,22 @@ describe("AppCatalog", () => {
         .list({ showHidden: true, showRestricted: true })
         .map((app) => app.id),
     ).toEqual(["app.visible", "app.restricted", "app.hidden", "app.overlay"]);
+  });
+
+  it("keeps development source paths separate from installed paths", () => {
+    const registry = new AppRegistry();
+    registry.register(manifest("app.dev", { isDevelopment: true }));
+    const catalog = new AppCatalog(
+      registry,
+      { canLaunchApp: () => true } as never,
+      "/installed",
+      "/dist",
+    );
+
+    catalog.setDevelopmentPath("app.dev", "/source/app.dev");
+
+    expect(catalog.getPath("app.dev")).toBe("/source/app.dev");
+    expect(catalog.development()).toHaveLength(1);
+    expect(catalog.installed()).toHaveLength(0);
   });
 });

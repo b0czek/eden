@@ -9,6 +9,7 @@ export const pl = {
       noDescription: "Brak opisu",
       systemComponent: "Komponent Systemowy",
       builtin: "Wbudowana",
+      development: "Deweloperska",
       autostart: "Autostart",
       hotReload: "Hot Reload",
       userInstalled: "Zainstalowana przez użytkownika",

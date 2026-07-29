@@ -15,6 +15,7 @@ import {
   getHotReloadDevUrl,
   isHotReloadConfigured,
   isHotReloadEnabled,
+  loadHotReloadAppsState,
   toggleHotReload,
 } from "../hotreload-config";
 import {
@@ -74,10 +75,12 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private toRuntimeManifest(
     manifest: AppManifest,
     isPrebuilt: boolean,
+    isDevelopment = false,
   ): RuntimeAppManifest {
     return {
       ...manifest,
       isPrebuilt,
+      isDevelopment,
       isCore: this.coreApps.has(manifest.id),
       isRestricted: this.restrictedApps.has(manifest.id),
       resolvedGrants: normalizeGrantPresets(manifest.grants, manifest.id),
@@ -118,12 +121,49 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     // Load installed apps
     await this.loadInstalledApps();
 
+    // Development sources intentionally win over installed and prebuilt apps.
+    if (this.config.development) await this.loadDevelopmentApps();
+
     const prebuiltCount = this.appCatalog.prebuilt().length;
     const installedCount = this.appCatalog.installed().length;
 
     log.info(
       `PackageManager initialized. Found ${prebuiltCount} prebuilt apps and ${installedCount} installed apps.`,
     );
+  }
+
+  private async loadDevelopmentApps(): Promise<void> {
+    const state = await loadHotReloadAppsState(this.config);
+    for (const entry of state.apps) {
+      try {
+        const sourcePath = path.resolve(entry.sourcePath);
+        const rawManifest = await this.applyHotReloadEntry(
+          JSON.parse(
+            await fs.readFile(path.join(sourcePath, "manifest.json"), "utf-8"),
+          ) as AppManifest,
+        );
+        if (rawManifest.id !== entry.id) {
+          throw new Error(
+            `apps.json id ${entry.id} does not match ${rawManifest.id}`,
+          );
+        }
+        const runtimeManifest = this.toRuntimeManifest(
+          rawManifest,
+          false,
+          true,
+        );
+        this.appCatalog.setDevelopmentPath(entry.id, sourcePath);
+        this.appRegistry.register(runtimeManifest);
+        this.permissionRegistry.registerApp(
+          runtimeManifest.id,
+          runtimeManifest.permissions,
+          runtimeManifest.resolvedGrants,
+        );
+        log.info(`Mounted development app: ${entry.id} (${sourcePath})`);
+      } catch (error) {
+        log.warn(`Failed to mount development app ${entry.id}:`, error);
+      }
+    }
   }
 
   /**
@@ -335,7 +375,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     }
 
     // Prevent uninstalling prebuilt apps
-    if (manifest.isPrebuilt) {
+    if (manifest.isPrebuilt || manifest.isDevelopment) {
       throw new Error(`Cannot uninstall ${manifest.id}: this is a system app.`);
     }
 
@@ -374,11 +414,17 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     const rawManifest = await this.applyHotReloadEntry(
       JSON.parse(manifestContent) as AppManifest,
     );
+    if (rawManifest.id !== appId) {
+      throw new Error(
+        `App ID changed from ${appId} to ${rawManifest.id}; restart the development host`,
+      );
+    }
 
     // Convert to runtime manifest, preserving prebuilt status
     const runtimeManifest = this.toRuntimeManifest(
       rawManifest,
       manifest.isPrebuilt,
+      manifest.isDevelopment,
     );
 
     // Update in-memory manifest

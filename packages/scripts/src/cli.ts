@@ -17,8 +17,32 @@ import {
   type ScaffoldSolidAppMode,
   scaffoldSolidApp,
 } from "./scaffold-solid-app";
+import { standaloneDev } from "./standalone-dev";
 
 const program = new Command();
+
+program
+  .command("dev")
+  .description("Run an Eden app directly from its source directory")
+  .argument("[app-dir]", "App source directory", ".")
+  .option("--host-version <version>", "Exact @edenapp/dev-host version")
+  .option("--host-path <path>", "Use a local built development host")
+  .option("--offline", "Use a previously cached host without registry access")
+  .option("--reset", "Remove this app's .eden-dev profile before starting")
+  .action(async (appDir, options) => {
+    try {
+      await standaloneDev({
+        appDirectory: appDir,
+        hostVersion: options.hostVersion,
+        hostPath: options.hostPath,
+        offline: options.offline,
+        reset: options.reset,
+      });
+    } catch (error) {
+      console.error("Development host failed:", error);
+      process.exit(1);
+    }
+  });
 
 program
   .name("eden-build")

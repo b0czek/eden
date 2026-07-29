@@ -328,6 +328,20 @@ export interface AppManifest {
     cwd?: string;
   };
 
+  /** Commands used when the app is mounted directly from source. */
+  development?: {
+    frontend?: {
+      command: string;
+      cwd?: string;
+      /** Renderer URL. Both command and URL may contain `{port}`. */
+      url: string;
+    };
+    backend?: {
+      command: string;
+      cwd?: string;
+    };
+  };
+
   /**
    * Permissions requested by this app.
    * Supports glob patterns: "fs/*" for all fs permissions, "*" for all permissions.
@@ -388,6 +402,9 @@ export interface AppManifest {
 export interface RuntimeAppManifest extends AppManifest {
   /** Whether this is a prebuilt system app */
   isPrebuilt: boolean;
+
+  /** Whether this app is mounted directly from a development source tree. */
+  isDevelopment: boolean;
 
   /** Whether this is a core app (always allowed to launch) */
   isCore: boolean;

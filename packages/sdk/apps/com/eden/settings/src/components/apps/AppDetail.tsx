@@ -129,7 +129,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               />
             </label>
           </Show>
-          <Show when={!props.app.isPrebuilt}>
+          <Show when={!props.app.isPrebuilt && !props.app.isDevelopment}>
             <button
               type="button"
               class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"
@@ -175,9 +175,11 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               {t("settings.apps.details.source")}
             </span>
             <span class="eden-text-md">
-              {props.app.isPrebuilt
-                ? t("settings.apps.builtin")
-                : t("settings.apps.userInstalled")}
+              {props.app.isDevelopment
+                ? t("settings.apps.development")
+                : props.app.isPrebuilt
+                  ? t("settings.apps.builtin")
+                  : t("settings.apps.userInstalled")}
             </span>
           </div>
           <div class="eden-flex eden-flex-col eden-gap-xs">

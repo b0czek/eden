@@ -37,6 +37,15 @@ importers:
         specifier: ^5.3.0
         version: 5.6.3
 
+  packages/dev-host:
+    dependencies:
+      '@edenapp/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      electron:
+        specifier: ^40.0.0
+        version: 40.1.0
+
   packages/example:
     dependencies:
       '@edenapp/scripts':

@@ -17,6 +17,15 @@ export interface HotReloadServerState {
   apps: Record<string, HotReloadAppServerState>;
 }
 
+export interface HotReloadAppsState {
+  protocolVersion: number;
+  apps: Array<{
+    id: string;
+    sourcePath: string;
+    launchOnStart: boolean;
+  }>;
+}
+
 export interface HotReloadAppServerState {
   appId: string;
   sourcePath: string;
@@ -24,12 +33,15 @@ export interface HotReloadAppServerState {
   url: string;
   status: "starting" | "ready" | "error";
   updatedAt: number;
+  revision?: number;
   error?: string;
 }
 
 const HOT_RELOAD_DIR = ".eden-hot-reload";
 const ENABLED_FILE = "enabled.json";
 const SERVERS_FILE = "servers.json";
+const APPS_FILE = "apps.json";
+export const HOT_RELOAD_PROTOCOL_VERSION = 1;
 
 export function isHotReloadConfigured(config: EdenConfig): boolean {
   return config.hotReload?.enabled ?? config.development === true;
@@ -52,6 +64,38 @@ export function getHotReloadEnabledPath(config?: EdenConfig): string {
 
 export function getHotReloadServersPath(config?: EdenConfig): string {
   return path.join(getHotReloadStateDirectory(config), SERVERS_FILE);
+}
+
+export function getHotReloadAppsPath(config?: EdenConfig): string {
+  return path.join(getHotReloadStateDirectory(config), APPS_FILE);
+}
+
+export async function loadHotReloadAppsState(
+  config?: EdenConfig,
+): Promise<HotReloadAppsState> {
+  try {
+    const parsed = JSON.parse(
+      await fs.readFile(getHotReloadAppsPath(config), "utf-8"),
+    ) as Partial<HotReloadAppsState>;
+    if (
+      parsed.protocolVersion !== HOT_RELOAD_PROTOCOL_VERSION ||
+      !Array.isArray(parsed.apps)
+    ) {
+      return { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] };
+    }
+    return {
+      protocolVersion: HOT_RELOAD_PROTOCOL_VERSION,
+      apps: parsed.apps.filter(
+        (entry) =>
+          !!entry &&
+          typeof entry.id === "string" &&
+          typeof entry.sourcePath === "string" &&
+          typeof entry.launchOnStart === "boolean",
+      ),
+    };
+  } catch {
+    return { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] };
+  }
 }
 
 export async function loadHotReloadEnabledState(

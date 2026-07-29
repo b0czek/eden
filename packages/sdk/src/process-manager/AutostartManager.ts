@@ -1,5 +1,6 @@
 import type { EdenConfig } from "@edenapp/types";
 import { delay, inject, injectable, singleton } from "tsyringe";
+import { loadHotReloadAppsState } from "../hotreload-config";
 import { log } from "../logging";
 import { SessionContext } from "../session";
 import { SessionManager } from "../session/SessionManager";
@@ -46,10 +47,25 @@ export class AutostartManager {
   onFoundationReady(): void {
     if (this.ready) return;
     this.ready = true;
+    if (this.config.development)
+      void this.queueLaunch(() => this.launchDevelopmentApps());
     if (this.sessionContext.getCurrentUser()) {
       void this.queueSessionLaunch();
     } else {
       void this.queueLoginLaunch();
+    }
+  }
+
+  private async launchDevelopmentApps(): Promise<void> {
+    const state = await loadHotReloadAppsState(this.config);
+    for (const app of state.apps.filter((entry) => entry.launchOnStart)) {
+      if (this.processManager.getAppInstance(app.id)) continue;
+      try {
+        await this.processManager.launchApp(app.id);
+        log.info(`Development app launched: ${app.id}`);
+      } catch (error) {
+        log.error(`Failed to launch development app ${app.id}:`, error);
+      }
     }
   }
 

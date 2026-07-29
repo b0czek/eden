@@ -3,3 +3,4 @@ export * from "./config";
 export * from "./copy-assets";
 export * from "./dev-watch";
 export * from "./scaffold-solid-app";
+export * from "./standalone-dev";

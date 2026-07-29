@@ -16,6 +16,7 @@ export interface AppCatalogListOptions {
 @singleton()
 @injectable()
 export class AppCatalog {
+  private developmentPaths = new Map<string, string>();
   constructor(
     @inject(AppRegistry) private appRegistry: AppRegistry,
     @inject(SessionContext) private sessionContext: SessionContext,
@@ -40,13 +41,22 @@ export class AppCatalog {
   }
 
   installed(): RuntimeAppManifest[] {
-    return this.all().filter((app) => !app.isPrebuilt);
+    return this.all().filter((app) => !app.isPrebuilt && !app.isDevelopment);
+  }
+
+  development(): RuntimeAppManifest[] {
+    return this.all().filter((app) => app.isDevelopment);
+  }
+
+  setDevelopmentPath(appId: string, sourcePath: string): void {
+    this.developmentPaths.set(appId, sourcePath);
   }
 
   getPath(appId: string): string | undefined {
     const app = this.get(appId);
     if (!app) return undefined;
 
+    if (app.isDevelopment) return this.developmentPaths.get(appId);
     return app.isPrebuilt
       ? path.join(this.distPath, "apps", "prebuilt", appId)
       : path.join(this.appsDirectory, appId);

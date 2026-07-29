@@ -47,7 +47,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private processHandler: ProcessHandler;
   private processMetrics: ProcessMetricsCollector;
   private loginAppId?: string;
-  private hotReloadUrls: Map<string, string | undefined> = new Map();
+  private hotReloadStates = new Map<string, string>();
   private hotReloadWatcher?: fs.FSWatcher;
   private hotReloadDebounceTimer?: NodeJS.Timeout;
 
@@ -154,24 +154,24 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private async handleHotReloadStateChanged(): Promise<void> {
     const state = await loadHotReloadServerState(this.config);
     const appIds = new Set([
-      ...this.hotReloadUrls.keys(),
+      ...this.hotReloadStates.keys(),
       ...Object.keys(state.apps),
     ]);
-    const nextUrls = new Map<string, string | undefined>();
+    const nextStates = new Map<string, string>();
 
     for (const appId of appIds) {
       const appState = state.apps[appId];
-      nextUrls.set(
+      nextStates.set(
         appId,
-        appState?.status === "ready" ? appState.url : undefined,
+        `${appState?.status}:${appState?.url}:${appState?.revision ?? 0}`,
       );
     }
 
     const changedAppIds = Array.from(appIds).filter(
-      (appId) => this.hotReloadUrls.get(appId) !== nextUrls.get(appId),
+      (appId) => this.hotReloadStates.get(appId) !== nextStates.get(appId),
     );
 
-    this.hotReloadUrls = nextUrls;
+    this.hotReloadStates = nextStates;
 
     for (const appId of changedAppIds) {
       await this.refreshHotReloadApp(appId);
@@ -205,7 +205,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    if (!this.isLoginApp(appId) && !this.sessionContext.canLaunchApp(appId)) {
+    const developmentApp =
+      this.config.development && this.appCatalog.get(appId)?.isDevelopment;
+    if (
+      !developmentApp &&
+      !this.isLoginApp(appId) &&
+      !this.sessionContext.canLaunchApp(appId)
+    ) {
       throw new Error(`User cannot launch app ${appId}`);
     }
 

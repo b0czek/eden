@@ -1,5 +1,10 @@
 import { Eden } from "./Eden";
 
+const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
+const userDirectory = process.env.EDEN_DEV_USER_DIRECTORY ?? ".eden-dev/user";
+const stateDirectory =
+  process.env.EDEN_DEV_HOT_RELOAD_DIRECTORY ?? ".eden-hot-reload";
+
 new Eden({
   development: true,
   tiling: {
@@ -9,14 +14,14 @@ new Eden({
     minTileWidth: 600,
     minTileHeight: 400,
   },
-  userDirectory: ".eden-dev/user",
-  appsDirectory: ".eden-dev/apps",
+  userDirectory,
+  appsDirectory,
   window: {
     title: "Eden SDK Dev Host",
   },
   hotReload: {
     enabled: true,
-    stateDirectory: ".eden-hot-reload",
+    stateDirectory,
   },
   coreApps: ["com.eden.eveshell", "com.eden.toaster", "com.eden.context-menu"],
   restrictedApps: ["com.eden.login", "com.eden.users"],

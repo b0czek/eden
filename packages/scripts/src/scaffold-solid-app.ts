@@ -26,6 +26,7 @@ interface ScaffoldContext {
   mode: Exclude<ScaffoldSolidAppMode, "auto">;
   targetDir: string;
   edenTypesVersion: string;
+  edenScriptsVersion: string;
 }
 
 export async function scaffoldSolidApp(
@@ -90,11 +91,16 @@ async function resolveScaffoldContext(
     mode === "sdk"
       ? "workspace:*"
       : await resolvePublishedPackageVersion("@edenapp/types");
+  const edenScriptsVersion =
+    mode === "sdk"
+      ? "workspace:*"
+      : await resolvePublishedPackageVersion("@edenapp/scripts");
 
   return {
     mode,
     targetDir,
     edenTypesVersion,
+    edenScriptsVersion,
   };
 }
 
@@ -288,6 +294,7 @@ function createScaffoldFiles(
         type: "module",
         scripts: {
           dev: "vite",
+          "dev:eden": "eden-build dev",
           build: "vite build",
         },
         dependencies: {
@@ -295,11 +302,16 @@ function createScaffoldFiles(
         },
         devDependencies: {
           "@edenapp/types": context.edenTypesVersion,
+          "@edenapp/scripts": context.edenScriptsVersion,
           typescript: DEFAULT_TYPESCRIPT_VERSION,
           vite: DEFAULT_VITE_VERSION,
           "vite-plugin-solid": DEFAULT_VITE_PLUGIN_SOLID_VERSION,
         },
       }),
+    },
+    {
+      relativePath: ".gitignore",
+      content: "node_modules/\ndist/\n.eden-dev/\n",
     },
     {
       relativePath: "tsconfig.json",

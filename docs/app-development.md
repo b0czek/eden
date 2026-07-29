@@ -145,3 +145,42 @@ For example, if you use simple static HTML/JS:
 2.  Set `"build": { "command": "echo 'No build needed'" }` or similar if pre-built, or standard `npm run build`.
 
 The Eden build system (`genesis build`) will look for this command and execute it when bundling the system.
+
+## Running an app from source
+
+Apps scaffolded for consumer projects include a standalone development command:
+
+```bash
+npm run dev:eden
+```
+
+This runs `eden-build dev` in a cached, version-matched Eden host. 
+Pass another directory as the first argument, or use `--reset` to 
+clear only that project's `.eden-dev/` profile.
+
+The first run downloads `@edenapp/dev-host`, including with
+`--offline`. Eden contributors can use a built local host with
+`--host-path <path-to-packages/sdk>`.
+
+By default the command uses `scripts.dev` in the app root, then in `frontend/`.
+For a backend it uses `backend/scripts.dev`, then root `scripts.dev:backend`.
+Commands can be made explicit in `manifest.json`:
+
+```json
+{
+  "development": {
+    "frontend": {
+      "command": "npm run dev -- --port {port}",
+      "url": "http://127.0.0.1:{port}"
+    },
+    "backend": {
+      "command": "npm run dev:backend"
+    }
+  }
+}
+```
+
+Both development commands are trusted local repository commands. Vite handles
+renderer HMR; manifest and compiled backend-entry changes restart the app while
+preserving its window bounds. Changing the app ID or development commands
+requires restarting `eden-build dev`.

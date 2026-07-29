@@ -9,6 +9,7 @@ const manifest = (id: string): RuntimeAppManifest =>
     name: id,
     version: "1.0.0",
     isPrebuilt: false,
+    isDevelopment: false,
     isCore: false,
     isRestricted: false,
     resolvedGrants: [],

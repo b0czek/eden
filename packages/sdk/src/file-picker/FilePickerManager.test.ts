@@ -67,6 +67,7 @@ const providerManifest = (
     frontend: { entry: "dist/index.html" },
     permissions,
     isPrebuilt: false,
+    isDevelopment: false,
     isCore: false,
     isRestricted: false,
     resolvedGrants: [],
