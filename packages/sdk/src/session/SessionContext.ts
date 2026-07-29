@@ -1,18 +1,11 @@
-import type { EdenConfig, UserProfile } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
-import { matchesGrants } from "../user/UserGrants";
-import { normalizeAppIds } from "../utils/normalize";
+import { randomUUID } from "node:crypto";
+import type { UserProfile } from "@edenapp/types";
+import { singleton } from "tsyringe";
 
 @singleton()
 export class SessionContext {
   private currentUser: UserProfile | null = null;
-  private readonly coreApps: Set<string>;
-  private readonly restrictedApps: Set<string>;
-
-  constructor(@inject("EdenConfig") config: EdenConfig) {
-    this.coreApps = normalizeAppIds(config.coreApps);
-    this.restrictedApps = normalizeAppIds(config.restrictedApps);
-  }
+  private sessionId = randomUUID();
 
   getCurrentUser(): UserProfile | null {
     return this.currentUser ? this.cloneUser(this.currentUser) : null;
@@ -22,32 +15,13 @@ export class SessionContext {
     this.currentUser = user ? this.cloneUser(user) : null;
   }
 
-  hasGrant(grant: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    return matchesGrants(this.currentUser.grants, grant);
+  getSessionId(): string {
+    return this.sessionId;
   }
 
-  canLaunchApp(appId: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    if (this.restrictedApps.has(appId)) return false;
-    if (this.coreApps.has(appId)) return true;
-    return matchesGrants(this.currentUser.grants, `apps/launch/${appId}`);
-  }
-
-  getAllowedApps(appIds: string[]): string[] {
-    return appIds.filter((appId) => this.canLaunchApp(appId));
-  }
-
-  canAccessSetting(appId: string, key: string): boolean {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === "vendor") return true;
-    return matchesGrants(this.currentUser.grants, `settings/${appId}/${key}`);
-  }
-
-  getAllowedSettingKeys(appId: string, keys: string[]): string[] {
-    return keys.filter((key) => this.canAccessSetting(appId, key));
+  beginSession(user: UserProfile | null): void {
+    this.sessionId = randomUUID();
+    this.setCurrentUser(user);
   }
 
   private cloneUser(user: UserProfile): UserProfile {

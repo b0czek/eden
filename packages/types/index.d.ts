@@ -1,5 +1,3 @@
-import { AppManifest } from "./AppManifest";
-
 export * from "./EdenConfig";
 export * from "./EdenSeedConfig";
 export * from "./Branding";
@@ -7,6 +5,7 @@ export * from "./User";
 
 export * from "./AppManifest";
 export * from "./AppAssociation";
+export * from "./Process";
 export * from "./ProcessMetrics";
 
 export * from "./global";
@@ -15,34 +14,6 @@ export * from "./worker";
 
 export * from "./ipc";
 export * from "./keyboard";
-
-/**
- * App Instance Interface
- *
- * Represents a running app instance in the Eden environment
- */
-export interface AppInstance {
-  /** App manifest */
-  manifest: AppManifest;
-
-  /** Unique instance ID */
-  instanceId: string;
-
-  /** Installation path on disk */
-  installPath: string;
-
-  /** WebContentsView ID */
-  viewId: number;
-
-  /** Current state */
-  state: "starting" | "running" | "paused" | "stopped" | "error";
-
-  /** Installation timestamp */
-  installedAt: Date;
-
-  /** Last launched timestamp */
-  lastLaunched?: Date;
-}
 
 /**
  * IPC Message Interface
