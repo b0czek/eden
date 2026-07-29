@@ -1,23 +1,11 @@
 import type { ViewBounds, WindowSize } from "@edenapp/types";
-import {
-  EdenEmitter,
-  EdenHandler,
-  EdenNamespace,
-  type IPCBridge,
-} from "../ipc";
+import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import { MouseTracker } from "./MouseTracker";
 import type { ViewManager } from "./ViewManager";
 
-/**
- * Events emitted by the ViewHandler
- */
-interface ViewHandlerEvents {
-  "bounds-updated": ViewBounds;
-}
-
 @EdenNamespace("view")
-export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
+export class ViewHandler {
   private viewManager: ViewManager;
   private mouseTracker: MouseTracker;
 
@@ -42,8 +30,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   // Or we can ask ViewManager to find views by appId.
   // ViewManager has getViewsByAppId(appId).
 
-  constructor(viewManager: ViewManager, ipcBridge: IPCBridge) {
-    super(ipcBridge);
+  constructor(viewManager: ViewManager) {
     this.viewManager = viewManager;
     this.mouseTracker = new MouseTracker(8); // ~120fps
   }
@@ -99,8 +86,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
         height: this.dragState.startBounds.height,
       };
 
-      this.viewManager.setViewBounds(viewId, newBounds);
-      this.notifySubscriber(viewId, "bounds-updated", newBounds);
+      this.viewManager.setViewBounds(viewId, newBounds, { notify: true });
     });
   }
 
@@ -167,8 +153,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
         height: Math.round(this.resizeState.currentHeight),
       };
 
-      this.viewManager.setViewBounds(viewId, newBounds);
-      this.notifySubscriber(viewId, "bounds-updated", newBounds);
+      this.viewManager.setViewBounds(viewId, newBounds, { notify: true });
     });
   }
 
@@ -193,8 +178,7 @@ export class ViewHandler extends EdenEmitter<ViewHandlerEvents> {
   }): Promise<{ success: boolean }> {
     const appId = this.requireCallerAppId(args._callerAppId);
     const viewId = this.getViewIdByAppId(appId);
-    this.viewManager.setViewBounds(viewId, args.bounds);
-    this.notifySubscriber(viewId, "bounds-updated", args.bounds);
+    this.viewManager.setViewBounds(viewId, args.bounds, { notify: true });
     return { success: true };
   }
 
