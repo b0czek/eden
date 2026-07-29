@@ -22,24 +22,23 @@ const USERS_INDEX_KEY = "users:index";
 const DEFAULT_USER_KEY = "users:default";
 
 /**
- * Seed the database from eden-seed.json
+ * Seed the database from a seed config file (eden-seed.json)
  *
  * This should be called once during Eden startup, before any managers
  * are initialized. After seeding, managers simply read from the database.
  */
 export async function seedDatabase(
   appsDirectory: string,
-  seedDirectory: string,
+  seedPath: string,
   userDirectory: string,
 ): Promise<void> {
-  const seedPath = path.join(seedDirectory, "eden-seed.json");
   let seedConfig: EdenSeedConfig;
 
   try {
     const content = await fs.readFile(seedPath, "utf-8");
     seedConfig = JSON.parse(content) as EdenSeedConfig;
   } catch {
-    log.info("No seed configuration found (eden-seed.json)");
+    log.info(`No seed configuration found at ${seedPath}`);
     return;
   }
 

@@ -4,6 +4,7 @@ const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
 const userDirectory = process.env.EDEN_DEV_USER_DIRECTORY ?? ".eden-dev/user";
 const stateDirectory =
   process.env.EDEN_DEV_HOT_RELOAD_DIRECTORY ?? ".eden-hot-reload";
+const seedPath = process.env.EDEN_DEV_SEED_PATH;
 
 new Eden({
   development: true,
@@ -16,6 +17,7 @@ new Eden({
   },
   userDirectory,
   appsDirectory,
+  seedPath,
   window: {
     title: "Eden SDK Dev Host",
   },

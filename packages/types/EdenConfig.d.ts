@@ -62,6 +62,11 @@ export interface EdenConfig {
   appsDirectory?: string;
   /** Root directory backing Eden's managed virtual filesystem. */
   userDirectory?: string;
+  /**
+   * Path to the seed config JSON file for one-time data seeding.
+   * Defaults to eden-seed.json in the consumer's dist directory.
+   */
+  seedPath?: string;
   branding?: EdenBrandingConfig;
   window?: {
     width?: number;

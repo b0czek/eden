@@ -1,13 +1,20 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { randomBytes, scryptSync } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AppManifest } from "@edenapp/types";
+import type { AppManifest, EdenSeedConfig } from "@edenapp/types";
 
 const PROTOCOL_VERSION = 1;
 const READY_TIMEOUT_MS = 30_000;
 const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+const DEVELOPMENT_USER = {
+  username: "demo",
+  name: "Demo User",
+  password: "demo",
+} as const;
 
 export interface StandaloneDevOptions {
   appDirectory?: string;
@@ -39,9 +46,14 @@ export async function standaloneDev(
 
   const profileDirectory = path.join(appDirectory, ".eden-dev");
   const stateDirectory = path.join(profileDirectory, "hot-reload");
+  const seedPath = path.join(profileDirectory, "eden-seed.json");
   if (options.reset)
     await fs.rm(profileDirectory, { recursive: true, force: true });
   await fs.mkdir(stateDirectory, { recursive: true });
+
+  // Seed a development user so the fresh profile can sign in.
+  // Seeding is idempotent in the host; --reset wipes the profile and re-seeds.
+  await writeJsonAtomic(seedPath, developmentSeed());
 
   const port = await findAvailablePort(5173);
   const frontend = await resolveFrontend(manifest, appDirectory, port);
@@ -113,10 +125,14 @@ export async function standaloneDev(
       EDEN_DEV_APPS_DIRECTORY: path.join(profileDirectory, "apps"),
       EDEN_DEV_USER_DIRECTORY: path.join(profileDirectory, "user"),
       EDEN_DEV_HOT_RELOAD_DIRECTORY: stateDirectory,
+      EDEN_DEV_SEED_PATH: seedPath,
     },
   );
   processes.push(host);
   console.log(`🌱 Mounted ${manifest.id} from ${appDirectory}`);
+  console.log(
+    `👤 Auto-signing in as "${DEVELOPMENT_USER.username}" (password: "${DEVELOPMENT_USER.password}")`,
+  );
 
   let failSession: (error: Error) => void = () => undefined;
   const completion = new Promise<never>((_resolve, reject) => {
@@ -392,6 +408,27 @@ async function writeServerState(
       },
     },
   });
+}
+
+function developmentSeed(): EdenSeedConfig {
+  const passwordSalt = randomBytes(16).toString("hex");
+  const passwordHash = scryptSync(
+    DEVELOPMENT_USER.password,
+    passwordSalt,
+    64,
+  ).toString("hex");
+  return {
+    users: [
+      {
+        username: DEVELOPMENT_USER.username,
+        name: DEVELOPMENT_USER.name,
+        role: "standard",
+        passwordHash,
+        passwordSalt,
+      },
+    ],
+    defaultUsername: DEVELOPMENT_USER.username,
+  };
 }
 
 async function writeJsonAtomic(file: string, value: unknown) {

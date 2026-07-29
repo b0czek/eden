@@ -112,7 +112,11 @@ export class Eden {
     log.info("Eden starting...");
 
     // Seed database before initializing managers
-    await seedDatabase(this.appsDirectory, this.distPath, this.userDirectory);
+    await seedDatabase(
+      this.appsDirectory,
+      this.config.seedPath ?? path.join(this.distPath, "eden-seed.json"),
+      this.userDirectory,
+    );
 
     this.initializeManagers();
 
