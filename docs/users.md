@@ -46,9 +46,29 @@ the Users app (App grants), and apps can check them via `user/has-grant`.
   - `users:default` (default username)
   - `user:${username}` (full user record)
 - Stored record includes: `username`, `name`, `role`, `grants`,
+  optional `homeDirectory`,
   `passwordHash`, `passwordSalt`, `createdAt`, `updatedAt`.
 - Public user profile exposes: `username`, `name`, `role`, `grants`,
+  optional `homeDirectory`,
   `createdAt`, `updatedAt`.
+
+## Filesystem Homes
+
+`EdenConfig.userDirectory` is always the root of Eden's managed filesystem.
+Users may optionally be assigned a writable home beneath that root:
+
+- Vendor users always see the full `userDirectory`.
+- Standard users with no `homeDirectory` also see the full root.
+- A standard user with `homeDirectory: "teams/operators"` sees that directory
+  as virtual `/`.
+- Assigning the same home to multiple users intentionally shares its contents.
+- Home paths are relative, cannot escape `userDirectory`, and are created when
+  assigned.
+- Deleting a user does not delete their home directory.
+
+The home boundary applies to Eden-managed filesystem, file-opening, and package
+commands. Node.js app backends remain trusted processes and can access Node APIs
+directly.
 
 ## Sessions and Identity
 

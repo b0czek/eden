@@ -36,6 +36,18 @@ export const pl = {
       systemGrants: "Uprawnienia systemowe",
       rawWarning:
         "Uwaga: modyfikowanie surowych grantów może zepsuć dostęp do aplikacji.",
+      filesystemLocation: "Lokalizacja systemu plików",
+      filesystemLocationPlaceholder:
+        "Ścieżka względna, na przykład teams/operators",
+      filesystemLocationHelp:
+        "Ogranicza dostęp tego użytkownika do systemu plików do wybranego folderu. Pozostaw puste dla wspólnego katalogu głównego; użytkownicy mogą współdzielić lokalizację.",
+      filesystemLocationUpdateFailed:
+        "Nie udało się zaktualizować lokalizacji systemu plików",
+      filesystemLocationPickerFailed: "Nie udało się otworzyć wyboru folderu",
+      filesystemLocationPickerTitle: "Wybierz lokalizację systemu plików",
+      chooseLocation: "Wybierz folder",
+      vendorFilesystemDescription:
+        "Użytkownicy vendor zawsze mają dostęp do całego systemu plików.",
     },
   },
 } as const;

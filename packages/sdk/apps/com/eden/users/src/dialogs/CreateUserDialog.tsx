@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import { createSignal } from "solid-js";
 import Modal from "../components/Modal";
+import FilesystemLocationField from "../components/users/FilesystemLocationField";
 import { t } from "../i18n";
 
 interface CreateUserDialogProps {
@@ -9,16 +10,19 @@ interface CreateUserDialogProps {
   onCreate: (args: {
     name: string;
     password: string;
+    homeDirectory?: string;
   }) => boolean | Promise<boolean>;
 }
 
 const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
   const [name, setName] = createSignal("");
   const [password, setPassword] = createSignal("");
+  const [homeDirectory, setHomeDirectory] = createSignal("");
 
   const reset = () => {
     setName("");
     setPassword("");
+    setHomeDirectory("");
   };
 
   const handleCreate = async () => {
@@ -27,6 +31,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
     const success = await props.onCreate({
       name: trimmedName,
       password: password(),
+      homeDirectory: homeDirectory().trim() || undefined,
     });
     if (success) {
       reset();
@@ -78,6 +83,19 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
           onInput={(e) => setName(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
         />
+      </div>
+      <div class="eden-form-group">
+        <label class="eden-form-label" for="create-user-filesystem-location">
+          {t("settings.users.filesystemLocation")}
+        </label>
+        <FilesystemLocationField
+          id="create-user-filesystem-location"
+          value={homeDirectory()}
+          onInput={setHomeDirectory}
+        />
+        <span class="eden-form-help">
+          {t("settings.users.filesystemLocationHelp")}
+        </span>
       </div>
       <div class="eden-form-group">
         <label class="eden-form-label" for="create-user-password">

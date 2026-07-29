@@ -13,6 +13,7 @@ import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
 import { defaultGrantsForRole } from "../user/UserGrants";
+import { ensureHomeDirectory } from "../user/UserHomeDirectory";
 
 // Key constants matching UserManager and SettingsManager schemas
 const USERS_SEED_VERSION_KEY = "_seed:users:version";
@@ -29,6 +30,7 @@ const DEFAULT_USER_KEY = "users:default";
 export async function seedDatabase(
   appsDirectory: string,
   seedDirectory: string,
+  userDirectory: string,
 ): Promise<void> {
   const seedPath = path.join(seedDirectory, "eden-seed.json");
   let seedConfig: EdenSeedConfig;
@@ -66,7 +68,7 @@ export async function seedDatabase(
   // Seed users
   if (!usersSeeded) {
     if (seedConfig.users && seedConfig.users.length > 0) {
-      await seedUsers(usersDb, seedConfig.users);
+      await seedUsers(usersDb, seedConfig.users, userDirectory);
     }
 
     // Seed default user
@@ -103,7 +105,11 @@ function getUserKey(username: string): string {
   return `user:${username}`;
 }
 
-async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
+async function seedUsers(
+  db: Keyv,
+  users: EdenUserConfig[],
+  userDirectory: string,
+): Promise<void> {
   const usernames: string[] = [];
 
   for (const user of users) {
@@ -114,11 +120,18 @@ async function seedUsers(db: Keyv, users: EdenUserConfig[]): Promise<void> {
     }
 
     const now = Date.now();
+    const role = user.role ?? "standard";
+    const homeDirectory = await ensureHomeDirectory(
+      userDirectory,
+      role,
+      user.homeDirectory,
+    );
     const storedUser = {
       username: user.username,
       name: user.name,
-      role: user.role ?? "standard",
-      grants: user.grants ?? defaultGrantsForRole(user.role ?? "standard"),
+      role,
+      homeDirectory,
+      grants: user.grants ?? defaultGrantsForRole(role),
       createdAt: now,
       updatedAt: now,
       passwordHash: user.passwordHash,

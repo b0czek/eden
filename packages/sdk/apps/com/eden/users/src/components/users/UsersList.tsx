@@ -23,7 +23,7 @@ const UsersList = (props: UsersListProps) => (
       <h2 class="settings-section-title">{t("settings.users.title")}</h2>
       <button
         type="button"
-        class="eden-btn eden-btn-ghost eden-btn-sm"
+        class="eden-btn eden-btn-ghost"
         onClick={props.onCreate}
         aria-label={t("settings.users.addUser")}
         title={t("settings.users.addUser")}

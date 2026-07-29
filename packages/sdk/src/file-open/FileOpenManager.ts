@@ -139,7 +139,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     preferenceKeys: string[];
     canonicalPreferenceKey: string | undefined;
   }> {
-    const fullPath = this.fsManager.resolvePath(filePath);
+    const fullPath = await this.fsManager.resolvePath(filePath);
     const stats = await fs.stat(fullPath);
     const isDirectory = stats.isDirectory();
 
@@ -617,7 +617,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   async openFileWith(filePath: string, appId: string): Promise<FileOpenResult> {
     try {
       // Resolve masked path to full filesystem path
-      const fullPath = this.fsManager.resolvePath(filePath);
+      const fullPath = await this.fsManager.resolvePath(filePath);
 
       // Check if file exists and get stats
       const stats = await fs.stat(fullPath);

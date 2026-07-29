@@ -123,15 +123,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   }
 
   private setupUserAccessHandlers(): void {
-    this.ipcBridge.eventSubscribers.subscribeInternal(
-      "user/changed",
-      async ({ currentUser, previousUsername }) => {
-        const currentUsername = currentUser?.username ?? null;
-        if (currentUsername !== previousUsername) {
-          await this.stopSessionApps();
-        }
-      },
-    );
+    // SessionManager should own this ordering once session coordination is split
+    // out of UserManager.
+    this.userManager.onBeforeSessionChange(() => this.stopSessionApps());
   }
 
   private setupHotReloadWatcher(): void {
@@ -511,11 +505,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private async stopSessionApps(): Promise<void> {
     const running = Array.from(this.runningApps.keys());
     for (const appId of running) {
-      try {
-        await this.stopApp(appId);
-      } catch (error) {
-        log.error(`Failed to stop session app ${appId}:`, error);
-      }
+      await this.stopApp(appId);
     }
   }
 

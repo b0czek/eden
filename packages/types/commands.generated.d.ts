@@ -795,7 +795,8 @@ export interface UserCommands {
     name: string;
     role?: import("./index").UserRole;
     password: string;
-    grants?: string[] };
+    grants?: string[];
+    homeDirectory?: string };
     response: { user: import("./index").UserProfile };
   };
   /**
@@ -806,7 +807,8 @@ export interface UserCommands {
     username: string;
     name?: string;
     role?: import("./index").UserRole;
-    grants?: string[] };
+    grants?: string[];
+    homeDirectory?: string | null };
     response: { user: import("./index").UserProfile };
   };
   /**

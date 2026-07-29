@@ -10,6 +10,10 @@ import {
   normalizeGrants,
 } from "./UserGrants";
 import { UserHandler } from "./UserHandler";
+import {
+  ensureHomeDirectory,
+  normalizeHomeDirectory,
+} from "./UserHomeDirectory";
 import { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 
@@ -31,12 +35,14 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
   private defaultUsername: string | null = null;
   private coreApps: Set<string>;
   private restrictedApps: Set<string>;
+  private beforeSessionChangeHandlers = new Set<() => Promise<void>>();
 
   constructor(
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("EdenConfig") config: EdenConfig,
     @inject("appsDirectory") appsDirectory: string,
+    @inject("userDirectory") private userDirectory: string,
   ) {
     super(ipcBridge);
     this.store = new UserStore(appsDirectory);
@@ -79,6 +85,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     role?: UserRole;
     password: string;
     grants?: string[];
+    homeDirectory?: string;
   }): Promise<UserProfile> {
     const username = this.normalizeUsername(args.username, args.name);
     const existing = await this.store.getUserRecord(username);
@@ -97,11 +104,17 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       role,
       args.grants ?? defaultGrantsForRole(role),
     );
+    const homeDirectory = await ensureHomeDirectory(
+      this.userDirectory,
+      role,
+      args.homeDirectory,
+    );
 
     const user: StoredUser = {
       username,
       name: args.name,
       role,
+      homeDirectory,
       grants,
       createdAt: now,
       updatedAt: now,
@@ -118,6 +131,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     name?: string;
     role?: UserRole;
     grants?: string[];
+    homeDirectory?: string | null;
   }): Promise<UserProfile> {
     const user = await this.requireUserRecord(args.username);
 
@@ -141,12 +155,27 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       user.grants = this.normalizeUserGrants(user.role, args.grants);
     }
 
+    if (args.homeDirectory !== undefined) {
+      const homeDirectory = await ensureHomeDirectory(
+        this.userDirectory,
+        user.role,
+        args.homeDirectory,
+      );
+      if (homeDirectory) {
+        user.homeDirectory = homeDirectory;
+      } else {
+        delete user.homeDirectory;
+      }
+    } else if (user.homeDirectory) {
+      user.homeDirectory = normalizeHomeDirectory(user.homeDirectory);
+    }
+
     user.updatedAt = Date.now();
 
     await this.store.saveUserRecord(user);
 
     if (this.currentUser?.username === user.username) {
-      this.setCurrentUser(user, "system");
+      await this.setCurrentUser(user, "system");
     }
 
     return this.toPublicUser(user);
@@ -158,11 +187,11 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       throw new Error("Vendor account cannot be deleted");
     }
 
-    await this.store.deleteUserRecord(username);
-
     if (this.currentUser?.username === username) {
       await this.setCurrentUser(null, "logout");
     }
+
+    await this.store.deleteUserRecord(username);
   }
 
   async setPassword(username: string, password: string): Promise<void> {
@@ -199,7 +228,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     await this.store.saveUserRecord(user);
 
     if (this.currentUser?.username === user.username) {
-      this.setCurrentUser(user, "system");
+      await this.setCurrentUser(user, "system");
     }
   }
 
@@ -218,6 +247,14 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
 
   async logout(): Promise<void> {
     await this.setCurrentUser(null, "logout");
+  }
+
+  /**
+   * Temporary lifecycle bridge until a SessionManager owns session transitions.
+   */
+  onBeforeSessionChange(handler: () => Promise<void>): () => void {
+    this.beforeSessionChangeHandlers.add(handler);
+    return () => this.beforeSessionChangeHandlers.delete(handler);
   }
 
   hasGrant(grant: string): boolean {
@@ -274,6 +311,12 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
     reason: UserNamespaceEvents["changed"]["reason"],
   ): Promise<void> {
     const previousUsername = this.currentUser?.username ?? null;
+    const nextUsername = user?.username ?? null;
+    if (previousUsername !== nextUsername) {
+      for (const handler of this.beforeSessionChangeHandlers) {
+        await handler();
+      }
+    }
     this.currentUser = user;
 
     this.notify("changed", {
@@ -311,6 +354,7 @@ export class UserManager extends EdenEmitter<UserNamespaceEvents> {
       username: user.username,
       name: user.name,
       role: user.role,
+      homeDirectory: user.homeDirectory,
       grants: user.grants,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

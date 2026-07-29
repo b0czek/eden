@@ -84,7 +84,7 @@ export class FilesystemHandler {
   @EdenHandler("resolve", { permission: "resolve" })
   async handleResolve(args: { path: string }): Promise<{ realPath: string }> {
     const { path: targetPath } = args;
-    return { realPath: this.fsManager.resolvePath(targetPath) };
+    return { realPath: await this.fsManager.resolvePath(targetPath) };
   }
 
   /**

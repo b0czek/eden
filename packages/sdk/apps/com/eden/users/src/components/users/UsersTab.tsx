@@ -205,12 +205,14 @@ export default function UsersTab(props: UsersTabProps) {
   const handleCreateUser = async (
     name: string,
     password: string,
+    homeDirectory?: string,
   ): Promise<boolean> => {
     if (!name || !password) return false;
     try {
       const result = await window.edenAPI.shellCommand("user/create", {
         name,
         password,
+        homeDirectory,
       });
       setShowCreateDialog(false);
       await loadUsers();
@@ -220,6 +222,27 @@ export default function UsersTab(props: UsersTabProps) {
       return true;
     } catch (error) {
       console.error("Failed to create user:", error);
+      return false;
+    }
+  };
+
+  const handleHomeDirectorySave = async (
+    username: string,
+    homeDirectory: string,
+  ): Promise<boolean> => {
+    try {
+      const result = await window.edenAPI.shellCommand("user/update", {
+        username,
+        homeDirectory: homeDirectory.trim() || null,
+      });
+      setUsers((current) =>
+        current.map((user) =>
+          user.username === username ? result.user : user,
+        ),
+      );
+      return true;
+    } catch (error) {
+      console.error("Failed to update home directory:", error);
       return false;
     }
   };
@@ -313,6 +336,7 @@ export default function UsersTab(props: UsersTabProps) {
               onDelete={handleDeleteUser}
               onOpenPasswordModal={(target) => setPasswordModalUser(target)}
               onToggleDefaultUser={handleToggleDefaultUser}
+              onSaveHomeDirectory={handleHomeDirectorySave}
               updateGrants={updateGrants}
             />
           )}
@@ -322,7 +346,9 @@ export default function UsersTab(props: UsersTabProps) {
       <CreateUserDialog
         show={showCreateDialog()}
         onClose={() => setShowCreateDialog(false)}
-        onCreate={({ name, password }) => handleCreateUser(name, password)}
+        onCreate={({ name, password, homeDirectory }) =>
+          handleCreateUser(name, password, homeDirectory)
+        }
       />
       <SetPasswordDialog
         show={Boolean(passwordModalUser())}
