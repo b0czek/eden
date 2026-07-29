@@ -1,7 +1,8 @@
 import type { EdenConfig } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, singleton } from "tsyringe";
 import { log } from "../logging";
-import { SessionContext, SessionManager } from "../session";
+import { SessionContext } from "../session";
+import type { SessionManager } from "../session/SessionManager";
 import { SettingsManager } from "../settings";
 import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
 import { ProcessManager } from "./ProcessManager";
@@ -20,7 +21,8 @@ export class AutostartManager {
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SettingsManager) private settingsManager: SettingsManager,
     @inject(SessionContext) private sessionContext: SessionContext,
-    @inject(SessionManager) sessionManager: SessionManager,
+    @inject(delay(() => require("../session/SessionManager").SessionManager))
+    sessionManager: SessionManager,
   ) {
     // Start the appropriate environment after a committed session transition.
     sessionManager.on("changed", ({ currentUser, previousUsername }) => {
