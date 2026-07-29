@@ -26,10 +26,11 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["settings/superuser", "user/grants", "package/read"],
+  "permissions": ["settings/superuser", "user/identity", "package/read"],
   "grants": [
     { "scope": "preset", "preset": "package/manage" },
-    { "scope": "preset", "preset": "appearance/manage" }
+    { "scope": "preset", "preset": "appearance/manage" },
+    { "scope": "preset", "preset": "daemon/manage" }
   ],
   "icon": "icon.svg"
 }

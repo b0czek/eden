@@ -5,6 +5,23 @@ export const en = {
       noAppsWithSettings: "No apps with settings",
     },
     selectCategory: "Select a category from the sidebar",
+    daemons: {
+      bootHint:
+        "Enable controls boot launch; start and stop affect this boot only.",
+      restartRequired: "Restart required",
+      empty: "No backend-only applications are installed.",
+      enabled: "Enabled at boot",
+      enabledHint: "Enabling does not start the daemon immediately.",
+      runAs: "Run as",
+      selectAccount: "Select an account",
+      restartPolicy: "Restart policy",
+      never: "Never",
+      onFailure: "On failure",
+      always: "Always",
+      start: "Start",
+      stop: "Stop",
+      restart: "Restart",
+    },
     apps: {
       noDescription: "No description provided",
       systemComponent: "System Component",

@@ -5,6 +5,23 @@ export const pl = {
       noAppsWithSettings: "Brak aplikacji z ustawieniami",
     },
     selectCategory: "Wybierz kategorię z paska bocznego",
+    daemons: {
+      bootHint:
+        "Włączenie steruje startem systemu; start i stop dotyczą tylko tego uruchomienia.",
+      restartRequired: "Wymagany restart",
+      empty: "Brak zainstalowanych aplikacji tylko z backendem.",
+      enabled: "Włączony przy starcie",
+      enabledHint: "Włączenie nie uruchamia demona natychmiast.",
+      runAs: "Uruchom jako",
+      selectAccount: "Wybierz konto",
+      restartPolicy: "Polityka restartu",
+      never: "Nigdy",
+      onFailure: "Po awarii",
+      always: "Zawsze",
+      start: "Uruchom",
+      stop: "Zatrzymaj",
+      restart: "Restartuj",
+    },
     apps: {
       noDescription: "Brak opisu",
       systemComponent: "Komponent Systemowy",

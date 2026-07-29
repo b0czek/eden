@@ -1,0 +1,64 @@
+.daemon-management {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-md);
+}
+
+.daemon-layout {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+  gap: var(--eden-space-md);
+}
+
+.daemon-list,
+.daemon-detail {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.daemon-detail {
+  align-self: stretch;
+}
+
+.daemon-state {
+  text-transform: capitalize;
+}
+
+.daemon-state-active {
+  color: var(--eden-color-success);
+}
+
+.daemon-state-failed {
+  color: var(--eden-color-danger);
+}
+
+.daemon-state-backoff,
+.daemon-state-starting,
+.daemon-state-stopping {
+  color: var(--eden-color-warning);
+}
+
+.daemon-error {
+  padding: var(--eden-space-sm) var(--eden-space-md);
+  color: var(--eden-color-danger);
+  background: var(--eden-color-danger-bg);
+  border: 1px solid var(--eden-color-danger);
+  border-radius: var(--eden-radius-sm);
+  font-size: var(--eden-font-size-sm);
+}
+
+@media (max-width: 720px) {
+  .daemon-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .daemon-list,
+  .daemon-detail {
+    overflow: visible;
+  }
+}
