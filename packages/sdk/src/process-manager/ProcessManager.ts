@@ -35,6 +35,7 @@ import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 interface ProcessNamespaceEvents {
   launched: { instance: AppInstance };
   stopped: { appId: string };
+  reloading: { appId: string };
   error: { appId: string; error: unknown };
   exited: { appId: string; code: number };
 }
@@ -239,6 +240,22 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
   }
 
+  async launchDaemon(
+    appId: string,
+    principal: ExecutionPrincipal,
+    profile?: UserProfile,
+  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+    const manifest = this.appCatalog.get(appId);
+    if (!manifest?.backend?.entry || manifest.frontend?.entry) {
+      throw new Error(`App ${appId} is not a backend-only daemon`);
+    }
+    return await this.launchAppInternal(appId, undefined, undefined, {
+      owner: { kind: "system" },
+      principal,
+      profile,
+    });
+  }
+
   private async launchAppInternal(
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
@@ -428,6 +445,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     return this.runningApps.get(appId);
   }
 
+  getInstalledManifest(appId: string) {
+    return this.appCatalog.get(appId);
+  }
+
   /**
    * Return a process metrics snapshot for running Eden apps.
    *
@@ -538,13 +559,20 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     log.info(`Reloading app ${appId}...`);
 
     // Stop the app
-    await this.stopApp(appId);
+    if (instance.owner.kind === "system") {
+      const runtime = this.runtimeContexts.get(appId);
+      this.notify("reloading", { appId });
+      await this.stopApp(appId);
+      await this.launchDaemon(appId, instance.principal, runtime?.profile);
+    } else {
+      await this.stopApp(appId);
 
-    // Small delay to ensure cleanup
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      // Small delay to ensure cleanup
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Relaunch with same bounds
-    await this.launchApp(appId, bounds);
+      // Relaunch with same bounds
+      await this.launchApp(appId, bounds);
+    }
 
     log.info(`App ${appId} reloaded successfully`);
   }

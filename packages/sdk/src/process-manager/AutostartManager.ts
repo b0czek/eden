@@ -117,6 +117,10 @@ export class AutostartManager {
             .map(([appId]) => appId);
 
           for (const appId of enabledApps) {
+            const manifest = this.processManager.getInstalledManifest(appId);
+            if (manifest && !manifest.frontend?.entry) {
+              continue;
+            }
             if (this.processManager.getAppInstance(appId)) {
               continue;
             }

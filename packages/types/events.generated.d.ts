@@ -22,6 +22,13 @@ export interface ContextMenuEvents {
 }
 
 /**
+ * DaemonEvents - Events for the "daemon" namespace
+ */
+export interface DaemonEvents {
+  "daemon/changed": { status: import("./index").DaemonStatus };
+}
+
+/**
  * FileEvents - Events for the "file" namespace
  */
 export interface FileEvents {
@@ -115,4 +122,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, ViewEvents {}
