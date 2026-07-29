@@ -1,5 +1,11 @@
 # com.eden.process-manager
 
+## 1.0.15
+
+### Patch Changes
+
+- @edenapp/babel@0.11.1
+
 ## 1.0.14
 
 ### Patch Changes

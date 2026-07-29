@@ -1,5 +1,14 @@
 # com.eden.files
 
+## 1.0.15
+
+### Patch Changes
+
+- @edenapp/babel@0.11.1
+- @edenapp/files-core@0.10.1
+- @edenapp/solid-kit@0.11.1
+- @edenapp/tablets@0.11.1
+
 ## 1.0.14
 
 ### Patch Changes
