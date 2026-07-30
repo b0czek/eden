@@ -26,4 +26,12 @@ export const GRANT_PRESET_LIST: GrantPresetDefinition[] = [
     },
     permissions: ["appearance/manage"],
   },
+  {
+    id: "daemon/manage",
+    label: {
+      en: "Daemon management",
+      pl: "Zarządzanie demonami",
+    },
+    permissions: ["daemon/read", "daemon/manage"],
+  },
 ];

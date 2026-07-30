@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import type { EdenConfig, UserProfile } from "@edenapp/types";
+import type { UserProfile } from "@edenapp/types";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { UserManager } from "../user/UserManager";
@@ -29,7 +29,7 @@ describe("SessionManager", () => {
   let manager: SessionManager;
 
   beforeEach(() => {
-    context = new SessionContext({} as EdenConfig);
+    context = new SessionContext();
     userManager = {
       authenticate: jest.fn(),
       getDefaultUser: jest.fn().mockResolvedValue(null),

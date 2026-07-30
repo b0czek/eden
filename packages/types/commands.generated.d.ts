@@ -156,6 +156,41 @@ export interface ContextMenuCommands {
 }
 
 /**
+ * DaemonCommands - Commands for the "daemon" namespace
+ */
+export interface DaemonCommands {
+  "daemon/list": {
+    args: Record<string, never>;
+    response: import("./index").DaemonStatus[];
+  };
+  "daemon/update-definition": {
+    args: {
+    definition: import("./index").DaemonDefinition };
+    response: { success: true };
+  };
+  "daemon/enable": {
+    args: { appId: string };
+    response: { success: true };
+  };
+  "daemon/disable": {
+    args: { appId: string };
+    response: { success: true };
+  };
+  "daemon/start": {
+    args: { appId: string };
+    response: { success: true };
+  };
+  "daemon/stop": {
+    args: { appId: string };
+    response: { success: true };
+  };
+  "daemon/restart": {
+    args: { appId: string };
+    response: { success: true };
+  };
+}
+
+/**
  * DbCommands - Commands for the "db" namespace
  */
 export interface DbCommands {
@@ -1010,4 +1045,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}

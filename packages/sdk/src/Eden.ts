@@ -9,7 +9,9 @@ import { AppChannelManager } from "./appbus";
 import { AppearanceManager } from "./appearance/AppearanceManager";
 import { BrandingManager } from "./branding";
 import { ContextMenuManager } from "./context-menu";
+import { DaemonManager } from "./daemon";
 import { DbManager } from "./db";
+import { ExecutionContext } from "./execution/ExecutionContext";
 import { FileOpenManager } from "./file-open";
 import { FilePickerManager } from "./file-picker";
 import { FilesystemManager } from "./filesystem";
@@ -53,6 +55,7 @@ export class Eden {
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
   private sessionManager!: SessionManager;
+  private daemonManager!: DaemonManager;
   private keyboardManager!: KeyboardManager;
 
   constructor(config: EdenConfig = {}) {
@@ -121,10 +124,12 @@ export class Eden {
     this.initializeManagers();
 
     await this.userManager.initialize();
-    await this.sessionManager.initialize();
-
     // Initialize package manager
     await this.packageManager.initialize();
+
+    // System-owned daemons start before any interactive session is committed.
+    await this.daemonManager.initialize();
+    await this.sessionManager.initialize();
 
     // Initialize Appearance Manager (load saved wallpaper)
     await container.resolve(AppearanceManager).initialize();
@@ -156,9 +161,16 @@ export class Eden {
     this.packageManager = container.resolve(PackageManager);
     this.processManager = container.resolve(ProcessManager);
     this.sessionManager = container.resolve(SessionManager);
+    this.daemonManager = container.resolve(DaemonManager);
     container
       .resolve(CommandRegistry)
-      .registerManager(new UserHandler(this.userManager, this.sessionManager));
+      .registerManager(
+        new UserHandler(
+          this.userManager,
+          this.sessionManager,
+          container.resolve(ExecutionContext),
+        ),
+      );
     this.appAssociationManager = container.resolve(AppAssociationManager);
     this.fileOpenManager = container.resolve(FileOpenManager);
     this.autostartManager = container.resolve(AutostartManager);
@@ -268,6 +280,7 @@ export class Eden {
         return;
       }
       // Shutdown all apps and wait for them to stop
+      await this.daemonManager.shutdown();
       await this.processManager.shutdown();
 
       // Brief delay to ensure all cleanup completes

@@ -101,19 +101,21 @@ const AppDetail: Component<AppDetailProps> = (props) => {
         </div>
 
         <div class="eden-flex eden-gap-sm eden-items-center">
-          <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
-            <span>{t("settings.apps.autostart")}</span>
-            <input
-              type="checkbox"
-              class="eden-toggle"
-              checked={props.autostart}
-              onChange={(event) =>
-                props.onAutostartToggle(
-                  (event.target as HTMLInputElement).checked,
-                )
-              }
-            />
-          </label>
+          <Show when={props.app.frontend?.entry}>
+            <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
+              <span>{t("settings.apps.autostart")}</span>
+              <input
+                type="checkbox"
+                class="eden-toggle"
+                checked={props.autostart}
+                onChange={(event) =>
+                  props.onAutostartToggle(
+                    (event.target as HTMLInputElement).checked,
+                  )
+                }
+              />
+            </label>
+          </Show>
           <Show when={props.devMode}>
             <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
               <span>{t("settings.apps.hotReload")}</span>

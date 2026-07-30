@@ -1,4 +1,5 @@
 import type { UserProfile, UserRole } from "@edenapp/types";
+import type { ExecutionContext } from "../execution/ExecutionContext";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SessionManager } from "../session";
 import type { UserManager } from "./UserManager";
@@ -8,11 +9,11 @@ export class UserHandler {
   constructor(
     private userManager: UserManager,
     private sessionManager: SessionManager,
+    private executionContext: ExecutionContext,
   ) {}
 
   private assertVendor(): void {
-    const user = this.sessionManager.getCurrentUser();
-    if (!user || user.role !== "vendor") {
+    if (!this.executionContext.isVendor()) {
       throw new Error("Vendor account required");
     }
   }
@@ -98,12 +99,12 @@ export class UserHandler {
     newPassword: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const currentUser = this.sessionManager.getCurrentUser();
-      if (!currentUser) {
+      const principal = this.executionContext.getPrincipal();
+      if (principal?.kind !== "user") {
         throw new Error("No active user session");
       }
       const user = await this.userManager.changePassword(
-        currentUser.username,
+        principal.profile.username,
         args.currentPassword,
         args.newPassword,
       );
@@ -123,7 +124,7 @@ export class UserHandler {
    */
   @EdenHandler("has-grant", { permission: "grants" })
   async handleHasGrant(args: { grant: string }): Promise<{ allowed: boolean }> {
-    return { allowed: this.sessionManager.hasGrant(args.grant) };
+    return { allowed: this.executionContext.hasGrant(args.grant) };
   }
 
   /**

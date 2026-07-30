@@ -379,8 +379,6 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       throw new Error(`Cannot uninstall ${manifest.id}: this is a system app.`);
     }
 
-    // Note: Stopping the app is the responsibility of ProcessManager.
-
     // Remove from disk
     const appPath = path.join(this.appsDirectory, appId);
     await fs.rm(appPath, { recursive: true, force: true });

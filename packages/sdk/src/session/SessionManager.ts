@@ -45,10 +45,6 @@ export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
     return this.context.getCurrentUser();
   }
 
-  hasGrant(grant: string): boolean {
-    return this.context.hasGrant(grant);
-  }
-
   async login(username: string, password: string): Promise<UserProfile> {
     return await this.runTransition(async () => {
       const user = await this.userManager.authenticate(username, password);
@@ -82,10 +78,14 @@ export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
     const nextUsername = user?.username ?? null;
 
     if (previousUsername !== nextUsername) {
-      await this.processManager.stopSessionApps();
+      await this.processManager.stopSessionApps(this.context.getSessionId());
     }
 
-    this.context.setCurrentUser(user);
+    if (previousUsername !== nextUsername) {
+      this.context.beginSession(user);
+    } else {
+      this.context.setCurrentUser(user);
+    }
     this.notify("changed", {
       currentUser: this.context.getCurrentUser(),
       previousUsername,

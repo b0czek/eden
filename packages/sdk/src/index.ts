@@ -5,6 +5,7 @@ import "reflect-metadata";
 export { EdenConfig } from "@edenapp/types";
 // Re-export core managers for library usage
 export { AppAssociationManager } from "./app-associations";
+export { DaemonManager } from "./daemon";
 export { Eden } from "./Eden";
 export { IPCBridge } from "./ipc";
 export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";

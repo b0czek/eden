@@ -34,8 +34,8 @@ const createManager = () => {
       get: (appId: string) =>
         appId === ownerManifest.id ? ownerManifest : undefined,
     },
-    sessionContext: {
-      canAccessSetting: () => true,
+    executionContext: {
+      hasGrant: () => true,
     },
     keyv: {
       get: jest.fn().mockResolvedValue(undefined),

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type BrowserWindow, ipcMain } from "electron";
 import { delay, inject, injectable, singleton } from "tsyringe";
+import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
@@ -38,6 +39,8 @@ export class IPCBridge extends EventEmitter {
     @inject(CommandRegistry) private commandRegistry: CommandRegistry,
     @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
     @inject(delay(() => ViewManager)) private viewManager: ViewManager,
+    @inject(delay(() => RuntimeContextRegistry))
+    private runtimeContexts: RuntimeContextRegistry,
   ) {
     super();
 
@@ -68,14 +71,6 @@ export class IPCBridge extends EventEmitter {
     return this.mainWindow;
   }
 
-  private asCommandArgs(value: unknown): Record<string, unknown> {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      return { ...(value as Record<string, unknown>) };
-    }
-
-    return {};
-  }
-
   /**
    * Setup IPC handlers for renderer processes
    */
@@ -89,13 +84,14 @@ export class IPCBridge extends EventEmitter {
         const isFoundation =
           this.mainWindow?.webContents.id === event.sender.id;
 
-        const argsWithContext = {
-          ...this.asCommandArgs(args),
-          _callerAppId: appId,
-          _callerWebContentsId: event.sender.id,
-          _isFoundation: isFoundation,
-        };
-        return this.handleShellCommand(command, argsWithContext, appId);
+        return this.handleShellCommand(command, args, {
+          appId,
+          webContentsId: event.sender.id,
+          principal: appId
+            ? this.runtimeContexts.resolvePrincipal(appId)
+            : undefined,
+          foundation: isFoundation,
+        });
       },
     );
   }
@@ -128,16 +124,13 @@ export class IPCBridge extends EventEmitter {
 
           // Backend requesting a shell command execution
           try {
-            // Inject caller context for backend commands
-            const argsWithContext = {
-              ...this.asCommandArgs(backendMessage.args),
-              _callerAppId: appId,
-            };
-
             const result = await this.handleShellCommand(
               backendMessage.command,
-              argsWithContext,
-              appId,
+              backendMessage.args,
+              {
+                appId,
+                principal: this.runtimeContexts.resolvePrincipal(appId),
+              },
             );
             // Send response back to backend
             this.sendBackendResponse(appId, backendMessage.commandId, result);
@@ -178,8 +171,8 @@ export class IPCBridge extends EventEmitter {
    */
   private async handleShellCommand(
     command: string,
-    args: Record<string, unknown>,
-    appId?: string,
+    args: unknown,
+    callerContext: import("../execution").CommandCallerContext = {},
   ): Promise<unknown> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
@@ -195,9 +188,9 @@ export class IPCBridge extends EventEmitter {
 
       this.pendingCommands.set(commandId, { resolve, reject, timeout });
 
-      // Execute via CommandRegistry with appId for permission checking
+      // Execute via CommandRegistry with trusted caller context
       this.commandRegistry
-        .execute(command, args, appId)
+        .execute(command, args, callerContext)
         .then((result) => {
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);
@@ -205,7 +198,9 @@ export class IPCBridge extends EventEmitter {
         })
         .catch((error) => {
           const err = error as Error;
-          const appInfo = appId ? ` (app: ${appId})` : "";
+          const appInfo = callerContext.appId
+            ? ` (app: ${callerContext.appId})`
+            : "";
           log.error(
             `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`,
           );

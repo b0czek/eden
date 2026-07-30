@@ -163,4 +163,20 @@ export const EDEN_SETTINGS_SCHEMA: SettingsCategory[] = [
     grantScope: "global",
     settings: [],
   },
+  {
+    id: "daemons",
+    name: {
+      en: "Daemons",
+      pl: "Demony",
+    },
+    description: {
+      en: "Configure backend services that run independently of user sessions.",
+      pl: "Konfiguruj usługi backendowe działające niezależnie od sesji użytkowników.",
+    },
+    icon: "cpu",
+    view: "daemons",
+    grant: "preset/daemon/manage",
+    grantScope: "global",
+    settings: [],
+  },
 ];

@@ -47,6 +47,11 @@ export class UserManager {
     return users;
   }
 
+  async getUser(username: string): Promise<UserProfile | null> {
+    const record = await this.store.getUserRecord(username);
+    return record ? this.toPublicUser(record) : null;
+  }
+
   async createUser(args: {
     username?: string;
     name: string;
