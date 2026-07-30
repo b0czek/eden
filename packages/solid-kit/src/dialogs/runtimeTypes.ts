@@ -15,6 +15,7 @@ interface DialogRequestMeta {
 }
 
 interface DialogRequestBehavior {
+  dismissable: boolean;
   dismissOnBackdrop: boolean;
   dismissOnEscape: boolean;
   onEnter: DialogEnterBehavior;

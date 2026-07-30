@@ -24,9 +24,11 @@ interface DialogBaseOptions {
   message?: JSX.Element | string;
   /** Optional width preset. Defaults to `"sm"`. */
   size?: DialogSize;
+  /** Allow passive dismissal via the close button, backdrop, or Escape. Defaults to `true`. */
+  dismissable?: boolean;
   /** Close when clicking the backdrop. Defaults to `true`. */
   dismissOnBackdrop?: boolean;
-  /** Close on Escape key. Defaults to `true`. */
+  /** Close on Escape when the dialog is dismissable. Defaults to `true`. */
   dismissOnEscape?: boolean;
   /** Enter key behavior. Defaults to `"submit"`. */
   onEnter?: DialogEnterBehavior;

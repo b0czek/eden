@@ -89,7 +89,11 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation();
 
-      if (e.key === "Escape" && current.dismissOnEscape) {
+      if (
+        e.key === "Escape" &&
+        current.dismissable &&
+        current.dismissOnEscape
+      ) {
         e.preventDefault();
         dialogs.cancel();
         return;
@@ -107,7 +111,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
     };
 
     const handleMouseDown = (e: MouseEvent) => {
-      if (!current.dismissOnBackdrop) return;
+      if (!current.dismissable || !current.dismissOnBackdrop) return;
 
       const target = e.target as Node | null;
       if (!target || !modalRef) return;
@@ -147,13 +151,15 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
               >
                 <div class="eden-modal-header">
                   <h3 class="eden-modal-title">{dialog.title}</h3>
-                  <button
-                    type="button"
-                    class="eden-modal-close"
-                    onClick={() => dialogs.cancel()}
-                  >
-                    ×
-                  </button>
+                  {dialog.dismissable && (
+                    <button
+                      type="button"
+                      class="eden-modal-close"
+                      onClick={() => dialogs.cancel()}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
                 <div class="eden-modal-body">
