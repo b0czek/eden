@@ -34,6 +34,8 @@ my-app/
     └── package.json
 ```
 
+An app with a backend and no frontend is a [daemon](processes-and-daemons.md). 
+
 ## Manifest (`manifest.json`)
 
 The `manifest.json` is the heart of an Eden app. It tells the system how to run your application.

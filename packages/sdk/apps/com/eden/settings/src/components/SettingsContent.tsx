@@ -7,6 +7,7 @@ import { getLocalizedValue, locale, t } from "../i18n";
 import type { SelectedItem } from "../types";
 import AppearanceTab from "./AppearanceTab";
 import AppsTab from "./apps";
+import DaemonsTab from "./daemons/DaemonsTab";
 import SettingsList from "./SettingsList";
 
 interface SettingsContentProps {
@@ -44,6 +45,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
   const viewRegistry: Record<string, Component> = {
     apps: AppsTab,
     appearance: AppearanceTab,
+    daemons: DaemonsTab,
   };
 
   const getViewComponent = () => {

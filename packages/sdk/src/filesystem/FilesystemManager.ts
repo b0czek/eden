@@ -2,10 +2,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
 import fg from "fast-glob";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, singleton } from "tsyringe";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
-import { SessionContext } from "../session/SessionContext";
 import {
   assertExistingPathWithin,
   assertPathWithin,
@@ -27,7 +27,7 @@ export class FilesystemManager {
   constructor(
     @inject("userDirectory") baseDir: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => SessionContext)) private sessionContext: SessionContext,
+    @inject(ExecutionContext) private executionContext: ExecutionContext,
   ) {
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
@@ -52,7 +52,7 @@ export class FilesystemManager {
    * @throws Error if the path attempts to escape the base directory
    */
   async resolvePath(targetPath: string): Promise<string> {
-    const effectiveRoot = this.getEffectiveRoot();
+    const effectiveRoot = await this.getEffectiveRoot();
     const relativePath = targetPath.replace(/^[\\/]+/, "");
     const resolved = path.resolve(effectiveRoot, relativePath);
 
@@ -69,7 +69,7 @@ export class FilesystemManager {
    * @throws Error if the path is outside the base directory
    */
   async toMaskedPath(absolutePath: string): Promise<string> {
-    const effectiveRoot = this.getEffectiveRoot();
+    const effectiveRoot = await this.getEffectiveRoot();
     const normalizedAbsolute = path.resolve(absolutePath);
 
     assertPathWithin(
@@ -96,11 +96,15 @@ export class FilesystemManager {
     }
   }
 
-  private getEffectiveRoot(): string {
-    const user = this.sessionContext.getCurrentUser();
-    if (!user) {
-      throw new Error("No active user session");
+  private async getEffectiveRoot(): Promise<string> {
+    const principal = this.executionContext.getPrincipal();
+    if (principal?.kind === "system") {
+      return this.baseDir;
     }
+    if (principal?.kind !== "user") {
+      throw new Error("Caller has no filesystem execution principal");
+    }
+    const user = principal.profile;
 
     if (user.role === "vendor") {
       return this.baseDir;

@@ -1,5 +1,9 @@
 import "reflect-metadata";
 import { delay, inject, injectable, singleton } from "tsyringe";
+import {
+  type CommandCallerContext,
+  ExecutionContext,
+} from "../execution/ExecutionContext";
 import { log } from "../logging";
 import type { SessionContext } from "../session";
 import { getManagerMetadata } from "./CommandMetadata";
@@ -45,6 +49,7 @@ export class CommandRegistry {
     @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry,
     @inject(delay(() => require("../session/SessionContext").SessionContext))
     private sessionContext: SessionContext,
+    @inject(ExecutionContext) private executionContext: ExecutionContext,
   ) {}
 
   /**
@@ -126,13 +131,13 @@ export class CommandRegistry {
    * Execute a command by its full name
    * @param fullCommand - The full command name (e.g., "process/launch")
    * @param args - The command arguments
-   * @param appId - Optional app ID for permission checking
+   * @param callerContext - Trusted caller metadata resolved by the transport
    * @returns The command result
    */
   async execute<TResult = unknown>(
     fullCommand: string,
     args: unknown,
-    appId?: string,
+    callerContext: CommandCallerContext = {},
   ): Promise<TResult> {
     const metadata = this.handlers.get(fullCommand);
 
@@ -140,42 +145,88 @@ export class CommandRegistry {
       throw new Error(`Unknown command: ${fullCommand}`);
     }
 
-    // Check app permission if required
-    if (metadata.permission && appId) {
-      // First check if app has this as a base permission
-      const hasBasePermission = this.permissionRegistry.hasPermission(
-        appId,
-        metadata.permission,
-      );
+    const context = this.resolveCallerContext(callerContext);
+    const appId = context.appId;
 
-      if (!hasBasePermission) {
-        // Check if app declares a grant that would unlock this permission
-        const requiredGrantKeys = this.permissionRegistry.getRequiredGrantKeys(
+    return this.executionContext.run(context, async () => {
+      // Check app permission if required
+      if (metadata.permission && appId) {
+        // First check if app has this as a base permission
+        const hasBasePermission = this.permissionRegistry.hasPermission(
           appId,
           metadata.permission,
         );
 
-        if (requiredGrantKeys.length === 0) {
-          // App neither has base permission nor declares any grant for it
-          throw new Error(
-            `Permission denied: ${metadata.permission} required for ${fullCommand}`,
-          );
-        }
+        if (!hasBasePermission) {
+          // Check if app declares a grant that would unlock this permission
+          const requiredGrantKeys =
+            this.permissionRegistry.getRequiredGrantKeys(
+              appId,
+              metadata.permission,
+            );
 
-        // Check if user has any of the grants that would unlock this permission
-        const hasGrant = requiredGrantKeys.some((grantKey) =>
-          this.sessionContext.hasGrant(grantKey),
-        );
+          if (requiredGrantKeys.length === 0) {
+            // App neither has base permission nor declares any grant for it
+            throw new Error(
+              `Permission denied: ${metadata.permission} required for ${fullCommand}`,
+            );
+          }
 
-        if (!hasGrant) {
-          throw new Error(
-            `Grant denied: ${requiredGrantKeys.join(",")} required for ${fullCommand}`,
+          // Check if user has any of the grants that would unlock this permission
+          const hasGrant = requiredGrantKeys.some((grantKey) =>
+            this.executionContext.hasGrant(grantKey),
           );
+
+          if (!hasGrant) {
+            throw new Error(
+              `Grant denied: ${requiredGrantKeys.join(",")} required for ${fullCommand}`,
+            );
+          }
         }
       }
+
+      return (await metadata.handler.call(
+        metadata.target,
+        this.withCallerContext(args, context),
+      )) as TResult;
+    });
+  }
+
+  private resolveCallerContext(
+    callerContext: CommandCallerContext,
+  ): CommandCallerContext {
+    if (callerContext.principal) return callerContext;
+    if (callerContext.appId) {
+      throw new Error(
+        `Caller principal could not be resolved for app ${callerContext.appId}`,
+      );
     }
 
-    return (await metadata.handler.call(metadata.target, args)) as TResult;
+    const profile = this.sessionContext.getCurrentUser();
+    return profile
+      ? { ...callerContext, principal: { kind: "user", profile } }
+      : callerContext;
+  }
+
+  private withCallerContext(
+    args: unknown,
+    context: CommandCallerContext,
+  ): Record<string, unknown> {
+    const commandArgs =
+      args && typeof args === "object" && !Array.isArray(args)
+        ? (args as Record<string, unknown>)
+        : {};
+
+    const callerArgs: Record<string, unknown> = {};
+    if (context.appId !== undefined) callerArgs._callerAppId = context.appId;
+    if (context.webContentsId !== undefined) {
+      callerArgs._callerWebContentsId = context.webContentsId;
+    }
+    if (context.foundation !== undefined) {
+      callerArgs._isFoundation = context.foundation;
+    }
+
+    return { ...commandArgs, ...callerArgs };
   }
 
   /**

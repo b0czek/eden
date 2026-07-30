@@ -5,11 +5,16 @@ import * as path from "node:path";
 import type {
   AppInstance,
   EdenConfig,
+  ExecutionPrincipal,
   ProcessMetricsSnapshot,
+  ProcessOwner,
+  UserProfile,
 } from "@edenapp/types";
 import { inject, injectable, singleton } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus/AppChannelManager";
+import { ExecutionContext } from "../execution/ExecutionContext";
+import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import {
   getHotReloadServersPath,
   isHotReloadConfigured,
@@ -18,7 +23,7 @@ import {
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
-import { SessionContext } from "../session";
+import { SessionContext } from "../session/SessionContext";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
 import { ProcessHandler } from "./ProcessHandler";
@@ -30,6 +35,7 @@ import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 interface ProcessNamespaceEvents {
   launched: { instance: AppInstance };
   stopped: { appId: string };
+  reloading: { appId: string };
   error: { appId: string; error: unknown };
   exited: { appId: string; code: number };
 }
@@ -59,8 +65,11 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
     @inject(SessionContext) private sessionContext: SessionContext,
+    @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject("EdenConfig") private config: EdenConfig,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    @inject(RuntimeContextRegistry)
+    private runtimeContexts: RuntimeContextRegistry,
   ) {
     super(ipcBridge);
     this.loginAppId = this.config.loginAppId;
@@ -71,10 +80,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     this.setupEventHandlers();
+    this.packageManager.on("uninstalled", async ({ appId }) => {
+      if (this.runningApps.has(appId)) await this.stopApp(appId);
+    });
     this.setupHotReloadWatcher();
 
     // Create and register handler
-    this.processHandler = new ProcessHandler(this);
+    this.processHandler = new ProcessHandler(this, this.executionContext);
     commandRegistry.registerManager(this.processHandler);
   }
 
@@ -210,18 +222,49 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     if (
       !developmentApp &&
       !this.isLoginApp(appId) &&
-      !this.sessionContext.canLaunchApp(appId)
+      !this.executionContext.canLaunchApp(appId)
     ) {
       throw new Error(`User cannot launch app ${appId}`);
     }
 
-    return await this.launchAppInternal(appId, bounds, launchArgs);
+    const currentUser = this.sessionContext.getCurrentUser();
+    return await this.launchAppInternal(appId, bounds, launchArgs, {
+      owner: {
+        kind: "session",
+        sessionId: this.sessionContext.getSessionId(),
+        username: currentUser?.username ?? null,
+      },
+      principal: currentUser
+        ? { kind: "user", username: currentUser.username }
+        : { kind: "system" },
+    });
+  }
+
+  async launchDaemon(
+    appId: string,
+    principal: ExecutionPrincipal,
+    profile?: UserProfile,
+  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+    const manifest = this.appCatalog.get(appId);
+    if (!manifest?.backend?.entry || manifest.frontend?.entry) {
+      throw new Error(`App ${appId} is not a backend-only daemon`);
+    }
+    return await this.launchAppInternal(appId, undefined, undefined, {
+      owner: { kind: "system" },
+      principal,
+      profile,
+    });
   }
 
   private async launchAppInternal(
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
+    runtime?: {
+      owner: ProcessOwner;
+      principal: ExecutionPrincipal;
+      profile?: UserProfile;
+    },
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
     const manifest = this.appCatalog.get(appId);
     if (!manifest) {
@@ -247,6 +290,27 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     const instanceId = randomUUID();
+    const currentUser = this.sessionContext.getCurrentUser();
+    const resolvedRuntime: {
+      owner: ProcessOwner;
+      principal: ExecutionPrincipal;
+      profile?: UserProfile;
+    } = runtime ?? {
+      owner: {
+        kind: "session" as const,
+        sessionId: this.sessionContext.getSessionId(),
+        username: currentUser?.username ?? null,
+      },
+      principal: currentUser
+        ? ({ kind: "user", username: currentUser.username } as const)
+        : ({ kind: "system" } as const),
+    };
+
+    this.runtimeContexts.register(appId, {
+      owner: resolvedRuntime.owner,
+      principal: resolvedRuntime.principal,
+      profile: resolvedRuntime.profile,
+    });
 
     try {
       // Create backend utility process if one is defined
@@ -275,6 +339,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       const instance: AppInstance = {
         manifest,
         instanceId,
+        owner: resolvedRuntime.owner,
+        principal: resolvedRuntime.principal,
         installPath,
         viewId: viewId ?? -1, // -1 indicates no view (backend-only)
         state: "running",
@@ -294,6 +360,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         appId,
       };
     } catch (error) {
+      this.runtimeContexts.unregister(appId);
       log.error(`Failed to launch app ${appId}:`, error);
       throw error;
     }
@@ -345,6 +412,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
       // Remove from running apps
       this.runningApps.delete(appId);
+      this.runtimeContexts.unregister(appId);
       this.syncRunningAppsState();
 
       this.notify("stopped", { appId });
@@ -375,6 +443,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    */
   getAppInstance(appId: string): AppInstance | undefined {
     return this.runningApps.get(appId);
+  }
+
+  getInstalledManifest(appId: string) {
+    return this.appCatalog.get(appId);
   }
 
   /**
@@ -439,6 +511,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     this.runningApps.delete(appId);
+    this.runtimeContexts.unregister(appId);
     this.syncRunningAppsState();
 
     this.notify("exited", { appId, code });
@@ -486,19 +559,34 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     log.info(`Reloading app ${appId}...`);
 
     // Stop the app
-    await this.stopApp(appId);
+    if (instance.owner.kind === "system") {
+      const runtime = this.runtimeContexts.get(appId);
+      this.notify("reloading", { appId });
+      await this.stopApp(appId);
+      await this.launchDaemon(appId, instance.principal, runtime?.profile);
+    } else {
+      await this.stopApp(appId);
 
-    // Small delay to ensure cleanup
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      // Small delay to ensure cleanup
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Relaunch with same bounds
-    await this.launchApp(appId, bounds);
+      // Relaunch with same bounds
+      await this.launchApp(appId, bounds);
+    }
 
     log.info(`App ${appId} reloaded successfully`);
   }
 
-  async stopSessionApps(): Promise<void> {
-    const running = Array.from(this.runningApps.keys());
+  async stopSessionApps(
+    sessionId = this.sessionContext.getSessionId(),
+  ): Promise<void> {
+    const running = Array.from(this.runningApps.values())
+      .filter(
+        (instance) =>
+          instance.owner.kind === "session" &&
+          instance.owner.sessionId === sessionId,
+      )
+      .map((instance) => instance.manifest.id);
     const errors: unknown[] = [];
     for (const appId of running) {
       try {
