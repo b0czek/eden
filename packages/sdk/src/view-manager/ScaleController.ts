@@ -63,9 +63,9 @@ export class ScaleController {
 
       if (scaleSetting) {
         const scale = parseFloat(scaleSetting);
-        if (!Number.isNaN(scale) && scale >= 0.5 && scale <= 2.0) {
-          this.currentScale = scale;
+        if (Number.isFinite(scale) && scale >= 0.5 && scale <= 2.0) {
           log.info(`Initialized interface scale to ${scale * 100}%`);
+          this.setScale(scale);
         }
       }
     } catch (error) {
@@ -78,7 +78,7 @@ export class ScaleController {
    * @param scale - Zoom factor (e.g., 1.0 = 100%, 1.5 = 150%)
    */
   setScale(scale: number): void {
-    if (scale < 0.5 || scale > 2.0) {
+    if (!Number.isFinite(scale) || scale < 0.5 || scale > 2.0) {
       throw new Error(`Invalid scale ${scale}. Must be between 0.5 and 2.0`);
     }
 

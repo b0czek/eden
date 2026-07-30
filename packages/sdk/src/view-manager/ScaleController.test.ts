@@ -13,10 +13,11 @@ type SettingsChangedCallback = (data: {
 const createController = (
   views: ViewInfo[] = [],
   notifyScaleChanged = jest.fn(),
+  initialScale: string | null = null,
 ) => {
   let settingsChangedCallback: SettingsChangedCallback | undefined;
   const settingsManager = {
-    get: jest.fn().mockResolvedValue(null),
+    get: jest.fn().mockResolvedValue(initialScale),
     on: jest.fn((_event: string, callback: SettingsChangedCallback) => {
       settingsChangedCallback = callback;
       return jest.fn();
@@ -100,5 +101,17 @@ describe("ScaleController", () => {
     emitSettingsChanged("1.25");
 
     expect(notifyScaleChanged).toHaveBeenCalledWith(1.25);
+  });
+
+  it("applies an asynchronously initialized scale to views already created", async () => {
+    const view = createView("app");
+    const notifyScaleChanged = jest.fn();
+
+    createController([view], notifyScaleChanged, "1.5");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
+    expect(notifyScaleChanged).toHaveBeenCalledWith(1.5);
   });
 });
