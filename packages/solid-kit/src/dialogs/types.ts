@@ -24,6 +24,8 @@ interface DialogBaseOptions {
   message?: JSX.Element | string;
   /** Optional width preset. Defaults to `"sm"`. */
   size?: DialogSize;
+  /** Accessible dialog role. Defaults to `"dialog"`. */
+  role?: "dialog" | "alertdialog";
   /** Allow passive dismissal via the close button, backdrop, or Escape. Defaults to `true`. */
   dismissable?: boolean;
   /** Close when clicking the backdrop. Defaults to `true`. */

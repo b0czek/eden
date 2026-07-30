@@ -2,4 +2,4 @@
 "@edenapp/solid-kit": patch
 ---
 
-Add a `dismissable` dialog option for disabling passive dismissal through the header close button, backdrop, and Escape key.
+Add dialog options for disabling passive dismissal and selecting either the `dialog` or `alertdialog` accessibility role, with labelled titles.

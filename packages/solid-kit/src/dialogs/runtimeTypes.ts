@@ -12,6 +12,7 @@ interface DialogRequestMeta {
   title: string;
   message?: JSX.Element | string;
   size: DialogSize;
+  role: "dialog" | "alertdialog";
 }
 
 interface DialogRequestBehavior {

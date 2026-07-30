@@ -141,16 +141,20 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
             }
 
             const renderContext = createRenderContext(dialog);
+            const titleId = `eden-dialog-title-${dialog.id}`;
 
             return (
               <div
                 ref={modalRef}
                 class={`eden-modal ${sizeClass(dialog.size)}`}
-                role="dialog"
+                role={dialog.role}
                 aria-modal="true"
+                aria-labelledby={titleId}
               >
                 <div class="eden-modal-header">
-                  <h3 class="eden-modal-title">{dialog.title}</h3>
+                  <h3 id={titleId} class="eden-modal-title">
+                    {dialog.title}
+                  </h3>
                   {dialog.dismissable && (
                     <button
                       type="button"
