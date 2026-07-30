@@ -89,12 +89,17 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
     const viewInfo = this.viewManager.getViewInfo(callerViewId);
     if (!viewInfo) return position;
 
-    return this.toPositionFromView(position, viewInfo.bounds);
+    return this.toPositionFromView(
+      position,
+      viewInfo.bounds,
+      viewInfo.view.webContents.getZoomFactor(),
+    );
   }
 
   private toPositionFromView(
     position: ContextMenuPosition,
     bounds: { x: number; y: number; width: number; height: number },
+    scale: number,
   ): ContextMenuPosition {
     const windowSize = this.viewManager.getWindowSize();
 
@@ -102,13 +107,21 @@ export class ContextMenuManager extends EdenEmitter<ContextMenuNamespaceEvents> 
     const bottomOffset = windowSize.height - (bounds.y + bounds.height);
 
     return {
-      left: position.left !== undefined ? position.left + bounds.x : undefined,
-      top: position.top !== undefined ? position.top + bounds.y : undefined,
+      left:
+        position.left !== undefined
+          ? position.left * scale + bounds.x
+          : undefined,
+      top:
+        position.top !== undefined
+          ? position.top * scale + bounds.y
+          : undefined,
       right:
-        position.right !== undefined ? position.right + rightOffset : undefined,
+        position.right !== undefined
+          ? position.right * scale + rightOffset
+          : undefined,
       bottom:
         position.bottom !== undefined
-          ? position.bottom + bottomOffset
+          ? position.bottom * scale + bottomOffset
           : undefined,
     };
   }

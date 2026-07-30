@@ -24,6 +24,7 @@ const createManager = () => {
   const commandRegistry = {
     registerManager: jest.fn(),
   } as unknown as jest.Mocked<Pick<CommandRegistry, "registerManager">>;
+  const getZoomFactor = jest.fn(() => 1);
   const viewManager: ViewManagerMock = {
     getViewIdByWebContentsId: jest.fn((webContentsId: number) => {
       if (webContentsId === 100) return 10;
@@ -40,6 +41,7 @@ const createManager = () => {
               : { x: 0, y: 0, width: 0, height: 0 },
           view: {
             webContents: {
+              getZoomFactor,
               isDestroyed: jest.fn(() => false),
             },
           },
@@ -54,7 +56,13 @@ const createManager = () => {
     viewManager as unknown as ViewManager,
   );
 
-  return { commandRegistry, eventSubscribers, manager, viewManager };
+  return {
+    commandRegistry,
+    eventSubscribers,
+    getZoomFactor,
+    manager,
+    viewManager,
+  };
 };
 
 describe("ContextMenuManager", () => {
@@ -101,6 +109,38 @@ describe("ContextMenuManager", () => {
       20,
       "context-menu/opened",
       expect.any(Object),
+    );
+  });
+
+  it("scales renderer coordinates by the opener view zoom factor", () => {
+    const { eventSubscribers, getZoomFactor, manager } = createManager();
+    getZoomFactor.mockReturnValue(1.5);
+
+    manager.registerDisplayProvider({
+      appId: "com.eden.context-menu",
+      webContentsId: 100,
+    });
+    manager.openMenu(
+      {
+        position: { left: 40, top: 60, right: 8, bottom: 12 },
+        items: [],
+      },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      10,
+      "context-menu/opened",
+      {
+        menu: expect.objectContaining({
+          position: {
+            left: 70,
+            top: 110,
+            right: 726,
+            bottom: 566,
+          },
+        }),
+      },
     );
   });
 
