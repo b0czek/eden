@@ -479,7 +479,6 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       viewInfo.requestedVisible = false;
       viewInfo.visible = false;
       viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-      viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
 
       if (viewInfo.mode === "tiled") {
         const visibilityChanged = this.syncTiledLayout({
