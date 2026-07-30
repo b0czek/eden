@@ -1,77 +1,168 @@
-# 🌿 Eden Desktop Environment
+<div align="center">
 
-> A modern, modular desktop environment framework built on Electron. Create beautiful, tiled desktop experiences with a powerful app ecosystem.
+# Eden
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+### An operating environment for building your own operating environment.
 
-## ✨ Overview
+Eden turns Electron into a modular desktop: sandboxed apps, tiled and floating
+windows, system services, permissions, theming, and app-to-app communication—
+without making every product rebuild the shell from scratch.
 
-Eden is a complete desktop environment SDK that lets you build custom desktop experiences with a focus on modularity, security, and developer experience. It provides window management with tiling support, a robust IPC architecture, and a beautiful design system out of the box.
+[Get started](#run-eden) · [Build an app](#build-for-eden) · [Read the docs](#documentation)
 
-![Eden Desktop Environment](images/screenshot.png)
+[![License: MIT](https://img.shields.io/badge/license-MIT-8bd5a0.svg)](LICENSE)
+[![Electron](https://img.shields.io/badge/runtime-Electron-9feaf9.svg)](https://www.electronjs.org/)
+[![TypeScript](https://img.shields.io/badge/built_with-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
 
-## 🚀 Best Features
+</div>
 
-- **🪟 Window Management** - Tiling window manager (horizontal, vertical, grid) with floating window support
-- **🔌 Three-Layer IPC** - EdenAPI (system ops), AppAPI (frontend↔backend), AppBus (app-to-app communication)
-- **🎨 EdenCSS Design System** - Glassmorphism UI with dark theme, component library, and design tokens
-- **🎯 Built-in Apps** - File manager, editor, settings, launcher, browser, calculator, and more
-- **💾 Data Management** - Per-app SQLite databases, persistent settings, and file associations
-- **👤 User Management** - Multi-user support with roles (vendor/standard), login/logout sessions, password management
-- **🔑 Grants & Access Control** - Fine-grained per-user grants with glob matching, app-level feature grants, and restricted app enforcement
-- **🌍 Internationalization (i18n)** - Full localization framework with typed translations, interpolation support, reactive locale switching, and localized app manifests
+![The Eden desktop, with multiple apps arranged across the workspace](images/screenshot.png)
 
-## 📖 Quick Start
+## A desktop is more than a window
 
-### Installation
+Eden provides the machinery behind an OS-like product experience. Applications
+run in isolated `WebContentsView`s and ask the shell for access to files,
+databases, processes, notifications, and other system resources. The host stays
+in control through explicit manifests, capabilities, and per-user grants.
+
+Out of the box, Eden gives you:
+
+- **A real windowing model** — tiled, floating, and overlay views managed by the shell.
+- **Sandboxed applications** — frontend-only apps, full-stack apps, and background daemons.
+- **Three purposeful communication layers** — system commands, frontend/backend messaging, and cross-app services.
+- **EdenCSS** — injected design tokens, utilities, and components that make apps feel native to the environment.
+- **A configurable product shell** — users, sessions, localization, branding, file associations, and provider-based system capabilities.
+- **A working app ecosystem** — files, settings, editor, calculator, process manager, PDF viewer, and more.
+- **Portable app bundles** — package and distribute applications as `.edenite` archives with Genesis.
+
+## Run Eden
+
+You will need Git, Node.js, and [pnpm](https://pnpm.io/).
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/eden.git
+git clone https://github.com/b0czek/eden.git
 cd eden
-
-# Install dependencies
+corepack enable
 pnpm install
-
-# Build all packages
-pnpm build
-```
-
-### Running the Example
-
-```bash
-# Run the example desktop environment
 pnpm dev
 ```
 
-This will build and launch the example Eden desktop environment with hot reload enabled.
-
-### Branding a Consumer
-
-Consumers can supply their own product name, login logo, and main-window icon
-through `new Eden({ branding: ... })`. See the
-[consumer branding guide](docs/branding.md) for asset rules and packaging
-considerations.
-
-### Building an App
-
-An Eden app is a web application (frontend-only or full-stack with Node.js backend) that runs within the Eden desktop environment. Apps are defined by a `manifest.json` file and can be packaged into `.edenite` archives.
+`pnpm dev` builds the SDK and starts its development host with watch mode. To
+launch the separate consumer example instead:
 
 ```bash
-# Using Genesis bundler
+pnpm dev:example
+```
+
+Useful workspace commands:
+
+```bash
+pnpm build       # build publishable workspace packages
+pnpm test        # run package test suites
+pnpm typecheck   # type-check the workspace
+pnpm lint        # run Biome checks
+```
+
+## Build for Eden
+
+An Eden app is a web app with a manifest. It can have only a frontend, pair that
+frontend with a Node.js backend, or run headlessly as a daemon.
+
+```text
+my-app/
+├── manifest.json
+├── package.json
+└── src/
+    └── index.tsx
+```
+
+The manifest declares what the app is, how it opens, and which capabilities it
+needs:
+
+```json
+{
+  "id": "com.example.notes",
+  "name": "Notes",
+  "version": "1.0.0",
+  "icon": "icon.svg",
+  "frontend": {
+    "entry": "dist/index.html"
+  },
+  "window": {
+    "mode": "both",
+    "defaultMode": "floating",
+    "defaultSize": { "width": 900, "height": 640 }
+  },
+  "permissions": ["fs/*", "db/rw"]
+}
+```
+
+Inside the sandbox, apps interact with Eden through APIs injected by the host:
+
+```ts
+const documents = await window.edenAPI.shellCommand("fs/readdir", {
+  path: "/Documents",
+});
+```
+
+When it is ready to ship, Genesis turns the app into a portable bundle:
+
+```bash
 genesis build ./my-app -o ./dist/my-app.edenite
 ```
 
-## 📚 Documentation
+See the [app development guide](docs/app-development.md) for manifests,
+permissions, backends, standalone development, and packaging.
 
-- **[App Development Guide](docs/app-development.md)**: Learn how to build Eden apps
-- **[IPC Architecture](docs/ipc-architecture.md)**: Deep dive into Eden's IPC system
-- **[Localizing Apps](docs/localizing-apps.md)**: Add i18n support to your Eden app
-- **[Consumer Branding](docs/branding.md)**: Configure product names, login logos, and window icons
-- **[User Management](docs/users.md)**: Users, roles, grants, and sessions
-- **[Genesis README](packages/genesis/README.md)**: App bundling and packaging
-- **[EdenCSS Documentation](packages/sdk/edencss/README.md)**: Design system reference
+## The model
 
-## 📝 License
+```text
+Your Electron product
+└── new Eden({ branding, apps, users, windowing, ... })
+    │
+    ├── Foundation
+    │   └── the host window and workspace behind every app
+    │
+    ├── Eden runtime
+    │   ├── packages and processes
+    │   ├── views and tiling
+    │   ├── users, sessions, permissions, and settings
+    │   └── files, associations, notifications, and services
+    │
+    └── Applications
+        ├── frontend-only ───── sandboxed WebContentsView
+        ├── frontend + backend ─ WebContentsView + utility process
+        └── daemon ───────────── backend without a frontend
+```
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Eden is an SDK embedded by a consumer Electron application, not a collection of
+pages wrapped in a shell. The consumer decides the product configuration and
+ships a set of built-in or packaged apps. Eden owns their lifecycle and gives
+them controlled access to the host through EdenAPI, AppAPI, and AppBus.
+
+Genesis sits on the build side of this model: it turns app source into the
+`.edenite` packages that the runtime installs and launches.
+
+| Package | Role |
+| --- | --- |
+| [`@edenapp/sdk`](packages/sdk) | Desktop runtime, shell services, built-in apps, and EdenCSS |
+| [`@edenapp/genesis`](packages/genesis) | Builds and packages `.edenite` applications |
+| [`@edenapp/types`](packages/types) | Shared contracts for apps, manifests, and the host |
+| [`@edenapp/solid-kit`](packages/solid-kit) | SolidJS helpers for Eden applications |
+| [`@edenapp/example`](packages/example) | Minimal consumer implementation |
+
+## Documentation
+
+- [App development](docs/app-development.md) — app structure, manifests, permissions, and development
+- [IPC architecture](docs/ipc-architecture.md) — EdenAPI, AppAPI, and AppBus
+- [Processes and daemons](docs/processes-and-daemons.md) — background work and lifecycle
+- [Settings](docs/settings.md) — adding host and app settings
+- [Localization](docs/localizing-apps.md) — typed translations and reactive locale changes
+- [Users and grants](docs/users.md) — accounts, roles, sessions, and access control
+- [Consumer branding](docs/branding.md) — product name, login artwork, and window icons
+- [EdenCSS](packages/sdk/edencss/README.md) — tokens, utilities, and components
+- [Genesis](packages/genesis/README.md) — application bundling and `.edenite` internals
+
+## License
+
+Eden is available under the [MIT License](LICENSE).
