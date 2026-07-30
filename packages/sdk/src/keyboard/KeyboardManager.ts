@@ -859,6 +859,7 @@ export class KeyboardManager {
     const lift = calculateDockedKeyboardLift({
       keyboardHeight: this.calculateDockedKeyboardBounds().height,
       targetBounds: target.targetBounds,
+      targetScale: targetView.view.webContents.getZoomFactor(),
       viewBounds: targetView.bounds,
       contentBounds,
     });

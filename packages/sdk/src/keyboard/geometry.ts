@@ -23,6 +23,14 @@ export type KeyboardGeometryOptions = {
   minWidth?: number;
 };
 
+export type DockedKeyboardLiftOptions = {
+  keyboardHeight: number;
+  targetBounds?: EdenKeyboardTargetBounds;
+  targetScale?: number;
+  viewBounds?: ViewBounds;
+  contentBounds: ViewBounds;
+};
+
 const clampScale = (scale: number): number => {
   if (!Number.isFinite(scale)) {
     return 1;
@@ -118,23 +126,25 @@ export const calculateKeyboardLayout = (
   return "text";
 };
 
-export const calculateDockedKeyboardLift = ({
-  keyboardHeight,
-  targetBounds,
-  viewBounds,
-  contentBounds,
-}: {
-  keyboardHeight: number;
-  targetBounds?: EdenKeyboardTargetBounds;
-  viewBounds?: ViewBounds;
-  contentBounds: ViewBounds;
-}): number => {
+export const calculateDockedKeyboardLift = (
+  options: DockedKeyboardLiftOptions,
+): number => {
+  const {
+    keyboardHeight,
+    targetBounds,
+    targetScale = 1,
+    viewBounds,
+    contentBounds,
+  } = options;
+
   if (!targetBounds || !viewBounds || keyboardHeight <= 0) {
     return 0;
   }
 
-  const targetTop = viewBounds.y + targetBounds.y;
-  const targetBottom = targetTop + targetBounds.height;
+  const normalizedTargetScale =
+    Number.isFinite(targetScale) && targetScale > 0 ? targetScale : 1;
+  const targetTop = viewBounds.y + targetBounds.y * normalizedTargetScale;
+  const targetBottom = targetTop + targetBounds.height * normalizedTargetScale;
   const visibleTop = KEYBOARD_TOP_MARGIN;
   const visibleBottom =
     contentBounds.height - keyboardHeight - KEYBOARD_BOTTOM_MARGIN;
