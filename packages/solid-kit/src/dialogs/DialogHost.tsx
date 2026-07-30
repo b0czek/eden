@@ -42,7 +42,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
       setValue: dialog.setValue as Setter<unknown>,
       canSubmit: dialog.canSubmit,
       setCanSubmit: dialog.setCanSubmit,
-      submit: (result) => dialogs.submit(result),
+      submit: (...args) => dialogs.submit(...args),
       cancel: dialogs.cancel,
       setPrimaryActionRef: (el) => {
         primaryActionRef = el;
