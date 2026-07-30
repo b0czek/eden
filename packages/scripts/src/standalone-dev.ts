@@ -422,12 +422,19 @@ function developmentSeed(): EdenSeedConfig {
       {
         username: DEVELOPMENT_USER.username,
         name: DEVELOPMENT_USER.name,
-        role: "standard",
+        role: "vendor",
         passwordHash,
         passwordSalt,
       },
     ],
     defaultUsername: DEVELOPMENT_USER.username,
+    settings: {
+      "com.eden": {
+        "autostart.com.eden.eveshell": "true",
+        "autostart.com.eden.toaster": "true",
+        "autostart.com.eden.context-menu": "true",
+      },
+    },
   };
 }
 
