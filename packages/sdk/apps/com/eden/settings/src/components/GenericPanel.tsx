@@ -6,7 +6,14 @@ import type {
   SettingsPanelLocalizedText,
   SettingsPanelValue,
 } from "@edenapp/types";
-import { type Accessor, createSignal, For, Show } from "solid-js";
+import {
+  type Accessor,
+  batch,
+  createEffect,
+  createSignal,
+  For,
+  Show,
+} from "solid-js";
 import { getLocalizedValue, locale, t } from "../i18n";
 import type { LoadedPanel, PanelAction } from "../types";
 
@@ -28,9 +35,32 @@ const FieldControl = (props: {
   value: SettingsPanelValue | undefined;
   disabled?: boolean;
   onInput: (value: SettingsPanelValue) => void;
+  deferCommit?: boolean;
 }) => {
   const inputType = () => ("input" in props.field ? props.field.input : "text");
-  const value = () => props.value ?? "";
+  const [draft, setDraft] = createSignal<SettingsPanelValue>(props.value ?? "");
+  const [dirty, setDirty] = createSignal(false);
+  createEffect(() => {
+    if (!dirty()) setDraft(props.value ?? "");
+  });
+  const value = () => (props.deferCommit ? draft() : (props.value ?? ""));
+  const update = (next: SettingsPanelValue) => {
+    if (!props.deferCommit) {
+      props.onInput(next);
+      return;
+    }
+    batch(() => {
+      setDraft(next);
+      setDirty(true);
+    });
+  };
+  const parsed = (raw: string): SettingsPanelValue =>
+    inputType() === "number" || inputType() === "range" ? Number(raw) : raw;
+  const commit = (next = draft()) => {
+    if (!props.deferCommit || !dirty()) return;
+    setDirty(false);
+    props.onInput(next);
+  };
 
   if (inputType() === "select") {
     return (
@@ -82,7 +112,8 @@ const FieldControl = (props: {
         disabled={props.disabled}
         value={String(value())}
         placeholder={localized(props.field.placeholder)}
-        onInput={(event) => props.onInput(event.currentTarget.value)}
+        onInput={(event) => update(event.currentTarget.value)}
+        onBlur={(event) => commit(event.currentTarget.value)}
       />
     );
   }
@@ -118,12 +149,14 @@ const FieldControl = (props: {
       placeholder={localized(props.field.placeholder)}
       onInput={(event) => {
         const raw = event.currentTarget.value;
-        props.onInput(
-          inputType() === "number" || inputType() === "range"
-            ? Number(raw)
-            : raw,
-        );
+        update(parsed(raw));
       }}
+      onChange={
+        inputType() === "range" || inputType() === "color"
+          ? (event) => commit(parsed(event.currentTarget.value))
+          : undefined
+      }
+      onBlur={(event) => commit(parsed(event.currentTarget.value))}
     />
   );
 };
@@ -374,6 +407,11 @@ export default function GenericPanel(props: GenericPanelProps) {
                     props.busyActions().has(control.actionId);
                   const disabled = () =>
                     state(control)?.disabled || !actionAuthorized(control);
+                  const deferInputCommit = () =>
+                    control.kind === "input" &&
+                    ["text", "textarea", "number", "color", "range"].includes(
+                      control.input,
+                    );
                   return (
                     <Show when={!state(control)?.hidden}>
                       <div class="setting-item">
@@ -433,7 +471,10 @@ export default function GenericPanel(props: GenericPanelProps) {
                               field={control as SettingsPanelInput}
                               inputId={`control-${control.id}`}
                               value={value(control)}
-                              disabled={busy() || disabled()}
+                              disabled={
+                                disabled() || (busy() && !deferInputCommit())
+                              }
+                              deferCommit={deferInputCommit()}
                               onInput={(next) =>
                                 void runValueAction(
                                   control as Extract<

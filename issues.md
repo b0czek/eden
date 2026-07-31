@@ -9,10 +9,10 @@
     explicitly supplied. Consequently the documented eden.apps.list({ showHidden: true }) example returns an empty array despite installed apps; run the query under the active/system principal or bypass
     caller authorization for this trusted facade.~~
 
-  - [P1] Keep value inputs enabled while users edit — /home/dariusz/Desktop/eden/packages/sdk/apps/com/eden/settings/src/components/GenericPanel.tsx:435-438
+  - ~~[P1] Keep value inputs enabled while users edit — /home/dariusz/Desktop/eden/packages/sdk/apps/com/eden/settings/src/components/GenericPanel.tsx:435-438
     For text, textarea, number, color, and range controls, every onInput starts an action, and App.runAction immediately adds that action to busyActions. This makes the control disabled after its first
     input event until the action and panel reload complete, so text fields accept roughly one character per IPC round trip and range dragging stops immediately; keep a local draft and commit on blur/
-    debounce, or avoid disabling the control during editing.
+    debounce, or avoid disabling the control during editing.~~
 
   - [P2] Preserve state when disabling unauthorized controls — /home/dariusz/Desktop/eden/packages/sdk/src/settings/SettingsPanelAuthorization.ts:81-84
     When a control's stateKey differs from its id and the user lacks its action grant, this creates a new state entry under control.id rather than merging the provider state under stateKey. GenericPanel

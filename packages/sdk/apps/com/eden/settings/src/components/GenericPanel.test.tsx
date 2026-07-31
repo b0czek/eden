@@ -25,6 +25,46 @@ const panel = (
 });
 
 describe("GenericPanel", () => {
+  it("keeps text inputs editable and commits their draft on blur", async () => {
+    const [busy, setBusy] = createSignal(new Set<string>());
+    const onAction = vi.fn<PanelAction>(async () => ({ success: true }));
+    const loaded = panel(
+      {
+        sections: [
+          {
+            id: "main",
+            controls: [
+              {
+                kind: "input",
+                input: "text",
+                id: "name",
+                label: "Name",
+                actionId: "save-name",
+              },
+            ],
+          },
+        ],
+        actions: [{ id: "save-name", authorized: true }],
+      },
+      { controls: { name: { value: "E" } } },
+    );
+    const view = render(() => (
+      <GenericPanel panel={loaded} busyActions={busy} onAction={onAction} />
+    ));
+    const input =
+      view.container.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!input) throw new Error("Expected text input");
+
+    await fireEvent.input(input, { target: { value: "Eden" } });
+    setBusy(new Set(["save-name"]));
+    expect(input.disabled).toBe(false);
+    expect(input.value).toBe("Eden");
+    expect(onAction).not.toHaveBeenCalled();
+
+    await fireEvent.blur(input);
+    expect(onAction).toHaveBeenCalledWith("save-name", { value: "Eden" });
+  });
+
   it("disables unauthorized actions and rolls a failed toggle back", async () => {
     const [busy] = createSignal(new Set<string>());
     const onAction = vi.fn<PanelAction>(async () => ({
