@@ -16,10 +16,10 @@ import type {
 } from "@edenapp/types";
 import { delay, inject, singleton } from "tsyringe";
 import { AppCatalog } from "../app-registry";
+import type { DaemonManager } from "../daemon";
 import { ExecutionContext } from "../execution";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import type { DaemonManager } from "../daemon";
 import type { PackageManager } from "../package-manager";
 import { SessionContext, type SessionManager } from "../session";
 import {

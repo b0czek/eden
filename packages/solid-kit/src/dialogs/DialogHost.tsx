@@ -144,6 +144,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
             const titleId = `eden-dialog-title-${dialog.id}`;
 
             return (
+              // biome-ignore lint/a11y/useAriaPropsSupportedByRole: the typed dynamic role is always dialog or alertdialog.
               <div
                 ref={modalRef}
                 class={`eden-modal ${sizeClass(dialog.size)}`}
