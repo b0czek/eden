@@ -462,6 +462,8 @@ export interface BuildSdkAppsOptions {
   outputDir: string;
   /** Force rebuild all apps */
   force?: boolean;
+  /** Build only apps whose manifest IDs are included in this list */
+  includeAppIds?: readonly string[];
 }
 
 /**
@@ -517,12 +519,18 @@ export async function buildSdkApps(
     return;
   }
 
-  const apps = await Promise.all(
+  const discoveredApps = await Promise.all(
     appPaths.map(async (appPath) => ({
       appPath,
       manifest: await readAppManifest(appPath),
     })),
   );
+  const includedIds = options.includeAppIds
+    ? new Set(options.includeAppIds)
+    : undefined;
+  const apps = includedIds
+    ? discoveredApps.filter(({ manifest }) => includedIds.has(manifest.id))
+    : discoveredApps;
 
   console.log(`Found ${apps.length} apps to build.`);
 
