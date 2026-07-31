@@ -326,6 +326,8 @@ export interface AppManifest {
     command: string;
     /** Working directory for build command (relative to app root) */
     cwd?: string;
+    /** Whether this app may build alongside other apps (default: true) */
+    concurrent?: boolean;
   };
 
   /** Commands used when the app is mounted directly from source. */

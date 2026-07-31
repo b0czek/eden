@@ -62,6 +62,24 @@ describe("bundler module", () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
+    it("validates the build concurrency hint", () => {
+      const manifest: AppManifest = {
+        id: "com.example.build",
+        name: "Build",
+        version: "1.0.0",
+        frontend: { entry: "dist/index.html" },
+        build: { command: "npm run build", concurrent: false },
+      };
+
+      expect(bundler.validateManifestObject(manifest).valid).toBe(true);
+
+      manifest.build!.concurrent = "no" as unknown as boolean;
+      expect(bundler.validateManifestObject(manifest)).toMatchObject({
+        valid: false,
+        errors: ["build.concurrent must be a boolean"],
+      });
+    });
+
     it("validates shared setting readers", () => {
       const baseManifest: AppManifest = {
         id: "com.example.owner",

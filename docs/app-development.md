@@ -148,6 +148,19 @@ For example, if you use simple static HTML/JS:
 
 The Eden build system (`genesis build`) will look for this command and execute it when bundling the system.
 
+Apps build alongside one another by default when Eden bundles multiple apps. If
+an app's build command already uses the machine's available parallelism, declare
+`"concurrent": false` in its build configuration so it runs alone:
+
+```json
+{
+  "build": {
+    "command": "npm run build",
+    "concurrent": false
+  }
+}
+```
+
 ## Settings Panels
 
 An app can publish ordinary persisted controls through the unchanged

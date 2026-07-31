@@ -10,6 +10,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
+import type { AppManifest } from "@edenapp/types";
 import { type AppSource, loadConfig, resolveSdkAppsPath } from "./config";
 
 export interface BuildAppsOptions {
@@ -30,6 +31,53 @@ const BUILD_CACHE_PATH = ".build-cache.json";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+interface BuildTask<T> {
+  concurrent: boolean;
+  run: () => Promise<T>;
+}
+
+/** Run ordinary builds together while treating non-concurrent builds as barriers. */
+async function runBuildTasks<T>(tasks: BuildTask<T>[]): Promise<T[]> {
+  const results = new Array<T>(tasks.length);
+  let activeBuilds: Promise<void>[] = [];
+
+  for (const [index, task] of tasks.entries()) {
+    const run = async () => {
+      results[index] = await task.run();
+    };
+
+    if (task.concurrent) {
+      activeBuilds.push(run());
+      continue;
+    }
+
+    await Promise.all(activeBuilds);
+    activeBuilds = [];
+    await run();
+  }
+
+  await Promise.all(activeBuilds);
+  return results;
+}
+
+async function readAppManifest(appDir: string): Promise<AppManifest> {
+  const content = await fs.readFile(
+    path.join(appDir, "manifest.json"),
+    "utf-8",
+  );
+  return JSON.parse(content) as AppManifest;
+}
+
+async function allowsConcurrentBuild(appDir: string): Promise<boolean> {
+  try {
+    const manifest = await readAppManifest(appDir);
+    return manifest.build?.concurrent !== false;
+  } catch {
+    // Genesis will report malformed or unreadable manifests during the build.
+    return true;
+  }
 }
 
 async function loadBuildCache(cwd: string): Promise<BuildCache> {
@@ -322,39 +370,51 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
   const prebuiltDir = path.join(cwd, PREBUILT_DIR);
   await fs.mkdir(prebuiltDir, { recursive: true });
 
-  // Build each app
-  let successCount = 0;
-  let failCount = 0;
-  let skippedCount = 0;
+  const appPlans = await Promise.all(
+    config.apps.map(async (appSource) => {
+      const appDir = await resolveAppDirectory(appSource, cwd, sdkAppsPath);
+      const concurrent = appDir ? await allowsConcurrentBuild(appDir) : true;
+      return { appSource, appDir, concurrent };
+    }),
+  );
 
-  for (const appSource of config.apps) {
-    const appDir = await resolveAppDirectory(appSource, cwd, sdkAppsPath);
-    if (!appDir) {
-      failCount++;
-      continue;
-    }
+  // Apps build in parallel by default. An app with build.concurrent set to
+  // false acts as a barrier and builds alone.
+  const results = await runBuildTasks(
+    appPlans.map(({ appSource, appDir, concurrent }) => ({
+      concurrent,
+      run: async () => {
+        if (!appDir) {
+          return "failed" as const;
+        }
 
-    const targetDir = path.join(prebuiltDir, appSource.id);
+        const targetDir = path.join(prebuiltDir, appSource.id);
 
-    // Check if rebuild is needed (for skip counting)
-    if (
-      !force &&
-      !(await needsRebuild(appSource.id, appDir, targetDir, cache))
-    ) {
-      console.log(`\n📦 ${appSource.id}`);
-      console.log(`  ⏭️  Skipping - no changes since last build`);
-      skippedCount++;
-      successCount++;
-      continue;
-    }
+        // Check if rebuild is needed (for skip counting)
+        if (
+          !force &&
+          !(await needsRebuild(appSource.id, appDir, targetDir, cache))
+        ) {
+          console.log(`\n📦 ${appSource.id}`);
+          console.log(`  ⏭️  Skipping - no changes since last build`);
+          return "skipped" as const;
+        }
 
-    const success = await buildApp(appSource, appDir, targetDir, cache, force);
-    if (success) {
-      successCount++;
-    } else {
-      failCount++;
-    }
-  }
+        const success = await buildApp(
+          appSource,
+          appDir,
+          targetDir,
+          cache,
+          force,
+        );
+        return success ? ("succeeded" as const) : ("failed" as const);
+      },
+    })),
+  );
+
+  const successCount = results.filter((result) => result !== "failed").length;
+  const failCount = results.filter((result) => result === "failed").length;
+  const skippedCount = results.filter((result) => result === "skipped").length;
 
   // Save updated cache
   await saveBuildCache(cwd, cache);
@@ -437,13 +497,15 @@ export async function buildSdkApps(
     return;
   }
 
-  console.log(`Found ${appPaths.length} apps to build:`);
-  for (const appPath of appPaths) {
-    const manifestContent = await fs.readFile(
-      path.join(appPath, "manifest.json"),
-      "utf-8",
-    );
-    const manifest = JSON.parse(manifestContent);
+  const apps = await Promise.all(
+    appPaths.map(async (appPath) => ({
+      appPath,
+      manifest: await readAppManifest(appPath),
+    })),
+  );
+
+  console.log(`Found ${apps.length} apps to build:`);
+  for (const { manifest } of apps) {
     console.log(`  - ${manifest.id}`);
   }
 
@@ -455,34 +517,35 @@ export async function buildSdkApps(
   }
   await fs.mkdir(outputDir, { recursive: true });
 
-  // Build each app using Genesis
-  let successCount = 0;
-  let failCount = 0;
+  // Build apps through Genesis in parallel unless an app declares that its
+  // own build is parallel and should run alone.
+  const results = await runBuildTasks(
+    apps.map(({ appPath, manifest }) => ({
+      concurrent: manifest.build?.concurrent !== false,
+      run: async () => {
+        const targetDir = path.join(outputDir, manifest.id);
 
-  for (const appPath of appPaths) {
-    const manifestContent = await fs.readFile(
-      path.join(appPath, "manifest.json"),
-      "utf-8",
-    );
-    const manifest = JSON.parse(manifestContent);
-    const targetDir = path.join(outputDir, manifest.id);
+        console.log(`\n📦 Building ${manifest.id}...`);
 
-    console.log(`\n📦 Building ${manifest.id}...`);
+        const result = await genesisBundler.bundle({
+          appDirectory: appPath,
+          extractToDirectory: targetDir,
+          verbose: false,
+        });
 
-    const result = await genesisBundler.bundle({
-      appDirectory: appPath,
-      extractToDirectory: targetDir,
-      verbose: false,
-    });
+        if (result.success) {
+          console.log(`   ✅ Built successfully`);
+          return true;
+        } else {
+          console.log(`   ❌ Build failed: ${result.error}`);
+          return false;
+        }
+      },
+    })),
+  );
 
-    if (result.success) {
-      console.log(`   ✅ Built successfully`);
-      successCount++;
-    } else {
-      console.log(`   ❌ Build failed: ${result.error}`);
-      failCount++;
-    }
-  }
+  const successCount = results.filter(Boolean).length;
+  const failCount = results.length - successCount;
 
   // Summary
   console.log(`\n${"=".repeat(50)}`);

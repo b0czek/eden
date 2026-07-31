@@ -240,6 +240,13 @@ export function validateManifestObject(manifest: AppManifest): {
     errors.push("Invalid frontend.entry URL");
   }
 
+  if (
+    manifest.build?.concurrent !== undefined &&
+    typeof manifest.build.concurrent !== "boolean"
+  ) {
+    errors.push("build.concurrent must be a boolean");
+  }
+
   if (manifest.fileHandlers) {
     for (const [index, handler] of manifest.fileHandlers.entries()) {
       if (!handler.name) {
