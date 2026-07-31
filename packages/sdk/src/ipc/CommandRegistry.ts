@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import {
   type CommandCallerContext,
   ExecutionContext,
@@ -40,7 +40,7 @@ interface CommandManager {
   constructor: object;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class CommandRegistry {
   private handlers = new Map<string, CommandMetadata>();
@@ -257,5 +257,9 @@ export class CommandRegistry {
    */
   clear(): void {
     this.handlers.clear();
+  }
+
+  dispose(): void {
+    this.clear();
   }
 }

@@ -97,4 +97,8 @@ export class UserStore {
     }
     return user;
   }
+
+  async dispose(): Promise<void> {
+    await this.keyv.disconnect();
+  }
 }

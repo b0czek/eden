@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { RuntimeAppManifest } from "@edenapp/types";
 import fg from "fast-glob";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution";
 import { log } from "../logging";
 import { AppRegistry } from "./AppRegistry";
@@ -13,7 +13,7 @@ export interface AppCatalogListOptions {
   showRestricted?: boolean;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class AppCatalog {
   private developmentPaths = new Map<string, string>();

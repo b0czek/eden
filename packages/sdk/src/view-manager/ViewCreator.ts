@@ -2,7 +2,7 @@ import * as path from "node:path";
 import type { AppManifest, WindowConfig } from "@edenapp/types";
 import type { Rectangle as Bounds, WebContentsView } from "electron";
 import { log } from "../logging";
-import { cachedFileReader } from "../utils/cachedFileReader";
+import { CachedFileReader } from "../utils/cachedFileReader";
 import type { FloatingWindowController } from "./FloatingWindowController";
 import type { TilingController } from "./TilingController";
 import { type ViewInfo, type ViewMode, type ViewType, Z_LAYERS } from "./types";
@@ -16,6 +16,7 @@ import { createView } from "./viewLifecycle";
 export class ViewCreator {
   private nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
   private nextViewId = 1;
+  private readonly fileReader = new CachedFileReader();
 
   constructor(
     private readonly basePath: string,
@@ -90,7 +91,7 @@ export class ViewCreator {
       const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
       const cssPath = path.join(edenCssPath, cssFileName);
 
-      const css = await cachedFileReader.readAsync(cssPath, "utf-8");
+      const css = await this.fileReader.readAsync(cssPath, "utf-8");
       await view.webContents.insertCSS(css);
 
       log.info(`Injected Eden CSS (${mode})`);
@@ -121,7 +122,7 @@ export class ViewCreator {
     try {
       // Inject CSS first
       const frameCSSPath = path.join(this.basePath, "app-frame/frame.css");
-      const frameCSS = await cachedFileReader.readAsync(frameCSSPath, "utf-8");
+      const frameCSS = await this.fileReader.readAsync(frameCSSPath, "utf-8");
       await view.webContents.insertCSS(frameCSS);
 
       // Inject bundled JavaScript
@@ -129,7 +130,7 @@ export class ViewCreator {
         this.basePath,
         "app-frame/frame-injector.js",
       );
-      const frameScript = await cachedFileReader.readAsync(
+      const frameScript = await this.fileReader.readAsync(
         frameScriptPath,
         "utf-8",
       );

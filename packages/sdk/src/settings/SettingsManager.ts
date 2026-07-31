@@ -2,7 +2,7 @@ import * as path from "node:path";
 import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
-import { delay, inject, singleton } from "tsyringe";
+import { delay, inject, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
@@ -33,7 +33,7 @@ interface SettingsNamespaceEvents {
  *
  * Eden system settings use appId "com.eden" which is reserved.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("settings")
 export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   private keyv: Keyv;
@@ -341,5 +341,10 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
 
   private canAccessSetting(appId: string, key: string): boolean {
     return this.executionContext.hasGrant(`settings/${appId}/${key}`);
+  }
+
+  override async dispose(): Promise<void> {
+    super.dispose();
+    await this.keyv.disconnect();
   }
 }

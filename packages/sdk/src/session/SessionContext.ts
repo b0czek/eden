@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { UserProfile } from "@edenapp/types";
-import { singleton } from "tsyringe";
+import { Lifecycle, scoped } from "tsyringe";
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 export class SessionContext {
   private currentUser: UserProfile | null = null;
   private sessionId = randomUUID();
@@ -26,5 +26,9 @@ export class SessionContext {
 
   private cloneUser(user: UserProfile): UserProfile {
     return { ...user, grants: [...user.grants] };
+  }
+
+  dispose(): void {
+    this.currentUser = null;
   }
 }

@@ -10,7 +10,7 @@ import type {
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -45,7 +45,7 @@ interface ProcessNamespaceEvents {
  *
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("process")
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
@@ -540,6 +540,19 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         log.error(`Failed to stop app ${appId}:`, error);
       }
     }
+  }
+
+  override dispose(): void {
+    this.hotReloadWatcher?.close();
+    this.hotReloadWatcher = undefined;
+    if (this.hotReloadDebounceTimer) {
+      clearTimeout(this.hotReloadDebounceTimer);
+      this.hotReloadDebounceTimer = undefined;
+    }
+    this.processMetrics.dispose();
+    this.runningApps.clear();
+    this.hotReloadStates.clear();
+    super.dispose();
   }
 
   /**

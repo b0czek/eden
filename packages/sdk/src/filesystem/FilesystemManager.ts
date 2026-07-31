@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
 import fg from "fast-glob";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
@@ -18,7 +18,7 @@ import { FilesystemHandler } from "./FilesystemHandler";
  *
  * Manages filesystem operations and path resolution.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class FilesystemManager {
   private baseDir: string;

@@ -1,9 +1,9 @@
 import type { EdenPowerCapabilities } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenHandler, EdenNamespace } from "../ipc";
 import { PowerManager } from "./PowerManager";
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("system")
 export class PowerHandler {

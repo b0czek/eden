@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EdenBrandingInfo, EdenConfig } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { log } from "../logging";
 
 const DEFAULT_PRODUCT_NAME = "Eden";
@@ -16,7 +16,7 @@ const LOGO_MIME_TYPES: Record<string, string> = {
 
 const WINDOW_ICON_EXTENSIONS = new Set([".png", ".ico"]);
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class BrandingManager {
   private readonly info: EdenBrandingInfo;

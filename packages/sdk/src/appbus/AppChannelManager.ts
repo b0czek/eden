@@ -4,7 +4,7 @@ import type {
   ServiceInfo,
 } from "@edenapp/types";
 import { MessageChannelMain, webContents } from "electron";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
 import { BackendManager } from "../process-manager/BackendManager";
@@ -17,7 +17,7 @@ import { AppChannelHandler } from "./AppChannelHandler";
  * Uses Electron's MessageChannelMain for direct communication
  * that bypasses the main process after initial setup.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class AppChannelManager {
   /** Map of "appId:serviceName" -> RegisteredService */
@@ -395,5 +395,9 @@ export class AppChannelManager {
 
     this.services.clear();
     log.info("Destroyed");
+  }
+
+  dispose(): void {
+    this.destroy();
   }
 }

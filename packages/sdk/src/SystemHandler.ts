@@ -1,9 +1,9 @@
 import type { EdenBrandingInfo, EdenConfig, SystemInfo } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { BrandingManager } from "./branding";
 import { CommandRegistry, EdenHandler, EdenNamespace, IPCBridge } from "./ipc";
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("system")
 export class SystemHandler {

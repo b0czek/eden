@@ -1,5 +1,5 @@
 import type { EdenConfig } from "@edenapp/types";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution";
 import { loadHotReloadAppsState } from "../hotreload-config";
 import { log } from "../logging";
@@ -11,7 +11,7 @@ import { ProcessManager } from "./ProcessManager";
 /**
  * AutostartManager handles launching applications when Eden starts
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class AutostartManager {
   private static readonly AUTOSTART_KEY_PREFIX = "autostart.";
@@ -159,5 +159,10 @@ export class AutostartManager {
     } catch (error) {
       log.error(`Failed to launch login app ${loginAppId}:`, error);
     }
+  }
+
+  dispose(): void {
+    this.ready = false;
+    this.launchPromise = Promise.resolve();
   }
 }

@@ -157,4 +157,9 @@ export abstract class EdenEmitter<TEvents> {
       data as EventData<typeof fullEventName>,
     );
   }
+
+  /** Release every in-process subscription owned by this emitter. */
+  public dispose(): void {
+    this.listeners.clear();
+  }
 }

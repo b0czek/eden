@@ -4,10 +4,8 @@ import type {
   SettingsPanelSummary,
   SettingsPanelValue,
 } from "@edenapp/types";
-import { EdenHandler, EdenNamespace, registerEventPermission } from "../ipc";
+import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SettingsPanelManager } from "./SettingsPanelManager";
-
-registerEventPermission("settings/panels-changed", "settings/panels");
 
 @EdenNamespace("settings")
 export class SettingsPanelHandler {

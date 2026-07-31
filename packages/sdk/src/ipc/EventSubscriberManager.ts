@@ -2,10 +2,7 @@ import type { EventData, EventName } from "@edenapp/types";
 import { log } from "../logging";
 import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
-import {
-  getEventPermission,
-  type PermissionRegistry,
-} from "./PermissionRegistry";
+import type { PermissionRegistry } from "./PermissionRegistry";
 export class EventSubscriberManager {
   private viewManager: ViewManager;
   private backendManager?: BackendManager;
@@ -43,7 +40,8 @@ export class EventSubscriberManager {
     }
 
     // Check event permission if required
-    const requiredPermission = getEventPermission(eventName);
+    const requiredPermission =
+      this.permissionRegistry?.getEventPermission(eventName);
     if (requiredPermission && this.permissionRegistry) {
       if (
         !this.permissionRegistry.hasPermission(
@@ -84,7 +82,8 @@ export class EventSubscriberManager {
    */
   public subscribeBackend(appId: string, eventName: string): boolean {
     // Check event permission if required
-    const requiredPermission = getEventPermission(eventName);
+    const requiredPermission =
+      this.permissionRegistry?.getEventPermission(eventName);
     if (requiredPermission && this.permissionRegistry) {
       if (!this.permissionRegistry.hasPermission(appId, requiredPermission)) {
         throw new Error(
@@ -251,5 +250,13 @@ export class EventSubscriberManager {
         }
       }
     }
+  }
+
+  dispose(): void {
+    this.subscriptions.clear();
+    this.backendSubscriptions.clear();
+    this.foundationSubscriptions.clear();
+    this.backendManager = undefined;
+    this.permissionRegistry = undefined;
   }
 }

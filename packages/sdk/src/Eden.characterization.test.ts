@@ -57,6 +57,8 @@ async function loadEdenHarness(): Promise<EdenHarness> {
     readonly options: Record<string, unknown>;
     readonly loadFile = jest.fn();
     readonly show = jest.fn();
+    readonly destroy = jest.fn();
+    readonly isDestroyed = jest.fn(() => false);
     readonly webContentsListeners = new Map<string, Listener>();
     readonly windowListeners = new Map<string, Listener>();
     readonly webContents = {
@@ -98,11 +100,15 @@ async function loadEdenHarness(): Promise<EdenHarness> {
       getWindowTitle: jest.fn((title?: string) => title ?? "Eden"),
       getWindowIconPath: jest.fn(() => "/consumer/icon.png"),
     },
+    PermissionRegistry: {
+      registerEventPermission: jest.fn(),
+    },
     CommandRegistry: { registerManager: jest.fn() },
     BackendManager: {},
     IPCBridge: {
       setMainWindow: jest.fn(),
       destroy: jest.fn(() => order.push("ipc.destroy")),
+      dispose: jest.fn(() => order.push("ipc.destroy")),
     },
     SettingsPanelManager: {
       synchronizeManifestPanels: jest.fn(() => order.push("panels.sync")),
@@ -146,6 +152,7 @@ async function loadEdenHarness(): Promise<EdenHarness> {
     KeyboardManager: {
       setMainWindow: jest.fn(),
       destroy: jest.fn(() => order.push("keyboard.destroy")),
+      dispose: jest.fn(() => order.push("keyboard.destroy")),
     },
     SystemHandler: {},
     PowerHandler: {},
@@ -159,9 +166,13 @@ async function loadEdenHarness(): Promise<EdenHarness> {
   const classes = Object.fromEntries(
     Object.keys(instances).map((name) => [name, managerClass(name)]),
   );
-  const container = {
+  const childContainer = {
     registerInstance: jest.fn(),
     resolve: jest.fn((token: { name: string }) => instances[token.name]),
+    dispose: jest.fn(),
+  };
+  const container = {
+    createChildContainer: jest.fn(() => childContainer),
   };
 
   jest.doMock("tsyringe", () => ({ container }));
@@ -214,6 +225,7 @@ async function loadEdenHarness(): Promise<EdenHarness> {
   jest.doMock("./ipc", () => ({
     CommandRegistry: classes.CommandRegistry,
     IPCBridge: classes.IPCBridge,
+    PermissionRegistry: classes.PermissionRegistry,
   }));
   jest.doMock("./keyboard/KeyboardManager", () => ({
     KeyboardManager: classes.KeyboardManager,

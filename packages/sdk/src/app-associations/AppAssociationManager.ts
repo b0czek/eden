@@ -5,7 +5,7 @@ import type {
   AppAssociationStore,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { CommandRegistry, EdenNamespace } from "../ipc";
 import { log } from "../logging";
@@ -15,7 +15,7 @@ export interface AppAssociationListOptions {
   kindPrefix?: string;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("associations")
 export class AppAssociationManager {
@@ -159,5 +159,10 @@ export class AppAssociationManager {
     }
 
     return valid;
+  }
+
+  dispose(): void {
+    this.associations.clear();
+    this.initialized = false;
   }
 }

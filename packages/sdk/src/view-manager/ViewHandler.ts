@@ -411,4 +411,10 @@ export class ViewHandler {
   async handleGetInterfaceScale(): Promise<{ scale: number }> {
     return { scale: this.viewManager.getCurrentScale() };
   }
+
+  dispose(): void {
+    this.dragState = null;
+    this.resizeState = null;
+    this.mouseTracker.dispose();
+  }
 }

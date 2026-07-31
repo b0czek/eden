@@ -3,7 +3,7 @@ import type {
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { SessionContext } from "../session/SessionContext";
 import type { EffectivePrincipal } from "./ExecutionContext";
 
@@ -13,7 +13,7 @@ type RuntimeContext = {
   profile?: UserProfile;
 };
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 export class RuntimeContextRegistry {
   private readonly contexts = new Map<string, RuntimeContext>();
 
@@ -46,5 +46,9 @@ export class RuntimeContextRegistry {
     return context.profile
       ? { kind: "user", profile: context.profile }
       : undefined;
+  }
+
+  dispose(): void {
+    this.contexts.clear();
   }
 }

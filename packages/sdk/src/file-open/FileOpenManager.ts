@@ -6,7 +6,7 @@ import type {
   FileOpenResult,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { AppAssociationManager } from "../app-associations";
 import { AppCatalog } from "../app-registry";
@@ -30,7 +30,7 @@ interface FileNamespaceEvents {
  *
  * Manages file type associations and handles opening files with appropriate applications.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("file")
 export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {

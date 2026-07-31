@@ -15,7 +15,7 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import { BrowserWindow, ipcMain, screen } from "electron";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { log } from "../logging";
 import { ProcessManager } from "../process-manager";
 import { EDEN_SETTINGS_APP_ID, SettingsManager } from "../settings";
@@ -69,7 +69,7 @@ type KeyboardDragState = {
   lastY?: number;
 };
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class KeyboardManager {
   private mainWindow: BrowserWindow | null = null;
@@ -936,6 +936,10 @@ export class KeyboardManager {
     this.mouseTracker.dispose();
     this.viewManager.setKeyboardPresentationLift(0);
     this.destroyKeyboardWindow();
+  }
+
+  dispose(): void {
+    this.destroy();
   }
 
   private async initializeSettings(): Promise<void> {

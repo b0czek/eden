@@ -3,7 +3,7 @@ import type {
   EdenPowerCapabilities,
   EdenPowerProvider,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { DaemonManager } from "../daemon";
 import { ProcessManager } from "../process-manager";
 
@@ -12,7 +12,7 @@ const unavailableCapabilities: EdenPowerCapabilities = {
   reboot: false,
 };
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class PowerManager {
   private readonly provider?: EdenPowerProvider;
@@ -65,5 +65,9 @@ export class PowerManager {
       this.powerActionPending = false;
       throw error;
     }
+  }
+
+  dispose(): void {
+    this.powerActionPending = false;
   }
 }

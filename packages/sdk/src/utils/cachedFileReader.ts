@@ -91,8 +91,4 @@ class CachedFileReader {
   }
 }
 
-// Export singleton instance for convenience
-export const cachedFileReader = new CachedFileReader();
-
-// Export class for creating custom instances if needed
 export { CachedFileReader };

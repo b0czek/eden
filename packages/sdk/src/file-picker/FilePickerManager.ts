@@ -4,7 +4,7 @@ import type {
   FilePickerResult,
   ViewBounds,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { AppAssociationManager } from "../app-associations";
 import {
   CommandRegistry,
@@ -44,7 +44,7 @@ const FILE_PICKER_PROVIDER_ASSOCIATION = "provider:file-picker";
 const FILE_PICKER_DISPLAY_PERMISSION = "file-picker/display";
 const PROVIDER_REGISTRATION_TIMEOUT_MS = 5_000;
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("file-picker")
 export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
@@ -363,5 +363,12 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     );
     this.idleProviderStopper.schedule();
     return { success: true };
+  }
+
+  override dispose(): void {
+    this.activeRequest = null;
+    this.idleProviderStopper.dispose();
+    this.displayProviders.dispose();
+    super.dispose();
   }
 }

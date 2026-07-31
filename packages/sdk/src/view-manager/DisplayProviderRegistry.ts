@@ -134,4 +134,13 @@ export class DisplayProviderRegistry {
     }
     return viewId;
   }
+
+  dispose(): void {
+    this.provider = null;
+    for (const waiter of this.waiters) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(`${this.label} display provider disposed`));
+    }
+    this.waiters.clear();
+  }
 }

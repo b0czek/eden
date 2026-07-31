@@ -6,7 +6,7 @@ import {
   type UtilityProcess,
   utilityProcess,
 } from "electron";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 
 import { log } from "../logging";
 /**
@@ -17,7 +17,7 @@ import { log } from "../logging";
  * Uses Electron's utilityProcess for better main process integration
  * and MessageChannelMain for direct frontend<->backend communication.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class BackendManager extends EventEmitter {
   private backends: Map<string, UtilityProcess> = new Map();
@@ -347,5 +347,17 @@ export class BackendManager extends EventEmitter {
       this.terminateBackend(appId),
     );
     await Promise.all(terminationPromises);
+  }
+
+  async dispose(): Promise<void> {
+    try {
+      await this.terminateAll();
+    } finally {
+      for (const port of this.backendPorts.values()) port.close();
+      this.backendPorts.clear();
+      this.backendData.clear();
+      this.backends.clear();
+      this.removeAllListeners();
+    }
   }
 }

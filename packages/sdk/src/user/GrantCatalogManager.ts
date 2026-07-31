@@ -3,14 +3,9 @@ import type {
   UserGrantOption,
   UserGrantOptionsResponse,
 } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
-import {
-  EdenEmitter,
-  EdenNamespace,
-  IPCBridge,
-  registerEventPermission,
-} from "../ipc";
+import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager";
 import { SettingsPanelManager } from "../settings";
 
@@ -18,9 +13,7 @@ interface GrantCatalogEvents {
   "grant-options-changed": { revision: number };
 }
 
-registerEventPermission("user/grant-options-changed", "user/manage");
-
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("user")
 export class GrantCatalogManager extends EdenEmitter<GrantCatalogEvents> {
   private revision = 1;

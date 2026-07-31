@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { EdenConfig, UserProfile } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { matchesGrants } from "../user/UserGrants";
 import { normalizeAppIds } from "../utils/normalize";
 
@@ -15,7 +15,7 @@ export interface CommandCallerContext {
   foundation?: boolean;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 export class ExecutionContext {
   private readonly storage = new AsyncLocalStorage<CommandCallerContext>();
   private readonly coreApps: Set<string>;

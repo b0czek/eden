@@ -6,7 +6,7 @@ import type {
   RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
@@ -31,7 +31,7 @@ interface RuntimeState {
   stableTimer?: NodeJS.Timeout;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("daemon")
 export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
   private static readonly KEY_PREFIX = "daemon.";
@@ -230,6 +230,19 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
     for (const app of this.daemonApps()) this.clearTimers(app.id);
+  }
+
+  override dispose(): void {
+    this.shuttingDown = true;
+    for (const runtime of this.runtime.values()) {
+      if (runtime.timer) clearTimeout(runtime.timer);
+      if (runtime.stableTimer) clearTimeout(runtime.stableTimer);
+    }
+    this.runtime.clear();
+    this.loaded.clear();
+    this.supervised.clear();
+    this.intentionalStops.clear();
+    super.dispose();
   }
 
   private async handleExit(appId: string, code: number): Promise<void> {

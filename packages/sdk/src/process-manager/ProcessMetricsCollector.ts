@@ -327,4 +327,16 @@ export class ProcessMetricsCollector {
 
     return snapshot;
   }
+
+  dispose(): void {
+    if (this.metricsSampler) {
+      clearInterval(this.metricsSampler);
+      this.metricsSampler = null;
+    }
+    for (const request of this.pendingMetricsRequests.values()) {
+      request.reject(new Error("Eden runtime disposed"));
+    }
+    this.pendingMetricsRequests.clear();
+    this.latestMetricsSample = null;
+  }
 }

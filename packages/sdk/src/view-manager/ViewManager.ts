@@ -9,7 +9,7 @@ import type {
   BrowserWindow,
   WebContentsView,
 } from "electron";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { attachWebContentsLogger } from "../logging/electron";
@@ -55,7 +55,7 @@ interface ViewManagerEvents {
  *
  * Central orchestrator for view management in Eden.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("view")
 export class ViewManager extends EdenEmitter<ViewManagerEvents> {
@@ -720,5 +720,20 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
       this.applyPresentedBounds(info);
     }
+  }
+
+  override dispose(): void {
+    this.viewHandler.dispose();
+    this.scaleController.dispose();
+    for (const info of this.views.values()) {
+      try {
+        destroyView(info, this.mainWindow);
+      } catch (error) {
+        log.warn(`Failed to destroy view ${info.id} during disposal:`, error);
+      }
+    }
+    this.views.clear();
+    this.mainWindow = null;
+    super.dispose();
   }
 }
