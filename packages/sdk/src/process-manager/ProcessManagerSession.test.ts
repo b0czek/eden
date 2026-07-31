@@ -125,4 +125,70 @@ describe("ProcessManager session cleanup", () => {
     expect(stop).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledWith("app.session");
   });
+
+  it("preserves session identity when reloading outside a user context", async () => {
+    const instance = {
+      manifest: { id: "app.hot-reload" },
+      instanceId: "instance",
+      owner: {
+        kind: "session" as const,
+        sessionId: "s1",
+        username: "operator",
+      },
+      principal: { kind: "user" as const, username: "operator" },
+      installPath: "/apps/app.hot-reload",
+      viewId: -1,
+      state: "running" as const,
+      installedAt: new Date(),
+      lastLaunched: new Date(),
+    };
+    const profile = {
+      username: "operator",
+      name: "Operator",
+      role: "user" as const,
+      grants: ["apps/launch/app.hot-reload"],
+    };
+    const manager = Object.create(ProcessManager.prototype) as ProcessManager;
+    Object.assign(manager, {
+      runningApps: new Map([["app.hot-reload", instance]]),
+      viewManager: { getViewInfo: () => undefined },
+      runtimeContexts: { get: () => ({ profile }) },
+      executionContext: { canLaunchApp: () => false },
+    });
+    jest
+      .spyOn(
+        manager as unknown as { stopApp: (appId: string) => Promise<void> },
+        "stopApp",
+      )
+      .mockResolvedValue(undefined);
+    const launch = jest
+      .spyOn(
+        manager as unknown as {
+          launchAppInternal: (...args: unknown[]) => Promise<{
+            success: boolean;
+            instanceId: string;
+            appId: string;
+          }>;
+        },
+        "launchAppInternal",
+      )
+      .mockResolvedValue({
+        success: true,
+        instanceId: "replacement",
+        appId: "app.hot-reload",
+      });
+
+    await manager.reloadApp("app.hot-reload");
+
+    expect(launch).toHaveBeenCalledWith(
+      "app.hot-reload",
+      undefined,
+      undefined,
+      {
+        owner: instance.owner,
+        principal: instance.principal,
+        profile,
+      },
+    );
+  });
 });

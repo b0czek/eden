@@ -558,9 +558,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
     log.info(`Reloading app ${appId}...`);
 
+    // A hot-reload watcher runs outside the request's AsyncLocalStorage
+    // context. Preserve the running process identity before stopApp removes it
+    // so relaunch does not depend on ambient user authorization state.
+    const runtime = this.runtimeContexts.get(appId);
+
     // Stop the app
     if (instance.owner.kind === "system") {
-      const runtime = this.runtimeContexts.get(appId);
       this.notify("reloading", { appId });
       await this.stopApp(appId);
       await this.launchDaemon(appId, instance.principal, runtime?.profile);
@@ -570,8 +574,13 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       // Small delay to ensure cleanup
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Relaunch with same bounds
-      await this.launchApp(appId, bounds);
+      // Relaunch with the same bounds and the identity of the process that was
+      // already authorized to run.
+      await this.launchAppInternal(appId, bounds, undefined, {
+        owner: instance.owner,
+        principal: instance.principal,
+        profile: runtime?.profile,
+      });
     }
 
     log.info(`App ${appId} reloaded successfully`);
