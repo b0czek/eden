@@ -1,29 +1,28 @@
-import type { AppManifest, SettingsCategory } from "@edenapp/types";
+import type { SettingsPanelSummary } from "@edenapp/types";
 import { BiSolidKeyboard } from "solid-icons/bi";
 import { FiCode, FiCpu, FiImage, FiPackage, FiSettings } from "solid-icons/fi";
 import { VsPulse, VsSymbolColor } from "solid-icons/vs";
 import { type Accessor, type Component, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../i18n";
-import type { SelectedItem } from "../types";
 
 interface SettingsSidebarProps {
   brandName: Accessor<string>;
-  edenSchema: Accessor<SettingsCategory[]>;
-  apps: Accessor<AppManifest[]>;
-  appIcons: Accessor<Record<string, string>>;
-  selectedItem: Accessor<SelectedItem | null>;
-  onSelectEdenCategory: (category: SettingsCategory) => void;
-  onSelectApp: (app: AppManifest) => void;
+  panels: Accessor<SettingsPanelSummary[]>;
+  selectedPanelId: Accessor<string | null>;
+  onSelect: (panelId: string) => void;
 }
 
 const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
-  const isSelected = (type: SelectedItem["type"], id: string) =>
-    props.selectedItem()?.type === type && props.selectedItem()?.id === id
-      ? "eden-sidebar-item-selected"
-      : "";
+  const systemPanels = () =>
+    props.panels().filter((panel) => panel.source !== "application");
+  const applicationPanels = () =>
+    props.panels().filter((panel) => panel.source === "application");
 
-  const getCategoryIcon = (iconName?: string) => {
-    switch (iconName) {
+  const icon = (panel: SettingsPanelSummary) => {
+    if (panel.source === "application" && panel.icon) {
+      return <img src={panel.icon} alt="" />;
+    }
+    switch (panel.icon) {
       case "palette":
         return <VsSymbolColor />;
       case "settings":
@@ -43,27 +42,27 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
     }
   };
 
+  const item = (panel: SettingsPanelSummary) => (
+    <button
+      type="button"
+      class={`eden-sidebar-item ${
+        props.selectedPanelId() === panel.id ? "eden-sidebar-item-selected" : ""
+      }`}
+      onClick={() => props.onSelect(panel.id)}
+    >
+      <div class="eden-sidebar-item-icon">{icon(panel)}</div>
+      <span class="eden-sidebar-item-text">
+        {getLocalizedValue(panel.title, locale())}
+      </span>
+    </button>
+  );
+
   return (
     <aside class="eden-sidebar">
       <div class="eden-sidebar-section">
         <div class="eden-sidebar-section-title">{props.brandName()}</div>
         <div class="eden-sidebar-items">
-          <For each={props.edenSchema()}>
-            {(category) => (
-              <button
-                type="button"
-                class={`eden-sidebar-item ${isSelected("eden", category.id)}`}
-                onClick={() => props.onSelectEdenCategory(category)}
-              >
-                <div class="eden-sidebar-item-icon">
-                  {getCategoryIcon(category.icon)}
-                </div>
-                <span class="eden-sidebar-item-text">
-                  {getLocalizedValue(category.name, locale())}
-                </span>
-              </button>
-            )}
-          </For>
+          <For each={systemPanels()}>{item}</For>
         </div>
       </div>
 
@@ -75,7 +74,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
         </div>
         <div class="eden-sidebar-items eden-sidebar-items-scrollable">
           <Show
-            when={props.apps().length > 0}
+            when={applicationPanels().length > 0}
             fallback={
               <div class="eden-sidebar-item eden-sidebar-item-disabled">
                 <div class="eden-sidebar-item-icon">
@@ -87,27 +86,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
               </div>
             }
           >
-            <For each={props.apps()}>
-              {(app) => (
-                <button
-                  type="button"
-                  class={`eden-sidebar-item ${isSelected("app", app.id)}`}
-                  onClick={() => props.onSelectApp(app)}
-                >
-                  <div class="eden-sidebar-item-icon">
-                    <Show
-                      when={props.appIcons()[app.id]}
-                      fallback={<FiPackage />}
-                    >
-                      <img src={props.appIcons()[app.id]} alt="" />
-                    </Show>
-                  </div>
-                  <span class="eden-sidebar-item-text">
-                    {getLocalizedValue(app.name, locale())}
-                  </span>
-                </button>
-              )}
-            </For>
+            <For each={applicationPanels()}>{item}</For>
           </Show>
         </div>
       </div>

@@ -5,6 +5,23 @@ export const en = {
       noAppsWithSettings: "No apps with settings",
     },
     selectCategory: "Select a category from the sidebar",
+    retry: "Retry",
+    emptyPanel: "This panel has no available settings.",
+    operationError: "Operation failed",
+    operationPending: "Working…",
+    errors: {
+      authorization: "Access denied",
+      not_found: "Panel not found",
+      validation: "Check the entered values",
+      load_failed: "Unable to load settings",
+      action_failed: "Operation failed",
+      session_changed: "Session changed",
+    },
+    validation: {
+      required: "This field is required.",
+      minLength: "Enter at least {count} characters.",
+      maxLength: "Enter no more than {count} characters.",
+    },
     daemons: {
       bootHint:
         "Enable controls boot launch; start and stop affect this boot only.",
