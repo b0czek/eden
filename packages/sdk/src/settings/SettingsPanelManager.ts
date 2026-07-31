@@ -406,7 +406,17 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
   private synchronizeManifestPanel(manifest: RuntimeAppManifest): void {
     this.removeManifestPanel(manifest.id);
     if (!manifest.settings?.length) return;
-    this.registerGeneratedPanel(`app.${manifest.id}`, manifest, "application");
+    try {
+      this.registerGeneratedPanel(
+        `app.${manifest.id}`,
+        manifest,
+        "application",
+      );
+    } catch (error) {
+      log.warn(
+        `Skipping invalid settings panel for app "${manifest.id}": ${this.errorMessage(error)}`,
+      );
+    }
   }
 
   private removeManifestPanel(appId: string): void {

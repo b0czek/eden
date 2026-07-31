@@ -86,4 +86,49 @@ describe("SettingsPanelManager manifest panels", () => {
     manager.synchronizeManifestPanels();
     expect(await manager.listPanels()).toHaveLength(1);
   });
+
+  it("skips invalid app panels without interrupting catalog synchronization", async () => {
+    const { manager, catalog } = harness(user([], { role: "vendor" }));
+    catalog.all.mockReturnValue([
+      {
+        id: "com.example.invalid",
+        name: "Invalid",
+        version: "1.0.0",
+        settings: [
+          {
+            id: "invalid category",
+            name: "Invalid",
+            settings: [{ key: "value", label: "Value", type: "text" }],
+          },
+        ],
+        isPrebuilt: false,
+        isDevelopment: false,
+        isCore: false,
+        isRestricted: false,
+        resolvedGrants: [],
+      } as RuntimeAppManifest,
+      {
+        id: "com.example.valid",
+        name: "Valid",
+        version: "1.0.0",
+        settings: [
+          {
+            id: "general",
+            name: "General",
+            settings: [{ key: "value", label: "Value", type: "text" }],
+          },
+        ],
+        isPrebuilt: false,
+        isDevelopment: false,
+        isCore: false,
+        isRestricted: false,
+        resolvedGrants: [],
+      } as RuntimeAppManifest,
+    ]);
+
+    expect(() => manager.synchronizeManifestPanels()).not.toThrow();
+    expect(await manager.listPanels()).toEqual([
+      expect.objectContaining({ id: "app.com.example.valid" }),
+    ]);
+  });
 });
