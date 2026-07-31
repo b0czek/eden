@@ -29,6 +29,14 @@ const localized = (value?: SettingsPanelLocalizedText) =>
 const badgeClass = (tone?: string) =>
   tone && tone !== "neutral" ? ` eden-badge-${tone}` : "";
 
+const dialogFieldErrors = (fields: Record<string, string>) =>
+  Object.fromEntries(
+    Object.entries(fields).map(([path, message]) => [
+      path.startsWith("input.") ? path.slice("input.".length) : path,
+      message,
+    ]),
+  );
+
 const FieldControl = (props: {
   field: SettingsPanelFormField | SettingsPanelInput;
   inputId: string;
@@ -240,7 +248,7 @@ const DialogControl = (props: {
         setErrors({});
         setOpen(false);
       } else if (result.error?.fields) {
-        setErrors(result.error.fields);
+        setErrors(dialogFieldErrors(result.error.fields));
       }
     } finally {
       clearSecrets();

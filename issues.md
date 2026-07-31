@@ -28,3 +28,8 @@
     When the Apps panel contains many or large installed packages, opening it now recursively scans every app directory via getSize() and waits for all scans before returning any panel data. The list
     does not display sizes, and the previous implementation loaded a size only after selecting an app, so this can introduce substantial startup I/O and delay the entire panel; restore lazy size loading
     or fetch it separately for the selected app.~~
+
+  - ~~[P2] Map server validation paths back to dialog fields — /home/dariusz/Desktop/eden/packages/sdk/apps/com/eden/settings/src/components/GenericPanel.tsx:242-243
+    When the backend rejects dialog input, validatePanelActionInput returns field keys such as input.password, but the dialog renders errors using errors()[field.id] (for
+    example, errors()["password"]). Assigning result.error.fields directly therefore hides server-side validation errors, leaving the dialog open without explaining why
+    submission failed; strip the input. prefix or otherwise map response paths to field IDs.~~

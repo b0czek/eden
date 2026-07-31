@@ -123,7 +123,17 @@ describe("GenericPanel", () => {
 
   it("runs validated forms in dialogs and clears password fields", async () => {
     const [busy] = createSignal(new Set<string>());
-    const onAction = vi.fn<PanelAction>(async () => ({ success: true }));
+    const onAction = vi
+      .fn<PanelAction>()
+      .mockResolvedValueOnce({
+        success: false,
+        error: {
+          code: "validation",
+          message: "Invalid input",
+          fields: { "input.password": "Password was rejected." },
+        },
+      })
+      .mockResolvedValueOnce({ success: true });
     const loaded = panel({
       sections: [
         {
@@ -178,6 +188,12 @@ describe("GenericPanel", () => {
     await fireEvent.submit(form);
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
     expect(onAction.mock.calls[0]?.[1]).toEqual({ password: "secret" });
+    expect(view.container.textContent).toContain("Password was rejected.");
+    expect(view.container.querySelector('[role="dialog"]')).not.toBeNull();
+
+    await fireEvent.input(password, { target: { value: "accepted" } });
+    await fireEvent.submit(form);
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(view.container.querySelector('[role="dialog"]')).toBeNull(),
     );
