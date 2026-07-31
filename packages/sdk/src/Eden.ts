@@ -281,6 +281,7 @@ export class Eden {
       sessionManager: this.sessionManager,
       appearanceManager,
       associationManager: this.appAssociationManager,
+      executionContext: container.resolve(ExecutionContext),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,

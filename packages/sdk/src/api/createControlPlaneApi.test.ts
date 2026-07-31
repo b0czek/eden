@@ -97,6 +97,9 @@ const createDependencies = () => {
       set: jest.fn(async () => undefined),
       remove: jest.fn(async () => undefined),
     },
+    executionContext: {
+      run: jest.fn((_context, task: () => unknown) => task()),
+    },
     packageListeners,
   };
 };
@@ -111,6 +114,10 @@ describe("main-process control-plane API", () => {
 
     expect(manifest.name).toBe("Example");
     expect(api.apps.get(manifest.id)).not.toBe(manifest);
+    expect(dependencies.executionContext.run).toHaveBeenCalledWith(
+      { principal: { kind: "user", profile: user } },
+      expect.any(Function),
+    );
   });
 
   it("routes user mutations through session synchronization", async () => {

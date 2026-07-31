@@ -2,6 +2,7 @@ import type { AppAssociationManager } from "../app-associations";
 import type { AppCatalog } from "../app-registry";
 import type { AppearanceManager } from "../appearance/AppearanceManager";
 import type { DaemonManager } from "../daemon";
+import type { ExecutionContext } from "../execution";
 import type { PackageManager } from "../package-manager";
 import type { SessionManager } from "../session";
 import type { UserManager } from "../user";
@@ -31,6 +32,7 @@ interface Dependencies {
   sessionManager: SessionManager;
   appearanceManager: AppearanceManager;
   associationManager: AppAssociationManager;
+  executionContext: ExecutionContext;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -43,9 +45,17 @@ export function createControlPlaneApis({
   sessionManager,
   appearanceManager,
   associationManager,
+  executionContext,
 }: Dependencies): EdenControlPlaneApis {
   const apps: EdenAppsApi = {
-    list: (options) => clone(appCatalog.list(options)),
+    list: (options) => {
+      const user = sessionManager.getCurrentUser();
+      if (!user) return [];
+      return executionContext.run(
+        { principal: { kind: "user", profile: user } },
+        () => clone(appCatalog.list(options)),
+      );
+    },
     get: (appId) => {
       const app = appCatalog.get(appId);
       return app ? clone(app) : undefined;

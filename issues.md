@@ -4,10 +4,10 @@
     unguarded synchronization throws. Since onReady() calls it outside per-app error handling, Eden enters the failed state and never creates a window; catch and skip invalid app panels or validate them
     before installation.~~
 
-  - [P1] Provide apps.list an effective principal — /home/dariusz/Desktop/eden/packages/sdk/src/api/createControlPlaneApi.ts:48-48
+  - ~~[P1] Provide apps.list an effective principal — /home/dariusz/Desktop/eden/packages/sdk/src/api/createControlPlaneApi.ts:48-48
     When eden.apps.list() is called from normal host code after whenReady(), it runs outside any ExecutionContext, so AppCatalog.list() treats every app as unlaunchable unless showRestricted: true is
     explicitly supplied. Consequently the documented eden.apps.list({ showHidden: true }) example returns an empty array despite installed apps; run the query under the active/system principal or bypass
-    caller authorization for this trusted facade.
+    caller authorization for this trusted facade.~~
 
   - [P1] Keep value inputs enabled while users edit — /home/dariusz/Desktop/eden/packages/sdk/apps/com/eden/settings/src/components/GenericPanel.tsx:435-438
     For text, textarea, number, color, and range controls, every onInput starts an action, and App.runAction immediately adds that action to busyActions. This makes the control disabled after its first
