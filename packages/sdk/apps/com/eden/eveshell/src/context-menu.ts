@@ -1,4 +1,11 @@
-import { button, type Menu, menu, title, when } from "@edenapp/tablets";
+import {
+  button,
+  type Menu,
+  menu,
+  separator,
+  title,
+  when,
+} from "@edenapp/tablets";
 import { t } from "./i18n";
 import type { AppInfo } from "./types";
 
@@ -44,6 +51,10 @@ export const createAppMenu = (actions: AppMenuActions): Menu<AppInfo> =>
 export interface UserContextMenuActions {
   changePassword: () => Promise<void> | void;
   logout: () => Promise<void> | void;
+  reboot: () => Promise<void> | void;
+  poweroff: () => Promise<void> | void;
+  canReboot: () => boolean;
+  canPoweroff: () => boolean;
 }
 
 export const createUserContextMenu = (
@@ -61,6 +72,19 @@ export const createUserContextMenu = (
     user &&
       button("logout", t("shell.logout"), actions.logout, {
         icon: "log-out",
+      }),
+    when(actions.canReboot() || actions.canPoweroff(), separator()),
+    when(
+      actions.canReboot(),
+      button("reboot", t("shell.reboot"), actions.reboot, {
+        icon: "rotate-cw",
+      }),
+    ),
+    when(
+      actions.canPoweroff(),
+      button("poweroff", t("shell.poweroff"), actions.poweroff, {
+        icon: "power",
         danger: true,
       }),
+    ),
   ]);

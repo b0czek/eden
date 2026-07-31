@@ -12,7 +12,8 @@
     "package/read",
     "process/read",
     "process/manage",
-    "view/manage"
+    "view/manage",
+    "system/power"
   ],
   "build": {
     "command": "npm run build"

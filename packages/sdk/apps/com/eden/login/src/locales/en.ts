@@ -9,5 +9,12 @@ export const en = {
     loginFailed: "Login failed.",
     failedToLoadUsers: "Failed to load users.",
     toggleKeyboard: "Toggle keyboard",
+    reboot: "Restart",
+    poweroff: "Power off",
+    rebootConfirmation:
+      "Restart the system now? All open applications will be closed.",
+    poweroffConfirmation:
+      "Power off the system now? All open applications will be closed.",
+    powerActionFailed: "The requested system power action failed.",
   },
 } as const;

@@ -160,6 +160,7 @@ Genesis sits on the build side of this model: it turns app source into the
 - [Localization](docs/localizing-apps.md) — typed translations and reactive locale changes
 - [Users and grants](docs/users.md) — accounts, roles, sessions, and access control
 - [Consumer branding](docs/branding.md) — product name, login artwork, and window icons
+- [Host power management](docs/power-management.md) — typed restart and power-off integration
 - [EdenCSS](packages/sdk/edencss/README.md) — tokens, utilities, and components
 - [Genesis](packages/genesis/README.md) — application bundling and `.edenite` internals
 

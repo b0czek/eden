@@ -39,6 +39,7 @@ import { attachWebContentsLogger } from "./logging/electron";
 import { NotificationManager } from "./notification";
 // Managers and Handlers
 import { PackageManager } from "./package-manager";
+import { PowerHandler } from "./power";
 import {
   AutostartManager,
   BackendManager,
@@ -268,6 +269,7 @@ export class Eden {
     this.keyboardManager = container.resolve(KeyboardManager);
 
     container.resolve(SystemHandler);
+    container.resolve(PowerHandler);
     container.resolve(NotificationManager);
     container.resolve(ContextMenuManager);
     container.resolve(FilePickerManager);

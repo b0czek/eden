@@ -16,9 +16,16 @@ body {
 }
 
 .login-root {
+  position: relative;
   height: 100%;
   padding: var(--eden-space-xl);
   box-sizing: border-box;
+}
+
+.login-power-actions {
+  position: absolute;
+  right: var(--eden-space-xl);
+  bottom: var(--eden-space-xl);
 }
 
 .login-card {

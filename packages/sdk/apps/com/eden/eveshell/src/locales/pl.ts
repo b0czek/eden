@@ -10,6 +10,13 @@ export const pl = {
     signIn: "Zaloguj",
     switchUser: "Przełącz użytkownika",
     logout: "Wyloguj",
+    reboot: "Uruchom ponownie",
+    poweroff: "Wyłącz",
+    rebootConfirmation:
+      "Uruchomić system ponownie? Wszystkie otwarte aplikacje zostaną zamknięte.",
+    poweroffConfirmation:
+      "Wyłączyć system? Wszystkie otwarte aplikacje zostaną zamknięte.",
+    powerActionFailed: "Nie udało się wykonać żądanej operacji zasilania.",
     currentUser: "Aktualny",
     changePassword: "Zmień hasło",
     toggleKeyboard: "Przełącz klawiaturę",

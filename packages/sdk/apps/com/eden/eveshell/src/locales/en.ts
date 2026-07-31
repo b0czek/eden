@@ -10,6 +10,13 @@ export const en = {
     signIn: "Sign in",
     switchUser: "Switch User",
     logout: "Log out",
+    reboot: "Restart",
+    poweroff: "Power off",
+    rebootConfirmation:
+      "Restart the system now? All open applications will be closed.",
+    poweroffConfirmation:
+      "Power off the system now? All open applications will be closed.",
+    powerActionFailed: "The requested system power action failed.",
     currentUser: "Current",
     changePassword: "Change password",
     toggleKeyboard: "Toggle keyboard",

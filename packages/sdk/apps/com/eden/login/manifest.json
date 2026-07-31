@@ -28,6 +28,6 @@
       "appFrame": false
     }
   },
-  "permissions": ["session/manage", "user/identity"],
+  "permissions": ["session/manage", "user/identity", "system/power"],
   "hidden": true
 }

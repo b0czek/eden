@@ -4,6 +4,10 @@ Eden is an electron environment that strives to provide os-like experience for t
 
 For every completed task that affects publishable packages, add or update an appropriate Changesets entry.
 
+# Testing
+
+Do not emulate integration tests with heavily mocked unit tests. Tests that mostly verify mock wiring, delegated calls, or an implementation's current call order are not a substitute for exercising real behavior across component boundaries. If meaningful integration coverage is impractical, prefer documenting the verification gap and using focused manual validation over adding low-value mock-heavy tests.
+
 # Apps
 
 Eden apps are sandboxed electron applications that run in WebContentsView. They communicate with main process through shell commands, and other apps through appbus.

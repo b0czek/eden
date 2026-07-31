@@ -58,6 +58,23 @@ export interface EdenBrandingConfig {
   iconPath?: string;
 }
 
+/** Host power actions exposed by a configured power provider. */
+export interface EdenPowerCapabilities {
+  poweroff: boolean;
+  reboot: boolean;
+}
+
+/**
+ * Main-process integration for host power management.
+ *
+ * Eden never executes configurable command strings. Consumers provide a typed
+ * implementation backed by the platform mechanism appropriate for their host.
+ */
+export interface EdenPowerProvider {
+  poweroff?: () => void | Promise<void>;
+  reboot?: () => void | Promise<void>;
+}
+
 export interface EdenConfig {
   appsDirectory?: string;
   /** Root directory backing Eden's managed virtual filesystem. */
@@ -68,6 +85,8 @@ export interface EdenConfig {
    */
   seedPath?: string;
   branding?: EdenBrandingConfig;
+  /** Optional host-side power integration. Power actions are unavailable when omitted. */
+  powerProvider?: EdenPowerProvider;
   window?: {
     width?: number;
     height?: number;

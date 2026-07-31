@@ -24,6 +24,14 @@ export interface SystemCommands {
     args: Record<string, never>;
     response: import("./index").EdenBrandingInfo;
   };
+  "system/power-capabilities": {
+    args: Record<string, never>;
+    response: import("./index").EdenPowerCapabilities;
+  };
+  "system/power": {
+    args: { action: "poweroff" | "reboot" };
+    response: void;
+  };
 }
 
 /**

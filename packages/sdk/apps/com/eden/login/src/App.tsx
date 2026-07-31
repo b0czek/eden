@@ -1,6 +1,8 @@
 import { KeyboardButton } from "@edenapp/solid-kit";
+import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   EdenBrandingInfo,
+  EdenPowerCapabilities,
   UserProfile,
   ViewBounds,
   WindowSize,
@@ -22,6 +24,7 @@ const getInitials = (name: string): string => {
 };
 
 const App = () => {
+  const dialogs = createDialogs();
   const [users, setUsers] = createSignal<UserProfile[]>([]);
   const [selectedUsername, setSelectedUsername] = createSignal<string | null>(
     null,
@@ -33,6 +36,8 @@ const App = () => {
   const [branding, setBranding] = createSignal<EdenBrandingInfo>({
     name: "Eden",
   });
+  const [powerCapabilities, setPowerCapabilities] =
+    createSignal<EdenPowerCapabilities>({ poweroff: false, reboot: false });
 
   const updateViewBounds = async (data: { windowSize: WindowSize }) => {
     const { windowSize } = data;
@@ -73,6 +78,16 @@ const App = () => {
     }
   };
 
+  const loadPowerCapabilities = async () => {
+    try {
+      setPowerCapabilities(
+        await window.edenAPI.shellCommand("system/power-capabilities", {}),
+      );
+    } catch (error) {
+      console.error("Failed to load power capabilities:", error);
+    }
+  };
+
   onMount(() => {
     onCleanup(() => {
       window.edenAPI.unsubscribe(
@@ -83,7 +98,7 @@ const App = () => {
 
     (async () => {
       await initLocale();
-      await Promise.all([loadBranding(), loadUsers()]);
+      await Promise.all([loadBranding(), loadUsers(), loadPowerCapabilities()]);
 
       // Set initial bounds
       try {
@@ -134,6 +149,33 @@ const App = () => {
       setError(t("login.loginFailed"));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePowerAction = async (action: "poweroff" | "reboot") => {
+    const confirmed = await dialogs.confirm({
+      title: action === "poweroff" ? t("login.poweroff") : t("login.reboot"),
+      message:
+        action === "poweroff"
+          ? t("login.poweroffConfirmation")
+          : t("login.rebootConfirmation"),
+      confirmLabel:
+        action === "poweroff" ? t("login.poweroff") : t("login.reboot"),
+      cancelLabel: t("common.cancel"),
+      tone: action === "poweroff" ? "danger" : "default",
+      role: "alertdialog",
+    });
+    if (!confirmed) return;
+
+    try {
+      await window.edenAPI.shellCommand("system/power", { action });
+    } catch (error) {
+      console.error(`Failed to ${action} the system:`, error);
+      await dialogs.alert({
+        title: t("common.error"),
+        message: t("login.powerActionFailed"),
+        okLabel: t("common.ok"),
+      });
     }
   };
 
@@ -267,6 +309,31 @@ const App = () => {
           </Show>
         </div>
       </div>
+
+      <Show when={powerCapabilities().reboot || powerCapabilities().poweroff}>
+        <div class="login-power-actions eden-flex eden-gap-sm">
+          <Show when={powerCapabilities().reboot}>
+            <button
+              type="button"
+              class="eden-btn eden-btn-secondary"
+              onClick={() => handlePowerAction("reboot")}
+            >
+              {t("login.reboot")}
+            </button>
+          </Show>
+          <Show when={powerCapabilities().poweroff}>
+            <button
+              type="button"
+              class="eden-btn eden-btn-danger"
+              onClick={() => handlePowerAction("poweroff")}
+            >
+              {t("login.poweroff")}
+            </button>
+          </Show>
+        </div>
+      </Show>
+
+      <DialogHost dialogs={dialogs} />
     </div>
   );
 };

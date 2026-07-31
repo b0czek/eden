@@ -20,6 +20,7 @@ body {
 .task-manager {
   --app-bg: var(--eden-color-bg-dark);
   --app-glass: var(--eden-glass-medium);
+  --task-manager-table-header-height: 2.5rem;
   height: 100%;
   min-height: 0;
   flex: 1;
@@ -63,6 +64,7 @@ body {
 }
 
 .task-manager__header,
+.task-manager__section-header,
 .task-manager__row {
   display: grid;
   grid-template-columns: minmax(20rem, 1.9fr) 7rem 7rem 9rem;
@@ -71,12 +73,11 @@ body {
 }
 
 .task-manager__header {
-  position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 3;
+  min-height: var(--task-manager-table-header-height);
   padding: 0.65rem var(--eden-space-md);
   background: var(--eden-color-bg-secondary);
-  border-bottom: 1px solid var(--eden-color-border-light);
   text-transform: uppercase;
   letter-spacing: var(--eden-font-letter-spacing-wide);
   font-size: var(--eden-font-size-xs);
@@ -92,11 +93,16 @@ body {
 }
 
 .task-manager__section-header {
-  display: grid;
-  grid-template-columns: minmax(20rem, 1.9fr) 7rem 7rem 9rem;
-  align-items: center;
-  gap: var(--eden-space-md);
+  top: var(--task-manager-table-header-height);
+  z-index: 2;
   padding: 0.65rem var(--eden-space-md);
+  background: var(--eden-color-bg-dark);
+}
+
+.task-manager__header,
+.task-manager__section-header {
+  position: sticky;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--eden-color-border-light);
 }
 

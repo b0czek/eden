@@ -3,6 +3,7 @@ import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   AppInstance,
   AppManifest,
+  EdenPowerCapabilities,
   UserProfile,
   WindowSize,
 } from "@edenapp/types";
@@ -27,8 +28,12 @@ export default function ShellOverlay() {
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
+  const [showPowerDialog, setShowPowerDialog] = createSignal(false);
+  const [powerCapabilities, setPowerCapabilities] =
+    createSignal<EdenPowerCapabilities>({ poweroff: false, reboot: false });
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
-  const isFullscreen = () => showAllApps() || showChangePassword();
+  const isFullscreen = () =>
+    showAllApps() || showChangePassword() || showPowerDialog();
   let overlayElement: HTMLDivElement | undefined;
 
   // Load pinned apps from database
@@ -152,6 +157,16 @@ export default function ShellOverlay() {
     }
   };
 
+  const loadPowerCapabilities = async () => {
+    try {
+      setPowerCapabilities(
+        await window.edenAPI.shellCommand("system/power-capabilities", {}),
+      );
+    } catch (error) {
+      console.error("Failed to load power capabilities:", error);
+    }
+  };
+
   // Helper function to calculate bounds based on mode and window size
   const calculateBounds = (
     mode: "dock" | "fullscreen",
@@ -256,10 +271,44 @@ export default function ShellOverlay() {
     }
   };
 
+  const handlePowerAction = async (action: "poweroff" | "reboot") => {
+    setShowPowerDialog(true);
+    try {
+      const confirmed = await dialogs.confirm({
+        title: action === "poweroff" ? t("shell.poweroff") : t("shell.reboot"),
+        message:
+          action === "poweroff"
+            ? t("shell.poweroffConfirmation")
+            : t("shell.rebootConfirmation"),
+        confirmLabel:
+          action === "poweroff" ? t("shell.poweroff") : t("shell.reboot"),
+        cancelLabel: t("common.cancel"),
+        tone: action === "poweroff" ? "danger" : "default",
+        role: "alertdialog",
+      });
+      if (confirmed) {
+        await window.edenAPI.shellCommand("system/power", { action });
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} the system:`, error);
+      await dialogs.alert({
+        title: t("common.error"),
+        message: t("shell.powerActionFailed"),
+        okLabel: t("common.ok"),
+      });
+    } finally {
+      setShowPowerDialog(false);
+    }
+  };
+
   // Create user menu factory
   const userContextMenu = createUserContextMenu({
     changePassword: handleOpenChangePassword,
     logout: handleLogout,
+    reboot: () => handlePowerAction("reboot"),
+    poweroff: () => handlePowerAction("poweroff"),
+    canReboot: () => powerCapabilities().reboot,
+    canPoweroff: () => powerCapabilities().poweroff,
   });
 
   onMount(() => {
@@ -281,6 +330,7 @@ export default function ShellOverlay() {
       loadSystemInfo();
       loadPinnedApps();
       loadCurrentUser();
+      loadPowerCapabilities();
 
       try {
         // Subscribe to events

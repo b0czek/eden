@@ -10,6 +10,8 @@
 export const COMMAND_NAMES: readonly string[] = [
   "system/info",
   "system/branding",
+  "system/power-capabilities",
+  "system/power",
   "associations/get",
   "associations/set",
   "associations/remove",
