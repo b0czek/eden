@@ -1,7 +1,12 @@
-import type { UserProfile, UserRole } from "@edenapp/types";
+import type {
+  UserGrantOptionsResponse,
+  UserProfile,
+  UserRole,
+} from "@edenapp/types";
 import type { ExecutionContext } from "../execution/ExecutionContext";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SessionManager } from "../session";
+import type { GrantCatalogManager } from "./GrantCatalogManager";
 import type { UserManager } from "./UserManager";
 
 @EdenNamespace("user")
@@ -10,12 +15,19 @@ export class UserHandler {
     private userManager: UserManager,
     private sessionManager: SessionManager,
     private executionContext: ExecutionContext,
+    private grantCatalog: GrantCatalogManager,
   ) {}
 
   private assertVendor(): void {
     if (!this.executionContext.isVendor()) {
       throw new Error("Vendor account required");
     }
+  }
+
+  @EdenHandler("grant-options", { permission: "manage" })
+  handleGrantOptions(): UserGrantOptionsResponse {
+    this.assertVendor();
+    return this.grantCatalog.getOptions();
   }
 
   /**

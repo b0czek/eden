@@ -162,20 +162,4 @@ export class SettingsHandler {
     await this.settingsManager.reset(args.appId, args.key, args.schema);
     return { success: true };
   }
-
-  // ===================================================================
-  // Eden Schema Endpoint
-  // ===================================================================
-
-  /**
-   * Get the Eden settings schema
-   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
-   */
-  @EdenHandler("schema")
-  async handleSchema(args: {
-    showRestricted?: boolean;
-  }): Promise<{ schema: SettingsCategory[] }> {
-    const schema = this.settingsManager.getEdenSchema(args.showRestricted);
-    return { schema };
-  }
 }
