@@ -7,13 +7,15 @@ import { AppCatalog } from "../app-registry";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { EDEN_SETTINGS_APP_ID } from "./constants";
 import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import { SettingsHandler } from "./SettingsHandler";
+
 /**
  * Reserved app ID for Eden system settings.
  * No external app can use this ID.
  */
-export const EDEN_SETTINGS_APP_ID = "com.eden";
+export { EDEN_SETTINGS_APP_ID } from "./constants";
 
 /**
  * Events emitted by the SettingsManager
@@ -199,17 +201,6 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
   // ===================================================================
   // Eden System Settings Helpers
   // ===================================================================
-
-  /**
-   * Get Eden settings schema
-   * @param showRestricted - If true, includes settings the current user cannot access
-   */
-  getEdenSchema(showRestricted?: boolean): SettingsCategory[] {
-    if (showRestricted) {
-      return EDEN_SETTINGS_SCHEMA;
-    }
-    return this.filterSchemaByGrants(EDEN_SETTINGS_SCHEMA);
-  }
 
   /**
    * Get the default value for an Eden setting key

@@ -148,6 +148,14 @@ For example, if you use simple static HTML/JS:
 
 The Eden build system (`genesis build`) will look for this command and execute it when bundling the system.
 
+## Settings Panels
+
+An app can publish ordinary persisted controls through the unchanged
+`settings` array in its manifest. Eden creates one `app.<appId>` panel and
+filters each field with the active-user grant
+`settings/<appId>/<setting.grant-or-key>`. See [Adding
+Settings](settings.md) for the schema and authorization model.
+
 ## Running an app from source
 
 Apps scaffolded for consumer projects include a standalone development command:

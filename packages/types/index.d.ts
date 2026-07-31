@@ -5,6 +5,8 @@ export * from "./User";
 
 export * from "./AppManifest";
 export * from "./AppAssociation";
+export * from "./SettingsPanel";
+export * from "./GrantCatalog";
 export * from "./Process";
 export * from "./ProcessMetrics";
 

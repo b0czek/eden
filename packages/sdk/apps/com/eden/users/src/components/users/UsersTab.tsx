@@ -1,7 +1,6 @@
 import type {
-  AppManifest,
-  RuntimeAppManifest,
-  SettingsCategory,
+  UserGrantOption,
+  UserGrantOptionsResponse,
   UserProfile,
 } from "@edenapp/types";
 import {
@@ -14,31 +13,19 @@ import {
 } from "solid-js";
 import CreateUserDialog from "../../dialogs/CreateUserDialog";
 import SetPasswordDialog from "../../dialogs/SetPasswordDialog";
-import {
-  isCustomViewCategory,
-  resolveCategoryGrantTarget,
-  resolveSettingGrantTarget,
-} from "../../grants";
-import { getLocalizedValue, locale, t } from "../../i18n";
-import type { SettingsOption } from "./types";
+import { t } from "../../i18n";
 import UserDetail from "./UserDetail";
 import UsersList from "./UsersList";
 import "./UsersTab.css";
 
-interface UsersTabProps {
-  edenSchema: () => SettingsCategory[];
-  apps: () => AppManifest[];
-}
-
-export default function UsersTab(props: UsersTabProps) {
+export default function UsersTab() {
   const [users, setUsers] = createSignal<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
   const [defaultUsername, setDefaultUsername] = createSignal<string | null>(
     null,
   );
-  const [installedApps, setInstalledApps] = createSignal<RuntimeAppManifest[]>(
-    [],
-  );
+  const [grantOptions, setGrantOptions] = createSignal<UserGrantOption[]>([]);
+  let grantOptionsRevision = 0;
   const [selectedUsername, setSelectedUsername] = createSignal<string | null>(
     null,
   );
@@ -67,15 +54,15 @@ export default function UsersTab(props: UsersTabProps) {
     }
   };
 
-  const loadInstalledApps = async () => {
+  const loadGrantOptions = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("package/list", {
-        showHidden: true,
-        showRestricted: true,
-      });
-      setInstalledApps(result);
+      const result: UserGrantOptionsResponse =
+        await window.edenAPI.shellCommand("user/grant-options", {});
+      if (result.revision < grantOptionsRevision) return;
+      grantOptionsRevision = result.revision;
+      setGrantOptions(result.options);
     } catch (error) {
-      console.error("Failed to load apps:", error);
+      console.error("Failed to load grant options:", error);
     }
   };
 
@@ -92,7 +79,7 @@ export default function UsersTab(props: UsersTabProps) {
     await Promise.all([
       loadUsers(),
       loadCurrentUser(),
-      loadInstalledApps(),
+      loadGrantOptions(),
       loadDefaultUser(),
     ]);
   };
@@ -102,30 +89,26 @@ export default function UsersTab(props: UsersTabProps) {
   });
 
   onMount(() => {
-    const handleInstalled = () => {
-      loadInstalledApps();
-    };
-    const handleUninstalled = () => {
-      loadInstalledApps();
-    };
+    const handleGrantOptionsChanged = () => loadGrantOptions();
 
     const subscribe = async () => {
       try {
-        await window.edenAPI.subscribe("package/installed", handleInstalled);
         await window.edenAPI.subscribe(
-          "package/uninstalled",
-          handleUninstalled,
+          "user/grant-options-changed",
+          handleGrantOptionsChanged,
         );
       } catch (error) {
-        console.error("Failed to subscribe to package events:", error);
+        console.error("Failed to subscribe to grant options:", error);
       }
     };
 
     subscribe();
 
     onCleanup(() => {
-      window.edenAPI.unsubscribe("package/installed", handleInstalled);
-      window.edenAPI.unsubscribe("package/uninstalled", handleUninstalled);
+      window.edenAPI.unsubscribe(
+        "user/grant-options-changed",
+        handleGrantOptionsChanged,
+      );
     });
   });
 
@@ -145,64 +128,6 @@ export default function UsersTab(props: UsersTabProps) {
     if (!users().some((user) => user.username === selected)) {
       setSelectedUsername(null);
     }
-  });
-
-  const settingsOptions = createMemo<SettingsOption[]>(() => {
-    const options: SettingsOption[] = [];
-    const seen = new Set<string>();
-
-    const pushOption = (appId: string, id: string, label: string) => {
-      const key = `${appId}:${id}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      options.push({ id, appId, label });
-    };
-
-    for (const category of props.edenSchema()) {
-      const categoryGrant = resolveCategoryGrantTarget(category);
-      if (categoryGrant) {
-        pushOption(
-          "com.eden",
-          categoryGrant,
-          getLocalizedValue(category.name, locale()),
-        );
-      }
-
-      if (isCustomViewCategory(category)) {
-        continue;
-      }
-
-      for (const setting of category.settings) {
-        const grant = resolveSettingGrantTarget(category, setting);
-        pushOption(
-          "com.eden",
-          grant,
-          `${getLocalizedValue(category.name, locale())} · ${getLocalizedValue(
-            setting.label,
-            locale(),
-          )}`,
-        );
-      }
-    }
-
-    for (const app of props.apps()) {
-      if (!app.settings) continue;
-      const appName = getLocalizedValue(app.name, locale());
-      for (const category of app.settings) {
-        for (const setting of category.settings) {
-          options.push({
-            id: setting.key,
-            appId: app.id,
-            label: `${appName} · ${getLocalizedValue(category.name, locale())} · ${getLocalizedValue(
-              setting.label,
-              locale(),
-            )}`,
-          });
-        }
-      }
-    }
-
-    return options;
   });
 
   const handleCreateUser = async (
@@ -332,8 +257,7 @@ export default function UsersTab(props: UsersTabProps) {
             <UserDetail
               user={user()}
               currentUser={currentUser()}
-              installedApps={installedApps()}
-              settingsOptions={settingsOptions()}
+              grantOptions={grantOptions()}
               isDefaultUser={defaultUsername() === user().username}
               onBack={() => setSelectedUsername(null)}
               onDelete={handleDeleteUser}

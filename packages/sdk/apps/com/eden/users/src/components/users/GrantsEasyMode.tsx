@@ -1,48 +1,91 @@
-import type { ResolvedGrant, RuntimeAppManifest } from "@edenapp/types";
-import type { Accessor } from "solid-js";
-import { For, Show } from "solid-js";
-import {
-  buildAppGrant,
-  buildPresetGrant,
-  buildSettingGrant,
-  getAppGrantKey,
-  getAppScopedGrants,
-  getGrantId,
-  getGrantLabel,
-  getGrantScope,
-  hasAppFeatureGrant,
-  hasPresetGrant,
-} from "../../grants";
+import type { UserGrantOption } from "@edenapp/types";
+import { createMemo, For, Show } from "solid-js";
+import { matchesGrant } from "../../grants";
 import { getLocalizedValue, locale, t } from "../../i18n";
-import type { SettingsOption } from "./types";
 
 interface GrantsEasyModeProps {
   grants: string[];
   isVendor: boolean;
   allowAllApps: boolean;
   allowAllSettings: boolean;
-  grantableApps: RuntimeAppManifest[];
-  settingsOptions: SettingsOption[];
-  systemGrants: Accessor<ResolvedGrant[]>;
-  appGrantApps: Accessor<RuntimeAppManifest[]>;
+  options: UserGrantOption[];
   updateGrants: (updater: (grants: Set<string>) => Set<string>) => void;
 }
 
 const GrantsEasyMode = (props: GrantsEasyModeProps) => {
-  const appGrants = () =>
-    new Set(
-      props.grants.filter(
-        (grant) =>
-          grant.startsWith("apps/launch/") && grant !== "apps/launch/*",
-      ),
+  const optionsByKind = (kind: UserGrantOption["kind"]) =>
+    props.options.filter((option) => option.kind === kind);
+  const appOptions = () => optionsByKind("app-launch");
+  const presetOptions = () => optionsByKind("preset");
+  const settingsOptions = () =>
+    props.options.filter(
+      (option) =>
+        (option.kind === "setting" ||
+          option.kind === "panel" ||
+          option.kind === "panel-action") &&
+        (!props.allowAllSettings || !option.grant.startsWith("settings/")),
     );
+  const appFeatureGroups = createMemo(() => {
+    const groups = new Map<
+      string,
+      { label: UserGrantOption["label"]; options: UserGrantOption[] }
+    >();
+    for (const option of optionsByKind("app-feature")) {
+      const ownerId = option.ownerId ?? "app";
+      const group = groups.get(ownerId) ?? {
+        label: option.ownerLabel ?? ownerId,
+        options: [],
+      };
+      group.options.push(option);
+      groups.set(ownerId, group);
+    }
+    return Array.from(groups.entries());
+  });
 
-  const settingGrants = () =>
-    new Set(
-      props.grants.filter(
-        (grant) => grant.startsWith("settings/") && grant !== "settings/*",
-      ),
-    );
+  const setOption = (option: UserGrantOption, enabled: boolean) => {
+    props.updateGrants((grants) => {
+      if (option.kind === "app-launch") grants.delete("apps/launch/*");
+      if (option.kind === "app-feature") {
+        grants.delete("app/*");
+        if (option.ownerId) grants.delete(`app/${option.ownerId}/*`);
+      }
+      if (option.kind === "preset") grants.delete("preset/*");
+      if (option.grant.startsWith("settings/")) grants.delete("settings/*");
+      if (enabled) grants.add(option.grant);
+      else grants.delete(option.grant);
+      return grants;
+    });
+  };
+  const optionLabel = (option: UserGrantOption) => {
+    const label = getLocalizedValue(option.label, locale());
+    const owner = option.ownerLabel
+      ? getLocalizedValue(option.ownerLabel, locale())
+      : "";
+    return owner && owner !== label ? `${owner} · ${label}` : label;
+  };
+
+  const OptionRow = (rowProps: { option: UserGrantOption }) => (
+    <label class="eden-list-item eden-list-item-interactive eden-flex-between">
+      <div class="eden-list-item-content">
+        <span class="eden-list-item-title">{optionLabel(rowProps.option)}</span>
+        <Show when={rowProps.option.description}>
+          {(description) => (
+            <span class="eden-list-item-description">
+              {getLocalizedValue(description(), locale())}
+            </span>
+          )}
+        </Show>
+      </div>
+      <input
+        type="checkbox"
+        class="eden-toggle"
+        checked={matchesGrant(props.grants, rowProps.option.grant)}
+        onChange={(event) =>
+          setOption(rowProps.option, event.currentTarget.checked)
+        }
+      />
+    </label>
+  );
 
   return (
     <div class="eden-flex eden-flex-col eden-gap-lg">
@@ -58,7 +101,6 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
           </div>
         }
       >
-        {/* Allow All Toggles */}
         <div class="eden-list">
           <label class="eden-list-item eden-list-item-interactive eden-flex-between">
             <div class="eden-list-item-content">
@@ -73,21 +115,19 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
               type="checkbox"
               class="eden-toggle"
               checked={props.allowAllApps}
-              onChange={(e) =>
+              onChange={(event) =>
                 props.updateGrants((grants) => {
-                  if (e.currentTarget.checked) {
+                  if (event.currentTarget.checked) {
                     grants.add("apps/launch/*");
-                    for (const perm of grants) {
+                    for (const grant of grants) {
                       if (
-                        perm.startsWith("apps/launch/") &&
-                        perm !== "apps/launch/*"
+                        grant.startsWith("apps/launch/") &&
+                        grant !== "apps/launch/*"
                       ) {
-                        grants.delete(perm);
+                        grants.delete(grant);
                       }
                     }
-                  } else {
-                    grants.delete("apps/launch/*");
-                  }
+                  } else grants.delete("apps/launch/*");
                   return grants;
                 })
               }
@@ -107,21 +147,19 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
               type="checkbox"
               class="eden-toggle"
               checked={props.allowAllSettings}
-              onChange={(e) =>
+              onChange={(event) =>
                 props.updateGrants((grants) => {
-                  if (e.currentTarget.checked) {
+                  if (event.currentTarget.checked) {
                     grants.add("settings/*");
-                    for (const perm of grants) {
+                    for (const grant of grants) {
                       if (
-                        perm.startsWith("settings/") &&
-                        perm !== "settings/*"
+                        grant.startsWith("settings/") &&
+                        grant !== "settings/*"
                       ) {
-                        grants.delete(perm);
+                        grants.delete(grant);
                       }
                     }
-                  } else {
-                    grants.delete("settings/*");
-                  }
+                  } else grants.delete("settings/*");
                   return grants;
                 })
               }
@@ -129,166 +167,47 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
           </label>
         </div>
 
-        {/* App Access */}
-        <Show when={!props.allowAllApps}>
+        <Show when={!props.allowAllApps && appOptions().length > 0}>
           <div class="eden-flex eden-flex-col eden-gap-sm">
             <div class="eden-text-sm eden-text-secondary eden-uppercase eden-tracking-wide eden-font-bold">
               {t("settings.users.appAccess")}
             </div>
             <div class="eden-list eden-scrollbar">
-              <For each={props.grantableApps}>
-                {(app) => (
-                  <label class="eden-list-item eden-list-item-interactive eden-flex-between">
-                    <span class="eden-list-item-title">
-                      {getLocalizedValue(app.name, locale())}
-                    </span>
-                    <input
-                      type="checkbox"
-                      class="eden-toggle"
-                      checked={appGrants().has(buildAppGrant(app.id))}
-                      onChange={(e) =>
-                        props.updateGrants((grants) => {
-                          const perm = buildAppGrant(app.id);
-                          grants.delete("apps/launch/*");
-                          if (e.currentTarget.checked) {
-                            grants.add(perm);
-                          } else {
-                            grants.delete(perm);
-                          }
-                          return grants;
-                        })
-                      }
-                    />
-                  </label>
-                )}
+              <For each={appOptions()}>
+                {(option) => <OptionRow option={option} />}
               </For>
             </div>
           </div>
         </Show>
 
-        {/* System Grants */}
-        <Show when={props.systemGrants().length > 0}>
+        <Show when={presetOptions().length > 0}>
           <div class="eden-flex eden-flex-col eden-gap-sm">
             <div class="eden-text-md eden-text-secondary eden-uppercase eden-tracking-wide eden-font-bold">
               {t("settings.users.systemGrants")}
             </div>
-            <div class="eden-flex eden-flex-col eden-gap-md">
-              <div class="eden-list eden-scrollbar">
-                <For each={props.systemGrants()}>
-                  {(grant) => {
-                    const grantId = getGrantId(grant);
-                    return (
-                      <label class="eden-list-item eden-list-item-interactive eden-flex-between">
-                        <div class="eden-list-item-content">
-                          <span class="eden-list-item-title">
-                            {getLocalizedValue(getGrantLabel(grant), locale())}
-                          </span>
-                          <Show when={grant.description}>
-                            <span class="eden-list-item-description">
-                              {getLocalizedValue(grant.description, locale())}
-                            </span>
-                          </Show>
-                        </div>
-                        <input
-                          type="checkbox"
-                          class="eden-toggle"
-                          checked={
-                            grantId
-                              ? hasPresetGrant(props.grants, grantId)
-                              : false
-                          }
-                          onChange={(e) =>
-                            props.updateGrants((grants) => {
-                              if (!grantId) {
-                                return grants;
-                              }
-                              const perm = buildPresetGrant(grantId);
-                              if (e.currentTarget.checked) {
-                                grants.add(perm);
-                              } else {
-                                grants.delete(perm);
-                              }
-                              return grants;
-                            })
-                          }
-                        />
-                      </label>
-                    );
-                  }}
-                </For>
-              </div>
+            <div class="eden-list eden-scrollbar">
+              <For each={presetOptions()}>
+                {(option) => <OptionRow option={option} />}
+              </For>
             </div>
           </div>
         </Show>
 
-        {/* App Grants */}
-        <Show when={props.appGrantApps().length > 0}>
+        <Show when={appFeatureGroups().length > 0}>
           <div class="eden-flex eden-flex-col eden-gap-sm">
             <div class="eden-text-md eden-text-secondary eden-uppercase eden-tracking-wide eden-font-bold">
               {t("settings.users.appGrants")}
             </div>
             <div class="eden-flex eden-flex-col eden-gap-md">
-              <For each={props.appGrantApps()}>
-                {(app) => (
+              <For each={appFeatureGroups()}>
+                {([, group]) => (
                   <div class="eden-flex eden-flex-col eden-gap-sm">
                     <div class="eden-text-sm eden-font-semibold">
-                      {getLocalizedValue(app.name, locale())}
+                      {getLocalizedValue(group.label, locale())}
                     </div>
                     <div class="eden-list eden-scrollbar">
-                      <For each={getAppScopedGrants(app)}>
-                        {(grant) => (
-                          <label class="eden-list-item eden-list-item-interactive eden-flex-between">
-                            <div class="eden-list-item-content">
-                              <span class="eden-list-item-title">
-                                {getLocalizedValue(
-                                  getGrantLabel(grant),
-                                  locale(),
-                                )}
-                              </span>
-                              <Show when={grant.description}>
-                                <span class="eden-list-item-description">
-                                  {getLocalizedValue(
-                                    grant.description,
-                                    locale(),
-                                  )}
-                                </span>
-                              </Show>
-                            </div>
-                            <input
-                              type="checkbox"
-                              class="eden-toggle"
-                              checked={hasAppFeatureGrant(
-                                props.grants,
-                                app.id,
-                                getGrantId(grant),
-                                getGrantScope(grant),
-                              )}
-                              onChange={(e) =>
-                                props.updateGrants((grants) => {
-                                  const scope = getGrantScope(grant);
-                                  const perm = getAppGrantKey(
-                                    app.id,
-                                    getGrantId(grant),
-                                    scope,
-                                  );
-                                  if (!perm) {
-                                    return grants;
-                                  }
-                                  if (scope === "app") {
-                                    grants.delete("app/*");
-                                    grants.delete(`app/${app.id}/*`);
-                                  }
-                                  if (e.currentTarget.checked) {
-                                    grants.add(perm);
-                                  } else {
-                                    grants.delete(perm);
-                                  }
-                                  return grants;
-                                })
-                              }
-                            />
-                          </label>
-                        )}
+                      <For each={group.options}>
+                        {(option) => <OptionRow option={option} />}
                       </For>
                     </div>
                   </div>
@@ -298,41 +217,14 @@ const GrantsEasyMode = (props: GrantsEasyModeProps) => {
           </div>
         </Show>
 
-        {/* Settings Access */}
-        <Show when={!props.allowAllSettings}>
+        <Show when={settingsOptions().length > 0}>
           <div class="eden-flex eden-flex-col eden-gap-sm">
             <div class="eden-text-sm eden-text-secondary eden-uppercase eden-tracking-wide eden-font-bold">
               {t("settings.users.settingsAccess")}
             </div>
             <div class="eden-list eden-scrollbar">
-              <For each={props.settingsOptions}>
-                {(option) => (
-                  <label class="eden-list-item eden-list-item-interactive eden-flex-between">
-                    <span class="eden-list-item-title">{option.label}</span>
-                    <input
-                      type="checkbox"
-                      class="eden-toggle"
-                      checked={settingGrants().has(
-                        buildSettingGrant(option.appId, option.id),
-                      )}
-                      onChange={(e) =>
-                        props.updateGrants((grants) => {
-                          const perm = buildSettingGrant(
-                            option.appId,
-                            option.id,
-                          );
-                          grants.delete("settings/*");
-                          if (e.currentTarget.checked) {
-                            grants.add(perm);
-                          } else {
-                            grants.delete(perm);
-                          }
-                          return grants;
-                        })
-                      }
-                    />
-                  </label>
-                )}
+              <For each={settingsOptions()}>
+                {(option) => <OptionRow option={option} />}
               </For>
             </div>
           </div>

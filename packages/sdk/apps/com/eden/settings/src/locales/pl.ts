@@ -5,6 +5,23 @@ export const pl = {
       noAppsWithSettings: "Brak aplikacji z ustawieniami",
     },
     selectCategory: "Wybierz kategorię z paska bocznego",
+    retry: "Spróbuj ponownie",
+    emptyPanel: "Ten panel nie zawiera dostępnych ustawień.",
+    operationError: "Operacja nie powiodła się",
+    operationPending: "Przetwarzanie…",
+    errors: {
+      authorization: "Brak dostępu",
+      not_found: "Nie znaleziono panelu",
+      validation: "Sprawdź wprowadzone wartości",
+      load_failed: "Nie można wczytać ustawień",
+      action_failed: "Operacja nie powiodła się",
+      session_changed: "Sesja uległa zmianie",
+    },
+    validation: {
+      required: "To pole jest wymagane.",
+      minLength: "Wprowadź co najmniej {count} znaków.",
+      maxLength: "Wprowadź nie więcej niż {count} znaków.",
+    },
     daemons: {
       bootHint:
         "Włączenie steruje startem systemu; start i stop dotyczą tylko tego uruchomienia.",

@@ -1,6 +1,6 @@
 import path from "node:path";
-import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -15,8 +15,19 @@ export default defineConfig({
     emptyOutDir: true,
   },
   resolve: {
+    conditions: ["development", "browser"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  test: {
+    environment: "jsdom",
+    clearMocks: true,
+    setupFiles: ["./src/test/setup.ts"],
+    server: {
+      deps: {
+        inline: ["solid-icons"],
+      },
     },
   },
 });

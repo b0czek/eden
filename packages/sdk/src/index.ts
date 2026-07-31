@@ -1,25 +1,12 @@
 import "reflect-metadata";
 
-// Re-export the Eden library
-
-export { EdenConfig } from "@edenapp/types";
-// Re-export core managers for library usage
-export { AppAssociationManager } from "./app-associations";
-export { DaemonManager } from "./daemon";
+export type { EdenConfig } from "@edenapp/types";
+export * from "./api";
 export { Eden } from "./Eden";
-export { IPCBridge } from "./ipc";
 export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";
-// Logging exports
 export {
   configureLogger,
-  createLogger,
   getLoggerConfig,
   log,
   setLogContext,
 } from "./logging";
-export { PackageManager } from "./package-manager";
-export { BackendManager, ProcessManager } from "./process-manager";
-export { SessionManager } from "./session";
-export { UserManager } from "./user";
-// Window management exports
-export { ViewManager } from "./view-manager";

@@ -55,15 +55,16 @@
     "reflect-metadata": "^0.2.2",
     "simple-keyboard": "^3.8.125",
     "tsyringe": "^4.10.0",
+    "valibot": "^1.4.2",
     "wasmagic": "^1.0.8"
   },
   "devDependencies": {
     "@edenapp/scripts": "workspace:*",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.10.0",
-    "esbuild": "^0.27.0",
     "concurrently": "^9.1.0",
     "electron": "^40.0.0",
+    "esbuild": "^0.27.0",
     "jest": "^29.7.0",
     "lightningcss-cli": "^1.30.2",
     "solid-js": "^1.9.10",

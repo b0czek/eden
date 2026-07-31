@@ -4,7 +4,23 @@ import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import { app, BrowserWindow } from "electron";
 import { container } from "tsyringe";
+import type {
+  EdenAppearanceApi,
+  EdenAppsApi,
+  EdenAssociationsApi,
+  EdenDaemonsApi,
+  EdenLifecycleState,
+  EdenSessionsApi,
+  EdenSettingsApi,
+  EdenUsersApi,
+} from "./api";
+import {
+  createControlPlaneApis,
+  type EdenControlPlaneApis,
+} from "./api/createControlPlaneApi";
+import { createSettingsApi } from "./api/createSettingsApi";
 import { AppAssociationManager } from "./app-associations";
+import { AppCatalog } from "./app-registry";
 import { AppChannelManager } from "./appbus";
 import { AppearanceManager } from "./appearance/AppearanceManager";
 import { BrandingManager } from "./branding";
@@ -31,8 +47,12 @@ import {
 import { SystemHandler } from "./SystemHandler";
 import { seedDatabase } from "./seed";
 import { SessionManager } from "./session";
-import { SettingsManager } from "./settings";
-import { UserManager } from "./user";
+import {
+  registerBuiltinSettingsPanels,
+  SettingsManager,
+  SettingsPanelManager,
+} from "./settings";
+import { GrantCatalogManager, UserManager } from "./user";
 import { UserHandler } from "./user/UserHandler";
 import { ViewManager } from "./view-manager";
 
@@ -46,6 +66,11 @@ export class Eden {
   private config: EdenConfig;
   private brandingManager: BrandingManager;
   private managersInitialized = false;
+  private lifecycleState: EdenLifecycleState = "created";
+  private controlPlaneApis?: EdenControlPlaneApis;
+  private readonly readyPromise: Promise<void>;
+  private resolveReady!: () => void;
+  private rejectReady!: (error: unknown) => void;
 
   // New components
   private packageManager!: PackageManager;
@@ -57,8 +82,14 @@ export class Eden {
   private sessionManager!: SessionManager;
   private daemonManager!: DaemonManager;
   private keyboardManager!: KeyboardManager;
+  private settingsPanelManager: SettingsPanelManager;
+  public readonly settings: EdenSettingsApi;
 
   constructor(config: EdenConfig = {}) {
+    this.readyPromise = new Promise<void>((resolve, reject) => {
+      this.resolveReady = resolve;
+      this.rejectReady = reject;
+    });
     this.config = {
       ...config,
       loginAppId: config.loginAppId ?? "com.eden.login",
@@ -94,18 +125,76 @@ export class Eden {
     // 2. Main communication bridge
     container.resolve(BackendManager);
     this.ipcBridge = container.resolve(IPCBridge);
+    this.settingsPanelManager = container.resolve(SettingsPanelManager);
+    this.settings = createSettingsApi(this.settingsPanelManager);
 
     this.setupAppEventHandlers();
+  }
+
+  /** Wait until Eden and all operational managers are initialized. */
+  public whenReady(): Promise<void> {
+    return this.readyPromise;
+  }
+
+  public get state(): EdenLifecycleState {
+    return this.lifecycleState;
+  }
+
+  public get apps(): EdenAppsApi {
+    return this.requireControlPlaneApis().apps;
+  }
+
+  public get daemons(): EdenDaemonsApi {
+    return this.requireControlPlaneApis().daemons;
+  }
+
+  public get users(): EdenUsersApi {
+    return this.requireControlPlaneApis().users;
+  }
+
+  public get sessions(): EdenSessionsApi {
+    return this.requireControlPlaneApis().sessions;
+  }
+
+  public get appearance(): EdenAppearanceApi {
+    return this.requireControlPlaneApis().appearance;
+  }
+
+  public get associations(): EdenAssociationsApi {
+    return this.requireControlPlaneApis().associations;
+  }
+
+  private requireControlPlaneApis(): EdenControlPlaneApis {
+    if (!this.controlPlaneApis || this.lifecycleState !== "ready") {
+      throw new Error(
+        "Eden is not ready. Await eden.whenReady() before using operational APIs.",
+      );
+    }
+    return this.controlPlaneApis;
   }
 
   /**
    * Setup Electron app event handlers
    */
   private setupAppEventHandlers(): void {
-    app.on("ready", () => this.onReady());
+    void app.whenReady().then(() => this.start());
     app.on("window-all-closed", () => this.onWindowAllClosed());
     app.on("activate", () => this.onActivate());
     app.on("before-quit", () => this.onBeforeQuit());
+  }
+
+  private async start(): Promise<void> {
+    if (this.lifecycleState !== "created") return;
+    this.lifecycleState = "starting";
+    try {
+      await this.onReady();
+      this.lifecycleState = "ready";
+      this.resolveReady();
+    } catch (error) {
+      this.lifecycleState = "failed";
+      this.rejectReady(error);
+      log.error("Eden failed to start", error);
+    }
   }
 
   /**
@@ -126,6 +215,7 @@ export class Eden {
     await this.userManager.initialize();
     // Initialize package manager
     await this.packageManager.initialize();
+    this.settingsPanelManager.synchronizeManifestPanels();
 
     // System-owned daemons start before any interactive session is committed.
     await this.daemonManager.initialize();
@@ -169,6 +259,7 @@ export class Eden {
           this.userManager,
           this.sessionManager,
           container.resolve(ExecutionContext),
+          container.resolve(GrantCatalogManager),
         ),
       );
     this.appAssociationManager = container.resolve(AppAssociationManager);
@@ -181,7 +272,32 @@ export class Eden {
     container.resolve(ContextMenuManager);
     container.resolve(FilePickerManager);
     container.resolve(DbManager);
-    container.resolve(AppearanceManager);
+    const appearanceManager = container.resolve(AppearanceManager);
+    this.controlPlaneApis = createControlPlaneApis({
+      appCatalog: container.resolve(AppCatalog),
+      packageManager: this.packageManager,
+      daemonManager: this.daemonManager,
+      userManager: this.userManager,
+      sessionManager: this.sessionManager,
+      appearanceManager,
+      associationManager: this.appAssociationManager,
+      executionContext: container.resolve(ExecutionContext),
+    });
+    registerBuiltinSettingsPanels({
+      panels: this.settingsPanelManager,
+      settings: container.resolve(SettingsManager),
+      appCatalog: container.resolve(AppCatalog),
+      appearanceManager,
+      packageManager: this.packageManager,
+      daemonManager: this.daemonManager,
+      userManager: this.userManager,
+      config: this.config,
+    });
+    this.settingsPanelManager.connectLifecycle(
+      this.sessionManager,
+      this.packageManager,
+      this.daemonManager,
+    );
   }
 
   private ensureDirectory(directory: string, label: string): void {
@@ -273,6 +389,7 @@ export class Eden {
    * Handle app quit
    */
   private async onBeforeQuit(): Promise<void> {
+    this.lifecycleState = "stopping";
     log.info("Eden shutting down...");
 
     try {
@@ -293,6 +410,8 @@ export class Eden {
       log.info("Eden shutdown complete");
     } catch (error) {
       log.error("Error during shutdown:", error);
+    } finally {
+      this.lifecycleState = "stopped";
     }
   }
 }

@@ -1,57 +1,37 @@
-import type { AppManifest, SettingsCategory } from "@edenapp/types";
+import type { SettingsPanelError } from "@edenapp/types";
 import { VsSettings } from "solid-icons/vs";
 import { type Accessor, type Component, Show } from "solid-js";
-import type { Store } from "solid-js/store";
 import { Dynamic } from "solid-js/web";
 import { getLocalizedValue, locale, t } from "../i18n";
-import type { SelectedItem } from "../types";
+import type { LoadedPanel, PanelAction } from "../types";
 import AppearanceTab from "./AppearanceTab";
 import AppsTab from "./apps";
 import DaemonsTab from "./daemons/DaemonsTab";
-import SettingsList from "./SettingsList";
+import GenericPanel from "./GenericPanel";
 
 interface SettingsContentProps {
   loading: Accessor<boolean>;
-  selectedItem: Accessor<SelectedItem | null>;
-  edenSchema: Accessor<SettingsCategory[]>;
-  apps: Accessor<AppManifest[]>;
-  currentSettings: Accessor<SettingsCategory[]>;
-  settingValues: Store<Record<string, string>>;
-  onSettingChange: (key: string, value: string) => void;
+  loadedPanel: Accessor<LoadedPanel | null>;
+  panelError: Accessor<SettingsPanelError | null>;
+  operationError: Accessor<SettingsPanelError | null>;
+  busyActions: Accessor<Set<string>>;
+  onAction: PanelAction;
+  onRetry: () => Promise<void>;
 }
 
 const SettingsContent: Component<SettingsContentProps> = (props) => {
-  const getItemDescription = (item: SelectedItem) => {
-    if (item.type === "app") {
-      return props.apps().find((app) => app.id === item.id)?.description;
-    }
-    return getLocalizedValue(
-      props.edenSchema().find((cat) => cat.id === item.id)?.description,
-      locale(),
-    );
-  };
-
-  const getSelectedCategory = () =>
-    props.selectedItem()?.type === "eden"
-      ? props.edenSchema().find((cat) => cat.id === props.selectedItem()?.id)
-      : null;
-
-  const getSelectedViewId = () => {
-    const item = props.selectedItem();
-    if (!item) return undefined;
-    return getSelectedCategory()?.view;
-  };
-
-  const viewRegistry: Record<string, Component> = {
-    apps: AppsTab,
+  const renderers: Record<
+    string,
+    Component<{
+      panel: LoadedPanel;
+      busyActions: Accessor<Set<string>>;
+      onAction: PanelAction;
+    }>
+  > = {
+    generic: GenericPanel,
     appearance: AppearanceTab,
+    apps: AppsTab,
     daemons: DaemonsTab,
-  };
-
-  const getViewComponent = () => {
-    const viewId = getSelectedViewId();
-    if (!viewId) return undefined;
-    return viewRegistry[viewId];
   };
 
   return (
@@ -59,43 +39,71 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
       <Show
         when={!props.loading()}
         fallback={
-          <div class="loading">
+          <output class="loading" aria-live="polite">
             <span class="loading-spinner">⟳</span> {t("common.loading")}
-          </div>
+          </output>
         }
       >
-        <Show
-          when={props.selectedItem()}
-          fallback={
-            <div class="empty-state">
-              <div class="empty-state-icon">
-                <VsSettings />
-              </div>
-              <div class="empty-state-text">{t("settings.selectCategory")}</div>
+        <Show when={props.panelError()}>
+          {(error) => (
+            <div class="panel-state eden-card eden-card-glass" role="alert">
+              <h2>{t(`settings.errors.${error().code}`)}</h2>
+              <p>{error().message}</p>
+              <button
+                type="button"
+                class="eden-btn eden-btn-primary"
+                onClick={() => void props.onRetry()}
+              >
+                {t("settings.retry")}
+              </button>
             </div>
+          )}
+        </Show>
+
+        <Show
+          when={!props.panelError() && props.loadedPanel()}
+          fallback={
+            <Show when={!props.panelError()}>
+              <div class="empty-state">
+                <div class="empty-state-icon">
+                  <VsSettings />
+                </div>
+                <div class="empty-state-text">
+                  {t("settings.selectCategory")}
+                </div>
+              </div>
+            </Show>
           }
         >
-          {(item) => (
+          {(loaded) => (
             <>
               <header class="content-header">
-                <h1 class="content-title">{item().label}</h1>
-                <Show when={getItemDescription(item())}>
-                  {(desc) => <p class="content-description">{desc()}</p>}
+                <h1 class="content-title">
+                  {getLocalizedValue(loaded().declaration.title, locale())}
+                </h1>
+                <Show when={loaded().declaration.description}>
+                  {(description) => (
+                    <p class="content-description">
+                      {getLocalizedValue(description(), locale())}
+                    </p>
+                  )}
                 </Show>
               </header>
-
-              <Show
-                when={getViewComponent()}
-                fallback={
-                  <SettingsList
-                    categories={props.currentSettings}
-                    values={props.settingValues}
-                    onSettingChange={props.onSettingChange}
-                  />
-                }
-              >
-                {(ViewComponent) => <Dynamic component={ViewComponent()} />}
+              <Show when={props.operationError()}>
+                {(error) => (
+                  <div class="operation-error" role="alert">
+                    {t("settings.operationError")}: {error().message}
+                  </div>
+                )}
               </Show>
+              <Dynamic
+                component={
+                  renderers[loaded().declaration.renderer] ?? GenericPanel
+                }
+                panel={loaded()}
+                busyActions={props.busyActions}
+                onAction={props.onAction}
+              />
             </>
           )}
         </Show>

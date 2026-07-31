@@ -97,6 +97,16 @@ export interface SessionEvents {
  */
 export interface SettingsEvents {
   "settings/changed": { appId: string; key: string; value: string };
+  "settings/panels-changed": {
+    reason: "catalog" | "grants" | "session" | "state" | "visibility";
+  };
+}
+
+/**
+ * UserEvents - Events for the "user" namespace
+ */
+export interface UserEvents {
+  "user/grant-options-changed": { revision: number };
 }
 
 /**
@@ -122,4 +132,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}

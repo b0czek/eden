@@ -1,229 +1,197 @@
-import type { AppManifest, SettingsCategory } from "@edenapp/types";
+import type {
+  SettingsPanelActionResponse,
+  SettingsPanelError,
+  SettingsPanelResponse,
+  SettingsPanelSummary,
+  SettingsPanelValue,
+} from "@edenapp/types";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, onMount } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import SettingsContent from "./components/SettingsContent";
 import SettingsSidebar from "./components/SettingsSidebar";
-import { getLocalizedValue, initLocale, locale } from "./i18n";
-import type { SelectedItem } from "./types";
+import { initLocale } from "./i18n";
+import type { LoadedPanel } from "./types";
 import "./App.css";
 
 const App: Component = () => {
-  const [apps, setApps] = createSignal<AppManifest[]>([]);
-  const [appIcons, setAppIcons] = createSignal<Record<string, string>>({});
-  const [edenSchema, setEdenSchema] = createSignal<SettingsCategory[]>([]);
-  const [selectedItem, setSelectedItem] = createSignal<SelectedItem | null>(
+  const [catalog, setCatalog] = createSignal<SettingsPanelSummary[]>([]);
+  const [selectedPanelId, setSelectedPanelId] = createSignal<string | null>(
     null,
   );
-  const [currentSettings, setCurrentSettings] = createSignal<
-    SettingsCategory[]
-  >([]);
-  const [settingValues, setSettingValues] = createStore<Record<string, string>>(
-    {},
+  const [loadedPanel, setLoadedPanel] = createSignal<LoadedPanel | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = createSignal(true);
+  const [loadingPanel, setLoadingPanel] = createSignal(false);
+  const [panelError, setPanelError] = createSignal<SettingsPanelError | null>(
+    null,
   );
-  const [loading, setLoading] = createSignal(true);
+  const [operationError, setOperationError] =
+    createSignal<SettingsPanelError | null>(null);
+  const [busyActions, setBusyActions] = createSignal<Set<string>>(new Set());
   const [brandName, setBrandName] = createSignal("Eden");
-
-  onMount(async () => {
-    await initLocale();
-    await Promise.all([loadBranding(), loadEdenSchema(), loadApps()]);
-    setLoading(false);
-  });
+  let panelRequest = 0;
 
   const loadBranding = async () => {
     try {
       const branding = await window.edenAPI.shellCommand("system/branding", {});
       setBrandName(branding.name);
-    } catch (error) {
-      console.error("Failed to load product branding:", error);
+    } catch {
+      // The product name fallback remains usable.
     }
   };
 
-  const loadEdenSchema = async () => {
+  const loadCatalog = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("settings/schema", {});
-      const schema = Array.isArray(result.schema) ? result.schema : [];
-      setEdenSchema(schema);
-    } catch (error) {
-      console.error("Failed to load Eden schema:", error);
-    }
-  };
-
-  const loadApps = async () => {
-    let appsWithSettings: AppManifest[] = [];
-    try {
-      const result = await window.edenAPI.shellCommand("package/list", {
-        showHidden: true,
-      });
-      appsWithSettings = result.filter(
-        (app: AppManifest) => app.settings && app.settings.length > 0,
-      );
-      setApps(appsWithSettings);
-
-      const icons: Record<string, string> = {};
-      for (const app of appsWithSettings) {
-        try {
-          const iconResult = await window.edenAPI.shellCommand(
-            "package/get-icon",
-            { appId: app.id },
-          );
-          if (iconResult.icon) {
-            icons[app.id] = iconResult.icon;
-          }
-        } catch {
-          // Icon not available
-        }
+      const result = await window.edenAPI.shellCommand("settings/panels", {});
+      const panels = Array.isArray(result.panels) ? result.panels : [];
+      setCatalog(panels);
+      const selected = selectedPanelId();
+      if (selected && !panels.some((panel) => panel.id === selected)) {
+        setSelectedPanelId(null);
+        setLoadedPanel(null);
+        setPanelError(null);
       }
-      setAppIcons(icons);
-    } catch (error) {
-      console.error("Failed to load apps:", error);
+    } catch {
+      setCatalog([]);
+      setSelectedPanelId(null);
+      setLoadedPanel(null);
+      setPanelError({
+        code: "load_failed",
+        message: "The settings catalog could not be loaded.",
+      });
+    } finally {
+      setLoadingCatalog(false);
     }
   };
 
-  createEffect(() => {
-    const item = selectedItem();
-    if (!item) return;
-
-    if (item.type === "eden") {
-      loadEdenSettings(item.id);
-    } else if (item.type === "app") {
-      loadAppSettings(item.id);
-    }
-  });
-
-  createEffect(() => {
-    const item = selectedItem();
-    if (!item || item.type !== "eden") return;
-    const exists = edenSchema().some((category) => category.id === item.id);
-    if (!exists) {
-      setSelectedItem(null);
-      setCurrentSettings([]);
-    }
-  });
-
-  const loadEdenSettings = async (categoryId: string) => {
-    const schema = edenSchema();
-    const category = schema.find((c) => c.id === categoryId);
-    if (!category) return;
-
-    if (category.view) {
-      setCurrentSettings([]);
-      setSettingValues({});
+  const loadSelectedPanel = async (showLoading = true) => {
+    const panelId = selectedPanelId();
+    if (!panelId) {
+      setLoadedPanel(null);
       return;
     }
 
-    setCurrentSettings([category]);
-
-    const values: Record<string, string> = {};
+    const request = ++panelRequest;
+    if (showLoading) setLoadingPanel(true);
+    setPanelError(null);
     try {
-      // Eden settings use appId "com.eden"
-      const result = await window.edenAPI.shellCommand("settings/get-all/su", {
-        appId: "com.eden",
+      const response: SettingsPanelResponse = await window.edenAPI.shellCommand(
+        "settings/panel",
+        { panelId },
+      );
+      if (request !== panelRequest || selectedPanelId() !== panelId) return;
+      if (response.error || !response.panel || !response.state) {
+        setLoadedPanel(null);
+        setPanelError(
+          response.error ?? {
+            code: "load_failed",
+            message: "The settings panel returned an incomplete response.",
+          },
+        );
+        return;
+      }
+      const declaration = response.panel;
+      const state = response.state;
+      setLoadedPanel((current) => ({
+        declaration:
+          !showLoading && current?.declaration.id === declaration.id
+            ? current.declaration
+            : declaration,
+        state,
+      }));
+    } catch {
+      if (request !== panelRequest) return;
+      setLoadedPanel(null);
+      setPanelError({
+        code: "load_failed",
+        message: "The settings panel could not be loaded.",
       });
-      for (const setting of category.settings) {
-        values[setting.key] =
-          result.settings[setting.key] ?? setting.defaultValue ?? "";
-      }
-    } catch (error) {
-      console.error("Failed to load Eden settings:", error);
-      for (const setting of category.settings) {
-        values[setting.key] = setting.defaultValue ?? "";
-      }
+    } finally {
+      if (showLoading && request === panelRequest) setLoadingPanel(false);
     }
-
-    setSettingValues(values);
   };
 
-  const loadAppSettings = async (appId: string) => {
-    const app = apps().find((a) => a.id === appId);
-    if (!app?.settings) return;
+  const refresh = async () => {
+    await loadCatalog();
+    if (selectedPanelId()) await loadSelectedPanel();
+  };
 
-    setCurrentSettings(app.settings);
+  onMount(async () => {
+    await initLocale();
+    await Promise.all([loadBranding(), loadCatalog()]);
+    await window.edenAPI.subscribe("settings/panels-changed", refresh);
+  });
+  onCleanup(() => {
+    void window.edenAPI.unsubscribe("settings/panels-changed", refresh);
+  });
 
-    const values: Record<string, string> = {};
+  createEffect(() => {
+    selectedPanelId();
+    void loadSelectedPanel();
+  });
+
+  const runAction = async (
+    actionId: string,
+    input?: SettingsPanelValue,
+  ): Promise<SettingsPanelActionResponse> => {
+    const panelId = selectedPanelId();
+    if (!panelId) {
+      return {
+        success: false,
+        error: {
+          code: "not_found",
+          message: "No settings panel is selected.",
+        },
+      };
+    }
+
+    setBusyActions((current) => new Set(current).add(actionId));
+    setOperationError(null);
+    let result: SettingsPanelActionResponse;
     try {
-      const result = await window.edenAPI.shellCommand("settings/get-all/su", {
-        appId,
+      result = await window.edenAPI.shellCommand("settings/action", {
+        panelId,
+        actionId,
+        input,
       });
-      for (const category of app.settings) {
-        for (const setting of category.settings) {
-          values[setting.key] =
-            result.settings[setting.key] ?? setting.defaultValue ?? "";
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load app settings:", error);
-      for (const category of app.settings) {
-        for (const setting of category.settings) {
-          values[setting.key] = setting.defaultValue ?? "";
-        }
-      }
+      if (result.error) setOperationError(result.error);
+    } catch {
+      result = {
+        success: false,
+        error: {
+          code: "action_failed",
+          message: "The settings operation failed.",
+        },
+      };
+      setOperationError(result.error ?? null);
+    } finally {
+      // An action is never retried. State is always read again because the
+      // operation may have completed before its response failed.
+      await loadSelectedPanel(false);
+      setBusyActions((current) => {
+        const next = new Set(current);
+        next.delete(actionId);
+        return next;
+      });
     }
-
-    setSettingValues(values);
-  };
-
-  const handleSettingChange = async (key: string, value: string) => {
-    setSettingValues(key, value);
-
-    const item = selectedItem();
-    if (!item) return;
-
-    try {
-      if (item.type === "eden") {
-        // Eden settings use appId "com.eden"
-        await window.edenAPI.shellCommand("settings/set/su", {
-          appId: "com.eden",
-          key,
-          value,
-        });
-      } else if (item.type === "app") {
-        await window.edenAPI.shellCommand("settings/set/su", {
-          appId: item.id,
-          key,
-          value,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to save setting:", error);
-    }
-  };
-
-  const handleSelectEdenCategory = (category: SettingsCategory) => {
-    setSelectedItem({
-      type: "eden",
-      id: category.id,
-      label: getLocalizedValue(category.name, locale()),
-    });
-  };
-
-  const handleSelectApp = (app: AppManifest) => {
-    setSelectedItem({
-      type: "app",
-      id: app.id,
-      label: getLocalizedValue(app.name, locale()),
-    });
+    return result;
   };
 
   return (
     <div class="settings-app">
       <SettingsSidebar
         brandName={brandName}
-        edenSchema={edenSchema}
-        apps={apps}
-        appIcons={appIcons}
-        selectedItem={selectedItem}
-        onSelectEdenCategory={handleSelectEdenCategory}
-        onSelectApp={handleSelectApp}
+        panels={catalog}
+        selectedPanelId={selectedPanelId}
+        onSelect={setSelectedPanelId}
       />
       <SettingsContent
-        loading={loading}
-        selectedItem={selectedItem}
-        edenSchema={edenSchema}
-        apps={apps}
-        currentSettings={currentSettings}
-        settingValues={settingValues}
-        onSettingChange={handleSettingChange}
+        loading={() => loadingCatalog() || loadingPanel()}
+        loadedPanel={loadedPanel}
+        panelError={panelError}
+        operationError={operationError}
+        busyActions={busyActions}
+        onAction={runAction}
+        onRetry={loadSelectedPanel}
       />
     </div>
   );

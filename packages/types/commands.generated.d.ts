@@ -797,13 +797,28 @@ export interface SettingsCommands {
     response: { success: boolean };
   };
   /**
-   * Get the Eden settings schema
-   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
+   * List the settings panels visible to the active user.
    */
-  "settings/schema": {
+  "settings/panels": {
+    args: Record<string, never>;
+    response: { panels: import("./index").SettingsPanelSummary[] };
+  };
+  /**
+   * Load one authorized panel declaration and its current state.
+   */
+  "settings/panel": {
+    args: { panelId: string };
+    response: import("./index").SettingsPanelResponse;
+  };
+  /**
+   * Invoke one declared panel-private action.
+   */
+  "settings/action": {
     args: {
-    showRestricted?: boolean };
-    response: { schema: import("./index").SettingsCategory[] };
+    panelId: string;
+    actionId: string;
+    input?: import("./index").SettingsPanelValue };
+    response: import("./index").SettingsPanelActionResponse;
   };
 }
 
@@ -811,6 +826,10 @@ export interface SettingsCommands {
  * UserCommands - Commands for the "user" namespace
  */
 export interface UserCommands {
+  "user/grant-options": {
+    args: Record<string, never>;
+    response: import("./index").UserGrantOptionsResponse;
+  };
   /**
    * List all users.
    */
