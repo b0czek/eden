@@ -39,6 +39,7 @@ describe("GenericPanel", () => {
                 input: "text",
                 id: "name",
                 label: "Name",
+                stateKey: "name",
                 actionId: "save-name",
               },
             ],

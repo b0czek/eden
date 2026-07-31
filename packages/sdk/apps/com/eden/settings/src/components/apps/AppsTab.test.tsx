@@ -1,4 +1,4 @@
-import type { RuntimeAppManifest } from "@edenapp/types";
+import type { RuntimeAppManifest, SettingsPanelValue } from "@edenapp/types";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -37,7 +37,7 @@ describe("AppsTab", () => {
         data: {
           apps: [{ manifest, hotReload: false, autostart: false }],
           development: false,
-        },
+        } as unknown as SettingsPanelValue,
       },
     };
     const view = render(() => (
