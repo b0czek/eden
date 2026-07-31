@@ -1,4 +1,5 @@
 import {
+  applyActionAuthorization,
   authorizePanelDeclaration,
   canOpenPanel,
   collectPanelGrantOptions,
@@ -52,5 +53,44 @@ describe("SettingsPanelAuthorization", () => {
         }),
       ]),
     );
+  });
+
+  it("merges denied action state under a control's state key", () => {
+    const declaration = authorizePanelDeclaration(
+      record({
+        definition: panelDefinition({
+          sections: [
+            {
+              id: "main",
+              controls: [
+                {
+                  kind: "toggle",
+                  id: "network-toggle",
+                  label: "Enabled",
+                  stateKey: "enabled",
+                  actionId: "toggle",
+                },
+              ],
+            },
+          ],
+          actions: [{ id: "toggle", grant: "panels/network/write" }],
+        }),
+      }),
+      panelUser(["panels/network"]),
+    );
+    if (!declaration) throw new Error("Expected an authorized panel");
+
+    expect(
+      applyActionAuthorization(
+        {
+          controls: {
+            enabled: { value: true, detail: "Running" },
+          },
+        },
+        declaration,
+      ).controls,
+    ).toEqual({
+      enabled: { value: true, detail: "Running", disabled: true },
+    });
   });
 });

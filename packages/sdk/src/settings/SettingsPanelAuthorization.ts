@@ -80,7 +80,8 @@ export function applyActionAuthorization(
     for (const control of section.controls) {
       if (!("actionId" in control)) continue;
       if (actionAccess.get(control.actionId) !== false) continue;
-      controls[control.id] = { ...controls[control.id], disabled: true };
+      const stateKey = "stateKey" in control ? control.stateKey : control.id;
+      controls[stateKey] = { ...controls[stateKey], disabled: true };
     }
   }
   return { ...state, controls };

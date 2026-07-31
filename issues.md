@@ -14,10 +14,10 @@
     input event until the action and panel reload complete, so text fields accept roughly one character per IPC round trip and range dragging stops immediately; keep a local draft and commit on blur/
     debounce, or avoid disabling the control during editing.~~
 
-  - [P2] Preserve state when disabling unauthorized controls — /home/dariusz/Desktop/eden/packages/sdk/src/settings/SettingsPanelAuthorization.ts:81-84
+  - ~~[P2] Preserve state when disabling unauthorized controls — /home/dariusz/Desktop/eden/packages/sdk/src/settings/SettingsPanelAuthorization.ts:81-84
     When a control's stateKey differs from its id and the user lacks its action grant, this creates a new state entry under control.id rather than merging the provider state under stateKey. GenericPanel
     checks the ID first, so the synthetic { disabled: true } entry shadows the real value, badge, detail, or hidden flag; merge authorization into the state-key entry or rely on the declaration's
-    authorization flag.
+    authorization flag.~~
 
   - [P2] Refresh daemon snapshots after daemon events — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/daemons.ts:80-85
     When a daemon changes independently of an action in this panel—for example, it crashes, restarts automatically, or is controlled through the host API—the loaded snapshot is never refreshed. The
