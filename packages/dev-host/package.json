@@ -10,7 +10,7 @@
   ],
   "dependencies": {
     "@edenapp/sdk": "workspace:*",
-    "electron": "^40.0.0"
+    "electron": "catalog:"
   },
   "license": "MIT",
   "repository": {

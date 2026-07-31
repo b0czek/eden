@@ -27,13 +27,13 @@
     "solid-js": "^1.9.0"
   },
   "dependencies": {
-    "solid-icons": "^1.1.0"
+    "solid-icons": "catalog:"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
     "@iconify-json/noto": "^1.2.7",
     "@iconify/utils": "^3.1.4",
-    "typescript": "^5.3.0"
+    "typescript": "catalog:"
   },
   "keywords": [
     "eden",
