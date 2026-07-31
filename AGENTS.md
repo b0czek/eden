@@ -17,6 +17,8 @@ Managers must use the existing internal subscription mechanism (`EdenEmitter.on(
 
 # Docs
 
+Documentation must describe supported workflows and useful behavior. Do not document rejected alternatives, removed symbols, internal implementation details, or unsupported actions unless required for migration, compatibility, or safety.
+
 - [App Development](docs/app-development.md)
 - [IPC](docs/ipc-architecture.md)
 - [Adding Settings](docs/settings.md)
