@@ -1,28 +1,16 @@
-import type {
-  ResolvedGrant,
-  RuntimeAppManifest,
-  UserProfile,
-} from "@edenapp/types";
+import type { UserGrantOption, UserProfile } from "@edenapp/types";
 import { FaSolidCode, FaSolidList } from "solid-icons/fa";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import {
-  canLaunchApp,
-  getGrantId,
-  getGrantScope,
-  getResolvedGrants,
-} from "../../grants";
-import { getLocalizedValue, locale, t } from "../../i18n";
+import { createEffect, createSignal, Show } from "solid-js";
+import { t } from "../../i18n";
 import FilesystemLocationField from "./FilesystemLocationField";
 import GrantsEasyMode from "./GrantsEasyMode";
 import GrantsRawMode from "./GrantsRawMode";
-import type { SettingsOption } from "./types";
 import UserDetailHeader from "./UserDetailHeader";
 
 interface UserDetailProps {
   user: UserProfile;
   currentUser: UserProfile | null;
-  installedApps: RuntimeAppManifest[];
-  settingsOptions: SettingsOption[];
+  grantOptions: UserGrantOption[];
   isDefaultUser: boolean;
   onBack: () => void;
   onDelete: (username: string) => void;
@@ -116,53 +104,6 @@ const UserDetail = (props: UserDetailProps) => {
     hasWildcard() || (props.user.grants?.includes("apps/launch/*") ?? false);
   const allowAllSettings = () =>
     hasWildcard() || (props.user.grants?.includes("settings/*") ?? false);
-
-  const grantableApps = createMemo(() =>
-    props.installedApps.filter((app) => !app.isCore && !app.isRestricted),
-  );
-
-  const launchableApps = createMemo(() => {
-    const apps = props.installedApps.filter((app) =>
-      canLaunchApp(app, props.user.grants ?? [], isVendor()),
-    );
-    return apps.sort((a, b) =>
-      getLocalizedValue(a.name, locale()).localeCompare(
-        getLocalizedValue(b.name, locale()),
-      ),
-    );
-  });
-
-  const appGrantApps = createMemo(() =>
-    launchableApps().filter((app) =>
-      getResolvedGrants(app).some((grant) => getGrantScope(grant) === "app"),
-    ),
-  );
-
-  const systemGrants = createMemo(() => {
-    const map = new Map<string, ResolvedGrant>();
-    for (const app of launchableApps()) {
-      for (const grant of getResolvedGrants(app)) {
-        if (getGrantScope(grant) !== "preset") continue;
-        const id = getGrantId(grant);
-        if (!id) continue;
-        if (!map.has(id)) {
-          map.set(id, grant);
-        }
-      }
-    }
-    const grants = Array.from(map.values());
-    return grants.sort((a, b) => {
-      const labelA =
-        typeof a.label === "string"
-          ? a.label
-          : getLocalizedValue(a.label ?? a.preset, locale());
-      const labelB =
-        typeof b.label === "string"
-          ? b.label
-          : getLocalizedValue(b.label ?? b.preset, locale());
-      return labelA.localeCompare(labelB);
-    });
-  });
 
   return (
     <div class="eden-card eden-card-glass eden-flex-col eden-gap-md">
@@ -267,10 +208,7 @@ const UserDetail = (props: UserDetailProps) => {
             isVendor={isVendor()}
             allowAllApps={allowAllApps()}
             allowAllSettings={allowAllSettings()}
-            grantableApps={grantableApps()}
-            settingsOptions={props.settingsOptions}
-            systemGrants={systemGrants}
-            appGrantApps={appGrantApps}
+            options={props.grantOptions}
             updateGrants={updateGrants}
           />
         </Show>
