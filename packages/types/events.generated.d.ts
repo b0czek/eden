@@ -98,7 +98,7 @@ export interface SessionEvents {
 export interface SettingsEvents {
   "settings/changed": { appId: string; key: string; value: string };
   "settings/panels-changed": {
-    reason: "catalog" | "grants" | "session" | "visibility";
+    reason: "catalog" | "grants" | "session" | "state" | "visibility";
   };
 }
 

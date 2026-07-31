@@ -19,10 +19,10 @@
     checks the ID first, so the synthetic { disabled: true } entry shadows the real value, badge, detail, or hidden flag; merge authorization into the state-key entry or rely on the declaration's
     authorization flag.~~
 
-  - [P2] Refresh daemon snapshots after daemon events — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/daemons.ts:80-85
+  - ~~[P2] Refresh daemon snapshots after daemon events — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/daemons.ts:80-85
     When a daemon changes independently of an action in this panel—for example, it crashes, restarts automatically, or is controlled through the host API—the loaded snapshot is never refreshed. The
     previous component subscribed to daemon/changed, while the new Settings app reloads only after its own actions or settings/panels-changed; forward the existing daemon emitter notification into panel
-    refresh using the repository's emitter mechanism (AGENTS.md:16).
+    refresh using the repository's emitter mechanism (AGENTS.md:16).~~
 
   - [P2] Defer app-size scans until an app is selected — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/apps.ts:40-44
     When the Apps panel contains many or large installed packages, opening it now recursively scans every app directory via getSize() and waits for all scans before returning any panel data. The list

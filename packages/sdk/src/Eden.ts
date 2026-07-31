@@ -296,6 +296,7 @@ export class Eden {
     this.settingsPanelManager.connectLifecycle(
       this.sessionManager,
       this.packageManager,
+      this.daemonManager,
     );
   }
 

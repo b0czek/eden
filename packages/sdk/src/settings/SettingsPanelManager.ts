@@ -19,6 +19,7 @@ import { AppCatalog } from "../app-registry";
 import { ExecutionContext } from "../execution";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import type { DaemonManager } from "../daemon";
 import type { PackageManager } from "../package-manager";
 import { SessionContext, type SessionManager } from "../session";
 import {
@@ -49,7 +50,7 @@ import type {
 
 interface SettingsPanelNamespaceEvents {
   "panels-changed": {
-    reason: "catalog" | "grants" | "session" | "visibility";
+    reason: "catalog" | "grants" | "session" | "state" | "visibility";
   };
 }
 
@@ -122,6 +123,7 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
   connectLifecycle(
     sessionManager: SessionManager,
     packageManager: PackageManager,
+    daemonManager: DaemonManager,
   ): void {
     if (this.lifecycleConnected) return;
     this.lifecycleConnected = true;
@@ -143,6 +145,9 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
     packageManager.on("uninstalled", ({ appId }) => {
       this.removeManifestPanel(appId);
       this.notify("panels-changed", { reason: "catalog" });
+    });
+    daemonManager.on("changed", () => {
+      this.notify("panels-changed", { reason: "state" });
     });
   }
 

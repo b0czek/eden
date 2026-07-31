@@ -8,7 +8,7 @@ import { registerBuiltinSettingsPanels } from "./index";
 
 describe("SettingsPanelManager built-in providers", () => {
   it("delegates appearance, package, and daemon actions to domain managers", async () => {
-    const { manager, settings, catalog } = harness(
+    const { manager, settings, catalog, notify } = harness(
       user([
         "preset/appearance/manage",
         "preset/package/manage",
@@ -32,6 +32,7 @@ describe("SettingsPanelManager built-in providers", () => {
       uninstallApp: jest.fn(async () => true),
       on: jest.fn(),
     };
+    let daemonChanged: (() => void) | undefined;
     const daemons = {
       list: jest.fn(async () => []),
       updateDefinition: jest.fn(async () => undefined),
@@ -39,7 +40,10 @@ describe("SettingsPanelManager built-in providers", () => {
       start: jest.fn(async () => undefined),
       stop: jest.fn(async () => undefined),
       restart: jest.fn(async () => undefined),
-      on: jest.fn(),
+      on: jest.fn((event: string, listener: () => void) => {
+        if (event === "changed") daemonChanged = listener;
+        return jest.fn();
+      }),
     };
     const users = { listUsers: jest.fn(async () => []) };
 
@@ -53,6 +57,11 @@ describe("SettingsPanelManager built-in providers", () => {
       userManager: users as never,
       config: {},
     });
+    manager.connectLifecycle(
+      { on: jest.fn() } as never,
+      { on: jest.fn() } as never,
+      daemons as never,
+    );
 
     await manager.invokeAction("eden.appearance", "set-wallpaper", {
       wallpaper: { type: "preset", id: "midnight" },
@@ -79,5 +88,9 @@ describe("SettingsPanelManager built-in providers", () => {
     );
     expect(packages.toggleHotReload).toHaveBeenCalledWith("com.example");
     expect(daemons.start).toHaveBeenCalledWith("com.daemon");
+    daemonChanged?.();
+    expect(notify).toHaveBeenCalledWith("settings/panels-changed", {
+      reason: "state",
+    });
   });
 });
