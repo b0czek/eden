@@ -6,7 +6,7 @@ packages:
 catalog:
   '@solidjs/testing-library': ^0.8.10
   '@types/jest': ^30.0.0
-  '@types/node': ^26.1.2
+  '@types/node': ^24.13.3
   commander: ^14.0.3
   concurrently: ^10.0.4
   electron: ^43.2.0
