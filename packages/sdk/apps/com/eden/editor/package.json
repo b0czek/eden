@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@bithero/monaco-editor-vite-plugin": "^1.0.2",
+    "@bithero/monaco-editor-vite-plugin": "^1.0.3",
     "@edenapp/babel": "workspace:*",
     "@edenapp/types": "workspace:*",
     "solid-js": "catalog:",

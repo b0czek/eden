@@ -5,8 +5,8 @@
  * Used by both frontend (window.edenAPI) and backend (worker.edenAPI).
  */
 
-import type { CommandName, CommandArgs, CommandResult } from "../commands";
-import type { EventName, EventData } from "../events";
+import type { CommandArgs, CommandName, CommandResult } from "../commands";
+import type { EventData, EventName } from "../events";
 
 /**
  * Eden API - shell commands and event subscriptions

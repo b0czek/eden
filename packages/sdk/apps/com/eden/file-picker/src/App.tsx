@@ -399,7 +399,7 @@ const App: Component = () => {
 
   const appendDefaultExtension = (name: string) => {
     const option = selectedFilterOption();
-    if (!option || option.kind !== "filter") return name;
+    if (option?.kind !== "filter") return name;
     if (getExtension(name)) return name;
     const extension = option.filter.extensions?.[0];
     return extension ? `${name}.${normalizeExtension(extension)}` : name;

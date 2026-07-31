@@ -5,7 +5,7 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
-import type { Zstd } from "zstd-codec";
+import { type Zstd, ZstdCodec } from "zstd-codec";
 
 /**
  * Result of streaming compression
@@ -56,9 +56,6 @@ export class ZstdCodecCompressor implements Compressor {
 
   async initialize(): Promise<void> {
     if (this.zstd) return;
-
-    // Dynamic import to avoid loading until needed
-    const { ZstdCodec } = await import("zstd-codec");
 
     return new Promise((resolve) => {
       ZstdCodec.run((zstd) => {

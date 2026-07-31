@@ -167,7 +167,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     for (const viewId of toHide) {
       const viewInfo = this.views.get(viewId);
-      if (!viewInfo || !viewInfo.visible) continue;
+      if (!viewInfo?.visible) continue;
 
       viewInfo.visible = false;
       viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };

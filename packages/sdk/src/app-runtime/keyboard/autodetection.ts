@@ -144,7 +144,7 @@ export const createKeyboardAutodetection = ({
   };
 
   const getLiveEditableElement = (): EditableElement | null => {
-    if (!activeEditableElement || !activeEditableElement.isConnected) {
+    if (!activeEditableElement?.isConnected) {
       return null;
     }
 

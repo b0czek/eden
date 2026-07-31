@@ -76,8 +76,8 @@ button.eden-list-item.eden-list-item-active:hover {
 }
 
 button.eden-list-item:hover:not(.eden-list-item-active):not(
-    .eden-list-item-disabled
-  ) {
+  .eden-list-item-disabled
+) {
   background: var(--eden-color-surface-hover);
 }
 

@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
-    "@types/node": "^20.0.0",
+    "@types/node": "catalog:",
     "typescript": "catalog:"
   }
 }

@@ -127,7 +127,7 @@ function restoreOpenSubmenus(path: number[]): void {
     const item = getMenuItemAtPath(activeMenu.items, currentPath);
     const trigger = getTriggerEntry(root, currentPath);
 
-    if (!item || item.type !== "item" || !item.items?.length || !trigger) {
+    if (item?.type !== "item" || !item.items?.length || !trigger) {
       openSubmenuPath = currentPath.slice(0, depth);
       break;
     }

@@ -44,14 +44,13 @@
     "chalk": "^4.1.2",
     "cli-progress": "^3.12.0",
     "commander": "catalog:",
-    "tar": "^7.4.3",
+    "tar": "^7.5.22",
     "zstd-codec": "^0.1.5"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
-    "@types/tar": "^6.1.13",
     "jest": "catalog:",
     "ts-jest": "catalog:",
     "typescript": "catalog:"

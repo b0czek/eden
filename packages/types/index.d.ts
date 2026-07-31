@@ -1,21 +1,17 @@
+export * from "./AppAssociation";
+export * from "./AppManifest";
+export * from "./Branding";
 export * from "./EdenConfig";
 export * from "./EdenSeedConfig";
-export * from "./Branding";
-export * from "./User";
-
-export * from "./AppManifest";
-export * from "./AppAssociation";
-export * from "./SettingsPanel";
 export * from "./GrantCatalog";
-export * from "./Process";
-export * from "./ProcessMetrics";
-
 export * from "./global";
-
-export * from "./worker";
-
 export * from "./ipc";
 export * from "./keyboard";
+export * from "./Process";
+export * from "./ProcessMetrics";
+export * from "./SettingsPanel";
+export * from "./User";
+export * from "./worker";
 
 /**
  * IPC Message Interface
@@ -56,19 +52,17 @@ export type RecursiveObject<T> = {
   [key: string]: T | RecursiveObject<T>;
 };
 
-// Export new command types
-export type {
-  CommandName,
-  CommandArgs,
-  CommandResult,
-  CommandMap,
-} from "./commands";
-
-// Export event types
-export * from "./events";
-
 // Export channel/appbus types
 export * from "./channels";
+// Export new command types
+export type {
+  CommandArgs,
+  CommandMap,
+  CommandName,
+  CommandResult,
+} from "./commands";
+// Export event types
+export * from "./events";
 
 export interface SystemInfo {
   platform: string;

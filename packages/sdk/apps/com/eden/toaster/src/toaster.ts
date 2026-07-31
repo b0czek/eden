@@ -275,7 +275,7 @@ function pauseToast(id: string): void {
  */
 function resumeToast(id: string): void {
   const toast = visibleToasts.get(id);
-  if (!toast || !toast.isHoverPaused) return;
+  if (!toast?.isHoverPaused) return;
 
   toast.isHoverPaused = false;
 

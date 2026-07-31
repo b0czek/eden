@@ -150,7 +150,7 @@ export const createDialogs = (): DialogController => {
 
   const submit: DialogRuntimeController["submit"] = async (...args) => {
     const current = active();
-    if (!current || !current.canSubmit()) return;
+    if (!current?.canSubmit()) return;
 
     const hasExplicitResult = args.length > 0;
     const result = args[0];

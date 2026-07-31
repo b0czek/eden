@@ -11,16 +11,16 @@
   },
   "dependencies": {
     "solid-icons": "catalog:",
-    "solid-js": "^1.9.3"
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@edenapp/babel": "workspace:*",
     "@edenapp/types": "workspace:*",
     "@solidjs/testing-library": "catalog:",
     "jsdom": "catalog:",
-    "typescript": "~5.6.2",
-    "vite": "^6.0.3",
-    "vite-plugin-solid": "^2.11.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:",
     "vitest": "catalog:"
   }
 }

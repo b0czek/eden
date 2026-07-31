@@ -59,14 +59,14 @@
 <body>
   <div class="browser-container">
     <div class="address-bar">
-      <button class="nav-btn" id="back" title="Back">←</button>
-      <button class="nav-btn" id="forward" title="Forward">→</button>
-      <button class="nav-btn" id="reload" title="Reload">⟳</button>
+      <button type="button" class="nav-btn" id="back" title="Back">←</button>
+      <button type="button" class="nav-btn" id="forward" title="Forward">→</button>
+      <button type="button" class="nav-btn" id="reload" title="Reload">⟳</button>
       <input type="text" class="eden-input eden-input-sm address-input" id="url" placeholder="Enter URL..."
         value="https://www.google.com">
-      <button class="nav-btn" id="go" title="Go">↵</button>
+      <button type="button" class="nav-btn" id="go" title="Go">↵</button>
     </div>
-    <iframe class="browser-frame" id="frame" src="https://www.google.com"
+    <iframe class="browser-frame" id="frame" title="Web content" src="https://www.google.com"
       allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; payment; picture-in-picture"
       allowfullscreen></iframe>
   </div>

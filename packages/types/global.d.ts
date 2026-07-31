@@ -1,8 +1,8 @@
 // Ambient declarations for renderer globals
 
 import type { AppFrameInjectionMode, CSSInjectionMode } from "./AppManifest";
+import type { AppBusAPI, AppBusConnection, EdenAPI } from "./ipc";
 import type { EdenKeyboardAPI } from "./keyboard";
-import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
 
 export interface EdenFrame {
   // Public API

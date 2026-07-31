@@ -120,8 +120,8 @@ button.eden-sidebar-item.eden-sidebar-item-selected:hover {
 }
 
 button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
-    .eden-sidebar-item-disabled
-  ) {
+  .eden-sidebar-item-disabled
+) {
   background: var(--eden-color-bg-glass-medium);
   color: var(--eden-color-text-primary);
 }

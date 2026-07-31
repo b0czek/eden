@@ -5,7 +5,7 @@
  * This mirrors the frontend's `window.edenAPI` and `window.appBus` pattern.
  */
 
-import type { EdenAPI, AppBusAPI, AppBusConnection } from "./ipc";
+import type { AppBusAPI, AppBusConnection, EdenAPI } from "./ipc";
 
 /**
  * Worker global - backend runtime namespace

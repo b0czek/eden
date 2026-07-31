@@ -214,7 +214,7 @@ export class EventSubscriberManager {
     payload: EventData<T>,
   ): boolean {
     const subscriptions = this.subscriptions.get(eventName);
-    if (!subscriptions || !subscriptions.has(viewId)) {
+    if (!subscriptions?.has(viewId)) {
       return false;
     }
 
