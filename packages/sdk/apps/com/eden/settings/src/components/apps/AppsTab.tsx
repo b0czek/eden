@@ -1,7 +1,7 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
 import { FiChevronRight, FiCpu, FiPackage } from "solid-icons/fi";
 import type { Accessor, Component } from "solid-js";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../../i18n";
 import type { LoadedPanel, PanelAction } from "../../types";
 import AppDetail from "./AppDetail";
@@ -10,7 +10,6 @@ import "./AppsTab.css";
 interface AppPanelItem {
   manifest: RuntimeAppManifest;
   icon?: string;
-  size?: number;
   hotReload: boolean;
   autostart: boolean;
 }
@@ -26,6 +25,13 @@ const AppsTab: Component<{
   onAction: PanelAction;
 }> = (props) => {
   const [selectedAppId, setSelectedAppId] = createSignal<string | null>(null);
+  const [appSizes, setAppSizes] = createSignal<
+    Record<string, number | undefined>
+  >({});
+  const [sizeLoading, setSizeLoading] = createSignal<Record<string, boolean>>(
+    {},
+  );
+  const loadedSizes = new Set<string>();
   const data = () => props.panel.state.data as unknown as AppsPanelData;
   const sortedApps = createMemo(() =>
     [...(data()?.apps ?? [])].sort((a, b) =>
@@ -43,6 +49,23 @@ const AppsTab: Component<{
       appId,
       ...extra,
     } as import("@edenapp/types").SettingsPanelValue);
+  const loadAppSize = async (appId: string) => {
+    if (loadedSizes.has(appId) || sizeLoading()[appId]) return;
+    setSizeLoading((current) => ({ ...current, [appId]: true }));
+    try {
+      const result = await window.edenAPI.shellCommand("package/get-size", {
+        appId,
+      });
+      setAppSizes((current) => ({ ...current, [appId]: result.size }));
+    } finally {
+      loadedSizes.add(appId);
+      setSizeLoading((current) => ({ ...current, [appId]: false }));
+    }
+  };
+  createEffect(() => {
+    const appId = selectedAppId();
+    if (appId) void loadAppSize(appId);
+  });
 
   return (
     <div class="apps-management eden-flex-col">
@@ -107,8 +130,8 @@ const AppsTab: Component<{
             autostart={item().autostart}
             hotReload={item().hotReload}
             devMode={data().development}
-            sizeLoading={false}
-            size={item().size}
+            sizeLoading={sizeLoading()[item().manifest.id] ?? false}
+            size={appSizes()[item().manifest.id]}
             uninstalling={props.busyActions().has("uninstall")}
             onBack={() => setSelectedAppId(null)}
             onAutostartToggle={(enabled) =>

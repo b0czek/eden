@@ -24,7 +24,7 @@
     previous component subscribed to daemon/changed, while the new Settings app reloads only after its own actions or settings/panels-changed; forward the existing daemon emitter notification into panel
     refresh using the repository's emitter mechanism (AGENTS.md:16).~~
 
-  - [P2] Defer app-size scans until an app is selected — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/apps.ts:40-44
+  - ~~[P2] Defer app-size scans until an app is selected — /home/dariusz/Desktop/eden/packages/sdk/src/settings/panels/apps.ts:40-44
     When the Apps panel contains many or large installed packages, opening it now recursively scans every app directory via getSize() and waits for all scans before returning any panel data. The list
     does not display sizes, and the previous implementation loaded a size only after selecting an app, so this can introduce substantial startup I/O and delay the entire panel; restore lazy size loading
-    or fetch it separately for the selected app.
+    or fetch it separately for the selected app.~~

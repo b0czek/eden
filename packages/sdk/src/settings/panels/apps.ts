@@ -35,9 +35,8 @@ const loadAppsPanelData = async ({
   const apps = await Promise.all(
     manifests.map(async (manifest) => {
       const autostartKey = `autostart.${manifest.id}`;
-      const [icon, size, hotReload, autostart] = await Promise.all([
+      const [icon, hotReload, autostart] = await Promise.all([
         appCatalog.getIcon(manifest.id),
-        appCatalog.getSize(manifest.id),
         packageManager.isHotReloadEnabled(manifest.id).catch(() => false),
         autostartKeys.has(autostartKey)
           ? settings
@@ -45,7 +44,7 @@ const loadAppsPanelData = async ({
               .then((value) => value === "true")
           : false,
       ]);
-      return { manifest, icon, size, hotReload, autostart };
+      return { manifest, icon, hotReload, autostart };
     }),
   );
   return cloneRendererValue({
