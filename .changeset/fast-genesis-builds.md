@@ -5,4 +5,5 @@
 ---
 
 Build apps concurrently through Genesis while allowing apps with internally
-parallel builds to opt out using `build.concurrent: false`.
+parallel builds to opt out using `build.concurrent: false`. Show compact,
+in-place build progress in interactive terminals.

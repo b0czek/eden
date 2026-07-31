@@ -38,6 +38,63 @@ interface BuildTask<T> {
   run: () => Promise<T>;
 }
 
+type BuildStatus = "succeeded" | "skipped" | "failed";
+
+interface BuildOutcome {
+  status: BuildStatus;
+  error?: string;
+}
+
+class BuildProgress {
+  private completed = 0;
+  private readonly interactive = process.stdout.isTTY === true;
+
+  constructor(private readonly total: number) {
+    if (this.interactive) {
+      this.render("Starting…");
+    }
+  }
+
+  update(appId: string, outcome: BuildOutcome): void {
+    this.completed++;
+    const icon =
+      outcome.status === "succeeded"
+        ? "✅"
+        : outcome.status === "skipped"
+          ? "⏭️ "
+          : "❌";
+    const detail = `${icon} ${appId}`;
+
+    if (this.interactive) {
+      this.render(detail);
+    } else {
+      console.log(`[${this.completed}/${this.total}] ${detail}`);
+    }
+
+    if (outcome.error) {
+      if (this.interactive) {
+        process.stdout.write("\r\u001b[2K");
+      }
+      console.error(`   ${outcome.error}`);
+      if (this.interactive) {
+        this.render(detail);
+      }
+    }
+  }
+
+  finish(): void {
+    if (this.interactive) {
+      process.stdout.write("\n");
+    }
+  }
+
+  private render(detail: string): void {
+    process.stdout.write(
+      `\r\u001b[2K📦 Building apps ${this.completed}/${this.total} · ${detail}`,
+    );
+  }
+}
+
 /** Run ordinary builds together while treating non-concurrent builds as barriers. */
 async function runBuildTasks<T>(tasks: BuildTask<T>[]): Promise<T[]> {
   const results = new Array<T>(tasks.length);
@@ -249,21 +306,7 @@ async function buildApp(
   appDir: string,
   targetDir: string,
   cache: BuildCache,
-  force: boolean,
-): Promise<boolean> {
-  console.log(`\n📦 Building ${appSource.id}...`);
-  console.log(
-    `   Source: ${appSource.source}${
-      appSource.source === "local" ? ` (${appSource.path})` : ""
-    }`,
-  );
-
-  // Check if rebuild is needed
-  if (!force && !(await needsRebuild(appSource.id, appDir, targetDir, cache))) {
-    console.log(`  ⏭️  Skipping - no changes since last build`);
-    return true;
-  }
-
+): Promise<BuildOutcome> {
   // For builtin apps, just copy the prebuilt files (they're already built in the SDK)
   if (appSource.source === "builtin") {
     try {
@@ -283,17 +326,9 @@ async function buildApp(
         sourceHash: "",
       };
 
-      // Read manifest for logging
-      const manifestPath = path.join(targetDir, "manifest.json");
-      const manifestContent = await fs.readFile(manifestPath, "utf-8");
-      const manifest = JSON.parse(manifestContent);
-
-      console.log(`✅ Copied prebuilt ${manifest.name} (${appSource.id})`);
-      return true;
+      return { status: "succeeded" };
     } catch (error: unknown) {
-      console.error(`❌ Failed to copy ${appSource.id}:`);
-      console.error(`   ${getErrorMessage(error)}`);
-      return false;
+      return { status: "failed", error: getErrorMessage(error) };
     }
   }
 
@@ -305,9 +340,7 @@ async function buildApp(
   });
 
   if (!result.success) {
-    console.error(`❌ Failed to build ${appSource.id}:`);
-    console.error(`   ${result.error}`);
-    return false;
+    return { status: "failed", error: result.error };
   }
 
   // Update cache
@@ -316,10 +349,7 @@ async function buildApp(
     sourceHash: "",
   };
 
-  console.log(
-    `✅ Successfully built ${result.manifest?.name} (${appSource.id})`,
-  );
-  return true;
+  return { status: "succeeded" };
 }
 
 export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
@@ -336,16 +366,7 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
     return;
   }
 
-  console.log(`Found ${config.apps.length} app(s) to build:`);
-  config.apps.forEach((app) => {
-    const sourceInfo =
-      app.source === "local"
-        ? ` (${app.path})`
-        : app.source === "npm"
-          ? ` (${app.package})`
-          : "";
-    console.log(`  - ${app.id} [${app.source}]${sourceInfo}`);
-  });
+  console.log(`Found ${config.apps.length} app(s) to build.`);
 
   // Resolve SDK apps path for builtin apps
   const sdkAppsPath = await resolveSdkAppsPath(options.sdkPath);
@@ -377,6 +398,7 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
       return { appSource, appDir, concurrent };
     }),
   );
+  const progress = new BuildProgress(appPlans.length);
 
   // Apps build in parallel by default. An app with build.concurrent set to
   // false acts as a barrier and builds alone.
@@ -385,7 +407,9 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
       concurrent,
       run: async () => {
         if (!appDir) {
-          return "failed" as const;
+          const outcome: BuildOutcome = { status: "failed" };
+          progress.update(appSource.id, outcome);
+          return outcome.status;
         }
 
         const targetDir = path.join(prebuiltDir, appSource.id);
@@ -395,22 +419,18 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
           !force &&
           !(await needsRebuild(appSource.id, appDir, targetDir, cache))
         ) {
-          console.log(`\n📦 ${appSource.id}`);
-          console.log(`  ⏭️  Skipping - no changes since last build`);
-          return "skipped" as const;
+          const outcome: BuildOutcome = { status: "skipped" };
+          progress.update(appSource.id, outcome);
+          return outcome.status;
         }
 
-        const success = await buildApp(
-          appSource,
-          appDir,
-          targetDir,
-          cache,
-          force,
-        );
-        return success ? ("succeeded" as const) : ("failed" as const);
+        const outcome = await buildApp(appSource, appDir, targetDir, cache);
+        progress.update(appSource.id, outcome);
+        return outcome.status;
       },
     })),
   );
+  progress.finish();
 
   const successCount = results.filter((result) => result !== "failed").length;
   const failCount = results.filter((result) => result === "failed").length;
@@ -504,10 +524,7 @@ export async function buildSdkApps(
     })),
   );
 
-  console.log(`Found ${apps.length} apps to build:`);
-  for (const { manifest } of apps) {
-    console.log(`  - ${manifest.id}`);
-  }
+  console.log(`Found ${apps.length} apps to build.`);
 
   // Clear and create output directory
   try {
@@ -516,6 +533,7 @@ export async function buildSdkApps(
     // Directory doesn't exist
   }
   await fs.mkdir(outputDir, { recursive: true });
+  const progress = new BuildProgress(apps.length);
 
   // Build apps through Genesis in parallel unless an app declares that its
   // own build is parallel and should run alone.
@@ -525,24 +543,21 @@ export async function buildSdkApps(
       run: async () => {
         const targetDir = path.join(outputDir, manifest.id);
 
-        console.log(`\n📦 Building ${manifest.id}...`);
-
         const result = await genesisBundler.bundle({
           appDirectory: appPath,
           extractToDirectory: targetDir,
           verbose: false,
         });
 
-        if (result.success) {
-          console.log(`   ✅ Built successfully`);
-          return true;
-        } else {
-          console.log(`   ❌ Build failed: ${result.error}`);
-          return false;
-        }
+        const outcome: BuildOutcome = result.success
+          ? { status: "succeeded" }
+          : { status: "failed", error: result.error };
+        progress.update(manifest.id, outcome);
+        return result.success;
       },
     })),
   );
+  progress.finish();
 
   const successCount = results.filter(Boolean).length;
   const failCount = results.length - successCount;
