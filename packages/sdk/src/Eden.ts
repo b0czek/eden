@@ -1,7 +1,6 @@
 import "reflect-metadata";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
-import { app } from "electron";
 import type {
   EdenAppearanceApi,
   EdenAppsApi,
@@ -12,6 +11,7 @@ import type {
   EdenSettingsApi,
   EdenUsersApi,
 } from "./api";
+import { createElectronPlatform } from "./platform/electron";
 import { EdenRuntime } from "./runtime/EdenRuntime";
 
 /** Public Electron host for one isolated Eden runtime. */
@@ -20,24 +20,29 @@ export class Eden {
   public readonly settings: EdenSettingsApi;
 
   constructor(config: EdenConfig = {}) {
-    app.commandLine.appendSwitch("enable-features", "V8CodeCache");
+    const platform = createElectronPlatform();
+    const application = platform.application;
+    application.appendCommandLineSwitch("enable-features", "V8CodeCache");
 
     const appsDirectory =
-      config.appsDirectory ?? path.join(app.getPath("userData"), "eden-apps");
+      config.appsDirectory ??
+      path.join(application.getPath("userData"), "eden-apps");
     const userDirectory =
-      config.userDirectory ?? path.join(app.getPath("userData"), "eden-user");
+      config.userDirectory ??
+      path.join(application.getPath("userData"), "eden-user");
 
     this.runtime = new EdenRuntime({
       config,
+      platform,
       paths: {
         appsDirectory,
         userDirectory,
         distPath: path.join(process.cwd(), "dist"),
-        appPath: app.getAppPath(),
+        appPath: application.getAppPath(),
       },
     });
     this.settings = this.runtime.settings;
-    this.setupAppEventHandlers();
+    this.setupAppEventHandlers(application);
   }
 
   public whenReady(): Promise<void> {
@@ -72,13 +77,15 @@ export class Eden {
     return this.runtime.associations;
   }
 
-  private setupAppEventHandlers(): void {
-    void app
+  private setupAppEventHandlers(
+    application: ReturnType<typeof createElectronPlatform>["application"],
+  ): void {
+    void application
       .whenReady()
       .then(() => this.runtime.start())
       .catch(() => undefined);
-    app.on("window-all-closed", () => app.quit());
-    app.on("activate", () => this.runtime.activate());
-    app.on("before-quit", () => this.runtime.dispose());
+    application.onWindowAllClosed(() => application.quit());
+    application.onActivate(() => this.runtime.activate());
+    application.onBeforeQuit(() => this.runtime.dispose());
   }
 }

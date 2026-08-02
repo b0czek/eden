@@ -1,14 +1,15 @@
 import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import type { AppManifest } from "@edenapp/types";
-import {
-  MessageChannelMain,
-  type UtilityProcess,
-  utilityProcess,
-} from "electron";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 
 import { log } from "../logging";
+import {
+  PLATFORM_UTILITY_PROCESSES,
+  type PlatformMessagePort,
+  type PlatformUtilityProcess,
+  type UtilityProcessPort,
+} from "../platform/ports";
 /**
  * BackendManager
  *
@@ -20,7 +21,7 @@ import { log } from "../logging";
 @scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class BackendManager extends EventEmitter {
-  private backends: Map<string, UtilityProcess> = new Map();
+  private backends: Map<string, PlatformUtilityProcess> = new Map();
   private backendData: Map<
     string,
     { manifest: AppManifest; installPath: string }
@@ -31,9 +32,13 @@ export class BackendManager extends EventEmitter {
    * MessagePort pairs for frontend<->backend communication
    * The BackendManager holds references to the main-process side of ports
    */
-  private backendPorts: Map<string, Electron.MessagePortMain> = new Map();
+  private backendPorts: Map<string, PlatformMessagePort> = new Map();
 
-  constructor(@inject("distPath") distPath: string) {
+  constructor(
+    @inject("distPath") distPath: string,
+    @inject(PLATFORM_UTILITY_PROCESSES)
+    private utilityProcesses: UtilityProcessPort,
+  ) {
     super();
     this.distPath = distPath;
   }
@@ -55,7 +60,7 @@ export class BackendManager extends EventEmitter {
     manifest: AppManifest,
     installPath: string,
     launchArgs?: string[],
-  ): Promise<{ backend: UtilityProcess }> {
+  ): Promise<{ backend: PlatformUtilityProcess }> {
     // Check if backend already exists
     if (this.backends.has(appId)) {
       throw new Error(`Backend for app ${appId} already exists`);
@@ -76,7 +81,7 @@ export class BackendManager extends EventEmitter {
     );
 
     // Create utility process with the runtime as entry point
-    const backend = utilityProcess.fork(
+    const backend = this.utilityProcesses.fork(
       runtimePath,
       [`--launch-args=${JSON.stringify(launchArgs || [])}`],
       {
@@ -99,7 +104,7 @@ export class BackendManager extends EventEmitter {
 
     if (hasFrontend) {
       // Create MessageChannel for frontend<->backend communication
-      const { port1, port2 } = new MessageChannelMain();
+      const { port1, port2 } = this.utilityProcesses.createMessageChannel();
 
       // port1 goes to the backend (utility process)
       // port2 goes to the frontend (will be transferred via IPCBridge)
@@ -206,7 +211,7 @@ export class BackendManager extends EventEmitter {
   sendPortToBackend(
     appId: string,
     message: unknown,
-    ports: Electron.MessagePortMain[],
+    ports: PlatformMessagePort[],
   ): boolean {
     const backend = this.backends.get(appId);
     if (!backend) {
@@ -233,7 +238,7 @@ export class BackendManager extends EventEmitter {
   /**
    * Get the frontend port for an app (to transfer to renderer)
    */
-  getFrontendPort(appId: string): Electron.MessagePortMain | undefined {
+  getFrontendPort(appId: string): PlatformMessagePort | undefined {
     return this.backendPorts.get(appId);
   }
 
@@ -300,7 +305,7 @@ export class BackendManager extends EventEmitter {
   /**
    * Get backend by app ID
    */
-  getBackend(appId: string): UtilityProcess | undefined {
+  getBackend(appId: string): PlatformUtilityProcess | undefined {
     return this.backends.get(appId);
   }
 
@@ -329,7 +334,7 @@ export class BackendManager extends EventEmitter {
     });
   }
 
-  private pipeBackendOutput(backend: UtilityProcess): void {
+  private pipeBackendOutput(backend: PlatformUtilityProcess): void {
     backend.stdout?.on("data", (chunk: Buffer | string) => {
       process.stdout.write(chunk);
     });

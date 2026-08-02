@@ -1,5 +1,5 @@
 import type { AppManifest } from "@edenapp/types";
-import type { Rectangle as Bounds, WebContentsView } from "electron";
+import type { Bounds, PlatformView } from "../platform/ports";
 
 export type ViewMode = "floating" | "tiled";
 export type ViewType = "app" | "overlay";
@@ -14,7 +14,7 @@ export const Z_LAYERS = {
 
 export interface ViewInfo {
   id: number;
-  view: WebContentsView;
+  view: PlatformView;
   appId: string;
   manifest: AppManifest;
   bounds: Bounds;

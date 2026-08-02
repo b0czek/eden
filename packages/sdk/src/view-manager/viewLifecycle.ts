@@ -1,17 +1,21 @@
-import { type BrowserWindow, WebContentsView } from "electron";
 import { log } from "../logging";
+import type {
+  PlatformView,
+  PlatformWindow,
+  WindowingPort,
+} from "../platform/ports";
 import type { ViewCreationOptions, ViewInfo } from "./types";
 /**
  * Check if a WebContentsView exists and is valid.
  */
-export function isValidView(view?: WebContentsView): view is WebContentsView {
+export function isValidView(view?: PlatformView): view is PlatformView {
   return view !== undefined && view !== null;
 }
 
 /**
  * Check if a WebContentsView's webContents is still alive (not destroyed).
  */
-export function isViewAlive(view?: WebContentsView): boolean {
+export function isViewAlive(view?: PlatformView): boolean {
   if (!isValidView(view)) return false;
   try {
     return !view.webContents.isDestroyed();
@@ -24,8 +28,8 @@ export function isViewAlive(view?: WebContentsView): boolean {
  * Check if a BrowserWindow exists and is not destroyed.
  */
 export function isWindowAlive(
-  window?: BrowserWindow | null,
-): window is BrowserWindow {
+  window?: PlatformWindow | null,
+): window is PlatformWindow {
   return window !== undefined && window !== null && !window.isDestroyed();
 }
 
@@ -73,7 +77,10 @@ export function requireViewByAppId(
 /**
  * Create a new WebContentsView with standard options.
  */
-export function createView(options: ViewCreationOptions): WebContentsView {
+export function createView(
+  options: ViewCreationOptions,
+  windows: WindowingPort,
+): PlatformView {
   const {
     preloadScript,
     transparent = true,
@@ -81,7 +88,7 @@ export function createView(options: ViewCreationOptions): WebContentsView {
     additionalArguments = [],
   } = options;
 
-  return new WebContentsView({
+  return windows.createView({
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -101,7 +108,7 @@ export function createView(options: ViewCreationOptions): WebContentsView {
  */
 export function destroyView(
   viewInfo: ViewInfo,
-  mainWindow: BrowserWindow | null,
+  mainWindow: PlatformWindow | null,
 ): void {
   try {
     // Check if view is already destroyed

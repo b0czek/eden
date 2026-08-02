@@ -374,9 +374,11 @@ describe("Eden host characterization", () => {
     harness.appListeners.get("window-all-closed")?.();
     expect(harness.app.quit).toHaveBeenCalledTimes(1);
 
-    const shutdown = harness.appListeners.get("before-quit")?.();
+    harness.appListeners.get("before-quit")?.({
+      preventDefault: jest.fn(),
+    });
     expect(eden.state).toBe("stopping");
-    await shutdown;
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(eden.state).toBe("stopped");
     expect(harness.order.slice(-4)).toEqual([

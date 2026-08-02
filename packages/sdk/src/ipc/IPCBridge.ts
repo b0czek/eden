@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { type BrowserWindow, ipcMain } from "electron";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
+import {
+  PLATFORM_RENDERER_IPC,
+  type PlatformWindow,
+  type RendererIpcPort,
+} from "../platform/ports";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { CommandRegistry } from "./CommandRegistry";
@@ -23,7 +27,7 @@ import { PermissionRegistry } from "./PermissionRegistry";
 export class IPCBridge extends EventEmitter {
   public eventSubscribers: EventSubscriberManager;
   private eventHandler: EventHandler;
-  private mainWindow: BrowserWindow | null = null;
+  private mainWindow: PlatformWindow | null = null;
   private runningAppIds: Set<string> = new Set();
   private pendingCommands: Map<
     string,
@@ -45,6 +49,7 @@ export class IPCBridge extends EventEmitter {
     @inject(delay(() => ViewManager)) private viewManager: ViewManager,
     @inject(delay(() => RuntimeContextRegistry))
     private runtimeContexts: RuntimeContextRegistry,
+    @inject(PLATFORM_RENDERER_IPC) private rendererIpc: RendererIpcPort,
   ) {
     super();
 
@@ -64,14 +69,14 @@ export class IPCBridge extends EventEmitter {
   /**
    * Set the main window for shell communication
    */
-  setMainWindow(window: BrowserWindow): void {
+  setMainWindow(window: PlatformWindow): void {
     this.mainWindow = window;
   }
 
   /**
    * Get the main window instance
    */
-  getMainWindow(): BrowserWindow | null {
+  getMainWindow(): PlatformWindow | null {
     return this.mainWindow;
   }
 
@@ -80,7 +85,7 @@ export class IPCBridge extends EventEmitter {
    */
   private setupIPCHandlers(): void {
     // Handle shell commands
-    ipcMain.handle(
+    this.rendererIpc.handle<[string, unknown], unknown>(
       "shell-command",
       async (event, command: string, args: unknown) => {
         // Build caller context for commands that need it
@@ -232,7 +237,7 @@ export class IPCBridge extends EventEmitter {
    */
   destroy(): void {
     // Remove global IPC handlers
-    ipcMain.removeHandler("shell-command");
+    this.rendererIpc.removeHandler("shell-command");
     if (this.backendMessageListener) {
       this.backendManager.removeListener(
         "backend-message",

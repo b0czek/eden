@@ -4,15 +4,18 @@ import type {
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
-import type {
-  Rectangle as Bounds,
-  BrowserWindow,
-  WebContentsView,
-} from "electron";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
-import { attachWebContentsLogger } from "../logging/electron";
+import {
+  type Bounds,
+  type DisplayPort,
+  PLATFORM_DISPLAY,
+  PLATFORM_WINDOWS,
+  type PlatformView,
+  type PlatformWindow,
+  type WindowingPort,
+} from "../platform/ports";
 import { SettingsManager } from "../settings/SettingsManager";
 import { DevToolsController } from "./DevToolsController";
 import { FloatingWindowController } from "./FloatingWindowController";
@@ -60,7 +63,7 @@ interface ViewManagerEvents {
 @EdenNamespace("view")
 export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   private views: Map<number, ViewInfo> = new Map();
-  private mainWindow: BrowserWindow | null = null;
+  private mainWindow: PlatformWindow | null = null;
 
   // Specialized modules
   private readonly tilingController: TilingController;
@@ -79,6 +82,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     @inject("EdenConfig") config: EdenConfig,
     @inject("distPath") distPath: string,
     @inject(delay(() => SettingsManager)) settingsManager: SettingsManager,
+    @inject(PLATFORM_WINDOWS) private windows: WindowingPort,
+    @inject(PLATFORM_DISPLAY) display: DisplayPort,
   ) {
     super(ipcBridge);
 
@@ -105,10 +110,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       distPath,
       this.tilingController,
       this.floatingWindows,
+      this.windows,
     );
 
     // Create and register handler
-    this.viewHandler = new ViewHandler(this);
+    this.viewHandler = new ViewHandler(this, display);
     commandRegistry.registerManager(this.viewHandler);
   }
 
@@ -127,7 +133,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   /**
    * Set the main window that will host the views
    */
-  setMainWindow(window: BrowserWindow): void {
+  setMainWindow(window: PlatformWindow): void {
     this.mainWindow = window;
   }
 
@@ -225,7 +231,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     const viewId = viewInfo.id;
 
-    attachWebContentsLogger(viewInfo.view.webContents, {
+    this.windows.attachWebContentsLogger(viewInfo.view.webContents, {
       appId,
       viewId,
       source: viewInfo.viewType === "overlay" ? "overlay" : "app",
@@ -381,7 +387,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
   /**
    * Get view by ID
    */
-  getView(viewId: number): WebContentsView | undefined {
+  getView(viewId: number): PlatformView | undefined {
     return this.views.get(viewId)?.view;
   }
 

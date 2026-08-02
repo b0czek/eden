@@ -23,6 +23,10 @@ import {
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
+import {
+  PLATFORM_PROCESS_METRICS,
+  type ProcessMetricsPort,
+} from "../platform/ports";
 import { SessionContext } from "../session/SessionContext";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
@@ -70,6 +74,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(RuntimeContextRegistry)
     private runtimeContexts: RuntimeContextRegistry,
+    @inject(PLATFORM_PROCESS_METRICS) processMetrics: ProcessMetricsPort,
   ) {
     super(ipcBridge);
     this.loginAppId = this.config.loginAppId;
@@ -77,6 +82,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       backendManager: this.backendManager,
       viewManager: this.viewManager,
       getRunningApps: (showHidden) => this.getRunningApps(showHidden),
+      processMetrics,
     });
 
     this.setupEventHandlers();

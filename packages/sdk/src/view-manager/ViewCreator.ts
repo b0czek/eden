@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import type { AppManifest, WindowConfig } from "@edenapp/types";
-import type { Rectangle as Bounds, WebContentsView } from "electron";
 import { log } from "../logging";
+import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
 import { CachedFileReader } from "../utils/cachedFileReader";
 import type { FloatingWindowController } from "./FloatingWindowController";
 import type { TilingController } from "./TilingController";
@@ -22,6 +22,7 @@ export class ViewCreator {
     private readonly basePath: string,
     private readonly tilingController: TilingController,
     private readonly floatingWindows: FloatingWindowController,
+    private readonly windows: WindowingPort,
   ) {}
 
   /**
@@ -55,8 +56,10 @@ export class ViewCreator {
    * Callback that strips X-Frame-Options and CSP headers from responses.
    */
   private static embeddingHeadersFilter(
-    details: Electron.OnHeadersReceivedListenerDetails,
-    callback: (response: Electron.HeadersReceivedResponse) => void,
+    details: { responseHeaders?: Record<string, string[]> },
+    callback: (response: {
+      responseHeaders?: Record<string, string[]>;
+    }) => void,
   ): void {
     const responseHeaders = { ...details.responseHeaders };
     for (const key of Object.keys(responseHeaders)) {
@@ -78,7 +81,7 @@ export class ViewCreator {
    * @param mode - "full" for complete CSS or "tokens" for only CSS custom properties
    */
   async injectEdenCSS(
-    view: WebContentsView,
+    view: PlatformView,
     mode: "full" | "tokens",
   ): Promise<boolean> {
     if (view.webContents.isDestroyed()) {
@@ -107,7 +110,7 @@ export class ViewCreator {
    * Adds a title bar with close button to each app
    */
   async injectAppFrame(
-    view: WebContentsView,
+    view: PlatformView,
     appId: string,
     manifestName: string | Record<string, string>,
     viewMode: ViewMode,
@@ -282,13 +285,16 @@ export class ViewCreator {
       "app-runtime/app-preload.js",
     );
 
-    const view = createView({
-      preloadScript,
-      additionalArguments: [
-        `--app-id=${appId}`,
-        `--launch-args=${JSON.stringify(launchArgs || [])}`,
-      ],
-    });
+    const view = createView(
+      {
+        preloadScript,
+        additionalArguments: [
+          `--app-id=${appId}`,
+          `--launch-args=${JSON.stringify(launchArgs || [])}`,
+        ],
+      },
+      this.windows,
+    );
 
     log.info(
       `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,

@@ -3,13 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import {
-  type BrowserWindow,
-  BrowserWindow as ElectronBrowserWindow,
-} from "electron";
-import {
-  container as rootContainer,
   type DependencyContainer,
   type InjectionToken,
+  container as rootContainer,
 } from "tsyringe";
 import type {
   EdenAppearanceApi,
@@ -42,15 +38,27 @@ import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
 import { log } from "../logging";
-import { attachWebContentsLogger } from "../logging/electron";
 import { NotificationManager } from "../notification";
 import { PackageManager } from "../package-manager";
+import {
+  type EdenPlatform,
+  PLATFORM_APP_CHANNELS,
+  PLATFORM_DISPLAY,
+  PLATFORM_PROCESS_METRICS,
+  PLATFORM_RENDERER_IPC,
+  PLATFORM_SHORTCUTS,
+  PLATFORM_THEME,
+  PLATFORM_UTILITY_PROCESSES,
+  PLATFORM_WINDOWS,
+  type PlatformWindow,
+} from "../platform/ports";
 import { PowerHandler } from "../power";
 import {
   AutostartManager,
   BackendManager,
   ProcessManager,
 } from "../process-manager";
+import { SystemHandler } from "../SystemHandler";
 import { seedDatabase } from "../seed";
 import { SessionManager } from "../session";
 import {
@@ -58,7 +66,6 @@ import {
   SettingsManager,
   SettingsPanelManager,
 } from "../settings";
-import { SystemHandler } from "../SystemHandler";
 import { GrantCatalogManager, UserManager } from "../user";
 import { UserHandler } from "../user/UserHandler";
 import { ViewManager } from "../view-manager";
@@ -73,6 +80,7 @@ export interface EdenRuntimePaths {
 export interface EdenRuntimeOptions {
   config?: EdenConfig;
   paths: EdenRuntimePaths;
+  platform: EdenPlatform;
   parentContainer?: DependencyContainer;
 }
 
@@ -91,7 +99,8 @@ export class EdenRuntime {
   private readonly ownedServiceSet = new Set<object>();
   private readonly config: EdenConfig;
   private readonly paths: EdenRuntimePaths;
-  private mainWindow: BrowserWindow | null = null;
+  private mainWindow: PlatformWindow | null = null;
+  private readonly platform: EdenPlatform;
   private viewManager!: ViewManager;
   private readonly ipcBridge: IPCBridge;
   private readonly brandingManager: BrandingManager;
@@ -133,6 +142,7 @@ export class EdenRuntime {
       loginAppId: options.config?.loginAppId ?? "com.eden.login",
     };
     this.paths = { ...options.paths };
+    this.platform = options.platform;
     this.ensureDirectory(this.paths.appsDirectory, "appsDirectory");
     this.ensureDirectory(this.paths.userDirectory, "userDirectory");
 
@@ -144,6 +154,29 @@ export class EdenRuntime {
     this.container.registerInstance("distPath", this.paths.distPath);
     this.container.registerInstance("userDirectory", this.paths.userDirectory);
     this.container.registerInstance("appPath", this.paths.appPath);
+    this.container.registerInstance(PLATFORM_WINDOWS, this.platform.windows);
+    this.container.registerInstance(
+      PLATFORM_RENDERER_IPC,
+      this.platform.rendererIpc,
+    );
+    this.container.registerInstance(
+      PLATFORM_UTILITY_PROCESSES,
+      this.platform.utilityProcesses,
+    );
+    this.container.registerInstance(
+      PLATFORM_APP_CHANNELS,
+      this.platform.appChannels,
+    );
+    this.container.registerInstance(PLATFORM_DISPLAY, this.platform.display);
+    this.container.registerInstance(
+      PLATFORM_PROCESS_METRICS,
+      this.platform.processMetrics,
+    );
+    this.container.registerInstance(
+      PLATFORM_SHORTCUTS,
+      this.platform.shortcuts,
+    );
+    this.container.registerInstance(PLATFORM_THEME, this.platform.theme);
 
     this.brandingManager = this.resolveOwned(BrandingManager);
     this.resolveOwned(CommandRegistry);
@@ -365,7 +398,7 @@ export class EdenRuntime {
     const title = this.brandingManager.getWindowTitle(windowConfig.title);
     const icon = this.brandingManager.getWindowIconPath();
 
-    this.mainWindow = new ElectronBrowserWindow({
+    this.mainWindow = this.platform.windows.createWindow({
       width: windowConfig.width || 1280,
       height: windowConfig.height || 800,
       minWidth: Math.max(windowConfig.minWidth || 800, 800),
@@ -387,7 +420,7 @@ export class EdenRuntime {
       show: false,
     });
 
-    attachWebContentsLogger(this.mainWindow.webContents, {
+    this.platform.windows.attachWebContentsLogger(this.mainWindow.webContents, {
       source: "foundation",
     });
     this.viewManager.setMainWindow(this.mainWindow);

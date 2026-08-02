@@ -14,9 +14,17 @@ import type {
   EdenKeyboardUpdateDragRequest,
   ViewBounds,
 } from "@edenapp/types";
-import { BrowserWindow, ipcMain, screen } from "electron";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { log } from "../logging";
+import {
+  type DisplayPort,
+  PLATFORM_DISPLAY,
+  PLATFORM_RENDERER_IPC,
+  PLATFORM_WINDOWS,
+  type PlatformWindow,
+  type RendererIpcPort,
+  type WindowingPort,
+} from "../platform/ports";
 import { ProcessManager } from "../process-manager";
 import { EDEN_SETTINGS_APP_ID, SettingsManager } from "../settings";
 import { ViewManager } from "../view-manager";
@@ -72,8 +80,8 @@ type KeyboardDragState = {
 @scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class KeyboardManager {
-  private mainWindow: BrowserWindow | null = null;
-  private keyboardWindow: BrowserWindow | null = null;
+  private mainWindow: PlatformWindow | null = null;
+  private keyboardWindow: PlatformWindow | null = null;
   private workspaceBounds: ViewBounds | null = null;
   private currentTarget: KeyboardTargetSession | null = null;
   private persistentVisibility = false;
@@ -88,7 +96,7 @@ export class KeyboardManager {
   private showNumberRow = DEFAULT_SHOW_NUMBER_ROW;
   private interfaceScale = DEFAULT_INTERFACE_SCALE;
   private dragState: KeyboardDragState | null = null;
-  private readonly mouseTracker = new MouseTracker(8);
+  private readonly mouseTracker: MouseTracker;
   private readonly keyboardFrontendPath = path.join(
     __dirname,
     "../keyboard-ui/index.html",
@@ -104,13 +112,18 @@ export class KeyboardManager {
     private readonly processManager: ProcessManager,
     @inject(delay(() => SettingsManager))
     private readonly settingsManager: SettingsManager,
+    @inject(PLATFORM_WINDOWS) private readonly windows: WindowingPort,
+    @inject(PLATFORM_RENDERER_IPC)
+    private readonly rendererIpc: RendererIpcPort,
+    @inject(PLATFORM_DISPLAY) private readonly display: DisplayPort,
   ) {
+    this.mouseTracker = new MouseTracker(this.display, 8);
     this.setupEventSubscriptions();
     this.setupIPCHandlers();
     void this.initializeSettings();
   }
 
-  setMainWindow(window: BrowserWindow): void {
+  setMainWindow(window: PlatformWindow): void {
     this.mainWindow = window;
     this.attachMainWindowTracking(window);
     this.ensureKeyboardWindow();
@@ -220,52 +233,55 @@ export class KeyboardManager {
   }
 
   private setupIPCHandlers(): void {
-    ipcMain.on(
+    this.rendererIpc.on<[EdenKeyboardFocusState | undefined]>(
       CHANNEL_FOCUS_STATE,
       (event, payload: EdenKeyboardFocusState | undefined) => {
         this.handleFocusState(event.sender.id, payload);
       },
     );
 
-    ipcMain.handle(CHANNEL_SHOW, async () => {
+    this.rendererIpc.handle(CHANNEL_SHOW, async () => {
       return await this.handleShowRequest();
     });
 
-    ipcMain.handle(
+    this.rendererIpc.handle<[EdenKeyboardAction | undefined], unknown>(
       CHANNEL_SEND_ACTION,
       async (event, action: EdenKeyboardAction | undefined) => {
         return await this.handleActionRequest(event.sender.id, action);
       },
     );
 
-    ipcMain.handle(CHANNEL_HIDE, async (event) => {
+    this.rendererIpc.handle(CHANNEL_HIDE, async (event) => {
       return await this.handleHideRequest(event.sender.id);
     });
 
-    ipcMain.handle(
+    this.rendererIpc.handle<
+      [EdenKeyboardStartDragRequest | undefined],
+      unknown
+    >(
       CHANNEL_START_DRAG,
       async (event, payload: EdenKeyboardStartDragRequest | undefined) => {
         return await this.handleStartDragRequest(event.sender.id, payload);
       },
     );
 
-    ipcMain.on(
+    this.rendererIpc.on<[EdenKeyboardUpdateDragRequest | undefined]>(
       CHANNEL_UPDATE_DRAG,
       (event, payload: EdenKeyboardUpdateDragRequest | undefined) => {
         this.handleUpdateDragRequest(event.sender.id, payload);
       },
     );
 
-    ipcMain.handle(CHANNEL_END_DRAG, async (event) => {
+    this.rendererIpc.handle(CHANNEL_END_DRAG, async (event) => {
       return await this.handleEndDragRequest(event.sender.id);
     });
 
-    ipcMain.handle(CHANNEL_GET_STATE, async () => {
+    this.rendererIpc.handle(CHANNEL_GET_STATE, async () => {
       return this.getKeyboardState();
     });
   }
 
-  private attachMainWindowTracking(window: BrowserWindow): void {
+  private attachMainWindowTracking(window: PlatformWindow): void {
     window.on("move", () => {
       if (
         this.isKeyboardVisible() &&
@@ -552,7 +568,7 @@ export class KeyboardManager {
   }
 
   private constrainFloatingBounds(bounds: ViewBounds): ViewBounds {
-    const display = screen.getDisplayMatching(bounds);
+    const display = this.display.getDisplayMatching(bounds);
     const area = display.workArea;
     const maxX = area.x + Math.max(0, area.width - bounds.width);
     const maxY = area.y + Math.max(0, area.height - bounds.height);
@@ -589,7 +605,7 @@ export class KeyboardManager {
     this.dragState = null;
   }
 
-  private ensureKeyboardWindow(): BrowserWindow | undefined {
+  private ensureKeyboardWindow(): PlatformWindow | undefined {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return undefined;
     }
@@ -612,7 +628,7 @@ export class KeyboardManager {
       return undefined;
     }
 
-    const keyboardWindow = new BrowserWindow({
+    const keyboardWindow = this.windows.createWindow({
       parent: this.mainWindow,
       show: false,
       frame: false,
@@ -924,14 +940,14 @@ export class KeyboardManager {
   }
 
   destroy(): void {
-    ipcMain.removeHandler(CHANNEL_SHOW);
-    ipcMain.removeHandler(CHANNEL_GET_STATE);
-    ipcMain.removeHandler(CHANNEL_SEND_ACTION);
-    ipcMain.removeHandler(CHANNEL_HIDE);
-    ipcMain.removeHandler(CHANNEL_START_DRAG);
-    ipcMain.removeAllListeners(CHANNEL_UPDATE_DRAG);
-    ipcMain.removeHandler(CHANNEL_END_DRAG);
-    ipcMain.removeAllListeners(CHANNEL_FOCUS_STATE);
+    this.rendererIpc.removeHandler(CHANNEL_SHOW);
+    this.rendererIpc.removeHandler(CHANNEL_GET_STATE);
+    this.rendererIpc.removeHandler(CHANNEL_SEND_ACTION);
+    this.rendererIpc.removeHandler(CHANNEL_HIDE);
+    this.rendererIpc.removeHandler(CHANNEL_START_DRAG);
+    this.rendererIpc.removeAllListeners(CHANNEL_UPDATE_DRAG);
+    this.rendererIpc.removeHandler(CHANNEL_END_DRAG);
+    this.rendererIpc.removeAllListeners(CHANNEL_FOCUS_STATE);
     this.endKeyboardDrag();
     this.mouseTracker.dispose();
     this.viewManager.setKeyboardPresentationLift(0);

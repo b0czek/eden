@@ -1,32 +1,25 @@
 import "reflect-metadata";
 
 import type { AppInstance, AppManifest } from "@edenapp/types";
-import { app, type UtilityProcess, type WebContentsView } from "electron";
+import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
 import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
 
-jest.mock("electron", () => ({
-  app: {
-    getAppMetrics: jest.fn(),
-  },
-}));
-
-const getAppMetrics = (app as unknown as { getAppMetrics: jest.Mock })
-  .getAppMetrics;
+const getAppMetrics = jest.fn();
 
 type CollectorDeps = ConstructorParameters<typeof ProcessMetricsCollector>[0];
 type BackendManagerLike = Pick<CollectorDeps["backendManager"], "getBackend">;
 type ViewManagerLike = Pick<CollectorDeps["viewManager"], "getView">;
 
-const createMockBackend = (pid: number): UtilityProcess =>
-  ({ pid }) as UtilityProcess;
+const createMockBackend = (pid: number): PlatformUtilityProcess =>
+  ({ pid }) as PlatformUtilityProcess;
 
-const createMockView = (pid: number): WebContentsView =>
+const createMockView = (pid: number): PlatformView =>
   ({
     webContents: {
       isDestroyed: () => false,
       getOSProcessId: () => pid,
     },
-  }) as WebContentsView;
+  }) as PlatformView;
 
 const createApp = (
   appId: string,
@@ -81,6 +74,7 @@ const createCollector = (deps: {
     backendManager: deps.backendManager as CollectorDeps["backendManager"],
     viewManager: deps.viewManager as CollectorDeps["viewManager"],
     getRunningApps: deps.getRunningApps,
+    processMetrics: { getAppMetrics },
   });
 
 describe("ProcessMetricsCollector", () => {

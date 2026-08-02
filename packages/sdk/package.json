@@ -28,6 +28,7 @@
     "dev:watch": "eden-build watch -c eden.dev.config.json --sdk-source-path .",
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",
+    "check:architecture": "node scripts/check-architecture.js",
     "test": "jest"
   },
   "keywords": [
