@@ -470,7 +470,6 @@ export class EdenRuntime {
     if (this.managersInitialized) {
       await this.daemonManager.shutdown();
       await this.processManager.shutdown();
-      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -478,10 +477,16 @@ export class EdenRuntime {
       this.mainWindow = null;
     }
     for (let index = this.ownedServices.length - 1; index >= 0; index--) {
+      const service = this.ownedServices[index];
       try {
-        await this.ownedServices[index].dispose();
+        await service.dispose();
       } catch (error) {
         log.error("Error disposing Eden runtime resource:", error);
+      } finally {
+        // tsyringe also records every constructed disposable. Remove services
+        // whose ordered disposal is owned here so the final container pass is
+        // limited to indirectly-created resources.
+        this.removeContainerDisposable(service);
       }
     }
     this.ownedServices.length = 0;
@@ -494,5 +499,12 @@ export class EdenRuntime {
       // The container pass releases any indirectly-created disposables.
       log.error("Error disposing Eden runtime container:", error);
     }
+  }
+
+  private removeContainerDisposable(service: object): void {
+    const disposableContainer = this.container as DependencyContainer & {
+      disposables?: Set<object>;
+    };
+    disposableContainer.disposables?.delete(service);
   }
 }
