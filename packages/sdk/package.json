@@ -29,7 +29,9 @@
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",
     "check:architecture": "node scripts/check-architecture.js",
-    "test": "jest",
+    "test": "pnpm run test:unit && pnpm run test:integration:node",
+    "test:unit": "jest --runInBand --testPathIgnorePatterns=integration.test.ts",
+    "test:integration:node": "jest --runInBand --silent --testPathPatterns=integration.test.ts",
     "pretest:integration:electron": "pnpm run build:main && pnpm run bundle:app-runtime && pnpm run copy-assets",
     "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts"
   },
