@@ -15,6 +15,7 @@ import {
 import { attachWebContentsLogger } from "../../logging/electron";
 import type {
   AppChannelPort,
+  ApplicationLifecycleEvent,
   ApplicationLifecyclePort,
   Bounds,
   DisplayPort,
@@ -36,6 +37,9 @@ import type {
 } from "../ports";
 
 class ElectronApplicationLifecycle implements ApplicationLifecyclePort {
+  private quitRequested = false;
+  private quitAllowed = false;
+
   appendCommandLineSwitch(name: string, value?: string): void {
     app.commandLine.appendSwitch(name, value);
   }
@@ -56,32 +60,32 @@ class ElectronApplicationLifecycle implements ApplicationLifecyclePort {
     app.quit();
   }
 
-  onWindowAllClosed(listener: () => void): () => void {
-    app.on("window-all-closed", listener);
-    return () => app.removeListener("window-all-closed", listener);
-  }
+  on(event: ApplicationLifecycleEvent, listener: () => void): () => void {
+    if (event !== "quit-requested") {
+      if (event === "activate") {
+        app.on("activate", listener);
+        return () => app.removeListener("activate", listener);
+      }
+      app.on("window-all-closed", listener);
+      return () => app.removeListener("window-all-closed", listener);
+    }
 
-  onActivate(listener: () => void): () => void {
-    app.on("activate", listener);
-    return () => app.removeListener("activate", listener);
-  }
+    const handleQuitRequested = (quitEvent: Electron.Event) => {
+      if (this.quitAllowed) return;
+      quitEvent.preventDefault();
+      if (this.quitRequested) return;
 
-  onBeforeQuit(listener: () => Promise<void>): () => void {
-    let shutdownStarted = false;
-    let allowQuit = false;
-    const handleBeforeQuit = (event: Electron.Event) => {
-      if (allowQuit) return;
-      event.preventDefault();
-      if (shutdownStarted) return;
-
-      shutdownStarted = true;
-      void listener().finally(() => {
-        allowQuit = true;
-        app.quit();
-      });
+      this.quitRequested = true;
+      listener();
     };
-    app.on("before-quit", handleBeforeQuit);
-    return () => app.removeListener("before-quit", handleBeforeQuit);
+    app.on("before-quit", handleQuitRequested);
+    return () => app.removeListener("before-quit", handleQuitRequested);
+  }
+
+  completeQuit(): void {
+    if (!this.quitRequested || this.quitAllowed) return;
+    this.quitAllowed = true;
+    app.quit();
   }
 }
 

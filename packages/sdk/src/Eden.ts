@@ -84,8 +84,10 @@ export class Eden {
       .whenReady()
       .then(() => this.runtime.start())
       .catch(() => undefined);
-    application.onWindowAllClosed(() => application.quit());
-    application.onActivate(() => this.runtime.activate());
-    application.onBeforeQuit(() => this.runtime.dispose());
+    application.on("window-all-closed", () => application.quit());
+    application.on("activate", () => this.runtime.activate());
+    application.on("quit-requested", () => {
+      void this.runtime.dispose().finally(() => application.completeQuit());
+    });
   }
 }

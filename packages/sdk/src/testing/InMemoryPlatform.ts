@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import type {
   AppChannelPort,
+  ApplicationLifecycleEvent,
   ApplicationLifecyclePort,
   Bounds,
   EdenPlatform,
@@ -495,14 +496,11 @@ class InMemoryApplication implements ApplicationLifecyclePort {
     this.effects.push({ type: "quit" });
   }
 
-  onWindowAllClosed(listener: () => void): () => void {
-    return this.add("window-all-closed", listener);
+  on(event: ApplicationLifecycleEvent, listener: () => void): () => void {
+    return this.add(event, listener);
   }
-  onActivate(listener: () => void): () => void {
-    return this.add("activate", listener);
-  }
-  onBeforeQuit(listener: () => Promise<void>): () => void {
-    return this.add("before-quit", listener);
+  completeQuit(): void {
+    this.effects.push({ type: "quit" });
   }
 
   get listenerCount(): number {

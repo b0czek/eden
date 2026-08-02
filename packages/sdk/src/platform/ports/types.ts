@@ -268,15 +268,19 @@ export interface ThemeStatePort {
   onChanged(listener: () => void): () => void;
 }
 
+export type ApplicationLifecycleEvent =
+  | "window-all-closed"
+  | "activate"
+  | "quit-requested";
+
 export interface ApplicationLifecyclePort {
   appendCommandLineSwitch(name: string, value?: string): void;
   getPath(name: "userData"): string;
   getAppPath(): string;
   whenReady(): Promise<void>;
   quit(): void;
-  onWindowAllClosed(listener: () => void): () => void;
-  onActivate(listener: () => void): () => void;
-  onBeforeQuit(listener: () => Promise<void>): () => void;
+  on(event: ApplicationLifecycleEvent, listener: () => void): () => void;
+  completeQuit(): void;
 }
 
 export interface EdenPlatform {
