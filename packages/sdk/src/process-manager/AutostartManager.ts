@@ -16,7 +16,9 @@ import { ProcessManager } from "./ProcessManager";
 export class AutostartManager {
   private static readonly AUTOSTART_KEY_PREFIX = "autostart.";
   private ready = false;
+  private disposed = false;
   private launchPromise: Promise<void> = Promise.resolve();
+  private readonly unsubscribeSession: () => void;
 
   constructor(
     @inject("EdenConfig") private config: EdenConfig,
@@ -27,27 +29,31 @@ export class AutostartManager {
     @inject(delay(() => SessionManager)) sessionManager: SessionManager,
   ) {
     // Start the appropriate environment after a committed session transition.
-    sessionManager.on("changed", ({ currentUser, previousUsername }) => {
-      const currentUsername = currentUser?.username ?? null;
-      if (currentUsername === previousUsername) {
-        // Same user, grants may have changed but no session reset
-        return;
-      }
+    this.unsubscribeSession = sessionManager.on(
+      "changed",
+      ({ currentUser, previousUsername }) => {
+        if (this.disposed) return;
+        const currentUsername = currentUser?.username ?? null;
+        if (currentUsername === previousUsername) {
+          // Same user, grants may have changed but no session reset
+          return;
+        }
 
-      if (!this.ready) {
-        return;
-      }
+        if (!this.ready) {
+          return;
+        }
 
-      if (currentUsername) {
-        void this.queueSessionLaunch();
-      } else {
-        void this.queueLoginLaunch();
-      }
-    });
+        if (currentUsername) {
+          void this.queueSessionLaunch();
+        } else {
+          void this.queueLoginLaunch();
+        }
+      },
+    );
   }
 
   onFoundationReady(): void {
-    if (this.ready) return;
+    if (this.ready || this.disposed) return;
     this.ready = true;
     if (this.config.development)
       void this.queueLaunch(() => this.launchDevelopmentApps());
@@ -61,6 +67,7 @@ export class AutostartManager {
   private async launchDevelopmentApps(): Promise<void> {
     const state = await loadHotReloadAppsState(this.config);
     for (const app of state.apps.filter((entry) => entry.launchOnStart)) {
+      if (this.disposed) return;
       if (this.processManager.getAppInstance(app.id)) continue;
       try {
         await this.processManager.launchApp(app.id);
@@ -72,7 +79,11 @@ export class AutostartManager {
   }
 
   private queueLaunch(task: () => Promise<void>): Promise<void> {
-    this.launchPromise = this.launchPromise.then(task);
+    if (this.disposed) return Promise.resolve();
+    this.launchPromise = this.launchPromise.then(async () => {
+      if (this.disposed) return;
+      await task();
+    });
     return this.launchPromise;
   }
 
@@ -117,6 +128,7 @@ export class AutostartManager {
             .map(([appId]) => appId);
 
           for (const appId of enabledApps) {
+            if (this.disposed) return;
             const manifest = this.processManager.getInstalledManifest(appId);
             if (manifest && !manifest.frontend?.entry) {
               continue;
@@ -140,7 +152,7 @@ export class AutostartManager {
   }
 
   private async launchLoginApp(): Promise<void> {
-    if (this.sessionContext.getCurrentUser()) {
+    if (this.disposed || this.sessionContext.getCurrentUser()) {
       return;
     }
 
@@ -161,8 +173,14 @@ export class AutostartManager {
     }
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
+    if (this.disposed) {
+      await this.launchPromise.catch(() => undefined);
+      return;
+    }
+    this.disposed = true;
     this.ready = false;
-    this.launchPromise = Promise.resolve();
+    this.unsubscribeSession();
+    await this.launchPromise.catch(() => undefined);
   }
 }

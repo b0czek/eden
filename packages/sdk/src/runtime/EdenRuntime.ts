@@ -479,6 +479,7 @@ export class EdenRuntime {
     this.resourcesDisposed = true;
 
     if (this.managersInitialized) {
+      await this.autostartManager.dispose();
       await this.daemonManager.shutdown();
       await this.processManager.shutdown();
     }
