@@ -39,6 +39,7 @@ export const getFileIcon = (item: FileItem) => {
     jpg: fileIcons.image,
     pdf: fileIcons.pdf,
     zip: fileIcons.archive,
+    edenite: fileIcons.archive,
   };
 
   return iconMap[ext] || fileIcons.document;
