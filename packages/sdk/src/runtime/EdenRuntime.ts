@@ -194,6 +194,7 @@ export class EdenRuntime {
       "user/grant-options-changed",
       "user/manage",
     );
+    permissions.registerEventPermission("fs/changed", "fs/read");
   }
 
   public whenReady(): Promise<void> {

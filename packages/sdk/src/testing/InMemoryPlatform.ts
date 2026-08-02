@@ -26,7 +26,12 @@ type RecordedEffect =
   | { type: "view-created"; options: PlatformViewOptions }
   | { type: "file-loaded"; webContentsId: number; filePath: string }
   | { type: "url-loaded"; webContentsId: number; url: string }
-  | { type: "message-sent"; webContentsId: number; channel: string }
+  | {
+      type: "message-sent";
+      webContentsId: number;
+      channel: string;
+      args: unknown[];
+    }
   | { type: "utility-process-started"; pid: number; modulePath: string }
   | { type: "utility-process-stopped"; pid: number }
   | { type: "quit" };
@@ -101,11 +106,12 @@ class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
 
   focus(): void {}
 
-  send(channel: string): void {
+  send(channel: string, ...args: unknown[]): void {
     this.effects.push({
       type: "message-sent",
       webContentsId: this.id,
       channel,
+      args,
     });
   }
 

@@ -115,6 +115,15 @@ const App: Component = () => {
   } = useExplorerNavigation({
     sortItems,
     onLoadError: showError,
+    onPathUnavailable: (path, fallbackPath) => {
+      void window.edenAPI.shellCommand("notification/push", {
+        title: t("files.directoryUnavailableTitle"),
+        message: fallbackPath
+          ? t("files.directoryUnavailableFallback", { path, fallbackPath })
+          : t("files.directoryUnavailable", { path }),
+        type: "warning",
+      });
+    },
     getLoadDirectoryErrorMessage: (error) =>
       `${t("files.errors.loadDirectoryFailed")}: ${error.message}`,
     setSelectedItem,

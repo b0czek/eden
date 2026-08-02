@@ -75,34 +75,18 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
 - **`window.defaultMode`** (Optional): Initial mode to use when `window.mode` is `both`.
 - **`window.overlayPriority`** (Optional): Stacking priority for overlay apps. Higher values render above lower values; defaults to `0`.
 - **`permissions`**: Array of permissions the app requires.
-  - `fs/*`: Full filesystem access.
-  - `fs/resolve`: Resolve an Eden path to the underlying OS path.
+  - `fs/*`: Full filesystem access. See [Filesystem Access](filesystem.md).
   - `db/rw`: Read/write access to the app's database.
 
 ## interacting with Eden (`window.edenAPI`)
 
 Eden apps run in a sandboxed environment but can interact with the system via the global `edenAPI` object. This API provides secure access to system features based on the requested permissions.
 
-Filesystem paths are virtual. `/` maps to the active user's configured home
-directory, or to the configured `userDirectory` root when the user has no home
-restriction. Vendor users always use the root. Applications should persist and
-exchange virtual paths rather than resolved host paths.
-
 ### Shell Commands
 
 The primary way to interact is `edenAPI.shellCommand`.
 
 ```typescript
-// Example: Reading a directory
-const files = await window.edenAPI.shellCommand("fs/readdir", {
-  path: "/Documents",
-});
-
-// Example: Resolving an Eden path for an external integration
-const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
-  path: "/Documents/report.txt",
-});
-
 // Example: Writing to a database
 await window.edenAPI.shellCommand("db/set", {
   key: "preferences",
@@ -110,15 +94,8 @@ await window.edenAPI.shellCommand("db/set", {
 });
 ```
 
-### Opening Files
-
-To open a file with the default associated app:
-
-```typescript
-await window.edenAPI.shellCommand("file/open", {
-  path: "/path/to/file.txt",
-});
-```
+For virtual paths, filesystem commands, opening files, and directory watching,
+see [Filesystem Access](filesystem.md).
 
 ## Styling
 

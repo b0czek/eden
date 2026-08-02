@@ -39,6 +39,10 @@ export const pl = {
     modified: "Data Modyfikacji",
     ascending: "Rosnąco",
     descending: "Malejąco",
+    directoryUnavailableTitle: "Folder jest niedostępny",
+    directoryUnavailableFallback:
+      "Folder „{path}” jest niedostępny. Wyświetlono „{fallbackPath}”.",
+    directoryUnavailable: "Folder „{path}” jest niedostępny.",
     errors: {
       invalidFolderName: "Nieprawidłowa nazwa folderu",
       folderExists: "Folder o tej nazwie już istnieje",

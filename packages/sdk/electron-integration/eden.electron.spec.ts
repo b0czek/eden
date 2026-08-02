@@ -190,6 +190,53 @@ test.describe
       expect(utilityPids.length).toBeGreaterThan(0);
     });
 
+    test("delivers native filesystem changes across preload IPC and stops after unwatch", async () => {
+      const watchId = await electronApp?.evaluate(
+        async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+            globalThis.__fsChanges = [];
+            await window.edenAPI.subscribe("fs/changed", (event) => globalThis.__fsChanges.push(event));
+            return (await window.edenAPI.shellCommand("fs/watch", { path: "/" })).watchId;
+          })()`);
+        },
+        APP_ID,
+      );
+      expect(watchId).toEqual(expect.any(String));
+
+      await fs.writeFile(path.join(root, "users", "external.txt"), "changed");
+      await expect
+        .poll(() =>
+          electronApp?.evaluate(
+            async ({ webContents }, { appId, watchId: expectedWatchId }) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(appId));
+              return contents?.executeJavaScript(
+                `globalThis.__fsChanges?.some((event) => event.watchId === ${JSON.stringify(expectedWatchId)} && event.kind === "change")`,
+              );
+            },
+            { appId: APP_ID, watchId },
+          ),
+        )
+        .toBe(true);
+
+      await electronApp?.evaluate(
+        async ({ webContents }, { appId, watchId: activeWatchId }) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          await contents?.executeJavaScript(
+            `window.edenAPI.shellCommand("fs/unwatch", { watchId: ${JSON.stringify(activeWatchId)} })`,
+          );
+        },
+        { appId: APP_ID, watchId },
+      );
+    });
+
     test("shuts down without orphaning Electron or utility processes", async () => {
       const app = electronApp;
       expect(app).toBeDefined();

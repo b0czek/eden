@@ -36,6 +36,10 @@ export const pl = {
     rename: "Zmień nazwę",
     duplicate: "Duplikuj",
     refresh: "Odśwież",
+    directoryUnavailableTitle: "Folder jest niedostępny",
+    directoryUnavailableFallback:
+      "Folder „{path}” jest niedostępny. Wyświetlono „{fallbackPath}”.",
+    directoryUnavailable: "Folder „{path}” jest niedostępny.",
     copySuffix: "kopia",
     errors: {
       invalidFolderName: "Nieprawidłowa nazwa folderu",

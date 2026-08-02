@@ -6,12 +6,21 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import type { ExecutionContext } from "../execution";
 import type { CommandRegistry } from "../ipc";
+import type { IPCBridge } from "../ipc";
+import type { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemManager } from "./FilesystemManager";
 
 describe("FilesystemManager user roots", () => {
   let root: string;
   let currentUser: UserProfile | null;
   let manager: FilesystemManager;
+  const ipcBridge = {
+    eventSubscribers: { notifyView: jest.fn() },
+  } as unknown as IPCBridge;
+  const viewManager = {
+    on: jest.fn(() => jest.fn()),
+    getViewIdByWebContentsId: jest.fn(),
+  } as unknown as ViewManager;
   const createUser = (): UserProfile => ({
     username: "operator",
     name: "Operator",
@@ -32,10 +41,13 @@ describe("FilesystemManager user roots", () => {
         getPrincipal: () =>
           currentUser ? { kind: "user", profile: currentUser } : undefined,
       } as unknown as ExecutionContext,
+      ipcBridge,
+      viewManager,
     );
   });
 
   afterEach(async () => {
+    manager.dispose();
     await fs.rm(root, { recursive: true, force: true });
   });
 
@@ -62,6 +74,8 @@ describe("FilesystemManager user roots", () => {
       root,
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       executionContext,
+      ipcBridge,
+      viewManager,
     );
 
     await expect(manager.resolvePath("/state.json")).resolves.toBe(
@@ -87,6 +101,8 @@ describe("FilesystemManager user roots", () => {
           profile: daemonUser,
         }),
       } as unknown as ExecutionContext,
+      ipcBridge,
+      viewManager,
     );
 
     await expect(manager.resolvePath("/state.json")).resolves.toBe(

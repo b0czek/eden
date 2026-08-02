@@ -154,6 +154,7 @@ Genesis sits on the build side of this model: it turns app source into the
 ## Documentation
 
 - [App development](docs/app-development.md) — app structure, manifests, permissions, and development
+- [Filesystem access](docs/filesystem.md) — virtual paths, file commands, and directory watching
 - [IPC architecture](docs/ipc-architecture.md) — EdenAPI, AppAPI, and AppBus
 - [Processes and daemons](docs/processes-and-daemons.md) — background work and lifecycle
 - [Settings](docs/settings.md) — adding host and app settings

@@ -78,6 +78,25 @@ export class FilesystemHandler {
     return await this.fsManager.stat(targetPath);
   }
 
+  @EdenHandler("watch", { permission: "read" })
+  async handleWatch(args: {
+    path: string;
+    _callerWebContentsId?: number;
+  }): Promise<{ watchId: string }> {
+    return await this.fsManager.watchDirectory(
+      args.path,
+      args._callerWebContentsId,
+    );
+  }
+
+  @EdenHandler("unwatch", { permission: "read" })
+  handleUnwatch(args: {
+    watchId: string;
+    _callerWebContentsId?: number;
+  }): void {
+    this.fsManager.unwatch(args.watchId, args._callerWebContentsId);
+  }
+
   /**
    * Resolve an Eden path to the underlying OS path.
    */

@@ -36,6 +36,10 @@ export const en = {
     rename: "Rename",
     duplicate: "Duplicate",
     refresh: "Refresh",
+    directoryUnavailableTitle: "Folder unavailable",
+    directoryUnavailableFallback:
+      '"{path}" is unavailable. Showing "{fallbackPath}" instead.',
+    directoryUnavailable: '"{path}" is unavailable.',
     copySuffix: "copy",
     errors: {
       invalidFolderName: "Invalid folder name",

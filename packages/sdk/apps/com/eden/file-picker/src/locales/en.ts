@@ -39,6 +39,10 @@ export const en = {
     modified: "Date Modified",
     ascending: "Ascending",
     descending: "Descending",
+    directoryUnavailableTitle: "Folder unavailable",
+    directoryUnavailableFallback:
+      '"{path}" is unavailable. Showing "{fallbackPath}" instead.',
+    directoryUnavailable: '"{path}" is unavailable.',
     errors: {
       invalidFolderName: "Invalid folder name",
       folderExists: "A folder with this name already exists",

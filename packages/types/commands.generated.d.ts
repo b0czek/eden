@@ -442,6 +442,16 @@ export interface FsCommands {
     args: { path: string };
     response: import("./index").FileStats;
   };
+  "fs/watch": {
+    args: {
+    path: string };
+    response: { watchId: string };
+  };
+  "fs/unwatch": {
+    args: {
+    watchId: string };
+    response: void;
+  };
   /**
    * Resolve an Eden path to the underlying OS path.
    */

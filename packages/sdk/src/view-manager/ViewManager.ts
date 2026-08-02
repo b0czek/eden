@@ -36,7 +36,8 @@ import {
 /**
  * Events emitted by the ViewManager
  */
-interface ViewManagerEvents {
+export interface ViewManagerEvents {
+  "view-removed": { viewId: number; appId: string };
   "bounds-updated": ViewBounds;
   "interface-scale-changed": { scale: number };
   "view-loaded": { viewId: number; appId: string; overlay: boolean };
@@ -304,7 +305,9 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
 
       // Remove from tracking map
-      this.views.delete(viewId);
+      if (this.views.delete(viewId)) {
+        this.notify("view-removed", { viewId, appId: viewInfo.appId });
+      }
 
       // Recalculate tiles if using tiling and this was an app view
       if (viewInfo.viewType === "app" && this.tilingController.isEnabled()) {
@@ -318,7 +321,9 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         error instanceof Error ? error.message : String(error);
       log.error(`Failed to remove view ${viewId}:`, errorMessage);
       // Still remove from tracking even if removal failed
-      this.views.delete(viewId);
+      if (this.views.delete(viewId)) {
+        this.notify("view-removed", { viewId, appId: viewInfo.appId });
+      }
       throw new Error(`Failed to remove view: ${errorMessage}`);
     }
   }

@@ -44,6 +44,13 @@ export interface FilePickerEvents {
 }
 
 /**
+ * FsEvents - Events for the "fs" namespace
+ */
+export interface FsEvents {
+  "fs/changed": { watchId: string; kind: "change" | "watch-error" };
+}
+
+/**
  * I18nEvents - Events for the "i18n" namespace
  */
 export interface I18nEvents {
@@ -113,6 +120,7 @@ export interface UserEvents {
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
+  "view/view-removed": { viewId: number; appId: string };
   "view/bounds-updated": import("./index").ViewBounds;
   "view/interface-scale-changed": { scale: number };
   "view/view-loaded": { viewId: number; appId: string; overlay: boolean };
@@ -132,4 +140,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}
