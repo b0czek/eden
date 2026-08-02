@@ -251,8 +251,12 @@ export class EdenRuntime {
   }
 
   public start(): Promise<void> {
-    if (this.startPromise) return this.startPromise;
-    if (this.lifecycleState === "ready") return Promise.resolve();
+    if (this.lifecycleState === "starting" && this.startPromise) {
+      return this.startPromise;
+    }
+    if (this.lifecycleState === "ready") {
+      return this.startPromise ?? Promise.resolve();
+    }
     if (this.lifecycleState !== "created") {
       return Promise.reject(
         new Error(

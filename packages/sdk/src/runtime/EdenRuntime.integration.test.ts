@@ -123,6 +123,9 @@ describe("EdenRuntime integration", () => {
     await afterStart.dispose();
     expect(afterStart.runtime.state).toBe("stopped");
     expect(afterStart.platform.activeResourceCount).toBe(0);
+    await expect(afterStart.start()).rejects.toThrow(
+      "Cannot start Eden runtime from stopped state",
+    );
   });
 
   it("aborts readiness when disposal starts during startup", async () => {
