@@ -298,6 +298,7 @@ export class EdenRuntime {
       await this.resolveOwned(AppearanceManager).initialize();
       await this.appAssociationManager.initialize();
       await this.fileOpenManager.initialize();
+      this.assertStartupActive();
       this.createMainWindow();
 
       this.lifecycleState = "ready";
@@ -306,11 +307,21 @@ export class EdenRuntime {
       log.info("Eden ready!");
     } catch (error) {
       await this.disposeResources();
-      this.lifecycleState = "failed";
+      if (this.lifecycleState !== "stopping") {
+        this.lifecycleState = "failed";
+      }
       this.readySettled = true;
       this.rejectReady(error);
-      log.error("Eden failed to start", error);
+      if (this.lifecycleState === "failed") {
+        log.error("Eden failed to start", error);
+      }
       throw error;
+    }
+  }
+
+  private assertStartupActive(): void {
+    if (this.lifecycleState !== "starting") {
+      throw new Error("Eden runtime startup aborted by shutdown");
     }
   }
 

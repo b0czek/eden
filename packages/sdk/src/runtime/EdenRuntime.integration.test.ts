@@ -125,6 +125,27 @@ describe("EdenRuntime integration", () => {
     expect(afterStart.platform.activeResourceCount).toBe(0);
   });
 
+  it("aborts readiness when disposal starts during startup", async () => {
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+
+    const readiness = expect(eden.runtime.whenReady()).rejects.toThrow(
+      "startup aborted by shutdown",
+    );
+    const startup = eden.start();
+    const shutdown = eden.dispose();
+
+    await expect(startup).rejects.toThrow("startup aborted by shutdown");
+    await shutdown;
+    await readiness;
+
+    expect(eden.runtime.state).toBe("stopped");
+    expect(eden.platform.activeResourceCount).toBe(0);
+    expect(
+      eden.platform.effects.some((effect) => effect.type === "window-created"),
+    ).toBe(false);
+  });
+
   it("does not retain platform resources or temporary roots across repeated cycles", async () => {
     for (let cycle = 0; cycle < 3; cycle++) {
       const eden = await createTestEden();
