@@ -261,8 +261,9 @@ export class BackendManager extends EventEmitter {
       });
 
       // Create a timeout promise (5 seconds)
+      let terminationTimeout: NodeJS.Timeout | undefined;
       const timeoutPromise = new Promise<void>((_, reject) => {
-        setTimeout(() => {
+        terminationTimeout = setTimeout(() => {
           reject(
             new Error(`Backend ${appId} termination timed out after 5 seconds`),
           );
@@ -281,7 +282,11 @@ export class BackendManager extends EventEmitter {
       }
 
       // Wait for either exit or timeout
-      await Promise.race([exitPromise, timeoutPromise]);
+      try {
+        await Promise.race([exitPromise, timeoutPromise]);
+      } finally {
+        if (terminationTimeout) clearTimeout(terminationTimeout);
+      }
 
       this.backends.delete(appId);
       this.backendData.delete(appId);

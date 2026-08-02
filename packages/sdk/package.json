@@ -29,7 +29,9 @@
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",
     "check:architecture": "node scripts/check-architecture.js",
-    "test": "jest"
+    "test": "jest",
+    "pretest:integration:electron": "pnpm run build:main && pnpm run bundle:app-runtime && pnpm run copy-assets",
+    "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts"
   },
   "keywords": [
     "eden",
@@ -62,6 +64,7 @@
   },
   "devDependencies": {
     "@edenapp/scripts": "workspace:*",
+    "@playwright/test": "^1.62.1",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
     "concurrently": "catalog:",

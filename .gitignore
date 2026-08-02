@@ -32,6 +32,8 @@ packages/sdk/.eden-hot-reload/
 # TypeScript
 *.tsbuildinfo
 packages/files-core/src/generated/
+packages/sdk/electron-integration/test-results/
+packages/sdk/playwright-report/
 
 # Eden CSS - Auto-generated files
 # These files are generated from tokens.json by Style Dictionary

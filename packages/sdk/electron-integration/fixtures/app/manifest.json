@@ -1,0 +1,25 @@
+{
+  "id": "com.eden.integration.fixture",
+  "name": "Electron Integration Fixture",
+  "version": "1.0.0",
+  "description": "Internal real-Electron integration fixture",
+  "author": "Eden",
+  "backend": {
+    "entry": "backend.js"
+  },
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "defaultSize": {
+      "width": 480,
+      "height": 320
+    },
+    "injections": {
+      "appFrame": "none",
+      "css": "none"
+    }
+  },
+  "permissions": ["process/read"]
+}
