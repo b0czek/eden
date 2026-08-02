@@ -32,6 +32,38 @@
   },
   "overrides": [
     {
+      "includes": [
+        "packages/sdk/src/**/*.ts",
+        "!packages/sdk/src/**/*.test.ts",
+        "!packages/sdk/src/Eden.ts",
+        "!packages/sdk/src/platform/electron/**",
+        "!packages/sdk/src/app-runtime/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "electron": "Runtime code must use platform ports instead of Electron."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "**/platform/electron",
+                      "**/platform/electron/**"
+                    ],
+                    "message": "Runtime code must not import production Electron adapters."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/sdk/apps/**/*icon.svg"],
       "linter": {
         "rules": {
