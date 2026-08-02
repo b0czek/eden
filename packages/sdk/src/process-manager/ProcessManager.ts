@@ -59,7 +59,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private loginAppId?: string;
   private hotReloadStates = new Map<string, string>();
   private hotReloadWatcher?: fs.FSWatcher;
+  private hotReloadSetupPromise?: Promise<void>;
   private hotReloadDebounceTimer?: NodeJS.Timeout;
+  private shuttingDown = false;
 
   constructor(
     @inject(BackendManager) private backendManager: BackendManager,
@@ -144,29 +146,40 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     const stateDirectory = path.dirname(serversPath);
     const debounceMs = Math.max(this.config.hotReload?.debounce ?? 300, 50);
 
-    void fsp.mkdir(stateDirectory, { recursive: true }).then(() => {
-      this.hotReloadWatcher = fs.watch(
-        stateDirectory,
-        (eventType, filename) => {
-          if (eventType !== "rename" && eventType !== "change") {
-            return;
-          }
-          if (filename && filename.toString() !== path.basename(serversPath)) {
-            return;
-          }
+    this.hotReloadSetupPromise = fsp
+      .mkdir(stateDirectory, { recursive: true })
+      .then(() => {
+        if (this.shuttingDown) return;
+        this.hotReloadWatcher = fs.watch(
+          stateDirectory,
+          (eventType, filename) => {
+            if (eventType !== "rename" && eventType !== "change") {
+              return;
+            }
+            if (
+              filename &&
+              filename.toString() !== path.basename(serversPath)
+            ) {
+              return;
+            }
 
-          if (this.hotReloadDebounceTimer) {
-            clearTimeout(this.hotReloadDebounceTimer);
-          }
-          this.hotReloadDebounceTimer = setTimeout(() => {
-            void this.handleHotReloadStateChanged();
-          }, debounceMs);
-        },
-      );
+            if (this.hotReloadDebounceTimer) {
+              clearTimeout(this.hotReloadDebounceTimer);
+            }
+            this.hotReloadDebounceTimer = setTimeout(() => {
+              void this.handleHotReloadStateChanged();
+            }, debounceMs);
+          },
+        );
 
-      void this.handleHotReloadStateChanged();
-      log.info(`Watching hot reload state: ${serversPath}`);
-    });
+        void this.handleHotReloadStateChanged();
+        log.info(`Watching hot reload state: ${serversPath}`);
+      })
+      .catch((error) => {
+        if (!this.shuttingDown) {
+          log.error(`Failed to watch hot reload state: ${serversPath}`, error);
+        }
+      });
   }
 
   private async handleHotReloadStateChanged(): Promise<void> {
@@ -527,6 +540,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Shutdown all apps
    */
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    await this.hotReloadSetupPromise;
     this.hotReloadWatcher?.close();
     if (this.hotReloadDebounceTimer) {
       clearTimeout(this.hotReloadDebounceTimer);
@@ -549,6 +564,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   }
 
   override dispose(): void {
+    this.shuttingDown = true;
     this.hotReloadWatcher?.close();
     this.hotReloadWatcher = undefined;
     if (this.hotReloadDebounceTimer) {

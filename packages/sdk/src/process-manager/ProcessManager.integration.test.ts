@@ -1,4 +1,7 @@
 import "reflect-metadata";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import { AppRegistry } from "../app-registry/AppRegistry";
 import { PermissionRegistry } from "../ipc";
@@ -73,5 +76,31 @@ describe("ProcessManager integration", () => {
     expect(
       eden.runtime.resolve(ProcessManager).getAppInstance(target.id),
     ).toBeUndefined();
+  });
+
+  it("drains hot-reload watcher setup during shutdown", async () => {
+    const stateRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "eden-hot-reload-test-"),
+    );
+    const stateDirectory = path.join(stateRoot, "state");
+    try {
+      eden = await createTestEden({
+        autoStart: false,
+        config: { hotReload: { enabled: true, stateDirectory } },
+      });
+      const processes = eden.runtime.resolve(ProcessManager) as unknown as {
+        hotReloadSetupPromise?: Promise<void>;
+        hotReloadWatcher?: unknown;
+      };
+      const setup = processes.hotReloadSetupPromise;
+
+      await eden.runtime.dispose();
+      await setup;
+
+      expect(processes.hotReloadWatcher).toBeUndefined();
+      await expect(fs.access(stateDirectory)).resolves.toBeUndefined();
+    } finally {
+      await fs.rm(stateRoot, { recursive: true, force: true });
+    }
   });
 });
