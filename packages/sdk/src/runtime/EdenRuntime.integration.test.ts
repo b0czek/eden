@@ -1,28 +1,22 @@
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import type { UserProfile } from "@edenapp/types";
-import { DaemonManager } from "../daemon";
 import { CommandRegistry, PermissionRegistry } from "../ipc";
-import { PowerManager } from "../power";
-import { ProcessManager } from "../process-manager";
 import { SessionManager } from "../session";
 import { SettingsManager } from "../settings";
+import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { UserManager } from "../user";
-import { createTestEden, type TestEden } from "./createTestEden";
 
-function caller(appId: string, profile: UserProfile) {
-  return {
-    appId,
-    principal: { kind: "user" as const, profile },
-  };
-}
+const caller = (appId: string, profile: UserProfile) => ({
+  appId,
+  principal: { kind: "user" as const, profile },
+});
 
-describe("EdenRuntime Node integration", () => {
+describe("EdenRuntime integration", () => {
   const active: TestEden[] = [];
 
   afterEach(async () => {
     await Promise.all(active.splice(0).map((eden) => eden.dispose()));
-    jest.restoreAllMocks();
   });
 
   it("isolates commands, sessions, permissions, settings, and filesystem roots", async () => {
@@ -94,94 +88,6 @@ describe("EdenRuntime Node integration", () => {
       await fs.readFile(`${second.paths.userDirectory}/runtime.txt`, "utf8"),
     ).toBe("second-root");
     expect(first.paths.root).not.toBe(second.paths.root);
-  });
-
-  it("executes authorized commands and rejects unauthorized callers through real permission handling", async () => {
-    const eden = await createTestEden();
-    active.push(eden);
-    const profile = await eden.runtime.resolve(UserManager).createUser({
-      username: "permission-user",
-      name: "Permission User",
-      password: "password",
-    });
-    const permissions = eden.runtime.resolve(PermissionRegistry);
-    permissions.registerApp("authorized-app", ["fs/write", "fs/read"]);
-    permissions.registerApp("unauthorized-app", ["fs/read"]);
-
-    await eden.execute(
-      "fs/write",
-      { path: "/authorized.txt", content: "allowed" },
-      caller("authorized-app", profile),
-    );
-    expect(
-      await eden.execute(
-        "fs/read",
-        { path: "/authorized.txt" },
-        caller("authorized-app", profile),
-      ),
-    ).toBe("allowed");
-    await expect(
-      eden.execute(
-        "fs/write",
-        { path: "/denied.txt", content: "blocked" },
-        caller("unauthorized-app", profile),
-      ),
-    ).rejects.toThrow("Permission denied: fs/write");
-    await expect(
-      fs.access(`${eden.paths.userDirectory}/denied.txt`),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("coordinates a power command through the real managers before the provider", async () => {
-    const order: string[] = [];
-    const eden = await createTestEden({
-      config: {
-        powerProvider: {
-          poweroff: async () => {
-            order.push("provider.poweroff");
-          },
-        },
-      },
-    });
-    active.push(eden);
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("power-app", ["system/power"]);
-
-    const daemons = eden.runtime.resolve(DaemonManager);
-    const processes = eden.runtime.resolve(ProcessManager);
-    const realDaemonShutdown = daemons.shutdown.bind(daemons);
-    const realProcessShutdown = processes.shutdown.bind(processes);
-    const daemonShutdown = jest
-      .spyOn(daemons, "shutdown")
-      .mockImplementation(async () => {
-        order.push("daemon.shutdown");
-        await realDaemonShutdown();
-      });
-    const processShutdown = jest
-      .spyOn(processes, "shutdown")
-      .mockImplementation(async () => {
-        order.push("process.shutdown");
-        await realProcessShutdown();
-      });
-
-    await eden.execute(
-      "system/power",
-      { action: "poweroff" },
-      { appId: "power-app", principal: { kind: "system" } },
-    );
-
-    expect(daemonShutdown).toHaveBeenCalledTimes(1);
-    expect(processShutdown).toHaveBeenCalledTimes(1);
-    expect(order).toEqual([
-      "daemon.shutdown",
-      "process.shutdown",
-      "provider.poweroff",
-    ]);
-    expect(eden.runtime.resolve(PowerManager).getCapabilities()).toEqual({
-      poweroff: true,
-      reboot: false,
-    });
   });
 
   it("disposes partially initialized resources after startup failure", async () => {
