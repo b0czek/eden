@@ -2,7 +2,7 @@
 
 Eden is an electron environment that strives to provide os-like experience for the user. This means it allows the user to run applications in a sandboxed environment, with access to the file system, network, and other system resources.
 
-For every completed task that affects publishable packages, add or update an appropriate Changesets entry.
+Changesets describe user-facing release units, not individual tasks or commits. Before adding one, inspect the unreleased entries and recent branch history for an existing changeset covering the same feature or fix. Update that entry as the work evolves, including follow-up fixes, tests, refactors, and review changes, rather than creating additional patch entries. Add a new changeset only for a separately releasable user-facing change to a publishable package; do not add one for internal-only work that does not change the package's released behavior. Give new changesets a descriptive `<package>-<release-unit>.md` filename, such as `sdk-runtime-shutdown.md`, so related work can find and reuse them. Keep the summary focused on the final behavior users will receive.
 
 # Testing
 
