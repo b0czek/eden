@@ -20,7 +20,6 @@
     "test:unit": "pnpm --filter @edenapp/sdk run test:unit && pnpm -r --filter '!@edenapp/sdk' --if-present run test",
     "test:integration:node": "pnpm --filter @edenapp/sdk run test:integration:node",
     "test:integration:electron": "pnpm --filter @edenapp/sdk run test:integration:electron",
-    "check:architecture": "pnpm --filter @edenapp/sdk run check:architecture",
     "typecheck": "bash ./scripts/ci-typecheck.sh",
     "lint-staged": "lint-staged",
     "prepare": "pnpm --filter @edenapp/files-core run prepare && simple-git-hooks",

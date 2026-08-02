@@ -8,8 +8,8 @@ then run `pnpm test` before handing it off.
 pnpm test:unit                  # SDK unit tests and other package test suites
 pnpm test:integration:node      # real Eden services with in-memory platform edges
 pnpm test:integration:electron  # built host, preload IPC, views, and utility processes
-pnpm check:architecture         # SDK Electron-import boundary
 pnpm test                       # unit plus Node integration coverage
+pnpm lint                       # Biome checks, including the SDK Electron boundary
 ```
 
 The Electron command builds the required SDK runtime assets before launching
@@ -24,14 +24,14 @@ assertions. They intentionally have no retries. When one fails, inspect the
 trace, screenshot, `eden.log`, and process diagnostics under
 `packages/sdk/electron-integration/test-results/`.
 
-CI runs lint, type checking, unit tests, Node integration tests, and the SDK
-architecture check as independent jobs. Electron integration runs for pull
-requests and pushes to `main`; its failure artifacts are retained briefly.
+CI runs lint, type checking, unit tests, and Node integration tests as
+independent jobs. Electron integration runs for pull requests and pushes to
+`main`; its failure artifacts are retained briefly.
 
 ## Repository administration
 
 After merging the workflow, a repository administrator must update the
 protected target branch and require the `Node integration` and
-`Electron integration` checks. `SDK architecture`, `Unit tests`, `Lint`, and
-`Typecheck` should also remain required. Branch-protection settings live in
-GitHub and cannot be applied by this repository change.
+`Electron integration` checks. `Unit tests`, `Lint`, and `Typecheck` should also
+remain required. Branch-protection settings live in GitHub and cannot be
+applied by this repository change.

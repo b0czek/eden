@@ -161,7 +161,7 @@ Genesis sits on the build side of this model: it turns app source into the
 - [Users and grants](docs/users.md) — accounts, roles, sessions, and access control
 - [Consumer branding](docs/branding.md) — product name, login artwork, and window icons
 - [Host power management](docs/power-management.md) — typed restart and power-off integration
-- [Contributor testing](docs/testing.md) — unit, integration, Electron, and architecture checks
+- [Contributor testing](docs/testing.md) — unit, integration, Electron, and CI checks
 - [EdenCSS](packages/sdk/edencss/README.md) — tokens, utilities, and components
 - [Genesis](packages/genesis/README.md) — application bundling and `.edenite` internals
 
