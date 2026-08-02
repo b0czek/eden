@@ -3,7 +3,7 @@ import type {
   NotificationAction,
   NotificationType,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { DisplayProviderRegistry, ViewManager } from "../view-manager";
@@ -37,7 +37,7 @@ interface NotificationCaller {
   webContentsId?: number;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("notification")
 export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents> {
@@ -164,5 +164,11 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
     }
 
     return { success: this.activeNotifications.delete(notificationId) };
+  }
+
+  override dispose(): void {
+    this.displayProviders.dispose();
+    this.activeNotifications.clear();
+    super.dispose();
   }
 }

@@ -10,7 +10,7 @@ import type {
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -23,6 +23,10 @@ import {
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { PackageManager } from "../package-manager/PackageManager";
+import {
+  PLATFORM_PROCESS_METRICS,
+  type ProcessMetricsPort,
+} from "../platform/ports";
 import { SessionContext } from "../session/SessionContext";
 import { ViewManager } from "../view-manager/ViewManager";
 import { BackendManager } from "./BackendManager";
@@ -45,7 +49,7 @@ interface ProcessNamespaceEvents {
  *
  * Handles app lifecycle (launch, stop) and coordination between workers and views.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("process")
 export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
@@ -55,7 +59,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   private loginAppId?: string;
   private hotReloadStates = new Map<string, string>();
   private hotReloadWatcher?: fs.FSWatcher;
+  private hotReloadSetupPromise?: Promise<void>;
   private hotReloadDebounceTimer?: NodeJS.Timeout;
+  private shuttingDown = false;
 
   constructor(
     @inject(BackendManager) private backendManager: BackendManager,
@@ -70,6 +76,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(RuntimeContextRegistry)
     private runtimeContexts: RuntimeContextRegistry,
+    @inject(PLATFORM_PROCESS_METRICS) processMetrics: ProcessMetricsPort,
   ) {
     super(ipcBridge);
     this.loginAppId = this.config.loginAppId;
@@ -77,6 +84,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       backendManager: this.backendManager,
       viewManager: this.viewManager,
       getRunningApps: (showHidden) => this.getRunningApps(showHidden),
+      processMetrics,
     });
 
     this.setupEventHandlers();
@@ -138,29 +146,40 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     const stateDirectory = path.dirname(serversPath);
     const debounceMs = Math.max(this.config.hotReload?.debounce ?? 300, 50);
 
-    void fsp.mkdir(stateDirectory, { recursive: true }).then(() => {
-      this.hotReloadWatcher = fs.watch(
-        stateDirectory,
-        (eventType, filename) => {
-          if (eventType !== "rename" && eventType !== "change") {
-            return;
-          }
-          if (filename && filename.toString() !== path.basename(serversPath)) {
-            return;
-          }
+    this.hotReloadSetupPromise = fsp
+      .mkdir(stateDirectory, { recursive: true })
+      .then(() => {
+        if (this.shuttingDown) return;
+        this.hotReloadWatcher = fs.watch(
+          stateDirectory,
+          (eventType, filename) => {
+            if (eventType !== "rename" && eventType !== "change") {
+              return;
+            }
+            if (
+              filename &&
+              filename.toString() !== path.basename(serversPath)
+            ) {
+              return;
+            }
 
-          if (this.hotReloadDebounceTimer) {
-            clearTimeout(this.hotReloadDebounceTimer);
-          }
-          this.hotReloadDebounceTimer = setTimeout(() => {
-            void this.handleHotReloadStateChanged();
-          }, debounceMs);
-        },
-      );
+            if (this.hotReloadDebounceTimer) {
+              clearTimeout(this.hotReloadDebounceTimer);
+            }
+            this.hotReloadDebounceTimer = setTimeout(() => {
+              void this.handleHotReloadStateChanged();
+            }, debounceMs);
+          },
+        );
 
-      void this.handleHotReloadStateChanged();
-      log.info(`Watching hot reload state: ${serversPath}`);
-    });
+        void this.handleHotReloadStateChanged();
+        log.info(`Watching hot reload state: ${serversPath}`);
+      })
+      .catch((error) => {
+        if (!this.shuttingDown) {
+          log.error(`Failed to watch hot reload state: ${serversPath}`, error);
+        }
+      });
   }
 
   private async handleHotReloadStateChanged(): Promise<void> {
@@ -521,6 +540,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Shutdown all apps
    */
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    await this.hotReloadSetupPromise;
     this.hotReloadWatcher?.close();
     if (this.hotReloadDebounceTimer) {
       clearTimeout(this.hotReloadDebounceTimer);
@@ -540,6 +561,20 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         log.error(`Failed to stop app ${appId}:`, error);
       }
     }
+  }
+
+  override dispose(): void {
+    this.shuttingDown = true;
+    this.hotReloadWatcher?.close();
+    this.hotReloadWatcher = undefined;
+    if (this.hotReloadDebounceTimer) {
+      clearTimeout(this.hotReloadDebounceTimer);
+      this.hotReloadDebounceTimer = undefined;
+    }
+    this.processMetrics.dispose();
+    this.runningApps.clear();
+    this.hotReloadStates.clear();
+    super.dispose();
   }
 
   /**

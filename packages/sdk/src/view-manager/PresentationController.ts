@@ -1,4 +1,4 @@
-import type { Rectangle as Bounds } from "electron";
+import type { Bounds } from "../platform/ports";
 
 /**
  * Applies transient shell-owned offsets to hosted web contents without mutating

@@ -1,5 +1,5 @@
 import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import { SettingsManager } from "../settings";
@@ -65,7 +65,7 @@ function getDefaultWallpaperPreset(): WallpaperPreset {
 
 const DEFAULT_WALLPAPER_PRESET = getDefaultWallpaperPreset();
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("appearance")
 export class AppearanceManager extends EdenEmitter<AppearanceEvents> {
   private currentWallpaper: WallpaperPreset = DEFAULT_WALLPAPER_PRESET;

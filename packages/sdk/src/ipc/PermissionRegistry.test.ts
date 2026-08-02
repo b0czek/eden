@@ -1,12 +1,7 @@
 import "reflect-metadata";
 
 import type { ResolvedGrant } from "@edenapp/types";
-import {
-  getAllEventPermissions,
-  getEventPermission,
-  PermissionRegistry,
-  registerEventPermission,
-} from "./PermissionRegistry";
+import { PermissionRegistry } from "./PermissionRegistry";
 
 describe("PermissionRegistry", () => {
   let logSpy: jest.SpyInstance;
@@ -82,11 +77,20 @@ describe("PermissionRegistry", () => {
 
 describe("Event Permission Registry", () => {
   it("tracks required permissions for events", () => {
-    registerEventPermission("app/ready", "app/observe");
+    const registry = new PermissionRegistry();
+    registry.registerEventPermission("app/ready", "app/observe");
 
-    expect(getEventPermission("app/ready")).toBe("app/observe");
+    expect(registry.getEventPermission("app/ready")).toBe("app/observe");
 
-    const permissions = getAllEventPermissions();
+    const permissions = registry.getAllEventPermissions();
     expect(permissions.get("app/ready")).toBe("app/observe");
+  });
+
+  it("keeps event permissions isolated between registries", () => {
+    const first = new PermissionRegistry();
+    const second = new PermissionRegistry();
+    first.registerEventPermission("app/ready", "app/observe");
+
+    expect(second.getEventPermission("app/ready")).toBeUndefined();
   });
 });

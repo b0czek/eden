@@ -4,7 +4,10 @@ import type {
   EdenProcessMetric,
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
-import { app, type ProcessMetric as ElectronProcessMetric } from "electron";
+import type {
+  PlatformProcessMetric,
+  ProcessMetricsPort,
+} from "../platform/ports";
 import type { ViewManager } from "../view-manager/ViewManager";
 import type { BackendManager } from "./BackendManager";
 
@@ -16,7 +19,7 @@ interface MetricsRequest {
 
 interface CachedMetricsSample {
   sampledAt: string;
-  appMetrics: ElectronProcessMetric[];
+  appMetrics: PlatformProcessMetric[];
 }
 
 const METRICS_SAMPLE_INTERVAL_MS = 1000;
@@ -27,12 +30,14 @@ interface ProcessMetricsCollectorDeps {
   backendManager: BackendManager;
   viewManager: ViewManager;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
+  processMetrics: ProcessMetricsPort;
 }
 
 export class ProcessMetricsCollector {
   private readonly backendManager: BackendManager;
   private readonly viewManager: ViewManager;
   private readonly getRunningApps: (showHidden?: boolean) => AppInstance[];
+  private readonly processMetrics: ProcessMetricsPort;
   private metricsSampler: NodeJS.Timeout | null = null;
   private nextMetricsRequestId = 0;
   private pendingMetricsRequests: Map<number, MetricsRequest> = new Map();
@@ -43,6 +48,7 @@ export class ProcessMetricsCollector {
     this.backendManager = deps.backendManager;
     this.viewManager = deps.viewManager;
     this.getRunningApps = deps.getRunningApps;
+    this.processMetrics = deps.processMetrics;
   }
 
   async getMetrics(
@@ -88,7 +94,7 @@ export class ProcessMetricsCollector {
 
     if (waitForAccurateCpu) {
       // Prime Electron's CPU sampler so the next interval-based sample is useful.
-      app.getAppMetrics();
+      this.processMetrics.getAppMetrics();
       this.latestMetricsSample = null;
     } else {
       this.captureMetricsSample();
@@ -142,7 +148,7 @@ export class ProcessMetricsCollector {
   }
 
   private captureMetricsSample(): CachedMetricsSample {
-    const appMetrics = app.getAppMetrics();
+    const appMetrics = this.processMetrics.getAppMetrics();
     const sampledAt = new Date().toISOString();
     const sample = { sampledAt, appMetrics };
     this.latestMetricsSample = sample;
@@ -158,7 +164,7 @@ export class ProcessMetricsCollector {
   }
 
   private buildMetricsSnapshot(
-    appMetrics: ElectronProcessMetric[],
+    appMetrics: PlatformProcessMetric[],
     sampledAt: string,
     showHidden: boolean,
   ): ProcessMetricsSnapshot {
@@ -262,7 +268,7 @@ export class ProcessMetricsCollector {
 
   private resolveRendererMetric(
     instance: AppInstance,
-    metricsByPid: Map<number, ElectronProcessMetric>,
+    metricsByPid: Map<number, PlatformProcessMetric>,
   ): EdenProcessMetric | undefined {
     if (instance.viewId === -1) return undefined;
 
@@ -283,7 +289,7 @@ export class ProcessMetricsCollector {
 
   private resolveBackendMetric(
     instance: AppInstance,
-    metricsByPid: Map<number, ElectronProcessMetric>,
+    metricsByPid: Map<number, PlatformProcessMetric>,
   ): EdenProcessMetric | undefined {
     const backendPid = this.backendManager.getBackend(
       instance.manifest.id,
@@ -299,7 +305,7 @@ export class ProcessMetricsCollector {
   }
 
   private toProcessMetric(
-    metric: ElectronProcessMetric,
+    metric: PlatformProcessMetric,
     category: EdenProcessMetric["category"],
     options: { appId?: string; viewId?: number } = {},
   ): EdenProcessMetric {
@@ -311,7 +317,7 @@ export class ProcessMetricsCollector {
       cpu: {
         percentCPUUsage: metric.cpu.percentCPUUsage,
         cumulativeCPUUsage: metric.cpu.cumulativeCPUUsage,
-        idleWakeupsPerSecond: metric.cpu.idleWakeupsPerSecond,
+        idleWakeupsPerSecond: metric.cpu.idleWakeupsPerSecond ?? 0,
       },
       memory: {
         workingSetSize: metric.memory.workingSetSize,
@@ -326,5 +332,17 @@ export class ProcessMetricsCollector {
     if (options.viewId !== undefined) snapshot.viewId = options.viewId;
 
     return snapshot;
+  }
+
+  dispose(): void {
+    if (this.metricsSampler) {
+      clearInterval(this.metricsSampler);
+      this.metricsSampler = null;
+    }
+    for (const request of this.pendingMetricsRequests.values()) {
+      request.reject(new Error("Eden runtime disposed"));
+    }
+    this.pendingMetricsRequests.clear();
+    this.latestMetricsSample = null;
   }
 }

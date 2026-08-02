@@ -1,6 +1,7 @@
 import type { ViewBounds, WindowSize } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
+import type { DisplayPort } from "../platform/ports";
 import { MouseTracker } from "./MouseTracker";
 import type { ViewManager } from "./ViewManager";
 
@@ -30,9 +31,9 @@ export class ViewHandler {
   // Or we can ask ViewManager to find views by appId.
   // ViewManager has getViewsByAppId(appId).
 
-  constructor(viewManager: ViewManager) {
+  constructor(viewManager: ViewManager, display: DisplayPort) {
     this.viewManager = viewManager;
-    this.mouseTracker = new MouseTracker(8); // ~120fps
+    this.mouseTracker = new MouseTracker(display, 8); // ~120fps
   }
 
   private requireCallerAppId(callerAppId?: string): string {
@@ -410,5 +411,11 @@ export class ViewHandler {
   @EdenHandler("get-interface-scale")
   async handleGetInterfaceScale(): Promise<{ scale: number }> {
     return { scale: this.viewManager.getCurrentScale() };
+  }
+
+  dispose(): void {
+    this.dragState = null;
+    this.resizeState = null;
+    this.mouseTracker.dispose();
   }
 }

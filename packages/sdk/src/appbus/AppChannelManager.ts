@@ -3,10 +3,10 @@ import type {
   RegisteredService,
   ServiceInfo,
 } from "@edenapp/types";
-import { MessageChannelMain, webContents } from "electron";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
+import { type AppChannelPort, PLATFORM_APP_CHANNELS } from "../platform/ports";
 import { BackendManager } from "../process-manager/BackendManager";
 import { AppChannelHandler } from "./AppChannelHandler";
 
@@ -17,7 +17,7 @@ import { AppChannelHandler } from "./AppChannelHandler";
  * Uses Electron's MessageChannelMain for direct communication
  * that bypasses the main process after initial setup.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class AppChannelManager {
   /** Map of "appId:serviceName" -> RegisteredService */
@@ -41,6 +41,7 @@ export class AppChannelManager {
   constructor(
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(delay(() => BackendManager)) backendManager: BackendManager,
+    @inject(PLATFORM_APP_CHANNELS) private appChannels: AppChannelPort,
   ) {
     this.handler = new AppChannelHandler(this);
     this.backendManager = backendManager;
@@ -176,10 +177,10 @@ export class AppChannelManager {
 
     // Get webContents for both requester and target
     const requesterWebContents = requesterWebContentsId
-      ? webContents.fromId(requesterWebContentsId)
+      ? this.appChannels.getWebContentsById(requesterWebContentsId)
       : undefined;
     const targetWebContents = service.webContentsId
-      ? webContents.fromId(service.webContentsId)
+      ? this.appChannels.getWebContentsById(service.webContentsId)
       : undefined;
 
     // Validate requester (must be frontend or backend)
@@ -210,7 +211,7 @@ export class AppChannelManager {
     }
 
     // Create MessageChannel for peer-to-peer communication
-    const { port1, port2 } = new MessageChannelMain();
+    const { port1, port2 } = this.appChannels.createMessageChannel();
     const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${Date.now()}`;
 
     this.connections.set(connectionId, {
@@ -341,7 +342,7 @@ export class AppChannelManager {
       `Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`,
     );
     if (webContentsId) {
-      const wc = webContents.fromId(webContentsId);
+      const wc = this.appChannels.getWebContentsById(webContentsId);
       if (wc && !wc.isDestroyed()) {
         wc.send("appbus-port-closed", { connectionId });
       }
@@ -395,5 +396,9 @@ export class AppChannelManager {
 
     this.services.clear();
     log.info("Destroyed");
+  }
+
+  dispose(): void {
+    this.destroy();
   }
 }

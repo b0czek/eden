@@ -1,8 +1,13 @@
 import "reflect-metadata";
 
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
-import type { Rectangle as Bounds, BrowserWindow } from "electron";
 import type { CommandRegistry, IPCBridge } from "../ipc";
+import type {
+  Bounds,
+  DisplayPort,
+  PlatformWindow,
+  WindowingPort,
+} from "../platform/ports";
 import type { SettingsManager } from "../settings/SettingsManager";
 import type { ViewInfo, ViewMode } from "./types";
 import { ViewManager } from "./ViewManager";
@@ -24,7 +29,7 @@ function createManager(tiling: TilingConfig): ViewManager {
     },
   } as unknown as IPCBridge;
   const settingsManager = {
-    on: jest.fn(),
+    on: jest.fn(() => jest.fn()),
     get: jest.fn().mockResolvedValue(undefined),
   } as unknown as SettingsManager;
 
@@ -34,6 +39,16 @@ function createManager(tiling: TilingConfig): ViewManager {
     { tiling } as EdenConfig,
     "/tmp",
     settingsManager,
+    {
+      createView: jest.fn(),
+      createWindow: jest.fn(),
+      attachWebContentsLogger: jest.fn(),
+      getWebContentsById: jest.fn(),
+    } as unknown as WindowingPort,
+    {
+      getCursorScreenPoint: jest.fn(() => ({ x: 0, y: 0 })),
+      getDisplayMatching: jest.fn(),
+    } as unknown as DisplayPort,
   );
   manager.setMainWindow({
     isDestroyed: () => false,
@@ -41,7 +56,7 @@ function createManager(tiling: TilingConfig): ViewManager {
       addChildView: jest.fn(),
       removeChildView: jest.fn(),
     },
-  } as unknown as BrowserWindow);
+  } as unknown as PlatformWindow);
 
   return manager;
 }

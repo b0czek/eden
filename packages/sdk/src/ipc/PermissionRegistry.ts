@@ -15,7 +15,7 @@ import { log } from "../logging";
  */
 
 import type { ResolvedGrant } from "@edenapp/types";
-import { injectable, singleton } from "tsyringe";
+import { injectable, Lifecycle, scoped } from "tsyringe";
 
 /**
  * Per-app permission state
@@ -27,10 +27,11 @@ interface AppPermissionState {
   grants: Map<string, { permissions: Set<string> }>;
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class PermissionRegistry {
   private apps: Map<string, AppPermissionState> = new Map();
+  private eventPermissions = new Map<string, string>();
 
   /**
    * Register permissions for an app from manifest data.
@@ -140,35 +141,24 @@ export class PermissionRegistry {
     }
     return false;
   }
-}
 
-/**
- * Event Permission Registry
- *
- * Stores which permissions are required to subscribe to specific events.
- */
-const EVENT_PERMISSIONS: Map<string, string> = new Map();
+  /** Register an event subscription permission for this runtime. */
+  registerEventPermission(eventName: string, permission: string): void {
+    this.eventPermissions.set(eventName, permission);
+  }
 
-/**
- * Register an event's required permission
- */
-export function registerEventPermission(
-  eventName: string,
-  permission: string,
-): void {
-  EVENT_PERMISSIONS.set(eventName, permission);
-}
+  /** Get the event subscription permission registered in this runtime. */
+  getEventPermission(eventName: string): string | undefined {
+    return this.eventPermissions.get(eventName);
+  }
 
-/**
- * Get the permission required to subscribe to an event
- */
-export function getEventPermission(eventName: string): string | undefined {
-  return EVENT_PERMISSIONS.get(eventName);
-}
+  /** Return a defensive snapshot of this runtime's event permissions. */
+  getAllEventPermissions(): Map<string, string> {
+    return new Map(this.eventPermissions);
+  }
 
-/**
- * Get all registered event permissions
- */
-export function getAllEventPermissions(): Map<string, string> {
-  return new Map(EVENT_PERMISSIONS);
+  dispose(): void {
+    this.apps.clear();
+    this.eventPermissions.clear();
+  }
 }

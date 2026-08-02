@@ -1,6 +1,5 @@
-import { screen } from "electron";
-
 import { log } from "../logging";
+import type { DisplayPort } from "../platform/ports";
 /**
  * Callback function for mouse updates
  */
@@ -27,7 +26,10 @@ export class MouseTracker {
   /**
    * @param updateInterval - Update interval in milliseconds (default: 8ms for ~120fps)
    */
-  constructor(updateInterval: number = 8) {
+  constructor(
+    private readonly display: Pick<DisplayPort, "getCursorScreenPoint">,
+    updateInterval: number = 8,
+  ) {
     this.updateInterval = updateInterval;
   }
 
@@ -63,7 +65,7 @@ export class MouseTracker {
    * Get the current mouse position
    */
   getCurrentPosition(): { x: number; y: number } {
-    return screen.getCursorScreenPoint();
+    return this.display.getCursorScreenPoint();
   }
 
   /**

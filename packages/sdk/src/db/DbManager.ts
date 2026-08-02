@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry } from "../ipc";
 import { log } from "../logging";
 import { DbHandler } from "./DbHandler";
@@ -11,7 +11,7 @@ import { DbHandler } from "./DbHandler";
  * Provides namespace-isolated storage using SQLite backend via Keyv.
  * Each app gets its own namespace, preventing cross-app data access.
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class DbManager {
   private keyv: Keyv;
@@ -130,5 +130,9 @@ export class DbManager {
     const namespacedKey = this.getNamespacedKey(appId, key);
     const value = await this.keyv.get(namespacedKey);
     return value !== undefined;
+  }
+
+  async dispose(): Promise<void> {
+    await this.keyv.disconnect();
   }
 }

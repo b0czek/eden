@@ -14,7 +14,7 @@ import type {
   UserGrantOption,
   UserProfile,
 } from "@edenapp/types";
-import { delay, inject, singleton } from "tsyringe";
+import { delay, inject, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import type { DaemonManager } from "../daemon";
 import { ExecutionContext } from "../execution";
@@ -54,7 +54,7 @@ interface SettingsPanelNamespaceEvents {
   };
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("settings")
 export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEvents> {
   private readonly panels = new Map<string, SettingsPanelRecord>();
@@ -522,5 +522,11 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
 
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : "Unknown error";
+  }
+
+  override dispose(): void {
+    this.panels.clear();
+    this.lifecycleConnected = false;
+    super.dispose();
   }
 }

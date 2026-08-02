@@ -1,5 +1,5 @@
 import type { RecursiveObject } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { SettingsManager } from "../settings/SettingsManager";
 import { I18nHandler } from "./I18nHandler";
@@ -17,7 +17,7 @@ interface I18nNamespaceEvents {
   "locale-changed": { locale: string };
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("i18n")
 export class I18nManager extends EdenEmitter<I18nNamespaceEvents> {

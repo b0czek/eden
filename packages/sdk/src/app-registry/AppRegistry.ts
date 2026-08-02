@@ -1,7 +1,7 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
-import { injectable, singleton } from "tsyringe";
+import { injectable, Lifecycle, scoped } from "tsyringe";
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class AppRegistry {
   private manifests = new Map<string, RuntimeAppManifest>();
@@ -24,5 +24,9 @@ export class AppRegistry {
 
   list(): RuntimeAppManifest[] {
     return Array.from(this.manifests.values());
+  }
+
+  dispose(): void {
+    this.manifests.clear();
   }
 }

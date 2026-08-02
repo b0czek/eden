@@ -6,7 +6,7 @@ import type {
   EdenConfig,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { AppCatalog } from "../app-registry";
 import { AppRegistry } from "../app-registry/AppRegistry";
 import { FilesystemManager } from "../filesystem";
@@ -37,7 +37,7 @@ interface PackageNamespaceEvents {
   uninstalled: { appId: string };
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("package")
 export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {

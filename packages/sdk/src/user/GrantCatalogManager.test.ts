@@ -2,7 +2,6 @@ import "reflect-metadata";
 import type { RuntimeAppManifest, UserGrantOption } from "@edenapp/types";
 import type { AppCatalog } from "../app-registry";
 import type { IPCBridge } from "../ipc";
-import { getEventPermission } from "../ipc/PermissionRegistry";
 import type { PackageManager } from "../package-manager";
 import type { SettingsPanelManager } from "../settings";
 import { GrantCatalogManager } from "./GrantCatalogManager";
@@ -128,11 +127,5 @@ describe("GrantCatalogManager", () => {
     expect(notify).toHaveBeenCalledWith("user/grant-options-changed", {
       revision: 2,
     });
-  });
-
-  it("protects the change event with user/manage", () => {
-    expect(getEventPermission("user/grant-options-changed")).toBe(
-      "user/manage",
-    );
   });
 });

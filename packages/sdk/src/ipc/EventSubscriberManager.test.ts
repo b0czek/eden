@@ -4,14 +4,13 @@ import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
 import { EventSubscriberManager } from "./EventSubscriberManager";
 import type { PermissionRegistry } from "./PermissionRegistry";
-import { registerEventPermission } from "./PermissionRegistry";
 
 type ViewManagerMock = jest.Mocked<
   Pick<ViewManager, "getViewInfo" | "sendToView" | "sendToMainWindow">
 >;
 type BackendManagerMock = jest.Mocked<Pick<BackendManager, "sendMessage">>;
 type PermissionRegistryMock = jest.Mocked<
-  Pick<PermissionRegistry, "hasPermission">
+  Pick<PermissionRegistry, "getEventPermission" | "hasPermission">
 >;
 type ViewInfo = NonNullable<ReturnType<ViewManager["getViewInfo"]>>;
 
@@ -26,6 +25,7 @@ const createBackendManagerMock = (): BackendManagerMock => ({
 });
 
 const createPermissionRegistryMock = (): PermissionRegistryMock => ({
+  getEventPermission: jest.fn(),
   hasPermission: jest.fn(),
 });
 
@@ -74,9 +74,8 @@ describe("EventSubscriberManager", () => {
       permissionRegistry as unknown as PermissionRegistry,
     );
 
-    registerEventPermission("event/secure", "permissions/secure");
-
     viewManager.getViewInfo.mockReturnValue(createViewInfo());
+    permissionRegistry.getEventPermission.mockReturnValue("permissions/secure");
     permissionRegistry.hasPermission.mockReturnValue(false);
 
     expect(() => manager.subscribe(1, "event/secure")).toThrow(

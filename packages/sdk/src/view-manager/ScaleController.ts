@@ -16,6 +16,7 @@ import type { ViewInfo, ViewType } from "./types";
 const INTERFACE_SCALE_KEY = "general.interfaceScale";
 
 export class ScaleController {
+  private readonly stopListening: () => void;
   private currentScale: number = 1.0;
   private readonly getViews: () => Iterable<ViewInfo>;
   private readonly settingsManager: SettingsManager;
@@ -31,7 +32,7 @@ export class ScaleController {
     this.notifyScaleChanged = notifyScaleChanged;
 
     // Listen for interface scale setting changes
-    settingsManager.on("changed", (data) => {
+    this.stopListening = settingsManager.on("changed", (data) => {
       if (data.key === INTERFACE_SCALE_KEY) {
         const scale = parseFloat(data.value);
         if (!Number.isNaN(scale)) {
@@ -42,6 +43,10 @@ export class ScaleController {
 
     // Initialize scale on next tick (after construction completes)
     this.initialize();
+  }
+
+  dispose(): void {
+    this.stopListening();
   }
 
   /**

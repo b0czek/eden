@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { type BrowserWindow, ipcMain } from "electron";
-import { delay, inject, injectable, singleton } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
+import {
+  PLATFORM_RENDERER_IPC,
+  type PlatformWindow,
+  type RendererIpcPort,
+} from "../platform/ports";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { CommandRegistry } from "./CommandRegistry";
@@ -18,12 +22,12 @@ import { PermissionRegistry } from "./PermissionRegistry";
  * - Utility processes (app backends)
  * - WebContentsViews (app frontends)
  */
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @injectable()
 export class IPCBridge extends EventEmitter {
   public eventSubscribers: EventSubscriberManager;
   private eventHandler: EventHandler;
-  private mainWindow: BrowserWindow | null = null;
+  private mainWindow: PlatformWindow | null = null;
   private runningAppIds: Set<string> = new Set();
   private pendingCommands: Map<
     string,
@@ -33,6 +37,10 @@ export class IPCBridge extends EventEmitter {
       timeout: NodeJS.Timeout;
     }
   > = new Map();
+  private backendMessageListener?: (payload: {
+    appId: string;
+    message: unknown;
+  }) => void;
 
   constructor(
     @inject(BackendManager) private backendManager: BackendManager,
@@ -41,6 +49,7 @@ export class IPCBridge extends EventEmitter {
     @inject(delay(() => ViewManager)) private viewManager: ViewManager,
     @inject(delay(() => RuntimeContextRegistry))
     private runtimeContexts: RuntimeContextRegistry,
+    @inject(PLATFORM_RENDERER_IPC) private rendererIpc: RendererIpcPort,
   ) {
     super();
 
@@ -60,14 +69,14 @@ export class IPCBridge extends EventEmitter {
   /**
    * Set the main window for shell communication
    */
-  setMainWindow(window: BrowserWindow): void {
+  setMainWindow(window: PlatformWindow): void {
     this.mainWindow = window;
   }
 
   /**
    * Get the main window instance
    */
-  getMainWindow(): BrowserWindow | null {
+  getMainWindow(): PlatformWindow | null {
     return this.mainWindow;
   }
 
@@ -76,7 +85,7 @@ export class IPCBridge extends EventEmitter {
    */
   private setupIPCHandlers(): void {
     // Handle shell commands
-    ipcMain.handle(
+    this.rendererIpc.handle<[string, unknown], unknown>(
       "shell-command",
       async (event, command: string, args: unknown) => {
         // Build caller context for commands that need it
@@ -100,55 +109,53 @@ export class IPCBridge extends EventEmitter {
    * Setup handlers for backend utility process messages
    */
   private setupBackendMessageHandlers(): void {
-    this.backendManager.on(
-      "backend-message",
-      async ({ appId, message }: { appId: string; message: unknown }) => {
-        if (!message || typeof message !== "object" || !("type" in message)) {
-          log.warn(`Unknown backend message from ${appId}:`, message);
+    this.backendMessageListener = async ({ appId, message }) => {
+      if (!message || typeof message !== "object" || !("type" in message)) {
+        log.warn(`Unknown backend message from ${appId}:`, message);
+        return;
+      }
+
+      const backendMessage = message as {
+        type: string;
+        command?: string;
+        commandId?: string;
+        args?: unknown;
+      };
+
+      // Handle different message types from backend
+      if (backendMessage.type === "shell-command") {
+        if (!backendMessage.command || !backendMessage.commandId) {
+          log.warn(`Malformed shell-command message from ${appId}:`, message);
           return;
         }
 
-        const backendMessage = message as {
-          type: string;
-          command?: string;
-          commandId?: string;
-          args?: unknown;
-        };
-
-        // Handle different message types from backend
-        if (backendMessage.type === "shell-command") {
-          if (!backendMessage.command || !backendMessage.commandId) {
-            log.warn(`Malformed shell-command message from ${appId}:`, message);
-            return;
-          }
-
-          // Backend requesting a shell command execution
-          try {
-            const result = await this.handleShellCommand(
-              backendMessage.command,
-              backendMessage.args,
-              {
-                appId,
-                principal: this.runtimeContexts.resolvePrincipal(appId),
-              },
-            );
-            // Send response back to backend
-            this.sendBackendResponse(appId, backendMessage.commandId, result);
-          } catch (error) {
-            this.backendManager.sendMessage(appId, {
-              type: "shell-command-response",
-              commandId: backendMessage.commandId,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        } else {
-          log.warn(
-            `Unknown backend message type from ${appId}:`,
-            backendMessage.type,
+        // Backend requesting a shell command execution
+        try {
+          const result = await this.handleShellCommand(
+            backendMessage.command,
+            backendMessage.args,
+            {
+              appId,
+              principal: this.runtimeContexts.resolvePrincipal(appId),
+            },
           );
+          // Send response back to backend
+          this.sendBackendResponse(appId, backendMessage.commandId, result);
+        } catch (error) {
+          this.backendManager.sendMessage(appId, {
+            type: "shell-command-response",
+            commandId: backendMessage.commandId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-      },
-    );
+      } else {
+        log.warn(
+          `Unknown backend message type from ${appId}:`,
+          backendMessage.type,
+        );
+      }
+    };
+    this.backendManager.on("backend-message", this.backendMessageListener);
   }
 
   /**
@@ -230,6 +237,25 @@ export class IPCBridge extends EventEmitter {
    */
   destroy(): void {
     // Remove global IPC handlers
-    ipcMain.removeHandler("shell-command");
+    this.rendererIpc.removeHandler("shell-command");
+    if (this.backendMessageListener) {
+      this.backendManager.removeListener(
+        "backend-message",
+        this.backendMessageListener,
+      );
+      this.backendMessageListener = undefined;
+    }
+    for (const pending of this.pendingCommands.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error("Eden runtime disposed"));
+    }
+    this.pendingCommands.clear();
+    this.eventSubscribers.dispose();
+    this.removeAllListeners();
+    this.mainWindow = null;
+  }
+
+  dispose(): void {
+    this.destroy();
   }
 }

@@ -21,6 +21,7 @@
     "codegen": "ts-node scripts/run-codegen.ts",
     "copy-assets": "mkdir -p dist/foundation && cp foundation/* dist/foundation/",
     "css:build": "npx lightningcss --bundle --minify --targets 'chrome 132' edencss/eden.css -o dist/edencss/eden.css && npx lightningcss --bundle --minify --targets 'chrome 132' edencss/tokens.css -o dist/edencss/eden-tokens.css",
+    "build:test-dependencies": "pnpm --filter '@edenapp/sdk^...' run build",
     "dev": "node ./scripts/dev.mjs",
     "dev:apps": "ts-node scripts/build-dev-apps.ts",
     "dev:electron": "NODE_ENV=development electron dist/dev-host.js",
@@ -28,7 +29,13 @@
     "dev:watch": "eden-build watch -c eden.dev.config.json --sdk-source-path .",
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",
-    "test": "jest"
+    "test": "pnpm run test:unit && pnpm run test:integration:node",
+    "pretest:unit": "pnpm run build:test-dependencies",
+    "test:unit": "jest --runInBand --testPathIgnorePatterns=integration.test.ts",
+    "pretest:integration:node": "pnpm run build:test-dependencies",
+    "test:integration:node": "jest --runInBand --silent --testPathPatterns=integration.test.ts",
+    "pretest:integration:electron": "pnpm run build:test-dependencies && pnpm run build:main && pnpm run bundle:app-runtime && pnpm run copy-assets",
+    "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts"
   },
   "keywords": [
     "eden",
@@ -61,6 +68,7 @@
   },
   "devDependencies": {
     "@edenapp/scripts": "workspace:*",
+    "@playwright/test": "^1.62.1",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
     "concurrently": "catalog:",

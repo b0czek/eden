@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
 import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
@@ -11,7 +11,7 @@ import {
 import { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 export class UserManager {
   private store: UserStore;
   private initialized = false;
@@ -298,5 +298,9 @@ export class UserManager {
       }
       return !this.restrictedApps.has(appId);
     });
+  }
+
+  async dispose(): Promise<void> {
+    await this.store.dispose();
   }
 }

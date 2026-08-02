@@ -1,0 +1,1 @@
+export { createElectronPlatform } from "./ElectronPlatform";

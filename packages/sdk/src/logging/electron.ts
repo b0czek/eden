@@ -1,4 +1,4 @@
-import type { WebContents } from "electron";
+import type { PlatformWebContents } from "../platform/ports";
 import type { LogLevel } from "./levels";
 import type { CallsiteInfo, LogContext } from "./logger";
 import { logExternal } from "./logger";
@@ -35,7 +35,7 @@ function mapConsoleLevel(level: number | string): LogLevel {
 }
 
 export function attachWebContentsLogger(
-  webContents: WebContents,
+  webContents: PlatformWebContents,
   context: LogContext,
 ): void {
   webContents.on("console-message", (_event, ...args: unknown[]) => {

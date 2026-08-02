@@ -1,5 +1,5 @@
 import type { UserProfile } from "@edenapp/types";
-import { inject, singleton } from "tsyringe";
+import { inject, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { UserManager } from "../user/UserManager";
@@ -14,7 +14,7 @@ interface SessionNamespaceEvents {
   };
 }
 
-@singleton()
+@scoped(Lifecycle.ContainerScoped)
 @EdenNamespace("session")
 export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
   private initialized = false;

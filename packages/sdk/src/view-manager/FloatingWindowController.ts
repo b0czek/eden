@@ -1,5 +1,5 @@
 import type { WindowConfig } from "@edenapp/types";
-import type { Rectangle as Bounds } from "electron";
+import type { Bounds } from "../platform/ports";
 import type { ViewInfo } from "./types";
 
 type ViewCollection = () => Iterable<ViewInfo>;
