@@ -315,6 +315,55 @@ export async function validateManifest(
   try {
     const content = await fs.readFile(manifestPath, "utf-8");
     const manifest: AppManifest = JSON.parse(content);
+
+    if (!manifest.version) {
+      const packageJsonPath = path.join(
+        path.dirname(manifestPath),
+        "package.json",
+      );
+      let packageJsonContent: string;
+
+      try {
+        packageJsonContent = await fs.readFile(packageJsonPath, "utf-8");
+      } catch (error: unknown) {
+        return {
+          valid: false,
+          errors: [
+            `Could not infer app version from package.json: ${getErrorMessage(error)}`,
+          ],
+        };
+      }
+
+      try {
+        const packageJson: unknown = JSON.parse(packageJsonContent);
+        const packageVersion =
+          typeof packageJson === "object" && packageJson !== null
+            ? (packageJson as { version?: unknown }).version
+            : undefined;
+
+        if (
+          typeof packageVersion !== "string" ||
+          packageVersion.trim().length === 0
+        ) {
+          return {
+            valid: false,
+            errors: [
+              "Could not infer app version from package.json: version must be a non-empty string",
+            ],
+          };
+        }
+
+        manifest.version = packageVersion;
+      } catch (error: unknown) {
+        return {
+          valid: false,
+          errors: [
+            `Could not infer app version from package.json: ${getErrorMessage(error)}`,
+          ],
+        };
+      }
+    }
+
     return validateManifestObject(manifest);
   } catch (error: unknown) {
     return {

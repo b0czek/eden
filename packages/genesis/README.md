@@ -121,6 +121,9 @@ my-app/
 }
 ```
 
+`version` may be omitted when a sibling `package.json` provides a non-empty
+string version. An explicit manifest version takes precedence.
+
 ## .edenite Format
 
 An `.edenite` file is a Zstandard-compressed TAR archive with the following structure:
@@ -161,4 +164,3 @@ console.log(info.checksum);
 ## License
 
 MIT
-
