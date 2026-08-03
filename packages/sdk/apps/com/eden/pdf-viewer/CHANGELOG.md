@@ -1,5 +1,13 @@
 # com.eden.pdf-viewer
 
+## 1.0.6
+
+### Patch Changes
+
+- Updated dependencies [c8075b0]
+  - @edenapp/babel@0.12.0
+  - @edenapp/tablets@0.12.0
+
 ## 1.0.5
 
 ### Patch Changes

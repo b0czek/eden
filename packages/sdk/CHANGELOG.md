@@ -1,5 +1,55 @@
 # @edenapp/sdk
 
+## 0.12.0
+
+### Minor Changes
+
+- 41fcd6f: Add system-owned, supervised backend daemons with persistent grant-controlled configuration, fixed Eden execution principals, session-independent lifecycle controls, and a grant-aware Settings management tab.
+- a156ad0: Add safe file and recursive-directory transfers with explicit replacement, plus reusable multi-selection explorer controls and in-app destination browsing for Files copy, move, and batch delete workflows.
+- 656844d: Add permission-aware native directory watching and live file explorer refreshes, including automatic recovery when an open directory becomes unavailable.
+- 01e622b: Add live, grant-aware Settings panels with declarative operation dialogs, an administrative grant catalog, and stable main-process control-plane APIs for apps, daemons, users, sessions, appearance, and app associations.
+
+### Patch Changes
+
+- dd335f4: Run host app catalog queries with the active user's authorization context.
+- 14a2705: Keep Process Manager subsection headers visible beneath the floating table header while scrolling.
+- e96012c: Preserve an autostarted app's authorized session identity when hot reload restarts it.
+- 081155c: Apply the configured interface scale to views created while scale settings initialize.
+- 92a61d3: Restore minimized floating app views to their previous bounds when focused again.
+- ca788bf: Isolate each Eden host in an independently disposable runtime and add Node and
+  real-Electron integration coverage for lifecycle, permissions, persistence,
+  views, IPC, processes, and shutdown behavior. Enforce the Electron platform
+  boundary through the SDK's Biome checks. Replace mock-heavy control-plane,
+  settings, process, filesystem, and file-association tests with runtime
+  integration scenarios that use real Eden services and persistence.
+- 4bfae27: Display server validation errors beside their matching settings dialog fields.
+- 4931d0a: Position system context menus correctly when their opener uses interface scaling.
+- 01e622b: Declare Jest and Node types in package TypeScript configurations so test globals are available consistently in editors and type checks.
+- 8438cb6: Load installed app sizes only when their detail view is selected.
+- f2d7979: Refresh settings panel snapshots when daemon runtime state changes.
+- 41aeba2: Skip invalid application settings panels instead of failing Eden startup.
+- 14a2705: Add a typed host power provider with permission-gated restart and power-off
+  commands, graceful managed-workload shutdown, and built-in eveshell and login
+  screen controls.
+- a156ad0: Restore all bundled Eden apps when running the SDK development environment.
+- d4e77e2: Shut down Eden runtimes cleanly by aborting in-progress startup, draining queued autostarts, cancelling hot-reload watcher setup, and preventing disposed runtimes from restarting.
+- 92b2bb8: Keep settings value inputs responsive by committing local drafts after editing.
+- fa2c2ad: Account for app interface scaling when lifting web contents above the docked on-screen keyboard.
+- 11846b2: Preserve settings control state when an action grant disables the control.
+- ac5b8eb: Limit SDK development app bundling to the built-in apps declared in the development configuration, avoiding example apps and the PDF viewer while retaining complete app bundles for SDK builds.
+- c8075b0: Centralize dependency versions shared by multiple workspace packages in the pnpm catalog and update dependencies to their latest releases.
+- Updated dependencies [41fcd6f]
+- Updated dependencies [c7c4e33]
+- Updated dependencies [a156ad0]
+- Updated dependencies [01e622b]
+- Updated dependencies [f2d7979]
+- Updated dependencies [14a2705]
+- Updated dependencies [656844d]
+- Updated dependencies [01e622b]
+- Updated dependencies [c8075b0]
+  - @edenapp/types@0.12.0
+  - @edenapp/genesis@0.12.0
+
 ## 0.11.1
 
 ### Patch Changes

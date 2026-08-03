@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/scripts",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Build tools and CLI for Eden projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

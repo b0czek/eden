@@ -1,5 +1,11 @@
 # @edenapp/babel
 
+## 0.12.0
+
+### Patch Changes
+
+- c8075b0: Centralize dependency versions shared by multiple workspace packages in the pnpm catalog and update dependencies to their latest releases.
+
 ## 0.11.1
 
 ## 0.11.0

@@ -1,5 +1,15 @@
 # com.eden.login
 
+## 1.0.16
+
+### Patch Changes
+
+- Updated dependencies [8c90d1d]
+- Updated dependencies [c5acf54]
+- Updated dependencies [c8075b0]
+  - @edenapp/solid-kit@0.12.0
+  - @edenapp/babel@0.12.0
+
 ## 1.0.15
 
 ### Patch Changes

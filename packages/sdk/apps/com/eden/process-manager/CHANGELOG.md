@@ -1,5 +1,12 @@
 # com.eden.process-manager
 
+## 1.0.16
+
+### Patch Changes
+
+- Updated dependencies [c8075b0]
+  - @edenapp/babel@0.12.0
+
 ## 1.0.15
 
 ### Patch Changes

@@ -1,5 +1,17 @@
 # com.eden.file-picker
 
+## 1.0.6
+
+### Patch Changes
+
+- Updated dependencies [a156ad0]
+- Updated dependencies [656844d]
+- Updated dependencies [a16eccf]
+- Updated dependencies [c8075b0]
+  - @edenapp/files-core@0.11.0
+  - @edenapp/babel@0.12.0
+  - @edenapp/tablets@0.12.0
+
 ## 1.0.5
 
 ### Patch Changes

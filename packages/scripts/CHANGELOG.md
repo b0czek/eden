@@ -1,5 +1,27 @@
 # @edenapp/scripts
 
+## 0.12.0
+
+### Patch Changes
+
+- 6a898c3: Fix the standalone `eden-build dev` seed generation to include default system autostart settings and to create the default demo user as a `vendor`, so dev hosts start with shell utilities and unrestricted access by default.
+- c7c4e33: Build apps concurrently through Genesis while allowing apps with internally
+  parallel builds to opt out using `build.concurrent: false`. Show compact,
+  in-place build progress in interactive terminals.
+- ac5b8eb: Limit SDK development app bundling to the built-in apps declared in the development configuration, avoiding example apps and the PDF viewer while retaining complete app bundles for SDK builds.
+- c8075b0: Centralize dependency versions shared by multiple workspace packages in the pnpm catalog and update dependencies to their latest releases.
+- Updated dependencies [41fcd6f]
+- Updated dependencies [c7c4e33]
+- Updated dependencies [a156ad0]
+- Updated dependencies [01e622b]
+- Updated dependencies [f2d7979]
+- Updated dependencies [14a2705]
+- Updated dependencies [656844d]
+- Updated dependencies [01e622b]
+- Updated dependencies [c8075b0]
+  - @edenapp/types@0.12.0
+  - @edenapp/genesis@0.12.0
+
 ## 0.11.1
 
 ### Patch Changes

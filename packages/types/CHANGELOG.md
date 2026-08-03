@@ -1,5 +1,25 @@
 # @edenapp/types
 
+## 0.12.0
+
+### Minor Changes
+
+- 41fcd6f: Add system-owned, supervised backend daemons with persistent grant-controlled configuration, fixed Eden execution principals, session-independent lifecycle controls, and a grant-aware Settings management tab.
+- a156ad0: Add safe file and recursive-directory transfers with explicit replacement, plus reusable multi-selection explorer controls and in-app destination browsing for Files copy, move, and batch delete workflows.
+- 656844d: Add permission-aware native directory watching and live file explorer refreshes, including automatic recovery when an open directory becomes unavailable.
+- 01e622b: Add live, grant-aware Settings panels with declarative operation dialogs, an administrative grant catalog, and stable main-process control-plane APIs for apps, daemons, users, sessions, appearance, and app associations.
+
+### Patch Changes
+
+- c7c4e33: Build apps concurrently through Genesis while allowing apps with internally
+  parallel builds to opt out using `build.concurrent: false`. Show compact,
+  in-place build progress in interactive terminals.
+- f2d7979: Refresh settings panel snapshots when daemon runtime state changes.
+- 14a2705: Add a typed host power provider with permission-gated restart and power-off
+  commands, graceful managed-workload shutdown, and built-in eveshell and login
+  screen controls.
+- c8075b0: Centralize dependency versions shared by multiple workspace packages in the pnpm catalog and update dependencies to their latest releases.
+
 ## 0.11.1
 
 ### Patch Changes

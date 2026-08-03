@@ -1,5 +1,16 @@
 # @edenapp/files-core
 
+## 0.11.0
+
+### Minor Changes
+
+- a156ad0: Add safe file and recursive-directory transfers with explicit replacement, plus reusable multi-selection explorer controls and in-app destination browsing for Files copy, move, and batch delete workflows.
+- 656844d: Add permission-aware native directory watching and live file explorer refreshes, including automatic recovery when an open directory becomes unavailable.
+
+### Patch Changes
+
+- a16eccf: Show Edenite app packages with the package file icon.
+
 ## 0.10.1
 
 ### Patch Changes

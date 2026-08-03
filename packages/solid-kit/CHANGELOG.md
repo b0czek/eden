@@ -1,5 +1,13 @@
 # @edenapp/solid-kit
 
+## 0.12.0
+
+### Patch Changes
+
+- 8c90d1d: Preserve argument omission when custom dialog renderers call `submit()`, allowing forms to submit their current values.
+- c5acf54: Add dialog options for disabling passive dismissal and selecting either the `dialog` or `alertdialog` accessibility role, with labelled titles.
+- c8075b0: Centralize dependency versions shared by multiple workspace packages in the pnpm catalog and update dependencies to their latest releases.
+
 ## 0.11.1
 
 ## 0.11.0
