@@ -20,12 +20,18 @@ export class ScaleController {
   private currentScale: number = 1.0;
   private readonly getViews: () => Iterable<ViewInfo>;
   private readonly settingsManager: SettingsManager;
-  private readonly notifyScaleChanged: (scale: number) => void;
+  private readonly notifyScaleChanged: (
+    scale: number,
+    previousScale: number,
+  ) => void;
 
   constructor(
     settingsManager: SettingsManager,
     getViews: () => Iterable<ViewInfo>,
-    notifyScaleChanged: (scale: number) => void = () => {},
+    notifyScaleChanged: (
+      scale: number,
+      previousScale: number,
+    ) => void = () => {},
   ) {
     this.settingsManager = settingsManager;
     this.getViews = getViews;
@@ -87,6 +93,7 @@ export class ScaleController {
       throw new Error(`Invalid scale ${scale}. Must be between 0.5 and 2.0`);
     }
 
+    const previousScale = this.currentScale;
     this.currentScale = scale;
     log.info(`Setting interface scale to ${scale * 100}%`);
 
@@ -94,7 +101,7 @@ export class ScaleController {
       this.applyToView(viewInfo);
     }
 
-    this.notifyScaleChanged(scale);
+    this.notifyScaleChanged(scale, previousScale);
   }
 
   /**

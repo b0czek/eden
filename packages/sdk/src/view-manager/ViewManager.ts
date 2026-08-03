@@ -92,18 +92,22 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     const tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
     const getViews = () => this.views.values();
 
-    this.tilingController = new TilingController(tilingConfig);
     this.devToolsController = new DevToolsController();
     this.presentationController = new PresentationController();
     this.scaleController = new ScaleController(
       settingsManager,
       getViews,
-      (scale) => this.notify("interface-scale-changed", { scale }),
+      (scale, previousScale) =>
+        this.handleInterfaceScaleChanged(scale, previousScale),
+    );
+    this.tilingController = new TilingController(tilingConfig, undefined, () =>
+      this.scaleController.getScale(),
     );
 
     this.floatingWindows = new FloatingWindowController(
       () => this.tilingController.getWorkspaceBounds(),
       getViews,
+      () => this.scaleController.getScale(),
     );
 
     // Use consumer's dist path for runtime assets
@@ -121,6 +125,47 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
   private markViewFocused(viewInfo: ViewInfo): void {
     viewInfo.lastFocusedAt = Date.now();
+  }
+
+  private handleInterfaceScaleChanged(
+    scale: number,
+    previousScale: number,
+  ): void {
+    this.notify("interface-scale-changed", { scale });
+
+    if (scale === previousScale || !this.floatingWindows) {
+      return;
+    }
+
+    const ratio = scale / previousScale;
+    for (const viewInfo of this.views.values()) {
+      const automaticallyScaled =
+        viewInfo.manifest.window?.scaling === "auto" ||
+        (viewInfo.viewType === "app" &&
+          viewInfo.manifest.window?.scaling !== "manual");
+      if (viewInfo.mode !== "floating" || !automaticallyScaled) {
+        continue;
+      }
+
+      const scaledBounds = {
+        ...viewInfo.bounds,
+        width: Math.round(viewInfo.bounds.width * ratio),
+        height: Math.round(viewInfo.bounds.height * ratio),
+      };
+      const finalBounds =
+        viewInfo.viewType === "overlay"
+          ? scaledBounds
+          : this.floatingWindows.applyWindowConstraints(
+              scaledBounds,
+              viewInfo.manifest.window,
+            );
+      viewInfo.bounds = finalBounds;
+      if (viewInfo.visible) {
+        this.applyPresentedBounds(viewInfo, finalBounds);
+      }
+    }
+
+    this.syncTiledLayout();
   }
 
   private attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
@@ -379,6 +424,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       const finalBounds = this.floatingWindows.applyWindowConstraints(
         bounds,
         windowConfig,
+        windowConfig?.scaling !== "manual",
       );
       viewInfo.bounds = finalBounds;
       this.applyPresentedBounds(viewInfo, finalBounds);

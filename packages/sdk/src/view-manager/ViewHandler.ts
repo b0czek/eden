@@ -129,6 +129,11 @@ export class ViewHandler {
       currentWidth: viewInfo.bounds.width,
       currentHeight: viewInfo.bounds.height,
     };
+    const interfaceScale =
+      viewInfo.manifest.window?.scaling === "manual"
+        ? 1
+        : this.viewManager.getCurrentScale();
+    const minimumSize = Math.round(200 * interfaceScale);
 
     // Subscribe to mouse updates
     this.mouseTracker.subscribe(`resize-${appId}`, (position) => {
@@ -141,8 +146,8 @@ export class ViewHandler {
       let targetHeight = this.resizeState.startBounds.height + deltaY;
 
       // Apply minimum size
-      targetWidth = Math.max(targetWidth, 200);
-      targetHeight = Math.max(targetHeight, 200);
+      targetWidth = Math.max(targetWidth, minimumSize);
+      targetHeight = Math.max(targetHeight, minimumSize);
 
       this.resizeState.currentWidth = targetWidth;
       this.resizeState.currentHeight = targetHeight;

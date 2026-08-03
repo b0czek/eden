@@ -19,9 +19,16 @@ export class TilingController {
   constructor(
     config: TilingConfig = { mode: "none", gap: 0, padding: 0 },
     workspaceBounds: Bounds = { x: 0, y: 0, width: 800, height: 600 },
+    private readonly getInterfaceScale: () => number = () => 1,
   ) {
     this.config = config;
     this.workspaceBounds = workspaceBounds;
+  }
+
+  private scaleForView(view: ViewInfo): number {
+    return view.manifest.window?.scaling === "manual"
+      ? 1
+      : this.getInterfaceScale();
   }
 
   /**
@@ -70,8 +77,15 @@ export class TilingController {
     minTileWidth: number;
     minTileHeight: number;
   } {
-    const baseMinTileWidth = Math.max(1, this.config.minTileWidth ?? 600);
-    const baseMinTileHeight = Math.max(1, this.config.minTileHeight ?? 400);
+    const scale = this.getInterfaceScale();
+    const baseMinTileWidth = Math.max(
+      1,
+      Math.round((this.config.minTileWidth ?? 600) * scale),
+    );
+    const baseMinTileHeight = Math.max(
+      1,
+      Math.round((this.config.minTileHeight ?? 400) * scale),
+    );
 
     let minTileWidth = baseMinTileWidth;
     let minTileHeight = baseMinTileHeight;
@@ -81,11 +95,16 @@ export class TilingController {
 
       minTileWidth = Math.max(
         minTileWidth,
-        view.manifest.window?.minSize?.width ?? 0,
+        Math.round(
+          (view.manifest.window?.minSize?.width ?? 0) * this.scaleForView(view),
+        ),
       );
       minTileHeight = Math.max(
         minTileHeight,
-        view.manifest.window?.minSize?.height ?? 0,
+        Math.round(
+          (view.manifest.window?.minSize?.height ?? 0) *
+            this.scaleForView(view),
+        ),
       );
     }
 
@@ -155,16 +174,30 @@ export class TilingController {
         return false;
       }
 
-      const minWidth = view.manifest.window?.minSize?.width ?? 0;
-      const minHeight = view.manifest.window?.minSize?.height ?? 0;
+      const scale = this.scaleForView(view);
+      const minWidth = Math.round(
+        (view.manifest.window?.minSize?.width ?? 0) * scale,
+      );
+      const minHeight = Math.round(
+        (view.manifest.window?.minSize?.height ?? 0) * scale,
+      );
 
       return bounds.width >= minWidth && bounds.height >= minHeight;
     });
   }
 
   private constrainTiledBounds(bounds: Bounds, view: ViewInfo): Bounds {
-    const maxWidth = view.manifest.window?.maxSize?.width;
-    const maxHeight = view.manifest.window?.maxSize?.height;
+    const scale = this.scaleForView(view);
+    const configuredMaxWidth = view.manifest.window?.maxSize?.width;
+    const configuredMaxHeight = view.manifest.window?.maxSize?.height;
+    const maxWidth =
+      configuredMaxWidth === undefined
+        ? undefined
+        : Math.round(configuredMaxWidth * scale);
+    const maxHeight =
+      configuredMaxHeight === undefined
+        ? undefined
+        : Math.round(configuredMaxHeight * scale);
 
     const width =
       typeof maxWidth === "number" && maxWidth > 0

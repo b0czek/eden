@@ -100,7 +100,7 @@ describe("ScaleController", () => {
 
     emitSettingsChanged("1.25");
 
-    expect(notifyScaleChanged).toHaveBeenCalledWith(1.25);
+    expect(notifyScaleChanged).toHaveBeenCalledWith(1.25, 1);
   });
 
   it("applies an asynchronously initialized scale to views already created", async () => {
@@ -112,6 +112,6 @@ describe("ScaleController", () => {
     await Promise.resolve();
 
     expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
-    expect(notifyScaleChanged).toHaveBeenCalledWith(1.5);
+    expect(notifyScaleChanged).toHaveBeenCalledWith(1.5, 1);
   });
 });

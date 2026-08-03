@@ -17,12 +17,22 @@ export class FloatingWindowController {
   constructor(
     private readonly getWorkspaceBounds: () => Bounds,
     private readonly getViews: ViewCollection,
+    private readonly getInterfaceScale: () => number = () => 1,
   ) {}
+
+  private scaled(value: number, applyInterfaceScale = true): number {
+    return Math.round(
+      value * (applyInterfaceScale ? this.getInterfaceScale() : 1),
+    );
+  }
 
   /**
    * Calculate initial bounds for a floating window, including cascade offset.
    */
-  calculateInitialBounds(windowConfig?: WindowConfig): Bounds {
+  calculateInitialBounds(
+    windowConfig?: WindowConfig,
+    applyInterfaceScale = true,
+  ): Bounds {
     const {
       x: workX,
       y: workY,
@@ -30,19 +40,37 @@ export class FloatingWindowController {
       height: workHeight,
     } = this.getWorkspaceBounds();
 
-    const defaultWidth = windowConfig?.defaultSize?.width || 800;
-    const defaultHeight = windowConfig?.defaultSize?.height || 600;
+    const defaultWidth = this.scaled(
+      windowConfig?.defaultSize?.width || 800,
+      applyInterfaceScale,
+    );
+    const defaultHeight = this.scaled(
+      windowConfig?.defaultSize?.height || 600,
+      applyInterfaceScale,
+    );
+    const minWidth = windowConfig?.minSize?.width
+      ? this.scaled(windowConfig.minSize.width, applyInterfaceScale)
+      : undefined;
+    const minHeight = windowConfig?.minSize?.height
+      ? this.scaled(windowConfig.minSize.height, applyInterfaceScale)
+      : undefined;
+    const maxWidth = windowConfig?.maxSize?.width
+      ? this.scaled(windowConfig.maxSize.width, applyInterfaceScale)
+      : undefined;
+    const maxHeight = windowConfig?.maxSize?.height
+      ? this.scaled(windowConfig.maxSize.height, applyInterfaceScale)
+      : undefined;
 
-    const width = windowConfig?.minSize?.width
-      ? Math.max(defaultWidth, windowConfig.minSize.width)
-      : windowConfig?.maxSize?.width
-        ? Math.min(defaultWidth, windowConfig.maxSize.width)
+    const width = minWidth
+      ? Math.max(defaultWidth, minWidth)
+      : maxWidth
+        ? Math.min(defaultWidth, maxWidth)
         : defaultWidth;
 
-    const height = windowConfig?.minSize?.height
-      ? Math.max(defaultHeight, windowConfig.minSize.height)
-      : windowConfig?.maxSize?.height
-        ? Math.min(defaultHeight, windowConfig.maxSize.height)
+    const height = minHeight
+      ? Math.max(defaultHeight, minHeight)
+      : maxHeight
+        ? Math.min(defaultHeight, maxHeight)
         : defaultHeight;
 
     let x: number;
@@ -72,28 +100,32 @@ export class FloatingWindowController {
   /**
    * Apply window-level constraints and workspace bounds to floating windows.
    */
-  applyWindowConstraints(bounds: Bounds, windowConfig?: WindowConfig): Bounds {
+  applyWindowConstraints(
+    bounds: Bounds,
+    windowConfig?: WindowConfig,
+    applyInterfaceScale = true,
+  ): Bounds {
     const finalBounds = { ...bounds };
 
     if (windowConfig?.minSize) {
       finalBounds.width = Math.max(
         finalBounds.width,
-        windowConfig.minSize.width,
+        this.scaled(windowConfig.minSize.width, applyInterfaceScale),
       );
       finalBounds.height = Math.max(
         finalBounds.height,
-        windowConfig.minSize.height,
+        this.scaled(windowConfig.minSize.height, applyInterfaceScale),
       );
     }
 
     if (windowConfig?.maxSize) {
       finalBounds.width = Math.min(
         finalBounds.width,
-        windowConfig.maxSize.width,
+        this.scaled(windowConfig.maxSize.width, applyInterfaceScale),
       );
       finalBounds.height = Math.min(
         finalBounds.height,
-        windowConfig.maxSize.height,
+        this.scaled(windowConfig.maxSize.height, applyInterfaceScale),
       );
     }
 

@@ -65,6 +65,10 @@ function addView(
   manager: ViewManager,
   mode: ViewMode,
   bounds: Bounds,
+  options: {
+    viewType?: ViewInfo["viewType"];
+    scaling?: "auto" | "manual";
+  } = {},
 ): { info: ViewInfo; setBounds: jest.Mock } {
   const setBounds = jest.fn();
   const info: ViewInfo = {
@@ -73,6 +77,7 @@ function addView(
       setBounds,
       webContents: {
         isDestroyed: () => false,
+        setZoomFactor: jest.fn(),
       },
     } as unknown as ViewInfo["view"],
     appId: "com.example.app",
@@ -80,13 +85,13 @@ function addView(
       id: "com.example.app",
       name: "Example",
       version: "1.0.0",
-      window: { mode },
+      window: { mode, scaling: options.scaling },
     } as AppManifest,
     bounds,
     requestedVisible: true,
     visible: true,
     mode,
-    viewType: "app",
+    viewType: options.viewType ?? "app",
     tileIndex: mode === "tiled" ? 0 : undefined,
     zIndex: mode === "floating" ? 1 : undefined,
   };
@@ -96,6 +101,52 @@ function addView(
 }
 
 describe("ViewManager visibility", () => {
+  it("preserves a floating app's logical size when interface scale changes", () => {
+    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+    const { info, setBounds } = addView(manager, "floating", {
+      x: 120,
+      y: 80,
+      width: 600,
+      height: 400,
+    });
+
+    manager.setInterfaceScale(1.5);
+
+    expect(info.bounds).toEqual({ x: 120, y: 80, width: 900, height: 600 });
+    expect(setBounds).toHaveBeenLastCalledWith(info.bounds);
+  });
+
+  it("resizes an explicitly auto-scaled overlay when interface scale changes", () => {
+    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+    const { info, setBounds } = addView(
+      manager,
+      "floating",
+      { x: 120, y: 80, width: 600, height: 400 },
+      { viewType: "overlay", scaling: "auto" },
+    );
+
+    manager.setInterfaceScale(1.5);
+
+    expect(info.bounds).toEqual({ x: 120, y: 80, width: 900, height: 600 });
+    expect(setBounds).toHaveBeenLastCalledWith(info.bounds);
+  });
+
+  it("restores oversized floating bounds after a scale round trip", () => {
+    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+    const { info } = addView(manager, "floating", {
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 800,
+    });
+
+    manager.setInterfaceScale(2);
+    expect(info.bounds).toMatchObject({ width: 2000, height: 1600 });
+
+    manager.setInterfaceScale(1);
+    expect(info.bounds).toMatchObject({ width: 1000, height: 800 });
+  });
+
   it("restores a floating view to its bounds after hiding it", () => {
     const manager = createManager({ mode: "none", gap: 0, padding: 0 });
     const originalBounds = { x: 120, y: 80, width: 640, height: 480 };

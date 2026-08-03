@@ -195,7 +195,11 @@ export class ViewCreator {
   ) {
     const zIndex = this.nextOverlayZIndex++;
     const viewBounds =
-      bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
+      bounds ||
+      this.floatingWindows.calculateInitialBounds(
+        windowConfig,
+        windowConfig?.scaling === "auto",
+      );
     log.info(`Creating overlay view for ${appId} at Z=${zIndex}`);
     return { viewBounds, zIndex, tileIndex: undefined };
   }
@@ -209,7 +213,11 @@ export class ViewCreator {
     windowConfig?: WindowConfig,
   ) {
     const viewBounds =
-      bounds || this.floatingWindows.calculateInitialBounds(windowConfig);
+      bounds ||
+      this.floatingWindows.calculateInitialBounds(
+        windowConfig,
+        windowConfig?.scaling !== "manual",
+      );
     const zIndex = this.floatingWindows.getNextZIndex();
     log.info(`Creating floating app view for ${appId}`);
     return { viewBounds, zIndex, tileIndex: undefined };
