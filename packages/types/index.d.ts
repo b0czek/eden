@@ -113,6 +113,14 @@ export interface FileStats {
   mtime: Date;
 }
 
+/** Arguments shared by the recursive filesystem copy and move commands. */
+export interface FilesystemTransferArgs {
+  from: string;
+  to: string;
+  /** Replace the complete destination when it already exists. */
+  overwrite?: boolean;
+}
+
 /**
  * Search result for filesystem queries
  */

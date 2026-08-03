@@ -6,19 +6,22 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
     "solid-js": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-solid": "catalog:"
+    "vite-plugin-solid": "catalog:",
+    "vitest": "catalog:"
   },
   "dependencies": {
     "@edenapp/babel": "workspace:*",
     "@edenapp/files-core": "workspace:*",
     "@edenapp/solid-kit": "workspace:*",
-    "@edenapp/tablets": "workspace:*"
+    "@edenapp/tablets": "workspace:*",
+    "solid-icons": "catalog:"
   }
 }

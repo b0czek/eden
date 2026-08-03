@@ -51,6 +51,32 @@ await window.edenAPI.shellCommand("file/open", {
 });
 ```
 
+## Copying and Moving Items
+
+`fs/cp` copies files and directories recursively. `fs/mv` moves or renames
+them. Both commands reject an existing destination by default:
+
+```typescript
+await window.edenAPI.shellCommand("fs/cp", {
+  from: "/Documents/report.txt",
+  to: "/Archive/report.txt",
+});
+```
+
+Set `overwrite` to replace the complete destination. Replacing a directory
+does not merge its previous contents with the source:
+
+```typescript
+await window.edenAPI.shellCommand("fs/mv", {
+  from: "/Drafts/report",
+  to: "/Published/report",
+  overwrite: true,
+});
+```
+
+Copying or moving an item onto itself is rejected. Directories also cannot be
+copied or moved into one of their descendants.
+
 ## Watching a Directory
 
 Apps with `fs/read` can watch a virtual directory without polling. Watches are

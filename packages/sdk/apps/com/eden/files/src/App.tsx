@@ -7,15 +7,22 @@ import {
   type FileItem,
   FileList,
   getParentPath,
-  ITEM_SIZES,
   useExplorerNavigation,
   useFileActivationPreference,
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
+import { FiCheckSquare, FiX } from "solid-icons/fi";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { createSignal, onCleanup, onMount } from "solid-js";
+import {
+  SelectionActionBar,
+  TransferActionBar,
+} from "./components/FileModeActionBars";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
 import { useFileActions } from "./features/useFileActions";
+import { useFileSelection } from "./features/useFileSelection";
+import { useFilesKeyboardShortcuts } from "./features/useFilesKeyboardShortcuts";
+import { useFileTransfers } from "./features/useFileTransfers";
 import { initLocale, t } from "./i18n";
 
 const getExplorerLabels = (): FileExplorerLabels => ({
@@ -49,6 +56,7 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   modified: t("files.modified"),
   ascending: t("files.ascending"),
   descending: t("files.descending"),
+  selectItem: t("files.select"),
 });
 
 const App: Component = () => {
@@ -130,17 +138,55 @@ const App: Component = () => {
     setScrollToSelected,
   });
 
+  const selection = useFileSelection({
+    items,
+    currentPath,
+    selectedItem,
+    setSelectedItem,
+    setScrollToSelected,
+  });
+  const {
+    selectionMode,
+    selectedPaths,
+    selectedFiles,
+    allItemsSelected,
+    exit: exitSelectionMode,
+    start: startSelectionMode,
+    focusItem: setFocusedItem,
+    toggleItem: toggleItemSelection,
+    selectAll: selectAllItems,
+    toggleAll: toggleAllItems,
+  } = selection;
+
+  const navigateWithSelectionClear = (path: string, selectedPath?: string) => {
+    selection.clear();
+    if (!selectedPath) setSelectedItem(null);
+    navigateTo(path, selectedPath);
+  };
+  const goBackWithSelectionClear = () => {
+    selection.exit();
+    goBack();
+  };
+  const goForwardWithSelectionClear = () => {
+    selection.exit();
+    goForward();
+  };
+  const goUpWithSelectionClear = () => {
+    selection.exit();
+    goUp();
+  };
+
   const openPathInExplorer = async (path: string) => {
     try {
       const stats = await window.edenAPI.shellCommand("fs/stat", { path });
 
       if (stats.isDirectory) {
-        navigateTo(path);
+        navigateWithSelectionClear(path);
         return;
       }
 
       if (stats.isFile) {
-        navigateTo(getParentPath(path), path);
+        navigateWithSelectionClear(getParentPath(path), path);
       }
     } catch (error) {
       showError(`${t("files.errors.openFailed")}: ${(error as Error).message}`);
@@ -201,43 +247,16 @@ const App: Component = () => {
     }
   };
 
-  createEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
-
-      const prefs = displayPreferences();
-      const sizes = ITEM_SIZES;
-
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        (e.key === "=" || e.key === "+" || e.key === "-")
-      ) {
-        e.preventDefault();
-
-        const currentIndex = sizes.indexOf(prefs.itemSize);
-        let newIndex = currentIndex;
-
-        if (e.key === "=" || e.key === "+") {
-          newIndex = Math.min(currentIndex + 1, sizes.length - 1);
-        } else if (e.key === "-") {
-          newIndex = Math.max(currentIndex - 1, 0);
-        }
-
-        if (newIndex !== currentIndex) {
-          handlePreferencesChange({ ...prefs, itemSize: sizes[newIndex] });
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+  const transfers = useFileTransfers({
+    refresh,
+    dialogs,
   });
 
   const {
     duplicateItem,
     openItem,
     getOpenWithMenuItems,
-    handleItemClick,
+    handleItemClick: handleSingleItemClick,
     handleItemActivate,
     promptCreateFolder,
     promptCreateFile,
@@ -248,12 +267,48 @@ const App: Component = () => {
   } = useFileActions({
     currentPath,
     refresh,
-    navigateTo,
+    navigateTo: navigateWithSelectionClear,
     showError,
     dialogs,
     setSelectedItem,
     setScrollToSelected,
   });
+
+  const handleExplorerItemClick = (
+    item: FileItem,
+    event?: MouseEvent | KeyboardEvent,
+  ) => {
+    if (
+      selectionMode() ||
+      event?.ctrlKey ||
+      event?.metaKey ||
+      event?.shiftKey
+    ) {
+      toggleItemSelection(item, event);
+      return;
+    }
+    handleSingleItemClick(item);
+  };
+
+  const startTransfer = (
+    operation: "copy" | "move",
+    selected = selectedFiles(),
+  ) => {
+    if (transfers.beginTransfer(operation, selected)) exitSelectionMode();
+  };
+
+  const deleteSelected = async () => {
+    const selected = selectedFiles();
+    if (await transfers.deleteItems(selected)) exitSelectionMode();
+  };
+
+  const shortcutItems = () => {
+    if (selectionMode()) return selectedFiles();
+    const path = selectedItem();
+    if (!path) return [];
+    const item = items().find((candidate) => candidate.path === path);
+    return item ? [item] : [];
+  };
 
   const { handleItemContextMenu, handleBackgroundContextMenu } =
     useExplorerContextMenus({
@@ -267,7 +322,30 @@ const App: Component = () => {
       setScrollToSelected,
       promptCreateFolder,
       promptCreateFile,
+      copyItem: (item) => {
+        startTransfer("copy", [item]);
+      },
+      moveItem: (item) => {
+        startTransfer("move", [item]);
+      },
+      isBusy: () => transfers.busy() || Boolean(transfers.pendingTransfer()),
+      clearSelection: exitSelectionMode,
     });
+
+  useFilesKeyboardShortcuts({
+    busy: transfers.busy,
+    hasPendingTransfer: () => Boolean(transfers.pendingTransfer()),
+    selectionMode,
+    selectedCount: () => selectedPaths().length,
+    shortcutItems,
+    displayPreferences,
+    cancelTransfer: transfers.cancelTransfer,
+    exitSelection: exitSelectionMode,
+    selectAll: selectAllItems,
+    startTransfer,
+    deleteSelected,
+    changePreferences: handlePreferencesChange,
+  });
 
   return (
     <div class="file-explorer">
@@ -277,10 +355,28 @@ const App: Component = () => {
         historyIndex={historyIndex()}
         historyLength={navigationHistory().length}
         breadcrumbs={buildBreadcrumbs(currentPath())}
-        onGoBack={goBack}
-        onGoForward={goForward}
-        onGoUp={goUp}
-        onNavigate={navigateTo}
+        onGoBack={goBackWithSelectionClear}
+        onGoForward={goForwardWithSelectionClear}
+        onGoUp={goUpWithSelectionClear}
+        onNavigate={navigateWithSelectionClear}
+        endActions={
+          <button
+            type="button"
+            class="eden-btn eden-btn-square eden-btn-sm file-select-button"
+            aria-label={selectionMode() ? t("files.done") : t("files.select")}
+            title={selectionMode() ? t("files.done") : t("files.select")}
+            disabled={transfers.busy() || Boolean(transfers.pendingTransfer())}
+            onClick={() =>
+              selectionMode() ? exitSelectionMode() : startSelectionMode()
+            }
+          >
+            {selectionMode() ? (
+              <FiX aria-hidden="true" />
+            ) : (
+              <FiCheckSquare aria-hidden="true" />
+            )}
+          </button>
+        }
         onNewFolder={() => {
           void promptCreateFolder();
         }}
@@ -290,22 +386,51 @@ const App: Component = () => {
         onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
       />
 
+      {selectionMode() && (
+        <SelectionActionBar
+          selectedCount={selectedPaths().length}
+          itemCount={items().length}
+          allItemsSelected={allItemsSelected()}
+          busy={transfers.busy()}
+          onToggleAll={toggleAllItems}
+          onTransfer={startTransfer}
+          onDelete={() => void deleteSelected()}
+        />
+      )}
+
+      {(transfers.pendingTransfer() || transfers.progress()) && (
+        <TransferActionBar
+          pendingTransfer={transfers.pendingTransfer()}
+          progress={transfers.progress()}
+          busy={transfers.busy()}
+          onComplete={() => void transfers.completeTransfer(currentPath())}
+          onCancel={transfers.cancelTransfer}
+        />
+      )}
+
       <FileList
         labels={getExplorerLabels()}
         loading={loading()}
         items={items()}
         selectedItem={selectedItem()}
+        selectedPaths={selectionMode() ? selectedPaths() : undefined}
+        selectionMode={selectionMode()}
         scrollToSelected={scrollToSelected()}
         viewStyle={displayPreferences().viewStyle}
         itemSize={displayPreferences().itemSize}
-        onItemClick={handleItemClick}
+        onItemClick={handleExplorerItemClick}
+        onItemFocus={setFocusedItem}
+        onSelectionToggle={toggleItemSelection}
         onItemActivate={handleItemActivate}
         activateOnSingleClick={openWithSingleClick()}
         onItemContextMenu={handleItemContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
-        onItemDelete={handleDeleteClick}
-        onItemDeleteShortcut={handleDeleteShortcut}
-        onBack={goBack}
+        onItemDelete={selectionMode() ? undefined : handleDeleteClick}
+        onItemDeleteShortcut={
+          selectionMode() ? undefined : handleDeleteShortcut
+        }
+        onBack={goBackWithSelectionClear}
+        disabled={transfers.busy()}
       />
 
       <DialogHost dialogs={dialogs} />

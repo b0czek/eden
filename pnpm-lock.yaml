@@ -446,6 +446,9 @@ importers:
       '@edenapp/tablets':
         specifier: workspace:*
         version: link:../../../../../tablets
+      solid-icons:
+        specifier: 'catalog:'
+        version: 1.2.0(solid-js@1.9.14)
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -462,6 +465,9 @@ importers:
       vite-plugin-solid:
         specifier: 'catalog:'
         version: 2.11.14(solid-js@1.9.14)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
 
   packages/sdk/apps/com/eden/installer:
     dependencies:

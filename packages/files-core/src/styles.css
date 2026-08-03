@@ -53,6 +53,12 @@ body {
   min-width: 40px;
 }
 
+.toolbar-left button svg,
+.toolbar-right button svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ===== Omnibox ===== */
 .omnibox-container {
   flex: 1;
@@ -267,6 +273,42 @@ body {
   background: var(--eden-color-surface-active);
   border-color: var(--eden-color-accent-primary);
   box-shadow: var(--eden-shadow-md);
+}
+
+.file-item.focused:not(.selected) {
+  outline: 2px solid var(--eden-color-border-medium);
+  outline-offset: 1px;
+}
+
+.file-item.disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.file-item.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.file-selection-checkbox {
+  position: absolute;
+  top: var(--eden-space-sm);
+  left: var(--eden-space-sm);
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+}
+
+.file-selection-checkbox:checked::after {
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background:
+    center / contain no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 8.5 6.25 12 13.5 4' fill='none' stroke='white' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transform: translate(-50%, -50%);
 }
 
 .file-icon {
@@ -740,6 +782,17 @@ body {
 
 .file-item.size-huge .file-name {
   font-weight: var(--eden-font-weight-semibold);
+}
+
+.file-item.selection-mode:not(.list-view) .file-item-main {
+  padding-top: calc(var(--eden-space-xl) + var(--eden-space-xs));
+}
+
+.file-item.selection-mode.list-view .file-selection-checkbox {
+  position: relative;
+  inset: auto;
+  order: -1;
+  margin-left: var(--eden-space-md);
 }
 
 /* ===== Responsive Design ===== */

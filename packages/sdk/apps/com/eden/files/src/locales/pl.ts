@@ -35,6 +35,31 @@ export const pl = {
     suggestedApp: "Polecane",
     rename: "Zmień nazwę",
     duplicate: "Duplikuj",
+    select: "Wybierz",
+    done: "Gotowe",
+    selectAll: "Wybierz wszystko",
+    unselectAll: "Odznacz wszystko",
+    selectedCount: "Wybrano: {count}",
+    copy: "Kopiuj",
+    move: "Przenieś",
+    copyHere: "Kopiuj tutaj",
+    moveHere: "Przenieś tutaj",
+    chooseCopyDestination: "Wybierz folder dla elementów: {count}",
+    chooseMoveDestination: "Wybierz folder dla elementów: {count}",
+    collisionTitle: "Element już istnieje",
+    collisionMessage: "Element „{name}” już istnieje w miejscu docelowym.",
+    replace: "Zastąp",
+    keepBoth: "Zachowaj oba",
+    skip: "Pomiń",
+    applyToAll: "Zastosuj do wszystkich pozostałych konfliktów",
+    deleteSelectedConfirmation:
+      "Czy na pewno chcesz usunąć wybrane elementy ({count})?",
+    progressCopy: "Kopiowanie {current} z {total}: {name}",
+    progressMove: "Przenoszenie {current} z {total}: {name}",
+    progressDelete: "Usuwanie {current} z {total}: {name}",
+    partialFailureTitle: "Nie przetworzono części elementów",
+    partialFailureMessage:
+      "Nie udało się przetworzyć {failed} z {total} elementów.",
     refresh: "Odśwież",
     directoryUnavailableTitle: "Folder jest niedostępny",
     directoryUnavailableFallback:
@@ -55,6 +80,9 @@ export const pl = {
       setDefaultHandlerFailed: "Nie udało się ustawić domyślnej aplikacji",
       deleteFailed: "Nie udało się usunąć elementu",
       loadDirectoryFailed: "Nie udało się wczytać folderu",
+      sourceMissing: "Element źródłowy już nie istnieje",
+      invalidTransferDestination:
+        "Nie można skopiować ani przenieść folderu do niego samego lub jego podfolderu",
     },
   },
-};
+} as const;

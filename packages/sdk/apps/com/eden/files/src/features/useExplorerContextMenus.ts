@@ -22,6 +22,10 @@ interface UseExplorerContextMenusOptions {
   setScrollToSelected: Setter<boolean>;
   promptCreateFolder: () => Promise<void>;
   promptCreateFile: () => Promise<void>;
+  copyItem: (item: FileItem) => void;
+  moveItem: (item: FileItem) => void;
+  isBusy: () => boolean;
+  clearSelection: () => void;
 }
 
 export const useExplorerContextMenus = (
@@ -39,6 +43,14 @@ export const useExplorerContextMenus = (
           icon: "external-link",
         }),
       ),
+      separator(),
+      button("copy", t("files.copy"), () => options.copyItem(data.item), {
+        icon: "copy",
+      }),
+      button("move", t("files.move"), () => options.moveItem(data.item), {
+        icon: "move",
+      }),
+      separator(),
       button(
         "rename",
         t("files.rename"),
@@ -84,6 +96,8 @@ export const useExplorerContextMenus = (
   const handleItemContextMenu = async (item: FileItem, e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (options.isBusy()) return;
+    options.clearSelection();
     options.setScrollToSelected(false);
     options.setSelectedItem(item.path);
     const openWithItems =
@@ -98,9 +112,11 @@ export const useExplorerContextMenus = (
 
   const handleBackgroundContextMenu = (e: MouseEvent) => {
     e.preventDefault();
+    if (options.isBusy()) return;
     if ((e.target as HTMLElement)?.closest(".file-item")) {
       return;
     }
+    options.clearSelection();
     void emptyAreaMenu.show(null, { left: e.clientX, top: e.clientY });
   };
 

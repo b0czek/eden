@@ -1,6 +1,7 @@
 import { render } from "solid-js/web";
 import App from "./App";
 import "@edenapp/files-core/styles.css";
+import "./styles.css";
 
 const root = document.getElementById("root");
 

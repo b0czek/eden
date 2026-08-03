@@ -55,4 +55,5 @@ export interface FileExplorerLabels {
   modified: string;
   ascending: string;
   descending: string;
+  selectItem?: string;
 }

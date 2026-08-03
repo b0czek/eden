@@ -6,11 +6,11 @@ import {
   FaSolidFileMedical,
   FaSolidFolderPlus,
 } from "solid-icons/fa";
-import type { Component } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import type { Breadcrumb, FileExplorerLabels } from "../types";
 import Omnibox from "./Omnibox";
 
-interface FileExplorerHeaderProps {
+export interface FileExplorerHeaderProps {
   labels: FileExplorerLabels;
   currentPath: string;
   historyIndex: number;
@@ -23,6 +23,7 @@ interface FileExplorerHeaderProps {
   onNewFolder?: () => void;
   onNewFile?: () => void;
   onOpenDisplayOptions?: () => void;
+  endActions?: JSX.Element;
 }
 
 const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
@@ -67,6 +68,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
         />
 
         <div class="toolbar-right">
+          {props.endActions}
           {props.onNewFolder && (
             <button
               type="button"

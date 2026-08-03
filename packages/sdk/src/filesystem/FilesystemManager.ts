@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { watch as watchNative, type FSWatcher } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FileStats, SearchResult } from "@edenapp/types";
@@ -14,22 +12,16 @@ import {
   normalizeHomeDirectory,
   resolveHomeDirectory,
 } from "../user/UserHomeDirectory";
-import { FilesystemHandler } from "./FilesystemHandler";
 import { ViewManager } from "../view-manager/ViewManager";
+import { FilesystemHandler } from "./FilesystemHandler";
+import { FilesystemTransfer } from "./FilesystemTransfer";
+import {
+  type FilesystemChangeKind,
+  FilesystemWatcher,
+} from "./FilesystemWatcher";
 
 interface FilesystemEvents {
-  changed: { watchId: string; kind: "change" | "watch-error" };
-}
-
-interface DirectoryWatch {
-  watcher: FSWatcher;
-  watchIds: Set<string>;
-  debounce?: NodeJS.Timeout;
-}
-
-interface ViewWatch {
-  viewId: number;
-  hostPath: string;
+  changed: { watchId: string; kind: FilesystemChangeKind };
 }
 /**
  * FilesystemManager
@@ -42,9 +34,8 @@ interface ViewWatch {
 export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
   private baseDir: string;
   private handler: FilesystemHandler;
-  private readonly directoryWatches = new Map<string, DirectoryWatch>();
-  private readonly viewWatches = new Map<string, ViewWatch>();
-  private readonly stopViewRemovalListener: () => void;
+  private readonly transfer = new FilesystemTransfer();
+  private readonly watcher: FilesystemWatcher;
 
   constructor(
     @inject("userDirectory") baseDir: string,
@@ -60,10 +51,14 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     // Create and register handler
     this.handler = new FilesystemHandler(this);
     commandRegistry.registerManager(this.handler);
-    this.stopViewRemovalListener = this.viewManager.on(
-      "view-removed",
-      ({ viewId }) => this.removeViewWatches(viewId),
-    );
+    this.watcher = new FilesystemWatcher({
+      resolveViewId: (webContentsId) =>
+        this.viewManager.getViewIdByWebContentsId(webContentsId),
+      onViewRemoved: (listener) =>
+        this.viewManager.on("view-removed", ({ viewId }) => listener(viewId)),
+      notify: (viewId, event) =>
+        this.notifySubscriber(viewId, "changed", event),
+    });
   }
 
   /**
@@ -290,147 +285,66 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
   /**
    * Copy a file or directory to another location.
    */
-  async copy(fromPath: string, toPath: string): Promise<void> {
-    const fullFromPath = await this.resolvePath(fromPath);
-    const fullToPath = await this.resolvePath(toPath);
-
-    await fs.mkdir(path.dirname(fullToPath), { recursive: true });
-    await fs.cp(fullFromPath, fullToPath, {
-      recursive: true,
-      errorOnExist: true,
-      force: false,
+  async copy(
+    fromPath: string,
+    toPath: string,
+    overwrite: boolean = false,
+  ): Promise<void> {
+    const source = await this.resolvePath(fromPath);
+    const destination = await this.resolvePath(toPath);
+    await this.transfer.copy({
+      source,
+      destination,
+      destinationLabel: toPath,
+      overwrite,
     });
-    this.invalidateHostDirectory(path.dirname(fullToPath));
+    this.invalidateHostDirectory(path.dirname(destination));
   }
 
   /**
    * Move or rename a file or directory.
    * Falls back to copy+delete when rename crosses filesystem boundaries.
    */
-  async move(fromPath: string, toPath: string): Promise<void> {
-    const fullFromPath = await this.resolvePath(fromPath);
-    const fullToPath = await this.resolvePath(toPath);
-
-    await fs.mkdir(path.dirname(fullToPath), { recursive: true });
-
-    try {
-      await fs.rename(fullFromPath, fullToPath);
-    } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code !== "EXDEV") {
-        throw error;
-      }
-
-      await this.copy(fromPath, toPath);
-      await this.delete(fromPath);
-    }
-    this.invalidateHostDirectory(path.dirname(fullFromPath));
-    this.invalidateHostDirectory(path.dirname(fullToPath));
+  async move(
+    fromPath: string,
+    toPath: string,
+    overwrite: boolean = false,
+  ): Promise<void> {
+    const source = await this.resolvePath(fromPath);
+    const destination = await this.resolvePath(toPath);
+    await this.transfer.move({
+      source,
+      destination,
+      destinationLabel: toPath,
+      overwrite,
+    });
+    this.invalidateHostDirectory(path.dirname(source));
+    this.invalidateHostDirectory(path.dirname(destination));
   }
 
   async watchDirectory(
     targetPath: string,
     callerWebContentsId: number | undefined,
   ): Promise<{ watchId: string }> {
-    if (callerWebContentsId === undefined) {
-      throw new Error("Filesystem watches are only available to app views");
-    }
-    const viewId =
-      this.viewManager.getViewIdByWebContentsId(callerWebContentsId);
-    if (viewId === undefined) throw new Error("Calling view was not found");
-
     const hostPath = await this.resolvePath(targetPath);
     const stats = await fs.stat(hostPath);
     if (!stats.isDirectory()) {
       throw new Error(`Path '${targetPath}' is not a directory`);
     }
 
-    let directoryWatch = this.directoryWatches.get(hostPath);
-    if (!directoryWatch) {
-      const watchIds = new Set<string>();
-      const watcher = watchNative(hostPath, { persistent: false }, () => {
-        this.scheduleDirectoryChange(hostPath, "change");
-      });
-      directoryWatch = { watcher, watchIds };
-      watcher.on("error", (error) => {
-        log.warn(`Filesystem watch failed for ${hostPath}:`, error);
-        this.scheduleDirectoryChange(hostPath, "watch-error");
-      });
-      this.directoryWatches.set(hostPath, directoryWatch);
-    }
-
-    const watchId = randomUUID();
-    directoryWatch.watchIds.add(watchId);
-    this.viewWatches.set(watchId, { viewId, hostPath });
-    return { watchId };
+    return this.watcher.watch(hostPath, callerWebContentsId);
   }
 
   unwatch(watchId: string, callerWebContentsId: number | undefined): void {
-    if (callerWebContentsId === undefined) {
-      throw new Error("Filesystem watches are only available to app views");
-    }
-    const viewId =
-      this.viewManager.getViewIdByWebContentsId(callerWebContentsId);
-    const ownedWatch = this.viewWatches.get(watchId);
-    if (!ownedWatch || ownedWatch.viewId !== viewId) {
-      throw new Error("Filesystem watch is not owned by the calling view");
-    }
-    this.removeWatch(watchId);
-  }
-
-  private scheduleDirectoryChange(
-    hostPath: string,
-    kind: "change" | "watch-error",
-  ): void {
-    const directoryWatch = this.directoryWatches.get(hostPath);
-    if (!directoryWatch) return;
-    if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
-    directoryWatch.debounce = setTimeout(() => {
-      directoryWatch.debounce = undefined;
-      for (const watchId of directoryWatch.watchIds) {
-        const ownedWatch = this.viewWatches.get(watchId);
-        if (ownedWatch) {
-          this.notifySubscriber(ownedWatch.viewId, "changed", {
-            watchId,
-            kind,
-          });
-        }
-      }
-    }, 100);
+    this.watcher.unwatch(watchId, callerWebContentsId);
   }
 
   private invalidateHostDirectory(hostPath: string): void {
-    this.scheduleDirectoryChange(path.resolve(hostPath), "change");
-  }
-
-  private removeWatch(watchId: string): void {
-    const ownedWatch = this.viewWatches.get(watchId);
-    if (!ownedWatch) return;
-    this.viewWatches.delete(watchId);
-    const directoryWatch = this.directoryWatches.get(ownedWatch.hostPath);
-    if (!directoryWatch) return;
-    directoryWatch.watchIds.delete(watchId);
-    if (directoryWatch.watchIds.size === 0) {
-      if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
-      directoryWatch.watcher.close();
-      this.directoryWatches.delete(ownedWatch.hostPath);
-    }
-  }
-
-  private removeViewWatches(viewId: number): void {
-    for (const [watchId, watch] of this.viewWatches) {
-      if (watch.viewId === viewId) this.removeWatch(watchId);
-    }
+    this.watcher.invalidate(hostPath);
   }
 
   override dispose(): void {
-    this.stopViewRemovalListener();
-    for (const directoryWatch of this.directoryWatches.values()) {
-      if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
-      directoryWatch.watcher.close();
-    }
-    this.directoryWatches.clear();
-    this.viewWatches.clear();
+    this.watcher.dispose();
     super.dispose();
   }
 }

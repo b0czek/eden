@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { createEffect, For, Show } from "solid-js";
+import { createEffect, For, onCleanup, Show } from "solid-js";
 import { fileIcons } from "../fileIcons";
 import type {
   FileExplorerLabels,
@@ -10,16 +10,23 @@ import type {
 import FileGraphic from "./FileGraphic";
 import FileItemComponent from "./FileItem";
 
-interface FileListProps {
+export interface FileListProps {
   labels: FileExplorerLabels;
   loading: boolean;
   items: FileItem[];
   selectedItem: string | null;
   selectedItems?: string[];
+  selectedPaths?: readonly string[];
+  selectionMode?: boolean;
   scrollToSelected?: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
   onItemClick: (item: FileItem, event?: MouseEvent | KeyboardEvent) => void;
+  onItemFocus?: (item: FileItem) => void;
+  onSelectionToggle?: (
+    item: FileItem,
+    event?: MouseEvent | KeyboardEvent,
+  ) => void;
   onItemActivate: (item: FileItem) => void;
   activateOnSingleClick: boolean;
   canActivateOnClick?: (item: FileItem) => boolean;
@@ -28,6 +35,7 @@ interface FileListProps {
   onItemDelete?: (item: FileItem, e: MouseEvent) => void;
   onItemDeleteShortcut?: (item: FileItem) => void;
   onBack?: () => void;
+  disabled?: boolean;
 }
 
 const FileList: Component<FileListProps> = (props) => {
@@ -35,7 +43,7 @@ const FileList: Component<FileListProps> = (props) => {
   let containerRef: HTMLDivElement | undefined;
 
   const isItemSelected = (item: FileItem) => {
-    const selectedItems = props.selectedItems;
+    const selectedItems = props.selectedPaths ?? props.selectedItems;
     if (selectedItems) {
       return selectedItems.includes(item.path);
     }
@@ -50,8 +58,19 @@ const FileList: Component<FileListProps> = (props) => {
     event: MouseEvent,
     pointerType: string | undefined,
   ) => {
+    if (props.disabled) return;
+    if (props.selectionMode) {
+      props.onItemFocus?.(item);
+      (props.onSelectionToggle ?? props.onItemClick)(item, event);
+      return;
+    }
+
     props.onItemClick(item, event);
     if (
+      !props.selectionMode &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
       canActivateOnClick(item) &&
       (pointerType === "touch" || props.activateOnSingleClick)
     ) {
@@ -60,7 +79,12 @@ const FileList: Component<FileListProps> = (props) => {
   };
 
   const handleItemDoubleClick = (item: FileItem) => {
-    if (!props.activateOnSingleClick && canActivateOnClick(item)) {
+    if (
+      !props.disabled &&
+      !props.selectionMode &&
+      !props.activateOnSingleClick &&
+      canActivateOnClick(item)
+    ) {
       props.onItemActivate(item);
     }
   };
@@ -87,7 +111,14 @@ const FileList: Component<FileListProps> = (props) => {
   createEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if input is focused
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
+          target.isContentEditable)
+      )
+        return;
+      if (props.disabled) return;
 
       const items = props.items;
       const selected = props.selectedItem;
@@ -95,12 +126,16 @@ const FileList: Component<FileListProps> = (props) => {
 
       if (!items.length) return;
 
-      if (e.key === "Enter") {
+      if (e.key === "Enter" || (props.selectionMode && e.key === " ")) {
         if (selected) {
           e.preventDefault();
           const item = items.find((i) => i.path === selected);
           if (item) {
-            props.onItemActivate(item);
+            if (props.selectionMode) {
+              (props.onSelectionToggle ?? props.onItemClick)(item, e);
+            } else if (!props.disabled) {
+              props.onItemActivate(item);
+            }
           }
         }
         return;
@@ -115,7 +150,7 @@ const FileList: Component<FileListProps> = (props) => {
       }
 
       if (e.key === "Delete") {
-        if (selected && props.onItemDeleteShortcut) {
+        if (!props.selectionMode && selected && props.onItemDeleteShortcut) {
           const item = items.find((i) => i.path === selected);
           if (item) {
             e.preventDefault();
@@ -137,7 +172,8 @@ const FileList: Component<FileListProps> = (props) => {
 
       // If nothing selected, select first
       if (currentIndex === -1) {
-        props.onItemClick(items[0]);
+        if (props.onItemFocus) props.onItemFocus(items[0]);
+        else props.onItemClick(items[0]);
         return;
       }
 
@@ -175,7 +211,8 @@ const FileList: Component<FileListProps> = (props) => {
 
       if (nextIndex !== currentIndex && items[nextIndex]) {
         const item = items[nextIndex];
-        props.onItemClick(item);
+        if (props.onItemFocus) props.onItemFocus(item);
+        else props.onItemClick(item);
 
         // Ensure visibility during keyboard navigation
         // We use immediate scroll since the element already exists
@@ -187,7 +224,7 @@ const FileList: Component<FileListProps> = (props) => {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    onCleanup(() => document.removeEventListener("keydown", handleKeyDown));
   });
 
   return (
@@ -221,6 +258,9 @@ const FileList: Component<FileListProps> = (props) => {
                 ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
                 item={item}
                 isSelected={isItemSelected(item)}
+                isFocused={props.selectedItem === item.path}
+                selectionMode={props.selectionMode}
+                disabled={props.disabled}
                 viewStyle={props.viewStyle}
                 itemSize={props.itemSize}
                 labels={props.labels}
@@ -228,6 +268,7 @@ const FileList: Component<FileListProps> = (props) => {
                 onDoubleClick={handleItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
                 onDelete={props.onItemDelete}
+                onSelectionToggle={props.onSelectionToggle}
               />
             )}
           </For>

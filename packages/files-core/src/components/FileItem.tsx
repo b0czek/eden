@@ -8,11 +8,14 @@ import type {
 import { formatFileSize, getFileIcon } from "../utils";
 import FileGraphic from "./FileGraphic";
 
-interface FileItemComponentProps {
+export interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
   labels: FileExplorerLabels;
   item: FileItem;
   isSelected: boolean;
+  isFocused?: boolean;
+  selectionMode?: boolean;
+  disabled?: boolean;
   viewStyle: ViewStyle;
   itemSize: ItemSize;
   onClick: (
@@ -23,6 +26,10 @@ interface FileItemComponentProps {
   onDoubleClick: (item: FileItem) => void;
   onContextMenu?: (item: FileItem, e: MouseEvent) => void;
   onDelete?: (item: FileItem, e: MouseEvent) => void;
+  onSelectionToggle?: (
+    item: FileItem,
+    event?: MouseEvent | KeyboardEvent,
+  ) => void;
 }
 
 const FileItemComponent: Component<FileItemComponentProps> = (props) => {
@@ -44,6 +51,9 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       class="file-item"
       classList={{
         selected: props.isSelected,
+        focused: props.isFocused,
+        "selection-mode": props.selectionMode,
+        disabled: props.disabled,
         "list-view": props.viewStyle === "list",
         [`size-${props.itemSize}`]: true,
       }}
@@ -51,6 +61,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
       <button
         type="button"
         class="file-item-main"
+        disabled={props.disabled}
+        aria-pressed={props.selectionMode ? props.isSelected : undefined}
         onPointerDown={(event) => {
           pointerType = event.pointerType;
         }}
@@ -81,7 +93,21 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         )}
       </button>
 
-      {props.onDelete && (
+      {props.selectionMode && (
+        <input
+          type="checkbox"
+          class="eden-checkbox file-selection-checkbox"
+          checked={props.isSelected}
+          disabled={props.disabled}
+          aria-label={`${props.labels.selectItem ?? "Select"} ${props.item.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onSelectionToggle?.(props.item, event);
+          }}
+        />
+      )}
+
+      {props.onDelete && !props.selectionMode && (
         <div class="file-item-actions">
           <button
             type="button"

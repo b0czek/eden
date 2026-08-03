@@ -1,4 +1,8 @@
-import type { FileStats, SearchResult } from "@edenapp/types";
+import type {
+  FileStats,
+  FilesystemTransferArgs,
+  SearchResult,
+} from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { FilesystemManager } from "./FilesystemManager";
 
@@ -132,17 +136,19 @@ export class FilesystemHandler {
   /**
    * Copy a file or directory.
    * Directories are copied recursively.
+   * Existing destinations are replaced only when overwrite is true.
    */
   @EdenHandler("cp", { permission: "write" })
-  async handleCopy(args: { from: string; to: string }): Promise<void> {
-    await this.fsManager.copy(args.from, args.to);
+  async handleCopy(args: FilesystemTransferArgs): Promise<void> {
+    await this.fsManager.copy(args.from, args.to, args.overwrite ?? false);
   }
 
   /**
    * Move or rename a file or directory.
+   * Existing destinations are replaced only when overwrite is true.
    */
   @EdenHandler("mv", { permission: "write" })
-  async handleMove(args: { from: string; to: string }): Promise<void> {
-    await this.fsManager.move(args.from, args.to);
+  async handleMove(args: FilesystemTransferArgs): Promise<void> {
+    await this.fsManager.move(args.from, args.to, args.overwrite ?? false);
   }
 }

@@ -480,16 +480,18 @@ export interface FsCommands {
   /**
    * Copy a file or directory.
    * Directories are copied recursively.
+   * Existing destinations are replaced only when overwrite is true.
    */
   "fs/cp": {
-    args: { from: string; to: string };
+    args: import("./index").FilesystemTransferArgs;
     response: void;
   };
   /**
    * Move or rename a file or directory.
+   * Existing destinations are replaced only when overwrite is true.
    */
   "fs/mv": {
-    args: { from: string; to: string };
+    args: import("./index").FilesystemTransferArgs;
     response: void;
   };
 }
