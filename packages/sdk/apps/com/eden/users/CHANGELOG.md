@@ -1,5 +1,11 @@
 # com.eden.users
 
+## 1.0.5
+
+### Patch Changes
+
+- @edenapp/tablets@0.12.1
+
 ## 1.0.4
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.12.1
+
+### Patch Changes
+
+- d84a2fc: Scale app default, minimum, and maximum window sizes with the configured interface scale, and preserve the logical size of open floating apps when that scale changes.
+  - @edenapp/types@0.12.1
+  - @edenapp/genesis@0.12.1
+
 ## 0.12.0
 
 ### Minor Changes

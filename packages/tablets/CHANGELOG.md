@@ -1,5 +1,7 @@
 # @edenapp/tablets
 
+## 0.12.1
+
 ## 0.12.0
 
 ### Patch Changes

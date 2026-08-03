@@ -1,5 +1,13 @@
 # com.eden.file-picker
 
+## 1.0.7
+
+### Patch Changes
+
+- @edenapp/babel@0.12.1
+- @edenapp/tablets@0.12.1
+- @edenapp/files-core@0.11.0
+
 ## 1.0.6
 
 ### Patch Changes

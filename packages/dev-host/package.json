@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/dev-host",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Version-matched standalone development host for Eden apps",
   "bin": {
     "eden-dev-host": "bin/eden-dev-host.js"
