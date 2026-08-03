@@ -73,7 +73,10 @@ describe("bundler module", () => {
 
       expect(bundler.validateManifestObject(manifest).valid).toBe(true);
 
-      manifest.build!.concurrent = "no" as unknown as boolean;
+      if (!manifest.build) {
+        throw new Error("Expected test manifest to include build settings");
+      }
+      manifest.build.concurrent = "no" as unknown as boolean;
       expect(bundler.validateManifestObject(manifest)).toMatchObject({
         valid: false,
         errors: ["build.concurrent must be a boolean"],

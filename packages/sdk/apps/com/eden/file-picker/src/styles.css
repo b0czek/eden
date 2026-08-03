@@ -47,10 +47,6 @@ body {
   width: 100%;
 }
 
-.file-picker-footer-grid .file-picker-field {
-  flex: 1 1 220px;
-}
-
 .file-picker-footer-row {
   display: flex;
   gap: var(--eden-space-md);
@@ -66,6 +62,10 @@ body {
   color: var(--eden-color-text-secondary);
   font-size: var(--eden-font-size-xs);
   font-weight: var(--eden-font-weight-medium);
+}
+
+.file-picker-footer-grid .file-picker-field {
+  flex: 1 1 220px;
 }
 
 .file-picker-field .eden-input,

@@ -5,8 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import type { ExecutionContext } from "../execution";
-import type { CommandRegistry } from "../ipc";
-import type { IPCBridge } from "../ipc";
+import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemManager } from "./FilesystemManager";
 

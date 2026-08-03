@@ -36,14 +36,6 @@ body {
   max-height: 100vh;
 }
 
-/* Keep dock at bottom when in fullscreen mode */
-.shell-overlay[data-mode="fullscreen"] .dock {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-}
-
 /* Dock Styles */
 .dock {
   height: var(--eden-layout-dock-height);
@@ -55,6 +47,14 @@ body {
   padding: var(--eden-space-sm);
   position: relative;
   overflow: visible;
+}
+
+/* Keep dock at bottom when in fullscreen mode */
+.shell-overlay[data-mode="fullscreen"] .dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 
 /* One-time slide-in animation on initial load */
@@ -164,26 +164,6 @@ body {
   color: var(--eden-color-text-primary);
 }
 
-.dock-right .clock .time {
-  color: var(--eden-color-text-primary);
-  font-size: var(--eden-font-size-lg);
-  line-height: var(--eden-font-line-height-tight);
-}
-
-.dock-right .clock .date {
-  color: var(--eden-color-text-secondary);
-}
-
-.dock-right .separator {
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
-}
-
 .shell-overlay-keyboard-fab {
   position: absolute;
   bottom: var(--eden-space-lg);
@@ -207,35 +187,9 @@ body {
   z-index: 1;
 }
 
-.app-icons.magnify .app-icon:hover {
-  transform: none;
-}
-
-.app-icons.magnify .icon-container {
-  transform-origin: bottom center;
-}
-
-.app-icons.magnify.magnify-active .icon-container {
-  filter: brightness(1.05);
-}
-
 .dock-left,
 .dock-left * {
   color: var(--eden-color-text-primary);
-}
-
-.dock-center .app-name {
-  color: var(--eden-color-text-secondary);
-}
-
-.dock-center .separator {
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--eden-color-border-medium) 20%,
-    var(--eden-color-border-medium) 80%,
-    transparent
-  );
 }
 
 .separator {
@@ -272,10 +226,6 @@ body {
 
 .app-icon:hover {
   transform: none;
-}
-
-.app-icon:hover .icon-container {
-  filter: brightness(1.1);
 }
 
 .app-icon:active {
@@ -365,6 +315,31 @@ body {
   letter-spacing: var(--eden-font-letter-spacing-tight);
 }
 
+.dock-right .clock .time {
+  color: var(--eden-color-text-primary);
+  font-size: var(--eden-font-size-lg);
+  line-height: var(--eden-font-line-height-tight);
+}
+
+.dock-right .clock .date {
+  color: var(--eden-color-text-secondary);
+}
+
+.dock-right .separator,
+.dock-center .separator {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--eden-color-border-medium) 20%,
+    var(--eden-color-border-medium) 80%,
+    transparent
+  );
+}
+
+.dock-center .app-name {
+  color: var(--eden-color-text-secondary);
+}
+
 /* ============================
    All Apps - Minimal overrides
    Uses eden-modal-*, eden-input, eden-btn from Eden CSS
@@ -444,6 +419,22 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-icons.magnify .app-icon:hover {
+  transform: none;
+}
+
+.app-icons.magnify .icon-container {
+  transform-origin: bottom center;
+}
+
+.app-icons.magnify.magnify-active .icon-container {
+  filter: brightness(1.05);
+}
+
+.app-icon:hover .icon-container {
+  filter: brightness(1.1);
 }
 
 /* Context Menu Icons */
