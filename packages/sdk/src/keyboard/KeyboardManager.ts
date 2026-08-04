@@ -861,7 +861,7 @@ export class KeyboardManager {
     const targetView = target
       ? this.viewManager.getViewInfo(target.viewId)
       : undefined;
-    if (targetView?.viewType !== "app" || !targetView.visible) {
+    if (!targetView?.visible) {
       this.viewManager.setKeyboardPresentationLift(0);
       return;
     }

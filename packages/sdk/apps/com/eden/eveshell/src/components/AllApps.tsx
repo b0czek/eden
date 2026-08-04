@@ -63,20 +63,6 @@ export default function AllApps(props: AllAppsProps) {
         aria-label={t("shell.allApps")}
         onKeyDown={handleKeyDown}
       >
-        {/* Header with search */}
-        <div class="eden-modal-header">
-          <div class="eden-flex eden-gap-sm" style="flex: 1;">
-            <input
-              ref={searchInputRef}
-              type="text"
-              class="eden-input"
-              placeholder={t("shell.searchApps")}
-              value={searchQuery()}
-              onInput={(e) => setSearchQuery(e.currentTarget.value)}
-            />
-          </div>
-        </div>
-
         {/* App grid - uses eden-modal-body for scrolling */}
         <div class="eden-modal-body eden-scrollbar">
           <div class="eden-card-grid" style="gap: var(--eden-space-lg);">
@@ -106,6 +92,18 @@ export default function AllApps(props: AllAppsProps) {
               </div>
             </Show>
           </div>
+        </div>
+
+        {/* Keep search beside the OSK so focusing it lifts the drawer into view */}
+        <div class="eden-modal-footer">
+          <input
+            ref={searchInputRef}
+            type="text"
+            class="eden-input"
+            placeholder={t("shell.searchApps")}
+            value={searchQuery()}
+            onInput={(e) => setSearchQuery(e.currentTarget.value)}
+          />
         </div>
       </div>
     </div>
