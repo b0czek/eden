@@ -83,6 +83,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "package/install",
   "package/uninstall",
   "package/list",
+  "package/self",
+  "package/get",
   "package/toggle-hot-reload",
   "package/is-hot-reload-enabled",
   "package/get-icon",

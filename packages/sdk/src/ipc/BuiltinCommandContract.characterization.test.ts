@@ -42,6 +42,8 @@ describe("built-in command contract characterization", () => {
       "package/install": "manage",
       "package/uninstall": "manage",
       "package/list": "read",
+      "package/self": undefined,
+      "package/get": "read",
       "package/get-info": "read",
     });
     expect(commandContract(ProcessHandler)).toEqual({

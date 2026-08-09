@@ -30,8 +30,8 @@ const ownerManifest = {
 const createManager = () => {
   const manager = Object.create(SettingsManager.prototype) as SettingsManager;
   Object.assign(manager, {
-    appCatalog: {
-      get: (appId: string) =>
+    packageCatalog: {
+      getApp: (appId: string) =>
         appId === ownerManifest.id ? ownerManifest : undefined,
     },
     executionContext: {

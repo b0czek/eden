@@ -47,7 +47,7 @@ export interface FilePickerEvents {
  * FsEvents - Events for the "fs" namespace
  */
 export interface FsEvents {
-  "fs/changed": { watchId: string; kind: "change" | "watch-error" };
+  "fs/changed": { watchId: string; kind: FilesystemChangeKind };
 }
 
 /**
@@ -73,8 +73,9 @@ export interface NotificationEvents {
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
-  "package/installed": { manifest: import("./index").RuntimeAppManifest };
-  "package/uninstalled": { appId: string };
+  "package/installed": { manifest: import("./index").InstalledPackageManifest };
+  "package/uninstalled": | { kind: "app"; packageId: string }
+    | { kind: "dlc"; packageId: string; hostAppId: string };
 }
 
 /**

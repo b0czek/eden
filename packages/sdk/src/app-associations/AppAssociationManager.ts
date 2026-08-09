@@ -6,7 +6,7 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { CommandRegistry, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import { AppAssociationHandler } from "./AppAssociationHandler";
@@ -28,7 +28,7 @@ export class AppAssociationManager {
   constructor(
     @inject("userDirectory") userDirectory: string,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
+    @inject(delay(() => PackageCatalog)) private packageCatalog: PackageCatalog,
   ) {
     this.associationsPath = path.join(userDirectory, "app-associations.json");
     this.handler = new AppAssociationHandler(this);
@@ -73,14 +73,14 @@ export class AppAssociationManager {
   ): AppAssociation[] {
     const association = this.get(key);
     if (association) {
-      const app = this.appCatalog.getLaunchable(association.appId);
+      const app = this.packageCatalog.getLaunchableApp(association.appId);
       if (app && matches(app)) {
         return [association];
       }
     }
 
-    return this.appCatalog
-      .list({ showHidden: true })
+    return this.packageCatalog
+      .listApps({ showHidden: true })
       .filter(matches)
       .map((app) => ({
         appId: app.id,

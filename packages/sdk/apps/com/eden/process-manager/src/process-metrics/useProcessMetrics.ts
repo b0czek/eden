@@ -96,7 +96,7 @@ export const useProcessMetrics = () => {
       missingAppIds.map(async (appId) => {
         try {
           const result = await window.edenAPI.shellCommand("package/get-icon", {
-            appId,
+            packageId: appId,
           });
           return [appId, result.icon] as const;
         } catch (caughtError) {

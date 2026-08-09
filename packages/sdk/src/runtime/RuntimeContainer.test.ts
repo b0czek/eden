@@ -2,12 +2,13 @@ import "reflect-metadata";
 
 import type { RuntimeAppManifest } from "@edenapp/types";
 import { container } from "tsyringe";
-import { AppRegistry } from "../app-registry/AppRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { PermissionRegistry } from "../ipc/PermissionRegistry";
 import { SessionContext } from "../session/SessionContext";
 
 const manifest = (id: string): RuntimeAppManifest =>
   ({
+    kind: "app",
     id,
     name: id,
     version: "1.0.0",
@@ -23,8 +24,8 @@ describe("runtime child containers", () => {
     const first = container.createChildContainer();
     const second = container.createChildContainer();
 
-    const firstApps = first.resolve(AppRegistry);
-    const secondApps = second.resolve(AppRegistry);
+    const firstApps = first.resolve(PackageRegistry);
+    const secondApps = second.resolve(PackageRegistry);
     const firstPermissions = first.resolve(PermissionRegistry);
     const secondPermissions = second.resolve(PermissionRegistry);
     const firstSession = first.resolve(SessionContext);

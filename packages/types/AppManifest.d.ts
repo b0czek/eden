@@ -243,18 +243,13 @@ export interface ResolvedGrant {
   preset?: string;
 }
 
-/**
- * App Manifest Interface
- *
- * Defines the structure of an Eden app package.
- * Each app must include a manifest.json file with this structure.
- */
-export interface AppManifest {
-  /** Unique identifier for the app (e.g., "com.example.myapp") */
+/** Fields shared by every Eden package manifest. */
+export interface PackageManifestBase {
+  /** Globally unique package identifier. */
   id: string;
 
   /**
-   * Human-readable name.
+   * Human-readable package name.
    * Can be a simple string or a map of locales to names (e.g. { "en": "Files", "pl": "Pliki" })
    */
   name: string | Record<string, string>;
@@ -262,11 +257,23 @@ export interface AppManifest {
   /** Version string (semver recommended) */
   version: string;
 
-  /** App description */
+  /** Package description. */
   description?: string;
 
-  /** App author information */
+  /** Package author information. */
   author?: string;
+
+  /** Icon path relative to the package root. */
+  icon?: string;
+}
+
+/**
+ * Defines the structure of an executable Eden app package.
+ * Each app must include a manifest.json file with this structure.
+ */
+export interface AppManifest extends PackageManifestBase {
+  /** Package kind. Omitted manifests are treated as apps for compatibility. */
+  kind?: "app";
 
   /** Entry point for the backend worker thread */
   backend?: {
@@ -316,9 +323,6 @@ export interface AppManifest {
 
   /** Window configuration */
   window?: WindowConfig;
-
-  /** App icon path (relative to app root) */
-  icon?: string;
 
   /** Build configuration (for prebuilt apps) */
   build?: {
@@ -393,7 +397,49 @@ export interface AppManifest {
    * @example ["node_modules/@linuxcnc-node/core", "node_modules/better-sqlite3"]
    */
   include?: string[];
+
+  /** DLC extension points exposed by this app. */
+  dlc?: {
+    extensionPoints: DlcExtensionPoint[];
+  };
 }
+
+/** A named, strictly-versioned extension point exposed by an app. */
+export interface DlcExtensionPoint {
+  id: string;
+  /** Strict SemVer version implemented by the host. */
+  version: string;
+}
+
+export type DlcMetadata =
+  | null
+  | boolean
+  | number
+  | string
+  | DlcMetadata[]
+  | { [key: string]: DlcMetadata };
+
+/** A contribution made by a DLC to one host extension point. */
+export interface DlcContribution {
+  extensionPoint: string;
+  /** SemVer range accepted by this contribution. */
+  requires: string;
+  /** Opaque host-defined JSON. Eden stores but never interprets this value. */
+  metadata?: DlcMetadata;
+}
+
+/**
+ * A data package bound to exactly one installed host app.
+ * DLC packages have no independent execution identity.
+ */
+export interface DlcManifest extends PackageManifestBase {
+  kind: "dlc";
+  hostAppId: string;
+  contributions: DlcContribution[];
+}
+
+/** Any manifest supported by an .edenite package. */
+export type PackageManifest = AppManifest | DlcManifest;
 
 /**
  * Runtime App Manifest
@@ -402,6 +448,9 @@ export interface AppManifest {
  * This is what Eden uses internally after loading and processing an app.
  */
 export interface RuntimeAppManifest extends AppManifest {
+  /** Installed app manifests always carry an explicit package discriminator. */
+  kind: "app";
+
   /** Whether this is a prebuilt system app */
   isPrebuilt: boolean;
 
@@ -417,3 +466,12 @@ export interface RuntimeAppManifest extends AppManifest {
   /** Grants with presets resolved to full definitions */
   resolvedGrants: ResolvedGrant[];
 }
+
+/** Installed DLC manifest with runtime package provenance. */
+export interface RuntimeDlcManifest extends DlcManifest {
+  /** Whether this DLC is bundled with Eden rather than user-installed. */
+  isPrebuilt: boolean;
+}
+
+/** Manifest for an installed app or DLC package. */
+export type InstalledPackageManifest = RuntimeAppManifest | RuntimeDlcManifest;

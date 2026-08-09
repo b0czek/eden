@@ -1,22 +1,20 @@
 import type { AppAssociationManager } from "../app-associations";
-import type { AppCatalog } from "../app-registry";
 import type { AppearanceManager } from "../appearance/AppearanceManager";
 import type { DaemonManager } from "../daemon";
-import type { ExecutionContext } from "../execution";
 import type { PackageManager } from "../package-manager";
 import type { SessionManager } from "../session";
 import type { UserManager } from "../user";
 import type {
   EdenAppearanceApi,
-  EdenAppsApi,
   EdenAssociationsApi,
   EdenDaemonsApi,
+  EdenPackagesApi,
   EdenSessionsApi,
   EdenUsersApi,
 } from "./ControlPlaneApi";
 
 export interface EdenControlPlaneApis {
-  apps: EdenAppsApi;
+  packages: EdenPackagesApi;
   daemons: EdenDaemonsApi;
   users: EdenUsersApi;
   sessions: EdenSessionsApi;
@@ -25,61 +23,61 @@ export interface EdenControlPlaneApis {
 }
 
 interface Dependencies {
-  appCatalog: AppCatalog;
   packageManager: PackageManager;
   daemonManager: DaemonManager;
   userManager: UserManager;
   sessionManager: SessionManager;
   appearanceManager: AppearanceManager;
   associationManager: AppAssociationManager;
-  executionContext: ExecutionContext;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
 
 export function createControlPlaneApis({
-  appCatalog,
   packageManager,
   daemonManager,
   userManager,
   sessionManager,
   appearanceManager,
   associationManager,
-  executionContext,
 }: Dependencies): EdenControlPlaneApis {
-  const apps: EdenAppsApi = {
-    list: (options) => {
-      const user = sessionManager.getCurrentUser();
-      if (!user) return [];
-      return executionContext.run(
-        { principal: { kind: "user", profile: user } },
-        () => clone(appCatalog.list(options)),
-      );
-    },
-    get: (appId) => {
-      const app = appCatalog.get(appId);
-      return app ? clone(app) : undefined;
-    },
-    getIcon: (appId) => appCatalog.getIcon(appId),
-    getSize: (appId) => appCatalog.getSize(appId),
-    getPackageInfo: async (sourcePath) =>
+  const packages: EdenPackagesApi = {
+    list: (options) =>
+      clone(
+        packageManager.listInstalledPackages({
+          ...options,
+          showRestricted: true,
+        }),
+      ),
+    get: (packageId) =>
+      clone(packageManager.getInstalledPackageInfo(packageId)),
+    getIcon: (packageId) => packageManager.getPackageIcon(packageId),
+    getSize: (packageId) => packageManager.getPackageSize(packageId),
+    inspect: async (sourcePath) =>
       clone(await packageManager.getPackageInfo(sourcePath)),
-    install: async (sourcePath) =>
-      clone(await packageManager.installApp(sourcePath)),
-    uninstall: (appId) => packageManager.uninstallApp(appId),
-    reload: (appId) => packageManager.reloadApp(appId),
-    isHotReloadEnabled: (appId) => packageManager.isHotReloadEnabled(appId),
-    toggleHotReload: (appId) => packageManager.toggleHotReload(appId),
+    install: async (sourcePath, options) =>
+      clone(
+        await packageManager.installPackage(
+          sourcePath,
+          options?.replace === true,
+        ),
+      ),
+    uninstall: (packageId) => packageManager.uninstallPackage(packageId),
+    reload: (packageId) => packageManager.reloadPackage(packageId),
+    isHotReloadEnabled: (packageId) =>
+      packageManager.isHotReloadEnabled(packageId),
+    toggleHotReload: (packageId) => packageManager.toggleHotReload(packageId),
     onChanged: (listener) => {
-      const offInstalled = packageManager.on("installed", ({ manifest }) => {
-        listener({ type: "upserted", manifest: clone(manifest) });
-      });
-      const offUninstalled = packageManager.on("uninstalled", ({ appId }) => {
-        listener({ type: "uninstalled", appId });
-      });
+      const offs = [
+        packageManager.on("installed", ({ manifest }) =>
+          listener({ type: "upserted", manifest: clone(manifest) }),
+        ),
+        packageManager.on("uninstalled", (change) =>
+          listener({ type: "uninstalled", ...clone(change) }),
+        ),
+      ];
       return () => {
-        offInstalled();
-        offUninstalled();
+        for (const off of offs) off();
       };
     },
   };
@@ -149,5 +147,12 @@ export function createControlPlaneApis({
     remove: (key) => associationManager.remove(key),
   };
 
-  return { apps, daemons, users, sessions, appearance, associations };
+  return {
+    packages,
+    daemons,
+    users,
+    sessions,
+    appearance,
+    associations,
+  };
 }

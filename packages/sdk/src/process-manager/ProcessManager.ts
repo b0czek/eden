@@ -11,7 +11,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
@@ -67,7 +67,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(BackendManager) private backendManager: BackendManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(AppCatalog) private appCatalog: AppCatalog,
+    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
     @inject(AppChannelManager) private appChannelManager: AppChannelManager,
     @inject(SessionContext) private sessionContext: SessionContext,
@@ -88,7 +88,9 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     });
 
     this.setupEventHandlers();
-    this.packageManager.on("uninstalled", async ({ appId }) => {
+    this.packageManager.on("uninstalled", async (change) => {
+      if (change.kind !== "app") return;
+      const appId = change.packageId;
       if (this.runningApps.has(appId)) await this.stopApp(appId);
     });
     this.setupHotReloadWatcher();
@@ -211,7 +213,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
 
   private async refreshHotReloadApp(appId: string): Promise<void> {
     try {
-      await this.packageManager.reloadApp(appId);
+      await this.packageManager.reloadPackage(appId);
     } catch (error) {
       log.warn(`Failed to refresh hot reload manifest for ${appId}:`, error);
       return;
@@ -237,7 +239,8 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     launchArgs?: string[],
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
     const developmentApp =
-      this.config.development && this.appCatalog.get(appId)?.isDevelopment;
+      this.config.development &&
+      this.packageCatalog.getApp(appId)?.isDevelopment;
     if (
       !developmentApp &&
       !this.isLoginApp(appId) &&
@@ -264,7 +267,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     principal: ExecutionPrincipal,
     profile?: UserProfile,
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.appCatalog.get(appId);
+    const manifest = this.packageCatalog.getApp(appId);
     if (!manifest?.backend?.entry || manifest.frontend?.entry) {
       throw new Error(`App ${appId} is not a backend-only daemon`);
     }
@@ -285,7 +288,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       profile?: UserProfile;
     },
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.appCatalog.get(appId);
+    const manifest = this.packageCatalog.getApp(appId);
     if (!manifest) {
       throw new Error(`App ${appId} is not installed`);
     }
@@ -303,7 +306,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     // Get the correct install path
-    const installPath = this.appCatalog.getPath(appId);
+    const installPath = this.packageCatalog.getPath(appId);
     if (!installPath) {
       throw new Error(`App path not found for ${appId}`);
     }
@@ -465,7 +468,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   }
 
   getInstalledManifest(appId: string) {
-    return this.appCatalog.get(appId);
+    return this.packageCatalog.getApp(appId);
   }
 
   /**

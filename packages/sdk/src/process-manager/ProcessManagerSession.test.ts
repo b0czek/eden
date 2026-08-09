@@ -6,8 +6,8 @@ describe("ProcessManager session cleanup", () => {
   it("launches backend-only apps as ordinary session processes", async () => {
     const manager = Object.create(ProcessManager.prototype) as ProcessManager;
     Object.assign(manager, {
-      appCatalog: {
-        get: () => ({
+      packageCatalog: {
+        getApp: () => ({
           id: "app.backend",
           backend: { entry: "backend.js" },
         }),

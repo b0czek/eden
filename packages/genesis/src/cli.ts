@@ -27,8 +27,8 @@ program
 // Build command
 program
   .command("build")
-  .description("Bundle an Eden app into .edenite format")
-  .argument("<app-directory>", "Path to the app directory")
+  .description("Bundle an Eden app or DLC into .edenite format")
+  .argument("<app-directory>", "Path to the package directory")
   .option("-o, --output <path>", "Output path for .edenite file")
   .option("-v, --verbose", "Verbose output", false)
   .option("-d, --dry-run", "Validate without creating files", false)
@@ -104,7 +104,10 @@ program
 
     if (result.valid && result.manifest) {
       console.log(chalk.green("✓ Manifest is valid\n"));
-      console.log(chalk.bold("App Information:"));
+      console.log(chalk.bold("Package Information:"));
+      console.log(
+        chalk.gray(`  Kind:        ${result.manifest.kind ?? "app"}`),
+      );
       console.log(chalk.gray(`  ID:          ${result.manifest.id}`));
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
@@ -114,14 +117,20 @@ program
       console.log(
         chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
-      console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
-      );
-      console.log(
-        chalk.gray(
-          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}\n`,
-        ),
-      );
+      if (result.manifest.kind === "dlc") {
+        console.log(chalk.gray(`  Host:        ${result.manifest.hostAppId}`));
+      } else {
+        console.log(
+          chalk.gray(
+            `  Backend:     ${result.manifest.backend?.entry || "N/A"}`,
+          ),
+        );
+        console.log(
+          chalk.gray(
+            `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`,
+          ),
+        );
+      }
 
       // Verify files
       const fileCheck = await bundler.verifyFiles(
@@ -160,7 +169,10 @@ program
     const result = await bundler.getInfo(path.resolve(edeniteFile));
 
     if (result.success && result.manifest) {
-      console.log(chalk.bold("App Information:"));
+      console.log(chalk.bold("Package Information:"));
+      console.log(
+        chalk.gray(`  Kind:        ${result.manifest.kind ?? "app"}`),
+      );
       console.log(chalk.gray(`  ID:          ${result.manifest.id}`));
       console.log(chalk.gray(`  Name:        ${result.manifest.name}`));
       console.log(chalk.gray(`  Version:     ${result.manifest.version}`));
@@ -170,14 +182,20 @@ program
       console.log(
         chalk.gray(`  Author:      ${result.manifest.author || "N/A"}`),
       );
-      console.log(
-        chalk.gray(`  Backend:     ${result.manifest.backend?.entry || "N/A"}`),
-      );
-      console.log(
-        chalk.gray(
-          `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`,
-        ),
-      );
+      if (result.manifest.kind === "dlc") {
+        console.log(chalk.gray(`  Host:        ${result.manifest.hostAppId}`));
+      } else {
+        console.log(
+          chalk.gray(
+            `  Backend:     ${result.manifest.backend?.entry || "N/A"}`,
+          ),
+        );
+        console.log(
+          chalk.gray(
+            `  Frontend:    ${result.manifest.frontend?.entry || "N/A"}`,
+          ),
+        );
+      }
       if (result.checksum) {
         console.log(chalk.gray(`  SHA256:      ${result.checksum}`));
       }

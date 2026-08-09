@@ -4,7 +4,7 @@ import type {
   SettingsPanelDefinition,
   UserProfile,
 } from "@edenapp/types";
-import type { AppCatalog } from "../app-registry";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { ExecutionContext } from "../execution";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { SessionContext } from "../session";
@@ -70,11 +70,13 @@ export function createSettingsPanelHarness(
     set: jest.fn<Promise<void>, [string, string, string]>(
       async () => undefined,
     ),
-    list: jest.fn<Promise<string[]>, [string, boolean?]>(async () => []),
+    listApps: jest.fn<Promise<string[]>, [string, boolean?]>(async () => []),
   };
   const catalog = {
-    all: jest.fn<RuntimeAppManifest[], []>(() => []),
-    list: jest.fn<RuntimeAppManifest[], [{ showHidden?: boolean }]>(() => []),
+    allApps: jest.fn<RuntimeAppManifest[], []>(() => []),
+    listApps: jest.fn<RuntimeAppManifest[], [{ showHidden?: boolean }]>(
+      () => [],
+    ),
     getIcon: jest.fn<Promise<string | undefined>, [string]>(
       async () => undefined,
     ),
@@ -89,7 +91,7 @@ export function createSettingsPanelHarness(
     { eventSubscribers: { notify } } as unknown as IPCBridge,
     { registerManager: jest.fn() } as unknown as CommandRegistry,
     settings as unknown as SettingsManager,
-    catalog as unknown as AppCatalog,
+    catalog as unknown as PackageCatalog,
     {
       getCurrentUser: () =>
         currentUser

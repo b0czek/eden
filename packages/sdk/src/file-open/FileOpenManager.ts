@@ -9,7 +9,7 @@ import type {
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { AppAssociationManager } from "../app-associations";
-import { AppCatalog } from "../app-registry";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
@@ -44,7 +44,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   constructor(
     @inject(AppAssociationManager)
     private appAssociationManager: AppAssociationManager,
-    @inject(AppCatalog) private appCatalog: AppCatalog,
+    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
@@ -230,7 +230,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       handler: FileHandlerConfig;
     }> = [];
 
-    for (const app of this.appCatalog.list({ showHidden: true })) {
+    for (const app of this.packageCatalog.listApps({ showHidden: true })) {
       for (const handler of app.fileHandlers ?? []) {
         handlers.push({ app, handler });
       }
@@ -342,7 +342,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   private resolveUserPreference(preferenceKeys: string[]): string | undefined {
     for (const key of preferenceKeys) {
       const preferredAppId = this.appAssociationManager.get(key)?.appId;
-      if (preferredAppId && this.appCatalog.has(preferredAppId)) {
+      if (preferredAppId && this.packageCatalog.hasApp(preferredAppId)) {
         return preferredAppId;
       }
     }
@@ -571,7 +571,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       }
 
       // Check if app is installed
-      const manifest = this.appCatalog.get(handlerAppId);
+      const manifest = this.packageCatalog.getApp(handlerAppId);
       if (!manifest) {
         return {
           success: false,
@@ -624,7 +624,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       const isDirectory = stats.isDirectory();
 
       // Check if app is installed
-      const manifest = this.appCatalog.get(appId);
+      const manifest = this.packageCatalog.getApp(appId);
       if (!manifest) {
         return {
           success: false,

@@ -1,4 +1,8 @@
-import type { RuntimeAppManifest, SettingsPanelValue } from "@edenapp/types";
+import type {
+  RuntimeAppManifest,
+  RuntimeDlcManifest,
+  SettingsPanelValue,
+} from "@edenapp/types";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -52,8 +56,55 @@ describe("AppsTab", () => {
     await fireEvent.click(view.getByText("Example"));
     await waitFor(() =>
       expect(shellCommand).toHaveBeenCalledWith("package/get-size", {
-        appId: manifest.id,
+        packageId: manifest.id,
       }),
     );
+  });
+
+  it("shows DLC details without app-only controls", async () => {
+    const dlc: RuntimeDlcManifest = {
+      kind: "dlc",
+      id: "com.example.theme",
+      name: "Example Theme",
+      version: "2.0.0",
+      hostAppId: manifest.id,
+      contributions: [{ extensionPoint: "themes", requires: "^1.0.0" }],
+      isPrebuilt: false,
+    };
+    Object.defineProperty(window, "edenAPI", {
+      configurable: true,
+      value: { shellCommand: vi.fn(async () => ({ size: 42 })) },
+    });
+    const [busy] = createSignal(new Set<string>());
+    const panel: LoadedPanel = {
+      declaration: {
+        id: "eden.apps",
+        title: "Apps",
+        source: "eden",
+        renderer: "apps",
+        sections: [],
+        actions: [],
+      },
+      state: {
+        data: {
+          apps: [{ manifest, hotReload: false, autostart: false }],
+          dlcs: [{ manifest: dlc }],
+          development: true,
+        } as unknown as SettingsPanelValue,
+      },
+    };
+    const view = render(() => (
+      <AppsTab
+        panel={panel}
+        busyActions={busy}
+        onAction={vi.fn(async () => ({ success: true }))}
+      />
+    ));
+
+    expect(view.getByText("DLC")).toBeTruthy();
+    await fireEvent.click(view.getByText("Example Theme"));
+    expect(view.getByText("themes · ^1.0.0")).toBeTruthy();
+    expect(view.queryByText("Autostart")).toBeNull();
+    expect(view.queryByText("Hot Reload")).toBeNull();
   });
 });

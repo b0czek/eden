@@ -48,6 +48,13 @@ export const en = {
       hotReload: "Hot Reload",
       userInstalled: "User Installed",
       sizeUnavailable: "Size unavailable",
+      dlc: "DLC",
+      host: "Host",
+      extensionPoints: "Extension points",
+      uninstallDlc: "Uninstall DLC",
+      uninstallDlcConfirm: "Are you sure you want to uninstall this DLC?",
+      uninstallCascade:
+        "Uninstalling this app will also remove these DLC packages:",
       uninstallApp: "Uninstall Application",
       uninstallConfirm:
         "Are you sure you want to uninstall this app? This action cannot be undone.",

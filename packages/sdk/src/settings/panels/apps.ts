@@ -22,12 +22,14 @@ export const appsSettingsCategory = {
 } satisfies SettingsCategory;
 
 const loadAppsPanelData = async ({
-  appCatalog,
   packageManager,
   settings,
   config,
 }: BuiltinSettingsDependencies): Promise<SettingsPanelValue> => {
-  const manifests = appCatalog.list({ showHidden: true });
+  const manifests = packageManager.listInstalledPackages({
+    kind: "app",
+    showHidden: true,
+  });
   const storedKeys = await settings.list(EDEN_SETTINGS_APP_ID, true);
   const autostartKeys = new Set(
     storedKeys.filter((key) => key.startsWith("autostart.")),
@@ -36,7 +38,7 @@ const loadAppsPanelData = async ({
     manifests.map(async (manifest) => {
       const autostartKey = `autostart.${manifest.id}`;
       const [icon, hotReload, autostart] = await Promise.all([
-        appCatalog.getIcon(manifest.id),
+        packageManager.getPackageIcon(manifest.id),
         packageManager.isHotReloadEnabled(manifest.id).catch(() => false),
         autostartKeys.has(autostartKey)
           ? settings
@@ -47,8 +49,19 @@ const loadAppsPanelData = async ({
       return { manifest, icon, hotReload, autostart };
     }),
   );
+  const dlcs = await Promise.all(
+    packageManager
+      .listInstalledPackages({ kind: "dlc" })
+      .map(async (manifest) => ({
+        manifest,
+        icon: await packageManager
+          .getPackageIcon(manifest.id)
+          .catch(() => undefined),
+      })),
+  );
   return cloneRendererValue({
     apps,
+    dlcs,
     development: config.development === true,
   }) as unknown as SettingsPanelValue;
 };
@@ -57,6 +70,13 @@ const appActionSchema: SettingsPanelActionInputSchema = {
   type: "object",
   required: true,
   properties: { appId: { type: "string", required: true } },
+  additionalProperties: false,
+};
+
+const packageActionSchema: SettingsPanelActionInputSchema = {
+  type: "object",
+  required: true,
+  properties: { packageId: { type: "string", required: true } },
   additionalProperties: false,
 };
 
@@ -94,11 +114,11 @@ export const appsPanel: BuiltinPanelModule = {
         );
       },
     },
-    uninstall: {
-      input: appActionSchema,
+    "uninstall-package": {
+      input: packageActionSchema,
       handler: async ({ packageManager }, input) => {
-        await packageManager.uninstallApp(
-          (input as unknown as { appId: string }).appId,
+        await packageManager.uninstallPackage(
+          (input as unknown as { packageId: string }).packageId,
         );
       },
     },

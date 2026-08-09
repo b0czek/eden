@@ -21,5 +21,8 @@
       "css": "none"
     }
   },
-  "permissions": ["process/read", "fs/read"]
+  "permissions": ["process/read", "fs/read"],
+  "dlc": {
+    "extensionPoints": [{ "id": "integration-module", "version": "1.0.0" }]
+  }
 }

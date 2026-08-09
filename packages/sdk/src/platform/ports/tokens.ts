@@ -8,3 +8,4 @@ export const PLATFORM_DISPLAY = Symbol("EdenPlatform.Display");
 export const PLATFORM_PROCESS_METRICS = Symbol("EdenPlatform.ProcessMetrics");
 export const PLATFORM_SHORTCUTS = Symbol("EdenPlatform.Shortcuts");
 export const PLATFORM_THEME = Symbol("EdenPlatform.Theme");
+export const PLATFORM_RESOURCES = Symbol("EdenPlatform.Resources");

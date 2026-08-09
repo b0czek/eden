@@ -7,7 +7,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
@@ -44,7 +44,7 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(AppCatalog) private appCatalog: AppCatalog,
+    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SettingsManager) private settingsManager: SettingsManager,
     @inject(UserManager) private userManager: UserManager,
@@ -85,7 +85,9 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
         this.intentionalStops.add(appId);
       }
     });
-    packageManager.on("uninstalled", async ({ appId }) => {
+    packageManager.on("uninstalled", async (change) => {
+      if (change.kind !== "app") return;
+      const appId = change.packageId;
       if (!this.isDaemon(appId)) return;
       this.clearTimers(appId);
       this.loaded.delete(appId);
@@ -278,18 +280,18 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
   }
 
   private daemonApps(): RuntimeAppManifest[] {
-    return this.appCatalog
-      .all()
+    return this.packageCatalog
+      .allApps()
       .filter((app) => !!app.backend?.entry && !app.frontend?.entry);
   }
 
   private isDaemon(appId: string): boolean {
-    const app = this.appCatalog.get(appId);
+    const app = this.packageCatalog.getApp(appId);
     return !!app?.backend?.entry && !app.frontend?.entry;
   }
 
   private requireDaemon(appId: string): RuntimeAppManifest {
-    const app = this.appCatalog.get(appId);
+    const app = this.packageCatalog.getApp(appId);
     if (!app?.backend?.entry || app.frontend?.entry) {
       throw new Error(`App ${appId} is not a backend-only daemon`);
     }

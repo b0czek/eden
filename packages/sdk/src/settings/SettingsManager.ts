@@ -3,7 +3,7 @@ import type { SettingsCategory } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
 import { delay, inject, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
@@ -43,7 +43,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject("appsDirectory") appsDirectory: string,
-    @inject(delay(() => AppCatalog)) private appCatalog: AppCatalog,
+    @inject(delay(() => PackageCatalog)) private packageCatalog: PackageCatalog,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
   ) {
     super(ipcBridge);
@@ -240,7 +240,7 @@ export class SettingsManager extends EdenEmitter<SettingsNamespaceEvents> {
     const schema =
       appId === EDEN_SETTINGS_APP_ID
         ? EDEN_SETTINGS_SCHEMA
-        : this.appCatalog.get(appId)?.settings;
+        : this.packageCatalog.getApp(appId)?.settings;
 
     for (const category of schema ?? []) {
       const setting = category.settings.find(

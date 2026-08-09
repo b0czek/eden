@@ -61,6 +61,7 @@ const providerManifest = (
   permissions = ["file-picker/display"],
 ): RuntimeAppManifest =>
   ({
+    kind: "app",
     id,
     name: id,
     version: "1.0.0",

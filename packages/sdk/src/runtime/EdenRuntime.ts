@@ -9,10 +9,10 @@ import {
 } from "tsyringe";
 import type {
   EdenAppearanceApi,
-  EdenAppsApi,
   EdenAssociationsApi,
   EdenDaemonsApi,
   EdenLifecycleState,
+  EdenPackagesApi,
   EdenSessionsApi,
   EdenSettingsApi,
   EdenUsersApi,
@@ -23,7 +23,6 @@ import {
 } from "../api/createControlPlaneApi";
 import { createSettingsApi } from "../api/createSettingsApi";
 import { AppAssociationManager } from "../app-associations";
-import { AppCatalog } from "../app-registry";
 import { AppChannelManager } from "../appbus";
 import { AppearanceManager } from "../appearance/AppearanceManager";
 import { BrandingManager } from "../branding";
@@ -46,6 +45,7 @@ import {
   PLATFORM_DISPLAY,
   PLATFORM_PROCESS_METRICS,
   PLATFORM_RENDERER_IPC,
+  PLATFORM_RESOURCES,
   PLATFORM_SHORTCUTS,
   PLATFORM_THEME,
   PLATFORM_UTILITY_PROCESSES,
@@ -177,6 +177,10 @@ export class EdenRuntime {
       this.platform.shortcuts,
     );
     this.container.registerInstance(PLATFORM_THEME, this.platform.theme);
+    this.container.registerInstance(
+      PLATFORM_RESOURCES,
+      this.platform.resources,
+    );
 
     this.brandingManager = this.resolveOwned(BrandingManager);
     this.resolveOwned(CommandRegistry);
@@ -205,8 +209,8 @@ export class EdenRuntime {
     return this.lifecycleState;
   }
 
-  public get apps(): EdenAppsApi {
-    return this.requireControlPlaneApis().apps;
+  public get packages(): EdenPackagesApi {
+    return this.requireControlPlaneApis().packages;
   }
 
   public get daemons(): EdenDaemonsApi {
@@ -365,19 +369,16 @@ export class EdenRuntime {
     this.resolveOwned(DbManager);
     const appearanceManager = this.resolveOwned(AppearanceManager);
     this.controlPlaneApis = createControlPlaneApis({
-      appCatalog: this.resolveOwned(AppCatalog),
       packageManager: this.packageManager,
       daemonManager: this.daemonManager,
       userManager: this.userManager,
       sessionManager: this.sessionManager,
       appearanceManager,
       associationManager: this.appAssociationManager,
-      executionContext: this.resolveOwned(ExecutionContext),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,
       settings: this.resolveOwned(SettingsManager),
-      appCatalog: this.resolveOwned(AppCatalog),
       appearanceManager,
       packageManager: this.packageManager,
       daemonManager: this.daemonManager,

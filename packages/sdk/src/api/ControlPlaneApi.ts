@@ -1,9 +1,9 @@
 import type {
   AppAssociation,
-  AppManifest,
   DaemonDefinition,
   DaemonStatus,
-  RuntimeAppManifest,
+  InstalledPackageInfo,
+  InstalledPackageManifest,
   UserProfile,
   UserRole,
   WallpaperConfig,
@@ -20,33 +20,45 @@ export type EdenLifecycleState =
   | "stopping"
   | "stopped";
 
-export interface EdenAppListOptions {
+export interface EdenPackageListOptions {
   showHidden?: boolean;
   showRestricted?: boolean;
+  kind?: "app" | "dlc";
+  hostAppId?: string;
 }
 
-export type EdenAppChange =
-  | { type: "upserted"; manifest: RuntimeAppManifest }
-  | { type: "uninstalled"; appId: string };
+export type EdenPackageChange =
+  | { type: "upserted"; manifest: InstalledPackageManifest }
+  | { type: "uninstalled"; kind: "app"; packageId: string }
+  | {
+      type: "uninstalled";
+      kind: "dlc";
+      packageId: string;
+      hostAppId: string;
+    };
 
 export interface EdenPackageInfo {
   success: boolean;
-  manifest?: AppManifest;
+  manifest?: import("@edenapp/types").PackageManifest;
+  preview?: import("@edenapp/types").PackageOperationPreview;
   error?: string;
 }
 
-export interface EdenAppsApi {
-  list(options?: EdenAppListOptions): RuntimeAppManifest[];
-  get(appId: string): RuntimeAppManifest | undefined;
-  getIcon(appId: string): Promise<string | undefined>;
-  getSize(appId: string): Promise<number | undefined>;
-  getPackageInfo(sourcePath: string): Promise<EdenPackageInfo>;
-  install(sourcePath: string): Promise<RuntimeAppManifest>;
-  uninstall(appId: string): Promise<boolean>;
-  reload(appId: string): Promise<void>;
-  isHotReloadEnabled(appId: string): Promise<boolean>;
-  toggleHotReload(appId: string): Promise<boolean>;
-  onChanged(listener: (change: EdenAppChange) => void): EdenUnsubscribe;
+export interface EdenPackagesApi {
+  list(options?: EdenPackageListOptions): InstalledPackageManifest[];
+  get(packageId: string): InstalledPackageInfo | undefined;
+  getIcon(packageId: string): Promise<string | undefined>;
+  getSize(packageId: string): Promise<number | undefined>;
+  inspect(sourcePath: string): Promise<EdenPackageInfo>;
+  install(
+    sourcePath: string,
+    options?: { replace?: boolean },
+  ): Promise<InstalledPackageManifest>;
+  uninstall(packageId: string): Promise<boolean>;
+  reload(packageId: string): Promise<void>;
+  isHotReloadEnabled(packageId: string): Promise<boolean>;
+  toggleHotReload(packageId: string): Promise<boolean>;
+  onChanged(listener: (change: EdenPackageChange) => void): EdenUnsubscribe;
 }
 
 export interface EdenDaemonsApi {

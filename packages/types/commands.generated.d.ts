@@ -579,18 +579,19 @@ export interface NotificationCommands {
  */
 export interface PackageCommands {
   /**
-   * Install an application from a local path.
+   * Install an application or DLC from a local path.
    */
   "package/install": {
     args: {
-    sourcePath: string };
-    response: import("./index").RuntimeAppManifest;
+    sourcePath: string;
+    replace?: boolean };
+    response: import("./index").InstalledPackageManifest;
   };
   /**
-   * Uninstall an application by its ID.
+   * Uninstall an application or DLC by its package ID.
    */
   "package/uninstall": {
-    args: { appId: string };
+    args: { packageId: string };
     response: boolean;
   };
   /**
@@ -605,11 +606,26 @@ export interface PackageCommands {
     response: import("./index").RuntimeAppManifest[];
   };
   /**
+   * Identify the authenticated app and return its extension resources.
+   */
+  "package/self": {
+    args: { };
+    response: import("./index").InstalledPackageInfo;
+  };
+  /**
+   * Get an installed package and any extension resources it owns.
+   */
+  "package/get": {
+    args: {
+    packageId: string };
+    response: import("./index").InstalledPackageInfo;
+  };
+  /**
    * Toggle hot reload for an app
    */
   "package/toggle-hot-reload": {
     args: {
-    appId: string };
+    packageId: string };
     response: { enabled: boolean };
   };
   /**
@@ -617,31 +633,35 @@ export interface PackageCommands {
    */
   "package/is-hot-reload-enabled": {
     args: {
-    appId: string };
+    packageId: string };
     response: { enabled: boolean };
   };
   /**
-   * Get the icon for an installed application as a data URL.
+   * Get the icon for an installed package as a data URL.
    */
   "package/get-icon": {
     args: {
-    appId: string };
+    packageId: string };
     response: { icon: string | undefined };
   };
   /**
    * Get info about a package file without installing it
    */
   "package/get-info": {
-    args: {
-    path: string };
-    response: { success: boolean; manifest?: import("./index").AppManifest; error?: string };
+    args: { path: string };
+    response: {
+    success: boolean;
+    manifest?: import("./index").PackageManifest;
+    preview?: import("./index").PackageOperationPreview;
+    error?: string;
+  };
   };
   /**
-   * Get the installed size of an app in bytes
+   * Get the installed size of a package in bytes.
    */
   "package/get-size": {
     args: {
-    appId: string };
+    packageId: string };
     response: { size: number | undefined };
   };
 }

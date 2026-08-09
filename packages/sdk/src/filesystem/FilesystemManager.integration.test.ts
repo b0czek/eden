@@ -2,7 +2,7 @@ import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import { AppRegistry } from "../app-registry/AppRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { PermissionRegistry } from "../ipc";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
@@ -23,6 +23,7 @@ describe("FilesystemManager native watch integration", () => {
   beforeEach(async () => {
     eden = await createTestEden();
     const manifest = {
+      kind: "app",
       id: appId,
       name: "Filesystem Watch Test",
       version: "1.0.0",
@@ -33,7 +34,7 @@ describe("FilesystemManager native watch integration", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest;
-    eden.runtime.resolve(AppRegistry).register(manifest);
+    eden.runtime.resolve(PackageRegistry).register(manifest);
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(appId, ["fs/read", "fs/write"]);
@@ -163,7 +164,8 @@ describe("FilesystemManager native watch integration", () => {
     const { watchId } = (await invokeFromView("fs/watch", { path: "/" })) as {
       watchId: string;
     };
-    eden.runtime.resolve(AppRegistry).register({
+    eden.runtime.resolve(PackageRegistry).register({
+      kind: "app",
       id: otherAppId,
       name: "Other Filesystem Watch Test",
       version: "1.0.0",

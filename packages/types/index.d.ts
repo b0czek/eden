@@ -1,5 +1,6 @@
 export * from "./AppAssociation";
 export * from "./AppManifest";
+export * from "./Package";
 export * from "./Branding";
 export * from "./EdenConfig";
 export * from "./EdenSeedConfig";

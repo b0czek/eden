@@ -73,10 +73,13 @@ program
 
 program
   .command("build-sdk")
-  .description("Build all apps in a directory for SDK packaging")
-  .requiredOption("-i, --input <path>", "Source apps directory")
-  .requiredOption("-o, --output <path>", "Output directory for prebuilt apps")
-  .option("-f, --force", "Force rebuild all apps")
+  .description("Build all app and DLC packages for SDK packaging")
+  .requiredOption("-i, --input <path>", "Source packages directory")
+  .requiredOption(
+    "-o, --output <path>",
+    "Output directory for built-in packages",
+  )
+  .option("-f, --force", "Force rebuild all packages")
   .action(async (options) => {
     try {
       await buildSdkApps({

@@ -48,6 +48,13 @@ export const pl = {
       hotReload: "Hot Reload",
       userInstalled: "Zainstalowana przez użytkownika",
       sizeUnavailable: "Rozmiar niedostępny",
+      dlc: "DLC",
+      host: "Aplikacja hosta",
+      extensionPoints: "Punkty rozszerzeń",
+      uninstallDlc: "Odinstaluj DLC",
+      uninstallDlcConfirm: "Czy na pewno chcesz odinstalować ten DLC?",
+      uninstallCascade:
+        "Odinstalowanie tej aplikacji usunie również następujące pakiety DLC:",
       uninstallApp: "Odinstaluj Aplikację",
       uninstallConfirm:
         "Czy na pewno chcesz odinstalować tę aplikację? Ta operacja nie może być cofnięta.",

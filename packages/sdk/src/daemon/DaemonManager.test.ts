@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { EventEmitter } from "node:events";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import type { AppCatalog } from "../app-registry";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { PackageManager } from "../package-manager/PackageManager";
@@ -46,9 +46,10 @@ describe("DaemonManager", () => {
       { eventSubscribers: { notify: jest.fn() } } as unknown as IPCBridge,
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       {
-        all: () => [manifest],
-        get: (appId: string) => (appId === manifest.id ? manifest : undefined),
-      } as unknown as AppCatalog,
+        allApps: () => [manifest],
+        getApp: (appId: string) =>
+          appId === manifest.id ? manifest : undefined,
+      } as unknown as PackageCatalog,
       processManager as unknown as ProcessManager,
       {
         list: jest

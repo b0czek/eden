@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import { AppRegistry } from "../app-registry/AppRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { PermissionRegistry } from "../ipc";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { ProcessManager } from "./ProcessManager";
@@ -23,6 +23,7 @@ describe("ProcessManager integration", () => {
   it("enforces process ownership through the real command path", async () => {
     eden = await createTestEden();
     const target = {
+      kind: "app",
       id: "com.example.target",
       name: "Target App",
       version: "1.0.0",
@@ -33,7 +34,7 @@ describe("ProcessManager integration", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest;
-    eden.runtime.resolve(AppRegistry).register(target);
+    eden.runtime.resolve(PackageRegistry).register(target);
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp("com.example.controller", ["process/manage"]);

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import type { RuntimeAppManifest } from "@edenapp/types";
-import { AppRegistry } from "../app-registry/AppRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { SettingsManager } from "../settings";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { AutostartManager } from "./AutostartManager";
@@ -16,6 +16,7 @@ describe("AutostartManager integration", () => {
   it("launches an enabled app after a real session transition", async () => {
     eden = await createTestEden();
     const app = {
+      kind: "app",
       id: "com.example.autostart",
       name: "Autostart App",
       version: "1.0.0",
@@ -26,7 +27,7 @@ describe("AutostartManager integration", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest;
-    eden.runtime.resolve(AppRegistry).register(app);
+    eden.runtime.resolve(PackageRegistry).register(app);
     await eden.runtime
       .resolve(SettingsManager)
       .set("com.eden", `autostart.${app.id}`, "true");
@@ -55,6 +56,7 @@ describe("AutostartManager integration", () => {
   it("cancels and drains a queued launch before process shutdown", async () => {
     eden = await createTestEden();
     const app = {
+      kind: "app",
       id: "com.example.delayed-autostart",
       name: "Delayed Autostart App",
       version: "1.0.0",
@@ -65,7 +67,7 @@ describe("AutostartManager integration", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest;
-    eden.runtime.resolve(AppRegistry).register(app);
+    eden.runtime.resolve(PackageRegistry).register(app);
     const settings = eden.runtime.resolve(SettingsManager);
     await settings.set("com.eden", `autostart.${app.id}`, "true");
     const user = await eden.runtime.users.create({

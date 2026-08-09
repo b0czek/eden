@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import type { RuntimeAppManifest } from "@edenapp/types";
-import { AppRegistry } from "../app-registry/AppRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 
 describe("FileOpenManager integration", () => {
@@ -13,6 +13,7 @@ describe("FileOpenManager integration", () => {
   it("persists associations through commands and reports compatibility data", async () => {
     eden = await createTestEden();
     const filesApp = {
+      kind: "app",
       id: "com.eden.files",
       name: "Files",
       version: "1.0.0",
@@ -24,7 +25,7 @@ describe("FileOpenManager integration", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest;
-    eden.runtime.resolve(AppRegistry).register(filesApp);
+    eden.runtime.resolve(PackageRegistry).register(filesApp);
     const user = await eden.runtime.users.create({
       username: "files-user",
       name: "Files User",

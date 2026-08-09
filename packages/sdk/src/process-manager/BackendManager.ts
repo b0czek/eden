@@ -4,6 +4,7 @@ import type { AppManifest } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 
 import { log } from "../logging";
+import { DlcResourceManager } from "../package-manager/DlcResourceManager";
 import {
   PLATFORM_UTILITY_PROCESSES,
   type PlatformMessagePort,
@@ -38,6 +39,8 @@ export class BackendManager extends EventEmitter {
     @inject("distPath") distPath: string,
     @inject(PLATFORM_UTILITY_PROCESSES)
     private utilityProcesses: UtilityProcessPort,
+    @inject(DlcResourceManager)
+    private readonly dlcResources: DlcResourceManager,
   ) {
     super();
     this.distPath = distPath;
@@ -79,6 +82,7 @@ export class BackendManager extends EventEmitter {
       this.distPath,
       "app-runtime/backend-preload.js",
     );
+    const dlcBinding = this.dlcResources.createBackendBinding(appId);
 
     // Create utility process with the runtime as entry point
     const backend = this.utilityProcesses.fork(
@@ -93,6 +97,7 @@ export class BackendManager extends EventEmitter {
           EDEN_BACKEND_ENTRY: backendEntryPath,
           EDEN_INSTALL_PATH: installPath,
           EDEN_MANIFEST: JSON.stringify(manifest),
+          EDEN_DLC_BINDING: JSON.stringify(dlcBinding),
         },
       },
     );
@@ -124,6 +129,7 @@ export class BackendManager extends EventEmitter {
       this.backends.delete(appId);
       this.backendData.delete(appId);
       this.backendPorts.delete(appId);
+      this.dlcResources.revokeBackend(appId);
       this.emit("backend-exit", { appId, code });
     });
 
@@ -170,6 +176,7 @@ export class BackendManager extends EventEmitter {
       this.backends.delete(appId);
       this.backendData.delete(appId);
       this.backendPorts.delete(appId);
+      this.dlcResources.revokeBackend(appId);
       throw error;
     }
 
@@ -215,6 +222,7 @@ export class BackendManager extends EventEmitter {
   ): boolean {
     const backend = this.backends.get(appId);
     if (!backend) {
+      this.dlcResources.revokeBackend(appId);
       log.warn(`No backend found for app ${appId}`);
       return false;
     }
@@ -290,6 +298,7 @@ export class BackendManager extends EventEmitter {
 
       this.backends.delete(appId);
       this.backendData.delete(appId);
+      this.dlcResources.revokeBackend(appId);
 
       // Close the port
       const port = this.backendPorts.get(appId);
@@ -303,6 +312,7 @@ export class BackendManager extends EventEmitter {
       this.backends.delete(appId);
       this.backendData.delete(appId);
       this.backendPorts.delete(appId);
+      this.dlcResources.revokeBackend(appId);
       throw error;
     }
   }

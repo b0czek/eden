@@ -10,6 +10,7 @@ describe("SettingsPanelManager manifest panels", () => {
       user(["settings/com.example.app/visible"]),
     );
     const manifest: RuntimeAppManifest = {
+      kind: "app",
       id: "com.example.app",
       name: "Example",
       version: "1.0.0",
@@ -30,7 +31,7 @@ describe("SettingsPanelManager manifest panels", () => {
       isRestricted: false,
       resolvedGrants: [],
     };
-    catalog.all.mockReturnValue([manifest]);
+    catalog.allApps.mockReturnValue([manifest]);
     settings.get.mockImplementation(
       async (_appId: string, key: string) => `${key}-value`,
     );
@@ -63,8 +64,9 @@ describe("SettingsPanelManager manifest panels", () => {
 
   it("allows vendor users to see every generated field", async () => {
     const { manager, catalog } = harness(user([], { role: "vendor" }));
-    catalog.all.mockReturnValue([
+    catalog.allApps.mockReturnValue([
       {
+        kind: "app",
         id: "com.example.app",
         name: "Example",
         version: "1.0.0",
@@ -89,8 +91,9 @@ describe("SettingsPanelManager manifest panels", () => {
 
   it("skips invalid app panels without interrupting catalog synchronization", async () => {
     const { manager, catalog } = harness(user([], { role: "vendor" }));
-    catalog.all.mockReturnValue([
+    catalog.allApps.mockReturnValue([
       {
+        kind: "app",
         id: "com.example.invalid",
         name: "Invalid",
         version: "1.0.0",
@@ -108,6 +111,7 @@ describe("SettingsPanelManager manifest panels", () => {
         resolvedGrants: [],
       } as RuntimeAppManifest,
       {
+        kind: "app",
         id: "com.example.valid",
         name: "Valid",
         version: "1.0.0",

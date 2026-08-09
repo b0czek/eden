@@ -6,7 +6,6 @@ import type {
   SettingsPanelDeclaration,
   SettingsPanelLoader,
 } from "@edenapp/types";
-import type { AppCatalog } from "../../app-registry";
 import type { AppearanceManager } from "../../appearance/AppearanceManager";
 import type { DaemonManager } from "../../daemon";
 import type { PackageManager } from "../../package-manager";
@@ -17,7 +16,6 @@ import type { SettingsPanelManager } from "../SettingsPanelManager";
 export interface BuiltinSettingsDependencies {
   panels: SettingsPanelManager;
   settings: SettingsManager;
-  appCatalog: AppCatalog;
   appearanceManager: AppearanceManager;
   packageManager: PackageManager;
   daemonManager: DaemonManager;
