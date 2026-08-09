@@ -1,7 +1,9 @@
+import * as path from "node:path";
 import { Eden } from "./Eden";
 
 const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
-const userDirectory = process.env.EDEN_DEV_USER_DIRECTORY ?? ".eden-dev/user";
+const userDirectory =
+  process.env.EDEN_DEV_USER_DIRECTORY ?? path.resolve(__dirname, "..");
 const stateDirectory =
   process.env.EDEN_DEV_HOT_RELOAD_DIRECTORY ?? ".eden-hot-reload";
 const seedPath = process.env.EDEN_DEV_SEED_PATH;

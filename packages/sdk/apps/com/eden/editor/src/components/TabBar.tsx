@@ -1,11 +1,13 @@
-import { For } from "solid-js";
+import { FiX } from "solid-icons/fi";
+import { For, Show } from "solid-js";
+import { t } from "../i18n";
 import type { EditorTab } from "../types";
 
 interface TabBarProps {
   tabs: EditorTab[];
   activeTabId: string | null;
   onTabClick: (tab: EditorTab) => void;
-  onTabClose: (tabId: string) => void;
+  onTabClose: (tabId: string) => Promise<void>;
 }
 
 export function TabBar(props: TabBarProps) {
@@ -25,20 +27,28 @@ export function TabBar(props: TabBarProps) {
             role="tab"
             tabIndex={props.activeTabId === tab.id ? 0 : -1}
             aria-selected={props.activeTabId === tab.id}
+            title={tab.path}
             onClick={() => props.onTabClick(tab)}
             onKeyDown={(e) => handleTabKeyDown(tab, e)}
           >
             <span class="tab-name">{tab.name}</span>
-            <button
-              type="button"
-              class="tab-close"
-              onClick={(e: MouseEvent) => {
-                e.stopPropagation();
-                props.onTabClose(tab.id);
-              }}
-            >
-              ×
-            </button>
+            <span class="tab-action">
+              <Show when={tab.isModified}>
+                <span class="tab-dirty-indicator" aria-hidden="true" />
+              </Show>
+              <button
+                type="button"
+                class="tab-close"
+                aria-label={`${t("common.close")}: ${tab.name}`}
+                title={t("common.close")}
+                onClick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  void props.onTabClose(tab.id);
+                }}
+              >
+                <FiX aria-hidden="true" size={14} />
+              </button>
+            </span>
           </div>
         )}
       </For>

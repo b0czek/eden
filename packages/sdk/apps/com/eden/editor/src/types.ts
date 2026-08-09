@@ -1,4 +1,5 @@
-// Tab interface for managing multiple open files
+import type { EditorState, StateEffect } from "@codemirror/state";
+
 export interface EditorTab {
   id: string;
   path: string;
@@ -7,6 +8,8 @@ export interface EditorTab {
   originalContent: string;
   isModified: boolean;
   language: string;
+  state: EditorState;
+  scrollSnapshot?: StateEffect<unknown>;
 }
 
 // File opened event type
@@ -16,7 +19,6 @@ export interface FileOpenedEvent {
   appId: string;
 }
 
-// Extension to Monaco language mapping
 export const extensionToLanguage: Record<string, string> = {
   // Text
   txt: "plaintext",
@@ -26,11 +28,11 @@ export const extensionToLanguage: Record<string, string> = {
 
   // JavaScript/TypeScript
   js: "javascript",
-  jsx: "javascript",
+  jsx: "jsx",
   mjs: "javascript",
   cjs: "javascript",
   ts: "typescript",
-  tsx: "typescript",
+  tsx: "tsx",
   mts: "typescript",
   cts: "typescript",
 
@@ -44,7 +46,7 @@ export const extensionToLanguage: Record<string, string> = {
   json: "json",
   yaml: "yaml",
   yml: "yaml",
-  toml: "ini",
+  toml: "toml",
 
   // Config
   ini: "ini",
