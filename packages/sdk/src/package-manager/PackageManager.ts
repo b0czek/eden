@@ -568,6 +568,20 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     const info = await this.readPackageInfo(edenitePath);
     const rawManifest = info.manifest;
     this.assertPackageIdAvailable(rawManifest.id);
+    return this.operations.runExclusive(() =>
+      this.installPackageExclusive(
+        edenitePath,
+        rawManifest,
+        replacementConfirmed,
+      ),
+    );
+  }
+
+  private async installPackageExclusive(
+    edenitePath: string,
+    rawManifest: PackageManifest,
+    replacementConfirmed: boolean,
+  ): Promise<InstalledPackageManifest> {
     if (rawManifest.kind === "dlc") {
       return this.installDlc(edenitePath, rawManifest, replacementConfirmed);
     }
@@ -633,6 +647,12 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   /** Uninstall an app or DLC by package ID. */
   async uninstallPackage(packageId: string): Promise<boolean> {
+    return this.operations.runExclusive(() =>
+      this.uninstallPackageExclusive(packageId),
+    );
+  }
+
+  private async uninstallPackageExclusive(packageId: string): Promise<boolean> {
     const dlc = this.catalog.getDlc(packageId);
     if (dlc) return this.uninstallDlc(dlc);
 

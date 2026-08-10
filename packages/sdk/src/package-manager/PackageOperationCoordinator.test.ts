@@ -84,4 +84,37 @@ describe("PackageOperationCoordinator", () => {
     ).resolves.toBe("old");
     await expect(fs.access(transaction)).rejects.toThrow();
   });
+
+  it("serializes mutation callbacks through their registry updates", async () => {
+    let unblockFirst!: () => void;
+    const firstBlocked = new Promise<void>((resolve) => {
+      unblockFirst = resolve;
+    });
+    let firstStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      firstStarted = resolve;
+    });
+    const order: string[] = [];
+
+    const first = coordinator.runExclusive(async () => {
+      order.push("first filesystem swap");
+      firstStarted();
+      await firstBlocked;
+      order.push("first registry update");
+    });
+    await started;
+    const second = coordinator.runExclusive(async () => {
+      order.push("second filesystem swap");
+    });
+
+    await Promise.resolve();
+    expect(order).toEqual(["first filesystem swap"]);
+    unblockFirst();
+    await Promise.all([first, second]);
+    expect(order).toEqual([
+      "first filesystem swap",
+      "first registry update",
+      "second filesystem swap",
+    ]);
+  });
 });
