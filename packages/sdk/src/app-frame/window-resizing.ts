@@ -6,6 +6,10 @@ import { log } from "../logging";
  */
 
 import {
+  calculateResizeBounds,
+  type ResizeDirection,
+} from "../view-manager/resize-geometry.js";
+import {
   getEdenFrameInternal,
   getScreenCoords,
   syncEdenFrameBounds,
@@ -25,34 +29,68 @@ interface BoundsRef {
 /**
  * Setup window resizing for floating windows
  */
-/**
- * Setup window resizing for floating windows
- */
 export function setupWindowResizing(
   windowConfig: NonNullable<Window["edenFrame"]>["_internal"]["config"],
   currentBoundsRef: BoundsRef,
 ): () => void {
-  // Create resize handle in bottom-right corner
-  const resizeHandle = document.createElement("div");
-  resizeHandle.id = "eden-resize-handle";
-  resizeHandle.style.cssText = `
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    cursor: nwse-resize;
-    z-index: 2147483647;
-    -webkit-app-region: no-drag;
-    touch-action: none;
-  `;
+  const handleDefinitions: Array<{
+    direction: ResizeDirection;
+    style: string;
+  }> = [
+    {
+      direction: "left",
+      style: "top: 40px; bottom: 20px; left: 0; width: 8px; cursor: ew-resize;",
+    },
+    {
+      direction: "right",
+      style:
+        "top: 40px; right: 0; bottom: 20px; width: 8px; cursor: ew-resize;",
+    },
+    {
+      direction: "bottom",
+      style:
+        "right: 20px; bottom: 0; left: 20px; height: 8px; cursor: ns-resize;",
+    },
+    {
+      direction: "bottom-left",
+      style:
+        "bottom: 0; left: 0; width: 20px; height: 20px; cursor: nesw-resize;",
+    },
+    {
+      direction: "bottom-right",
+      style:
+        "right: 0; bottom: 0; width: 20px; height: 20px; cursor: nwse-resize;",
+    },
+  ];
 
-  document.body.appendChild(resizeHandle);
+  const resizeHandles = handleDefinitions.map(({ direction, style }) => {
+    const handle = document.createElement("div");
+    handle.id =
+      direction === "bottom-right"
+        ? "eden-resize-handle"
+        : `eden-resize-handle-${direction}`;
+    handle.className = "eden-resize-handle";
+    handle.dataset.edenResizeDirection = direction;
+    handle.ariaHidden = "true";
+    handle.style.cssText = `
+      all: initial;
+      position: fixed;
+      ${style}
+      z-index: 2147483647;
+      -webkit-app-region: no-drag;
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+    `;
+    document.body.appendChild(handle);
+    return { direction, handle };
+  });
 
   let isResizing = false;
   let startX = 0;
   let startY = 0;
   let resizeStartBounds: Bounds | null = null;
+  let resizeDirection: ResizeDirection = "bottom-right";
   let isTouch = false;
   let rafId: number | null = null;
   let pendingBounds: Bounds | null = null;
@@ -74,7 +112,10 @@ export function setupWindowResizing(
     }
   };
 
-  const startResize = (e: MouseEvent | TouchEvent): void => {
+  const startResize = (
+    direction: ResizeDirection,
+    e: MouseEvent | TouchEvent,
+  ): void => {
     let currentBounds = currentBoundsRef.current;
 
     // Initialize current bounds if not set
@@ -97,6 +138,7 @@ export function setupWindowResizing(
     startX = coords.x;
     startY = coords.y;
     resizeStartBounds = { ...currentBounds };
+    resizeDirection = direction;
 
     e.preventDefault();
     e.stopPropagation();
@@ -117,6 +159,7 @@ export function setupWindowResizing(
         .shellCommand("view/start-resize", {
           startX: coords.x,
           startY: coords.y,
+          direction,
         })
         .catch(log.error);
     }
@@ -140,29 +183,18 @@ export function setupWindowResizing(
     const deltaX = coords.x - startX;
     const deltaY = coords.y - startY;
 
-    let newWidth = resizeStartBounds.width + deltaX;
-    let newHeight = resizeStartBounds.height + deltaY;
-
-    // Apply min/max constraints
-    if (windowConfig.minSize) {
-      newWidth = Math.max(newWidth, windowConfig.minSize.width || 200);
-      newHeight = Math.max(newHeight, windowConfig.minSize.height || 200);
-    } else {
-      newWidth = Math.max(newWidth, 200);
-      newHeight = Math.max(newHeight, 200);
-    }
-
-    if (windowConfig.maxSize) {
-      newWidth = Math.min(newWidth, windowConfig.maxSize.width || 2000);
-      newHeight = Math.min(newHeight, windowConfig.maxSize.height || 2000);
-    }
-
-    const newBounds = {
-      x: resizeStartBounds.x,
-      y: resizeStartBounds.y,
-      width: Math.round(newWidth),
-      height: Math.round(newHeight),
-    };
+    const newBounds = calculateResizeBounds(
+      resizeStartBounds,
+      deltaX,
+      deltaY,
+      resizeDirection,
+      {
+        minWidth: windowConfig.minSize?.width || 200,
+        minHeight: windowConfig.minSize?.height || 200,
+        maxWidth: windowConfig.maxSize?.width,
+        maxHeight: windowConfig.maxSize?.height,
+      },
+    );
 
     // Update tracked bounds immediately for next move calculation
     currentBoundsRef.current = newBounds;
@@ -214,11 +246,13 @@ export function setupWindowResizing(
     window.edenAPI.shellCommand("view/focus", {}).catch(log.error);
   };
 
-  // Mouse events
-  resizeHandle.addEventListener("mousedown", startResize);
-
-  // Touch events
-  resizeHandle.addEventListener("touchstart", startResize, { passive: false });
+  const handleListeners = resizeHandles.map(({ direction, handle }) => {
+    const listener = (event: MouseEvent | TouchEvent) =>
+      startResize(direction, event);
+    handle.addEventListener("mousedown", listener);
+    handle.addEventListener("touchstart", listener, { passive: false });
+    return { handle, listener };
+  });
 
   // Move events for touch (mouse uses main process tracking)
   // Use document and capture to ensure we get all touch moves
@@ -232,12 +266,11 @@ export function setupWindowResizing(
   document.addEventListener("touchcancel", endResize, { passive: false });
 
   return () => {
-    if (resizeHandle.parentNode) {
-      resizeHandle.parentNode.removeChild(resizeHandle);
+    for (const { handle, listener } of handleListeners) {
+      handle.removeEventListener("mousedown", listener);
+      handle.removeEventListener("touchstart", listener);
+      handle.remove();
     }
-
-    resizeHandle.removeEventListener("mousedown", startResize);
-    resizeHandle.removeEventListener("touchstart", startResize);
 
     document.removeEventListener("touchmove", moveResize, {
       capture: true,

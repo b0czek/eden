@@ -3,6 +3,11 @@ import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
 import { MouseTracker } from "./MouseTracker";
+import {
+  calculateResizeBounds,
+  type ResizeConstraints,
+  type ResizeDirection,
+} from "./resize-geometry";
 import type { ViewManager } from "./ViewManager";
 
 @EdenNamespace("view")
@@ -23,8 +28,8 @@ export class ViewHandler {
     startX: number;
     startY: number;
     startBounds: ViewBounds;
-    currentWidth: number;
-    currentHeight: number;
+    direction: ResizeDirection;
+    constraints: ResizeConstraints;
   } | null = null;
 
   // We need a way to get running app instances to map appId to viewId
@@ -106,6 +111,7 @@ export class ViewHandler {
     appId: string,
     startX: number,
     startY: number,
+    direction: ResizeDirection,
   ): void {
     const viewId = this.getViewIdByAppId(appId);
 
@@ -120,20 +126,31 @@ export class ViewHandler {
       this.mouseTracker.unsubscribe(`resize-${this.resizeState.appId}`);
     }
 
+    const interfaceScale =
+      viewInfo.manifest.window?.scaling === "manual"
+        ? 1
+        : this.viewManager.getCurrentScale();
+    const windowConfig = viewInfo.manifest.window;
+    const scaled = (value: number) => Math.round(value * interfaceScale);
+
     // Initialize resize state
     this.resizeState = {
       appId,
       startX,
       startY,
       startBounds: { ...viewInfo.bounds },
-      currentWidth: viewInfo.bounds.width,
-      currentHeight: viewInfo.bounds.height,
+      direction,
+      constraints: {
+        minWidth: scaled(windowConfig?.minSize?.width || 200),
+        minHeight: scaled(windowConfig?.minSize?.height || 200),
+        maxWidth: windowConfig?.maxSize?.width
+          ? scaled(windowConfig.maxSize.width)
+          : undefined,
+        maxHeight: windowConfig?.maxSize?.height
+          ? scaled(windowConfig.maxSize.height)
+          : undefined,
+      },
     };
-    const interfaceScale =
-      viewInfo.manifest.window?.scaling === "manual"
-        ? 1
-        : this.viewManager.getCurrentScale();
-    const minimumSize = Math.round(200 * interfaceScale);
 
     // Subscribe to mouse updates
     this.mouseTracker.subscribe(`resize-${appId}`, (position) => {
@@ -142,22 +159,13 @@ export class ViewHandler {
       const deltaX = position.x - this.resizeState.startX;
       const deltaY = position.y - this.resizeState.startY;
 
-      let targetWidth = this.resizeState.startBounds.width + deltaX;
-      let targetHeight = this.resizeState.startBounds.height + deltaY;
-
-      // Apply minimum size
-      targetWidth = Math.max(targetWidth, minimumSize);
-      targetHeight = Math.max(targetHeight, minimumSize);
-
-      this.resizeState.currentWidth = targetWidth;
-      this.resizeState.currentHeight = targetHeight;
-
-      const newBounds = {
-        x: this.resizeState.startBounds.x,
-        y: this.resizeState.startBounds.y,
-        width: Math.round(this.resizeState.currentWidth),
-        height: Math.round(this.resizeState.currentHeight),
-      };
+      const newBounds = calculateResizeBounds(
+        this.resizeState.startBounds,
+        deltaX,
+        deltaY,
+        this.resizeState.direction,
+        this.resizeState.constraints,
+      );
 
       this.viewManager.setViewBounds(viewId, newBounds, { notify: true });
     });
@@ -363,10 +371,16 @@ export class ViewHandler {
   async handleStartOwnResize(args: {
     startX: number;
     startY: number;
+    direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right";
     _callerAppId?: string;
   }): Promise<{ success: boolean }> {
     const appId = this.requireCallerAppId(args._callerAppId);
-    this.startResizeForApp(appId, args.startX, args.startY);
+    this.startResizeForApp(
+      appId,
+      args.startX,
+      args.startY,
+      args.direction ?? "bottom-right",
+    );
     return { success: true };
   }
 

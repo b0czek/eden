@@ -1066,7 +1066,8 @@ export interface ViewCommands {
   "view/start-resize": {
     args: {
     startX: number;
-    startY: number };
+    startY: number;
+    direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" };
     response: { success: boolean };
   };
   /**
