@@ -121,7 +121,7 @@ export interface UserEvents {
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
-  "view/view-removed": { viewId: number; appId: string };
+  "view/view-removed": { viewId: number; appId: string; webContentsId: number };
   "view/bounds-updated": import("./index").ViewBounds;
   "view/interface-scale-changed": { scale: number };
   "view/view-loaded": { viewId: number; appId: string; overlay: boolean };

@@ -28,7 +28,7 @@ export interface BackendDlcBinding {
 @injectable()
 export class DlcResourceManager {
   private readonly capabilities = new Map<string, Capability>();
-  private readonly capabilityByView = new Map<number, string>();
+  private readonly capabilityByView = new Map<number, Map<string, string>>();
   private readonly backendBindings = new Map<string, BackendDlcBinding>();
   private initialized = false;
   private offViewRemoved?: () => void;
@@ -48,8 +48,8 @@ export class DlcResourceManager {
       (request) => this.authorize(request),
       (request) => this.serve(request),
     );
-    this.offViewRemoved = this.views.on("view-removed", ({ appId }) =>
-      this.revokeApp(appId),
+    this.offViewRemoved = this.views.on("view-removed", ({ webContentsId }) =>
+      this.revokeView(webContentsId),
     );
   }
 
@@ -104,26 +104,27 @@ export class DlcResourceManager {
   }
 
   private getOrCreateCapability(appId: string, webContentsId: number): string {
-    const existing = this.capabilityByView.get(webContentsId);
-    if (existing) {
-      const binding = this.capabilities.get(existing);
-      if (binding?.appId !== appId) {
-        throw new Error("DLC resource capability has a conflicting app owner");
-      }
-      return existing;
+    let capabilityByHost = this.capabilityByView.get(webContentsId);
+    if (!capabilityByHost) {
+      capabilityByHost = new Map();
+      this.capabilityByView.set(webContentsId, capabilityByHost);
     }
+    const existing = capabilityByHost.get(appId);
+    if (existing) return existing;
+
     const capability = randomBytes(32).toString("base64url");
     this.capabilities.set(capability, { appId, webContentsId });
-    this.capabilityByView.set(webContentsId, capability);
+    capabilityByHost.set(appId, capability);
     return capability;
   }
 
-  private revokeApp(appId: string): void {
-    for (const [capability, binding] of this.capabilities) {
-      if (binding.appId !== appId) continue;
+  private revokeView(webContentsId: number): void {
+    const capabilityByHost = this.capabilityByView.get(webContentsId);
+    if (!capabilityByHost) return;
+    for (const capability of capabilityByHost.values()) {
       this.capabilities.delete(capability);
-      this.capabilityByView.delete(binding.webContentsId);
     }
+    this.capabilityByView.delete(webContentsId);
   }
 
   private authorize(request: PlatformProtocolRequest): boolean {

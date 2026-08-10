@@ -37,7 +37,7 @@ import {
  * Events emitted by the ViewManager
  */
 export interface ViewManagerEvents {
-  "view-removed": { viewId: number; appId: string };
+  "view-removed": { viewId: number; appId: string; webContentsId: number };
   "bounds-updated": ViewBounds;
   "interface-scale-changed": { scale: number };
   "view-loaded": { viewId: number; appId: string; overlay: boolean };
@@ -351,7 +351,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
       // Remove from tracking map
       if (this.views.delete(viewId)) {
-        this.notify("view-removed", { viewId, appId: viewInfo.appId });
+        this.notify("view-removed", {
+          viewId,
+          appId: viewInfo.appId,
+          webContentsId: viewInfo.view.webContents.id,
+        });
       }
 
       // Recalculate tiles if using tiling and this was an app view
@@ -367,7 +371,11 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       log.error(`Failed to remove view ${viewId}:`, errorMessage);
       // Still remove from tracking even if removal failed
       if (this.views.delete(viewId)) {
-        this.notify("view-removed", { viewId, appId: viewInfo.appId });
+        this.notify("view-removed", {
+          viewId,
+          appId: viewInfo.appId,
+          webContentsId: viewInfo.view.webContents.id,
+        });
       }
       throw new Error(`Failed to remove view: ${errorMessage}`);
     }

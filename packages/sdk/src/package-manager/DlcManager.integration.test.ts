@@ -12,6 +12,7 @@ import type { EdenPackageChange } from "../api";
 import { PermissionRegistry } from "../ipc";
 import { SettingsPanelManager } from "../settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { ViewManager } from "../view-manager/ViewManager";
 import { PackageCatalog } from "./PackageCatalog";
 
 const vendor: UserProfile = {
@@ -98,6 +99,12 @@ describe("DLC package lifecycle", () => {
       frontend: { entry: "index.html" },
       dlc: { extensionPoints: [{ id: "themes", version: "1.2.0" }] },
     };
+    const hostWithoutDlcs: AppManifest = {
+      id: "com.example.plain-host",
+      name: "Plain Host",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+    };
     const dlc: DlcManifest = {
       kind: "dlc",
       id: "com.example.theme",
@@ -113,6 +120,12 @@ describe("DLC package lifecycle", () => {
       {
         "index.html": "<html></html>",
       },
+    );
+    const hostWithoutDlcsArchive = await makeArchive(
+      root,
+      eden.paths.userDirectory,
+      hostWithoutDlcs,
+      { "index.html": "<html></html>" },
     );
     const dlcArchive = await makeArchive(root, eden.paths.userDirectory, dlc, {
       "payload/theme.json": '{"accent":"blue"}',
@@ -134,6 +147,11 @@ describe("DLC package lifecycle", () => {
     await eden.execute(
       "package/install",
       { sourcePath: hostArchive },
+      { principal: { kind: "user", profile: vendor } },
+    );
+    await eden.execute(
+      "package/install",
+      { sourcePath: hostWithoutDlcsArchive },
       { principal: { kind: "user", profile: vendor } },
     );
     const settingsChanges: string[] = [];
@@ -188,6 +206,23 @@ describe("DLC package lifecycle", () => {
 
     const inspectorAppId = "com.example.inspector";
     const permissions = eden.runtime.resolve(PermissionRegistry);
+    const views = eden.runtime.resolve(ViewManager);
+    const inspectorViewId = views.createView(
+      inspectorAppId,
+      {
+        id: inspectorAppId,
+        name: "Package Inspector",
+        version: "1.0.0",
+        frontend: { entry: "index.html" },
+      },
+      root,
+      undefined,
+    );
+    const inspectorWebContentsId =
+      views.getViewInfo(inspectorViewId)?.view.webContents.id;
+    if (inspectorWebContentsId === undefined) {
+      throw new Error("Expected inspector WebContents");
+    }
     await expect(
       eden.execute(
         "package/get",
@@ -202,14 +237,27 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute<InstalledPackageInfo>(
         "package/get",
-        { packageId: host.id },
+        { packageId: hostWithoutDlcs.id },
         {
           appId: inspectorAppId,
-          webContentsId: 40,
+          webContentsId: inspectorWebContentsId,
           principal: { kind: "user", profile: vendor },
         },
       ),
     ).resolves.toEqual({
+      manifest: expect.objectContaining(hostWithoutDlcs),
+      dlcs: [],
+    });
+    const inspectedHost = await eden.execute<InstalledPackageInfo>(
+      "package/get",
+      { packageId: host.id },
+      {
+        appId: inspectorAppId,
+        webContentsId: inspectorWebContentsId,
+        principal: { kind: "user", profile: vendor },
+      },
+    );
+    expect(inspectedHost).toEqual({
       manifest: expect.objectContaining(host),
       dlcs: [
         {
@@ -222,6 +270,25 @@ describe("DLC package lifecycle", () => {
         },
       ],
     });
+    const inspectedModuleUrl = new URL(
+      "payload/entry.mjs",
+      inspectedHost.dlcs[0].rootUrl,
+    ).href;
+    await expect(
+      eden.platform.requestResource("eden-dlc", {
+        url: inspectedModuleUrl,
+        method: "GET",
+        webContentsId: inspectorWebContentsId,
+      }),
+    ).resolves.toMatchObject({ status: 200 });
+    views.removeView(inspectorViewId);
+    await expect(
+      eden.platform.requestResource("eden-dlc", {
+        url: inspectedModuleUrl,
+        method: "GET",
+        webContentsId: inspectorWebContentsId,
+      }),
+    ).resolves.toEqual({ status: 403 });
     await expect(
       eden.execute<InstalledPackageInfo>(
         "package/get",
