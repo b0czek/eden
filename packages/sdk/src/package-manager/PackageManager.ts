@@ -49,6 +49,19 @@ interface PackageNamespaceEvents {
     | { kind: "dlc"; packageId: string; hostAppId: string };
 }
 
+const RESERVED_PACKAGE_IDS = new Set([
+  "com.eden",
+  "settings.db",
+  "settings.db-shm",
+  "settings.db-wal",
+  "storage.db",
+  "storage.db-shm",
+  "storage.db-wal",
+  "users.db",
+  "users.db-shm",
+  "users.db-wal",
+]);
+
 export interface InstalledPackageListOptions {
   showHidden?: boolean;
   showRestricted?: boolean;
@@ -554,13 +567,9 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     const edenitePath = await this.resolvePackageSource(virtualPath);
     const info = await this.readPackageInfo(edenitePath);
     const rawManifest = info.manifest;
+    this.assertPackageIdAvailable(rawManifest.id);
     if (rawManifest.kind === "dlc") {
       return this.installDlc(edenitePath, rawManifest, replacementConfirmed);
-    }
-    if (rawManifest.id === "com.eden") {
-      throw new Error(
-        `App ID "${rawManifest.id}" is reserved for Eden system use`,
-      );
     }
     if (this.catalog.hasDlc(rawManifest.id)) {
       throw new Error(`Package ID ${rawManifest.id} is already used by a DLC`);
@@ -722,10 +731,8 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     manifest: DlcManifest,
     replacementConfirmed = false,
   ): Promise<RuntimeDlcManifest> {
-    if (manifest.id === "com.eden" || this.catalog.hasApp(manifest.id)) {
-      throw new Error(
-        `Package ID ${manifest.id} is reserved or already used by an app`,
-      );
+    if (this.catalog.hasApp(manifest.id)) {
+      throw new Error(`Package ID ${manifest.id} is already used by an app`);
     }
     const host = this.catalog.getApp(manifest.hostAppId);
     if (!host)
@@ -807,6 +814,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private replacementRequiredMessage(from: string, to: string): string {
     const operation = from === to ? "reinstall" : "replacement";
     return `Explicit ${operation} confirmation is required (${from} → ${to})`;
+  }
+
+  private assertPackageIdAvailable(packageId: string): void {
+    if (packageId.startsWith(".") || RESERVED_PACKAGE_IDS.has(packageId)) {
+      throw new Error(
+        `Package ID "${packageId}" is reserved for Eden system use`,
+      );
+    }
   }
 
   private async readPackageInfo(

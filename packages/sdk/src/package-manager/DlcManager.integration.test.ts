@@ -65,6 +65,30 @@ describe("DLC package lifecycle", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
+  it("rejects package IDs owned by runtime storage", async () => {
+    const caller = { principal: { kind: "user" as const, profile: vendor } };
+    const storagePath = path.join(eden.paths.appsDirectory, "storage.db");
+    await fs.writeFile(storagePath, "persistent runtime data");
+    const archive = await makeArchive(
+      root,
+      eden.paths.userDirectory,
+      {
+        id: "storage.db",
+        name: "Storage collision",
+        version: "1.0.0",
+        frontend: { entry: "index.html" },
+      },
+      { "index.html": "package data" },
+    );
+
+    await expect(
+      eden.execute("package/install", { sourcePath: archive }, caller),
+    ).rejects.toThrow('Package ID "storage.db" is reserved');
+    await expect(fs.readFile(storagePath, "utf-8")).resolves.toBe(
+      "persistent runtime data",
+    );
+  });
+
   it("installs host-first, scopes access, persists, and cascades removal", async () => {
     const host: AppManifest = {
       id: "com.example.host",
