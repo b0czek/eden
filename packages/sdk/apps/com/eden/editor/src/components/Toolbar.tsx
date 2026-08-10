@@ -1,5 +1,6 @@
 import { FiFolder, FiRotateCcw, FiRotateCw, FiSave } from "solid-icons/fi";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
+import { localizedLanguageName } from "../language-registry";
 import type { EditorTab } from "../types";
 
 interface ToolbarProps {
@@ -18,7 +19,11 @@ export function Toolbar(props: ToolbarProps) {
     <div class="editor-toolbar">
       <div class="toolbar-info">
         <span class="file-path">{props.activeTab?.path}</span>
-        <span class="file-language">{props.activeTab?.language}</span>
+        <span class="file-language">
+          {props.activeTab
+            ? localizedLanguageName(props.activeTab.languageName, locale())
+            : ""}
+        </span>
       </div>
       <div class="toolbar-actions">
         <div class="toolbar-action-group">

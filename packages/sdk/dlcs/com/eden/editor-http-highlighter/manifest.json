@@ -1,0 +1,37 @@
+{
+  "kind": "dlc",
+  "id": "com.eden.editor.http-highlighter",
+  "name": {
+    "en": "HTTP request highlighting",
+    "pl": "Kolorowanie żądań HTTP"
+  },
+  "version": "1.0.0",
+  "description": "Syntax highlighting for HTTP Client .http and .rest files",
+  "author": "Dariusz Majnert",
+  "hostAppId": "com.eden.editor",
+  "fileHandlers": [
+    {
+      "name": "HTTP request files",
+      "extensions": ["http", "rest"]
+    }
+  ],
+  "contributions": [
+    {
+      "extensionPoint": "language-highlighters",
+      "requires": "^1.0.0",
+      "metadata": {
+        "entry": "index.mjs",
+        "languages": [
+          {
+            "id": "http-request",
+            "name": {
+              "en": "HTTP request",
+              "pl": "Żądanie HTTP"
+            },
+            "extensions": ["http", "rest"]
+          }
+        ]
+      }
+    }
+  ]
+}

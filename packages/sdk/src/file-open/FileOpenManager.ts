@@ -9,11 +9,11 @@ import type {
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { AppAssociationManager } from "../app-associations";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
 import { FileOpenHandler } from "./FileOpenHandler";
@@ -231,7 +231,10 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     }> = [];
 
     for (const app of this.packageCatalog.listApps({ showHidden: true })) {
-      for (const handler of app.fileHandlers ?? []) {
+      const dlcHandlers = this.packageCatalog
+        .dlcsForHost(app.id)
+        .flatMap((dlc) => dlc.fileHandlers ?? []);
+      for (const handler of [...(app.fileHandlers ?? []), ...dlcHandlers]) {
         handlers.push({ app, handler });
       }
     }

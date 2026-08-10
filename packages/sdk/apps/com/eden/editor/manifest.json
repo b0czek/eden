@@ -27,6 +27,9 @@
     "movable": true
   },
   "permissions": ["fs/*"],
+  "dlc": {
+    "extensionPoints": [{ "id": "language-highlighters", "version": "1.0.0" }]
+  },
   "fileHandlers": [
     {
       "name": "Text Files",

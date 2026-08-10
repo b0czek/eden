@@ -55,11 +55,33 @@ genesis validate ./night-theme
 genesis build ./night-theme -o ./night-theme.edenite
 ```
 
-To ship a DLC with Eden, place its source package alongside the SDK's built-in
-apps. The SDK package build discovers both app and DLC manifests and emits them
-as built-in packages. A built-in DLC must target a compatible app included in
-the same runtime. It is reported with `isPrebuilt: true` and cannot be replaced
-or removed at runtime.
+### Extending host file handlers
+
+A DLC that adds support for new file types can advertise those types on behalf
+of its host:
+
+```json
+{
+  "kind": "dlc",
+  "hostAppId": "com.example.editor",
+  "fileHandlers": [
+    {
+      "name": "Diagram files",
+      "extensions": ["diagram"]
+    }
+  ]
+}
+```
+
+These handlers resolve to the host app and are available only while the DLC is
+installed and compatible. The host does not need to advertise support for an
+optional DLC's file types in its own manifest.
+
+To ship a DLC with Eden, place its source package under `packages/sdk/dlcs/`.
+The SDK package build discovers app and DLC source roots separately and emits
+both as built-in packages. A built-in DLC must target a compatible app included
+in the same runtime. It is reported with `isPrebuilt: true` and cannot be
+replaced or removed at runtime.
 
 ## Scoped module consumption
 
@@ -95,6 +117,9 @@ backend requests are securely resolved by Eden's backend runtime. The host
 validates imported exports against its own contract before registering them.
 Multiple DLCs may contribute independent implementations to the same extension
 point.
+
+For the text editor's public `language-highlighters` contract, see
+[Editor language-highlighter DLCs](editor-highlighter-dlcs.md).
 
 Direct filesystem access is intentionally not part of the portable DLC resource
 contract because it has no renderer equivalent. Use `fetch()` for opaque files.

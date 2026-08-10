@@ -40,6 +40,8 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { lineHighlighterExtension } from "./custom-highlighter";
+import type { ResolvedEditorLanguage } from "./language-registry";
 import { getLanguageFromPath } from "./types";
 
 const languageExtensions: Record<string, () => Extension> = {
@@ -65,6 +67,10 @@ const codeHighlightStyle = HighlightStyle.define([
     color: "var(--eden-color-accent-purple-light)",
   },
   {
+    tag: tags.operator,
+    color: "var(--eden-color-text-secondary)",
+  },
+  {
     tag: [tags.string, tags.regexp, tags.special(tags.string)],
     color: "var(--eden-color-success)",
   },
@@ -80,6 +86,14 @@ const codeHighlightStyle = HighlightStyle.define([
   {
     tag: [tags.function(tags.variableName), tags.labelName],
     color: "var(--eden-color-info)",
+  },
+  {
+    tag: tags.variableName,
+    color: "var(--eden-color-info)",
+  },
+  {
+    tag: tags.propertyName,
+    color: "var(--eden-color-accent-blue)",
   },
   {
     tag: [tags.typeName, tags.className, tags.namespace],
@@ -177,7 +191,10 @@ export function languageExtensionForPath(filePath: string): Extension {
   return languageExtensions[getLanguageFromPath(filePath)]?.() ?? [];
 }
 
-export function editorExtensions(filePath: string): Extension[] {
+export function editorExtensions(
+  filePath: string,
+  language?: ResolvedEditorLanguage,
+): Extension[] {
   return [
     lineNumbers(),
     highlightActiveLineGutter(),
@@ -207,16 +224,19 @@ export function editorExtensions(filePath: string): Extension[] {
       indentWithTab,
     ]),
     edenTheme,
-    languageExtensionForPath(filePath),
+    language?.highlighter
+      ? lineHighlighterExtension(filePath, language.id, language.highlighter)
+      : languageExtensionForPath(filePath),
   ];
 }
 
 export function createEditorState(
   filePath: string,
   content: string,
+  language?: ResolvedEditorLanguage,
 ): EditorState {
   return EditorState.create({
     doc: content,
-    extensions: editorExtensions(filePath),
+    extensions: editorExtensions(filePath, language),
   });
 }

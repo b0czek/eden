@@ -2,6 +2,7 @@ packages:
   - packages/*
   - genesis
   - packages/sdk/apps/**/*
+  - packages/sdk/dlcs/**/*
 
 catalog:
   '@solidjs/testing-library': ^0.8.10

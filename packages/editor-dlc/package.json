@@ -1,0 +1,23 @@
+{
+  "name": "@edenapp/editor-dlc",
+  "version": "0.12.1",
+  "description": "TypeScript contract for Eden Editor language-highlighter DLCs",
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "eden",
+    "editor",
+    "dlc",
+    "syntax-highlighting"
+  ],
+  "author": "Dariusz Majnert",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/editor-dlc"
+  }
+}

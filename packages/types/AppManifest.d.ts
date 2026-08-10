@@ -436,6 +436,8 @@ export interface DlcManifest extends PackageManifestBase {
   kind: "dlc";
   hostAppId: string;
   contributions: DlcContribution[];
+  /** Additional file types opened by the host while this DLC is installed. */
+  fileHandlers?: FileHandlerConfig[];
 }
 
 /** Any manifest supported by an .edenite package. */

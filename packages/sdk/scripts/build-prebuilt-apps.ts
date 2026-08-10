@@ -1,7 +1,7 @@
 import { buildSdkApps } from "@edenapp/scripts";
 
 buildSdkApps({
-  appsDir: "apps",
+  packageDirs: ["apps", "dlcs"],
   outputDir: "dist/apps/prebuilt",
   force: false,
 }).catch((error) => {

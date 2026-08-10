@@ -29,6 +29,7 @@ describe("editor language resolution", () => {
   it("falls back to plain text for unknown and extensionless files", () => {
     expect(getLanguageFromPath("archive.unknown")).toBe("plaintext");
     expect(getLanguageFromPath("README")).toBe("plaintext");
+    expect(getLanguageFromPath("archive.constructor")).toBe("plaintext");
     expect(languageExtensionForPath("archive.unknown")).toEqual([]);
   });
 });

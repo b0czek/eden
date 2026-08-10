@@ -284,6 +284,12 @@ describe("bundler module", () => {
         name: "Theme",
         version: "release-4",
         hostAppId: legacy.id,
+        fileHandlers: [
+          {
+            name: "Theme source",
+            extensions: ["theme-source"],
+          },
+        ],
         contributions: [
           {
             extensionPoint: "themes",
@@ -296,6 +302,32 @@ describe("bundler module", () => {
       expect(bundler.validatePackageManifestObject(legacy).valid).toBe(true);
       expect(bundler.validatePackageManifestObject(dlc).valid).toBe(true);
       expect(bundler.isDlcCompatible(legacy, dlc).compatible).toBe(true);
+    });
+
+    it("rejects malformed DLC file handlers", () => {
+      const base = {
+        kind: "dlc",
+        id: "com.example.theme",
+        name: "Theme",
+        version: "1.0.0",
+        hostAppId: "com.example.host",
+        contributions: [{ extensionPoint: "themes", requires: "^1.0.0" }],
+      } as const;
+
+      expect(
+        bundler.validatePackageManifestObject({
+          ...base,
+          fileHandlers: [{ name: "Empty" }],
+        }).errors,
+      ).toContain(
+        "fileHandlers[0] must declare extensions, mimeTypes, or directories",
+      );
+      expect(
+        bundler.validatePackageManifestObject({
+          ...base,
+          fileHandlers: "http",
+        }).errors,
+      ).toContain("fileHandlers must be an array");
     });
 
     it("rejects malformed kinds and invalid DLC contracts", () => {

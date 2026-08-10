@@ -1,4 +1,5 @@
 import type { EditorState, StateEffect } from "@codemirror/state";
+import type { EditorLanguageName } from "@edenapp/editor-dlc";
 
 export interface EditorTab {
   id: string;
@@ -8,6 +9,7 @@ export interface EditorTab {
   originalContent: string;
   isModified: boolean;
   language: string;
+  languageName: EditorLanguageName;
   state: EditorState;
   scrollSnapshot?: StateEffect<unknown>;
 }
@@ -63,7 +65,9 @@ export const extensionToLanguage: Record<string, string> = {
 
 export function getLanguageFromPath(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() || "";
-  return extensionToLanguage[ext] || "plaintext";
+  return Object.hasOwn(extensionToLanguage, ext)
+    ? extensionToLanguage[ext]
+    : "plaintext";
 }
 
 export function getFileName(filePath: string): string {

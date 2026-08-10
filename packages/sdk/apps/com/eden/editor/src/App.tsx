@@ -19,11 +19,10 @@ import {
 import { createEditorState } from "./editor-config";
 import { initLocale, t } from "./i18n";
 import {
-  type EditorTab,
-  type FileOpenedEvent,
-  getFileName,
-  getLanguageFromPath,
-} from "./types";
+  EditorLanguageRegistry,
+  loadEditorLanguageRegistry,
+} from "./language-registry";
+import { type EditorTab, type FileOpenedEvent, getFileName } from "./types";
 
 const App: Component = () => {
   const dialogs = createDialogs();
@@ -31,8 +30,13 @@ const App: Component = () => {
   const [activeTabId, setActiveTabId] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [extensionWarning, setExtensionWarning] = createSignal<string | null>(
+    null,
+  );
   const openingFiles = new Map<string, Promise<string>>();
   const closingTabs = new Set<string>();
+  let languageRegistry = new EditorLanguageRegistry();
+  let editorReady = Promise.resolve();
   let tabSequence = 0;
   let openRequestSequence = 0;
 
@@ -66,6 +70,7 @@ const App: Component = () => {
         }
 
         tabId = `tab-${Date.now()}-${++tabSequence}`;
+        const language = languageRegistry.resolve(path);
         const newTab: EditorTab = {
           id: tabId,
           path,
@@ -73,8 +78,9 @@ const App: Component = () => {
           content: fileContent,
           originalContent: fileContent,
           isModified: false,
-          language: getLanguageFromPath(path),
-          state: createEditorState(path, fileContent),
+          language: language.id,
+          languageName: language.name,
+          state: createEditorState(path, fileContent, language),
         };
         return [...currentTabs, newTab];
       });
@@ -91,6 +97,7 @@ const App: Component = () => {
     const requestId = ++openRequestSequence;
     try {
       setError(null);
+      await editorReady;
       const tabId = await loadTab(path);
       if (requestId === openRequestSequence) activateTab(tabId);
     } catch (err) {
@@ -242,8 +249,33 @@ const App: Component = () => {
     if (!data.isDirectory) void openFile(data.path);
   };
 
+  const initializeLanguageDlcs = async () => {
+    try {
+      const { dlcs } = await window.edenAPI.shellCommand("package/self", {});
+      const result = await loadEditorLanguageRegistry(dlcs);
+      languageRegistry = result.registry;
+      if (result.diagnostics.length === 0) return;
+
+      for (const diagnostic of result.diagnostics) {
+        console.warn(
+          `Skipped editor highlighter ${diagnostic.source}: ${diagnostic.message}`,
+        );
+      }
+      const sources = [
+        ...new Set(result.diagnostics.map(({ source }) => source)),
+      ];
+      setExtensionWarning(
+        t("editor.extensionWarning", { sources: sources.join(", ") }),
+      );
+    } catch (err) {
+      console.warn("Failed to load editor language highlighters", err);
+      setExtensionWarning(t("editor.extensionLoadFailed"));
+    }
+  };
+
   onMount(() => {
     initLocale();
+    editorReady = initializeLanguageDlcs();
     const launchArgs = window.edenAPI.getLaunchArgs();
     if (launchArgs.length > 0) void openFile(launchArgs[0]);
 
@@ -307,6 +339,16 @@ const App: Component = () => {
       <Show when={error()}>
         {(message) => (
           <ErrorBanner message={message()} onDismiss={() => setError(null)} />
+        )}
+      </Show>
+
+      <Show when={extensionWarning()}>
+        {(message) => (
+          <ErrorBanner
+            message={message()}
+            tone="warning"
+            onDismiss={() => setExtensionWarning(null)}
+          />
         )}
       </Show>
 

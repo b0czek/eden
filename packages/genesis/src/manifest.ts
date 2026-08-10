@@ -9,6 +9,43 @@ const errorMessage = (error: unknown): string =>
 const isRemoteEntry = (entry?: string): boolean =>
   !!entry && /^https?:\/\//i.test(entry);
 
+function validateFileHandlers(
+  value: unknown,
+  field: string,
+  errors: string[],
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${field} must be an array`);
+    return;
+  }
+
+  for (const [index, candidate] of value.entries()) {
+    const handlerField = `${field}[${index}]`;
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate)
+    ) {
+      errors.push(`${handlerField} must be an object`);
+      continue;
+    }
+    const handler = candidate as Record<string, unknown>;
+    if (typeof handler.name !== "string" || !handler.name.trim()) {
+      errors.push(`Missing required field: ${handlerField}.name`);
+    }
+    const hasExtensions =
+      Array.isArray(handler.extensions) && handler.extensions.length > 0;
+    const hasMimeTypes =
+      Array.isArray(handler.mimeTypes) && handler.mimeTypes.length > 0;
+    if (!hasExtensions && !hasMimeTypes && handler.directories !== true) {
+      errors.push(
+        `${handlerField} must declare extensions, mimeTypes, or directories`,
+      );
+    }
+  }
+}
+
 export function validateAppManifestObject(manifest: AppManifest): {
   valid: boolean;
   errors: string[];
@@ -44,20 +81,7 @@ export function validateAppManifestObject(manifest: AppManifest): {
   ) {
     errors.push("build.concurrent must be a boolean");
   }
-  for (const [index, handler] of (manifest.fileHandlers ?? []).entries()) {
-    if (!handler.name) {
-      errors.push(`Missing required field: fileHandlers[${index}].name`);
-    }
-    const hasExtensions =
-      Array.isArray(handler.extensions) && handler.extensions.length > 0;
-    const hasMimeTypes =
-      Array.isArray(handler.mimeTypes) && handler.mimeTypes.length > 0;
-    if (!hasExtensions && !hasMimeTypes && !handler.directories) {
-      errors.push(
-        `fileHandlers[${index}] must declare extensions, mimeTypes, or directories`,
-      );
-    }
-  }
+  validateFileHandlers(manifest.fileHandlers, "fileHandlers", errors);
   for (const [categoryIndex, category] of (manifest.settings ?? []).entries()) {
     for (const [settingIndex, setting] of category.settings.entries()) {
       if (setting.sharedWith === undefined) continue;
@@ -141,6 +165,7 @@ export function validateDlcManifestObject(manifest: DlcManifest): {
   if (manifest.id && manifest.id === manifest.hostAppId) {
     errors.push("A DLC id must differ from its hostAppId");
   }
+  validateFileHandlers(manifest.fileHandlers, "fileHandlers", errors);
   for (const field of [
     "frontend",
     "backend",
@@ -151,7 +176,6 @@ export function validateDlcManifestObject(manifest: DlcManifest): {
     "window",
     "overlay",
     "hidden",
-    "fileHandlers",
     "development",
     "build",
     "include",

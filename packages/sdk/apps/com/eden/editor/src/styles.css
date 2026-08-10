@@ -222,6 +222,11 @@
   font-size: var(--eden-font-size-sm);
 }
 
+.error-banner.warning {
+  background: var(--eden-color-warning);
+  color: var(--eden-color-text-inverse);
+}
+
 .error-banner button {
   background: rgba(255, 255, 255, 0.2);
   border: none;
@@ -233,6 +238,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.error-banner.warning button {
+  color: var(--eden-color-text-inverse);
 }
 
 .error-banner button:hover {
