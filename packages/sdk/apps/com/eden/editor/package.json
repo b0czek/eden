@@ -19,6 +19,6 @@
   },
   "dependencies": {
     "@edenapp/tablets": "workspace:*",
-    "monaco-editor": "^0.52.2"
+    "monaco-editor": "^0.56.0"
   }
 }
