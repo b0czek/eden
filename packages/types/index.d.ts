@@ -114,6 +114,9 @@ export interface FileStats {
   mtime: Date;
 }
 
+/** Kind of update delivered by a filesystem watch subscription. */
+export type FilesystemChangeKind = "change" | "watch-error";
+
 /** Arguments shared by the recursive filesystem copy and move commands. */
 export interface FilesystemTransferArgs {
   from: string;

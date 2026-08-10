@@ -47,7 +47,7 @@ export interface FilePickerEvents {
  * FsEvents - Events for the "fs" namespace
  */
 export interface FsEvents {
-  "fs/changed": { watchId: string; kind: "change" | "watch-error" };
+  "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind };
 }
 
 /**

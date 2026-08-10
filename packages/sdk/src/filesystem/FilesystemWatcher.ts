@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { type FSWatcher, watch as watchNative } from "node:fs";
 import * as path from "node:path";
+import type { FilesystemChangeKind } from "@edenapp/types";
 import { log } from "../logging";
-
-export type FilesystemChangeKind = "change" | "watch-error";
 
 interface DirectoryWatch {
   watcher: FSWatcher;
