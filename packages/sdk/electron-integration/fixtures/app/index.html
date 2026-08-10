@@ -6,5 +6,21 @@
   </head>
   <body>
     <main id="integration-fixture">Eden integration fixture loaded</main>
+    <div id="shadow-input-host" data-eden-keyboard="floating"></div>
+    <script>
+      const outerShadowRoot = document
+        .getElementById("shadow-input-host")
+        .attachShadow({ mode: "open" });
+      const innerHost = document.createElement("div");
+      innerHost.id = "inner-shadow-input-host";
+      outerShadowRoot.append(innerHost);
+      const innerShadowRoot = innerHost.attachShadow({ mode: "open" });
+      const shadowInput = document.createElement("input");
+      shadowInput.id = "shadow-input";
+      shadowInput.addEventListener("input", () => {
+        document.body.dataset.shadowInputValue = shadowInput.value;
+      });
+      innerShadowRoot.append(shadowInput);
+    </script>
   </body>
 </html>

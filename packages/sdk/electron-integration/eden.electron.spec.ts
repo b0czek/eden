@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
 const APP_ID = "com.eden.integration.fixture";
+const PDF_VIEWER_APP_ID = "com.eden.pdf-viewer";
 const DLC_ID = "com.eden.integration.fixture.module";
 const REMOTE_APP_ID = "com.eden.integration.remote";
 const REMOTE_DLC_ID = "com.eden.integration.remote.module";
@@ -23,6 +24,7 @@ test.describe
     let remoteServer: http.Server;
     let remoteUrl: string;
     let fixtureDirectory: string;
+    let pdfViewerFixtureDirectory: string;
     const logs: string[] = [];
 
     test.beforeAll(async () => {
@@ -30,6 +32,11 @@ test.describe
       const appsDirectory = path.join(root, "apps");
       const userDirectory = path.join(root, "users");
       fixtureDirectory = path.join(root, "dist/apps/prebuilt", APP_ID);
+      pdfViewerFixtureDirectory = path.join(
+        root,
+        "dist/apps/prebuilt",
+        PDF_VIEWER_APP_ID,
+      );
       const remoteFixtureDirectory = path.join(
         root,
         "dist/apps/prebuilt",
@@ -59,6 +66,7 @@ test.describe
         fs.mkdir(appsDirectory, { recursive: true }),
         fs.mkdir(userDirectory, { recursive: true }),
         fs.mkdir(path.dirname(fixtureDirectory), { recursive: true }),
+        fs.mkdir(pdfViewerFixtureDirectory, { recursive: true }),
         fs.mkdir(path.join(dlcDirectory, "dist"), { recursive: true }),
         fs.mkdir(remoteFixtureDirectory, { recursive: true }),
         fs.mkdir(path.join(remoteDlcDirectory, "dist"), { recursive: true }),
@@ -83,6 +91,24 @@ test.describe
       await fs.cp(path.join(__dirname, "fixtures/app"), fixtureDirectory, {
         recursive: true,
       });
+      await Promise.all([
+        fs.cp(
+          path.join(__dirname, "../apps/com/eden/pdf-viewer/manifest.json"),
+          path.join(pdfViewerFixtureDirectory, "manifest.json"),
+        ),
+        fs.cp(
+          path.join(__dirname, "../apps/com/eden/pdf-viewer/dist"),
+          path.join(pdfViewerFixtureDirectory, "dist"),
+          { recursive: true },
+        ),
+      ]);
+      await fs.cp(
+        path.join(
+          __dirname,
+          "../apps/com/eden/pdf-viewer/node_modules/@embedpdf/snippet/dist/demo.pdf",
+        ),
+        path.join(pdfViewerFixtureDirectory, "dist/demo.pdf"),
+      );
       await Promise.all([
         fs.writeFile(
           path.join(dlcDirectory, "manifest.json"),
@@ -308,6 +334,319 @@ test.describe
           rootUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           value: "loaded-through-eden-dlc",
         });
+    });
+
+    test("supports keyboard focus, policy, and input across nested shadow DOM", async () => {
+      const focused = await electronApp?.evaluate(({ webContents }, appId) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) => candidate.getURL().includes(appId));
+        if (!contents) throw new Error("Integration app view not found");
+
+        return contents.executeJavaScript(`(() => {
+            const input = document
+              .getElementById("shadow-input-host")
+              .shadowRoot
+              .getElementById("inner-shadow-input-host")
+              .shadowRoot
+              .getElementById("shadow-input");
+            input.focus();
+            return input === input.getRootNode().activeElement;
+          })()`);
+      }, APP_ID);
+      expect(focused).toBe(true);
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return false;
+
+            return contents.executeJavaScript(`window.edenKeyboard
+              .getState()
+              .then(({ visible, placementMode, target }) => ({
+                visible,
+                placementMode,
+                targetKind: target?.kind,
+              }))`);
+          }, APP_ID);
+        })
+        .toEqual({
+          visible: true,
+          placementMode: "floating",
+          targetKind: "input",
+        });
+
+      const actionResult = await electronApp?.evaluate(({ webContents }) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) =>
+            candidate.getURL().includes("keyboard-ui/index.html"),
+          );
+        if (!contents) throw new Error("Keyboard view not found");
+
+        return contents.executeJavaScript(
+          'window.edenKeyboard.sendAction({ type: "insertText", text: "Eden" })',
+        );
+      });
+      expect(actionResult).toEqual({ success: true });
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(
+              "document.body.dataset.shadowInputValue",
+            );
+          }, APP_ID);
+        })
+        .toBe("Eden");
+    });
+
+    test("types into the PDF viewer search input with the on-screen keyboard", async () => {
+      const hideResult = await electronApp?.evaluate(({ webContents }) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) =>
+            candidate.getURL().includes("keyboard-ui/index.html"),
+          );
+        if (!contents) throw new Error("Keyboard view not found");
+
+        return contents.executeJavaScript("window.edenKeyboard.hide()");
+      });
+      expect(hideResult).toEqual({ success: true });
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(
+              "window.edenKeyboard.getState().then((state) => state.visible)",
+            );
+          }, APP_ID);
+        })
+        .toBe(false);
+
+      const launchResult = await foundation.evaluate((appId) => {
+        const edenWindow = window as typeof window & {
+          edenAPI: {
+            shellCommand: (command: string, args: unknown) => Promise<unknown>;
+          };
+        };
+        return edenWindow.edenAPI.shellCommand("process/launch", { appId });
+      }, PDF_VIEWER_APP_ID);
+      expect(launchResult).toMatchObject({
+        success: true,
+        appId: PDF_VIEWER_APP_ID,
+      });
+
+      const clickPdfSearchButton = async () => {
+        return electronApp?.evaluate(async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("PDF viewer app view not found");
+
+          const point = await contents.executeJavaScript(`(() => {
+            const button = document
+              .querySelector("embedpdf-container")
+              .shadowRoot
+              .querySelector('button[aria-label="Search"]');
+            if (!button) throw new Error("PDF search button not found");
+            const rect = button.getBoundingClientRect();
+            return {
+              x: Math.round(rect.x + rect.width / 2),
+              y: Math.round(rect.y + rect.height / 2),
+            };
+          })()`);
+          contents.focus();
+          contents.sendInputEvent({
+            type: "mouseDown",
+            button: "left",
+            clickCount: 1,
+            ...point,
+          });
+          contents.sendInputEvent({
+            type: "mouseUp",
+            button: "left",
+            clickCount: 1,
+            ...point,
+          });
+        }, PDF_VIEWER_APP_ID);
+      };
+
+      await expect
+        .poll(() =>
+          electronApp?.evaluate(
+            ({ webContents }, appId) =>
+              webContents
+                .getAllWebContents()
+                .some((contents) => contents.getURL().includes(appId)),
+            PDF_VIEWER_APP_ID,
+          ),
+        )
+        .toBe(true);
+
+      await electronApp?.evaluate(async ({ webContents }, appId) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) => candidate.getURL().includes(appId));
+        if (!contents) throw new Error("PDF viewer app view not found");
+
+        return contents.executeJavaScript(`(async () => {
+            const container = document.querySelector("embedpdf-container");
+            const registry = await container.registry;
+            const documentManager = registry
+              .getPlugin("document-manager")
+              .provides();
+            const response = await fetch(new URL("demo.pdf", location.href));
+            const buffer = await response.arrayBuffer();
+            await documentManager.openDocumentBuffer({
+              buffer,
+              name: "demo.pdf",
+              documentId: "osk-search-test",
+            }).toPromise();
+          })()`);
+      }, PDF_VIEWER_APP_ID);
+
+      await clickPdfSearchButton();
+
+      await expect
+        .poll(() =>
+          electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return false;
+
+            return contents.executeJavaScript(`(() => {
+              const root = document.querySelector("embedpdf-container").shadowRoot;
+              const activeElement = root.activeElement;
+              return {
+                searchPanel: Boolean(root.querySelector(
+                  '[data-sidebar-id="search-panel"]',
+                )),
+                searchInput: Boolean(root.querySelector(
+                  'input[placeholder="Search"]',
+                )),
+                activeTag: activeElement?.tagName ?? null,
+                activeLabel: activeElement?.getAttribute("aria-label") ?? null,
+              };
+            })()`);
+          }, PDF_VIEWER_APP_ID),
+        )
+        .toEqual({
+          searchPanel: true,
+          searchInput: true,
+          activeTag: "INPUT",
+          activeLabel: null,
+        });
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(async ({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return false;
+
+            return contents.executeJavaScript(`window.edenKeyboard
+              .getState()
+              .then((state) => ({
+                visible: state.visible,
+                targetKind: state.target?.kind ?? null,
+                documentFocused: document.hasFocus(),
+              }))`);
+          }, PDF_VIEWER_APP_ID);
+        })
+        .toEqual({
+          visible: true,
+          targetKind: "input",
+          documentFocused: true,
+        });
+
+      const actionResult = await electronApp?.evaluate(({ webContents }) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) =>
+            candidate.getURL().includes("keyboard-ui/index.html"),
+          );
+        if (!contents) throw new Error("Keyboard view not found");
+
+        return contents.executeJavaScript(
+          'window.edenKeyboard.sendAction({ type: "insertText", text: "invoice" })',
+        );
+      });
+      expect(actionResult).toEqual({ success: true });
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(`document
+                .querySelector("embedpdf-container")
+                .shadowRoot
+                .querySelector('input[placeholder="Search"]')
+                .value`);
+          }, PDF_VIEWER_APP_ID);
+        })
+        .toBe("invoice");
+
+      await clickPdfSearchButton();
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(
+              "window.edenKeyboard.getState().then((state) => state.visible)",
+            );
+          }, PDF_VIEWER_APP_ID);
+        })
+        .toBe(false);
+
+      await clickPdfSearchButton();
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(`Promise.all([
+                window.edenKeyboard.getState(),
+                Promise.resolve(document
+                  .querySelector("embedpdf-container")
+                  .shadowRoot
+                  .activeElement
+                  ?.matches('input[placeholder="Search"]') ?? false),
+              ]).then(([state, focused]) => ({
+                visible: state.visible,
+                focused,
+              }))`);
+          }, PDF_VIEWER_APP_ID);
+        })
+        .toEqual({ visible: true, focused: true });
     });
 
     test("loads a host-bound DLC module and rejects the same URL from another view", async () => {

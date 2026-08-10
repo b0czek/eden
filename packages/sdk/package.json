@@ -33,7 +33,7 @@
     "test:unit": "jest --runInBand --testPathIgnorePatterns=integration.test.ts",
     "pretest:integration:node": "pnpm run build:test-dependencies",
     "test:integration:node": "jest --runInBand --silent --testPathPatterns=integration.test.ts",
-    "pretest:integration:electron": "pnpm run build:test-dependencies && pnpm run build:main && pnpm run bundle:app-runtime && pnpm run copy-assets",
+    "pretest:integration:electron": "pnpm run build:test-dependencies && pnpm run build:main && pnpm run bundle:app-runtime && pnpm run copy-assets && pnpm --dir apps/com/eden/pdf-viewer run build",
     "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts"
   },
   "keywords": [

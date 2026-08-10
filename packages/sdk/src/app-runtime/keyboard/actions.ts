@@ -1,5 +1,6 @@
 import type { EdenKeyboardAction } from "@edenapp/types";
 import type { KeyboardAutodetectionController } from "./autodetection";
+import { getDeepActiveElement } from "./composed-tree";
 import type { EditableElement } from "./editable-target";
 
 interface KeyboardActionController {
@@ -41,7 +42,7 @@ const dispatchKeyboardEvent = (
 };
 
 const focusEditableElement = (element: EditableElement): void => {
-  if (document.activeElement === element) {
+  if (getDeepActiveElement() === element) {
     return;
   }
 

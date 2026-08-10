@@ -3,6 +3,7 @@ import EmbedPDF, {
   type DocumentManagerPlugin,
   type EmbedPdfContainer,
   type PluginRegistry,
+  type UIPlugin,
   ZoomMode,
 } from "@embedpdf/snippet";
 import type { Component } from "solid-js";
@@ -28,12 +29,50 @@ const App: Component = () => {
   let viewer: EmbedPdfContainer | undefined;
   let registryPromise: Promise<PluginRegistry> | undefined;
   let removeNativeFilePickerPatch: (() => void) | undefined;
+  let searchFocusObserver: MutationObserver | undefined;
+
+  const focusSearchInput = () => {
+    searchFocusObserver?.disconnect();
+    searchFocusObserver = undefined;
+
+    const shadowRoot =
+      viewerHost?.querySelector("embedpdf-container")?.shadowRoot;
+    if (!shadowRoot) {
+      return;
+    }
+
+    const focusWhenReady = () => {
+      const searchInput = shadowRoot.querySelector<HTMLInputElement>(
+        'input[placeholder="Search"]',
+      );
+      if (!searchInput) {
+        return false;
+      }
+
+      searchInput.focus({ preventScroll: true });
+      searchFocusObserver?.disconnect();
+      searchFocusObserver = undefined;
+      return true;
+    };
+
+    if (focusWhenReady()) {
+      return;
+    }
+
+    searchFocusObserver = new MutationObserver(focusWhenReady);
+    searchFocusObserver.observe(shadowRoot, {
+      childList: true,
+      subtree: true,
+    });
+  };
 
   const destroyViewer = () => {
     const viewerToDestroy = viewer;
 
     removeNativeFilePickerPatch?.();
     removeNativeFilePickerPatch = undefined;
+    searchFocusObserver?.disconnect();
+    searchFocusObserver = undefined;
     viewer = undefined;
     registryPromise = undefined;
 
@@ -59,6 +98,7 @@ const App: Component = () => {
     const documentManagerPlugin =
       registry.getPlugin<DocumentManagerPlugin>("document-manager");
     const documentManager = documentManagerPlugin?.provides();
+    const ui = registry.getPlugin<UIPlugin>("ui")?.provides();
 
     if (documentManagerPlugin) {
       installEdenOpenFileDialog(
@@ -93,6 +133,12 @@ const App: Component = () => {
 
       if (activeDocumentTitle) {
         window.edenFrame?.setTitle(activeDocumentTitle);
+      }
+    });
+
+    ui?.onSidebarChanged(({ sidebarId }) => {
+      if (sidebarId === "search-panel") {
+        focusSearchInput();
       }
     });
   };

@@ -2,9 +2,11 @@ import type {
   EdenKeyboardFocusState,
   EdenKeyboardTarget,
 } from "@edenapp/types";
+import { getDeepActiveElement } from "./composed-tree";
 import {
   type EditableElement,
   getEditableElementBounds,
+  getEditableElementFromEvent,
   getKeyboardAutodetectionMode,
   getKeyboardFocusPlacementMode,
   getKeyboardTarget,
@@ -156,7 +158,7 @@ export const createKeyboardAutodetection = ({
   };
 
   const focusEditableElement = (element: EditableElement): void => {
-    if (document.activeElement === element) {
+    if (getDeepActiveElement() === element) {
       return;
     }
 
@@ -192,46 +194,88 @@ export const createKeyboardAutodetection = ({
     };
 
   const setup = (): void => {
-    document.addEventListener(
-      "focusin",
-      (event) => {
-        if (!isEditableElement(event.target)) {
+    const observedShadowRoots = new WeakSet<ShadowRoot>();
+
+    const reconcileActiveEditableElement = (): void => {
+      if (!activeEditableElement) {
+        return;
+      }
+
+      const focusedElement = getDeepActiveElement();
+      if (focusedElement === activeEditableElement) {
+        return;
+      }
+
+      if (focusedElement && isEditableElement(focusedElement)) {
+        setActiveEditableElement(focusedElement);
+        return;
+      }
+
+      clearActiveEditableElement();
+    };
+
+    const handleFocusIn = (event: Event): void => {
+      const editableElement = getEditableElementFromEvent(event);
+      if (!editableElement) {
+        return;
+      }
+
+      if (getKeyboardAutodetectionMode(editableElement) === "manual") {
+        return;
+      }
+
+      setActiveEditableElement(editableElement);
+    };
+
+    const handleFocusOut = (): void => {
+      queueMicrotask(() => {
+        if (!activeEditableElement) {
           return;
         }
 
-        if (getKeyboardAutodetectionMode(event.target) === "manual") {
-          return;
-        }
-
-        setActiveEditableElement(event.target);
-      },
-      { capture: true },
-    );
-
-    document.addEventListener(
-      "focusout",
-      () => {
-        queueMicrotask(() => {
-          if (!activeEditableElement) {
-            return;
-          }
-
-          if (!document.hasFocus()) {
-            clearActiveEditableElement();
-            return;
-          }
-
-          const nextActiveElement = document.activeElement;
-          if (nextActiveElement && isEditableElement(nextActiveElement)) {
-            setActiveEditableElement(nextActiveElement);
-            return;
-          }
-
+        if (!document.hasFocus()) {
           clearActiveEditableElement();
+          return;
+        }
+
+        const nextActiveElement = getDeepActiveElement();
+        if (nextActiveElement && isEditableElement(nextActiveElement)) {
+          setActiveEditableElement(nextActiveElement);
+          return;
+        }
+
+        clearActiveEditableElement();
+      });
+    };
+
+    const observeOpenShadowRoots = (root: ParentNode): void => {
+      const elements = [
+        ...(root instanceof Element ? [root] : []),
+        ...root.querySelectorAll("*"),
+      ];
+
+      for (const element of elements) {
+        if (
+          !element.shadowRoot ||
+          observedShadowRoots.has(element.shadowRoot)
+        ) {
+          continue;
+        }
+
+        const shadowRoot = element.shadowRoot;
+        observedShadowRoots.add(shadowRoot);
+        shadowRoot.addEventListener("focusin", handleFocusIn, {
+          capture: true,
         });
-      },
-      { capture: true },
-    );
+        shadowRoot.addEventListener("focusout", handleFocusOut, {
+          capture: true,
+        });
+        observeOpenShadowRoots(shadowRoot);
+      }
+    };
+
+    document.addEventListener("focusin", handleFocusIn, { capture: true });
+    document.addEventListener("focusout", handleFocusOut, { capture: true });
 
     document.addEventListener("selectionchange", syncContentEditableSelection, {
       capture: true,
@@ -263,6 +307,25 @@ export const createKeyboardAutodetection = ({
 
     window.addEventListener("blur", () => {
       clearActiveEditableElement();
+    });
+
+    observeOpenShadowRoots(document);
+    const documentObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof Element) {
+            observeOpenShadowRoots(node);
+          }
+        }
+      }
+
+      if (!activeEditableElement?.isConnected) {
+        queueMicrotask(reconcileActiveEditableElement);
+      }
+    });
+    documentObserver.observe(document, {
+      childList: true,
+      subtree: true,
     });
   };
 

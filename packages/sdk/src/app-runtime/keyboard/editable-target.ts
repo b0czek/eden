@@ -3,6 +3,7 @@ import type {
   EdenKeyboardTarget,
   EdenKeyboardTargetBounds,
 } from "@edenapp/types";
+import { findComposedAncestor } from "./composed-tree";
 
 export type EditableElement =
   | HTMLInputElement
@@ -33,7 +34,9 @@ const isSupportedInput = (element: HTMLInputElement): boolean => {
 const getKeyboardAutodetectionAttribute = (
   element: EditableElement,
 ): string | null => {
-  const owner = element.closest("[data-eden-keyboard]");
+  const owner = findComposedAncestor(element, (candidate) =>
+    candidate.hasAttribute("data-eden-keyboard"),
+  );
   if (!(owner instanceof HTMLElement)) {
     return null;
   }
@@ -80,6 +83,18 @@ export const isEditableElement = (
   }
 
   return value.isContentEditable;
+};
+
+export const getEditableElementFromEvent = (
+  event: Event,
+): EditableElement | null => {
+  for (const target of event.composedPath()) {
+    if (isEditableElement(target)) {
+      return target;
+    }
+  }
+
+  return isEditableElement(event.target) ? event.target : null;
 };
 
 export const getKeyboardTarget = (
