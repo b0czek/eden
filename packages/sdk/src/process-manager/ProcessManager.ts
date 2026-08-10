@@ -267,7 +267,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     principal: ExecutionPrincipal,
     profile?: UserProfile,
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.packageCatalog.getApp(appId);
+    const manifest = this.packageManager.getAppForLaunch(appId);
     if (!manifest?.backend?.entry || manifest.frontend?.entry) {
       throw new Error(`App ${appId} is not a backend-only daemon`);
     }
@@ -288,7 +288,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       profile?: UserProfile;
     },
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.packageCatalog.getApp(appId);
+    const manifest = this.packageManager.getAppForLaunch(appId);
     if (!manifest) {
       throw new Error(`App ${appId} is not installed`);
     }

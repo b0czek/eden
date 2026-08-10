@@ -77,6 +77,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private packageHandler: PackageHandler;
   private coreApps: Set<string>;
   private restrictedApps: Set<string>;
+  private readonly changingHostIds = new Map<string, number>();
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
@@ -538,6 +539,12 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     return this.catalog.get(packageId);
   }
 
+  getAppForLaunch(appId: string): RuntimeAppManifest | undefined {
+    return this.changingHostIds.has(appId)
+      ? undefined
+      : this.catalog.getApp(appId);
+  }
+
   getInstalledPackageInfo(
     packageId: string,
     webContentsId?: number,
@@ -583,12 +590,43 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     replacementConfirmed: boolean,
   ): Promise<InstalledPackageManifest> {
     if (rawManifest.kind === "dlc") {
-      return this.installDlc(edenitePath, rawManifest, replacementConfirmed);
+      if (this.catalog.hasApp(rawManifest.id)) {
+        throw new Error(
+          `Package ID ${rawManifest.id} is already used by an app`,
+        );
+      }
+      const host = this.catalog.getApp(rawManifest.hostAppId);
+      if (!host) {
+        throw new Error(`Host app ${rawManifest.hostAppId} is not installed`);
+      }
+      const existing = this.catalog.getDlc(rawManifest.id);
+      return this.runWithHostsChanging(
+        [host.id, ...(existing ? [existing.hostAppId] : [])],
+        () =>
+          this.installDlc(
+            edenitePath,
+            rawManifest,
+            host,
+            existing,
+            replacementConfirmed,
+          ),
+      );
     }
     if (this.catalog.hasDlc(rawManifest.id)) {
       throw new Error(`Package ID ${rawManifest.id} is already used by a DLC`);
     }
     const existing = this.catalog.getApp(rawManifest.id);
+    return this.runWithHostsChanging([rawManifest.id], () =>
+      this.installApp(edenitePath, rawManifest, existing, replacementConfirmed),
+    );
+  }
+
+  private async installApp(
+    edenitePath: string,
+    rawManifest: AppManifest,
+    existing: RuntimeAppManifest | undefined,
+    replacementConfirmed: boolean,
+  ): Promise<RuntimeAppManifest> {
     if (existing) {
       if (existing.isPrebuilt || existing.isDevelopment) {
         throw new Error(
@@ -654,35 +692,45 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   private async uninstallPackageExclusive(packageId: string): Promise<boolean> {
     const dlc = this.catalog.getDlc(packageId);
-    if (dlc) return this.uninstallDlc(dlc);
+    if (dlc) {
+      return this.runWithHostsChanging([dlc.hostAppId], () =>
+        this.uninstallDlc(dlc),
+      );
+    }
 
     const manifest = this.catalog.getApp(packageId);
     if (!manifest) {
       return false;
     }
 
+    return this.runWithHostsChanging([manifest.id], () =>
+      this.uninstallApp(manifest),
+    );
+  }
+
+  private async uninstallApp(manifest: RuntimeAppManifest): Promise<boolean> {
     if (manifest.isPrebuilt || manifest.isDevelopment) {
       throw new Error(`Cannot uninstall ${manifest.id}: this is a system app.`);
     }
-    this.assertHostStopped(packageId);
-    const dlcs = this.catalog.dlcsForHost(packageId);
+    this.assertHostStopped(manifest.id);
+    const dlcs = this.catalog.dlcsForHost(manifest.id);
     const protectedDlc = dlcs.find((dlc) => dlc.isPrebuilt);
     if (protectedDlc) {
       throw new Error(
-        `Cannot uninstall ${packageId}: it owns bundled DLC ${protectedDlc.id}`,
+        `Cannot uninstall ${manifest.id}: it owns bundled DLC ${protectedDlc.id}`,
       );
     }
     await this.operations.execute([
-      { target: path.join(this.appsDirectory, packageId) },
+      { target: path.join(this.appsDirectory, manifest.id) },
       ...dlcs.map((dlc) => ({
         target: path.join(this.catalog.dlcDirectory, dlc.id),
       })),
     ]);
     for (const dlc of dlcs) this.unregisterDlc(dlc);
-    this.registry.unregister(packageId);
-    this.permissionRegistry.unregisterApp(packageId);
+    this.registry.unregister(manifest.id);
+    this.permissionRegistry.unregisterApp(manifest.id);
 
-    this.notify("uninstalled", { kind: "app", packageId });
+    this.notify("uninstalled", { kind: "app", packageId: manifest.id });
 
     return true;
   }
@@ -749,14 +797,10 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   private async installDlc(
     edenitePath: string,
     manifest: DlcManifest,
+    host: RuntimeAppManifest,
+    existing: RuntimeDlcManifest | undefined,
     replacementConfirmed = false,
   ): Promise<RuntimeDlcManifest> {
-    if (this.catalog.hasApp(manifest.id)) {
-      throw new Error(`Package ID ${manifest.id} is already used by an app`);
-    }
-    const host = this.catalog.getApp(manifest.hostAppId);
-    if (!host)
-      throw new Error(`Host app ${manifest.hostAppId} is not installed`);
     const compatibility = genesisBundler.isDlcCompatible(host, manifest);
     if (!compatibility.compatible) {
       throw new Error(
@@ -764,7 +808,6 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
     this.assertHostStopped(host.id);
-    const existing = this.catalog.getDlc(manifest.id);
     if (existing?.isPrebuilt) {
       throw new Error(`Cannot replace ${manifest.id}: it is a bundled DLC`);
     }
@@ -828,6 +871,32 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       throw new Error(
         `Host app ${appId} must be stopped before changing packages`,
       );
+    }
+  }
+
+  private async runWithHostsChanging<T>(
+    appIds: Iterable<string>,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const ids = [...new Set(appIds)];
+    for (const appId of ids) {
+      this.changingHostIds.set(
+        appId,
+        (this.changingHostIds.get(appId) ?? 0) + 1,
+      );
+    }
+
+    try {
+      return await operation();
+    } finally {
+      for (const appId of ids) {
+        const depth = this.changingHostIds.get(appId);
+        if (depth === undefined || depth <= 1) {
+          this.changingHostIds.delete(appId);
+        } else {
+          this.changingHostIds.set(appId, depth - 1);
+        }
+      }
     }
   }
 
