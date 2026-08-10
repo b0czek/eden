@@ -21,7 +21,7 @@ import {
 } from "./FilesystemWatcher";
 
 interface FilesystemEvents {
-  changed: { watchId: string; kind: FilesystemChangeKind };
+  changed: { watchId: string; kind: "change" | "watch-error" };
 }
 /**
  * FilesystemManager
