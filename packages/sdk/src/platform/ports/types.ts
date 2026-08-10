@@ -25,6 +25,35 @@ export interface PlatformWebRequest {
   ): void;
 }
 
+export interface PlatformProtocolRequest {
+  url: string;
+  method: string;
+  webContentsId?: number;
+}
+
+export interface PlatformProtocolResponse {
+  status: number;
+  filePath?: string;
+  headers?: Record<string, string>;
+}
+
+export interface ResourceProtocolPort {
+  /**
+   * Declare custom URL schemes before the platform becomes ready so the
+   * renderer treats them as secure, standard schemes. This does not attach a
+   * request handler; runtime managers do that later through `handle`.
+   */
+  registerSchemes(schemes: string[]): void;
+  handle(
+    scheme: string,
+    authorize: (request: PlatformProtocolRequest) => boolean,
+    handler: (
+      request: PlatformProtocolRequest,
+    ) => Promise<PlatformProtocolResponse>,
+  ): void;
+  unhandle(scheme: string): void;
+}
+
 export interface PlatformWebContents {
   readonly id: number;
   readonly session: { webRequest: PlatformWebRequest };
@@ -293,4 +322,5 @@ export interface EdenPlatform {
   processMetrics: ProcessMetricsPort;
   shortcuts: ShortcutPort;
   theme: ThemeStatePort;
+  resources: ResourceProtocolPort;
 }

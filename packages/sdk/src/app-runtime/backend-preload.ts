@@ -33,6 +33,7 @@ import {
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import { installDlcModuleResolver } from "./common/dlc-module-resolver";
 import {
   type AppBusPortData,
   createAppBusState,
@@ -75,6 +76,9 @@ function requireEnv(name: string): string {
 const appId = requireEnv("EDEN_APP_ID");
 const backendEntry = requireEnv("EDEN_BACKEND_ENTRY");
 const manifest = JSON.parse(process.env.EDEN_MANIFEST || "{}");
+const dlcBinding = process.env.EDEN_DLC_BINDING;
+delete process.env.EDEN_DLC_BINDING;
+installDlcModuleResolver(dlcBinding);
 
 setLogContext({ appId });
 

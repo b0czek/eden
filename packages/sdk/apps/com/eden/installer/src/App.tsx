@@ -1,10 +1,15 @@
-import type { AppManifest } from "@edenapp/types";
+import type {
+  AppManifest,
+  PackageManifest,
+  PackageOperationPreview,
+} from "@edenapp/types";
 import { FiAlertTriangle, FiCheck, FiLock, FiPackage } from "solid-icons/fi";
 import { createSignal, For, onMount, Show } from "solid-js";
 
 interface PackageInfoResponse {
   success: boolean;
-  manifest?: AppManifest;
+  manifest?: PackageManifest;
+  preview?: PackageOperationPreview;
   error?: string;
 }
 
@@ -13,7 +18,10 @@ const App = () => {
   const [installing, setInstalling] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal(false);
-  const [manifest, setManifest] = createSignal<AppManifest | null>(null);
+  const [manifest, setManifest] = createSignal<PackageManifest | null>(null);
+  const [preview, setPreview] = createSignal<PackageOperationPreview | null>(
+    null,
+  );
   const [packagePath, setPackagePath] = createSignal<string | null>(null);
 
   onMount(async () => {
@@ -48,6 +56,7 @@ const App = () => {
 
       if (result.success && result.manifest) {
         setManifest(result.manifest);
+        setPreview(result.preview ?? null);
       } else {
         setError(result.error || "Failed to load package info.");
       }
@@ -60,12 +69,33 @@ const App = () => {
 
   const installPackage = async () => {
     const path = packagePath();
-    if (!path) return;
+    const packageManifest = manifest();
+    if (!path || !packageManifest) return;
+
+    const currentPreview = preview();
+    const existingVersion = currentPreview?.existingVersion;
+    if (existingVersion) {
+      const removals =
+        currentPreview?.kind === "app" ? currentPreview.incompatibleDlcs : [];
+      const detail = removals.length
+        ? `\n\nThe following incompatible DLCs will be removed:\n${removals
+            .map((dlc) => `• ${getLocalizedName(dlc.name)}`)
+            .join("\n")}`
+        : "";
+      if (
+        !confirm(
+          `Confirm ${replacementLabel(existingVersion, packageManifest.version).toLowerCase()} of ${getLocalizedName(packageManifest.name)}.${detail}`,
+        )
+      ) {
+        return;
+      }
+    }
 
     setInstalling(true);
     try {
       await window.edenAPI.shellCommand("package/install", {
         sourcePath: path,
+        replace: !!existingVersion,
       });
       setSuccess(true);
       setTimeout(() => {
@@ -85,6 +115,37 @@ const App = () => {
   const getLocalizedName = (name: AppManifest["name"]): string => {
     if (typeof name === "string") return name;
     return name.en || Object.values(name)[0] || "Unknown App";
+  };
+
+  const replacementLabel = (from: string, to: string): string => {
+    if (from === to) return "Reinstall";
+    return to.localeCompare(from, undefined, { numeric: true }) > 0
+      ? "Upgrade"
+      : "Downgrade";
+  };
+
+  const blockingMessage = () => {
+    const current = preview();
+    if (!current) return null;
+    if (current.hostRunning) return "The host app must be stopped first.";
+    if (current.replaceable === false) {
+      return "Prebuilt and development apps cannot be replaced.";
+    }
+    return current.kind === "dlc"
+      ? current.compatibilityErrors.join(" ") || null
+      : null;
+  };
+
+  const installLabel = (version: string): string => {
+    const existingVersion = preview()?.existingVersion;
+    return existingVersion
+      ? replacementLabel(existingVersion, version)
+      : "Install";
+  };
+
+  const previewHostName = () => {
+    const current = preview();
+    return current?.kind === "dlc" ? current.host?.name : undefined;
   };
 
   return (
@@ -141,6 +202,9 @@ const App = () => {
                   <span class="eden-badge eden-badge-secondary">
                     v{app.version}
                   </span>
+                  <span class="eden-badge eden-badge-primary">
+                    {app.kind === "dlc" ? "DLC" : "App"}
+                  </span>
                   <span>by {app.author || "Unknown"}</span>
                 </div>
                 <p class="eden-text-secondary eden-mt-md eden-text-center">
@@ -148,30 +212,61 @@ const App = () => {
                 </p>
               </div>
 
-              <div class="permissions-section eden-card eden-p-lg eden-mt-xl">
-                <h3 class="eden-card-title eden-mb-md">Permissions</h3>
-                <Show
-                  when={app.permissions && app.permissions.length > 0}
-                  fallback={
-                    <p class="eden-text-secondary eden-text-sm">
-                      No special permissions required.
-                    </p>
-                  }
-                >
-                  <ul class="eden-list">
-                    <For each={app.permissions}>
-                      {(perm) => (
-                        <li class="eden-list-item">
-                          <FiLock class="eden-text-secondary eden-mr-sm" />
-                          <span>{perm}</span>
-                        </li>
+              <Show
+                when={app.kind === "dlc" ? app : null}
+                fallback={
+                  <div class="permissions-section eden-card eden-p-lg eden-mt-xl">
+                    <h3 class="eden-card-title eden-mb-md">Permissions</h3>
+                    <Show
+                      when={app.kind !== "dlc" && app.permissions?.length}
+                      fallback={
+                        <p class="eden-text-secondary eden-text-sm">
+                          No special permissions required.
+                        </p>
+                      }
+                    >
+                      <ul class="eden-list">
+                        <For each={app.kind !== "dlc" ? app.permissions : []}>
+                          {(permission) => (
+                            <li class="eden-list-item">
+                              <FiLock class="eden-text-secondary eden-mr-sm" />
+                              <span>{permission}</span>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </Show>
+                  </div>
+                }
+              >
+                {(dlc) => (
+                  <div class="eden-card eden-p-lg eden-mt-xl eden-flex-col eden-gap-md">
+                    <div>
+                      <strong>Host:</strong>{" "}
+                      {getLocalizedName(previewHostName() ?? dlc().hostAppId)}
+                    </div>
+                    <h3 class="eden-card-title">Contributions</h3>
+                    <For each={dlc().contributions}>
+                      {(contribution) => (
+                        <div class="eden-tag">
+                          {contribution.extensionPoint} ·{" "}
+                          {contribution.requires}
+                        </div>
                       )}
                     </For>
-                  </ul>
-                </Show>
-              </div>
+                  </div>
+                )}
+              </Show>
 
-              <Show when={app.backend}>
+              <Show when={blockingMessage()}>
+                {(message) => (
+                  <div class="eden-card eden-border-danger eden-bg-danger-transparent eden-mt-lg eden-p-md eden-text-danger">
+                    <FiAlertTriangle /> {message()}
+                  </div>
+                )}
+              </Show>
+
+              <Show when={app.kind !== "dlc" && app.backend}>
                 <div class="eden-card eden-card-outlined eden-border-danger eden-bg-danger-transparent eden-mt-lg eden-p-md">
                   <div class="eden-flex-start eden-gap-md">
                     <FiAlertTriangle class="eden-text-danger" size={24} />
@@ -200,10 +295,10 @@ const App = () => {
                 <button
                   type="button"
                   class="eden-btn eden-btn-primary"
-                  disabled={installing() || success()}
+                  disabled={installing() || success() || !!blockingMessage()}
                   onClick={installPackage}
                 >
-                  {installing() ? "Installing..." : "Install"}
+                  {installing() ? "Installing..." : installLabel(app.version)}
                 </button>
               </div>
             </div>

@@ -10,7 +10,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
-import type { AppManifest } from "@edenapp/types";
+import type { PackageManifest } from "@edenapp/types";
 import { type AppSource, loadConfig, resolveSdkAppsPath } from "./config";
 
 export interface BuildAppsOptions {
@@ -119,18 +119,18 @@ async function runBuildTasks<T>(tasks: BuildTask<T>[]): Promise<T[]> {
   return results;
 }
 
-async function readAppManifest(appDir: string): Promise<AppManifest> {
+async function readPackageManifest(appDir: string): Promise<PackageManifest> {
   const content = await fs.readFile(
     path.join(appDir, "manifest.json"),
     "utf-8",
   );
-  return JSON.parse(content) as AppManifest;
+  return JSON.parse(content) as PackageManifest;
 }
 
 async function allowsConcurrentBuild(appDir: string): Promise<boolean> {
   try {
-    const manifest = await readAppManifest(appDir);
-    return manifest.build?.concurrent !== false;
+    const manifest = await readPackageManifest(appDir);
+    return manifest.kind === "dlc" || manifest.build?.concurrent !== false;
   } catch {
     // Genesis will report malformed or unreadable manifests during the build.
     return true;
@@ -452,25 +452,25 @@ export async function buildApps(options: BuildAppsOptions = {}): Promise<void> {
   console.log("🎉 All apps built successfully!");
 }
 
-/**
- * Options for building SDK apps
- */
+/** Options for building SDK app and DLC packages. */
 export interface BuildSdkAppsOptions {
-  /** Source directory containing apps (e.g., packages/sdk/apps) */
-  appsDir: string;
-  /** Output directory for prebuilt apps (e.g., packages/sdk/dist/apps/prebuilt) */
+  /** Source directories containing SDK packages. */
+  packageDirs?: readonly string[];
+  /** @deprecated Use packageDirs when apps and DLCs have separate roots. */
+  appsDir?: string;
+  /** Output directory for built-in packages (e.g., packages/sdk/dist/apps/prebuilt) */
   outputDir: string;
-  /** Force rebuild all apps */
+  /** Force rebuild all packages */
   force?: boolean;
-  /** Build only apps whose manifest IDs are included in this list */
+  /** Build only packages whose manifest IDs are included in this list. */
+  includePackageIds?: readonly string[];
+  /** @deprecated Use includePackageIds. */
   includeAppIds?: readonly string[];
 }
 
-/**
- * Find all app directories containing manifest.json
- */
-async function findAllApps(dir: string): Promise<string[]> {
-  const apps: string[] = [];
+/** Find all package directories containing manifest.json. */
+async function findAllPackages(dir: string): Promise<string[]> {
+  const packages: string[] = [];
 
   async function scan(currentDir: string) {
     const entries = await fs.readdir(currentDir, { withFileTypes: true });
@@ -486,7 +486,7 @@ async function findAllApps(dir: string): Promise<string[]> {
 
         try {
           await fs.access(manifestPath);
-          apps.push(subPath);
+          packages.push(subPath);
         } catch {
           // No manifest, scan subdirectories
           await scan(subPath);
@@ -496,43 +496,51 @@ async function findAllApps(dir: string): Promise<string[]> {
   }
 
   await scan(dir);
-  return apps;
+  return packages;
 }
 
 /**
- * Build all apps found in a directory (for SDK packaging)
+ * Build all app and DLC packages found in a directory (for SDK packaging)
  *
- * This is used when building the SDK itself to prebuild all builtin apps.
+ * This is used when building the SDK itself to bundle built-in packages.
  */
 export async function buildSdkApps(
   options: BuildSdkAppsOptions,
 ): Promise<void> {
-  const { appsDir, outputDir } = options;
+  const { outputDir } = options;
+  const packageDirs =
+    options.packageDirs ?? (options.appsDir ? [options.appsDir] : []);
+  if (packageDirs.length === 0) {
+    throw new Error("At least one SDK package source directory is required");
+  }
 
-  console.log("🔨 Building SDK apps...\n");
+  console.log("🔨 Building SDK packages...\n");
 
-  // Find all apps
-  const appPaths = await findAllApps(appsDir);
+  // Find all packages
+  const packagePaths = (
+    await Promise.all(
+      packageDirs.map((directory) => findAllPackages(directory)),
+    )
+  ).flat();
 
-  if (appPaths.length === 0) {
-    console.log(`ℹ️  No apps found in ${appsDir}`);
+  if (packagePaths.length === 0) {
+    console.log(`ℹ️  No packages found in ${packageDirs.join(", ")}`);
     return;
   }
 
-  const discoveredApps = await Promise.all(
-    appPaths.map(async (appPath) => ({
-      appPath,
-      manifest: await readAppManifest(appPath),
+  const discoveredPackages = await Promise.all(
+    packagePaths.map(async (packagePath) => ({
+      packagePath,
+      manifest: await readPackageManifest(packagePath),
     })),
   );
-  const includedIds = options.includeAppIds
-    ? new Set(options.includeAppIds)
-    : undefined;
-  const apps = includedIds
-    ? discoveredApps.filter(({ manifest }) => includedIds.has(manifest.id))
-    : discoveredApps;
+  const requestedIds = options.includePackageIds ?? options.includeAppIds;
+  const includedIds = requestedIds ? new Set(requestedIds) : undefined;
+  const packages = includedIds
+    ? discoveredPackages.filter(({ manifest }) => includedIds.has(manifest.id))
+    : discoveredPackages;
 
-  console.log(`Found ${apps.length} apps to build.`);
+  console.log(`Found ${packages.length} packages to build.`);
 
   // Clear and create output directory
   try {
@@ -541,18 +549,19 @@ export async function buildSdkApps(
     // Directory doesn't exist
   }
   await fs.mkdir(outputDir, { recursive: true });
-  const progress = new BuildProgress(apps.length);
+  const progress = new BuildProgress(packages.length);
 
-  // Build apps through Genesis in parallel unless an app declares that its
+  // Build packages through Genesis in parallel unless an app declares that its
   // own build is parallel and should run alone.
   const results = await runBuildTasks(
-    apps.map(({ appPath, manifest }) => ({
-      concurrent: manifest.build?.concurrent !== false,
+    packages.map(({ packagePath, manifest }) => ({
+      concurrent:
+        manifest.kind === "dlc" || manifest.build?.concurrent !== false,
       run: async () => {
         const targetDir = path.join(outputDir, manifest.id);
 
         const result = await genesisBundler.bundle({
-          appDirectory: appPath,
+          appDirectory: packagePath,
           extractToDirectory: targetDir,
           verbose: false,
         });
@@ -580,5 +589,5 @@ export async function buildSdkApps(
     process.exit(1);
   }
 
-  console.log("🎉 All SDK apps prebuilt successfully!");
+  console.log("🎉 All SDK packages built successfully!");
 }

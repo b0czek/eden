@@ -1,80 +1,302 @@
+import {
+  redo as redoCommand,
+  redoDepth,
+  undo as undoCommand,
+  undoDepth,
+} from "@codemirror/commands";
+import type { EditorState, StateEffect } from "@codemirror/state";
+import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { filePicker } from "@edenapp/tablets";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-
-// Use lazy-loading components - Monaco is loaded on-demand, not at startup
 import {
+  CodeMirrorEditor,
   ErrorBanner,
-  getEditorContentLazy,
-  LazyMonacoEditor,
-  preloadMonaco,
-  setEditorContentLazy,
   TabBar,
   Toolbar,
   WelcomeScreen,
 } from "./components";
+import { createEditorState } from "./editor-config";
 import { initLocale, t } from "./i18n";
 import {
-  type EditorTab,
-  type FileOpenedEvent,
-  getFileName,
-  getLanguageFromPath,
-} from "./types";
-
-// Type for the editor instance (just the interface, not the actual module)
-type IStandaloneCodeEditor =
-  import("monaco-editor").editor.IStandaloneCodeEditor;
+  EditorLanguageRegistry,
+  loadEditorLanguageRegistry,
+} from "./language-registry";
+import { type EditorTab, type FileOpenedEvent, getFileName } from "./types";
 
 const App: Component = () => {
+  const dialogs = createDialogs();
   const [tabs, setTabs] = createSignal<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  const [editorReady, setEditorReady] = createSignal(false);
+  const [extensionWarning, setExtensionWarning] = createSignal<string | null>(
+    null,
+  );
+  const openingFiles = new Map<string, Promise<string>>();
+  const closingTabs = new Set<string>();
+  let languageRegistry = new EditorLanguageRegistry();
+  let editorReady = Promise.resolve();
+  let tabSequence = 0;
+  let openRequestSequence = 0;
 
-  let editor: IStandaloneCodeEditor | undefined;
+  const activeTab = () => tabs().find((tab) => tab.id === activeTabId());
 
-  // Get the currently active tab
-  const activeTab = () => tabs().find((t) => t.id === activeTabId());
+  const activateTab = (tabId: string) => {
+    const tab = tabs().find((candidate) => candidate.id === tabId);
+    if (!tab) return;
+    setActiveTabId(tabId);
+    window.edenFrame?.setTitle(tab.name);
+  };
 
-  // Subscribe to file open events and set up keyboard shortcuts
-  onMount(async () => {
-    console.log("Editor app mounted");
+  const loadTab = (path: string): Promise<string> => {
+    const existing = tabs().find((tab) => tab.path === path);
+    if (existing) return Promise.resolve(existing.id);
 
-    // Initialize i18n
-    initLocale();
+    const pending = openingFiles.get(path);
+    if (pending) return pending;
 
-    // Start loading Monaco in the background immediately
-    // This way it's ready by the time the user opens a file
-    preloadMonaco();
+    const task = (async () => {
+      const fileContent = await window.edenAPI.shellCommand("fs/read", {
+        path,
+      });
+      let tabId = "";
 
-    // Check for launch arguments - if app was launched with a file path, open it
-    const launchArgs = window.edenAPI.getLaunchArgs();
-    console.log("Launch args:", launchArgs);
-    if (launchArgs.length > 0) {
-      // Open the first argument as a file path
-      openFile(launchArgs[0]);
+      setTabs((currentTabs) => {
+        const alreadyOpen = currentTabs.find((tab) => tab.path === path);
+        if (alreadyOpen) {
+          tabId = alreadyOpen.id;
+          return currentTabs;
+        }
+
+        tabId = `tab-${Date.now()}-${++tabSequence}`;
+        const language = languageRegistry.resolve(path);
+        const newTab: EditorTab = {
+          id: tabId,
+          path,
+          name: getFileName(path),
+          content: fileContent,
+          originalContent: fileContent,
+          isModified: false,
+          language: language.id,
+          languageName: language.name,
+          state: createEditorState(path, fileContent, language),
+        };
+        return [...currentTabs, newTab];
+      });
+
+      return tabId;
+    })();
+
+    openingFiles.set(path, task);
+    void task.finally(() => openingFiles.delete(path)).catch(() => {});
+    return task;
+  };
+
+  const openFile = async (path: string) => {
+    const requestId = ++openRequestSequence;
+    try {
+      setError(null);
+      await editorReady;
+      const tabId = await loadTab(path);
+      if (requestId === openRequestSequence) activateTab(tabId);
+    } catch (err) {
+      setError(t("editor.failedToLoad", { message: (err as Error).message }));
+    }
+  };
+
+  const openFileFromPicker = async () => {
+    try {
+      setError(null);
+      const path = await filePicker.openFile({ title: t("editor.openFile") });
+      if (path) await openFile(path);
+    } catch (err) {
+      setError(t("editor.failedToLoad", { message: (err as Error).message }));
+    }
+  };
+
+  const closeTab = async (tabId: string) => {
+    if (closingTabs.has(tabId)) return;
+    const tab = tabs().find((candidate) => candidate.id === tabId);
+    if (!tab) return;
+
+    if (tab.isModified) {
+      closingTabs.add(tabId);
+      const confirmed = await dialogs.confirm({
+        title: t("editor.discardTitle"),
+        message: t("editor.discardMessage", { name: tab.name }),
+        confirmLabel: t("editor.discard"),
+        cancelLabel: t("common.cancel"),
+        tone: "danger",
+        role: "alertdialog",
+      });
+      closingTabs.delete(tabId);
+      if (!confirmed) return;
     }
 
-    // Subscribe to file open events for when app is already running
+    const currentTabs = tabs();
+    const tabIndex = currentTabs.findIndex(
+      (candidate) => candidate.id === tabId,
+    );
+    if (tabIndex < 0) return;
+    const nextTabs = currentTabs.filter((candidate) => candidate.id !== tabId);
+    if (activeTabId() !== tabId) {
+      setTabs((tabsToUpdate) =>
+        tabsToUpdate.filter((candidate) => candidate.id !== tabId),
+      );
+      return;
+    }
+
+    const nextTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)];
+    if (nextTab) {
+      activateTab(nextTab.id);
+      setTabs((tabsToUpdate) =>
+        tabsToUpdate.filter((candidate) => candidate.id !== tabId),
+      );
+    } else {
+      setTabs([]);
+      setActiveTabId(null);
+      window.edenFrame?.resetTitle();
+    }
+  };
+
+  const saveFile = async () => {
+    const active = activeTab();
+    if (!active || isSaving()) return;
+    const currentContent = active.state.doc.toString();
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      await window.edenAPI.shellCommand("fs/write", {
+        path: active.path,
+        content: currentContent,
+      });
+      setTabs((currentTabs) =>
+        currentTabs.map((tab) =>
+          tab.id === active.id
+            ? {
+                ...tab,
+                originalContent: currentContent,
+                isModified: tab.state.doc.toString() !== currentContent,
+              }
+            : tab,
+        ),
+      );
+    } catch (err) {
+      setError(t("editor.failedToSave", { message: (err as Error).message }));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateTabState = (tabId: string, state: EditorState) => {
+    const content = state.doc.toString();
+    setTabs((currentTabs) =>
+      currentTabs.map((tab) =>
+        tab.id === tabId
+          ? {
+              ...tab,
+              state,
+              content,
+              isModified: content !== tab.originalContent,
+            }
+          : tab,
+      ),
+    );
+  };
+
+  const undo = () => {
+    const active = activeTab();
+    if (!active) return;
+    undoCommand({
+      state: active.state,
+      dispatch: (transaction) => updateTabState(active.id, transaction.state),
+    });
+  };
+
+  const redo = () => {
+    const active = activeTab();
+    if (!active) return;
+    redoCommand({
+      state: active.state,
+      dispatch: (transaction) => updateTabState(active.id, transaction.state),
+    });
+  };
+
+  const snapshotTab = (
+    tabId: string,
+    state: EditorState,
+    scrollSnapshot: StateEffect<unknown>,
+  ) => {
+    const content = state.doc.toString();
+    setTabs((currentTabs) =>
+      currentTabs.map((tab) =>
+        tab.id === tabId
+          ? {
+              ...tab,
+              state,
+              content,
+              isModified: content !== tab.originalContent,
+              scrollSnapshot,
+            }
+          : tab,
+      ),
+    );
+  };
+
+  const handleFileOpened = (data: FileOpenedEvent) => {
+    if (!data.isDirectory) void openFile(data.path);
+  };
+
+  const initializeLanguageDlcs = async () => {
+    try {
+      const { dlcs } = await window.edenAPI.shellCommand("package/self", {});
+      const result = await loadEditorLanguageRegistry(dlcs);
+      languageRegistry = result.registry;
+      if (result.diagnostics.length === 0) return;
+
+      for (const diagnostic of result.diagnostics) {
+        console.warn(
+          `Skipped editor highlighter ${diagnostic.source}: ${diagnostic.message}`,
+        );
+      }
+      const sources = [
+        ...new Set(result.diagnostics.map(({ source }) => source)),
+      ];
+      setExtensionWarning(
+        t("editor.extensionWarning", { sources: sources.join(", ") }),
+      );
+    } catch (err) {
+      console.warn("Failed to load editor language highlighters", err);
+      setExtensionWarning(t("editor.extensionLoadFailed"));
+    }
+  };
+
+  onMount(() => {
+    initLocale();
+    editorReady = initializeLanguageDlcs();
+    const launchArgs = window.edenAPI.getLaunchArgs();
+    if (launchArgs.length > 0) void openFile(launchArgs[0]);
+
     window.edenAPI.subscribe(
       "file/opened",
       handleFileOpened as (data: unknown) => void,
     );
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        saveFile();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "o") {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveFile();
+      } else if (event.key.toLowerCase() === "o") {
+        event.preventDefault();
         void openFileFromPicker();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "w") {
-        e.preventDefault();
+      } else if (event.key.toLowerCase() === "w") {
+        event.preventDefault();
         const active = activeTabId();
-        if (active) closeTab(active);
+        if (active) void closeTab(active);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
@@ -88,150 +310,30 @@ const App: Component = () => {
     });
   });
 
-  const handleFileOpened = (data: FileOpenedEvent) => {
-    console.log("File opened:", data);
-    if (!data.isDirectory) {
-      openFile(data.path);
-    }
-  };
-
-  const openFileFromPicker = async () => {
-    try {
-      setError(null);
-      const path = await filePicker.openFile({
-        title: t("editor.openFile"),
-      });
-
-      if (path) {
-        await openFile(path);
-      }
-    } catch (err) {
-      setError(t("editor.failedToLoad", { message: (err as Error).message }));
-    }
-  };
-
-  const openFile = async (path: string) => {
-    // Check if file is already open
-    const existingTab = tabs().find((t) => t.path === path);
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      switchToTab(existingTab);
-      return;
-    }
-
-    try {
-      setError(null);
-
-      const fileContent = await window.edenAPI.shellCommand("fs/read", {
-        path,
-      });
-
-      const newTab: EditorTab = {
-        id: `tab-${Date.now()}`,
-        path,
-        name: getFileName(path),
-        content: fileContent,
-        originalContent: fileContent,
-        isModified: false,
-        language: getLanguageFromPath(path),
-      };
-
-      setTabs([...tabs(), newTab]);
-      setActiveTabId(newTab.id);
-
-      // Only set content if editor is ready, otherwise onEditorReady will handle it
-      if (editorReady()) {
-        await setEditorContentLazy(editor, fileContent, newTab.language);
-      }
-      window.edenFrame?.setTitle(newTab.name);
-    } catch (err) {
-      setError(t("editor.failedToLoad", { message: (err as Error).message }));
-    }
-  };
-
-  const switchToTab = async (tab: EditorTab) => {
-    setActiveTabId(tab.id);
-    await setEditorContentLazy(editor, tab.content, tab.language);
-    window.edenFrame?.setTitle(tab.name);
-  };
-
-  const closeTab = (tabId: string) => {
-    const tabIndex = tabs().findIndex((t) => t.id === tabId);
-    const newTabs = tabs().filter((t) => t.id !== tabId);
-    setTabs(newTabs);
-
-    if (activeTabId() === tabId) {
-      if (newTabs.length > 0) {
-        const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
-        switchToTab(newTabs[newActiveIndex]);
-      } else {
-        setActiveTabId(null);
-        if (editor) editor.setValue("");
-        window.edenFrame?.resetTitle();
-      }
-    }
-  };
-
-  const saveFile = async () => {
-    const active = activeTab();
-    if (!active || isSaving()) return;
-
-    try {
-      setIsSaving(true);
-      setError(null);
-
-      const currentContent = getEditorContentLazy(editor);
-
-      await window.edenAPI.shellCommand("fs/write", {
-        path: active.path,
-        content: currentContent,
-      });
-
-      setTabs(
-        tabs().map((t) =>
-          t.id === active.id
-            ? { ...t, originalContent: currentContent, isModified: false }
-            : t,
-        ),
-      );
-    } catch (err) {
-      setError(t("editor.failedToSave", { message: (err as Error).message }));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleEditorContentChange = (content: string) => {
-    const active = activeTab();
-    if (active) {
-      setTabs(
-        tabs().map((t) =>
-          t.id === active.id
-            ? { ...t, content, isModified: content !== t.originalContent }
-            : t,
-        ),
-      );
-    }
-  };
-
   return (
     <div class="editor-app">
       <Show when={tabs().length > 0}>
         <TabBar
           tabs={tabs()}
           activeTabId={activeTabId()}
-          onTabClick={switchToTab}
+          onTabClick={(tab) => activateTab(tab.id)}
           onTabClose={closeTab}
         />
       </Show>
 
       <Show when={activeTab()}>
-        <Toolbar
-          activeTab={activeTab()}
-          isSaving={isSaving()}
-          onOpen={openFileFromPicker}
-          onSave={saveFile}
-        />
+        {(tab) => (
+          <Toolbar
+            activeTab={tab()}
+            isSaving={isSaving()}
+            canUndo={undoDepth(tab().state) > 0}
+            canRedo={redoDepth(tab().state) > 0}
+            onOpen={openFileFromPicker}
+            onSave={saveFile}
+            onUndo={undo}
+            onRedo={redo}
+          />
+        )}
       </Show>
 
       <Show when={error()}>
@@ -240,26 +342,31 @@ const App: Component = () => {
         )}
       </Show>
 
+      <Show when={extensionWarning()}>
+        {(message) => (
+          <ErrorBanner
+            message={message()}
+            tone="warning"
+            onDismiss={() => setExtensionWarning(null)}
+          />
+        )}
+      </Show>
+
       <Show when={tabs().length === 0}>
         <WelcomeScreen onOpen={openFileFromPicker} />
       </Show>
 
-      <Show when={tabs().length > 0}>
-        <LazyMonacoEditor
-          onContentChange={handleEditorContentChange}
-          ref={(e: IStandaloneCodeEditor) => {
-            editor = e;
-          }}
-          onReady={() => {
-            setEditorReady(true);
-            // Set content for the active tab now that editor is ready
-            const active = activeTab();
-            if (active) {
-              setEditorContentLazy(editor, active.content, active.language);
-            }
-          }}
-        />
+      <Show when={activeTab()}>
+        {(tab) => (
+          <CodeMirrorEditor
+            tab={tab()}
+            onStateChange={updateTabState}
+            onTabSnapshot={snapshotTab}
+          />
+        )}
       </Show>
+
+      <DialogHost dialogs={dialogs} />
     </div>
   );
 };

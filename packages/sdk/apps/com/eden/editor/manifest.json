@@ -5,7 +5,7 @@
     "pl": "Edytor Tekstu"
   },
   "version": "1.0.0",
-  "description": "A Monaco-based text editor for editing files",
+  "description": "A CodeMirror-based text editor for editing files",
   "author": "Dariusz Majnert",
   "build": {
     "command": "npm run build"
@@ -27,6 +27,9 @@
     "movable": true
   },
   "permissions": ["fs/*"],
+  "dlc": {
+    "extensionPoints": [{ "id": "language-highlighters", "version": "1.0.0" }]
+  },
   "fileHandlers": [
     {
       "name": "Text Files",

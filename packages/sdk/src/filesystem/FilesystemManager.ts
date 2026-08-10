@@ -1,6 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { FileStats, SearchResult } from "@edenapp/types";
+import type {
+  FileStats,
+  FilesystemChangeKind,
+  SearchResult,
+} from "@edenapp/types";
 import fg from "fast-glob";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -15,10 +19,7 @@ import {
 import { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemHandler } from "./FilesystemHandler";
 import { FilesystemTransfer } from "./FilesystemTransfer";
-import {
-  type FilesystemChangeKind,
-  FilesystemWatcher,
-} from "./FilesystemWatcher";
+import { FilesystemWatcher } from "./FilesystemWatcher";
 
 interface FilesystemEvents {
   changed: { watchId: string; kind: FilesystemChangeKind };

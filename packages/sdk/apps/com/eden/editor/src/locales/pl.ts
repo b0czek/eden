@@ -9,5 +9,14 @@ export const pl = {
     textFiles: "Pliki Tekstowe",
     failedToLoad: "Nie udało się załadować pliku: {message}",
     failedToSave: "Nie udało się zapisać pliku: {message}",
+    extensionWarning:
+      "Niektóre moduły podświetlania języków zostały pominięte: {sources}",
+    extensionLoadFailed:
+      "Nie udało się załadować modułów podświetlania języków",
+    discardTitle: "Odrzucić zmiany?",
+    discardMessage: "Zamknąć „{name}” i odrzucić niezapisane zmiany?",
+    discard: "Odrzuć",
+    undo: "Cofnij",
+    redo: "Ponów",
   },
 } as const;

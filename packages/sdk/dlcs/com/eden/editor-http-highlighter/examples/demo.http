@@ -1,0 +1,32 @@
+# HTTP request highlighter DLC demo
+@host = https://httpbin.org
+@requestId = eden-demo-42
+
+### Fetch request details
+GET {{host}}/get?source=eden HTTP/1.1
+Accept: application/json
+X-Request-ID: {{requestId}}
+
+### Create an item
+POST {{host}}/anything HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Eden highlighter demo",
+  "enabled": true,
+  "count": 2,
+  "tags": ["editor", "dlc"]
+}
+
+### Update the item
+PATCH {{host}}/anything/42
+Content-Type: application/json
+
+{
+  "enabled": false,
+  "count": 3
+}
+
+# Lines beginning with # or // are comments.
+// The separators above begin with ###.

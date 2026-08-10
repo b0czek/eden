@@ -16,7 +16,7 @@ registration.setVisible(false);
 // Operational APIs become available after startup has completed.
 await eden.whenReady();
 
-const apps = eden.apps.list({ showHidden: true });
+const packages = eden.packages.list({ showHidden: true });
 const daemons = await eden.daemons.list();
 ```
 
@@ -35,7 +35,8 @@ during startup and later when a host integration is loaded dynamically.
 The main-process API is grouped by stable domain rather than exposing manager
 implementations:
 
-- `eden.apps` lists, inspects, installs, removes, and reloads apps.
+- `eden.packages` inventories, inspects, installs, and uninstalls both apps and
+  DLCs, and controls app-specific reload behavior.
 - `eden.daemons` reads and controls daemon definitions and runtime state.
 - `eden.users` manages user profiles, grants, defaults, and passwords.
 - `eden.sessions` reads and changes the interactive session.

@@ -4,8 +4,13 @@ export {
   executeBuild,
   extract,
   getInfo,
+  isDlcCompatible,
+  validateAppManifest,
+  validateAppManifestObject,
+  validateDlcManifestObject,
   validateManifest,
   validateManifestObject,
+  validatePackageManifestObject,
   verifyFiles,
 } from "./bundler";
 export type { Compressor } from "./compression";

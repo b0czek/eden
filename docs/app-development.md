@@ -146,6 +146,12 @@ filters each field with the active-user grant
 `settings/<appId>/<setting.grant-or-key>`. See [Adding
 Settings](settings.md) for the schema and authorization model.
 
+## DLC extension points
+
+Apps can expose named, SemVer-versioned extension points for app-bound data
+packages. See [App-bound DLC packages](dlc-packages.md) for manifest examples,
+packaging, scoped JavaScript module resources, and lifecycle restrictions.
+
 ## Running an app from source
 
 Apps scaffolded for consumer projects include a standalone development command:

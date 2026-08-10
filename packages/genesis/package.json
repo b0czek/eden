@@ -44,6 +44,7 @@
     "chalk": "^4.1.2",
     "cli-progress": "^3.12.0",
     "commander": "catalog:",
+    "semver": "catalog:",
     "tar": "^7.5.22",
     "zstd-codec": "^0.1.5"
   },
@@ -51,6 +52,7 @@
     "@types/cli-progress": "^3.11.6",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
+    "@types/semver": "^7.7.1",
     "jest": "catalog:",
     "ts-jest": "catalog:",
     "typescript": "catalog:"

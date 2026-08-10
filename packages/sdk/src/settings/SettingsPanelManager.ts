@@ -15,12 +15,12 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { delay, inject, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
 import type { DaemonManager } from "../daemon";
 import { ExecutionContext } from "../execution";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import type { PackageManager } from "../package-manager";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { SessionContext, type SessionManager } from "../session";
 import {
   createGeneratedSettingsPanel,
@@ -65,7 +65,7 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(delay(() => SettingsManager))
     private readonly settingsManager: SettingsManager,
-    @inject(AppCatalog) private readonly appCatalog: AppCatalog,
+    @inject(PackageCatalog) private readonly packageCatalog: PackageCatalog,
     @inject(SessionContext) private readonly sessionContext: SessionContext,
     @inject(ExecutionContext)
     private readonly executionContext: ExecutionContext,
@@ -137,13 +137,21 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       );
     });
     packageManager.on("installed", ({ manifest }) => {
+      if (manifest.kind === "dlc") {
+        this.notify("panels-changed", { reason: "catalog" });
+        return;
+      }
       this.synchronizeManifestPanel(manifest);
       if (!manifest.settings?.length) {
         this.notify("panels-changed", { reason: "catalog" });
       }
     });
-    packageManager.on("uninstalled", ({ appId }) => {
-      this.removeManifestPanel(appId);
+    packageManager.on("uninstalled", (change) => {
+      if (change.kind === "dlc") {
+        this.notify("panels-changed", { reason: "catalog" });
+        return;
+      }
+      this.removeManifestPanel(change.packageId);
       this.notify("panels-changed", { reason: "catalog" });
     });
     daemonManager.on("changed", () => {
@@ -153,7 +161,7 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
 
   synchronizeManifestPanels(): void {
     const liveIds = new Set<string>();
-    for (const manifest of this.appCatalog.all()) {
+    for (const manifest of this.packageCatalog.allApps()) {
       if (!manifest.settings?.length) continue;
       liveIds.add(manifest.id);
       this.synchronizeManifestPanel(manifest);
@@ -202,7 +210,7 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
 
       let icon = declaration.icon;
       if (record.source === "application" && record.ownerAppId) {
-        icon = await this.appCatalog.getIcon(record.ownerAppId);
+        icon = await this.packageCatalog.getIcon(record.ownerAppId);
         if (!this.sameSession(snapshot)) return [];
       }
       summaries.push(

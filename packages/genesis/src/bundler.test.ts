@@ -1,8 +1,65 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AppManifest } from "@edenapp/types";
+import type { AppManifest, DlcManifest } from "@edenapp/types";
+import * as tar from "tar";
 import * as bundler from "./bundler";
+import { ZstdCodecCompressor } from "./compression";
+
+async function rewriteArchiveMetadata(
+  archive: string,
+  update: (metadata: Record<string, unknown>) => void,
+): Promise<void> {
+  const content = await fs.readFile(archive);
+  const length = content.readUInt32BE(0);
+  const metadata = JSON.parse(
+    content.subarray(4, 4 + length).toString("utf-8"),
+  );
+  update(metadata);
+  const next = Buffer.from(JSON.stringify(metadata), "utf-8");
+  if (next.length !== length) throw new Error("Test metadata length changed");
+  next.copy(content, 4);
+  await fs.writeFile(archive, content);
+}
+
+async function createArchiveWithLink(
+  directory: string,
+  archive: string,
+  manifest: AppManifest,
+): Promise<void> {
+  const tarPath = path.join(directory, "hostile.tar");
+  const compressedPath = `${tarPath}.zst`;
+  await fs.writeFile(
+    path.join(directory, "manifest.json"),
+    JSON.stringify(manifest),
+  );
+  await fs.symlink("/tmp", path.join(directory, "escaping-link"));
+  await tar.create({ cwd: directory, file: tarPath, portable: true }, [
+    "manifest.json",
+    "escaping-link",
+  ]);
+  const compressor = new ZstdCodecCompressor();
+  await compressor.initialize();
+  const { checksum } = await compressor.compressFileStreaming(
+    tarPath,
+    compressedPath,
+    1,
+  );
+  const metadata = Buffer.from(
+    JSON.stringify({
+      version: 1,
+      checksum,
+      created: new Date(0).toISOString(),
+      manifest,
+    }),
+  );
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(metadata.length);
+  await fs.writeFile(
+    archive,
+    Buffer.concat([length, metadata, await fs.readFile(compressedPath)]),
+  );
+}
 
 describe("bundler module", () => {
   // Use absolute path from project root
@@ -212,6 +269,91 @@ describe("bundler module", () => {
         expect(bundler.validateManifestObject(manifest).valid).toBe(false);
       }
     });
+
+    it("accepts legacy apps and valid DLC manifests", () => {
+      const legacy: AppManifest = {
+        id: "com.example.host",
+        name: "Host",
+        version: "not-strict-semver",
+        frontend: { entry: "index.html" },
+        dlc: { extensionPoints: [{ id: "themes", version: "2.1.0" }] },
+      };
+      const dlc: DlcManifest = {
+        kind: "dlc",
+        id: "com.example.theme",
+        name: "Theme",
+        version: "release-4",
+        hostAppId: legacy.id,
+        fileHandlers: [
+          {
+            name: "Theme source",
+            extensions: ["theme-source"],
+          },
+        ],
+        contributions: [
+          {
+            extensionPoint: "themes",
+            requires: "^2.0.0",
+            metadata: { palette: ["blue", "green"] },
+          },
+        ],
+      };
+
+      expect(bundler.validatePackageManifestObject(legacy).valid).toBe(true);
+      expect(bundler.validatePackageManifestObject(dlc).valid).toBe(true);
+      expect(bundler.isDlcCompatible(legacy, dlc).compatible).toBe(true);
+    });
+
+    it("rejects malformed DLC file handlers", () => {
+      const base = {
+        kind: "dlc",
+        id: "com.example.theme",
+        name: "Theme",
+        version: "1.0.0",
+        hostAppId: "com.example.host",
+        contributions: [{ extensionPoint: "themes", requires: "^1.0.0" }],
+      } as const;
+
+      expect(
+        bundler.validatePackageManifestObject({
+          ...base,
+          fileHandlers: [{ name: "Empty" }],
+        }).errors,
+      ).toContain(
+        "fileHandlers[0] must declare extensions, mimeTypes, or directories",
+      );
+      expect(
+        bundler.validatePackageManifestObject({
+          ...base,
+          fileHandlers: "http",
+        }).errors,
+      ).toContain("fileHandlers must be an array");
+    });
+
+    it("rejects malformed kinds and invalid DLC contracts", () => {
+      expect(
+        bundler.validatePackageManifestObject({
+          kind: "plugin",
+          id: "com.example.bad",
+        }).errors,
+      ).toContain('Manifest kind must be "app", "dlc", or omitted');
+
+      const invalid = bundler.validatePackageManifestObject({
+        kind: "dlc",
+        id: "com.example.bad-dlc",
+        name: "Bad DLC",
+        version: "1",
+        hostAppId: "",
+        contributions: [
+          { extensionPoint: "themes", requires: "not a semver range" },
+        ],
+        permissions: ["*"],
+      });
+      expect(invalid.valid).toBe(false);
+      expect(invalid.errors.join(" ")).toContain("hostAppId");
+      expect(invalid.errors.join(" ")).toContain("valid SemVer range");
+      expect(invalid.errors.join(" ")).toContain("cannot declare permissions");
+    });
   });
 
   describe("verifyFiles", () => {
@@ -235,6 +377,39 @@ describe("bundler module", () => {
   });
 
   describe("bundle", () => {
+    it("bundles and extracts a DLC package", async () => {
+      const source = path.join(tempDir, "dlc-source");
+      const archive = path.join(tempDir, "theme.edenite");
+      const extracted = path.join(tempDir, "dlc-extracted");
+      const manifest: DlcManifest = {
+        kind: "dlc",
+        id: "com.example.theme",
+        name: "Theme",
+        version: "1.0.0",
+        hostAppId: "com.example.host",
+        contributions: [{ extensionPoint: "themes", requires: "^1.0.0" }],
+      };
+      await fs.mkdir(path.join(source, "payload"), { recursive: true });
+      await fs.writeFile(
+        path.join(source, "manifest.json"),
+        JSON.stringify(manifest),
+      );
+      await fs.writeFile(path.join(source, "payload", "theme.json"), "{}");
+
+      const bundled = await bundler.bundle({
+        appDirectory: source,
+        outputPath: archive,
+      });
+      expect(bundled).toMatchObject({ success: true, manifest });
+      const result = await bundler.extract({
+        edenitePath: archive,
+        outputDirectory: extracted,
+      });
+      expect(result).toMatchObject({ success: true, manifest });
+      await expect(
+        fs.readFile(path.join(extracted, "payload", "theme.json"), "utf-8"),
+      ).resolves.toBe("{}");
+    });
     it("should bundle the sample app successfully", async () => {
       const outputPath = path.join(tempDir, "test-app.edenite");
 
@@ -367,6 +542,18 @@ describe("bundler module", () => {
       expect(infoResult.manifest?.name).toBe("Hello Eden");
       expect(infoResult.checksum).toBe(bundleResult.checksum);
     }, 30000);
+
+    it("rejects unsupported archive versions", async () => {
+      const outputPath = path.join(tempDir, "future.edenite");
+      await bundler.bundle({ appDirectory: sampleAppPath, outputPath });
+      await rewriteArchiveMetadata(outputPath, (metadata) => {
+        metadata.version = 2;
+      });
+      await expect(bundler.getInfo(outputPath)).resolves.toMatchObject({
+        success: false,
+        error: expect.stringContaining("Unsupported .edenite archive version"),
+      });
+    });
   });
 
   describe("extract", () => {
@@ -436,5 +623,41 @@ describe("bundler module", () => {
       expect(extractResult.success).toBe(false);
       expect(extractResult.error).toContain("Checksum mismatch");
     }, 30000);
+
+    it("rejects disagreement between archive metadata and extracted manifest", async () => {
+      const bundlePath = path.join(tempDir, "mismatch.edenite");
+      await bundler.bundle({
+        appDirectory: sampleAppPath,
+        outputPath: bundlePath,
+      });
+      await rewriteArchiveMetadata(bundlePath, (metadata) => {
+        const manifest = metadata.manifest as { id: string };
+        manifest.id = "com.example.other";
+      });
+      const result = await bundler.extract({
+        edenitePath: bundlePath,
+        outputDirectory: path.join(tempDir, "mismatch-output"),
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("does not match");
+    });
+
+    it("rejects archive links before they can escape extraction", async () => {
+      const source = path.join(tempDir, "hostile-source");
+      const archive = path.join(tempDir, "hostile.edenite");
+      await fs.mkdir(source);
+      await createArchiveWithLink(source, archive, {
+        id: "com.example.hostile",
+        name: "Hostile",
+        version: "1.0.0",
+        frontend: { entry: "index.html" },
+      });
+      const result = await bundler.extract({
+        edenitePath: archive,
+        outputDirectory: path.join(tempDir, "hostile-output"),
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unsupported archive entry type");
+    });
   });
 });

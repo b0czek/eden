@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import {
   app,
   BrowserWindow,
@@ -7,7 +8,10 @@ import {
   ipcMain,
   MessageChannelMain,
   nativeTheme,
+  net,
+  protocol,
   screen,
+  session,
   utilityProcess,
   WebContentsView,
   webContents,
@@ -30,11 +34,14 @@ import type {
   ProcessMetricsPort,
   RendererIpcEvent,
   RendererIpcPort,
+  ResourceProtocolPort,
   ShortcutPort,
   ThemeStatePort,
   UtilityProcessPort,
   WindowingPort,
 } from "../ports";
+
+let privilegedSchemesRegistered = false;
 
 class ElectronApplicationLifecycle implements ApplicationLifecyclePort {
   private quitRequested = false;
@@ -226,6 +233,77 @@ class ElectronThemeState implements ThemeStatePort {
   }
 }
 
+class ElectronResourceProtocols implements ResourceProtocolPort {
+  registerSchemes(schemes: string[]): void {
+    if (privilegedSchemesRegistered) return;
+    protocol.registerSchemesAsPrivileged(
+      schemes.map((scheme) => ({
+        scheme,
+        privileges: {
+          standard: true,
+          secure: true,
+          supportFetchAPI: true,
+          corsEnabled: true,
+          codeCache: true,
+        },
+      })),
+    );
+    privilegedSchemesRegistered = true;
+  }
+
+  handle(
+    scheme: string,
+    authorize: Parameters<ResourceProtocolPort["handle"]>[1],
+    handler: Parameters<ResourceProtocolPort["handle"]>[2],
+  ): void {
+    const ses = session.defaultSession;
+    const filter = { urls: [`${scheme}://*/*`] };
+    ses.webRequest.onBeforeRequest(filter, (details, callback) => {
+      callback({
+        cancel: !authorize({
+          url: details.url,
+          method: details.method,
+          webContentsId: details.webContentsId,
+        }),
+      });
+    });
+    void ses.protocol.handle(scheme, async (request) => {
+      const response = await handler({
+        url: request.url,
+        method: request.method,
+      });
+      if (!response.filePath) {
+        return new Response(null, {
+          status: response.status,
+          headers: response.headers,
+        });
+      }
+      const fileResponse = await net.fetch(
+        pathToFileURL(response.filePath).href,
+      );
+      const headers = new Headers(fileResponse.headers);
+      for (const [name, value] of Object.entries(response.headers ?? {})) {
+        headers.set(name, value);
+      }
+      return new Response(
+        request.method === "HEAD" ? null : fileResponse.body,
+        {
+          status: response.status,
+          headers,
+        },
+      );
+    });
+  }
+
+  unhandle(scheme: string): void {
+    const ses = session.defaultSession;
+    ses.webRequest.onBeforeRequest({ urls: [`${scheme}://*/*`] }, null);
+    if (ses.protocol.isProtocolHandled(scheme)) {
+      void ses.protocol.unhandle(scheme);
+    }
+  }
+}
+
 export function createElectronPlatform(): EdenPlatform {
   const windows = new ElectronWindowing();
   return {
@@ -238,5 +316,6 @@ export function createElectronPlatform(): EdenPlatform {
     processMetrics: new ElectronProcessMetrics(),
     shortcuts: new ElectronShortcuts(),
     theme: new ElectronThemeState(),
+    resources: new ElectronResourceProtocols(),
   };
 }

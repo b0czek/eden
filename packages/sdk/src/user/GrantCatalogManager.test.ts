@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import type { RuntimeAppManifest, UserGrantOption } from "@edenapp/types";
-import type { AppCatalog } from "../app-registry";
 import type { IPCBridge } from "../ipc";
 import type { PackageManager } from "../package-manager";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { SettingsPanelManager } from "../settings";
 import { GrantCatalogManager } from "./GrantCatalogManager";
 
@@ -70,7 +70,7 @@ describe("GrantCatalogManager", () => {
     ];
     const manager = new GrantCatalogManager(
       { eventSubscribers: { notify: jest.fn() } } as unknown as IPCBridge,
-      { all: () => [app] } as unknown as AppCatalog,
+      { allApps: () => [app] } as unknown as PackageCatalog,
       {
         on: panels.on,
         listGrantOptions: () => panelOptions,
@@ -109,7 +109,7 @@ describe("GrantCatalogManager", () => {
     const notify = jest.fn();
     const manager = new GrantCatalogManager(
       { eventSubscribers: { notify } } as unknown as IPCBridge,
-      { all: () => [] } as unknown as AppCatalog,
+      { allApps: () => [] } as unknown as PackageCatalog,
       {
         on: panels.on,
         listGrantOptions: () => [],

@@ -3,10 +3,10 @@ import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import type {
   EdenAppearanceApi,
-  EdenAppsApi,
   EdenAssociationsApi,
   EdenDaemonsApi,
   EdenLifecycleState,
+  EdenPackagesApi,
   EdenSessionsApi,
   EdenSettingsApi,
   EdenUsersApi,
@@ -21,6 +21,9 @@ export class Eden {
 
   constructor(config: EdenConfig = {}) {
     const platform = createElectronPlatform();
+    // Electron requires privileged schemes to be declared before app readiness;
+    // DlcResourceManager attaches the authorized file handler during startup.
+    platform.resources.registerSchemes(["eden-dlc"]);
     const application = platform.application;
     application.appendCommandLineSwitch("enable-features", "V8CodeCache");
 
@@ -53,8 +56,8 @@ export class Eden {
     return this.runtime.state;
   }
 
-  public get apps(): EdenAppsApi {
-    return this.runtime.apps;
+  public get packages(): EdenPackagesApi {
+    return this.runtime.packages;
   }
 
   public get daemons(): EdenDaemonsApi {

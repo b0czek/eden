@@ -9,5 +9,12 @@ export const en = {
     textFiles: "Text Files",
     failedToLoad: "Failed to load file: {message}",
     failedToSave: "Failed to save file: {message}",
+    extensionWarning: "Some language highlighters were skipped: {sources}",
+    extensionLoadFailed: "Language highlighters could not be loaded",
+    discardTitle: "Discard changes?",
+    discardMessage: 'Close "{name}" and discard its unsaved changes?',
+    discard: "Discard",
+    undo: "Undo",
+    redo: "Redo",
   },
 } as const;

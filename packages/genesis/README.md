@@ -4,7 +4,7 @@
 
 ## Overview
 
-Genesis is the official bundler for Eden apps. It packages your Eden applications into `.edenite` format using modern Zstandard (zstd) compression - ready to be planted in any Eden environment.
+Genesis is the official bundler for Eden app and DLC packages. It packages them into `.edenite` format using modern Zstandard (zstd) compression - ready to be planted in any Eden environment.
 
 ## Features
 

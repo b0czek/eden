@@ -9,11 +9,11 @@ import type {
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { AppAssociationManager } from "../app-associations";
-import { AppCatalog } from "../app-registry";
 import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
 import { FileOpenHandler } from "./FileOpenHandler";
@@ -44,7 +44,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   constructor(
     @inject(AppAssociationManager)
     private appAssociationManager: AppAssociationManager,
-    @inject(AppCatalog) private appCatalog: AppCatalog,
+    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(ViewManager) private viewManager: ViewManager,
     @inject(FilesystemManager) private fsManager: FilesystemManager,
@@ -230,8 +230,11 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       handler: FileHandlerConfig;
     }> = [];
 
-    for (const app of this.appCatalog.list({ showHidden: true })) {
-      for (const handler of app.fileHandlers ?? []) {
+    for (const app of this.packageCatalog.listApps({ showHidden: true })) {
+      const dlcHandlers = this.packageCatalog
+        .dlcsForHost(app.id)
+        .flatMap((dlc) => dlc.fileHandlers ?? []);
+      for (const handler of [...(app.fileHandlers ?? []), ...dlcHandlers]) {
         handlers.push({ app, handler });
       }
     }
@@ -339,10 +342,13 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Resolve the handler app ID for a file or directory
    */
-  private resolveUserPreference(preferenceKeys: string[]): string | undefined {
+  private resolveUserPreference(
+    preferenceKeys: string[],
+    matchingAppIds: ReadonlySet<string>,
+  ): string | undefined {
     for (const key of preferenceKeys) {
       const preferredAppId = this.appAssociationManager.get(key)?.appId;
-      if (preferredAppId && this.appCatalog.has(preferredAppId)) {
+      if (preferredAppId && matchingAppIds.has(preferredAppId)) {
         return preferredAppId;
       }
     }
@@ -369,17 +375,19 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       };
     }
 
+    const matchingHandlers = this.getMatchingHandlers({
+      extension: fileContext.extension,
+      mimeType: fileContext.mimeType,
+    });
     const preferredAppId = this.resolveUserPreference(
       fileContext.preferenceKeys,
+      new Set(matchingHandlers.map(({ app }) => app.id)),
     );
     if (preferredAppId) {
       return { appId: preferredAppId, mimeType: fileContext.mimeType };
     }
 
-    const appId = this.getMatchingHandlers({
-      extension: fileContext.extension,
-      mimeType: fileContext.mimeType,
-    })[0]?.app.id;
+    const appId = matchingHandlers[0]?.app.id;
 
     return { appId, mimeType: fileContext.mimeType };
   }
@@ -571,7 +579,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       }
 
       // Check if app is installed
-      const manifest = this.appCatalog.get(handlerAppId);
+      const manifest = this.packageCatalog.getApp(handlerAppId);
       if (!manifest) {
         return {
           success: false,
@@ -624,7 +632,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       const isDirectory = stats.isDirectory();
 
       // Check if app is installed
-      const manifest = this.appCatalog.get(appId);
+      const manifest = this.packageCatalog.getApp(appId);
       if (!manifest) {
         return {
           success: false,

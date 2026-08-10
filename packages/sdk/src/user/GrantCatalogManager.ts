@@ -4,9 +4,9 @@ import type {
   UserGrantOptionsResponse,
 } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
-import { AppCatalog } from "../app-registry";
 import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { SettingsPanelManager } from "../settings";
 
 interface GrantCatalogEvents {
@@ -21,7 +21,7 @@ export class GrantCatalogManager extends EdenEmitter<GrantCatalogEvents> {
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(AppCatalog) private readonly appCatalog: AppCatalog,
+    @inject(PackageCatalog) private readonly packageCatalog: PackageCatalog,
     @inject(SettingsPanelManager)
     private readonly settingsPanels: SettingsPanelManager,
     @inject(PackageManager) packageManager: PackageManager,
@@ -41,7 +41,7 @@ export class GrantCatalogManager extends EdenEmitter<GrantCatalogEvents> {
       options.set(option.grant, structuredClone(option));
     };
 
-    for (const app of this.appCatalog.all()) {
+    for (const app of this.packageCatalog.allApps()) {
       this.addAppOptions(app, add);
     }
     for (const option of this.settingsPanels.listGrantOptions()) add(option);

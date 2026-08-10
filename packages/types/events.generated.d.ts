@@ -47,7 +47,7 @@ export interface FilePickerEvents {
  * FsEvents - Events for the "fs" namespace
  */
 export interface FsEvents {
-  "fs/changed": { watchId: string; kind: "change" | "watch-error" };
+  "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind };
 }
 
 /**
@@ -73,8 +73,9 @@ export interface NotificationEvents {
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
-  "package/installed": { manifest: import("./index").RuntimeAppManifest };
-  "package/uninstalled": { appId: string };
+  "package/installed": { manifest: import("./index").InstalledPackageManifest };
+  "package/uninstalled": | { kind: "app"; packageId: string }
+    | { kind: "dlc"; packageId: string; hostAppId: string };
 }
 
 /**
@@ -120,7 +121,7 @@ export interface UserEvents {
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
-  "view/view-removed": { viewId: number; appId: string };
+  "view/view-removed": { viewId: number; appId: string; webContentsId: number };
   "view/bounds-updated": import("./index").ViewBounds;
   "view/interface-scale-changed": { scale: number };
   "view/view-loaded": { viewId: number; appId: string; overlay: boolean };

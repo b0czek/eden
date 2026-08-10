@@ -7,6 +7,7 @@ import type {
   EdenPlatform,
   PlatformListener,
   PlatformMessagePort,
+  PlatformProtocolRequest,
   PlatformUtilityProcess,
   PlatformView,
   PlatformViewOptions,
@@ -15,6 +16,7 @@ import type {
   PlatformWindowOptions,
   RendererIpcEvent,
   RendererIpcPort,
+  ResourceProtocolPort,
   ShortcutPort,
   ThemeStatePort,
   UtilityProcessPort,
@@ -556,6 +558,41 @@ class InMemoryTheme implements ThemeStatePort {
   }
 }
 
+class InMemoryResourceProtocols implements ResourceProtocolPort {
+  private handlers = new Map<
+    string,
+    {
+      authorize: Parameters<ResourceProtocolPort["handle"]>[1];
+      handler: Parameters<ResourceProtocolPort["handle"]>[2];
+    }
+  >();
+
+  registerSchemes(): void {}
+
+  handle(
+    scheme: string,
+    authorize: Parameters<ResourceProtocolPort["handle"]>[1],
+    handler: Parameters<ResourceProtocolPort["handle"]>[2],
+  ): void {
+    this.handlers.set(scheme, { authorize, handler });
+  }
+
+  unhandle(scheme: string): void {
+    this.handlers.delete(scheme);
+  }
+
+  get count(): number {
+    return this.handlers.size;
+  }
+
+  async request(scheme: string, request: PlatformProtocolRequest) {
+    const registered = this.handlers.get(scheme);
+    if (!registered) return { status: 404 };
+    if (!registered.authorize(request)) return { status: 403 };
+    return registered.handler(request);
+  }
+}
+
 export class InMemoryPlatform implements EdenPlatform {
   public readonly effects: RecordedEffect[] = [];
   public readonly application: InMemoryApplication;
@@ -572,6 +609,7 @@ export class InMemoryPlatform implements EdenPlatform {
   public readonly processMetrics = { getAppMetrics: () => [] };
   public readonly shortcuts = new InMemoryShortcuts();
   public readonly theme = new InMemoryTheme();
+  public readonly resources = new InMemoryResourceProtocols();
 
   constructor(root: string, options: InMemoryPlatformOptions = {}) {
     this.application = new InMemoryApplication(this.effects, root, root);
@@ -583,6 +621,10 @@ export class InMemoryPlatform implements EdenPlatform {
     };
   }
 
+  requestResource(scheme: string, request: PlatformProtocolRequest) {
+    return this.resources.request(scheme, request);
+  }
+
   get activeResourceCount(): number {
     return (
       this.application.listenerCount +
@@ -590,7 +632,8 @@ export class InMemoryPlatform implements EdenPlatform {
       this.windows.activeWebContentsCount +
       this.utilityProcesses.activeCount +
       this.shortcuts.count +
-      this.theme.listenerCount
+      this.theme.listenerCount +
+      this.resources.count
     );
   }
 }
