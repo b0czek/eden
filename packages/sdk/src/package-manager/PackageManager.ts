@@ -782,8 +782,11 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       manifest.isDevelopment,
     );
 
-    // Update in-memory manifest
-    this.registry.register(runtimeManifest);
+    // Update in-memory manifest without losing the mounted development path.
+    this.registry.register(
+      runtimeManifest,
+      manifest.isDevelopment ? { sourcePath: appPath } : undefined,
+    );
     this.permissionRegistry.registerApp(
       runtimeManifest.id,
       runtimeManifest.permissions,
