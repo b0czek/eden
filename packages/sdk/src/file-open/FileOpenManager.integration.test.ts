@@ -108,10 +108,20 @@ describe("FileOpenManager integration", () => {
         icon: undefined,
       },
     ]);
+    await eden.execute("file/set-default-handler", {
+      path: "/request.http",
+      appId: editor.id,
+    });
+    await expect(
+      eden.execute("file/get-handler", { path: "/request.http" }),
+    ).resolves.toEqual({ appId: editor.id });
 
     registry.unregister(highlighter.id);
     await expect(
       eden.execute("file/get-supported-handlers", { path: "/request.http" }),
     ).resolves.toEqual([]);
+    await expect(
+      eden.execute("file/get-handler", { path: "/request.http" }),
+    ).resolves.toEqual({ appId: undefined });
   });
 });

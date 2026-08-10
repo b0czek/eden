@@ -342,10 +342,13 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Resolve the handler app ID for a file or directory
    */
-  private resolveUserPreference(preferenceKeys: string[]): string | undefined {
+  private resolveUserPreference(
+    preferenceKeys: string[],
+    matchingAppIds: ReadonlySet<string>,
+  ): string | undefined {
     for (const key of preferenceKeys) {
       const preferredAppId = this.appAssociationManager.get(key)?.appId;
-      if (preferredAppId && this.packageCatalog.hasApp(preferredAppId)) {
+      if (preferredAppId && matchingAppIds.has(preferredAppId)) {
         return preferredAppId;
       }
     }
@@ -372,17 +375,19 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       };
     }
 
+    const matchingHandlers = this.getMatchingHandlers({
+      extension: fileContext.extension,
+      mimeType: fileContext.mimeType,
+    });
     const preferredAppId = this.resolveUserPreference(
       fileContext.preferenceKeys,
+      new Set(matchingHandlers.map(({ app }) => app.id)),
     );
     if (preferredAppId) {
       return { appId: preferredAppId, mimeType: fileContext.mimeType };
     }
 
-    const appId = this.getMatchingHandlers({
-      extension: fileContext.extension,
-      mimeType: fileContext.mimeType,
-    })[0]?.app.id;
+    const appId = matchingHandlers[0]?.app.id;
 
     return { appId, mimeType: fileContext.mimeType };
   }
