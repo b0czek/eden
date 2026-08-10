@@ -137,14 +137,20 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       );
     });
     packageManager.on("installed", ({ manifest }) => {
-      if (manifest.kind === "dlc") return;
+      if (manifest.kind === "dlc") {
+        this.notify("panels-changed", { reason: "catalog" });
+        return;
+      }
       this.synchronizeManifestPanel(manifest);
       if (!manifest.settings?.length) {
         this.notify("panels-changed", { reason: "catalog" });
       }
     });
     packageManager.on("uninstalled", (change) => {
-      if (change.kind !== "app") return;
+      if (change.kind === "dlc") {
+        this.notify("panels-changed", { reason: "catalog" });
+        return;
+      }
       this.removeManifestPanel(change.packageId);
       this.notify("panels-changed", { reason: "catalog" });
     });

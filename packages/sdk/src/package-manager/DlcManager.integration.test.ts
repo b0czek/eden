@@ -10,6 +10,7 @@ import type {
 } from "@edenapp/types";
 import type { EdenPackageChange } from "../api";
 import { PermissionRegistry } from "../ipc";
+import { SettingsPanelManager } from "../settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { PackageCatalog } from "./PackageCatalog";
 
@@ -135,6 +136,12 @@ describe("DLC package lifecycle", () => {
       { sourcePath: hostArchive },
       { principal: { kind: "user", profile: vendor } },
     );
+    const settingsChanges: string[] = [];
+    const stopTrackingSettings = eden.runtime
+      .resolve(SettingsPanelManager)
+      .on("panels-changed", ({ reason }) => {
+        settingsChanges.push(reason);
+      });
     await eden.execute(
       "package/install",
       { sourcePath: dlcArchive },
@@ -145,6 +152,8 @@ describe("DLC package lifecycle", () => {
       { sourcePath: secondDlcArchive },
       { principal: { kind: "user", profile: vendor } },
     );
+    stopTrackingSettings();
+    expect(settingsChanges).toEqual(["catalog", "catalog"]);
 
     await expect(
       eden.execute<InstalledPackageInfo>(
@@ -285,11 +294,19 @@ describe("DLC package lifecycle", () => {
       { ...secondDlc, isPrebuilt: false },
     ]);
     const changes: EdenPackageChange[] = [];
+    const uninstallSettingsChanges: string[] = [];
+    const stopTrackingUninstallSettings = eden.runtime
+      .resolve(SettingsPanelManager)
+      .on("panels-changed", ({ reason }) => {
+        uninstallSettingsChanges.push(reason);
+      });
     const unsubscribe = eden.runtime.packages.onChanged((change) =>
       changes.push(change),
     );
     await eden.runtime.packages.uninstall(host.id);
     unsubscribe();
+    stopTrackingUninstallSettings();
+    expect(uninstallSettingsChanges).toEqual(["catalog", "catalog", "catalog"]);
     expect(eden.runtime.packages.list({ kind: "dlc" })).toEqual([]);
     expect(changes).toEqual([
       {
