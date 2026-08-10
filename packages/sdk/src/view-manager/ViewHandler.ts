@@ -1,4 +1,9 @@
-import type { ViewBounds, WindowSize } from "@edenapp/types";
+import type {
+  TileLayoutDirection,
+  TileLayoutState,
+  ViewBounds,
+  WindowSize,
+} from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
@@ -316,6 +321,43 @@ export class ViewHandler {
     const viewId = this.getViewIdByAppId(args.appId);
     this.viewManager.setViewMode(viewId, args.mode);
     return { success: true };
+  }
+
+  /**
+   * Get adjacent tiled windows for the caller's app-frame layout controls.
+   */
+  @EdenHandler("tile-layout-state")
+  async handleTileLayoutState(args: {
+    _callerAppId?: string;
+  }): Promise<TileLayoutState> {
+    const appId = this.requireCallerAppId(args._callerAppId);
+    return this.viewManager.getTileLayoutState(this.getViewIdByAppId(appId));
+  }
+
+  /** Swap the caller with the tiled window on one edge. */
+  @EdenHandler("swap-tile")
+  async handleSwapTile(args: {
+    direction: TileLayoutDirection;
+    _callerAppId?: string;
+  }): Promise<TileLayoutState> {
+    const appId = this.requireCallerAppId(args._callerAppId);
+    return this.viewManager.swapTiledView(
+      this.getViewIdByAppId(appId),
+      args.direction,
+    );
+  }
+
+  /** Temporarily cover the tiled window on one edge with the caller. */
+  @EdenHandler("expand-tile")
+  async handleExpandTile(args: {
+    direction: TileLayoutDirection;
+    _callerAppId?: string;
+  }): Promise<TileLayoutState> {
+    const appId = this.requireCallerAppId(args._callerAppId);
+    return this.viewManager.expandTiledView(
+      this.getViewIdByAppId(appId),
+      args.direction,
+    );
   }
 
   /**

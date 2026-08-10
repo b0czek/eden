@@ -1,4 +1,9 @@
-import type { TilingConfig, WindowConfig } from "@edenapp/types";
+import type {
+  TileLayoutDirection,
+  TileLayoutState,
+  TilingConfig,
+  WindowConfig,
+} from "@edenapp/types";
 import type { Bounds } from "../platform/ports";
 import {
   calculateTileBounds,
@@ -15,6 +20,7 @@ import type { ViewInfo, ViewMode } from "./types";
 export class TilingController {
   private config: TilingConfig;
   private workspaceBounds: Bounds;
+  private readonly expandedTiles = new Map<number, number>();
 
   constructor(
     config: TilingConfig = { mode: "none", gap: 0, padding: 0 },
@@ -50,6 +56,9 @@ export class TilingController {
    */
   setConfig(config: TilingConfig): void {
     this.config = config;
+    if (config.mode === "none") {
+      this.expandedTiles.clear();
+    }
   }
 
   /**
@@ -152,6 +161,293 @@ export class TilingController {
     });
 
     return boundsByViewId;
+  }
+
+  private getVisibleTiledViews(views: Map<number, ViewInfo>): ViewInfo[] {
+    return this.getSortedVisibleTiledViews(
+      Array.from(views.values()).filter(
+        (view) =>
+          view.viewType === "app" && view.visible && view.mode === "tiled",
+      ),
+    );
+  }
+
+  private getBaseLayout(views: Map<number, ViewInfo>): {
+    visibleViews: ViewInfo[];
+    boundsByViewId: Map<number, Bounds>;
+  } {
+    const visibleViews = this.getVisibleTiledViews(views);
+    return {
+      visibleViews,
+      boundsByViewId: this.calculateVisibleSetBounds(visibleViews),
+    };
+  }
+
+  private getNeighbor(
+    sourceId: number,
+    direction: TileLayoutDirection,
+    visibleViews: ViewInfo[],
+    boundsByViewId: Map<number, Bounds>,
+  ): ViewInfo | undefined {
+    const sourceBounds = boundsByViewId.get(sourceId);
+    if (!sourceBounds) return undefined;
+
+    const sourceRight = sourceBounds.x + sourceBounds.width;
+    const sourceBottom = sourceBounds.y + sourceBounds.height;
+    const candidates: Array<{
+      view: ViewInfo;
+      distance: number;
+      overlap: number;
+    }> = [];
+
+    for (const view of visibleViews) {
+      if (view.id === sourceId) continue;
+      const bounds = boundsByViewId.get(view.id);
+      if (!bounds) continue;
+
+      const right = bounds.x + bounds.width;
+      const bottom = bounds.y + bounds.height;
+      const horizontalOverlap =
+        Math.min(sourceRight, right) - Math.max(sourceBounds.x, bounds.x);
+      const verticalOverlap =
+        Math.min(sourceBottom, bottom) - Math.max(sourceBounds.y, bounds.y);
+
+      switch (direction) {
+        case "left":
+          if (right <= sourceBounds.x && verticalOverlap > 0) {
+            candidates.push({
+              view,
+              distance: sourceBounds.x - right,
+              overlap: verticalOverlap,
+            });
+          }
+          break;
+        case "right":
+          if (bounds.x >= sourceRight && verticalOverlap > 0) {
+            candidates.push({
+              view,
+              distance: bounds.x - sourceRight,
+              overlap: verticalOverlap,
+            });
+          }
+          break;
+        case "top":
+          if (bottom <= sourceBounds.y && horizontalOverlap > 0) {
+            candidates.push({
+              view,
+              distance: sourceBounds.y - bottom,
+              overlap: horizontalOverlap,
+            });
+          }
+          break;
+        case "bottom":
+          if (bounds.y >= sourceBottom && horizontalOverlap > 0) {
+            candidates.push({
+              view,
+              distance: bounds.y - sourceBottom,
+              overlap: horizontalOverlap,
+            });
+          }
+          break;
+      }
+    }
+
+    return candidates.sort(
+      (a, b) =>
+        a.distance - b.distance ||
+        b.overlap - a.overlap ||
+        a.view.id - b.view.id,
+    )[0]?.view;
+  }
+
+  private canCoverNeighbor(
+    source: ViewInfo,
+    neighbor: ViewInfo,
+    direction: TileLayoutDirection,
+    boundsByViewId: Map<number, Bounds>,
+  ): boolean {
+    const sourceBounds = boundsByViewId.get(source.id);
+    const neighborBounds = boundsByViewId.get(neighbor.id);
+    if (!sourceBounds || !neighborBounds) return false;
+
+    const sameHorizontalBand =
+      Math.abs(sourceBounds.y - neighborBounds.y) <= 1 &&
+      Math.abs(sourceBounds.height - neighborBounds.height) <= 1;
+    const sameVerticalBand =
+      Math.abs(sourceBounds.x - neighborBounds.x) <= 1 &&
+      Math.abs(sourceBounds.width - neighborBounds.width) <= 1;
+    const sharesBand =
+      direction === "left" || direction === "right"
+        ? sameHorizontalBand
+        : sameVerticalBand;
+
+    if (!sharesBand) return false;
+
+    const combinedBounds = this.combineBounds(sourceBounds, neighborBounds);
+    const constrainedBounds = this.constrainTiledBounds(combinedBounds, source);
+    return (
+      Math.abs(constrainedBounds.width - combinedBounds.width) <= 1 &&
+      Math.abs(constrainedBounds.height - combinedBounds.height) <= 1
+    );
+  }
+
+  private combineBounds(first: Bounds, second: Bounds): Bounds {
+    const x = Math.min(first.x, second.x);
+    const y = Math.min(first.y, second.y);
+    const right = Math.max(first.x + first.width, second.x + second.width);
+    const bottom = Math.max(first.y + first.height, second.y + second.height);
+    return { x, y, width: right - x, height: bottom - y };
+  }
+
+  private isExpansionParticipant(viewId: number): boolean {
+    if (this.expandedTiles.has(viewId)) return true;
+    return Array.from(this.expandedTiles.values()).includes(viewId);
+  }
+
+  private findDirectionToView(
+    sourceId: number,
+    targetId: number,
+    visibleViews: ViewInfo[],
+    boundsByViewId: Map<number, Bounds>,
+  ): TileLayoutDirection | undefined {
+    const directions: TileLayoutDirection[] = [
+      "top",
+      "right",
+      "bottom",
+      "left",
+    ];
+    return directions.find(
+      (direction) =>
+        this.getNeighbor(sourceId, direction, visibleViews, boundsByViewId)
+          ?.id === targetId,
+    );
+  }
+
+  getTileLayoutState(
+    viewId: number,
+    views: Map<number, ViewInfo>,
+  ): TileLayoutState {
+    const source = views.get(viewId);
+    if (
+      !source ||
+      !this.isEnabled() ||
+      source.mode !== "tiled" ||
+      !source.visible
+    ) {
+      return {
+        mode: source?.mode ?? "floating",
+        neighbors: {},
+      };
+    }
+
+    if (this.isExpansionParticipant(source.id)) {
+      return { mode: "tiled", neighbors: {} };
+    }
+
+    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const directions: TileLayoutDirection[] = [
+      "top",
+      "right",
+      "bottom",
+      "left",
+    ];
+    const neighbors: TileLayoutState["neighbors"] = {};
+
+    for (const direction of directions) {
+      const neighbor = this.getNeighbor(
+        source.id,
+        direction,
+        visibleViews,
+        boundsByViewId,
+      );
+      if (!neighbor || this.isExpansionParticipant(neighbor.id)) continue;
+      neighbors[direction] = {
+        name: neighbor.manifest.name,
+        canExpand: this.canCoverNeighbor(
+          source,
+          neighbor,
+          direction,
+          boundsByViewId,
+        ),
+      };
+    }
+
+    return {
+      mode: "tiled",
+      neighbors,
+    };
+  }
+
+  swapTile(
+    viewId: number,
+    direction: TileLayoutDirection,
+    views: Map<number, ViewInfo>,
+  ): boolean {
+    const source = views.get(viewId);
+    if (
+      source?.mode !== "tiled" ||
+      !source.visible ||
+      this.isExpansionParticipant(viewId)
+    ) {
+      return false;
+    }
+
+    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const neighbor = this.getNeighbor(
+      source.id,
+      direction,
+      visibleViews,
+      boundsByViewId,
+    );
+    if (!neighbor || this.isExpansionParticipant(neighbor.id)) return false;
+
+    const sourceIndex = source.tileIndex;
+    source.tileIndex = neighbor.tileIndex;
+    neighbor.tileIndex = sourceIndex;
+    return true;
+  }
+
+  expandTile(
+    viewId: number,
+    direction: TileLayoutDirection,
+    views: Map<number, ViewInfo>,
+  ): boolean {
+    const source = views.get(viewId);
+    if (
+      source?.mode !== "tiled" ||
+      !source.visible ||
+      this.isExpansionParticipant(viewId)
+    ) {
+      return false;
+    }
+
+    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const neighbor = this.getNeighbor(
+      source.id,
+      direction,
+      visibleViews,
+      boundsByViewId,
+    );
+    if (
+      !neighbor ||
+      this.isExpansionParticipant(neighbor.id) ||
+      !this.canCoverNeighbor(source, neighbor, direction, boundsByViewId)
+    ) {
+      return false;
+    }
+
+    this.expandedTiles.set(source.id, neighbor.id);
+    return true;
+  }
+
+  restoreExpansionForView(viewId: number): boolean {
+    let restored = this.expandedTiles.delete(viewId);
+    for (const [sourceId, targetId] of this.expandedTiles) {
+      if (targetId !== viewId) continue;
+      this.expandedTiles.delete(sourceId);
+      restored = true;
+    }
+    return restored;
   }
 
   private canFitVisibleSet(visibleViews: ViewInfo[]): boolean {
@@ -428,16 +724,45 @@ export class TilingController {
   recalculateTiledViews(views: Map<number, ViewInfo>): void {
     if (!this.isEnabled()) return;
 
-    // Get visible tiled views sorted by tile index
-    const visibleViews = this.getSortedVisibleTiledViews(
-      Array.from(views.values()).filter(
-        (info) => info.visible && info.mode === "tiled",
-      ),
-    );
-    const boundsByViewId = this.calculateVisibleSetBounds(visibleViews);
+    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const presentedBoundsByViewId = new Map(boundsByViewId);
+
+    for (const [sourceId, targetId] of this.expandedTiles) {
+      const source = views.get(sourceId);
+      const target = views.get(targetId);
+      const direction = this.findDirectionToView(
+        sourceId,
+        targetId,
+        visibleViews,
+        boundsByViewId,
+      );
+      if (
+        !source ||
+        !target ||
+        !direction ||
+        !this.canCoverNeighbor(source, target, direction, boundsByViewId)
+      ) {
+        this.expandedTiles.delete(sourceId);
+        continue;
+      }
+
+      const sourceBounds = boundsByViewId.get(sourceId);
+      const targetBounds = boundsByViewId.get(targetId);
+      if (!sourceBounds || !targetBounds) continue;
+      presentedBoundsByViewId.set(
+        sourceId,
+        this.combineBounds(sourceBounds, targetBounds),
+      );
+      presentedBoundsByViewId.set(targetId, {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+      });
+    }
 
     visibleViews.forEach((info, index) => {
-      const bounds = boundsByViewId.get(info.id);
+      const bounds = presentedBoundsByViewId.get(info.id);
       if (!bounds) {
         return;
       }

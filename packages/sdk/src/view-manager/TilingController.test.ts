@@ -17,6 +17,7 @@ function createTiledView(
     id,
     appId: `app-${id}`,
     manifest: {
+      name: `App ${id}`,
       window:
         options.minSize || options.maxSize
           ? {
@@ -41,6 +42,150 @@ function createTiledView(
     } as unknown as ViewInfo["view"],
   };
 }
+
+describe("TilingController tile layout actions", () => {
+  function createHorizontalPair(options: { firstMaxWidth?: number } = {}) {
+    const controller = new TilingController(
+      {
+        mode: "horizontal",
+        columns: 2,
+        gap: 10,
+        padding: 0,
+      },
+      { x: 0, y: 0, width: 1000, height: 600 },
+    );
+    const views = new Map<number, ViewInfo>([
+      [
+        1,
+        createTiledView(1, {
+          visible: true,
+          tileIndex: 0,
+          maxSize: options.firstMaxWidth
+            ? { width: options.firstMaxWidth, height: 600 }
+            : undefined,
+        }),
+      ],
+      [2, createTiledView(2, { visible: true, tileIndex: 1 })],
+    ]);
+    controller.recalculateTiledViews(views);
+    return { controller, views };
+  }
+
+  it("discovers spatial neighbors and reports supported actions", () => {
+    const { controller, views } = createHorizontalPair();
+
+    expect(controller.getTileLayoutState(1, views)).toEqual({
+      mode: "tiled",
+      neighbors: {
+        right: {
+          name: "App 2",
+          canExpand: true,
+        },
+      },
+    });
+  });
+
+  it("maps all four edges around a tile in a grid", () => {
+    const controller = new TilingController(
+      {
+        mode: "grid",
+        rows: 3,
+        columns: 3,
+        gap: 0,
+        padding: 0,
+      },
+      { x: 0, y: 0, width: 900, height: 900 },
+    );
+    const views = new Map<number, ViewInfo>(
+      Array.from({ length: 9 }, (_, index) => {
+        const id = index + 1;
+        return [id, createTiledView(id, { visible: true, tileIndex: index })];
+      }),
+    );
+    controller.recalculateTiledViews(views);
+
+    const state = controller.getTileLayoutState(5, views);
+    expect(state.neighbors.top?.name).toBe("App 2");
+    expect(state.neighbors.right?.name).toBe("App 6");
+    expect(state.neighbors.bottom?.name).toBe("App 8");
+    expect(state.neighbors.left?.name).toBe("App 4");
+    expect(Object.values(state.neighbors).every((item) => item.canExpand)).toBe(
+      true,
+    );
+  });
+
+  it("swaps adjacent tiles according to their visual direction", () => {
+    const { controller, views } = createHorizontalPair();
+
+    expect(controller.swapTile(1, "right", views)).toBe(true);
+    controller.recalculateTiledViews(views);
+
+    expect(views.get(1)?.bounds).toEqual({
+      x: 505,
+      y: 0,
+      width: 495,
+      height: 600,
+    });
+    expect(views.get(2)?.bounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 495,
+      height: 600,
+    });
+    expect(controller.getTileLayoutState(1, views).neighbors.left?.name).toBe(
+      "App 2",
+    );
+  });
+
+  it("covers an adjacent tile and restores the original split", () => {
+    const { controller, views } = createHorizontalPair();
+
+    expect(controller.expandTile(1, "right", views)).toBe(true);
+    controller.recalculateTiledViews(views);
+
+    expect(views.get(1)?.bounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 600,
+    });
+    expect(views.get(2)?.bounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+    });
+    expect(controller.getTileLayoutState(1, views)).toEqual({
+      mode: "tiled",
+      neighbors: {},
+    });
+
+    expect(controller.swapTile(1, "right", views)).toBe(false);
+    controller.recalculateTiledViews(views);
+    expect(views.get(1)?.bounds.width).toBe(1000);
+    expect(views.get(2)?.bounds.width).toBe(0);
+
+    expect(controller.restoreExpansionForView(1)).toBe(true);
+    controller.recalculateTiledViews(views);
+
+    expect(views.get(1)?.bounds.width).toBe(495);
+    expect(views.get(2)?.bounds).toEqual({
+      x: 505,
+      y: 0,
+      width: 495,
+      height: 600,
+    });
+  });
+
+  it("keeps expand unavailable when the caller's maximum size forbids it", () => {
+    const { controller, views } = createHorizontalPair({ firstMaxWidth: 600 });
+
+    expect(
+      controller.getTileLayoutState(1, views).neighbors.right?.canExpand,
+    ).toBe(false);
+    expect(controller.expandTile(1, "right", views)).toBe(false);
+  });
+});
 
 describe("TilingController.resolveTiledVisibilityChanges", () => {
   it("keeps the preferred tiled view visible when capacity is full", () => {

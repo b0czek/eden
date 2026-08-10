@@ -24,9 +24,11 @@ export interface ViewInfo {
    */
   requestedVisible: boolean;
   /**
-   * Whether the view is currently displayed on-screen.
+   * Whether the view participates in the active presentation.
    * This may be false either because the user hid it or because tiling
-   * temporarily removed it to satisfy layout capacity.
+   * temporarily removed it to satisfy layout capacity. A transient tile
+   * expansion may cover a participating view with zero bounds without
+   * changing this flag, which preserves the underlying layout for restore.
    */
   visible: boolean;
   mode: ViewMode;

@@ -53,6 +53,18 @@ body::before {
 
 #eden-app-frame-overlay#eden-app-frame-overlay {
   all: revert;
+  --eden-frame-fg: #333;
+  --eden-frame-muted: #666;
+  --eden-frame-glass: rgba(255, 255, 255, 0.7);
+  --eden-frame-hover: rgba(0, 0, 0, 0.08);
+  --eden-frame-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --eden-layout-bg: rgba(250, 251, 253, 0.94);
+  --eden-layout-border: rgba(25, 30, 45, 0.11);
+  --eden-layout-shadow: 0 18px 44px rgba(20, 24, 35, 0.2);
+  --eden-layout-action-bg: rgba(255, 255, 255, 0.72);
+  --eden-layout-action-shadow: 0 1px 3px rgba(20, 24, 35, 0.1);
   /* Now only set what we actually need */
   position: fixed;
   top: 0;
@@ -81,6 +93,18 @@ body::before {
 }
 
 #eden-app-frame-overlay.dark#eden-app-frame-overlay.dark {
+  --eden-frame-fg: #fff;
+  --eden-frame-muted: #aaa;
+  --eden-frame-glass: rgba(40, 40, 40, 0.7);
+  --eden-frame-hover: rgba(255, 255, 255, 0.12);
+  --eden-frame-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --eden-layout-bg: rgba(30, 31, 36, 0.94);
+  --eden-layout-border: rgba(255, 255, 255, 0.1);
+  --eden-layout-shadow: 0 20px 50px rgba(0, 0, 0, 0.48);
+  --eden-layout-action-bg: rgba(255, 255, 255, 0.09);
+  --eden-layout-action-shadow: 0 1px 4px rgba(0, 0, 0, 0.23);
   background: transparent;
   border-bottom: none;
   color: #cccccc;
@@ -94,7 +118,7 @@ body::before {
   transform: translateX(-50%);
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--eden-frame-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -106,7 +130,7 @@ body::before {
   line-height: 1;
   letter-spacing: -0.3px;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--eden-frame-glass);
   backdrop-filter: blur(20px) saturate(180%);
   padding: 8px 16px;
   border-radius: 10px;
@@ -115,18 +139,194 @@ body::before {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: var(--eden-frame-shadow);
 }
 
-#eden-app-frame-overlay.dark #eden-app-frame-title {
-  color: #ffffff;
-  background: rgba(40, 40, 40, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+#eden-app-frame-overlay.eden-app-frame-tiled #eden-app-frame-title {
+  pointer-events: auto;
+}
+
+#eden-app-frame-overlay #eden-app-frame-title:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary, #5b7cfa);
+  outline-offset: 2px;
+}
+
+#eden-app-frame-overlay #eden-app-frame-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#eden-app-frame-overlay .eden-app-frame-title-chevron {
+  display: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+
+#eden-app-frame-overlay.eden-app-frame-tiled .eden-app-frame-title-chevron {
+  display: block;
+  opacity: 0.56;
+}
+
+#eden-app-frame-overlay
+  #eden-app-frame-title[aria-expanded="true"]
+  .eden-app-frame-title-chevron {
+  transform: rotate(180deg) translateY(1px);
+  opacity: 0.9;
+}
+
+#eden-app-frame-overlay #eden-tile-layout-compass[hidden] {
+  display: none;
+}
+
+#eden-app-frame-overlay #eden-tile-layout-compass {
+  all: revert;
+  position: absolute;
+  top: 43px;
+  left: 50%;
+  width: 228px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--eden-layout-border);
+  border-radius: var(--eden-radius-lg, 18px);
+  color: var(--eden-frame-fg);
+  background: var(--eden-layout-bg);
+  box-shadow: var(--eden-layout-shadow);
+  backdrop-filter: var(--eden-glass-strong, blur(26px) saturate(160%));
+  pointer-events: auto;
+  touch-action: auto;
+  user-select: none;
+  font: 12px var(--eden-font-family-base, sans-serif);
+}
+
+#eden-app-frame-overlay .eden-tile-layout-heading {
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-weight: var(--eden-font-weight-semibold, 600);
+}
+
+#eden-app-frame-overlay .eden-tile-layout-map {
+  display: grid;
+  grid-template: 43px 62px 43px / 55px 76px 55px;
+  gap: 4px;
+  width: 194px;
+  margin: 4px auto;
+  place-items: center;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge-top {
+  --eden-edge-rotation: -90deg;
+  grid-area: 1 / 2;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge-right {
+  grid-area: 2 / 3;
+  flex-direction: column;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge-bottom {
+  --eden-edge-rotation: 90deg;
+  grid-area: 3 / 2;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge-left {
+  --eden-edge-rotation: 180deg;
+  grid-area: 2 / 1;
+  flex-direction: column;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button {
+  all: revert;
+  width: 27px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--eden-radius-xs, 6px);
+  color: var(--eden-frame-muted);
+  background: var(--eden-layout-action-bg);
+  box-shadow: var(--eden-layout-action-shadow);
+  cursor: pointer;
+  transition: all var(--eden-duration-instant, 100ms) ease;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button:hover {
+  color: white;
+  background: var(--eden-color-accent-primary, #5b7cfa);
+  box-shadow: 0 4px 10px rgba(63, 91, 205, 0.3);
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button:hover {
+  transform: translateY(-1px);
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary, #5b7cfa);
+  outline-offset: 2px;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button:disabled {
+  opacity: 0.16;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button svg {
+  width: 17px;
+  height: 17px;
+  transform: rotate(var(--eden-edge-rotation, 0deg));
+}
+
+#eden-app-frame-overlay .eden-tile-layout-window {
+  position: relative;
+  grid-area: 2 / 2;
+  width: 72px;
+  height: 52px;
+  color: var(--eden-color-accent-primary, #5b7cfa);
+}
+
+#eden-app-frame-overlay .eden-tile-layout-window > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-window-body {
+  fill: rgba(91, 124, 250, 0.12);
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-window-bar {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #eden-app-frame-overlay :is(.eden-app-frame-title-chevron, button, svg) {
+    transition: none;
+  }
 }
 
 #eden-app-frame-overlay #eden-app-frame-controls {
@@ -136,23 +336,13 @@ body::before {
   gap: 8px;
   -webkit-app-region: no-drag;
   align-items: center;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--eden-frame-glass);
   backdrop-filter: blur(20px) saturate(180%);
   padding: 4px;
   border-radius: 10px;
   height: 32px;
   box-sizing: border-box;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-#eden-app-frame-overlay.dark #eden-app-frame-controls {
-  background: rgba(40, 40, 40, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: var(--eden-frame-shadow);
 }
 
 #eden-app-frame-overlay .eden-app-frame-button {
@@ -160,10 +350,6 @@ body::before {
   /* Now only set what we actually need */
   width: 24px;
   height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  max-width: 24px;
-  max-height: 24px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -173,7 +359,7 @@ body::before {
   justify-content: center;
   font-size: 16px;
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  color: #666;
+  color: var(--eden-frame-muted);
   line-height: 1;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   font-weight: 400;
@@ -183,17 +369,8 @@ body::before {
   flex-shrink: 0;
 }
 
-#eden-app-frame-overlay.dark .eden-app-frame-button {
-  color: #aaa;
-}
-
 #eden-app-frame-overlay .eden-app-frame-button:hover {
-  background: rgba(0, 0, 0, 0.08);
-  transform: scale(1.05);
-}
-
-#eden-app-frame-overlay.dark .eden-app-frame-button:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--eden-frame-hover);
   transform: scale(1.05);
 }
 

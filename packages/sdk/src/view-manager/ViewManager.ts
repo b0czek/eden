@@ -1,6 +1,8 @@
 import type {
   AppManifest,
   EdenConfig,
+  TileLayoutDirection,
+  TileLayoutState,
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
@@ -221,6 +223,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       const viewInfo = this.views.get(viewId);
       if (!viewInfo?.visible) continue;
 
+      this.tilingController.restoreExpansionForView(viewId);
       viewInfo.visible = false;
       viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -340,6 +343,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
 
     try {
+      this.tilingController.restoreExpansionForView(viewId);
+
       // Close DevTools if open
       this.devToolsController.closeDevToolsForView(viewInfo.view);
 
@@ -501,6 +506,35 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     return Array.from(this.views.entries());
   }
 
+  getTileLayoutState(viewId: number): TileLayoutState {
+    requireView(viewId, this.views);
+    return this.tilingController.getTileLayoutState(viewId, this.views);
+  }
+
+  swapTiledView(
+    viewId: number,
+    direction: TileLayoutDirection,
+  ): TileLayoutState {
+    if (!this.tilingController.swapTile(viewId, direction, this.views)) {
+      throw new Error(`No tiled window is available to swap ${direction}`);
+    }
+    this.syncTiledLayout();
+    this.reorderViewLayers();
+    return this.getTileLayoutState(viewId);
+  }
+
+  expandTiledView(
+    viewId: number,
+    direction: TileLayoutDirection,
+  ): TileLayoutState {
+    if (!this.tilingController.expandTile(viewId, direction, this.views)) {
+      throw new Error(`The tiled window cannot expand ${direction}`);
+    }
+    this.syncTiledLayout();
+    this.reorderViewLayers();
+    return this.getTileLayoutState(viewId);
+  }
+
   /**
    * Show a view (bring to front)
    */
@@ -508,6 +542,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     const viewInfo = requireView(viewId, this.views);
 
     try {
+      this.tilingController.restoreExpansionForView(viewId);
       viewInfo.requestedVisible = true;
       viewInfo.visible = true;
 
@@ -541,6 +576,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     const viewInfo = requireView(viewId, this.views);
 
     try {
+      this.tilingController.restoreExpansionForView(viewId);
       viewInfo.requestedVisible = false;
       viewInfo.visible = false;
       viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
@@ -689,6 +725,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     try {
       if (newMode === "floating") {
+        this.tilingController.restoreExpansionForView(viewId);
         viewInfo.tileIndex = undefined;
         const floatingBounds =
           this.floatingWindows.calculateInitialBounds(windowConfig);

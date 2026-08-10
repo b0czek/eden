@@ -12,6 +12,7 @@ export * from "./Process";
 export * from "./ProcessMetrics";
 export * from "./SettingsPanel";
 export * from "./User";
+export * from "./View";
 export * from "./worker";
 
 /**

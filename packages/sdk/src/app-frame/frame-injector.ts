@@ -15,6 +15,7 @@ import {
   setupToggleModeButton,
   toggleAppFrameViewMode,
 } from "./button-handlers.js";
+import { setupLayoutCompass } from "./layout-compass.js";
 import {
   createOverlay,
   getAppName,
@@ -88,6 +89,9 @@ import { setupWindowResizing } from "./window-resizing.js";
   window.edenFrame._internal.injected = true;
 
   let appName: string = "App";
+  let currentLocale = "en";
+  let closeLayoutCompass: (() => void) | null = null;
+  let refreshLayoutCompassLocale: (() => void) | null = null;
 
   // Track current window bounds for floating windows
   // Using an object reference so we can update it and have the change reflected in all modules
@@ -109,6 +113,26 @@ import { setupWindowResizing } from "./window-resizing.js";
     ? createOverlay(window.edenFrame._internal.config)
     : null;
 
+  const syncOverlayMode = (): void => {
+    if (!overlay || !window.edenFrame) return;
+    const isTiled = window.edenFrame._internal.currentMode === "tiled";
+    overlay.classList.toggle("eden-app-frame-tiled", isTiled);
+    const title = overlay.querySelector<HTMLElement>("#eden-app-frame-title");
+    if (!isTiled) closeLayoutCompass?.();
+    if (!title) return;
+    if (isTiled) {
+      title.setAttribute("role", "button");
+      title.setAttribute("aria-haspopup", "dialog");
+      title.setAttribute("aria-expanded", "false");
+      title.tabIndex = 0;
+    } else {
+      title.removeAttribute("role");
+      title.removeAttribute("tabindex");
+      title.removeAttribute("aria-haspopup");
+      title.removeAttribute("aria-expanded");
+    }
+  };
+
   // Setup handlers after overlay is injected
   const setupHandlers = (): void => {
     // Get appId from injected config
@@ -122,9 +146,10 @@ import { setupWindowResizing } from "./window-resizing.js";
           .shellCommand("i18n/get-locale", {})
           .then((response: { locale: string }) => {
             const locale = response?.locale;
-            const currentLocale = locale || "en";
+            currentLocale = locale || "en";
             appName = getAppName(rawName, currentLocale);
             setTitle(appName);
+            refreshLayoutCompassLocale?.();
           })
           .catch(() => {
             appName = getAppName(rawName, "en");
@@ -139,9 +164,11 @@ import { setupWindowResizing } from "./window-resizing.js";
           "i18n/locale-changed",
           (data: { locale: string }) => {
             const newLocale = data.locale;
+            currentLocale = newLocale;
             const currentName = getAppName(rawName, newLocale);
             setTitle(currentName);
             appName = currentName;
+            refreshLayoutCompassLocale?.();
           },
         );
       }
@@ -152,6 +179,15 @@ import { setupWindowResizing } from "./window-resizing.js";
       setupCloseButton();
       setupMinimizeButton();
       setupToggleModeButton();
+      if (overlay) {
+        const layoutCompass = setupLayoutCompass(overlay, {
+          getLocale: () => currentLocale,
+          getMode: () => window.edenFrame?._internal.currentMode ?? "floating",
+        });
+        closeLayoutCompass = layoutCompass.close;
+        refreshLayoutCompassLocale = layoutCompass.refreshLocale;
+        syncOverlayMode();
+      }
     }
 
     // Setup floating window controls
@@ -175,6 +211,7 @@ import { setupWindowResizing } from "./window-resizing.js";
         }
 
         // Re-setup controls for new mode
+        syncOverlayMode();
         setupFloatingWindowControls();
       },
     );

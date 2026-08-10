@@ -25,7 +25,33 @@ export function createOverlay(
     : "";
 
   // Create title HTML if showTitle is true
-  const titleHtml = showTitle ? `<div id="eden-app-frame-title">App</div>` : "";
+  const titleHtml = showTitle
+    ? `<div id="eden-app-frame-title">
+        <span id="eden-app-frame-title-text">App</span>
+        <svg class="eden-app-frame-title-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m5 6 3 3 3-3" />
+        </svg>
+      </div>
+      <div id="eden-tile-layout-compass" role="dialog" aria-modal="false" hidden>
+        <div class="eden-tile-layout-heading">
+          <span id="eden-tile-layout-heading-text">Arrange window</span>
+        </div>
+        <div class="eden-tile-layout-map">
+          ${createCompassEdge("top")}
+          ${createCompassEdge("right")}
+          ${createCompassEdge("bottom")}
+          ${createCompassEdge("left")}
+          <div class="eden-tile-layout-window">
+            <svg viewBox="0 0 72 52" aria-hidden="true">
+              <rect class="eden-tile-layout-window-body" x="1" y="1" width="70" height="50" rx="10" />
+              <path class="eden-tile-layout-window-bar" d="M2 13.5h68" />
+              <circle cx="62" cy="7.5" r="1.5" />
+              <circle cx="57" cy="7.5" r="1.5" />
+            </svg>
+          </div>
+        </div>
+      </div>`
+    : "";
 
   const minimizeButtonHtml = showMinimize
     ? `<button class="eden-app-frame-button minimize" id="eden-minimize-btn" title="Minimize">−</button>`
@@ -97,10 +123,35 @@ export function setupDarkMode(overlay: HTMLElement): void {
  * @param title - The title to display
  */
 export function setTitle(title: string): void {
-  const titleEl = document.getElementById("eden-app-frame-title");
+  const titleEl = document.getElementById("eden-app-frame-title-text");
   if (titleEl) {
     titleEl.textContent = title;
   }
+}
+
+type CompassDirection = "top" | "right" | "bottom" | "left";
+
+function createCompassEdge(direction: CompassDirection): string {
+  return `<div class="eden-tile-layout-edge eden-tile-layout-edge-${direction}" data-layout-direction="${direction}">
+    <button type="button" data-layout-action="expand" disabled>
+      ${expandIcon()}
+    </button>
+    <button type="button" data-layout-action="swap" disabled>
+      ${swapIcon()}
+    </button>
+  </div>`;
+}
+
+function expandIcon(): string {
+  return compassIcon("M5 12h12m-4-4 4 4-4 4M19 5v14");
+}
+
+function swapIcon(): string {
+  return compassIcon("M6 7h12m-3-3 3 3-3 3M18 17H6m3-3-3 3 3 3");
+}
+
+function compassIcon(path: string): string {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}" /></svg>`;
 }
 
 /**
@@ -119,5 +170,8 @@ export function getAppName(
     return readable.charAt(0).toUpperCase() + readable.slice(1);
   }
 
-  return name[locale] || name.en || Object.values(name)[0] || "App";
+  const language = locale.split("-")[0];
+  return (
+    name[locale] || name[language] || name.en || Object.values(name)[0] || "App"
+  );
 }

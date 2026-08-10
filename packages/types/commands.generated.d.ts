@@ -1037,6 +1037,29 @@ export interface ViewCommands {
     response: { success: boolean };
   };
   /**
+   * Get adjacent tiled windows for the caller's app-frame layout controls.
+   */
+  "view/tile-layout-state": {
+    args: { };
+    response: import("./index").TileLayoutState;
+  };
+  /**
+   * Swap the caller with the tiled window on one edge.
+   */
+  "view/swap-tile": {
+    args: {
+    direction: import("./index").TileLayoutDirection };
+    response: import("./index").TileLayoutState;
+  };
+  /**
+   * Temporarily cover the tiled window on one edge with the caller.
+   */
+  "view/expand-tile": {
+    args: {
+    direction: import("./index").TileLayoutDirection };
+    response: import("./index").TileLayoutState;
+  };
+  /**
    * Start dragging caller's own view.
    */
   "view/start-drag": {
