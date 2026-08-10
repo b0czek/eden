@@ -15,12 +15,12 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { delay, inject, Lifecycle, scoped } from "tsyringe";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { DaemonManager } from "../daemon";
 import { ExecutionContext } from "../execution";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import type { PackageManager } from "../package-manager";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { SessionContext, type SessionManager } from "../session";
 import {
   createGeneratedSettingsPanel,

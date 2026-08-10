@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import type { RuntimeAppManifest, UserGrantOption } from "@edenapp/types";
-import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { IPCBridge } from "../ipc";
 import type { PackageManager } from "../package-manager";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { SettingsPanelManager } from "../settings";
 import { GrantCatalogManager } from "./GrantCatalogManager";
 

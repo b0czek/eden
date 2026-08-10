@@ -4,9 +4,9 @@ import type {
   UserGrantOptionsResponse,
 } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { PackageManager } from "../package-manager";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { SettingsPanelManager } from "../settings";
 
 interface GrantCatalogEvents {

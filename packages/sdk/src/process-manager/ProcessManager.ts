@@ -11,7 +11,6 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { AppChannelManager } from "../appbus/AppChannelManager";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
@@ -22,6 +21,7 @@ import {
 } from "../hotreload-config";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import {
   PLATFORM_PROCESS_METRICS,

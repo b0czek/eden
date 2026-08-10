@@ -6,9 +6,9 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { CommandRegistry, EdenNamespace } from "../ipc";
 import { log } from "../logging";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { AppAssociationHandler } from "./AppAssociationHandler";
 
 export interface AppAssociationListOptions {

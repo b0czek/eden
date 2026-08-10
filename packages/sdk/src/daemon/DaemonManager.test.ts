@@ -2,9 +2,9 @@ import "reflect-metadata";
 
 import { EventEmitter } from "node:events";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import type { CommandRegistry, IPCBridge } from "../ipc";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { PackageManager } from "../package-manager/PackageManager";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { SettingsManager } from "../settings";

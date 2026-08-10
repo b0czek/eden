@@ -1,6 +1,5 @@
 export * from "./AppAssociation";
 export * from "./AppManifest";
-export * from "./Package";
 export * from "./Branding";
 export * from "./EdenConfig";
 export * from "./EdenSeedConfig";
@@ -8,6 +7,7 @@ export * from "./GrantCatalog";
 export * from "./global";
 export * from "./ipc";
 export * from "./keyboard";
+export * from "./Package";
 export * from "./Process";
 export * from "./ProcessMetrics";
 export * from "./SettingsPanel";

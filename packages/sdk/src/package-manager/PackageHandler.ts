@@ -66,7 +66,7 @@ export class PackageHandler {
       appId,
       args._callerWebContentsId,
     );
-    if (!info || info.manifest.kind !== "app") {
+    if (info?.manifest.kind !== "app") {
       throw new Error(`App ${appId} is not installed`);
     }
     return info;

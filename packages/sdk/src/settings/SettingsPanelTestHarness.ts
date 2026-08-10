@@ -4,9 +4,9 @@ import type {
   SettingsPanelDefinition,
   UserProfile,
 } from "@edenapp/types";
-import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { ExecutionContext } from "../execution";
 import type { CommandRegistry, IPCBridge } from "../ipc";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { SessionContext } from "../session";
 import type { SettingsManager } from "./SettingsManager";
 import { SettingsPanelManager } from "./SettingsPanelManager";

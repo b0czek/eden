@@ -7,10 +7,10 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { SettingsManager } from "../settings";

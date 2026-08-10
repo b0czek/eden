@@ -2,8 +2,8 @@ import "reflect-metadata";
 
 import type { RuntimeAppManifest } from "@edenapp/types";
 import { container } from "tsyringe";
-import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { PermissionRegistry } from "../ipc/PermissionRegistry";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { SessionContext } from "../session/SessionContext";
 
 const manifest = (id: string): RuntimeAppManifest =>

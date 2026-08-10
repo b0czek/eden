@@ -3,10 +3,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import { PermissionRegistry } from "../ipc";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
-import { PermissionRegistry } from "../ipc";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { ProcessManager } from "./ProcessManager";
 
