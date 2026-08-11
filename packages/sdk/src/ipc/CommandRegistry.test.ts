@@ -261,6 +261,21 @@ describe("CommandRegistry", () => {
     expect(permissionRegistry.getRequiredGrantKeys).not.toHaveBeenCalled();
   });
 
+  it("limits foundation to its explicit command capabilities", async () => {
+    const allowedHandler = jest.fn().mockReturnValue("allowed");
+    const deniedHandler = jest.fn().mockReturnValue("denied");
+    registry.register("appearance", "get-wallpaper", allowedHandler, {});
+    registry.register("process", "launch", deniedHandler, {});
+
+    await expect(
+      registry.execute("appearance/get-wallpaper", {}, { foundation: true }),
+    ).resolves.toBe("allowed");
+    await expect(
+      registry.execute("process/launch", {}, { foundation: true }),
+    ).rejects.toThrow("Foundation is not allowed to execute process/launch");
+    expect(deniedHandler).not.toHaveBeenCalled();
+  });
+
   it("throws on unknown commands", async () => {
     await expect(registry.execute("missing/command", {})).rejects.toThrow(
       "Unknown command: missing/command",

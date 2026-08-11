@@ -27,6 +27,27 @@ test.describe
     let pdfViewerFixtureDirectory: string;
     const logs: string[] = [];
 
+    const executeHostCommand = async <TResult>(
+      command: string,
+      args: unknown,
+    ): Promise<TResult> => {
+      if (!electronApp) throw new Error("Electron app is not running");
+      return electronApp.evaluate(
+        async (_electron, payload) => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              execute: (command: string, args: unknown) => Promise<unknown>;
+            };
+          };
+          return integration.__edenIntegration.execute(
+            payload.command,
+            payload.args,
+          );
+        },
+        { command, args },
+      ) as Promise<TResult>;
+    };
+
     test.beforeAll(async () => {
       root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-electron-"));
       const appsDirectory = path.join(root, "apps");
@@ -252,37 +273,41 @@ test.describe
         .toBe("ready");
     });
 
-    test("routes foundation preload IPC to a registered Eden command", async () => {
-      const capabilities = await foundation.evaluate(() => {
+    test("limits foundation preload IPC to its UI capabilities", async () => {
+      const result = await foundation.evaluate(async () => {
         const edenWindow = window as typeof window & {
           edenAPI: {
             shellCommand: (command: string, args: unknown) => Promise<unknown>;
           };
         };
-        return edenWindow.edenAPI.shellCommand("system/power-capabilities", {});
+        const scale = await edenWindow.edenAPI.shellCommand(
+          "view/get-interface-scale",
+          {},
+        );
+        let denied = "";
+        try {
+          await edenWindow.edenAPI.shellCommand("process/launch", {
+            appId: "com.eden.forbidden",
+          });
+        } catch (error) {
+          denied = error instanceof Error ? error.message : String(error);
+        }
+        return { scale, denied };
       });
-      expect(capabilities).toEqual({ poweroff: false, reboot: false });
+      expect(result.scale).toEqual({ scale: 1 });
+      expect(result.denied).toContain(
+        "Foundation is not allowed to execute process/launch",
+      );
     });
 
     test("launches a bundled app with an associated real view and utility process", async () => {
-      const result = await foundation.evaluate((appId) => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/launch", { appId });
-      }, APP_ID);
+      const result = await executeHostCommand<{
+        success: boolean;
+        appId: string;
+      }>("process/launch", { appId: APP_ID });
       expect(result).toMatchObject({ success: true, appId: APP_ID });
 
-      const processes = await foundation.evaluate(() => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/list", {});
-      });
+      const processes = await executeHostCommand<unknown[]>("process/list", {});
       expect(processes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -437,14 +462,10 @@ test.describe
         })
         .toBe(false);
 
-      const launchResult = await foundation.evaluate((appId) => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/launch", { appId });
-      }, PDF_VIEWER_APP_ID);
+      const launchResult = await executeHostCommand<{
+        success: boolean;
+        appId: string;
+      }>("process/launch", { appId: PDF_VIEWER_APP_ID });
       expect(launchResult).toMatchObject({
         success: true,
         appId: PDF_VIEWER_APP_ID,
@@ -683,22 +704,8 @@ test.describe
     });
 
     test("revokes DLC module URLs when the host stops", async () => {
-      await foundation.evaluate((appId) => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/stop", { appId });
-      }, APP_ID);
-      await foundation.evaluate((appId) => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/launch", { appId });
-      }, APP_ID);
+      await executeHostCommand("process/stop", { appId: APP_ID });
+      await executeHostCommand("process/launch", { appId: APP_ID });
 
       await expect
         .poll(() =>
@@ -736,14 +743,7 @@ test.describe
     });
 
     test("supports DLC module imports from an HTTP development frontend", async () => {
-      await foundation.evaluate((appId) => {
-        const edenWindow = window as typeof window & {
-          edenAPI: {
-            shellCommand: (command: string, args: unknown) => Promise<unknown>;
-          };
-        };
-        return edenWindow.edenAPI.shellCommand("process/launch", { appId });
-      }, REMOTE_APP_ID);
+      await executeHostCommand("process/launch", { appId: REMOTE_APP_ID });
       await expect
         .poll(() =>
           electronApp?.evaluate(

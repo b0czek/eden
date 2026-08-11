@@ -2,6 +2,7 @@ import { APP_EVENT_NAMES } from "../generated/runtime";
 import type { ViewManager } from "../view-manager/ViewManager";
 import { EdenHandler, EdenNamespace } from "./CommandDecorators";
 import type { EventSubscriberManager } from "./EventSubscriberManager";
+import { assertFoundationEventAllowed } from "./FoundationPolicy";
 
 @EdenNamespace("event")
 export class EventHandler {
@@ -31,6 +32,7 @@ export class EventHandler {
     }
 
     if (_isFoundation) {
+      assertFoundationEventAllowed(eventName);
       this.subscriberManager.subscribeFoundation(eventName);
     } else if (_callerWebContentsId !== undefined) {
       // Request from a view
@@ -59,6 +61,7 @@ export class EventHandler {
       args;
 
     if (_isFoundation) {
+      assertFoundationEventAllowed(eventName);
       this.subscriberManager.unsubscribeFoundation(eventName);
     } else if (_callerWebContentsId !== undefined) {
       // Request from a view

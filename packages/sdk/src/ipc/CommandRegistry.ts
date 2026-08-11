@@ -7,6 +7,7 @@ import {
 import { log } from "../logging";
 import type { SessionContext } from "../session";
 import { getManagerMetadata } from "./CommandMetadata";
+import { assertFoundationCommandAllowed } from "./FoundationPolicy";
 import { PermissionRegistry } from "./PermissionRegistry";
 
 export {
@@ -147,6 +148,10 @@ export class CommandRegistry {
 
     const context = this.resolveCallerContext(callerContext);
     const appId = context.appId;
+
+    if (context.foundation) {
+      assertFoundationCommandAllowed(fullCommand);
+    }
 
     return this.executionContext.run(context, async () => {
       // Check app permission if required

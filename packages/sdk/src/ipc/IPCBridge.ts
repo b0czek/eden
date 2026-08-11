@@ -93,6 +93,10 @@ export class IPCBridge extends EventEmitter {
         const isFoundation =
           this.mainWindow?.webContents.id === event.sender.id;
 
+        if (!appId && !isFoundation) {
+          throw new Error("Shell command caller is not a registered Eden view");
+        }
+
         return this.handleShellCommand(command, args, {
           appId,
           webContentsId: event.sender.id,

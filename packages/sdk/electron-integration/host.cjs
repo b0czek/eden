@@ -10,7 +10,11 @@ const eden = new Eden({
   },
 });
 
-globalThis.__edenIntegration = { eden };
+globalThis.__edenIntegration = {
+  eden,
+  execute: (command, args) =>
+    eden.runtime.ipcBridge.commandRegistry.execute(command, args),
+};
 
 eden.whenReady().then(
   () => console.log("EDEN_INTEGRATION_READY"),
