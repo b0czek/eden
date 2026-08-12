@@ -26,7 +26,7 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["settings/panels"],
+  "permissions": ["settings/panels", "package/read"],
   "grants": [
     { "scope": "preset", "preset": "package/manage" },
     { "scope": "preset", "preset": "appearance/manage" },
