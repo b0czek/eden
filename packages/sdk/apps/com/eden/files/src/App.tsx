@@ -11,6 +11,7 @@ import {
   useFileActivationPreference,
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
+import { notification } from "@edenapp/tablets";
 import { FiCheckSquare, FiX } from "solid-icons/fi";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount } from "solid-js";
@@ -124,13 +125,13 @@ const App: Component = () => {
     sortItems,
     onLoadError: showError,
     onPathUnavailable: (path, fallbackPath) => {
-      void window.edenAPI.shellCommand("notification/push", {
-        title: t("files.directoryUnavailableTitle"),
-        message: fallbackPath
+      void notification.push(
+        t("files.directoryUnavailableTitle"),
+        fallbackPath
           ? t("files.directoryUnavailableFallback", { path, fallbackPath })
           : t("files.directoryUnavailable", { path }),
-        type: "warning",
-      });
+        { type: "warning" },
+      );
     },
     getLoadDirectoryErrorMessage: (error) =>
       `${t("files.errors.loadDirectoryFailed")}: ${error.message}`,

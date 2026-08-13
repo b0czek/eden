@@ -17,16 +17,19 @@
   ],
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run src"
   },
   "dependencies": {},
   "devDependencies": {
     "@edenapp/types": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "keywords": [
     "eden",
     "context-menu",
+    "notification",
     "renderer",
     "ipc"
   ],

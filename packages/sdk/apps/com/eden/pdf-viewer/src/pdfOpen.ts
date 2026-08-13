@@ -1,4 +1,4 @@
-import { filePicker } from "@edenapp/tablets";
+import { filePicker, notification } from "@edenapp/tablets";
 import type {
   DocumentManagerCapability,
   DocumentManagerPlugin,
@@ -45,10 +45,8 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 function pushWarningToast(message: string) {
-  void window.edenAPI
-    .shellCommand("notification/push", {
-      title: t("pdfViewer.title"),
-      message,
+  void notification
+    .push(t("pdfViewer.title"), message, {
       type: "warning",
       timeout: 5000,
     })

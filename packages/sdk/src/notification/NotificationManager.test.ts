@@ -142,8 +142,8 @@ describe("NotificationManager", () => {
     );
   });
 
-  it("deletes notification state when the toaster reports dismissal", async () => {
-    const { manager } = createManager();
+  it("deletes notification state and reports removal to its source view", async () => {
+    const { eventSubscribers, manager } = createManager();
     const callback = jest.fn();
     manager.registerDisplayProvider({
       appId: "com.eden.toaster",
@@ -156,6 +156,7 @@ describe("NotificationManager", () => {
       "warning",
       [{ id: "force", label: "Force open" }],
       { force: callback },
+      { appId: "com.eden.editor", webContentsId: 200 },
     );
 
     expect(
@@ -169,10 +170,15 @@ describe("NotificationManager", () => {
       webContentsId: 100,
     });
     expect(callback).not.toHaveBeenCalled();
+    expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
+      20,
+      "notification/removed",
+      { id: notification.id },
+    );
   });
 
   it("returns false for dismissed notifications it does not know about", () => {
-    const { manager } = createManager();
+    const { eventSubscribers, manager } = createManager();
     manager.registerDisplayProvider({
       appId: "com.eden.toaster",
       webContentsId: 100,
@@ -184,6 +190,11 @@ describe("NotificationManager", () => {
         webContentsId: 100,
       }),
     ).toEqual({ success: false });
+    expect(eventSubscribers.notifyView).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      "notification/removed",
+      expect.any(Object),
+    );
   });
 
   it("rejects action clicks and dismissals from callers that are not the display provider", async () => {

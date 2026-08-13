@@ -1,11 +1,12 @@
 # @edenapp/tablets
 
-Tiny renderer toolkit for Eden apps. It provides runtime helpers for Eden’s system context menu and file picker without wiring IPC directly.
+Tiny renderer toolkit for Eden apps. It provides runtime helpers for Eden’s system context menu, file picker, and notifications without wiring IPC directly.
 
 ## What it does
 
 - Provides `contextMenu` runtime helper for opening/closing menus.
 - Provides `filePicker` async helpers for opening and saving file paths.
+- Provides `notification` helpers with automatically routed action callbacks.
 - Provides menu builder helpers (`menu`, `button`, `title`, `separator`, `when`).
 
 ## Install
@@ -69,3 +70,34 @@ const savePath = await filePicker.saveFile({
   filters: [{ name: "Markdown", extensions: ["md"] }],
 });
 ```
+
+## Notifications
+
+```ts
+import { notification } from "@edenapp/tablets";
+
+await notification.push("Saved", "Your changes were saved.", {
+  type: "success",
+});
+
+await notification.push(
+  "Update ready",
+  "Restart to apply the update.",
+  [
+    {
+      label: "Restart",
+      onClick: async () => restartApp(),
+    },
+    {
+      label: "Later",
+      dismissOnClick: false,
+      onClick: () => scheduleReminder(),
+    },
+  ],
+  { timeout: 10_000 },
+);
+```
+
+Tablets generates action IDs and routes clicks back to the callback that created
+each action. Actions dismiss the notification after a click by default. Set
+`dismissOnClick: false` to keep the action active until the notification closes.

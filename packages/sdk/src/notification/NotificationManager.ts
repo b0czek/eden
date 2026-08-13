@@ -163,7 +163,18 @@ export class NotificationManager extends EdenEmitter<NotificationNamespaceEvents
       );
     }
 
-    return { success: this.activeNotifications.delete(notificationId) };
+    const activeNotification = this.activeNotifications.get(notificationId);
+    if (!activeNotification) {
+      return { success: false };
+    }
+
+    this.activeNotifications.delete(notificationId);
+    if (activeNotification.sourceViewId !== undefined) {
+      this.notifySubscriber(activeNotification.sourceViewId, "removed", {
+        id: notificationId,
+      });
+    }
+    return { success: true };
   }
 
   override dispose(): void {

@@ -13,7 +13,7 @@ import {
   useExplorerNavigation,
   useFileActivationPreference,
 } from "@edenapp/files-core";
-import { waitForEdenFrame } from "@edenapp/tablets";
+import { notification, waitForEdenFrame } from "@edenapp/tablets";
 import type {
   FilePickerFilter,
   FilePickerOpenEvent,
@@ -215,16 +215,16 @@ const App: Component = () => {
     sortItems,
     onLoadError: setError,
     onPathUnavailable: (path, fallbackPath) => {
-      void window.edenAPI.shellCommand("notification/push", {
-        title: t("filePicker.directoryUnavailableTitle"),
-        message: fallbackPath
+      void notification.push(
+        t("filePicker.directoryUnavailableTitle"),
+        fallbackPath
           ? t("filePicker.directoryUnavailableFallback", {
               path,
               fallbackPath,
             })
           : t("filePicker.directoryUnavailable", { path }),
-        type: "warning",
-      });
+        { type: "warning" },
+      );
     },
     getLoadDirectoryErrorMessage: (loadError) =>
       `${t("filePicker.errors.loadDirectoryFailed")}: ${loadError.message}`,
