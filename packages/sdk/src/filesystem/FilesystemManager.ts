@@ -159,6 +159,15 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
   }
 
   /**
+   * Read the contents of a file without text encoding.
+   */
+  async readBinaryFile(targetPath: string): Promise<Uint8Array> {
+    const fullPath = await this.resolvePath(targetPath);
+    const content = await fs.readFile(fullPath);
+    return new Uint8Array(content);
+  }
+
+  /**
    * Write content to a file, creating directories if needed.
    */
   async writeFile(
@@ -170,6 +179,19 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     // Ensure directory exists
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content, encoding);
+    this.invalidateHostDirectory(path.dirname(fullPath));
+  }
+
+  /**
+   * Write bytes to a file, creating directories if needed.
+   */
+  async writeBinaryFile(
+    targetPath: string,
+    content: Uint8Array,
+  ): Promise<void> {
+    const fullPath = await this.resolvePath(targetPath);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, content);
     this.invalidateHostDirectory(path.dirname(fullPath));
   }
 

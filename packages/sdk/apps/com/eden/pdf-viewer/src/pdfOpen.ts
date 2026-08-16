@@ -33,15 +33,10 @@ export function getFileName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? t("pdfViewer.title");
 }
 
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes.buffer;
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
 }
 
 function pushWarningToast(message: string) {
@@ -195,9 +190,8 @@ export function createPdfOpenController({
       return undefined;
     }
 
-    const base64Content = await window.edenAPI.shellCommand("fs/read", {
+    const content = await window.edenAPI.shellCommand("fs/read-binary", {
       path,
-      encoding: "base64",
     });
     if (version !== loadVersion) {
       return undefined;
@@ -205,7 +199,7 @@ export function createPdfOpenController({
 
     return documentManager
       .openDocumentBuffer({
-        buffer: base64ToArrayBuffer(base64Content),
+        buffer: toArrayBuffer(content),
         name: getFileName(path),
         documentId:
           options?.documentId ??

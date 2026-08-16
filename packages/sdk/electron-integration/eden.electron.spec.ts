@@ -130,6 +130,10 @@ test.describe
         ),
         path.join(pdfViewerFixtureDirectory, "dist/demo.pdf"),
       );
+      await fs.writeFile(
+        path.join(userDirectory, "binary-input.bin"),
+        new Uint8Array([0, 255, 128, 13, 10]),
+      );
       await Promise.all([
         fs.writeFile(
           path.join(dlcDirectory, "manifest.json"),
@@ -355,10 +359,48 @@ test.describe
         })
         .toEqual({
           asset: "adjacent asset",
+          binary: {
+            bytes: [0, 255, 128, 13, 10],
+            isUint8Array: true,
+          },
           moduleUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           rootUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           value: "loaded-through-eden-dlc",
         });
+    });
+
+    test("round-trips binary filesystem data across renderer IPC", async () => {
+      const result = await electronApp?.evaluate(
+        async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+            const content = new Uint8Array([0, 255, 128, 1, 0]);
+            await window.edenAPI.shellCommand("fs/write-binary", {
+              path: "/renderer-output.bin",
+              content,
+            });
+            const result = await window.edenAPI.shellCommand("fs/read-binary", {
+              path: "/renderer-output.bin",
+            });
+            return {
+              bytes: [...result],
+              isUint8Array: result instanceof Uint8Array,
+            };
+          })()`);
+        },
+        APP_ID,
+      );
+
+      expect(result).toEqual({
+        bytes: [0, 255, 128, 1, 0],
+        isUint8Array: true,
+      });
+      await expect(
+        fs.readFile(path.join(root, "users", "renderer-output.bin")),
+      ).resolves.toEqual(Buffer.from([0, 255, 128, 1, 0]));
     });
 
     test("supports keyboard focus, policy, and input across nested shadow DOM", async () => {

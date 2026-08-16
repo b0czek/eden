@@ -303,6 +303,30 @@ describe("FilesystemManager integration", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("round-trips binary files without text encoding", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const content = new Uint8Array([0, 255, 128, 1, 13, 10, 0]);
+
+    await eden.execute(
+      "fs/write-binary",
+      { path: "/binary/nested/data.bin", content },
+      transferCaller,
+    );
+
+    await expect(
+      fs.readFile(
+        path.join(eden.paths.userDirectory, "binary", "nested", "data.bin"),
+      ),
+    ).resolves.toEqual(Buffer.from(content));
+    const result = await eden.execute<Uint8Array>(
+      "fs/read-binary",
+      { path: "/binary/nested/data.bin" },
+      transferCaller,
+    );
+    expect(result).toBeInstanceOf(Uint8Array);
+    expect([...result]).toEqual([...content]);
+  });
+
   it("copies and moves files and recursive directories", async () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(

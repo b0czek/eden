@@ -30,6 +30,14 @@ export class FilesystemHandler {
   }
 
   /**
+   * Read the raw contents of a file.
+   */
+  @EdenHandler("read-binary", { permission: "read" })
+  async handleReadBinaryFile(args: { path: string }): Promise<Uint8Array> {
+    return await this.fsManager.readBinaryFile(args.path);
+  }
+
+  /**
    * Write content to a file, creating directories if needed.
    */
   @EdenHandler("write", { permission: "write" })
@@ -44,6 +52,20 @@ export class FilesystemHandler {
       content,
       encoding as BufferEncoding,
     );
+  }
+
+  /**
+   * Write raw bytes to a file, creating directories if needed.
+   */
+  @EdenHandler("write-binary", { permission: "write" })
+  async handleWriteBinaryFile(args: {
+    path: string;
+    content: Uint8Array;
+  }): Promise<void> {
+    if (!(args.content instanceof Uint8Array)) {
+      throw new TypeError("Binary file content must be a Uint8Array");
+    }
+    await this.fsManager.writeBinaryFile(args.path, args.content);
   }
 
   /**

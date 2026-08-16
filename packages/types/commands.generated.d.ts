@@ -405,6 +405,13 @@ export interface FsCommands {
     response: string;
   };
   /**
+   * Read the raw contents of a file.
+   */
+  "fs/read-binary": {
+    args: { path: string };
+    response: Uint8Array;
+  };
+  /**
    * Write content to a file, creating directories if needed.
    */
   "fs/write": {
@@ -412,6 +419,15 @@ export interface FsCommands {
     path: string;
     content: string;
     encoding?: string };
+    response: void;
+  };
+  /**
+   * Write raw bytes to a file, creating directories if needed.
+   */
+  "fs/write-binary": {
+    args: {
+    path: string;
+    content: Uint8Array };
     response: void;
   };
   /**
