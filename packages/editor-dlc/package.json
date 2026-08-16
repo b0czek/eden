@@ -1,7 +1,7 @@
 {
   "name": "@edenapp/editor-dlc",
   "version": "0.12.1",
-  "description": "TypeScript contract for Eden Editor language-highlighter DLCs",
+  "description": "TypeScript contracts for Eden Editor DLC modules",
   "types": "index.d.ts",
   "files": [
     "index.d.ts",
@@ -11,7 +11,8 @@
     "eden",
     "editor",
     "dlc",
-    "syntax-highlighting"
+    "syntax-highlighting",
+    "document-formats"
   ],
   "author": "Dariusz Majnert",
   "license": "MIT",

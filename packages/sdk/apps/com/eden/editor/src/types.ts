@@ -1,5 +1,6 @@
 import type { EditorState, StateEffect } from "@codemirror/state";
 import type { EditorLanguageName } from "@edenapp/editor-dlc";
+import type { EditorDlcDocumentState } from "./editor-dlcs";
 
 export interface EditorTab {
   id: string;
@@ -11,6 +12,7 @@ export interface EditorTab {
   language: string;
   languageName: EditorLanguageName;
   state: EditorState;
+  documentHandler?: EditorDlcDocumentState;
   scrollSnapshot?: StateEffect<unknown>;
 }
 

@@ -1,8 +1,10 @@
 # @edenapp/editor-dlc
 
-TypeScript definitions for implementing `language-highlighters` DLC modules for
-the Eden text editor.
+TypeScript definitions for implementing `language-highlighters` and
+`document-handlers` DLC modules for the Eden text editor.
 
-See the
-[editor highlighter DLC guide](https://github.com/b0czek/eden/blob/master/docs/editor-highlighter-dlcs.md)
-for the manifest, module, build, and packaging contract.
+See the guides for
+[language highlighters](https://github.com/b0czek/eden/blob/master/docs/editor-highlighter-dlcs.md)
+and
+[document handlers](https://github.com/b0czek/eden/blob/master/docs/editor-document-handler-dlcs.md)
+for manifest, module, build, and packaging contracts.

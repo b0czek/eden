@@ -17,11 +17,8 @@ import {
   WelcomeScreen,
 } from "./components";
 import { createEditorState } from "./editor-config";
+import { EditorDlcHost, loadEditorDlcs } from "./editor-dlcs";
 import { initLocale, t } from "./i18n";
-import {
-  EditorLanguageRegistry,
-  loadEditorLanguageRegistry,
-} from "./language-registry";
 import { type EditorTab, type FileOpenedEvent, getFileName } from "./types";
 
 const App: Component = () => {
@@ -35,7 +32,7 @@ const App: Component = () => {
   );
   const openingFiles = new Map<string, Promise<string>>();
   const closingTabs = new Set<string>();
-  let languageRegistry = new EditorLanguageRegistry();
+  let editorDlcs = new EditorDlcHost();
   let editorReady = Promise.resolve();
   let tabSequence = 0;
   let openRequestSequence = 0;
@@ -57,9 +54,10 @@ const App: Component = () => {
     if (pending) return pending;
 
     const task = (async () => {
-      const fileContent = await window.edenAPI.shellCommand("fs/read", {
-        path,
-      });
+      const dlcDocument = await editorDlcs.openDocument(path);
+      const fileContent =
+        dlcDocument?.content ??
+        (await window.edenAPI.shellCommand("fs/read", { path }));
       let tabId = "";
 
       setTabs((currentTabs) => {
@@ -70,7 +68,7 @@ const App: Component = () => {
         }
 
         tabId = `tab-${Date.now()}-${++tabSequence}`;
-        const language = languageRegistry.resolve(path);
+        const language = editorDlcs.resolveLanguage(path);
         const newTab: EditorTab = {
           id: tabId,
           path,
@@ -81,6 +79,7 @@ const App: Component = () => {
           language: language.id,
           languageName: language.name,
           state: createEditorState(path, fileContent, language),
+          documentHandler: dlcDocument?.state,
         };
         return [...currentTabs, newTab];
       });
@@ -168,10 +167,19 @@ const App: Component = () => {
     try {
       setIsSaving(true);
       setError(null);
-      await window.edenAPI.shellCommand("fs/write", {
-        path: active.path,
-        content: currentContent,
-      });
+      let savedDocumentHandler: EditorTab["documentHandler"];
+      if (active.documentHandler) {
+        savedDocumentHandler = await editorDlcs.saveDocument(
+          active.path,
+          currentContent,
+          active.documentHandler,
+        );
+      } else {
+        await window.edenAPI.shellCommand("fs/write", {
+          path: active.path,
+          content: currentContent,
+        });
+      }
       setTabs((currentTabs) =>
         currentTabs.map((tab) =>
           tab.id === active.id
@@ -179,6 +187,7 @@ const App: Component = () => {
                 ...tab,
                 originalContent: currentContent,
                 isModified: tab.state.doc.toString() !== currentContent,
+                documentHandler: savedDocumentHandler ?? tab.documentHandler,
               }
             : tab,
         ),
@@ -249,33 +258,23 @@ const App: Component = () => {
     if (!data.isDirectory) void openFile(data.path);
   };
 
-  const initializeLanguageDlcs = async () => {
+  const initializeEditorDlcs = async () => {
     try {
-      const { dlcs } = await window.edenAPI.shellCommand("package/self", {});
-      const result = await loadEditorLanguageRegistry(dlcs);
-      languageRegistry = result.registry;
-      if (result.diagnostics.length === 0) return;
-
-      for (const diagnostic of result.diagnostics) {
-        console.warn(
-          `Skipped editor highlighter ${diagnostic.source}: ${diagnostic.message}`,
-        );
-      }
-      const sources = [
-        ...new Set(result.diagnostics.map(({ source }) => source)),
-      ];
+      const { host, warningSources } = await loadEditorDlcs();
+      editorDlcs = host;
+      if (warningSources.length === 0) return;
       setExtensionWarning(
-        t("editor.extensionWarning", { sources: sources.join(", ") }),
+        t("editor.extensionWarning", { sources: warningSources.join(", ") }),
       );
     } catch (err) {
-      console.warn("Failed to load editor language highlighters", err);
+      console.warn("Failed to load editor extensions", err);
       setExtensionWarning(t("editor.extensionLoadFailed"));
     }
   };
 
   onMount(() => {
     initLocale();
-    editorReady = initializeLanguageDlcs();
+    editorReady = initializeEditorDlcs();
     const launchArgs = window.edenAPI.getLaunchArgs();
     if (launchArgs.length > 0) void openFile(launchArgs[0]);
 

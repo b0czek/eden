@@ -120,6 +120,8 @@ point.
 
 For the text editor's public `language-highlighters` contract, see
 [Editor language-highlighter DLCs](editor-highlighter-dlcs.md).
+For custom byte formats that should open as editable text, see
+[Editor document-handler DLCs](editor-document-handler-dlcs.md).
 
 Direct filesystem access is intentionally not part of the portable DLC resource
 contract because it has no renderer equivalent. Use `fetch()` for opaque files.

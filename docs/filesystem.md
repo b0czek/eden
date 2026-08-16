@@ -51,6 +51,38 @@ await window.edenAPI.shellCommand("file/open", {
 });
 ```
 
+## Reading and Writing File Contents
+
+Use `fs/read` and `fs/write` for text. Both commands default to UTF-8 and also
+accept a Node.js encoding name when another text representation is required:
+
+```typescript
+const content = await window.edenAPI.shellCommand("fs/read", {
+  path: "/Documents/notes.txt",
+});
+await window.edenAPI.shellCommand("fs/write", {
+  path: "/Documents/notes.txt",
+  content: `${content}\nUpdated`,
+});
+```
+
+Use the binary commands for archives, images, documents, and other byte-based
+formats. They transfer complete files as `Uint8Array` values without applying
+text encoding:
+
+```typescript
+const bytes = await window.edenAPI.shellCommand("fs/read-binary", {
+  path: "/Documents/archive.bin",
+});
+await window.edenAPI.shellCommand("fs/write-binary", {
+  path: "/Documents/archive-copy.bin",
+  content: bytes,
+});
+```
+
+`fs/read-binary` requires `fs/read`; `fs/write-binary` requires `fs/write`.
+Like the text commands, binary writes create missing parent directories.
+
 ## Copying and Moving Items
 
 `fs/cp` copies files and directories recursively. `fs/mv` moves or renames
