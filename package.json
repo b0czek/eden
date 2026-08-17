@@ -29,8 +29,8 @@
     "release": "pnpm run build && changeset publish"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.6",
-    "@changesets/cli": "^2.31.1",
+    "@biomejs/biome": "^2.5.8",
+    "@changesets/cli": "^3.0.0",
     "lint-staged": "^17.3.0",
     "simple-git-hooks": "^2.13.0"
   },
