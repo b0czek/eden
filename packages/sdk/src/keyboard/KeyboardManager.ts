@@ -95,6 +95,7 @@ export class KeyboardManager {
   private placementMode: EdenKeyboardPlacementMode = DEFAULT_PLACEMENT_MODE;
   private showNumberRow = DEFAULT_SHOW_NUMBER_ROW;
   private interfaceScale = DEFAULT_INTERFACE_SCALE;
+  private keyboardVisibilityRequested = false;
   private dragState: KeyboardDragState | null = null;
   private readonly mouseTracker: MouseTracker;
   private readonly keyboardFrontendPath = path.join(
@@ -661,6 +662,9 @@ export class KeyboardManager {
     keyboardWindow.setMovable(this.getEffectivePlacementMode() === "floating");
     keyboardWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     keyboardWindow.webContents.on("did-finish-load", () => {
+      if (this.keyboardVisibilityRequested && !keyboardWindow.isVisible()) {
+        keyboardWindow.showInactive();
+      }
       this.notifyKeyboardStateChanged();
     });
     keyboardWindow.on("closed", () => {
@@ -908,6 +912,7 @@ export class KeyboardManager {
       return;
     }
 
+    this.keyboardVisibilityRequested = true;
     keyboardWindow.setMovable(this.getEffectivePlacementMode() === "floating");
     this.updateKeyboardWindowBounds();
     if (!keyboardWindow.isVisible()) {
@@ -919,6 +924,7 @@ export class KeyboardManager {
   }
 
   private async hideKeyboard(): Promise<void> {
+    this.keyboardVisibilityRequested = false;
     if (!this.keyboardWindow || this.keyboardWindow.isDestroyed()) {
       this.updateWorkspacePresentation();
       return;
