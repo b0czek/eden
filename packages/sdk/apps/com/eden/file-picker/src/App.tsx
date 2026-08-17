@@ -13,6 +13,7 @@ import {
   useExplorerNavigation,
   useFileActivationPreference,
 } from "@edenapp/files-core";
+import { createInterfaceScale } from "@edenapp/solid-kit";
 import { notification, waitForEdenFrame } from "@edenapp/tablets";
 import type {
   FilePickerFilter,
@@ -106,14 +107,16 @@ const matchesAnyFilter = (item: FileItem, filters: FilePickerFilter[]) =>
 const calculateBounds = (
   windowSize: WindowSize,
   openerBounds?: ViewBounds,
+  scale = 1,
 ): ViewBounds => {
+  const viewportMargin = Math.round(VIEWPORT_MARGIN * scale);
   const width = Math.min(
-    DEFAULT_PICKER_SIZE.width,
-    Math.max(320, windowSize.width - VIEWPORT_MARGIN * 2),
+    Math.round(DEFAULT_PICKER_SIZE.width * scale),
+    Math.max(Math.round(320 * scale), windowSize.width - viewportMargin * 2),
   );
   const height = Math.min(
-    DEFAULT_PICKER_SIZE.height,
-    Math.max(280, windowSize.height - VIEWPORT_MARGIN * 2),
+    Math.round(DEFAULT_PICKER_SIZE.height * scale),
+    Math.max(Math.round(280 * scale), windowSize.height - viewportMargin * 2),
   );
   const preferredX = openerBounds
     ? openerBounds.x + (openerBounds.width - width) / 2
@@ -122,17 +125,17 @@ const calculateBounds = (
     ? openerBounds.y + (openerBounds.height - height) / 2
     : (windowSize.height - height) / 2;
   const maxX = Math.max(
-    VIEWPORT_MARGIN,
-    windowSize.width - width - VIEWPORT_MARGIN,
+    viewportMargin,
+    windowSize.width - width - viewportMargin,
   );
   const maxY = Math.max(
-    VIEWPORT_MARGIN,
-    windowSize.height - height - VIEWPORT_MARGIN,
+    viewportMargin,
+    windowSize.height - height - viewportMargin,
   );
 
   return {
-    x: Math.round(Math.min(Math.max(preferredX, VIEWPORT_MARGIN), maxX)),
-    y: Math.round(Math.min(Math.max(preferredY, VIEWPORT_MARGIN), maxY)),
+    x: Math.round(Math.min(Math.max(preferredX, viewportMargin), maxX)),
+    y: Math.round(Math.min(Math.max(preferredY, viewportMargin), maxY)),
     width: Math.round(width),
     height: Math.round(height),
   };
@@ -147,6 +150,7 @@ const getPickerTitle = (request: FilePickerOpenEvent) => {
 };
 
 const App: Component = () => {
+  const interfaceScale = createInterfaceScale();
   const openWithSingleClick = useFileActivationPreference(FILES_APP_ID);
   const [activeRequest, setActiveRequest] =
     createSignal<FilePickerOpenEvent | null>(null);
@@ -329,7 +333,11 @@ const App: Component = () => {
     request = activeRequest(),
   ) => {
     const bounds = visible
-      ? calculateBounds(await getWindowSize(), request?.opener.bounds)
+      ? calculateBounds(
+          await getWindowSize(),
+          request?.opener.bounds,
+          interfaceScale(),
+        )
       : HIDDEN_BOUNDS;
 
     await window.edenAPI.shellCommand("view/update-bounds", { bounds });
@@ -558,6 +566,18 @@ const App: Component = () => {
     } else {
       window.edenFrame?.resetTitle();
     }
+  });
+
+  let previousInterfaceScale = interfaceScale();
+  createEffect(() => {
+    const nextInterfaceScale = interfaceScale();
+    if (
+      nextInterfaceScale !== previousInterfaceScale &&
+      activeRequest() !== null
+    ) {
+      void updateOverlayBounds(true);
+    }
+    previousInterfaceScale = nextInterfaceScale;
   });
 
   const confirmLabel = createMemo(() => {

@@ -41,6 +41,7 @@ const visibleToasts = new Map<string, ActiveToast>();
 const pendingQueue: Notification[] = [];
 
 let windowSize: WindowSize | null = null;
+let interfaceScale = 1;
 
 /**
  * Get current window size from Eden API
@@ -57,11 +58,29 @@ async function fetchWindowSize(): Promise<WindowSize> {
 }
 
 /**
+ * Get the current interface scale from Eden API
+ */
+async function fetchInterfaceScale(): Promise<number> {
+  try {
+    const { scale } = await window.edenAPI.shellCommand(
+      "view/get-interface-scale",
+      {},
+    );
+    if (Number.isFinite(scale)) {
+      interfaceScale = scale;
+    }
+  } catch (err) {
+    console.error("Failed to get interface scale:", err);
+  }
+  return interfaceScale;
+}
+
+/**
  * Calculate max available height for toasts
  */
 function getMaxHeight(): number {
   const ws = windowSize || { width: 1280, height: 800 };
-  return ws.height - CONFIG.marginY * 2;
+  return ws.height / interfaceScale - CONFIG.marginY * 2;
 }
 
 /**
@@ -106,29 +125,31 @@ function calculateBounds(): ViewBounds {
   const ws = windowSize || { width: 1280, height: 800 };
 
   // Use container's scrollHeight to get actual content height
-  const totalHeight = container.scrollHeight;
+  const totalHeight = Math.round(container.scrollHeight * interfaceScale);
 
-  const width = CONFIG.toastWidth;
+  const width = Math.round(CONFIG.toastWidth * interfaceScale);
   const height = totalHeight;
+  const marginX = Math.round(CONFIG.marginX * interfaceScale);
+  const marginY = Math.round(CONFIG.marginY * interfaceScale);
 
   // Calculate position based on corner
   let x: number, y: number;
   switch (CONFIG.corner) {
     case "top-left":
-      x = CONFIG.marginX;
-      y = CONFIG.marginY;
+      x = marginX;
+      y = marginY;
       break;
     case "top-right":
-      x = ws.width - width - CONFIG.marginX;
-      y = CONFIG.marginY;
+      x = ws.width - width - marginX;
+      y = marginY;
       break;
     case "bottom-left":
-      x = CONFIG.marginX;
-      y = ws.height - height - CONFIG.marginY;
+      x = marginX;
+      y = ws.height - height - marginY;
       break;
     default:
-      x = ws.width - width - CONFIG.marginX;
-      y = ws.height - height - CONFIG.marginY;
+      x = ws.width - width - marginX;
+      y = ws.height - height - marginY;
       break;
   }
 
@@ -490,8 +511,8 @@ function handleToastAdded(data: { notification: Notification }): void {
 async function init(): Promise<void> {
   console.log("Eden Toaster initializing...");
 
-  // Fetch initial window size
-  await fetchWindowSize();
+  // Fetch initial layout settings
+  await Promise.all([fetchWindowSize(), fetchInterfaceScale()]);
 
   // Register as the display provider for notifications
   await window.edenAPI.shellCommand("notification/register-display", {});
@@ -504,6 +525,16 @@ async function init(): Promise<void> {
     "view/global-bounds-changed",
     (data: { windowSize: WindowSize }) => {
       windowSize = data.windowSize;
+      updateOverlayBounds();
+    },
+  );
+
+  // Keep the overlay's physical bounds in sync with renderer zoom.
+  window.edenAPI.subscribe(
+    "view/interface-scale-changed",
+    (data: { scale: number }) => {
+      if (!Number.isFinite(data.scale)) return;
+      interfaceScale = data.scale;
       updateOverlayBounds();
     },
   );

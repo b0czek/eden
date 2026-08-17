@@ -25,6 +25,7 @@
       "y": 0
     },
     "showMinimize": false,
+    "scaling": "auto",
     "injections": {
       "css": "full",
       "appFrame": true
