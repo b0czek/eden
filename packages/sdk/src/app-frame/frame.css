@@ -58,8 +58,7 @@ body::before {
   --eden-frame-glass: rgba(255, 255, 255, 0.7);
   --eden-frame-hover: rgba(0, 0, 0, 0.08);
   --eden-frame-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    0 2px 8px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   --eden-layout-bg: rgba(250, 251, 253, 0.94);
   --eden-layout-border: rgba(25, 30, 45, 0.11);
   --eden-layout-shadow: 0 18px 44px rgba(20, 24, 35, 0.2);
@@ -98,8 +97,7 @@ body::before {
   --eden-frame-glass: rgba(40, 40, 40, 0.7);
   --eden-frame-hover: rgba(255, 255, 255, 0.12);
   --eden-frame-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   --eden-layout-bg: rgba(30, 31, 36, 0.94);
   --eden-layout-border: rgba(255, 255, 255, 0.1);
   --eden-layout-shadow: 0 20px 50px rgba(0, 0, 0, 0.48);
@@ -289,12 +287,6 @@ body::before {
   transform: none;
 }
 
-#eden-app-frame-overlay .eden-tile-layout-edge button svg {
-  width: 17px;
-  height: 17px;
-  transform: rotate(var(--eden-edge-rotation, 0deg));
-}
-
 #eden-app-frame-overlay .eden-tile-layout-window {
   position: relative;
   grid-area: 2 / 2;
@@ -308,6 +300,12 @@ body::before {
   width: 100%;
   height: 100%;
   fill: currentColor;
+}
+
+#eden-app-frame-overlay .eden-tile-layout-edge button svg {
+  width: 17px;
+  height: 17px;
+  transform: rotate(var(--eden-edge-rotation, 0deg));
 }
 
 #eden-app-frame-overlay .eden-tile-layout-window-body {

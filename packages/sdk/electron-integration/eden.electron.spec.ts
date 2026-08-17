@@ -410,6 +410,7 @@ test.describe
           .find((candidate) => candidate.getURL().includes(appId));
         if (!contents) throw new Error("Integration app view not found");
 
+        contents.focus();
         return contents.executeJavaScript(`(() => {
             const input = document
               .getElementById("shadow-input-host")
