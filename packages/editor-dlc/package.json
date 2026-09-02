@@ -1,6 +1,7 @@
 {
   "name": "@edenapp/editor-dlc",
   "version": "0.13.0",
+  "private": true,
   "description": "TypeScript contracts for Eden Editor DLC modules",
   "types": "index.d.ts",
   "files": [
