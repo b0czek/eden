@@ -1,5 +1,16 @@
 # @edenapp/types
 
+## 0.13.0
+
+### Minor Changes
+
+- 7ebd35d: Add app-bound DLC manifests, secure `.edenite` packaging and extraction, built-in DLC bundling, unified package installation and removal, transactional host-aware lifecycle handling, host-scoped JavaScript module resource URLs, trusted main-process inventory APIs with package-size details in Settings, optional host file-handler extensions, binary filesystem commands, editor-owned contracts for external language highlighters and custom document codecs, and a built-in HTTP request highlighter DLC.
+- 9bd04f0: Open a compact spatial layout compass from tiled app titles when adjacent windows are available, with controls to swap positions or temporarily expand across compatible neighbors without persistent gutters or another renderer. Keep layout actions unavailable during an active expansion so they cannot implicitly restore or rearrange the covered split.
+
+### Patch Changes
+
+- 6128a97: Resize floating app windows from their left, right, and bottom edges, including both bottom corners, with side handles beginning below the title bar so the full top frame remains available for window dragging.
+
 ## 0.12.1
 
 ## 0.12.0

@@ -1,5 +1,15 @@
 # com.eden.editor
 
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [7ebd35d]
+- Updated dependencies [f9119b2]
+  - @edenapp/editor-dlc@0.13.0
+  - @edenapp/tablets@0.13.0
+  - @edenapp/solid-kit@0.13.0
+
 ## 1.0.7
 
 ### Patch Changes

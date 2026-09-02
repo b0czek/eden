@@ -1,5 +1,19 @@
 # @edenapp/dev-host
 
+## 0.13.0
+
+### Patch Changes
+
+- Updated dependencies [7ebd35d]
+- Updated dependencies [a443e42]
+- Updated dependencies [d64ffce]
+- Updated dependencies [817b12b]
+- Updated dependencies [3ec2420]
+- Updated dependencies [6128a97]
+- Updated dependencies [9bd04f0]
+- Updated dependencies [f9119b2]
+  - @edenapp/sdk@0.13.0
+
 ## 0.12.1
 
 ### Patch Changes

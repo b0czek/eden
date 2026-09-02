@@ -1,5 +1,19 @@
 # @edenapp/genesis
 
+## 0.13.0
+
+### Minor Changes
+
+- 7ebd35d: Add app-bound DLC manifests, secure `.edenite` packaging and extraction, built-in DLC bundling, unified package installation and removal, transactional host-aware lifecycle handling, host-scoped JavaScript module resource URLs, trusted main-process inventory APIs with package-size details in Settings, optional host file-handler extensions, binary filesystem commands, editor-owned contracts for external language highlighters and custom document codecs, and a built-in HTTP request highlighter DLC.
+
+### Patch Changes
+
+- a3fe6ef: Infer an app manifest's version from its sibling package.json when the manifest omits it, and report a clear validation error when inference is not possible.
+- Updated dependencies [7ebd35d]
+- Updated dependencies [6128a97]
+- Updated dependencies [9bd04f0]
+  - @edenapp/types@0.13.0
+
 ## 0.12.1
 
 ### Patch Changes

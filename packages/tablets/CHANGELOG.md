@@ -1,5 +1,11 @@
 # @edenapp/tablets
 
+## 0.13.0
+
+### Minor Changes
+
+- f9119b2: Add a renderer notification helper with automatically routed action callbacks, reliable cleanup after dismissal, and adoption across Eden's bundled apps.
+
 ## 0.12.1
 
 ## 0.12.0

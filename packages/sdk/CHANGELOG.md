@@ -1,5 +1,27 @@
 # @edenapp/sdk
 
+## 0.13.0
+
+### Minor Changes
+
+- 7ebd35d: Add app-bound DLC manifests, secure `.edenite` packaging and extraction, built-in DLC bundling, unified package installation and removal, transactional host-aware lifecycle handling, host-scoped JavaScript module resource URLs, trusted main-process inventory APIs with package-size details in Settings, optional host file-handler extensions, binary filesystem commands, editor-owned contracts for external language highlighters and custom document codecs, and a built-in HTTP request highlighter DLC.
+- 9bd04f0: Open a compact spatial layout compass from tiled app titles when adjacent windows are available, with controls to swap positions or temporarily expand across compatible neighbors without persistent gutters or another renderer. Keep layout actions unavailable during an active expansion so they cannot implicitly restore or rearrange the covered split.
+
+### Patch Changes
+
+- a443e42: Scale the built-in file picker and toast notifications, including their overlay bounds, with the configured interface scale.
+- d64ffce: Restrict the Foundation renderer to its required shell commands and event subscriptions, and reject shell commands from renderers that are not registered Eden views.
+- 817b12b: Lift visible overlay views when the docked on-screen keyboard would obscure their focused field.
+- 3ec2420: Open the on-screen keyboard for editable controls nested inside shadow DOM, inherit keyboard placement policies across shadow hosts, discard controls removed by dynamic interfaces, and deliver input to the focused control. Focus the PDF viewer search field whenever its sidebar opens so the keyboard appears without a second click.
+- 6128a97: Resize floating app windows from their left, right, and bottom edges, including both bottom corners, with side handles beginning below the title bar so the full top frame remains available for window dragging.
+- f9119b2: Add a renderer notification helper with automatically routed action callbacks, reliable cleanup after dismissal, and adoption across Eden's bundled apps.
+- Updated dependencies [7ebd35d]
+- Updated dependencies [a3fe6ef]
+- Updated dependencies [6128a97]
+- Updated dependencies [9bd04f0]
+  - @edenapp/types@0.13.0
+  - @edenapp/genesis@0.13.0
+
 ## 0.12.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # com.eden.users
 
+## 1.0.6
+
+### Patch Changes
+
+- Updated dependencies [f9119b2]
+  - @edenapp/tablets@0.13.0
+
 ## 1.0.5
 
 ### Patch Changes
