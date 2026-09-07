@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@edenapp/babel": "workspace:*",
-    "@embedpdf/pdfium": "^2.14.4",
-    "@embedpdf/snippet": "^2.14.4",
+    "@embedpdf/pdfium": "^2.15.0",
+    "@embedpdf/snippet": "^2.15.0",
     "@edenapp/tablets": "workspace:*",
     "solid-js": "catalog:"
   },
