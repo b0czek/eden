@@ -194,6 +194,10 @@ export interface SettingsPanelControlState {
   badge?: SettingsPanelBadge;
   disabled?: boolean;
   hidden?: boolean;
+  /** Live options for an input control, replacing its declared options. */
+  options?: SettingsPanelOption[];
+  /** Live options for fields in a dialog control, keyed by field ID. */
+  fieldOptions?: Record<string, SettingsPanelOption[]>;
 }
 
 export interface SettingsPanelState {
@@ -230,6 +234,8 @@ export interface SettingsPanelRegistrationOptions {
 
 export interface SettingsPanelRegistration {
   readonly panelId: string;
+  /** Notify Settings that this panel's provider state has changed. */
+  invalidate(): void;
   setVisible(visible: boolean): void;
   unregister(): void;
 }

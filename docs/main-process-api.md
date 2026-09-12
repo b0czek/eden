@@ -12,6 +12,7 @@ const eden = new Eden(config);
 // Registration APIs are also available before operational startup completes.
 const registration = eden.settings.registerPanel(definition, provider);
 registration.setVisible(false);
+registration.invalidate();
 
 // Operational APIs become available after startup has completed.
 await eden.whenReady();

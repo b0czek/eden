@@ -48,6 +48,24 @@ describe("SettingsPanelManager registration", () => {
     expect(await manager.listPanels()).toEqual([]);
   });
 
+  it("invalidates only the registered panel state", () => {
+    const { manager, notify } = harness();
+    const registration = manager.registerPanel(definition(), {
+      load: async () => ({ controls: {} }),
+      actions: { toggle: async () => undefined },
+    });
+    notify.mockClear();
+
+    registration.invalidate();
+
+    expect(notify).toHaveBeenCalledWith("settings/panels-changed", {
+      reason: "state",
+      panelId: registration.panelId,
+    });
+    registration.unregister();
+    expect(() => registration.invalidate()).toThrow("unregistered");
+  });
+
   it("keeps hidden panels declared while blocking discovery and callbacks", async () => {
     const { manager } = harness();
     const action = jest.fn();

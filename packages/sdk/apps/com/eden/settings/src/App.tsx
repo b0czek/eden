@@ -1,4 +1,5 @@
 import type {
+  EventData,
   SettingsPanelActionResponse,
   SettingsPanelError,
   SettingsPanelResponse,
@@ -110,7 +111,13 @@ const App: Component = () => {
     }
   };
 
-  const refresh = async () => {
+  const refresh = async (change?: EventData<"settings/panels-changed">) => {
+    if (change?.reason === "state") {
+      if (!change.panelId || change.panelId === selectedPanelId()) {
+        await loadSelectedPanel(false);
+      }
+      return;
+    }
     await loadCatalog();
     if (selectedPanelId()) await loadSelectedPanel();
   };

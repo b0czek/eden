@@ -136,11 +136,40 @@ Use the registration handle to control the panel's lifetime:
 ```ts
 registration.setVisible(false);
 registration.setVisible(true);
+registration.invalidate();
 registration.unregister();
 ```
 
 A hidden panel cannot be opened or used, but administrators can still assign
 its grants. Calling `unregister()` removes the panel.
+
+Call `invalidate()` when state owned by the host changes outside a panel action.
+If that panel is currently open, Settings reloads its provider state without
+reloading the catalog or rebuilding the panel declaration.
+
+Input controls can replace their declared options through `options` in their
+control state. Dialog controls can provide live select or radio options through
+`fieldOptions`, keyed by field ID:
+
+```ts
+registration.invalidate();
+
+// Returned by the panel provider's next load.
+return {
+  controls: {
+    "connect-wifi": {
+      fieldOptions: {
+        network: [
+          { value: "access-point-id", label: "Workshop Wi-Fi" },
+        ],
+      },
+    },
+  },
+};
+```
+
+Use opaque option values and validate them again in the action handler because
+the underlying resource may change after the state snapshot was loaded.
 
 Panel IDs must be unique. The `eden.` and `app.` prefixes are reserved. The
 active user must have the panel grant and, when declared, the action grant.

@@ -212,4 +212,76 @@ describe("GenericPanel", () => {
         ?.value,
     ).toBe("");
   });
+
+  it("updates dialog field options from live panel state", async () => {
+    const [busy] = createSignal(new Set<string>());
+    const onAction = vi.fn<PanelAction>(async () => ({ success: true }));
+    const declaration: SettingsPanelDeclaration = {
+      id: "test.network",
+      title: "Network",
+      source: "host",
+      renderer: "generic",
+      sections: [
+        {
+          id: "wifi",
+          controls: [
+            {
+              kind: "dialog",
+              id: "connect",
+              label: "Wi-Fi network",
+              actionId: "connect",
+              buttonLabel: "Connect",
+              dialog: {
+                title: "Connect to Wi-Fi",
+                submitLabel: "Connect",
+                cancelLabel: "Cancel",
+                fields: [
+                  {
+                    id: "network",
+                    label: "Network",
+                    input: "select",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      actions: [{ id: "connect", authorized: true }],
+    };
+    const [loaded, setLoaded] = createSignal(
+      panel(declaration, {
+        controls: {
+          connect: {
+            fieldOptions: {
+              network: [{ value: "shop", label: "Shop Wi-Fi" }],
+            },
+          },
+        },
+      }),
+    );
+    const view = render(() => (
+      <GenericPanel panel={loaded()} busyActions={busy} onAction={onAction} />
+    ));
+
+    await fireEvent.click(view.getByText("Connect"));
+    const select = view.container.querySelector("select");
+    if (!select) throw new Error("Expected network selector");
+    expect(select.textContent).toContain("Shop Wi-Fi");
+
+    setLoaded(
+      panel(declaration, {
+        controls: {
+          connect: {
+            fieldOptions: {
+              network: [{ value: "office", label: "Office Wi-Fi" }],
+            },
+          },
+        },
+      }),
+    );
+
+    await waitFor(() => expect(select.textContent).toContain("Office Wi-Fi"));
+    expect(view.container.querySelector("select")).toBe(select);
+  });
 });

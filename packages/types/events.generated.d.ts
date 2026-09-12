@@ -107,6 +107,8 @@ export interface SettingsEvents {
   "settings/changed": { appId: string; key: string; value: string };
   "settings/panels-changed": {
     reason: "catalog" | "grants" | "session" | "state" | "visibility";
+    /** Limits a state refresh to one panel when supplied. */
+    panelId?: string;
   };
 }
 

@@ -1,9 +1,11 @@
 import type {
   SettingsPanelControl,
+  SettingsPanelControlState,
   SettingsPanelDialog,
   SettingsPanelFormField,
   SettingsPanelInput,
   SettingsPanelLocalizedText,
+  SettingsPanelOption,
   SettingsPanelValue,
 } from "@edenapp/types";
 import {
@@ -44,6 +46,7 @@ const FieldControl = (props: {
   disabled?: boolean;
   onInput: (value: SettingsPanelValue) => void;
   deferCommit?: boolean;
+  options?: SettingsPanelOption[];
 }) => {
   const inputType = () => ("input" in props.field ? props.field.input : "text");
   const [draft, setDraft] = createSignal<SettingsPanelValue>(props.value ?? "");
@@ -79,7 +82,7 @@ const FieldControl = (props: {
         value={String(value())}
         onChange={(event) => props.onInput(event.currentTarget.value)}
       >
-        <For each={props.field.options ?? []}>
+        <For each={props.options ?? props.field.options ?? []}>
           {(option) => (
             <option value={option.value}>{localized(option.label)}</option>
           )}
@@ -94,7 +97,7 @@ const FieldControl = (props: {
         role="radiogroup"
         aria-labelledby={`${props.inputId}-label`}
       >
-        <For each={props.field.options ?? []}>
+        <For each={props.options ?? props.field.options ?? []}>
           {(option) => (
             <label class="eden-radio-option">
               <input
@@ -173,6 +176,7 @@ const DialogControl = (props: {
   control: SettingsPanelDialog;
   busy: boolean;
   disabled: boolean;
+  state?: SettingsPanelControlState;
   onAction: PanelAction;
 }) => {
   const [open, setOpen] = createSignal(false);
@@ -312,6 +316,7 @@ const DialogControl = (props: {
                         inputId={inputId}
                         value={values()[field.id]}
                         disabled={props.busy || props.disabled}
+                        options={props.state?.fieldOptions?.[field.id]}
                         onInput={(value) => setValue(field.id, value)}
                       />
                       <Show when={field.description}>
@@ -482,6 +487,7 @@ export default function GenericPanel(props: GenericPanelProps) {
                               disabled={
                                 disabled() || (busy() && !deferInputCommit())
                               }
+                              options={state(control)?.options}
                               deferCommit={deferInputCommit()}
                               onInput={(next) =>
                                 void runValueAction(
@@ -499,6 +505,7 @@ export default function GenericPanel(props: GenericPanelProps) {
                               control={control as SettingsPanelDialog}
                               busy={busy()}
                               disabled={disabled()}
+                              state={state(control)}
                               onAction={props.onAction}
                             />
                           </Show>

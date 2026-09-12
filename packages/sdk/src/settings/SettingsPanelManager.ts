@@ -51,6 +51,8 @@ import type {
 interface SettingsPanelNamespaceEvents {
   "panels-changed": {
     reason: "catalog" | "grants" | "session" | "state" | "visibility";
+    /** Limits a state refresh to one panel when supplied. */
+    panelId?: string;
   };
 }
 
@@ -400,6 +402,19 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
     };
     return Object.freeze({
       panelId: cloned.id,
+      invalidate: () => {
+        if (!active) {
+          throw new Error(`Settings panel "${cloned.id}" is unregistered`);
+        }
+        const record = this.panels.get(cloned.id);
+        if (!record || record.token !== token) {
+          throw new Error(`Settings panel "${cloned.id}" is stale`);
+        }
+        this.notify("panels-changed", {
+          reason: "state",
+          panelId: cloned.id,
+        });
+      },
       setVisible: (nextVisible: boolean) => {
         if (!active) {
           throw new Error(`Settings panel "${cloned.id}" is unregistered`);
