@@ -6,8 +6,13 @@
   </head>
   <body>
     <main id="integration-fixture">Eden integration fixture loaded</main>
+    <input id="number-input" type="number" data-eden-keyboard="floating" />
     <div id="shadow-input-host" data-eden-keyboard="floating"></div>
     <script>
+      const numberInput = document.getElementById("number-input");
+      numberInput.addEventListener("input", () => {
+        document.body.dataset.numberInputValue = numberInput.value;
+      });
       const outerShadowRoot = document
         .getElementById("shadow-input-host")
         .attachShadow({ mode: "open" });
