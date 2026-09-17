@@ -477,6 +477,76 @@ test.describe
         .toBe("Eden");
     });
 
+    test("edits number inputs with the on-screen keyboard", async () => {
+      const focused = await electronApp?.evaluate(({ webContents }, appId) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) => candidate.getURL().includes(appId));
+        if (!contents) throw new Error("Integration app view not found");
+
+        contents.focus();
+        return contents.executeJavaScript(`(() => {
+          const input = document.getElementById("number-input");
+          input.focus();
+          return input === document.activeElement;
+        })()`);
+      }, APP_ID);
+      expect(focused).toBe(true);
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(`window.edenKeyboard
+              .getState()
+              .then(({ visible, target }) => ({
+                visible,
+                inputType: target?.inputType,
+              }))`);
+          }, APP_ID);
+        })
+        .toEqual({ visible: true, inputType: "number" });
+
+      const actionResults = await electronApp?.evaluate(({ webContents }) => {
+        const contents = webContents
+          .getAllWebContents()
+          .find((candidate) =>
+            candidate.getURL().includes("keyboard-ui/index.html"),
+          );
+        if (!contents) throw new Error("Keyboard view not found");
+
+        return contents.executeJavaScript(`(async () => [
+          await window.edenKeyboard.sendAction({ type: "insertText", text: "4" }),
+          await window.edenKeyboard.sendAction({ type: "insertText", text: "2" }),
+          await window.edenKeyboard.sendAction({ type: "backspace" }),
+        ])()`);
+      });
+      expect(actionResults).toEqual([
+        { success: true },
+        { success: true },
+        { success: true },
+      ]);
+
+      await expect
+        .poll(async () => {
+          return electronApp?.evaluate(({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) return undefined;
+
+            return contents.executeJavaScript(
+              "document.body.dataset.numberInputValue",
+            );
+          }, APP_ID);
+        })
+        .toBe("4");
+    });
+
     test("types into the PDF viewer search input with the on-screen keyboard", async () => {
       const hideResult = await electronApp?.evaluate(({ webContents }) => {
         const contents = webContents

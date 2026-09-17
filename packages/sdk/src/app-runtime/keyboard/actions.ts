@@ -55,16 +55,19 @@ const getControlSelection = (
   element: HTMLInputElement | HTMLTextAreaElement,
 ): { start: number; end: number; supportsRangeText: boolean } => {
   try {
+    const selectionStart = element.selectionStart;
+    const selectionEnd = element.selectionEnd;
     return {
       start:
-        typeof element.selectionStart === "number"
-          ? element.selectionStart
+        typeof selectionStart === "number"
+          ? selectionStart
           : element.value.length,
       end:
-        typeof element.selectionEnd === "number"
-          ? element.selectionEnd
-          : element.value.length,
-      supportsRangeText: typeof element.setRangeText === "function",
+        typeof selectionEnd === "number" ? selectionEnd : element.value.length,
+      supportsRangeText:
+        typeof selectionStart === "number" &&
+        typeof selectionEnd === "number" &&
+        typeof element.setRangeText === "function",
     };
   } catch {
     return {
