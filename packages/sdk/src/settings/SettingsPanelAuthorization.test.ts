@@ -1,6 +1,6 @@
 import {
+  actionAuthorization,
   applyActionAuthorization,
-  authorizePanelDeclaration,
   canOpenPanel,
   collectPanelGrantOptions,
   hasUserGrant,
@@ -8,89 +8,108 @@ import {
 import type { SettingsPanelRecord } from "./SettingsPanelRecord";
 import { panelDefinition, panelUser } from "./SettingsPanelTestHarness";
 
-const record = (overrides: Partial<SettingsPanelRecord> = {}) =>
-  ({
-    definition: panelDefinition(),
-    provider: {
-      load: async () => ({}),
-      actions: { toggle: async () => undefined },
-    },
-    source: "host",
-    renderer: "generic",
-    token: Symbol("panel"),
-    visible: true,
-    ...overrides,
-  }) satisfies SettingsPanelRecord;
+const record = (
+  overrides: Partial<SettingsPanelRecord> = {},
+): SettingsPanelRecord => ({
+  definition: panelDefinition(),
+  provider: {
+    load: async () => ({ sections: [] }),
+    actions: { toggle: async () => undefined },
+  },
+  source: "host",
+  renderer: "generic",
+  token: Symbol("panel"),
+  visible: true,
+  ...overrides,
+});
 
 describe("SettingsPanelAuthorization", () => {
-  it("combines visibility, panel grants, wildcards, and vendor access", () => {
+  it("combines visibility, panel grants, ancestors, wildcards, and vendor access", () => {
     expect(canOpenPanel(record(), panelUser(["panels/network"]))).toBe(true);
     expect(canOpenPanel(record(), panelUser(["panels/*"]))).toBe(true);
     expect(canOpenPanel(record({ visible: false }), panelUser(["*"]))).toBe(
       false,
     );
+    expect(
+      canOpenPanel(record(), panelUser(["panels/network"]), [
+        record({ visible: false }),
+      ]),
+    ).toBe(false);
     expect(hasUserGrant(panelUser([], { role: "vendor" }), "private")).toBe(
       true,
     );
   });
 
-  it("filters action authorization and produces grant options", () => {
+  it("authorizes actions and builds grants without loading providers", () => {
     const protectedRecord = record({
       definition: panelDefinition({
-        actions: [{ id: "toggle", grant: "panels/network/write" }],
+        actions: [
+          {
+            id: "toggle",
+            label: "Change network",
+            grant: "panels/network/write",
+            value: { type: "boolean" },
+          },
+        ],
       }),
     });
     expect(
-      authorizePanelDeclaration(protectedRecord, panelUser(["panels/network"]))
-        ?.actions,
+      actionAuthorization(protectedRecord, panelUser(["panels/network"])),
     ).toEqual([{ id: "toggle", authorized: false }]);
     expect(collectPanelGrantOptions([protectedRecord])).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ grant: "panels/network", kind: "panel" }),
         expect.objectContaining({
           grant: "panels/network/write",
+          label: "Change network",
           kind: "panel-action",
         }),
       ]),
     );
   });
 
-  it("merges denied action state under a control's state key", () => {
-    const declaration = authorizePanelDeclaration(
-      record({
-        definition: panelDefinition({
-          sections: [
-            {
-              id: "main",
-              controls: [
-                {
-                  kind: "toggle",
-                  id: "network-toggle",
-                  label: "Enabled",
-                  stateKey: "enabled",
-                  actionId: "toggle",
-                },
-              ],
-            },
-          ],
-          actions: [{ id: "toggle", grant: "panels/network/write" }],
-        }),
-      }),
-      panelUser(["panels/network"]),
-    );
-    if (!declaration) throw new Error("Expected an authorized panel");
-
-    expect(
-      applyActionAuthorization(
-        {
-          controls: {
-            enabled: { value: true, detail: "Running" },
+  it("disables denied generic action nodes including collection rows", () => {
+    const authorized = applyActionAuthorization(
+      {
+        sections: [
+          {
+            id: "main",
+            nodes: [
+              {
+                kind: "toggle",
+                id: "enabled",
+                label: "Enabled",
+                value: true,
+                action: { actionId: "toggle" },
+              },
+              {
+                kind: "collection",
+                id: "rows",
+                label: "Rows",
+                items: [
+                  {
+                    id: "one",
+                    title: "One",
+                    nodes: [
+                      {
+                        kind: "button",
+                        id: "remove",
+                        label: "Remove",
+                        action: { actionId: "toggle" },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
-        },
-        declaration,
-      ).controls,
-    ).toEqual({
-      enabled: { value: true, detail: "Running", disabled: true },
+        ],
+      },
+      new Map([["toggle", false]]),
+    );
+    expect(authorized.sections[0]?.nodes[0]).toMatchObject({ disabled: true });
+    expect(authorized.sections[0]?.nodes[1]).toMatchObject({
+      items: [{ nodes: [{ disabled: true }] }],
     });
   });
 });

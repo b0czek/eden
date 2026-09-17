@@ -1,4 +1,4 @@
-import type { SettingsPanelSummary } from "@edenapp/types";
+import type { SettingsPanelError, SettingsPanelSummary } from "@edenapp/types";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -35,22 +35,29 @@ describe("Settings shell", () => {
     expect(sections[0].textContent).toContain("General");
     expect(sections[0].textContent).toContain("Network");
     expect(sections[1].textContent).toContain("Example App");
+    const scrollArea = view.container.querySelector(".settings-sidebar-scroll");
+    expect(scrollArea?.textContent).toContain("General");
+    expect(scrollArea?.textContent).toContain("Example App");
+    expect(
+      view.container.querySelectorAll(".settings-sidebar-scroll").length,
+    ).toBe(1);
   });
 
   it("renders loading and retryable errors", async () => {
     const retry = vi.fn(async () => undefined);
     const [loading, setLoading] = createSignal(true);
-    const [error, setError] = createSignal<
-      import("@edenapp/types").SettingsPanelError | null
-    >(null);
+    const [error, setError] = createSignal<SettingsPanelError | null>(null);
     const view = render(() => (
       <SettingsContent
         loading={loading}
+        panels={() => []}
+        selectedPanelId={() => null}
         loadedPanel={() => null}
         panelError={error}
         operationError={() => null}
         busyActions={() => new Set()}
         onAction={async () => ({ success: true })}
+        onSelect={() => undefined}
         onRetry={retry}
       />
     ));
@@ -65,39 +72,95 @@ describe("Settings shell", () => {
 
   it("selects the renderer declared by the trusted backend", () => {
     const loaded: LoadedPanel = {
-      declaration: {
-        id: "eden.appearance",
-        title: "Appearance",
-        source: "eden",
-        renderer: "appearance",
-        sections: [],
-        actions: [{ id: "set-wallpaper", authorized: true }],
-      },
-      state: {
-        data: {
-          presets: { solid: [], gradients: [] },
-          wallpaper: {
-            id: "midnight",
-            name: "Midnight",
-            type: "color",
-            value: "#000000",
-          },
+      id: "eden.appearance",
+      title: "Appearance",
+      source: "eden",
+      renderer: "appearance",
+      actions: [{ id: "set-wallpaper", authorized: true }],
+      data: {
+        presets: { solid: [], gradients: [] },
+        wallpaper: {
+          id: "midnight",
+          name: "Midnight",
+          type: "color",
+          value: "#000000",
         },
       },
     };
     const view = render(() => (
       <SettingsContent
         loading={() => false}
+        panels={() => []}
+        selectedPanelId={() => "eden.appearance"}
         loadedPanel={() => loaded}
         panelError={() => null}
         operationError={() => null}
         busyActions={() => new Set()}
         onAction={async () => ({ success: true })}
+        onSelect={() => undefined}
         onRetry={async () => undefined}
       />
     ));
 
     expect(view.container.textContent).toContain("Wallpaper");
     expect(view.container.textContent).toContain("Solid Colors");
+  });
+
+  it("keeps child panels out of the sidebar and navigates their hierarchy", async () => {
+    const panels: SettingsPanelSummary[] = [
+      { id: "host.network", title: "Network", source: "host" },
+      {
+        id: "host.network.connections",
+        parentId: "host.network",
+        title: "Connections",
+        description: "Network interfaces",
+        source: "host",
+      },
+    ];
+    const selected = createSignal<string | null>("host.network");
+    const loaded: LoadedPanel = {
+      ...panels[0],
+      renderer: "generic",
+      view: { sections: [] },
+      actions: [],
+    };
+    const sidebar = render(() => (
+      <SettingsSidebar
+        brandName={() => "Eden"}
+        panels={() => panels}
+        selectedPanelId={selected[0]}
+        onSelect={selected[1]}
+      />
+    ));
+    expect(sidebar.container.textContent).toContain("Network");
+    expect(sidebar.container.textContent).not.toContain("Connections");
+
+    const content = render(() => (
+      <SettingsContent
+        loading={() => false}
+        panels={() => panels}
+        selectedPanelId={selected[0]}
+        loadedPanel={() => loaded}
+        panelError={() => null}
+        operationError={() => null}
+        busyActions={() => new Set()}
+        onAction={async () => ({ success: true })}
+        onSelect={selected[1]}
+        onRetry={async () => undefined}
+      />
+    ));
+    expect(content.container.querySelector(".content-navigation")).toBeNull();
+    await fireEvent.click(content.getByText("Connections"));
+    expect(selected[0]()).toBe("host.network.connections");
+    const childNavigation = content.container.querySelector(
+      ".content-navigation",
+    );
+    expect(childNavigation?.textContent).toContain("Network");
+    expect(childNavigation?.textContent).not.toContain("Connections");
+    expect(childNavigation?.querySelector(".content-back")).not.toBeNull();
+    expect(
+      sidebar.container.querySelector(".eden-sidebar-item-selected")
+        ?.textContent,
+    ).toContain("Network");
   });
 });

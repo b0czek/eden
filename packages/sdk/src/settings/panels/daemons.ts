@@ -33,47 +33,48 @@ export const daemonsPanel: BuiltinPanelModule = {
   category: daemonsSettingsCategory,
   actions: {
     "update-definition": {
-      input: {
+      value: {
         type: "object",
         required: true,
         properties: { definition: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: async ({ daemonManager }, input) =>
+      handler: async ({ daemonManager }, invocation) =>
         daemonManager.updateDefinition(
-          (input as unknown as { definition: DaemonDefinition }).definition,
+          (invocation.value as unknown as { definition: DaemonDefinition })
+            .definition,
         ),
     },
     enable: {
-      input: daemonActionSchema,
-      handler: async ({ daemonManager }, input) =>
+      params: daemonActionSchema,
+      handler: async ({ daemonManager }, invocation) =>
         daemonManager.setEnabled(
-          (input as unknown as { appId: string }).appId,
+          (invocation.params as { appId: string }).appId,
           true,
         ),
     },
     disable: {
-      input: daemonActionSchema,
-      handler: async ({ daemonManager }, input) =>
+      params: daemonActionSchema,
+      handler: async ({ daemonManager }, invocation) =>
         daemonManager.setEnabled(
-          (input as unknown as { appId: string }).appId,
+          (invocation.params as { appId: string }).appId,
           false,
         ),
     },
     start: {
-      input: daemonActionSchema,
-      handler: async ({ daemonManager }, input) =>
-        daemonManager.start((input as unknown as { appId: string }).appId),
+      params: daemonActionSchema,
+      handler: async ({ daemonManager }, invocation) =>
+        daemonManager.start((invocation.params as { appId: string }).appId),
     },
     stop: {
-      input: daemonActionSchema,
-      handler: async ({ daemonManager }, input) =>
-        daemonManager.stop((input as unknown as { appId: string }).appId),
+      params: daemonActionSchema,
+      handler: async ({ daemonManager }, invocation) =>
+        daemonManager.stop((invocation.params as { appId: string }).appId),
     },
     restart: {
-      input: daemonActionSchema,
-      handler: async ({ daemonManager }, input) =>
-        daemonManager.restart((input as unknown as { appId: string }).appId),
+      params: daemonActionSchema,
+      handler: async ({ daemonManager }, invocation) =>
+        daemonManager.restart((invocation.params as { appId: string }).appId),
     },
   },
   createLoader:

@@ -1,11 +1,8 @@
 import type { UserProfile } from "./User";
 
-/** Text that can be localized by the Settings renderer. */
 export type SettingsPanelLocalizedText =
   | string
   | Readonly<Record<string, string>>;
-
-/** JSON-compatible values accepted by panel state and action inputs. */
 export type SettingsPanelValue =
   | string
   | number
@@ -13,25 +10,19 @@ export type SettingsPanelValue =
   | null
   | SettingsPanelValue[]
   | { [key: string]: SettingsPanelValue };
-
 export type SettingsPanelBadgeTone =
   | "neutral"
   | "info"
   | "success"
   | "warning"
   | "danger";
-
-/** Fully-qualified active-user grant required to discover a panel. */
 export type SettingsPanelGrant = string;
-
-/** Additional active-user grant required to invoke one panel action. */
 export type SettingsPanelActionGrant = string;
 
 export interface SettingsPanelBadge {
   label: SettingsPanelLocalizedText;
   tone?: SettingsPanelBadgeTone;
 }
-
 export interface SettingsPanelValidation {
   required?: boolean;
   minLength?: number;
@@ -41,96 +32,10 @@ export interface SettingsPanelValidation {
   max?: number;
   step?: number;
 }
-
 export interface SettingsPanelOption {
   value: string;
   label: SettingsPanelLocalizedText;
   description?: SettingsPanelLocalizedText;
-}
-
-export type SettingsPanelInputType =
-  | "text"
-  | "password"
-  | "number"
-  | "checkbox"
-  | "radio"
-  | "select"
-  | "textarea"
-  | "color"
-  | "range";
-
-export interface SettingsPanelFormField {
-  id: string;
-  label: SettingsPanelLocalizedText;
-  description?: SettingsPanelLocalizedText;
-  input: SettingsPanelInputType;
-  placeholder?: SettingsPanelLocalizedText;
-  options?: SettingsPanelOption[];
-  validation?: SettingsPanelValidation;
-  autocomplete?: string;
-}
-
-export interface SettingsPanelControlBase {
-  id: string;
-  label: SettingsPanelLocalizedText;
-  description?: SettingsPanelLocalizedText;
-}
-
-export interface SettingsPanelStatusRow extends SettingsPanelControlBase {
-  kind: "status";
-  stateKey: string;
-}
-
-export interface SettingsPanelToggle extends SettingsPanelControlBase {
-  kind: "toggle";
-  stateKey: string;
-  actionId: string;
-}
-
-export interface SettingsPanelButton extends SettingsPanelControlBase {
-  kind: "button";
-  actionId: string;
-  tone?: SettingsPanelBadgeTone;
-  confirmation?: SettingsPanelLocalizedText;
-}
-
-export interface SettingsPanelInput extends SettingsPanelControlBase {
-  kind: "input";
-  stateKey: string;
-  actionId: string;
-  input: SettingsPanelInputType;
-  placeholder?: SettingsPanelLocalizedText;
-  options?: SettingsPanelOption[];
-  validation?: SettingsPanelValidation;
-}
-
-export interface SettingsPanelDialogContent {
-  title: SettingsPanelLocalizedText;
-  description?: SettingsPanelLocalizedText;
-  fields: SettingsPanelFormField[];
-  submitLabel: SettingsPanelLocalizedText;
-  cancelLabel: SettingsPanelLocalizedText;
-}
-
-export interface SettingsPanelDialog extends SettingsPanelControlBase {
-  kind: "dialog";
-  actionId: string;
-  buttonLabel: SettingsPanelLocalizedText;
-  dialog: SettingsPanelDialogContent;
-}
-
-export type SettingsPanelControl =
-  | SettingsPanelStatusRow
-  | SettingsPanelToggle
-  | SettingsPanelButton
-  | SettingsPanelInput
-  | SettingsPanelDialog;
-
-export interface SettingsPanelSection {
-  id: string;
-  title?: SettingsPanelLocalizedText;
-  description?: SettingsPanelLocalizedText;
-  controls: SettingsPanelControl[];
 }
 
 export type SettingsPanelActionInputSchema =
@@ -155,55 +60,196 @@ export type SettingsPanelActionInputSchema =
       required?: boolean;
       items?: SettingsPanelActionInputSchema;
     }
-  | {
-      type: "object";
-      required?: boolean;
-      properties?: Record<string, SettingsPanelActionInputSchema>;
-      additionalProperties?: boolean;
-    }
+  | SettingsPanelObjectInputSchema
   | { type: "any"; required?: boolean };
+
+export interface SettingsPanelObjectInputSchema {
+  type: "object";
+  required?: boolean;
+  properties?: Record<string, SettingsPanelActionInputSchema>;
+  additionalProperties?: boolean;
+}
 
 export interface SettingsPanelActionDefinition {
   id: string;
   label?: SettingsPanelLocalizedText;
   description?: SettingsPanelLocalizedText;
-  /** An additional active-user grant required for this action. */
   grant?: SettingsPanelActionGrant;
-  input?: SettingsPanelActionInputSchema;
+  params?: SettingsPanelObjectInputSchema;
+  value?: SettingsPanelActionInputSchema;
+  fields?: SettingsPanelObjectInputSchema;
 }
 
-/**
- * Serializable panel declaration. Callbacks belong in the separate provider.
- *
- * IDs beginning with `eden.` and `app.` are reserved by Eden.
- */
+/** Serializable metadata that remains stable for a registration's lifetime. */
 export interface SettingsPanelDefinition {
   id: string;
+  parentId?: string;
   title: SettingsPanelLocalizedText;
   description?: SettingsPanelLocalizedText;
   icon?: string;
-  /** Active-user grant required before the panel can be discovered or loaded. */
   grant: SettingsPanelGrant;
-  sections: SettingsPanelSection[];
   actions?: SettingsPanelActionDefinition[];
 }
 
-export interface SettingsPanelControlState {
+export interface SettingsPanelActionBinding {
+  actionId: string;
+  /** Public, client-visible parameters. Handlers must reauthorize resources. */
+  params?: Record<string, SettingsPanelValue>;
+}
+
+export interface SettingsPanelActionInvocation {
+  params?: Record<string, SettingsPanelValue>;
   value?: SettingsPanelValue;
+  fields?: Record<string, SettingsPanelValue>;
+}
+
+interface SettingsPanelNodeBase {
+  id: string;
+  label: SettingsPanelLocalizedText;
+  description?: SettingsPanelLocalizedText;
+}
+interface SettingsPanelInteractiveNode extends SettingsPanelNodeBase {
+  action: SettingsPanelActionBinding;
+  disabled?: boolean;
+}
+
+export interface SettingsPanelStatusNode extends SettingsPanelNodeBase {
+  kind: "status";
+  value?: SettingsPanelLocalizedText;
+  detail?: SettingsPanelLocalizedText;
+  badge?: SettingsPanelBadge;
+}
+export interface SettingsPanelToggleNode extends SettingsPanelInteractiveNode {
+  kind: "toggle";
+  value: boolean;
+}
+export interface SettingsPanelButtonNode extends SettingsPanelInteractiveNode {
+  kind: "button";
+  tone?: SettingsPanelBadgeTone;
+  confirmation?: SettingsPanelLocalizedText;
+}
+
+interface SettingsPanelInputNodeBase extends SettingsPanelInteractiveNode {
+  kind: "input";
+  placeholder?: SettingsPanelLocalizedText;
+  validation?: SettingsPanelValidation;
+}
+export interface SettingsPanelStringInputNode
+  extends SettingsPanelInputNodeBase {
+  input: "text" | "textarea" | "color";
+  value: string;
+}
+export interface SettingsPanelChoiceInputNode
+  extends SettingsPanelInputNodeBase {
+  input: "select" | "radio";
+  value: string;
+  options: SettingsPanelOption[];
+}
+export interface SettingsPanelNumberInputNode
+  extends SettingsPanelInputNodeBase {
+  input: "number" | "range";
+  value: number;
+}
+export interface SettingsPanelCheckboxInputNode
+  extends SettingsPanelInputNodeBase {
+  input: "checkbox";
+  value: boolean;
+}
+export type SettingsPanelInputNode =
+  | SettingsPanelStringInputNode
+  | SettingsPanelChoiceInputNode
+  | SettingsPanelNumberInputNode
+  | SettingsPanelCheckboxInputNode;
+
+interface SettingsPanelDialogFieldBase {
+  id: string;
+  label: SettingsPanelLocalizedText;
+  description?: SettingsPanelLocalizedText;
+  placeholder?: SettingsPanelLocalizedText;
+  validation?: SettingsPanelValidation;
+  autocomplete?: string;
+}
+export interface SettingsPanelStringDialogField
+  extends SettingsPanelDialogFieldBase {
+  input: "text" | "textarea" | "color";
+  value?: string;
+}
+export interface SettingsPanelChoiceDialogField
+  extends SettingsPanelDialogFieldBase {
+  input: "select" | "radio";
+  value?: string;
+  options: SettingsPanelOption[];
+}
+export interface SettingsPanelNumberDialogField
+  extends SettingsPanelDialogFieldBase {
+  input: "number" | "range";
+  value?: number;
+}
+export interface SettingsPanelCheckboxDialogField
+  extends SettingsPanelDialogFieldBase {
+  input: "checkbox";
+  value?: boolean;
+}
+export interface SettingsPanelPasswordDialogField
+  extends SettingsPanelDialogFieldBase {
+  input: "password";
+  value?: never;
+}
+export type SettingsPanelDialogField =
+  | SettingsPanelStringDialogField
+  | SettingsPanelChoiceDialogField
+  | SettingsPanelNumberDialogField
+  | SettingsPanelCheckboxDialogField
+  | SettingsPanelPasswordDialogField;
+
+export interface SettingsPanelDialogContent {
+  title: SettingsPanelLocalizedText;
+  description?: SettingsPanelLocalizedText;
+  fields: SettingsPanelDialogField[];
+  submitLabel: SettingsPanelLocalizedText;
+  cancelLabel: SettingsPanelLocalizedText;
+}
+export interface SettingsPanelDialogNode extends SettingsPanelInteractiveNode {
+  kind: "dialog";
+  buttonLabel: SettingsPanelLocalizedText;
+  dialog: SettingsPanelDialogContent;
+}
+export type SettingsPanelRowNode =
+  | SettingsPanelStatusNode
+  | SettingsPanelButtonNode
+  | SettingsPanelToggleNode
+  | SettingsPanelDialogNode;
+
+export interface SettingsPanelCollectionItem {
+  id: string;
+  title: SettingsPanelLocalizedText;
+  description?: SettingsPanelLocalizedText;
   detail?: SettingsPanelLocalizedText;
   badge?: SettingsPanelBadge;
   disabled?: boolean;
-  hidden?: boolean;
-  /** Live options for an input control, replacing its declared options. */
-  options?: SettingsPanelOption[];
-  /** Live options for fields in a dialog control, keyed by field ID. */
-  fieldOptions?: Record<string, SettingsPanelOption[]>;
+  nodes: SettingsPanelRowNode[];
 }
+export interface SettingsPanelCollectionNode extends SettingsPanelNodeBase {
+  kind: "collection";
+  emptyLabel?: SettingsPanelLocalizedText;
+  items: SettingsPanelCollectionItem[];
+}
+export type SettingsPanelNode =
+  | SettingsPanelStatusNode
+  | SettingsPanelToggleNode
+  | SettingsPanelButtonNode
+  | SettingsPanelInputNode
+  | SettingsPanelDialogNode
+  | SettingsPanelCollectionNode;
 
-export interface SettingsPanelState {
-  controls?: Record<string, SettingsPanelControlState>;
-  /** Renderer-specific, JSON-compatible state for Eden-owned custom views. */
-  data?: SettingsPanelValue;
+export interface SettingsPanelSection {
+  id: string;
+  title?: SettingsPanelLocalizedText;
+  description?: SettingsPanelLocalizedText;
+  nodes: SettingsPanelNode[];
+}
+export interface SettingsPanelView {
+  sections: SettingsPanelSection[];
 }
 
 export interface SettingsPanelProviderContext {
@@ -211,56 +257,71 @@ export interface SettingsPanelProviderContext {
   sessionId: string;
   user: UserProfile;
 }
-
 export type SettingsPanelLoader = (
   context: SettingsPanelProviderContext,
-) => SettingsPanelState | Promise<SettingsPanelState>;
-
+) => SettingsPanelView | Promise<SettingsPanelView>;
 export type SettingsPanelActionHandler = (
-  input: SettingsPanelValue | undefined,
+  invocation: SettingsPanelActionInvocation,
   context: SettingsPanelProviderContext,
 ) => void | Promise<void>;
-
-/** Trusted main-process callbacks for a registered panel. */
 export interface SettingsPanelProvider {
   load: SettingsPanelLoader;
   actions?: Record<string, SettingsPanelActionHandler>;
 }
 
 export interface SettingsPanelRegistrationOptions {
-  /** Whether the panel is initially included in the Settings catalog. */
   visible?: boolean;
 }
-
 export interface SettingsPanelRegistration {
   readonly panelId: string;
-  /** Notify Settings that this panel's provider state has changed. */
+  /** Reload the selected panel's complete resolved snapshot. */
   invalidate(): void;
   setVisible(visible: boolean): void;
   unregister(): void;
 }
 
 export type SettingsPanelSource = "eden" | "application" | "host";
-
 export interface SettingsPanelSummary {
   id: string;
+  parentId?: string;
   title: SettingsPanelLocalizedText;
   description?: SettingsPanelLocalizedText;
   icon?: string;
   source: SettingsPanelSource;
 }
-
 export interface SettingsPanelActionAuthorization {
   id: string;
   authorized: boolean;
 }
-
-export interface SettingsPanelDeclaration extends SettingsPanelSummary {
-  sections: SettingsPanelSection[];
+interface SettingsPanelSnapshotBase extends SettingsPanelSummary {
   actions: SettingsPanelActionAuthorization[];
-  /** Eden-owned renderer ID. Third-party registrations always use `generic`. */
-  renderer: "generic" | "appearance" | "apps" | "daemons";
 }
+export interface SettingsPanelGenericSnapshot
+  extends SettingsPanelSnapshotBase {
+  renderer: "generic";
+  view: SettingsPanelView;
+}
+export interface SettingsPanelAppearanceSnapshot
+  extends SettingsPanelSnapshotBase {
+  renderer: "appearance";
+  data?: SettingsPanelValue;
+}
+export interface SettingsPanelAppsSnapshot extends SettingsPanelSnapshotBase {
+  renderer: "apps";
+  data?: SettingsPanelValue;
+}
+export interface SettingsPanelDaemonsSnapshot
+  extends SettingsPanelSnapshotBase {
+  renderer: "daemons";
+  data?: SettingsPanelValue;
+}
+export type SettingsPanelCustomSnapshot =
+  | SettingsPanelAppearanceSnapshot
+  | SettingsPanelAppsSnapshot
+  | SettingsPanelDaemonsSnapshot;
+export type SettingsPanelSnapshot =
+  | SettingsPanelGenericSnapshot
+  | SettingsPanelCustomSnapshot;
 
 export interface SettingsPanelError {
   code:
@@ -273,13 +334,10 @@ export interface SettingsPanelError {
   message: string;
   fields?: Record<string, string>;
 }
-
 export interface SettingsPanelResponse {
-  panel?: SettingsPanelDeclaration;
-  state?: SettingsPanelState;
+  panel?: SettingsPanelSnapshot;
   error?: SettingsPanelError;
 }
-
 export interface SettingsPanelActionResponse {
   success: boolean;
   error?: SettingsPanelError;

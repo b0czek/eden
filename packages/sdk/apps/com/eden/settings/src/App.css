@@ -29,6 +29,12 @@ body {
 }
 
 /* ===== Main Content ===== */
+.settings-sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .main-content {
   flex: 1;
   display: flex;
@@ -46,6 +52,62 @@ body {
   border: 1px solid var(--eden-color-border-light);
   border-radius: var(--eden-radius-xl);
   box-shadow: var(--eden-shadow-lg);
+}
+
+.content-navigation {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  margin-bottom: var(--eden-space-md);
+}
+
+.content-back,
+.content-breadcrumbs button {
+  border: 0;
+  background: transparent;
+  color: var(--eden-color-text-muted);
+  cursor: pointer;
+}
+
+.content-back {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: var(--eden-radius-md);
+}
+
+.content-back:hover,
+.content-breadcrumbs button:not(:disabled):hover {
+  color: var(--eden-color-text-primary);
+  background: var(--eden-color-bg-glass-light);
+}
+
+.content-breadcrumbs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--eden-space-xs);
+}
+
+.content-breadcrumbs svg {
+  flex: 0 0 auto;
+  color: var(--eden-color-text-muted);
+}
+
+.content-breadcrumbs button {
+  min-width: 0;
+  padding: var(--eden-space-xs) var(--eden-space-sm);
+  border-radius: var(--eden-radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-breadcrumbs button:disabled {
+  color: var(--eden-color-text-primary);
+  cursor: default;
 }
 
 .content-title {
@@ -117,7 +179,7 @@ body {
 }
 
 .setting-item:hover {
-  border-color: var(--eden-color-border-hover);
+  border-color: var(--eden-color-border-medium);
 }
 
 .setting-info {
@@ -142,6 +204,112 @@ body {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+}
+
+.setting-item-collection {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.setting-item-collection > .setting-control,
+.settings-collection {
+  width: 100%;
+}
+
+.settings-collection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.settings-collection-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eden-space-lg);
+  padding: var(--eden-space-md) 0;
+  border-top: 1px solid var(--eden-color-border-separator);
+}
+
+.settings-collection-heading,
+.settings-collection-actions,
+.settings-collection-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+}
+
+.settings-collection-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settings-collection-toggle {
+  color: var(--eden-color-text-secondary);
+  font-size: var(--eden-font-size-sm);
+}
+
+.settings-collection-empty {
+  margin: 0;
+  padding-top: var(--eden-space-sm);
+  color: var(--eden-color-text-muted);
+}
+
+.setting-item-status {
+  flex: 1 1 18rem;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: var(--eden-space-sm);
+}
+
+.setting-status-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.settings-children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-md);
+  overflow-y: auto;
+}
+
+.setting-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--eden-space-lg);
+  width: 100%;
+  padding: var(--eden-space-lg);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-xl);
+  background: var(--eden-color-bg-glass-strong);
+  color: var(--eden-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--eden-transition-base);
+}
+
+.setting-child:hover {
+  border-color: var(--eden-color-border-medium);
+}
+
+.setting-child-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--eden-space-xs);
+}
+
+.setting-child-info span {
+  color: var(--eden-color-text-muted);
+  font-size: var(--eden-font-size-sm);
+}
+
+.setting-child > svg {
+  flex: 0 0 auto;
 }
 
 /* ===== Empty State ===== */
@@ -179,7 +347,37 @@ body {
 }
 
 .loading-spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+@media (max-width: 760px) {
+  .setting-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .setting-item-status {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .setting-status-value {
+    text-align: left;
+  }
+
+  .settings-collection-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-collection-actions {
+    justify-content: flex-start;
+  }
 }
 
 @keyframes spin {

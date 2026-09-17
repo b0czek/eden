@@ -3,8 +3,9 @@ import type {
   SettingsCategory,
   SettingsPanelActionDefinition,
   SettingsPanelActionHandler,
-  SettingsPanelDeclaration,
-  SettingsPanelLoader,
+  SettingsPanelCustomSnapshot,
+  SettingsPanelProviderContext,
+  SettingsPanelValue,
 } from "@edenapp/types";
 import type { AppearanceManager } from "../../appearance/AppearanceManager";
 import type { DaemonManager } from "../../daemon";
@@ -23,7 +24,7 @@ export interface BuiltinSettingsDependencies {
   config: EdenConfig;
 }
 
-type PanelRenderer = SettingsPanelDeclaration["renderer"];
+type PanelRenderer = SettingsPanelCustomSnapshot["renderer"];
 
 export interface GeneratedBuiltinPanel {
   kind: "generated";
@@ -34,7 +35,11 @@ export interface CustomBuiltinPanel {
   kind: "custom";
   category: SettingsCategory & { view: PanelRenderer };
   actions: Record<string, BuiltinPanelAction>;
-  createLoader(dependencies: BuiltinSettingsDependencies): SettingsPanelLoader;
+  createLoader(
+    dependencies: BuiltinSettingsDependencies,
+  ): (
+    context: SettingsPanelProviderContext,
+  ) => { data?: SettingsPanelValue } | Promise<{ data?: SettingsPanelValue }>;
 }
 
 export type BuiltinPanelAction = Omit<SettingsPanelActionDefinition, "id"> & {

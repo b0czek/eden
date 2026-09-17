@@ -30,28 +30,10 @@ export const panelDefinition = (
   id: "vendor.network",
   title: { en: "Network" },
   grant: "panels/network",
-  sections: [
-    {
-      id: "main",
-      controls: [
-        {
-          kind: "toggle",
-          id: "enabled",
-          label: "Enabled",
-          stateKey: "enabled",
-          actionId: "toggle",
-        },
-      ],
-    },
-  ],
   actions: [
     {
       id: "toggle",
-      input: {
-        type: "object",
-        properties: { value: { type: "boolean", required: true } },
-        additionalProperties: false,
-      },
+      value: { type: "boolean", required: true },
     },
   ],
   ...overrides,

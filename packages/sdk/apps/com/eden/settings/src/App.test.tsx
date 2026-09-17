@@ -44,23 +44,24 @@ describe("Settings app transport", () => {
             title: "General",
             source: "eden",
             renderer: "generic",
-            sections: [
-              {
-                id: "main",
-                controls: [
-                  {
-                    kind: "toggle",
-                    id: "enabled",
-                    label: "Enabled",
-                    stateKey: "enabled",
-                    actionId: "toggle",
-                  },
-                ],
-              },
-            ],
+            view: {
+              sections: [
+                {
+                  id: "main",
+                  nodes: [
+                    {
+                      kind: "toggle",
+                      id: "enabled",
+                      label: "Enabled",
+                      value: panelValue,
+                      action: { actionId: "toggle" },
+                    },
+                  ],
+                },
+              ],
+            },
             actions: [{ id: "toggle", authorized: true }],
           },
-          state: { controls: { enabled: { value: panelValue } } },
         };
       }
       if (command === "settings/action") return { success: true };
@@ -106,6 +107,7 @@ describe("Settings app transport", () => {
       expect.objectContaining({
         panelId: "eden.general",
         actionId: "toggle",
+        invocation: { value: true },
       }),
     );
 

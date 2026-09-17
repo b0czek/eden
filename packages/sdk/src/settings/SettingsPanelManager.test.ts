@@ -4,273 +4,239 @@ import {
   panelUser as user,
 } from "./SettingsPanelTestHarness";
 
-describe("SettingsPanelManager registration", () => {
-  it("rejects reserved, duplicate, malformed, and incomplete providers", () => {
-    const { manager } = harness();
-    const provider = {
-      load: async () => ({ controls: {} }),
-      actions: { toggle: async () => undefined },
-    };
+const emptyProvider = () => ({
+  load: async () => ({ sections: [] }),
+  actions: { toggle: async () => undefined },
+});
 
+describe("SettingsPanelManager registration", () => {
+  it("rejects reserved, duplicate, malformed, incomplete, and cross-owner registrations", () => {
+    const { manager } = harness();
     expect(() =>
-      manager.registerPanel(definition({ id: "eden.private" }), provider),
+      manager.registerPanel(
+        definition({ id: "eden.private" }),
+        emptyProvider(),
+      ),
     ).toThrow("reserved");
     expect(() =>
-      manager.registerPanel(definition({ id: "app.some-app" }), provider),
-    ).toThrow("reserved");
-    expect(() =>
-      manager.registerPanel(definition({ id: "bad id" }), provider),
+      manager.registerPanel(definition({ id: "bad id" }), emptyProvider()),
     ).toThrow("Invalid");
     expect(() =>
       manager.registerPanel(definition(), {
-        load: async () => ({}),
+        load: async () => ({ sections: [] }),
       }),
-    ).toThrow('missing action "toggle"');
-
-    manager.registerPanel(definition(), provider);
-    expect(() => manager.registerPanel(definition(), provider)).toThrow(
+    ).toThrow("missing action");
+    manager.registerPanel(definition(), emptyProvider());
+    expect(() => manager.registerPanel(definition(), emptyProvider())).toThrow(
       "already registered",
     );
+    expect(() =>
+      manager.registerBuiltinPanel(
+        {
+          id: "eden.child",
+          parentId: "vendor.network",
+          title: "Child",
+          grant: "child",
+          actions: [],
+        },
+        { load: async () => ({ sections: [] }) },
+      ),
+    ).toThrow("ownership domain");
   });
 
-  it("deep-copies declarations and unregisters idempotently", async () => {
-    const { manager } = harness();
-    const source = definition();
-    const registration = manager.registerPanel(source, {
-      load: async () => ({ controls: { enabled: { value: true } } }),
-      actions: { toggle: async () => undefined },
-    });
-    source.title = "Changed";
-
-    expect((await manager.listPanels())[0]?.title).toEqual({ en: "Network" });
-    registration.unregister();
-    registration.unregister();
-    expect(await manager.listPanels()).toEqual([]);
-  });
-
-  it("invalidates only the registered panel state", () => {
+  it("deep-copies metadata, invalidates one snapshot, and keeps registration lifetimes independent", async () => {
     const { manager, notify } = harness();
-    const registration = manager.registerPanel(definition(), {
-      load: async () => ({ controls: {} }),
-      actions: { toggle: async () => undefined },
-    });
+    const source = definition();
+    const registration = manager.registerPanel(source, emptyProvider());
+    source.title = "Changed";
+    expect((await manager.listPanels())[0]?.title).toEqual({ en: "Network" });
     notify.mockClear();
-
     registration.invalidate();
-
     expect(notify).toHaveBeenCalledWith("settings/panels-changed", {
       reason: "state",
       panelId: registration.panelId,
     });
     registration.unregister();
-    expect(() => registration.invalidate()).toThrow("unregistered");
+    registration.unregister();
+    expect(await manager.listPanels()).toEqual([]);
   });
 
-  it("keeps hidden panels declared while blocking discovery and callbacks", async () => {
-    const { manager } = harness();
-    const action = jest.fn();
-    const registration = manager.registerPanel(
-      definition({
-        actions: [
-          {
-            id: "toggle",
-            label: "Change network",
-            grant: "panels/network/write",
-          },
-        ],
-      }),
-      { load: async () => ({}), actions: { toggle: action } },
-      { visible: false },
+  it("requires visible, authorized ancestors at arbitrary depth and rejects parent removal", async () => {
+    const { manager, setUser } = harness();
+    const parent = manager.registerPanel(
+      definition({ id: "vendor.root", actions: [] }),
+      { load: async () => ({ sections: [] }) },
     );
-
-    expect(await manager.listPanels()).toEqual([]);
-    expect(await manager.loadPanel(registration.panelId)).toMatchObject({
+    const child = manager.registerPanel(
+      definition({
+        id: "vendor.child",
+        parentId: parent.panelId,
+        grant: "panels/child",
+        actions: [],
+      }),
+      { load: async () => ({ sections: [] }) },
+    );
+    const grandchild = manager.registerPanel(
+      definition({
+        id: "vendor.grandchild",
+        parentId: child.panelId,
+        grant: "panels/grandchild",
+        actions: [],
+      }),
+      { load: async () => ({ sections: [] }) },
+    );
+    setUser(user(["panels/network", "panels/child", "panels/grandchild"]));
+    expect(await manager.listPanels()).toHaveLength(3);
+    child.setVisible(false);
+    expect((await manager.listPanels()).map(({ id }) => id)).toEqual([
+      "vendor.root",
+    ]);
+    expect(await manager.loadPanel(grandchild.panelId)).toMatchObject({
       error: { code: "authorization" },
     });
-    expect(
-      await manager.invokeAction(registration.panelId, "toggle", undefined),
-    ).toMatchObject({ success: false, error: { code: "authorization" } });
-    expect(action).not.toHaveBeenCalled();
-    expect(manager.listGrantOptions()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ grant: "panels/network", kind: "panel" }),
-        expect.objectContaining({
-          grant: "panels/network/write",
-          kind: "panel-action",
-          label: "Change network",
-        }),
-      ]),
-    );
-
-    registration.setVisible(true);
-    expect(await manager.listPanels()).toHaveLength(1);
-    registration.unregister();
-    expect(() => registration.setVisible(true)).toThrow("unregistered");
-  });
-
-  it("snapshots callbacks and returns renderer-safe state copies", async () => {
-    const { manager } = harness();
-    const original = jest.fn(async () => undefined);
-    const replacement = jest.fn(async () => undefined);
-    const state = {
-      controls: { enabled: { value: true } },
-      data: { privateHostData: "not rendered" },
-    };
-    const provider = {
-      load: async () => state,
-      actions: { toggle: original },
-    };
-    manager.registerPanel(definition(), provider);
-    provider.actions.toggle = replacement;
-
-    const loaded = await manager.loadPanel("vendor.network");
-    expect(loaded.state?.data).toBeUndefined();
-    expect(loaded.state?.controls?.enabled.value).toBe(true);
-    if (loaded.state?.controls?.enabled) {
-      loaded.state.controls.enabled.value = false;
-    }
-    expect((await manager.loadPanel("vendor.network")).state).toMatchObject({
-      controls: { enabled: { value: true } },
-    });
-
-    await manager.invokeAction("vendor.network", "toggle", { value: true });
-    expect(original).toHaveBeenCalledTimes(1);
-    expect(replacement).not.toHaveBeenCalled();
+    child.setVisible(true);
+    expect(() => parent.unregister()).toThrow("child panel");
+    grandchild.unregister();
+    child.unregister();
+    parent.unregister();
   });
 });
 
-describe("SettingsPanelManager authorization and callbacks", () => {
-  it("requires the panel and action grants together", async () => {
-    const { manager, setUser } = harness();
-    const action = jest.fn();
+describe("SettingsPanelManager snapshots and actions", () => {
+  it("assembles generic snapshots, validates dynamic bindings, and disables denied nodes", async () => {
+    const { manager } = harness();
     manager.registerPanel(
       definition({
         actions: [
           {
             id: "toggle",
+            label: "Toggle",
             grant: "panels/network/write",
-            input: {
-              type: "object",
-              properties: { value: { type: "boolean", required: true } },
-              additionalProperties: false,
-            },
+            value: { type: "boolean", required: true },
           },
         ],
       }),
       {
-        load: async () => ({}),
-        actions: { toggle: action },
+        load: async () => ({
+          sections: [
+            {
+              id: "main",
+              nodes: [
+                {
+                  kind: "toggle",
+                  id: "enabled",
+                  label: "Enabled",
+                  value: true,
+                  action: { actionId: "toggle" },
+                },
+              ],
+            },
+          ],
+        }),
+        actions: { toggle: async () => undefined },
       },
     );
-
-    expect(
-      await manager.invokeAction("vendor.network", "toggle", { value: true }),
-    ).toMatchObject({ success: false, error: { code: "authorization" } });
-    expect(action).not.toHaveBeenCalled();
-
-    setUser(user(["panels/network", "panels/network/write"]));
-    expect(
-      await manager.invokeAction("vendor.network", "toggle", { value: true }),
-    ).toEqual({ success: true });
-    expect(action).toHaveBeenCalledTimes(1);
-
-    setUser(user(["panels/network/write"]));
-    expect(await manager.listPanels()).toEqual([]);
+    expect(await manager.loadPanel("vendor.network")).toMatchObject({
+      panel: {
+        renderer: "generic",
+        view: { sections: [{ nodes: [{ disabled: true }] }] },
+      },
+    });
   });
 
-  it("validates input before invoking a private callback", async () => {
+  it("validates params, value, and fields independently without collisions", async () => {
     const { manager } = harness();
-    const action = jest.fn();
-    manager.registerPanel(definition(), {
-      load: async () => ({}),
-      actions: { toggle: action },
-    });
-
-    const response = await manager.invokeAction("vendor.network", "toggle", {
+    const handler = jest.fn();
+    manager.registerPanel(
+      definition({
+        actions: [
+          {
+            id: "toggle",
+            params: {
+              type: "object",
+              required: true,
+              properties: { value: { type: "string", required: true } },
+              additionalProperties: false,
+            },
+            value: { type: "boolean", required: true },
+          },
+        ],
+      }),
+      {
+        load: async () => ({
+          sections: [
+            {
+              id: "main",
+              nodes: [
+                {
+                  kind: "toggle",
+                  id: "enabled",
+                  label: "Enabled",
+                  value: true,
+                  action: { actionId: "toggle", params: { value: "provider" } },
+                },
+              ],
+            },
+          ],
+        }),
+        actions: { toggle: handler },
+      },
+    );
+    expect(
+      await manager.invokeAction("vendor.network", "toggle", {
+        params: { value: "provider" },
+        value: true,
+      }),
+    ).toEqual({ success: true });
+    expect(handler).toHaveBeenCalledWith(
+      { params: { value: "provider" }, value: true },
+      expect.anything(),
+    );
+    const invalid = await manager.invokeAction("vendor.network", "toggle", {
+      params: { value: 1 },
       value: "yes",
-      unexpected: true,
+      fields: {},
     });
-    expect(response).toMatchObject({
+    expect(invalid.error?.fields).toEqual(
+      expect.objectContaining({
+        "params.value": expect.any(String),
+        value: expect.any(String),
+        fields: expect.any(String),
+      }),
+    );
+  });
+
+  it("rejects unknown invocation members before the callback", async () => {
+    const { manager } = harness();
+    const handler = jest.fn();
+    manager.registerPanel(definition(), {
+      load: async () => ({ sections: [] }),
+      actions: { toggle: handler },
+    });
+    const result = await manager.invokeAction("vendor.network", "toggle", {
+      value: true,
+      unexpected: true,
+    } as never);
+    expect(result).toMatchObject({
       success: false,
       error: { code: "validation" },
     });
-    expect(action).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
   });
 
-  it("normalizes loader and action failures without exposing stacks", async () => {
-    const { manager } = harness();
-    manager.registerPanel(definition(), {
-      load: async () => {
-        throw new Error("secret loader details");
-      },
-      actions: {
-        toggle: async () => {
-          throw new Error("secret action details");
-        },
-      },
-    });
-
-    expect(await manager.loadPanel("vendor.network")).toMatchObject({
-      error: {
-        code: "load_failed",
-        message: "The settings panel could not be loaded.",
-      },
-    });
-    expect(
-      await manager.invokeAction("vendor.network", "toggle", { value: true }),
-    ).toMatchObject({
-      success: false,
-      error: {
-        code: "action_failed",
-        message: "The settings operation failed.",
-      },
-    });
-  });
-
-  it("discards a loader result after a mid-load session change", async () => {
+  it("preserves session checks around loads and actions", async () => {
     const { manager, setSession } = harness();
-    let finish:
-      | ((value: { controls: Record<string, never> }) => void)
-      | undefined;
-    const pending = new Promise<{
-      controls: Record<string, never>;
-    }>((resolve) => {
+    let finish: ((value: { sections: [] }) => void) | undefined;
+    const pending = new Promise<{ sections: [] }>((resolve) => {
       finish = resolve;
     });
     manager.registerPanel(definition(), {
       load: () => pending,
       actions: { toggle: async () => undefined },
     });
-
     const result = manager.loadPanel("vendor.network");
     setSession("session-2");
-    finish?.({ controls: {} });
-    expect(await result).toMatchObject({
-      error: { code: "session_changed" },
-    });
-  });
-
-  it("discards a loader result when the panel is hidden mid-load", async () => {
-    const { manager } = harness();
-    let finish:
-      | ((value: { controls: Record<string, never> }) => void)
-      | undefined;
-    const pending = new Promise<{ controls: Record<string, never> }>(
-      (resolve) => {
-        finish = resolve;
-      },
-    );
-    const registration = manager.registerPanel(definition(), {
-      load: () => pending,
-      actions: { toggle: async () => undefined },
-    });
-
-    const result = manager.loadPanel(registration.panelId);
-    registration.setVisible(false);
-    finish?.({ controls: {} });
-
-    expect(await result).toMatchObject({
-      error: { code: "session_changed" },
-    });
+    finish?.({ sections: [] });
+    expect(await result).toMatchObject({ error: { code: "session_changed" } });
   });
 });

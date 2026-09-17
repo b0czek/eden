@@ -1,8 +1,7 @@
 import type {
-  SettingsPanelControl,
-  SettingsPanelDeclaration,
   SettingsPanelLocalizedText,
-  SettingsPanelState,
+  SettingsPanelNode,
+  SettingsPanelView,
   UserGrantOption,
   UserProfile,
 } from "@edenapp/types";
@@ -17,11 +16,12 @@ export const hasUserGrant = (user: UserProfile, grant: string): boolean =>
 export function canOpenPanel(
   record: SettingsPanelRecord,
   user: UserProfile,
+  ancestors: readonly SettingsPanelRecord[] = [],
 ): boolean {
+  if (ancestors.some((ancestor) => !canOpenPanel(ancestor, user))) return false;
   if (!record.visible) return false;
-  if (record.definition.grant) {
+  if (record.definition.grant)
     return hasUserGrant(user, record.definition.grant);
-  }
   if (!record.generatedSettings || !record.ownerAppId) return false;
   return record.generatedSettings.some((category) =>
     category.settings.some((setting) =>
@@ -30,88 +30,57 @@ export function canOpenPanel(
   );
 }
 
-export function authorizePanelDeclaration(
+export const actionAuthorization = (
   record: SettingsPanelRecord,
   user: UserProfile,
-): SettingsPanelDeclaration | undefined {
-  if (!canOpenPanel(record, user)) return undefined;
-  const sections = record.generatedSettings
-    ? record.definition.sections
-        .map((section, categoryIndex) => ({
-          ...section,
-          controls: section.controls.filter((_, settingIndex) => {
-            const setting =
-              record.generatedSettings?.[categoryIndex]?.settings[settingIndex];
-            return (
-              !!setting &&
-              !!record.ownerAppId &&
-              hasUserGrant(user, settingGrant(record.ownerAppId, setting))
-            );
-          }),
-        }))
-        .filter((section) => section.controls.length > 0)
-    : record.definition.sections;
-  if (record.generatedSettings && sections.length === 0) return undefined;
+) =>
+  (record.definition.actions ?? []).map((action) => ({
+    id: action.id,
+    authorized: !action.grant || hasUserGrant(user, action.grant),
+  }));
 
+export function applyActionAuthorization(
+  view: SettingsPanelView,
+  access: ReadonlyMap<string, boolean>,
+): SettingsPanelView {
+  const authorize = (node: SettingsPanelNode): SettingsPanelNode => {
+    if (node.kind === "collection") {
+      return {
+        ...node,
+        items: node.items.map((item) => ({
+          ...item,
+          nodes: item.nodes.map((child) =>
+            child.kind === "status" ||
+            access.get(child.action.actionId) !== false
+              ? child
+              : { ...child, disabled: true },
+          ),
+        })),
+      };
+    }
+    return node.kind === "status" || access.get(node.action.actionId) !== false
+      ? node
+      : { ...node, disabled: true };
+  };
   return {
-    id: record.definition.id,
-    title: record.definition.title,
-    description: record.definition.description,
-    icon: record.definition.icon,
-    source: record.source,
-    renderer: record.renderer,
-    sections,
-    actions: (record.definition.actions ?? []).map((action) => ({
-      id: action.id,
-      authorized: !action.grant || hasUserGrant(user, action.grant),
+    sections: view.sections.map((section) => ({
+      ...section,
+      nodes: section.nodes.map(authorize),
     })),
   };
 }
-
-export function applyActionAuthorization(
-  state: SettingsPanelState,
-  declaration: SettingsPanelDeclaration,
-): SettingsPanelState {
-  const controls = { ...(state.controls ?? {}) };
-  const actionAccess = new Map(
-    declaration.actions.map((action) => [action.id, action.authorized]),
-  );
-  for (const section of declaration.sections) {
-    for (const control of section.controls) {
-      if (!("actionId" in control)) continue;
-      if (actionAccess.get(control.actionId) !== false) continue;
-      const stateKey = "stateKey" in control ? control.stateKey : control.id;
-      controls[stateKey] = { ...controls[stateKey], disabled: true };
-    }
-  }
-  return { ...state, controls };
-}
-
-const findActionControl = (
-  record: SettingsPanelRecord,
-  actionId: string,
-): SettingsPanelControl | undefined => {
-  for (const section of record.definition.sections) {
-    const control = section.controls.find(
-      (candidate) => "actionId" in candidate && candidate.actionId === actionId,
-    );
-    if (control) return control;
-  }
-  return undefined;
-};
 
 const joinLocalized = (
   first: SettingsPanelLocalizedText,
   second: SettingsPanelLocalizedText,
 ): SettingsPanelLocalizedText => {
-  if (typeof first === "string" && typeof second === "string") {
+  if (typeof first === "string" && typeof second === "string")
     return `${first} · ${second}`;
-  }
   const locales = new Set([
     ...(typeof first === "string" ? [] : Object.keys(first)),
     ...(typeof second === "string" ? [] : Object.keys(second)),
   ]);
-  const resolve = (value: SettingsPanelLocalizedText, locale: string) =>
+  const resolve = (value: typeof first, locale: string) =>
     typeof value === "string"
       ? value
       : (value[locale] ?? value.en ?? Object.values(value)[0] ?? "");
@@ -128,13 +97,13 @@ export function collectPanelGrantOptions(
 ): UserGrantOption[] {
   const options = new Map<string, UserGrantOption>();
   const add = (option: UserGrantOption) => {
-    if (!option.grant.trim() || options.has(option.grant)) return;
-    options.set(option.grant, cloneRendererValue(option));
+    if (option.grant.trim() && !options.has(option.grant))
+      options.set(option.grant, cloneRendererValue(option));
   };
   for (const record of records) {
     const ownerId = record.ownerAppId ?? record.definition.id;
     const ownerLabel = record.definition.title;
-    if (record.definition.grant) {
+    if (record.definition.grant)
       add({
         grant: record.definition.grant,
         kind: "panel",
@@ -143,9 +112,8 @@ export function collectPanelGrantOptions(
         ownerId,
         ownerLabel,
       });
-    }
-    for (const category of record.generatedSettings ?? []) {
-      for (const setting of category.settings) {
+    for (const category of record.generatedSettings ?? [])
+      for (const setting of category.settings)
         add({
           grant: settingGrant(ownerId, setting),
           kind: "setting",
@@ -154,20 +122,16 @@ export function collectPanelGrantOptions(
           ownerId,
           ownerLabel,
         });
-      }
-    }
-    for (const action of record.definition.actions ?? []) {
-      if (!action.grant) continue;
-      const control = findActionControl(record, action.id);
-      add({
-        grant: action.grant,
-        kind: "panel-action",
-        label: action.label ?? control?.label ?? action.id,
-        description: action.description ?? control?.description,
-        ownerId,
-        ownerLabel,
-      });
-    }
+    for (const action of record.definition.actions ?? [])
+      if (action.grant && action.label)
+        add({
+          grant: action.grant,
+          kind: "panel-action",
+          label: action.label,
+          description: action.description,
+          ownerId,
+          ownerLabel,
+        });
   }
   return Array.from(options.values());
 }

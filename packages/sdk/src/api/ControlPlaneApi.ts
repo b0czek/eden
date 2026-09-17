@@ -4,6 +4,8 @@ import type {
   DaemonStatus,
   InstalledPackageInfo,
   InstalledPackageManifest,
+  PackageManifest,
+  PackageOperationPreview,
   UserProfile,
   UserRole,
   WallpaperConfig,
@@ -39,8 +41,8 @@ export type EdenPackageChange =
 
 export interface EdenPackageInfo {
   success: boolean;
-  manifest?: import("@edenapp/types").PackageManifest;
-  preview?: import("@edenapp/types").PackageOperationPreview;
+  manifest?: PackageManifest;
+  preview?: PackageOperationPreview;
   error?: string;
 }
 

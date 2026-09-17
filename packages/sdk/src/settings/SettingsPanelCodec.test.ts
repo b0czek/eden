@@ -1,88 +1,319 @@
-import type { SettingsPanelDefinition } from "@edenapp/types";
+import type { SettingsPanelView } from "@edenapp/types";
 import {
+  cloneAndValidatePanelActionInvocation,
   cloneAndValidatePanelDefinition,
-  cloneRendererValue,
-  validatePanelActionInput,
+  cloneAndValidatePanelView,
   validatePanelProvider,
 } from "./SettingsPanelCodec";
 import { panelDefinition } from "./SettingsPanelTestHarness";
 
-describe("SettingsPanelCodec", () => {
-  it("validates and clones renderer declarations", () => {
-    const source = panelDefinition();
-    const cloned = cloneAndValidatePanelDefinition(source);
-    source.title = "Changed";
-
-    expect(cloned.title).toEqual({ en: "Network" });
-    expect(() =>
-      cloneAndValidatePanelDefinition({
-        ...panelDefinition(),
-        sections: [{ id: "main", controls: "invalid" }],
-      } as unknown as SettingsPanelDefinition),
-    ).toThrow("Invalid settings panel declaration");
-    expect(() => cloneRendererValue({ value: Number.NaN })).toThrow(
-      "Non-finite",
-    );
-  });
-
-  it("checks action relationships and provider callbacks", () => {
-    expect(() =>
-      cloneAndValidatePanelDefinition({
-        ...panelDefinition(),
-        actions: [],
-      }),
-    ).toThrow('undeclared action "toggle"');
-    expect(() =>
-      validatePanelProvider(panelDefinition(), { load: async () => ({}) }),
-    ).toThrow('missing action "toggle"');
-  });
-
-  it("validates operation dialogs and keeps passwords dialog-local", () => {
-    const definition = panelDefinition();
-    definition.sections[0]?.controls.push({
-      kind: "dialog",
-      id: "ftp-password",
-      label: "FTP password",
-      buttonLabel: "Update password",
-      actionId: "toggle",
-      dialog: {
-        title: "Update FTP password",
-        fields: [{ id: "password", label: "FTP password", input: "password" }],
-        submitLabel: "Save",
-        cancelLabel: "Cancel",
+const definition = () =>
+  panelDefinition({
+    actions: [
+      {
+        id: "button",
+        params: {
+          type: "object",
+          required: true,
+          properties: { deviceId: { type: "string", required: true } },
+          additionalProperties: false,
+        },
       },
-    });
+      { id: "toggle", value: { type: "boolean", required: true } },
+      {
+        id: "dialog",
+        fields: {
+          type: "object",
+          required: true,
+          properties: { password: { type: "string", required: true } },
+          additionalProperties: false,
+        },
+      },
+    ],
+  });
 
-    expect(() => cloneAndValidatePanelDefinition(definition)).not.toThrow();
+const view = (): SettingsPanelView => ({
+  sections: [
+    {
+      id: "main",
+      nodes: [
+        {
+          kind: "status",
+          id: "status",
+          label: "Status",
+          value: "Ready",
+          badge: { label: "Online", tone: "success" },
+        },
+        {
+          kind: "toggle",
+          id: "toggle",
+          label: "Enabled",
+          value: true,
+          action: { actionId: "toggle" },
+        },
+        {
+          kind: "button",
+          id: "button",
+          label: "Reset",
+          action: { actionId: "button", params: { deviceId: "one" } },
+        },
+        {
+          kind: "input",
+          input: "select",
+          id: "mode",
+          label: "Mode",
+          value: "a",
+          options: [{ value: "a", label: "A" }],
+          action: { actionId: "button", params: { deviceId: "one" } },
+        },
+        {
+          kind: "dialog",
+          id: "dialog",
+          label: "Password",
+          buttonLabel: "Change",
+          action: { actionId: "dialog" },
+          dialog: {
+            title: "Change",
+            fields: [{ id: "password", label: "Password", input: "password" }],
+            submitLabel: "Save",
+            cancelLabel: "Cancel",
+          },
+        },
+        {
+          kind: "collection",
+          id: "devices",
+          label: "Devices",
+          items: [
+            {
+              id: "one",
+              title: "One",
+              nodes: [
+                {
+                  kind: "status",
+                  id: "health",
+                  label: "Health",
+                  value: "Good",
+                },
+                {
+                  kind: "button",
+                  id: "remove",
+                  label: "Remove",
+                  action: { actionId: "button", params: { deviceId: "one" } },
+                },
+                {
+                  kind: "toggle",
+                  id: "live",
+                  label: "Live",
+                  value: true,
+                  action: { actionId: "toggle" },
+                },
+                {
+                  kind: "dialog",
+                  id: "secret",
+                  label: "Secret",
+                  buttonLabel: "Set",
+                  action: { actionId: "dialog" },
+                  dialog: {
+                    title: "Set",
+                    fields: [
+                      { id: "password", label: "Password", input: "password" },
+                    ],
+                    submitLabel: "Save",
+                    cancelLabel: "Cancel",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
+describe("SettingsPanelCodec", () => {
+  it("accepts every resolved node kind and collection row primitive", () => {
+    expect(cloneAndValidatePanelView(definition(), view())).toEqual(view());
+  });
+
+  it("strictly validates definitions and providers", () => {
     expect(() =>
       cloneAndValidatePanelDefinition({
-        ...panelDefinition(),
+        ...definition(),
+        extra: true,
+      } as never),
+    ).toThrow("definition");
+    expect(() =>
+      cloneAndValidatePanelDefinition(
+        panelDefinition({ actions: [{ id: "write", grant: "write" }] }),
+      ),
+    ).toThrow("requires a label");
+    expect(() =>
+      validatePanelProvider(definition(), {
+        load: async () => ({ sections: [] }),
+      }),
+    ).toThrow("missing action");
+  });
+
+  it.each([
+    [
+      "duplicate sections",
+      () => {
+        const value = view();
+        value.sections.push(value.sections[0] as never);
+        return value;
+      },
+    ],
+    [
+      "duplicate nodes",
+      () => {
+        const value = view();
+        value.sections[0]?.nodes.push(value.sections[0].nodes[0] as never);
+        return value;
+      },
+    ],
+    [
+      "duplicate items",
+      () => {
+        const value = view();
+        const node = value.sections[0]?.nodes[5];
+        if (node?.kind === "collection")
+          node.items.push(node.items[0] as never);
+        return value;
+      },
+    ],
+    [
+      "duplicate row nodes",
+      () => {
+        const value = view();
+        const node = value.sections[0]?.nodes[5];
+        if (node?.kind === "collection")
+          node.items[0]?.nodes.push(node.items[0].nodes[0] as never);
+        return value;
+      },
+    ],
+  ])("rejects %s", (_name, mutate) =>
+    expect(() => cloneAndValidatePanelView(definition(), mutate())).toThrow(
+      "view",
+    ),
+  );
+
+  it("rejects wrong values, missing choices, password values, unknown properties, actions, and params", () => {
+    const cases: unknown[] = [
+      {
         sections: [
           {
             id: "main",
-            controls: [
+            nodes: [
               {
-                kind: "input",
-                id: "password",
-                label: "Password",
-                input: "password",
-                stateKey: "password",
-                actionId: "toggle",
+                kind: "toggle",
+                id: "x",
+                label: "X",
+                value: "yes",
+                action: { actionId: "toggle" },
               },
             ],
           },
         ],
-      }),
-    ).toThrow("must be component-local inside a dialog");
+      },
+      {
+        sections: [
+          {
+            id: "main",
+            nodes: [
+              {
+                kind: "input",
+                input: "select",
+                id: "x",
+                label: "X",
+                value: "a",
+                action: { actionId: "button", params: { deviceId: "one" } },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        sections: [
+          {
+            id: "main",
+            nodes: [
+              {
+                kind: "dialog",
+                id: "x",
+                label: "X",
+                buttonLabel: "X",
+                action: { actionId: "dialog" },
+                dialog: {
+                  title: "X",
+                  fields: [
+                    {
+                      id: "password",
+                      label: "Password",
+                      input: "password",
+                      value: "secret",
+                    },
+                  ],
+                  submitLabel: "X",
+                  cancelLabel: "X",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      { sections: [], extra: true },
+      {
+        sections: [
+          {
+            id: "main",
+            nodes: [
+              {
+                kind: "button",
+                id: "x",
+                label: "X",
+                action: { actionId: "missing" },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        sections: [
+          {
+            id: "main",
+            nodes: [
+              {
+                kind: "button",
+                id: "x",
+                label: "X",
+                action: { actionId: "button", params: { deviceId: 4 } },
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    for (const candidate of cases)
+      expect(() =>
+        cloneAndValidatePanelView(definition(), candidate as SettingsPanelView),
+      ).toThrow();
   });
 
-  it("validates action values against recursive input declarations", () => {
-    const schema = panelDefinition().actions?.[0]?.input;
-    expect(validatePanelActionInput({ value: true }, schema)).toEqual([]);
-    expect(validatePanelActionInput({ value: "yes" }, schema)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: "input.value" }),
-      ]),
-    );
+  it("validates invocation channels independently with channel paths", () => {
+    const action = definition().actions?.[0];
+    if (!action) throw new Error("missing action");
+    expect(
+      cloneAndValidatePanelActionInvocation(
+        { params: { deviceId: "one" } },
+        action,
+      ).failures,
+    ).toEqual([]);
+    expect(
+      cloneAndValidatePanelActionInvocation(
+        { params: { deviceId: 1 }, value: true },
+        action,
+      ).failures.map(({ path }) => path),
+    ).toEqual(expect.arrayContaining(["params.deviceId", "value"]));
   });
 });

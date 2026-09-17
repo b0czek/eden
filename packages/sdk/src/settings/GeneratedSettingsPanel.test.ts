@@ -57,7 +57,10 @@ describe("SettingsPanelManager manifest panels", () => {
     ]);
 
     const response = await manager.loadPanel("app.com.example.app");
-    expect(response.panel?.sections[0]?.controls).toHaveLength(1);
+    expect(response.panel?.renderer).toBe("generic");
+    if (response.panel?.renderer !== "generic")
+      throw new Error("Expected generic panel");
+    expect(response.panel.view.sections[0]?.nodes).toHaveLength(1);
     expect(settings.get).toHaveBeenCalledTimes(1);
     expect(settings.get).toHaveBeenCalledWith("com.example.app", "visible");
   });

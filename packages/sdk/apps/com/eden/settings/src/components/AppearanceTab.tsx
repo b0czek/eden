@@ -1,8 +1,13 @@
-import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
+import type {
+  SettingsPanelAppearanceSnapshot,
+  SettingsPanelValue,
+  WallpaperConfig,
+  WallpaperPreset,
+} from "@edenapp/types";
 import type { Accessor, Component } from "solid-js";
 import { For } from "solid-js";
 import { t } from "../i18n";
-import type { LoadedPanel, PanelAction } from "../types";
+import type { PanelAction } from "../types";
 import "./AppearanceTab.css";
 
 interface AppearancePanelData {
@@ -41,16 +46,18 @@ const WallpaperGrid: Component<{
 );
 
 const AppearanceTab: Component<{
-  panel: LoadedPanel;
+  panel: SettingsPanelAppearanceSnapshot;
   busyActions: Accessor<Set<string>>;
   onAction: PanelAction;
 }> = (props) => {
-  const data = () => props.panel.state.data as unknown as AppearancePanelData;
+  const data = () => props.panel.data as unknown as AppearancePanelData;
   const handleSelect = (preset: WallpaperPreset) => {
     const wallpaper: WallpaperConfig = { type: "preset", id: preset.id };
-    void props.onAction("set-wallpaper", {
-      wallpaper,
-    } as unknown as import("@edenapp/types").SettingsPanelValue);
+    void props.onAction("appearance/set-wallpaper", "set-wallpaper", {
+      value: {
+        wallpaper,
+      } as unknown as SettingsPanelValue,
+    });
   };
 
   return (
@@ -64,14 +71,14 @@ const AppearanceTab: Component<{
           options={data().presets.solid}
           onSelect={handleSelect}
           activeId={data().wallpaper.id}
-          disabled={props.busyActions().has("set-wallpaper")}
+          disabled={props.busyActions().has("appearance/set-wallpaper")}
         />
         <h3 class="category-header">{t("settings.appearance.gradients")}</h3>
         <WallpaperGrid
           options={data().presets.gradients}
           onSelect={handleSelect}
           activeId={data().wallpaper.id}
-          disabled={props.busyActions().has("set-wallpaper")}
+          disabled={props.busyActions().has("appearance/set-wallpaper")}
         />
       </div>
     </div>

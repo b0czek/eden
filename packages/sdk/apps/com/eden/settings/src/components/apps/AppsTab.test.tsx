@@ -29,20 +29,15 @@ describe("AppsTab", () => {
     });
     const [busy] = createSignal(new Set<string>());
     const panel: LoadedPanel = {
-      declaration: {
-        id: "eden.apps",
-        title: "Apps",
-        source: "eden",
-        renderer: "apps",
-        sections: [],
-        actions: [],
-      },
-      state: {
-        data: {
-          apps: [{ manifest, hotReload: false, autostart: false }],
-          development: false,
-        } as unknown as SettingsPanelValue,
-      },
+      id: "eden.apps",
+      title: "Apps",
+      source: "eden",
+      renderer: "apps",
+      actions: [],
+      data: {
+        apps: [{ manifest, hotReload: false, autostart: false }],
+        development: false,
+      } as unknown as SettingsPanelValue,
     };
     const view = render(() => (
       <AppsTab
@@ -77,21 +72,16 @@ describe("AppsTab", () => {
     });
     const [busy] = createSignal(new Set<string>());
     const panel: LoadedPanel = {
-      declaration: {
-        id: "eden.apps",
-        title: "Apps",
-        source: "eden",
-        renderer: "apps",
-        sections: [],
-        actions: [],
-      },
-      state: {
-        data: {
-          apps: [{ manifest, hotReload: false, autostart: false }],
-          dlcs: [{ manifest: dlc }],
-          development: true,
-        } as unknown as SettingsPanelValue,
-      },
+      id: "eden.apps",
+      title: "Apps",
+      source: "eden",
+      renderer: "apps",
+      actions: [],
+      data: {
+        apps: [{ manifest, hotReload: false, autostart: false }],
+        dlcs: [{ manifest: dlc }],
+        development: true,
+      } as unknown as SettingsPanelValue,
     };
     const view = render(() => (
       <AppsTab

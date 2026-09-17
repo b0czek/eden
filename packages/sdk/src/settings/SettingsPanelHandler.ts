@@ -1,8 +1,8 @@
 import type {
+  SettingsPanelActionInvocation,
   SettingsPanelActionResponse,
   SettingsPanelResponse,
   SettingsPanelSummary,
-  SettingsPanelValue,
 } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SettingsPanelManager } from "./SettingsPanelManager";
@@ -17,7 +17,7 @@ export class SettingsPanelHandler {
     return { panels: await this.manager.listPanels() };
   }
 
-  /** Load one authorized panel declaration and its current state. */
+  /** Load one complete authorized panel snapshot. */
   @EdenHandler("panel", { permission: "panels" })
   async panel(args: { panelId: string }): Promise<SettingsPanelResponse> {
     return this.manager.loadPanel(args.panelId);
@@ -28,8 +28,12 @@ export class SettingsPanelHandler {
   async action(args: {
     panelId: string;
     actionId: string;
-    input?: SettingsPanelValue;
+    invocation?: SettingsPanelActionInvocation;
   }): Promise<SettingsPanelActionResponse> {
-    return this.manager.invokeAction(args.panelId, args.actionId, args.input);
+    return this.manager.invokeAction(
+      args.panelId,
+      args.actionId,
+      args.invocation ?? {},
+    );
   }
 }

@@ -85,20 +85,11 @@ export const appsPanel: BuiltinPanelModule = {
   category: appsSettingsCategory,
   actions: {
     "set-autostart": {
-      input: {
-        type: "object",
-        required: true,
-        properties: {
-          appId: { type: "string", required: true },
-          enabled: { type: "boolean", required: true },
-        },
-        additionalProperties: false,
-      },
-      handler: async ({ settings }, input) => {
-        const { appId, enabled } = input as unknown as {
-          appId: string;
-          enabled: boolean;
-        };
+      params: appActionSchema,
+      value: { type: "boolean", required: true },
+      handler: async ({ settings }, invocation) => {
+        const { appId } = invocation.params as { appId: string };
+        const enabled = invocation.value as boolean;
         await settings.set(
           EDEN_SETTINGS_APP_ID,
           `autostart.${appId}`,
@@ -107,18 +98,18 @@ export const appsPanel: BuiltinPanelModule = {
       },
     },
     "toggle-hot-reload": {
-      input: appActionSchema,
-      handler: async ({ packageManager }, input) => {
+      params: appActionSchema,
+      handler: async ({ packageManager }, invocation) => {
         await packageManager.toggleHotReload(
-          (input as unknown as { appId: string }).appId,
+          (invocation.params as { appId: string }).appId,
         );
       },
     },
     "uninstall-package": {
-      input: packageActionSchema,
-      handler: async ({ packageManager }, input) => {
+      params: packageActionSchema,
+      handler: async ({ packageManager }, invocation) => {
         await packageManager.uninstallPackage(
-          (input as unknown as { packageId: string }).packageId,
+          (invocation.params as { packageId: string }).packageId,
         );
       },
     },

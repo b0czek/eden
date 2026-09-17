@@ -1,19 +1,14 @@
 import type {
+  SettingsPanelActionInvocation,
   SettingsPanelActionResponse,
-  SettingsPanelDeclaration,
-  SettingsPanelState,
+  SettingsPanelSnapshot,
   SettingsPanelSummary,
-  SettingsPanelValue,
 } from "@edenapp/types";
 
-export interface LoadedPanel {
-  declaration: SettingsPanelDeclaration;
-  state: SettingsPanelState;
-}
-
+export type LoadedPanel = SettingsPanelSnapshot;
 export type PanelAction = (
+  instancePath: string,
   actionId: string,
-  input?: SettingsPanelValue,
+  invocation?: SettingsPanelActionInvocation,
 ) => Promise<SettingsPanelActionResponse>;
-
 export type PanelCatalog = SettingsPanelSummary[];

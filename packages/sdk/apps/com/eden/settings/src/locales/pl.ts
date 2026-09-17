@@ -6,6 +6,8 @@ export const pl = {
     },
     selectCategory: "Wybierz kategorię z paska bocznego",
     retry: "Spróbuj ponownie",
+    back: "Wstecz",
+    breadcrumbs: "Położenie ustawień",
     emptyPanel: "Ten panel nie zawiera dostępnych ustawień.",
     operationError: "Operacja nie powiodła się",
     operationPending: "Przetwarzanie…",

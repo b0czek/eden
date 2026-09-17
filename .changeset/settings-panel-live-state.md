@@ -1,6 +1,8 @@
 ---
-"@edenapp/sdk": patch
-"@edenapp/types": patch
+"@edenapp/sdk": minor
+"@edenapp/types": minor
 ---
 
-Let host settings panels invalidate their live state and provide dynamic input and dialog field options without rebuilding their declarations.
+Replace host settings panel declarations and state overlays with complete validated resolved views, typed action envelopes, stable-ID reconciliation, resolved collection rows, and independently authorized same-owner nested panels. This intentionally replaces the pre-1.0 panel API without a compatibility adapter.
+
+Keep controls synchronized after rejected or unchanged actions, isolate radio selections between node instances, and discard incompatible drafts when an input changes kind.

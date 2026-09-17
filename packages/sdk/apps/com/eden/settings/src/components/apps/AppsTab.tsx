@@ -1,13 +1,14 @@
 import type {
   RuntimeAppManifest,
   RuntimeDlcManifest,
+  SettingsPanelAppsSnapshot,
   SettingsPanelValue,
 } from "@edenapp/types";
 import { FiChevronRight, FiCpu, FiPackage } from "solid-icons/fi";
 import type { Accessor, Component } from "solid-js";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../../i18n";
-import type { LoadedPanel, PanelAction } from "../../types";
+import type { PanelAction } from "../../types";
 import AppDetail from "./AppDetail";
 import DlcDetail from "./DlcDetail";
 import "./AppsTab.css";
@@ -33,7 +34,7 @@ interface AppsPanelData {
 type Selection = { kind: "app" | "dlc"; id: string };
 
 const AppsTab: Component<{
-  panel: LoadedPanel;
+  panel: SettingsPanelAppsSnapshot;
   busyActions: Accessor<Set<string>>;
   onAction: PanelAction;
 }> = (props) => {
@@ -45,7 +46,7 @@ const AppsTab: Component<{
     {},
   );
   const loadedSizes = new Set<string>();
-  const data = () => props.panel.state.data as unknown as AppsPanelData;
+  const data = () => props.panel.data as unknown as AppsPanelData;
   const apps = createMemo(() =>
     [...(data()?.apps ?? [])].sort((a, b) =>
       getLocalizedValue(a.manifest.name, locale()).localeCompare(
@@ -72,8 +73,10 @@ const AppsTab: Component<{
       ? (data().dlcs.find((item) => item.manifest.id === selected.id) ?? null)
       : null;
   });
-  const run = (actionId: string, values: Record<string, unknown>) =>
-    props.onAction(actionId, values as SettingsPanelValue);
+  const run = (actionId: string, params: Record<string, unknown>) =>
+    props.onAction(`apps/${actionId}`, actionId, {
+      params: params as Record<string, SettingsPanelValue>,
+    });
   const sizeKey = (selected: Selection) => `${selected.kind}:${selected.id}`;
   const loadSize = async (selected: Selection) => {
     const key = sizeKey(selected);
@@ -189,10 +192,13 @@ const AppsTab: Component<{
               devMode={data().development}
               sizeLoading={sizeLoading()[key] ?? false}
               size={sizes()[key]}
-              uninstalling={props.busyActions().has("uninstall-package")}
+              uninstalling={props.busyActions().has("apps/uninstall-package")}
               onBack={() => setSelection(null)}
               onAutostartToggle={(enabled) =>
-                void run("set-autostart", { appId: item.manifest.id, enabled })
+                void props.onAction("apps/set-autostart", "set-autostart", {
+                  params: { appId: item.manifest.id },
+                  value: enabled,
+                })
               }
               onHotReloadToggle={() =>
                 void run("toggle-hot-reload", { appId: item.manifest.id })
@@ -227,7 +233,7 @@ const AppsTab: Component<{
               hostName={hostName(item.manifest.hostAppId)}
               size={sizes()[key]}
               sizeLoading={sizeLoading()[key] ?? false}
-              uninstalling={props.busyActions().has("uninstall-package")}
+              uninstalling={props.busyActions().has("apps/uninstall-package")}
               onBack={() => setSelection(null)}
               onUninstall={() => {
                 if (!confirm(t("settings.apps.uninstallDlcConfirm"))) return;

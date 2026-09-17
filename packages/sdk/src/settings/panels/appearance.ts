@@ -32,14 +32,14 @@ export const appearancePanel: BuiltinPanelModule = {
   category: appearanceSettingsCategory,
   actions: {
     "set-wallpaper": {
-      input: {
+      value: {
         type: "object",
         required: true,
         properties: { wallpaper: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: async ({ appearanceManager }, input) => {
-        const { wallpaper } = input as unknown as {
+      handler: async ({ appearanceManager }, invocation) => {
+        const { wallpaper } = invocation.value as unknown as {
           wallpaper: WallpaperConfig;
         };
         await appearanceManager.setWallpaper(wallpaper);

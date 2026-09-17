@@ -14,9 +14,26 @@ interface SettingsSidebarProps {
 
 const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
   const systemPanels = () =>
-    props.panels().filter((panel) => panel.source !== "application");
+    props
+      .panels()
+      .filter((panel) => !panel.parentId && panel.source !== "application");
   const applicationPanels = () =>
-    props.panels().filter((panel) => panel.source === "application");
+    props
+      .panels()
+      .filter((panel) => !panel.parentId && panel.source === "application");
+
+  const selectedRootId = () => {
+    const byId = new Map(props.panels().map((panel) => [panel.id, panel]));
+    let current = props.selectedPanelId();
+    const seen = new Set<string>();
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      const panel = byId.get(current);
+      if (!panel?.parentId) return current;
+      current = panel.parentId;
+    }
+    return null;
+  };
 
   const icon = (panel: SettingsPanelSummary) => {
     if (panel.source === "application" && panel.icon) {
@@ -46,7 +63,7 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
     <button
       type="button"
       class={`eden-sidebar-item ${
-        props.selectedPanelId() === panel.id ? "eden-sidebar-item-selected" : ""
+        selectedRootId() === panel.id ? "eden-sidebar-item-selected" : ""
       }`}
       onClick={() => props.onSelect(panel.id)}
     >
@@ -59,35 +76,37 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
 
   return (
     <aside class="eden-sidebar">
-      <div class="eden-sidebar-section">
-        <div class="eden-sidebar-section-title">{props.brandName()}</div>
-        <div class="eden-sidebar-items">
-          <For each={systemPanels()}>{item}</For>
+      <div class="settings-sidebar-scroll eden-scrollbar">
+        <div class="eden-sidebar-section">
+          <div class="eden-sidebar-section-title">{props.brandName()}</div>
+          <div class="eden-sidebar-items">
+            <For each={systemPanels()}>{item}</For>
+          </div>
         </div>
-      </div>
 
-      <div class="eden-sidebar-divider" />
+        <div class="eden-sidebar-divider" />
 
-      <div class="eden-sidebar-section eden-sidebar-section-scrollable">
-        <div class="eden-sidebar-section-title">
-          {t("settings.sidebar.applications")}
-        </div>
-        <div class="eden-sidebar-items eden-sidebar-items-scrollable">
-          <Show
-            when={applicationPanels().length > 0}
-            fallback={
-              <div class="eden-sidebar-item eden-sidebar-item-disabled">
-                <div class="eden-sidebar-item-icon">
-                  <FiPackage />
+        <div class="eden-sidebar-section">
+          <div class="eden-sidebar-section-title">
+            {t("settings.sidebar.applications")}
+          </div>
+          <div class="eden-sidebar-items">
+            <Show
+              when={applicationPanels().length > 0}
+              fallback={
+                <div class="eden-sidebar-item eden-sidebar-item-disabled">
+                  <div class="eden-sidebar-item-icon">
+                    <FiPackage />
+                  </div>
+                  <span class="eden-sidebar-item-text">
+                    {t("settings.sidebar.noAppsWithSettings")}
+                  </span>
                 </div>
-                <span class="eden-sidebar-item-text">
-                  {t("settings.sidebar.noAppsWithSettings")}
-                </span>
-              </div>
-            }
-          >
-            <For each={applicationPanels()}>{item}</For>
-          </Show>
+              }
+            >
+              <For each={applicationPanels()}>{item}</For>
+            </Show>
+          </div>
         </div>
       </div>
     </aside>

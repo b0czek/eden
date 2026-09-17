@@ -37,7 +37,6 @@ export function registerBuiltinSettingsPanels(
         description: panel.category.description,
         icon: panel.category.icon,
         grant: panel.category.grant,
-        sections: [],
         actions: actions.map(([id, { handler: _, ...definition }]) => ({
           id,
           ...definition,
@@ -48,7 +47,7 @@ export function registerBuiltinSettingsPanels(
         actions: Object.fromEntries(
           actions.map(([id, { handler }]) => [
             id,
-            (input, context) => handler(dependencies, input, context),
+            (invocation, context) => handler(dependencies, invocation, context),
           ]),
         ),
       },

@@ -1,181 +1,300 @@
 import type {
+  SettingsPanelActionBinding,
   SettingsPanelActionInputSchema,
-  SettingsPanelControl,
+  SettingsPanelActionInvocation,
   SettingsPanelDefinition,
+  SettingsPanelNode,
   SettingsPanelProvider,
+  SettingsPanelRowNode,
   SettingsPanelValidation,
   SettingsPanelValue,
+  SettingsPanelView,
 } from "@edenapp/types";
 import * as v from "valibot";
 
 export type InternalPanelDefinition = Omit<SettingsPanelDefinition, "grant"> & {
   grant?: string;
 };
-
 export interface ValidationFailure {
   path: string;
   message: string;
+}
+export class SettingsPanelViewValidationError extends Error {
+  constructor(readonly path: string) {
+    super(`Invalid settings panel view at ${path}`);
+  }
 }
 
 const PANEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const ITEM_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 const nonBlank = v.pipe(v.string(), v.regex(/\S/));
 const itemId = v.pipe(v.string(), v.regex(ITEM_ID));
-const finiteNumber = v.pipe(v.number(), v.finite());
-const localizedText = v.union([
+const finite = v.pipe(v.number(), v.finite());
+const localized = v.union([
   nonBlank,
   v.pipe(
     v.record(v.string(), nonBlank),
     v.check((value) => Object.keys(value).length > 0),
   ),
 ]);
-const validation = v.object({
-  required: v.optional(v.boolean()),
-  minLength: v.optional(finiteNumber),
-  maxLength: v.optional(finiteNumber),
-  pattern: v.optional(v.string()),
-  min: v.optional(finiteNumber),
-  max: v.optional(finiteNumber),
-  step: v.optional(finiteNumber),
-});
-const option = v.object({
-  value: v.string(),
-  label: localizedText,
-  description: v.optional(localizedText),
-});
-const inputType = v.picklist([
-  "text",
-  "password",
-  "number",
-  "checkbox",
-  "radio",
-  "select",
-  "textarea",
-  "color",
-  "range",
-]);
-const field = v.object({
-  id: itemId,
-  label: localizedText,
-  description: v.optional(localizedText),
-  input: inputType,
-  placeholder: v.optional(localizedText),
-  options: v.optional(v.array(option)),
-  validation: v.optional(validation),
-  autocomplete: v.optional(v.string()),
-});
-const controlBase = {
-  id: itemId,
-  label: localizedText,
-  description: v.optional(localizedText),
-};
-const control = v.variant("kind", [
-  v.object({ ...controlBase, kind: v.literal("status"), stateKey: nonBlank }),
-  v.object({
-    ...controlBase,
-    kind: v.literal("toggle"),
-    stateKey: nonBlank,
-    actionId: itemId,
-  }),
-  v.object({
-    ...controlBase,
-    kind: v.literal("button"),
-    actionId: itemId,
-    tone: v.optional(
-      v.picklist(["neutral", "info", "success", "warning", "danger"]),
-    ),
-    confirmation: v.optional(localizedText),
-  }),
-  v.object({
-    ...controlBase,
-    kind: v.literal("input"),
-    stateKey: nonBlank,
-    actionId: itemId,
-    input: inputType,
-    placeholder: v.optional(localizedText),
-    options: v.optional(v.array(option)),
-    validation: v.optional(validation),
-  }),
-  v.object({
-    ...controlBase,
-    kind: v.literal("dialog"),
-    actionId: itemId,
-    buttonLabel: localizedText,
-    dialog: v.object({
-      title: localizedText,
-      description: v.optional(localizedText),
-      fields: v.pipe(v.array(field), v.nonEmpty()),
-      submitLabel: localizedText,
-      cancelLabel: localizedText,
-    }),
-  }),
-]);
-const actionInputSchema: v.GenericSchema = v.lazy(() =>
-  v.variant("type", [
-    v.object({
-      type: v.literal("string"),
-      required: v.optional(v.boolean()),
-      minLength: v.optional(finiteNumber),
-      maxLength: v.optional(finiteNumber),
-      pattern: v.optional(v.string()),
-      enum: v.optional(v.array(v.string())),
-    }),
-    v.object({
-      type: v.literal("number"),
-      required: v.optional(v.boolean()),
-      min: v.optional(finiteNumber),
-      max: v.optional(finiteNumber),
-      enum: v.optional(v.array(finiteNumber)),
-    }),
-    v.object({ type: v.literal("boolean"), required: v.optional(v.boolean()) }),
-    v.object({
-      type: v.literal("array"),
-      required: v.optional(v.boolean()),
-      items: v.optional(actionInputSchema),
-    }),
-    v.object({
-      type: v.literal("object"),
-      required: v.optional(v.boolean()),
-      properties: v.optional(v.record(v.string(), actionInputSchema)),
-      additionalProperties: v.optional(v.boolean()),
-    }),
-    v.object({ type: v.literal("any"), required: v.optional(v.boolean()) }),
+const jsonValue: v.GenericSchema<SettingsPanelValue> = v.lazy(() =>
+  v.union([
+    v.string(),
+    finite,
+    v.boolean(),
+    v.null(),
+    v.array(jsonValue),
+    v.record(v.string(), jsonValue),
   ]),
 );
-const action = v.object({
-  id: itemId,
-  label: v.optional(localizedText),
-  description: v.optional(localizedText),
-  grant: v.optional(nonBlank),
-  input: v.optional(actionInputSchema),
+const badge = v.strictObject({
+  label: localized,
+  tone: v.optional(
+    v.picklist(["neutral", "info", "success", "warning", "danger"]),
+  ),
 });
-const panelDefinition = v.object({
+const validation = v.strictObject({
+  required: v.optional(v.boolean()),
+  minLength: v.optional(finite),
+  maxLength: v.optional(finite),
+  pattern: v.optional(v.string()),
+  min: v.optional(finite),
+  max: v.optional(finite),
+  step: v.optional(finite),
+});
+const option = v.strictObject({
+  value: v.string(),
+  label: localized,
+  description: v.optional(localized),
+});
+const actionSchema: v.GenericSchema<SettingsPanelActionInputSchema> = v.lazy(
+  () =>
+    v.variant("type", [
+      v.strictObject({
+        type: v.literal("string"),
+        required: v.optional(v.boolean()),
+        minLength: v.optional(finite),
+        maxLength: v.optional(finite),
+        pattern: v.optional(v.string()),
+        enum: v.optional(v.array(v.string())),
+      }),
+      v.strictObject({
+        type: v.literal("number"),
+        required: v.optional(v.boolean()),
+        min: v.optional(finite),
+        max: v.optional(finite),
+        enum: v.optional(v.array(finite)),
+      }),
+      v.strictObject({
+        type: v.literal("boolean"),
+        required: v.optional(v.boolean()),
+      }),
+      v.strictObject({
+        type: v.literal("array"),
+        required: v.optional(v.boolean()),
+        items: v.optional(actionSchema),
+      }),
+      v.strictObject({
+        type: v.literal("object"),
+        required: v.optional(v.boolean()),
+        properties: v.optional(v.record(v.string(), actionSchema)),
+        additionalProperties: v.optional(v.boolean()),
+      }),
+      v.strictObject({
+        type: v.literal("any"),
+        required: v.optional(v.boolean()),
+      }),
+    ]),
+);
+const objectActionSchema = v.strictObject({
+  type: v.literal("object"),
+  required: v.optional(v.boolean()),
+  properties: v.optional(v.record(v.string(), actionSchema)),
+  additionalProperties: v.optional(v.boolean()),
+});
+const actionDefinition = v.strictObject({
+  id: itemId,
+  label: v.optional(localized),
+  description: v.optional(localized),
+  grant: v.optional(nonBlank),
+  params: v.optional(objectActionSchema),
+  value: v.optional(actionSchema),
+  fields: v.optional(objectActionSchema),
+});
+const panelDefinition = v.strictObject({
   id: v.pipe(v.string(), v.regex(PANEL_ID)),
-  title: localizedText,
-  description: v.optional(localizedText),
+  parentId: v.optional(v.pipe(v.string(), v.regex(PANEL_ID))),
+  title: localized,
+  description: v.optional(localized),
   icon: v.optional(v.string()),
   grant: v.optional(nonBlank),
-  sections: v.array(
-    v.object({
+  actions: v.optional(v.array(actionDefinition)),
+});
+const binding = v.strictObject({
+  actionId: itemId,
+  params: v.optional(v.record(v.string(), jsonValue)),
+});
+const nodeBase = {
+  id: itemId,
+  label: localized,
+  description: v.optional(localized),
+};
+const interactive = {
+  ...nodeBase,
+  action: binding,
+  disabled: v.optional(v.boolean()),
+};
+const fieldBase = {
+  id: itemId,
+  label: localized,
+  description: v.optional(localized),
+  placeholder: v.optional(localized),
+  validation: v.optional(validation),
+  autocomplete: v.optional(v.string()),
+};
+const dialogField = v.variant("input", [
+  v.strictObject({
+    ...fieldBase,
+    input: v.picklist(["text", "textarea", "color"]),
+    value: v.optional(v.string()),
+  }),
+  v.strictObject({
+    ...fieldBase,
+    input: v.picklist(["select", "radio"]),
+    value: v.optional(v.string()),
+    options: v.pipe(v.array(option), v.nonEmpty()),
+  }),
+  v.strictObject({
+    ...fieldBase,
+    input: v.picklist(["number", "range"]),
+    value: v.optional(finite),
+  }),
+  v.strictObject({
+    ...fieldBase,
+    input: v.literal("checkbox"),
+    value: v.optional(v.boolean()),
+  }),
+  v.strictObject({ ...fieldBase, input: v.literal("password") }),
+]);
+const dialogContent = v.strictObject({
+  title: localized,
+  description: v.optional(localized),
+  fields: v.pipe(v.array(dialogField), v.nonEmpty()),
+  submitLabel: localized,
+  cancelLabel: localized,
+});
+const statusNode = v.strictObject({
+  ...nodeBase,
+  kind: v.literal("status"),
+  value: v.optional(localized),
+  detail: v.optional(localized),
+  badge: v.optional(badge),
+});
+const buttonNode = v.strictObject({
+  ...interactive,
+  kind: v.literal("button"),
+  tone: v.optional(
+    v.picklist(["neutral", "info", "success", "warning", "danger"]),
+  ),
+  confirmation: v.optional(localized),
+});
+const toggleNode = v.strictObject({
+  ...interactive,
+  kind: v.literal("toggle"),
+  value: v.boolean(),
+});
+const dialogNode = v.strictObject({
+  ...interactive,
+  kind: v.literal("dialog"),
+  buttonLabel: localized,
+  dialog: dialogContent,
+});
+const rowNode = v.variant("kind", [
+  statusNode,
+  buttonNode,
+  toggleNode,
+  dialogNode,
+]);
+const inputNode = v.variant("input", [
+  v.strictObject({
+    ...interactive,
+    kind: v.literal("input"),
+    input: v.picklist(["text", "textarea", "color"]),
+    value: v.string(),
+    placeholder: v.optional(localized),
+    validation: v.optional(validation),
+  }),
+  v.strictObject({
+    ...interactive,
+    kind: v.literal("input"),
+    input: v.picklist(["select", "radio"]),
+    value: v.string(),
+    options: v.pipe(v.array(option), v.nonEmpty()),
+    placeholder: v.optional(localized),
+    validation: v.optional(validation),
+  }),
+  v.strictObject({
+    ...interactive,
+    kind: v.literal("input"),
+    input: v.picklist(["number", "range"]),
+    value: finite,
+    placeholder: v.optional(localized),
+    validation: v.optional(validation),
+  }),
+  v.strictObject({
+    ...interactive,
+    kind: v.literal("input"),
+    input: v.literal("checkbox"),
+    value: v.boolean(),
+    placeholder: v.optional(localized),
+    validation: v.optional(validation),
+  }),
+]);
+const collectionNode = v.strictObject({
+  ...nodeBase,
+  kind: v.literal("collection"),
+  emptyLabel: v.optional(localized),
+  items: v.array(
+    v.strictObject({
       id: itemId,
-      title: v.optional(localizedText),
-      description: v.optional(localizedText),
-      controls: v.array(control),
+      title: localized,
+      description: v.optional(localized),
+      detail: v.optional(localized),
+      badge: v.optional(badge),
+      disabled: v.optional(v.boolean()),
+      nodes: v.array(rowNode),
     }),
   ),
-  actions: v.optional(v.array(action)),
+});
+const node = v.variant("kind", [
+  statusNode,
+  buttonNode,
+  toggleNode,
+  inputNode,
+  dialogNode,
+  collectionNode,
+]);
+const panelView = v.strictObject({
+  sections: v.array(
+    v.strictObject({
+      id: itemId,
+      title: v.optional(localized),
+      description: v.optional(localized),
+      nodes: v.array(node),
+    }),
+  ),
+});
+const invocationCodec = v.strictObject({
+  params: v.optional(v.record(v.string(), jsonValue)),
+  value: v.optional(jsonValue),
+  fields: v.optional(v.record(v.string(), jsonValue)),
 });
 
 export function cloneRendererValue<T>(value: T): T {
   const seen = new Set<object>();
   const clone = (item: unknown, path: string): unknown => {
-    if (
-      item === null ||
-      typeof item === "string" ||
-      typeof item === "boolean"
-    ) {
+    if (item === null || typeof item === "string" || typeof item === "boolean")
       return item;
-    }
     if (typeof item === "number") {
       if (!Number.isFinite(item))
         throw new Error(`Non-finite number at ${path}`);
@@ -194,13 +313,12 @@ export function cloneRendererValue<T>(value: T): T {
       return result;
     }
     const prototype = Object.getPrototypeOf(item);
-    if (prototype !== Object.prototype && prototype !== null) {
+    if (prototype !== Object.prototype && prototype !== null)
       throw new Error(`Non-plain object at ${path}`);
-    }
     const result: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(item)) {
-      const cloned = clone(child, `${path}.${key}`);
-      if (cloned !== undefined) result[key] = cloned;
+      const copied = clone(child, `${path}.${key}`);
+      if (copied !== undefined) result[key] = copied;
     }
     seen.delete(item);
     return result;
@@ -208,9 +326,14 @@ export function cloneRendererValue<T>(value: T): T {
   return clone(value, "value") as T;
 }
 
+const issuePath = (
+  issues: readonly { path?: readonly { key: unknown }[] }[],
+): string | undefined =>
+  issues[0]?.path?.map(({ key }) => String(key)).join(".");
+
 const validateRules = (
   rules: SettingsPanelValidation | undefined,
-  id: string,
+  path: string,
 ): void => {
   if (!rules) return;
   if (
@@ -223,59 +346,18 @@ const validateRules = (
     (rules.minLength !== undefined &&
       rules.maxLength !== undefined &&
       rules.minLength > rules.maxLength)
-  ) {
-    throw new Error(`Input "${id}" has invalid validation rules`);
-  }
+  )
+    throw new Error(`Invalid validation rules at ${path}`);
   if (rules.pattern) {
     try {
       new RegExp(rules.pattern);
     } catch {
-      throw new Error(`Input "${id}" has an invalid validation pattern`);
+      throw new Error(`Invalid validation pattern at ${path}.pattern`);
     }
   }
 };
 
-const validateInput = (
-  input: string,
-  options: { value: string }[] | undefined,
-  id: string,
-): void => {
-  if ((input === "select" || input === "radio") && !options?.length) {
-    throw new Error(`Input "${id}" requires options`);
-  }
-  if (
-    options &&
-    new Set(options.map(({ value }) => value)).size !== options.length
-  ) {
-    throw new Error(`Input "${id}" has invalid options`);
-  }
-};
-
-const validateControl = (value: SettingsPanelControl): void => {
-  if (value.kind === "input") {
-    if (value.input === "password") {
-      throw new Error(
-        `Password input "${value.id}" must be component-local inside a dialog`,
-      );
-    }
-    validateInput(value.input, value.options, value.id);
-    validateRules(value.validation, value.id);
-  }
-  if (value.kind === "dialog") {
-    const ids = value.dialog.fields.map(({ id }) => id);
-    if (new Set(ids).size !== ids.length) {
-      throw new Error(
-        `Duplicate dialog field "${ids.find((id, index) => ids.indexOf(id) !== index)}"`,
-      );
-    }
-    for (const item of value.dialog.fields) {
-      validateInput(item.input, item.options, item.id);
-      validateRules(item.validation, item.id);
-    }
-  }
-};
-
-const validateActionSchema = (
+const validateSchema = (
   schema: SettingsPanelActionInputSchema,
   path: string,
 ): void => {
@@ -292,28 +374,21 @@ const validateActionSchema = (
       schema.enum &&
       (schema.enum.length === 0 ||
         new Set(schema.enum).size !== schema.enum.length)
-    ) {
-      throw new Error(`Invalid action schema at ${path}`);
-    }
-  }
-  if (schema.type === "number") {
+    )
+      throw new Error(`Invalid action schema at ${path}.enum`);
+  } else if (schema.type === "number") {
     validateRules({ min: schema.min, max: schema.max }, path);
     if (
       schema.enum &&
       (schema.enum.length === 0 ||
         new Set(schema.enum).size !== schema.enum.length)
-    ) {
-      throw new Error(`Invalid action schema at ${path}`);
-    }
-  }
-  if (schema.type === "array" && schema.items) {
-    validateActionSchema(schema.items, `${path}[]`);
-  }
-  if (schema.type === "object") {
-    for (const [key, child] of Object.entries(schema.properties ?? {})) {
-      validateActionSchema(child, `${path}.${key}`);
-    }
-  }
+    )
+      throw new Error(`Invalid action schema at ${path}.enum`);
+  } else if (schema.type === "array" && schema.items)
+    validateSchema(schema.items, `${path}[]`);
+  else if (schema.type === "object")
+    for (const [key, child] of Object.entries(schema.properties ?? {}))
+      validateSchema(child, `${path}.${key}`);
 };
 
 export function cloneAndValidatePanelDefinition(
@@ -322,44 +397,26 @@ export function cloneAndValidatePanelDefinition(
   const cloned = cloneRendererValue(definition);
   const parsed = v.safeParse(panelDefinition, cloned);
   if (!parsed.success) {
-    const path = parsed.issues[0]?.path
-      ?.map((item) => String(item.key))
-      .join(".");
+    const path = issuePath(parsed.issues);
     throw new Error(
-      `Invalid settings panel declaration${path ? ` at ${path}` : ""}`,
+      `Invalid settings panel definition${path ? ` at ${path}` : ""}`,
     );
   }
-
-  const sectionIds = new Set<string>();
-  const controlIds = new Set<string>();
-  const referencedActions = new Set<string>();
-  for (const section of cloned.sections) {
-    if (sectionIds.has(section.id)) {
-      throw new Error(`Duplicate settings panel section "${section.id}"`);
-    }
-    sectionIds.add(section.id);
-    for (const item of section.controls) {
-      validateControl(item);
-      if (controlIds.has(item.id)) {
-        throw new Error(`Duplicate settings panel control "${item.id}"`);
-      }
-      controlIds.add(item.id);
-      if ("actionId" in item) referencedActions.add(item.actionId);
-    }
-  }
-
-  const actionIds = new Set<string>();
-  for (const item of cloned.actions ?? []) {
-    if (actionIds.has(item.id)) {
-      throw new Error(`Duplicate settings panel action "${item.id}"`);
-    }
-    actionIds.add(item.id);
-    if (item.input) validateActionSchema(item.input, "input");
-  }
-  for (const actionId of referencedActions) {
-    if (!actionIds.has(actionId)) {
-      throw new Error(`Control references undeclared action "${actionId}"`);
-    }
+  const ids = new Set<string>();
+  for (const action of cloned.actions ?? []) {
+    if (ids.has(action.id))
+      throw new Error(`Duplicate settings panel action "${action.id}"`);
+    ids.add(action.id);
+    if (action.grant && !action.label)
+      throw new Error(
+        `Action "${action.id}" requires a label when it declares a grant`,
+      );
+    if (action.params)
+      validateSchema(action.params, `actions.${action.id}.params`);
+    if (action.value)
+      validateSchema(action.value, `actions.${action.id}.value`);
+    if (action.fields)
+      validateSchema(action.fields, `actions.${action.id}.fields`);
   }
   return cloned;
 }
@@ -368,78 +425,178 @@ export function validatePanelProvider(
   definition: InternalPanelDefinition,
   provider: SettingsPanelProvider,
 ): void {
-  if (!provider || typeof provider.load !== "function") {
+  if (!provider || typeof provider.load !== "function")
     throw new Error("Settings panel provider requires a load function");
-  }
-  for (const action of definition.actions ?? []) {
-    if (typeof provider.actions?.[action.id] !== "function") {
+  for (const action of definition.actions ?? [])
+    if (typeof provider.actions?.[action.id] !== "function")
       throw new Error(
         `Settings panel provider is missing action "${action.id}"`,
       );
-    }
-  }
   for (const [id, handler] of Object.entries(provider.actions ?? {})) {
-    if (typeof handler !== "function") {
+    if (typeof handler !== "function")
       throw new Error(`Settings panel action "${id}" must be a function`);
-    }
-    if (!definition.actions?.some((action) => action.id === id)) {
+    if (!definition.actions?.some((action) => action.id === id))
       throw new Error(`Settings panel provider has undeclared action "${id}"`);
+  }
+}
+
+const validateBinding = (
+  value: SettingsPanelActionBinding,
+  definition: InternalPanelDefinition,
+  path: string,
+): void => {
+  const action = definition.actions?.find(({ id }) => id === value.actionId);
+  if (!action) throw new SettingsPanelViewValidationError(`${path}.actionId`);
+  const failures = validatePanelActionInput(
+    value.params,
+    action.params,
+    `${path}.params`,
+  );
+  if (failures.length)
+    throw new SettingsPanelViewValidationError(
+      failures[0]?.path ?? `${path}.params`,
+    );
+};
+
+const validateNode = (
+  value: SettingsPanelNode | SettingsPanelRowNode,
+  definition: InternalPanelDefinition,
+  path: string,
+): void => {
+  if (value.kind !== "status" && value.kind !== "collection")
+    validateBinding(value.action, definition, `${path}.action`);
+  if (value.kind === "input") {
+    try {
+      validateRules(value.validation, `${path}.validation`);
+    } catch {
+      throw new SettingsPanelViewValidationError(`${path}.validation`);
     }
   }
+  if (value.kind === "dialog") {
+    const fieldIds = new Set<string>();
+    for (const field of value.dialog.fields) {
+      if (fieldIds.has(field.id))
+        throw new SettingsPanelViewValidationError(
+          `${path}.dialog.fields.${field.id}`,
+        );
+      fieldIds.add(field.id);
+      try {
+        validateRules(
+          field.validation,
+          `${path}.dialog.fields.${field.id}.validation`,
+        );
+      } catch {
+        throw new SettingsPanelViewValidationError(
+          `${path}.dialog.fields.${field.id}.validation`,
+        );
+      }
+    }
+  }
+  if (value.kind === "collection") {
+    const itemIds = new Set<string>();
+    for (const item of value.items) {
+      if (itemIds.has(item.id))
+        throw new SettingsPanelViewValidationError(`${path}.items.${item.id}`);
+      itemIds.add(item.id);
+      const rowIds = new Set<string>();
+      for (const child of item.nodes) {
+        if (rowIds.has(child.id))
+          throw new SettingsPanelViewValidationError(
+            `${path}.items.${item.id}.nodes.${child.id}`,
+          );
+        rowIds.add(child.id);
+        validateNode(
+          child,
+          definition,
+          `${path}.items.${item.id}.nodes.${child.id}`,
+        );
+      }
+    }
+  }
+};
+
+export function cloneAndValidatePanelView(
+  definition: InternalPanelDefinition,
+  view: SettingsPanelView,
+): SettingsPanelView {
+  let cloned: SettingsPanelView;
+  try {
+    cloned = cloneRendererValue(view);
+  } catch (error) {
+    const path =
+      error instanceof Error
+        ? error.message.match(/ at value\.(.+)$/)?.[1]
+        : undefined;
+    throw new SettingsPanelViewValidationError(path ?? "view");
+  }
+  const parsed = v.safeParse(panelView, cloned);
+  if (!parsed.success)
+    throw new SettingsPanelViewValidationError(
+      issuePath(parsed.issues) ?? "view",
+    );
+  const sectionIds = new Set<string>();
+  for (const section of cloned.sections) {
+    if (sectionIds.has(section.id))
+      throw new SettingsPanelViewValidationError(`sections.${section.id}`);
+    sectionIds.add(section.id);
+    const nodeIds = new Set<string>();
+    for (const child of section.nodes) {
+      if (nodeIds.has(child.id))
+        throw new SettingsPanelViewValidationError(
+          `sections.${section.id}.nodes.${child.id}`,
+        );
+      nodeIds.add(child.id);
+      validateNode(
+        child,
+        definition,
+        `sections.${section.id}.nodes.${child.id}`,
+      );
+    }
+  }
+  return cloned;
 }
 
 export function validatePanelActionInput(
   value: SettingsPanelValue | undefined,
   schema: SettingsPanelActionInputSchema | undefined,
-  path = "input",
+  path: string,
 ): ValidationFailure[] {
-  if (!schema) {
+  if (!schema)
     return value === undefined
       ? []
-      : [{ path, message: "This action does not accept input." }];
-  }
-  if (value === undefined || value === null) {
+      : [{ path, message: "This action does not accept this member." }];
+  if (value === undefined || value === null)
     return schema.required
       ? [{ path, message: "This value is required." }]
       : [];
-  }
   if (schema.type === "any") return [];
   if (schema.type === "string") {
     if (typeof value !== "string") return [{ path, message: "Expected text." }];
-    if (schema.minLength !== undefined && value.length < schema.minLength) {
+    if (schema.minLength !== undefined && value.length < schema.minLength)
       return [{ path, message: `Minimum length is ${schema.minLength}.` }];
-    }
-    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+    if (schema.maxLength !== undefined && value.length > schema.maxLength)
       return [{ path, message: `Maximum length is ${schema.maxLength}.` }];
-    }
-    if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
+    if (schema.pattern && !new RegExp(schema.pattern).test(value))
       return [{ path, message: "The value has an invalid format." }];
-    }
-    if (schema.enum && !schema.enum.includes(value)) {
+    if (schema.enum && !schema.enum.includes(value))
       return [{ path, message: "The value is not an allowed option." }];
-    }
     return [];
   }
   if (schema.type === "number") {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
+    if (typeof value !== "number" || !Number.isFinite(value))
       return [{ path, message: "Expected a number." }];
-    }
-    if (schema.min !== undefined && value < schema.min) {
+    if (schema.min !== undefined && value < schema.min)
       return [{ path, message: `Minimum value is ${schema.min}.` }];
-    }
-    if (schema.max !== undefined && value > schema.max) {
+    if (schema.max !== undefined && value > schema.max)
       return [{ path, message: `Maximum value is ${schema.max}.` }];
-    }
-    if (schema.enum && !schema.enum.includes(value)) {
+    if (schema.enum && !schema.enum.includes(value))
       return [{ path, message: "The value is not an allowed option." }];
-    }
     return [];
   }
-  if (schema.type === "boolean") {
+  if (schema.type === "boolean")
     return typeof value === "boolean"
       ? []
       : [{ path, message: "Expected true or false." }];
-  }
   if (schema.type === "array") {
     if (!Array.isArray(value)) return [{ path, message: "Expected a list." }];
     return schema.items
@@ -448,25 +605,56 @@ export function validatePanelActionInput(
         )
       : [];
   }
-  if (typeof value !== "object" || Array.isArray(value) || value === null) {
+  if (typeof value !== "object" || Array.isArray(value) || value === null)
     return [{ path, message: "Expected an object." }];
-  }
   const failures: ValidationFailure[] = [];
   const properties = schema.properties ?? {};
-  for (const [key, child] of Object.entries(properties)) {
+  for (const [key, child] of Object.entries(properties))
     failures.push(
       ...validatePanelActionInput(value[key], child, `${path}.${key}`),
     );
-  }
-  if (schema.additionalProperties === false) {
-    for (const key of Object.keys(value)) {
-      if (!(key in properties)) {
+  if (schema.additionalProperties === false)
+    for (const key of Object.keys(value))
+      if (!(key in properties))
         failures.push({
           path: `${path}.${key}`,
           message: "This field is not allowed.",
         });
-      }
-    }
-  }
   return failures;
+}
+
+export function cloneAndValidatePanelActionInvocation(
+  invocation: SettingsPanelActionInvocation,
+  definition: NonNullable<InternalPanelDefinition["actions"]>[number],
+): {
+  invocation: SettingsPanelActionInvocation;
+  failures: ValidationFailure[];
+} {
+  let cloned: SettingsPanelActionInvocation;
+  try {
+    cloned = cloneRendererValue(invocation);
+  } catch {
+    return {
+      invocation: {},
+      failures: [
+        { path: "invocation", message: "This invocation is invalid." },
+      ],
+    };
+  }
+  const parsed = v.safeParse(invocationCodec, cloned);
+  if (!parsed.success) {
+    const path = issuePath(parsed.issues) ?? "invocation";
+    return {
+      invocation: cloned,
+      failures: [{ path, message: "This invocation is invalid." }],
+    };
+  }
+  return {
+    invocation: cloned,
+    failures: [
+      ...validatePanelActionInput(cloned.params, definition.params, "params"),
+      ...validatePanelActionInput(cloned.value, definition.value, "value"),
+      ...validatePanelActionInput(cloned.fields, definition.fields, "fields"),
+    ],
+  };
 }

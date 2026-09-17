@@ -6,6 +6,8 @@ export const en = {
     },
     selectCategory: "Select a category from the sidebar",
     retry: "Retry",
+    back: "Back",
+    breadcrumbs: "Settings location",
     emptyPanel: "This panel has no available settings.",
     operationError: "Operation failed",
     operationPending: "Working…",

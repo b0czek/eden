@@ -1,10 +1,10 @@
 import type {
   EventData,
+  SettingsPanelActionInvocation,
   SettingsPanelActionResponse,
   SettingsPanelError,
   SettingsPanelResponse,
   SettingsPanelSummary,
-  SettingsPanelValue,
 } from "@edenapp/types";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
@@ -80,7 +80,7 @@ const App: Component = () => {
         { panelId },
       );
       if (request !== panelRequest || selectedPanelId() !== panelId) return;
-      if (response.error || !response.panel || !response.state) {
+      if (response.error || !response.panel) {
         setLoadedPanel(null);
         setPanelError(
           response.error ?? {
@@ -90,15 +90,7 @@ const App: Component = () => {
         );
         return;
       }
-      const declaration = response.panel;
-      const state = response.state;
-      setLoadedPanel((current) => ({
-        declaration:
-          !showLoading && current?.declaration.id === declaration.id
-            ? current.declaration
-            : declaration,
-        state,
-      }));
+      setLoadedPanel(response.panel);
     } catch {
       if (request !== panelRequest) return;
       setLoadedPanel(null);
@@ -137,8 +129,9 @@ const App: Component = () => {
   });
 
   const runAction = async (
+    instancePath: string,
     actionId: string,
-    input?: SettingsPanelValue,
+    invocation?: SettingsPanelActionInvocation,
   ): Promise<SettingsPanelActionResponse> => {
     const panelId = selectedPanelId();
     if (!panelId) {
@@ -151,14 +144,14 @@ const App: Component = () => {
       };
     }
 
-    setBusyActions((current) => new Set(current).add(actionId));
+    setBusyActions((current) => new Set(current).add(instancePath));
     setOperationError(null);
     let result: SettingsPanelActionResponse;
     try {
       result = await window.edenAPI.shellCommand("settings/action", {
         panelId,
         actionId,
-        input,
+        invocation,
       });
       if (result.error) setOperationError(result.error);
     } catch {
@@ -176,7 +169,7 @@ const App: Component = () => {
       await loadSelectedPanel(false);
       setBusyActions((current) => {
         const next = new Set(current);
-        next.delete(actionId);
+        next.delete(instancePath);
         return next;
       });
     }
@@ -193,11 +186,14 @@ const App: Component = () => {
       />
       <SettingsContent
         loading={() => loadingCatalog() || loadingPanel()}
+        panels={catalog}
+        selectedPanelId={selectedPanelId}
         loadedPanel={loadedPanel}
         panelError={panelError}
         operationError={operationError}
         busyActions={busyActions}
         onAction={runAction}
+        onSelect={setSelectedPanelId}
         onRetry={loadSelectedPanel}
       />
     </div>

@@ -860,7 +860,7 @@ export interface SettingsCommands {
     response: { panels: import("./index").SettingsPanelSummary[] };
   };
   /**
-   * Load one authorized panel declaration and its current state.
+   * Load one complete authorized panel snapshot.
    */
   "settings/panel": {
     args: { panelId: string };
@@ -873,7 +873,7 @@ export interface SettingsCommands {
     args: {
     panelId: string;
     actionId: string;
-    input?: import("./index").SettingsPanelValue };
+    invocation?: import("./index").SettingsPanelActionInvocation };
     response: import("./index").SettingsPanelActionResponse;
   };
 }

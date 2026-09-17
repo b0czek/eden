@@ -1,6 +1,7 @@
 import type {
   DaemonDefinition,
   DaemonStatus,
+  SettingsPanelDaemonsSnapshot,
   SettingsPanelValue,
   UserProfile,
 } from "@edenapp/types";
@@ -8,7 +9,7 @@ import { FiCpu, FiPlay, FiRefreshCw, FiSquare } from "solid-icons/fi";
 import type { Accessor } from "solid-js";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { getLocalizedValue, locale, t } from "../../i18n";
-import type { LoadedPanel, PanelAction } from "../../types";
+import type { PanelAction } from "../../types";
 import "./DaemonsTab.css";
 
 interface DaemonsPanelData {
@@ -17,12 +18,12 @@ interface DaemonsPanelData {
 }
 
 export default function DaemonsTab(props: {
-  panel: LoadedPanel;
+  panel: SettingsPanelDaemonsSnapshot;
   busyActions: Accessor<Set<string>>;
   onAction: PanelAction;
 }) {
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
-  const data = () => props.panel.state.data as unknown as DaemonsPanelData;
+  const data = () => props.panel.data as unknown as DaemonsPanelData;
   const selected = createMemo(
     () =>
       data()?.statuses.find((status) => status.appId === selectedId()) ??
@@ -30,12 +31,14 @@ export default function DaemonsTab(props: {
       null,
   );
   const busy = () => props.busyActions().size > 0;
-  const run = (actionId: string, input: SettingsPanelValue) =>
-    props.onAction(actionId, input);
+  const run = (actionId: string, params: Record<string, SettingsPanelValue>) =>
+    props.onAction(`daemons/${actionId}`, actionId, { params });
   const update = (definition: DaemonDefinition) =>
-    run("update-definition", {
-      definition,
-    } as unknown as SettingsPanelValue);
+    props.onAction("daemons/update-definition", "update-definition", {
+      value: {
+        definition,
+      } as unknown as SettingsPanelValue,
+    });
 
   return (
     <div class="daemon-management">
