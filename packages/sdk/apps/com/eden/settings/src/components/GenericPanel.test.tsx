@@ -473,4 +473,142 @@ describe("GenericPanel", () => {
     view.unmount();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
+
+  it("discards dialog drafts and errors when a field disappears", async () => {
+    const dialog = (
+      includeField: boolean,
+      value: string,
+    ): SettingsPanelView => ({
+      sections: [
+        {
+          id: "main",
+          nodes: [
+            {
+              kind: "dialog",
+              id: "profile",
+              label: "Profile",
+              buttonLabel: "Edit",
+              action: { actionId: "save" },
+              dialog: {
+                title: "Profile",
+                fields: includeField
+                  ? [{ id: "name", label: "Name", input: "text", value }]
+                  : [],
+                submitLabel: "Save",
+                cancelLabel: "Cancel",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const [loaded, setLoaded] = createSignal(panel(dialog(true, "initial")));
+    const view = render(() => (
+      <GenericPanel
+        panel={loaded()}
+        busyActions={() => new Set()}
+        onAction={async () => ({
+          success: false,
+          error: {
+            code: "validation",
+            message: "Invalid",
+            fields: { "fields.name": "Rejected" },
+          },
+        })}
+      />
+    ));
+    await fireEvent.click(view.getByText("Edit"));
+    const form = document.querySelector<HTMLFormElement>('form[role="dialog"]');
+    const input = form?.querySelector<HTMLInputElement>('input[name="name"]');
+    if (!form || !input) throw new Error("missing dialog");
+    await fireEvent.input(input, { target: { value: "draft" } });
+    await fireEvent.submit(form);
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("Rejected"),
+    );
+
+    setLoaded(panel(dialog(false, "unused")));
+    await waitFor(() =>
+      expect(form.querySelector('input[name="name"]')).toBeNull(),
+    );
+    setLoaded(panel(dialog(true, "restored")));
+    await waitFor(() =>
+      expect(
+        form.querySelector<HTMLInputElement>('input[name="name"]')?.value,
+      ).toBe("restored"),
+    );
+    expect(document.body.textContent).not.toContain("Rejected");
+    view.unmount();
+  });
+
+  it("discards dialog drafts when a field changes input kind", async () => {
+    const dialog = (
+      input: "text" | "password",
+      value?: string,
+    ): SettingsPanelView => ({
+      sections: [
+        {
+          id: "main",
+          nodes: [
+            {
+              kind: "dialog",
+              id: "credentials",
+              label: "Credentials",
+              buttonLabel: "Edit",
+              action: { actionId: "save" },
+              dialog: {
+                title: "Credentials",
+                fields: [
+                  input === "password"
+                    ? { id: "credential", label: "Credential", input }
+                    : { id: "credential", label: "Credential", input, value },
+                ],
+                submitLabel: "Save",
+                cancelLabel: "Cancel",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const [loaded, setLoaded] = createSignal(panel(dialog("password")));
+    const view = render(() => (
+      <GenericPanel
+        panel={loaded()}
+        busyActions={() => new Set()}
+        onAction={async () => ({ success: true })}
+      />
+    ));
+    await fireEvent.click(view.getByText("Edit"));
+    const form = document.querySelector<HTMLFormElement>('form[role="dialog"]');
+    const password = form?.querySelector<HTMLInputElement>(
+      'input[name="credential"]',
+    );
+    if (!form || !password) throw new Error("missing dialog");
+    await fireEvent.input(password, { target: { value: "secret" } });
+
+    setLoaded(panel(dialog("text", "visible default")));
+    await waitFor(() => {
+      const text = form.querySelector<HTMLInputElement>(
+        'input[name="credential"]',
+      );
+      expect(text?.type).toBe("text");
+      expect(text?.value).toBe("visible default");
+    });
+    const text = form.querySelector<HTMLInputElement>(
+      'input[name="credential"]',
+    );
+    if (!text) throw new Error("missing text field");
+    await fireEvent.input(text, { target: { value: "text draft" } });
+
+    setLoaded(panel(dialog("password")));
+    await waitFor(() => {
+      const nextPassword = form.querySelector<HTMLInputElement>(
+        'input[name="credential"]',
+      );
+      expect(nextPassword?.type).toBe("password");
+      expect(nextPassword?.value).toBe("");
+    });
+    view.unmount();
+  });
 });
