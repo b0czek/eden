@@ -32,7 +32,7 @@
   "devDependencies": {
     "@edenapp/types": "workspace:*",
     "@iconify-json/noto": "^1.2.7",
-    "@iconify/utils": "^3.1.4",
+    "@iconify/utils": "^3.1.7",
     "typescript": "catalog:"
   },
   "keywords": [
