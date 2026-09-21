@@ -94,8 +94,9 @@
 .eden-select {
   font-family: var(--eden-font-family-base);
   font-size: var(--eden-font-size-md);
-  padding: var(--eden-space-md) var(--eden-space-md);
-  padding-right: var(--eden-space-2xl);
+  line-height: var(--eden-font-line-height-normal);
+  min-height: calc(3 * var(--eden-space-md));
+  padding: 0 var(--eden-space-md);
   border-radius: var(--eden-radius-md);
   border: 1px solid var(--eden-color-border-light);
 
@@ -109,10 +110,7 @@
   width: 100%;
   cursor: pointer;
 
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23eff4ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--eden-space-md) center;
+  appearance: base-select;
 }
 
 .eden-select:hover {
@@ -123,6 +121,60 @@
 .eden-select:focus {
   border-color: var(--eden-color-accent-primary);
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+}
+
+.eden-select::picker-icon {
+  color: var(--eden-color-text-muted);
+  transition: rotate var(--eden-transition-base);
+}
+
+.eden-select:open::picker-icon {
+  rotate: 180deg;
+}
+
+.eden-select::picker(select) {
+  appearance: base-select;
+  width: anchor-size(width);
+  max-height: min(320px, 50vh);
+  margin-top: var(--eden-space-xs);
+  padding: var(--eden-space-xs);
+  overflow-y: auto;
+  border: 1px solid var(--eden-color-border-medium);
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-bg-secondary);
+  color: var(--eden-color-text-primary);
+  box-shadow: var(--eden-shadow-xl);
+}
+
+.eden-select option {
+  min-height: calc(3 * var(--eden-space-md));
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  padding: 0 var(--eden-space-md);
+  border-radius: var(--eden-radius-sm);
+  background: transparent;
+  color: var(--eden-color-text-primary);
+  cursor: pointer;
+}
+
+.eden-select option:hover,
+.eden-select option:focus {
+  background: var(--eden-color-surface-hover);
+}
+
+.eden-select option:checked {
+  background: var(--eden-color-surface-active);
+  font-weight: var(--eden-font-weight-medium);
+}
+
+.eden-select option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eden-select option::checkmark {
+  color: var(--eden-color-accent-primary);
 }
 
 /* ===== Checkbox ===== */
