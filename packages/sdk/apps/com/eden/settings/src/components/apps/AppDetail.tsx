@@ -43,9 +43,9 @@ const formatBytes = (bytes?: number): string => {
 
 const AppDetail: Component<AppDetailProps> = (props) => {
   return (
-    <div class="eden-card eden-card-glass eden-flex-col eden-gap-md">
-      <div class="eden-card-header eden-flex eden-flex-between eden-items-center">
-        <div class="eden-flex eden-items-center eden-gap-md">
+    <div class="eden-card eden-card-glass eden-flex-col eden-gap-md app-detail-card">
+      <div class="eden-card-header eden-flex eden-flex-between eden-items-center app-detail-header">
+        <div class="eden-flex eden-items-center eden-gap-md app-detail-header-main">
           <button
             type="button"
             class="eden-btn eden-btn-ghost eden-btn-icon"
@@ -54,7 +54,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           >
             <FiArrowLeft />
           </button>
-          <div class="eden-flex eden-items-center eden-gap-md">
+          <div class="eden-flex eden-items-center eden-gap-md app-detail-identity">
             <div
               class={
                 props.appIcon
@@ -82,12 +82,12 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 />
               </Show>
             </div>
-            <div class="eden-flex eden-flex-col">
-              <h3 class="eden-card-title">
+            <div class="eden-flex eden-flex-col app-detail-heading">
+              <h3 class="eden-card-title app-detail-title">
                 {getLocalizedValue(props.app.name, locale())}
               </h3>
-              <div class="eden-flex eden-gap-xs eden-items-center">
-                <span class="eden-text-xs eden-text-tertiary">
+              <div class="eden-flex eden-gap-xs eden-items-center app-detail-id-row">
+                <span class="eden-text-xs eden-text-tertiary app-detail-id">
                   {props.app.id}
                 </span>
                 <Show when={props.app.isPrebuilt}>
@@ -100,7 +100,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           </div>
         </div>
 
-        <div class="eden-flex eden-gap-sm eden-items-center">
+        <div class="eden-flex eden-gap-sm eden-items-center app-detail-actions">
           <Show when={props.app.frontend?.entry}>
             <label class="eden-flex eden-items-center eden-gap-sm eden-text-sm eden-text-secondary eden-interactive">
               <span>{t("settings.apps.autostart")}</span>
@@ -155,7 +155,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               : t("settings.apps.noDescription"))}
         </div>
 
-        <div class="eden-grid eden-grid-2 eden-gap-md">
+        <div class="eden-grid eden-grid-2 eden-gap-md app-detail-metadata">
           <div class="eden-flex eden-flex-col eden-gap-xs">
             <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-tracking-wide eden-font-bold">
               {t("common.version")}
@@ -199,7 +199,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           <h4 class="eden-text-sm eden-font-semibold">
             {t("settings.apps.details.capabilities")}
           </h4>
-          <div class="eden-flex eden-gap-xs eden-flex-wrap">
+          <div class="eden-flex eden-gap-xs eden-flex-wrap app-detail-badges">
             <Show
               when={
                 props.app.frontend ||
@@ -241,7 +241,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
           <h4 class="eden-text-sm eden-font-semibold">
             {t("settings.apps.details.permissions")}
           </h4>
-          <div class="eden-flex eden-gap-xs eden-flex-wrap">
+          <div class="eden-flex eden-gap-xs eden-flex-wrap app-detail-badges">
             <Show
               when={(props.app.permissions?.length ?? 0) > 0}
               fallback={

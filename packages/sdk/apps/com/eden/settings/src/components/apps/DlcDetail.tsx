@@ -26,9 +26,9 @@ const DlcDetail: Component<{
   onBack: () => void;
   onUninstall: () => void;
 }> = (props) => (
-  <div class="eden-card eden-card-glass eden-flex-col eden-gap-md">
-    <div class="eden-card-header eden-flex eden-flex-between eden-items-center">
-      <div class="eden-flex eden-items-center eden-gap-md">
+  <div class="eden-card eden-card-glass eden-flex-col eden-gap-md app-detail-card">
+    <div class="eden-card-header eden-flex eden-flex-between eden-items-center app-detail-header">
+      <div class="eden-flex eden-items-center eden-gap-md app-detail-header-main">
         <button
           type="button"
           class="eden-btn eden-btn-ghost eden-btn-icon"
@@ -42,12 +42,14 @@ const DlcDetail: Component<{
             <img src={props.icon} alt="" />
           </Show>
         </div>
-        <div class="eden-flex eden-flex-col eden-gap-xs">
-          <h3 class="eden-card-title">
+        <div class="eden-flex eden-flex-col eden-gap-xs app-detail-heading">
+          <h3 class="eden-card-title app-detail-title">
             {getLocalizedValue(props.dlc.name, locale())}
           </h3>
-          <div class="eden-flex eden-items-center eden-gap-xs">
-            <span class="eden-text-xs eden-text-tertiary">{props.dlc.id}</span>
+          <div class="eden-flex eden-items-center eden-gap-xs app-detail-id-row">
+            <span class="eden-text-xs eden-text-tertiary app-detail-id">
+              {props.dlc.id}
+            </span>
             <span class="eden-badge eden-badge-primary eden-badge-sm">
               {t("settings.apps.dlc")}
             </span>
@@ -62,7 +64,7 @@ const DlcDetail: Component<{
       <Show when={!props.dlc.isPrebuilt}>
         <button
           type="button"
-          class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon"
+          class="eden-btn eden-btn-danger eden-btn-sm eden-btn-icon app-detail-uninstall"
           disabled={props.uninstalling}
           onClick={props.onUninstall}
           title={t("settings.apps.uninstallDlc")}
@@ -77,7 +79,7 @@ const DlcDetail: Component<{
       <p class="eden-text-sm eden-text-secondary">
         {props.dlc.description || t("settings.apps.noDescription")}
       </p>
-      <div class="eden-grid eden-grid-2 eden-gap-md">
+      <div class="eden-grid eden-grid-2 eden-gap-md app-detail-metadata">
         <div class="eden-flex eden-flex-col eden-gap-xs">
           <span class="eden-text-xs eden-text-tertiary eden-uppercase eden-font-bold">
             {t("settings.apps.host")}
@@ -105,7 +107,7 @@ const DlcDetail: Component<{
         <h4 class="eden-text-sm eden-font-semibold">
           {t("settings.apps.extensionPoints")}
         </h4>
-        <div class="eden-flex eden-flex-wrap eden-gap-xs">
+        <div class="eden-flex eden-flex-wrap eden-gap-xs app-detail-badges">
           <For each={props.dlc.contributions}>
             {(contribution) => (
               <span class="eden-tag">

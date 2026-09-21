@@ -83,8 +83,8 @@ export default function DaemonsTab(props: {
           <Show when={selected()}>
             {(status) => (
               <div class="eden-card eden-card-glass daemon-detail">
-                <div class="eden-card-header eden-flex-between">
-                  <div>
+                <div class="eden-card-header eden-flex-between daemon-detail-header">
+                  <div class="daemon-detail-heading">
                     <h3 class="eden-card-title">
                       {getLocalizedValue(status().name, locale())}
                     </h3>
@@ -179,7 +179,7 @@ export default function DaemonsTab(props: {
                   <Show when={status().lastError}>
                     {(message) => <div class="daemon-error">{message()}</div>}
                   </Show>
-                  <div class="eden-flex eden-gap-sm">
+                  <div class="eden-flex eden-gap-sm daemon-actions">
                     <button
                       type="button"
                       class="eden-btn eden-btn-success"

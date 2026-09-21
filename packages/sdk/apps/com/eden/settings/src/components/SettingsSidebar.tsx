@@ -59,18 +59,21 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
     }
   };
 
+  const panelTitle = (panel: SettingsPanelSummary) =>
+    getLocalizedValue(panel.title, locale());
+
   const item = (panel: SettingsPanelSummary) => (
     <button
       type="button"
       class={`eden-sidebar-item ${
         selectedRootId() === panel.id ? "eden-sidebar-item-selected" : ""
       }`}
+      aria-label={panelTitle(panel)}
+      title={panelTitle(panel)}
       onClick={() => props.onSelect(panel.id)}
     >
       <div class="eden-sidebar-item-icon">{icon(panel)}</div>
-      <span class="eden-sidebar-item-text">
-        {getLocalizedValue(panel.title, locale())}
-      </span>
+      <span class="eden-sidebar-item-text">{panelTitle(panel)}</span>
     </button>
   );
 
@@ -94,7 +97,10 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
             <Show
               when={applicationPanels().length > 0}
               fallback={
-                <div class="eden-sidebar-item eden-sidebar-item-disabled">
+                <div
+                  class="eden-sidebar-item eden-sidebar-item-disabled"
+                  title={t("settings.sidebar.noAppsWithSettings")}
+                >
                   <div class="eden-sidebar-item-icon">
                     <FiPackage />
                   </div>

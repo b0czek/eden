@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--eden-space-md);
+  container-type: inline-size;
 }
 
 .daemon-layout {
@@ -22,6 +23,37 @@
 
 .daemon-detail {
   align-self: stretch;
+}
+
+.daemon-detail-header {
+  gap: var(--eden-space-md);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.daemon-detail-heading {
+  flex: 1 1 12rem;
+}
+
+.daemon-detail-heading,
+.daemon-list .eden-list-item-content {
+  min-width: 0;
+}
+
+.daemon-detail-heading .eden-card-title,
+.daemon-detail-heading .eden-card-subtitle {
+  overflow-wrap: anywhere;
+}
+
+.daemon-list .eden-list-item-title,
+.daemon-list .eden-list-item-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daemon-actions {
+  flex-wrap: wrap;
 }
 
 .daemon-state {
@@ -51,14 +83,27 @@
   font-size: var(--eden-font-size-sm);
 }
 
-@media (max-width: 720px) {
+@container (max-width: 700px) {
   .daemon-layout {
     grid-template-columns: 1fr;
     overflow-y: auto;
   }
 
-  .daemon-list,
+  .daemon-list {
+    overflow: visible;
+  }
+
   .daemon-detail {
     overflow: visible;
+    padding: var(--eden-space-sm);
+  }
+
+  .daemon-detail-header,
+  .daemon-detail .eden-card-body {
+    padding: var(--eden-space-md);
+  }
+
+  .daemon-actions .eden-btn {
+    flex: 1 1 7rem;
   }
 }

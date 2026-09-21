@@ -2,6 +2,25 @@
 .apps-management {
   flex: 1;
   min-height: 0;
+  container-type: inline-size;
+}
+
+.apps-management .eden-list-item-content,
+.app-detail-header-main,
+.app-detail-identity,
+.app-detail-heading {
+  min-width: 0;
+}
+
+.app-detail-heading {
+  flex: 1;
+}
+
+.apps-management .eden-list-item-title,
+.apps-management .eden-list-item-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-list-icon-img {
@@ -34,4 +53,59 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.app-detail-header {
+  gap: var(--eden-space-md);
+}
+
+.app-detail-actions,
+.app-detail-id-row {
+  flex-wrap: wrap;
+}
+
+.app-detail-title,
+.app-detail-id,
+.app-detail-badges > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.app-detail-metadata {
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+@container (max-width: 700px) {
+  .app-detail-card {
+    padding: var(--eden-space-sm);
+  }
+
+  .app-detail-header,
+  .app-detail-card > .eden-card-body {
+    padding: var(--eden-space-md);
+  }
+
+  .app-detail-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-detail-header-main {
+    align-items: flex-start;
+  }
+
+  .app-detail-identity {
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  .app-detail-actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  .app-detail-header > .app-detail-uninstall {
+    align-self: flex-end;
+  }
 }

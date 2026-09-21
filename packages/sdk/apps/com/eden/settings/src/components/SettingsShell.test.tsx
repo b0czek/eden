@@ -41,6 +41,12 @@ describe("Settings shell", () => {
     expect(
       view.container.querySelectorAll(".settings-sidebar-scroll").length,
     ).toBe(1);
+    expect(
+      view.getByRole("button", { name: "General" }).getAttribute("title"),
+    ).toBe("General");
+    expect(
+      view.getByRole("button", { name: "Example App" }).getAttribute("title"),
+    ).toBe("Example App");
   });
 
   it("renders loading and retryable errors", async () => {
