@@ -7,4 +7,4 @@ Replace host settings panel declarations and state overlays with complete valida
 
 Keep controls synchronized after rejected or unchanged actions, isolate radio selections between node instances, and discard dialog drafts and errors when fields disappear or change input kind.
 
-Keep settings navigation and management views usable in narrow spaces by collapsing the sidebar to labeled icon actions and reflowing daemon and package details around their available panel width. Render resolved settings in grouped, responsive rows instead of leaving the new panel markup unstyled, and match select pickers to their controls with consistent Eden styling and option heights.
+Keep settings navigation and management views usable in narrow spaces by collapsing the sidebar to labeled icon actions and reflowing daemon and package details around their available panel width. Render resolved settings in grouped, responsive rows instead of leaving the new panel markup unstyled, and match select pickers to their controls with consistent Eden styling, centered values, and option heights.

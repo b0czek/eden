@@ -109,6 +109,7 @@
   transition: all var(--eden-transition-base);
   width: 100%;
   cursor: pointer;
+  align-items: center;
 
   appearance: base-select;
 }
