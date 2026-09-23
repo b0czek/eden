@@ -383,8 +383,6 @@ export class KeyboardManager {
       return { success: false };
     }
 
-    this.mainWindow?.focus();
-    this.viewManager.focusView(target.viewId);
     const sent = this.viewManager.sendToView(
       target.viewId,
       CHANNEL_APPLY_ACTION,
