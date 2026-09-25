@@ -145,3 +145,23 @@ Password fields are allowed only in dialogs and cannot have a provider-supplied 
 Set `parentId` on independently registered children and register the parent first. Root panels appear in the sidebar; children appear inside their parent with back and breadcrumb navigation at arbitrary depth.
 
 The active user must be authorized for the selected panel and every ancestor. Parent and child must share an ownership domain: host with host, Eden with Eden, or the same application owner. A public registration cannot be unregistered while descendants remain; unregister descendants first. Registration lifetimes never cascade through the public host API.
+
+For a host navigation category with no controls or grant of its own, register an empty parent panel first:
+
+```ts
+const parent = eden.settings.registerPanel(
+  { id: "acme.device", title: { en: "Device", pl: "Urządzenie" } },
+  { load: () => ({ sections: [] }) },
+);
+eden.settings.registerPanel(
+  {
+    id: "acme.display",
+    parentId: parent.panelId,
+    title: { en: "Display", pl: "Ekran" },
+    grant: "settings-panels/acme.display",
+  },
+  displayProvider,
+);
+```
+
+Omitting `grant` adds no permission check for that panel. A root without a grant is public; a child without a grant inherits its ancestors' access requirements. A child with its own grant must satisfy that grant as well as its ancestors' grants. The empty parent remains visible even when none of its children are accessible.

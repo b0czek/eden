@@ -12,9 +12,7 @@ import type {
 } from "@edenapp/types";
 import * as v from "valibot";
 
-export type InternalPanelDefinition = Omit<SettingsPanelDefinition, "grant"> & {
-  grant?: string;
-};
+export type InternalPanelDefinition = SettingsPanelDefinition;
 export interface ValidationFailure {
   path: string;
   message: string;

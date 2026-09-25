@@ -22,6 +22,7 @@ export function canOpenPanel(
   if (!record.visible) return false;
   if (record.definition.grant)
     return hasUserGrant(user, record.definition.grant);
+  if (record.source === "host") return true;
   if (!record.generatedSettings || !record.ownerAppId) return false;
   return record.generatedSettings.some((category) =>
     category.settings.some((setting) =>

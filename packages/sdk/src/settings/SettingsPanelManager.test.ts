@@ -10,6 +10,77 @@ const emptyProvider = () => ({
 });
 
 describe("SettingsPanelManager registration", () => {
+  it("keeps child grants independent under a public parent", async () => {
+    const { manager, setUser } = harness(user(["panels/display"]));
+    const parent = manager.registerPanel(
+      { id: "vendor.device", title: "Device" },
+      { load: async () => ({ sections: [] }) },
+    );
+    manager.registerPanel(
+      definition({
+        id: "vendor.display",
+        parentId: parent.panelId,
+        grant: "panels/display",
+        actions: [],
+      }),
+      { load: async () => ({ sections: [] }) },
+    );
+    manager.registerPanel(
+      definition({
+        id: "vendor.wifi",
+        parentId: parent.panelId,
+        grant: "panels/wifi",
+        actions: [],
+      }),
+      { load: async () => ({ sections: [] }) },
+    );
+
+    expect((await manager.listPanels()).map(({ id }) => id)).toEqual([
+      "vendor.device",
+      "vendor.display",
+    ]);
+    expect(manager.listGrantOptions().map(({ grant }) => grant)).toEqual([
+      "panels/display",
+      "panels/wifi",
+    ]);
+    expect(await manager.loadPanel("vendor.device")).toMatchObject({
+      panel: { id: "vendor.device", view: { sections: [] } },
+    });
+    expect(await manager.loadPanel("vendor.wifi")).toMatchObject({
+      error: { code: "authorization" },
+    });
+
+    setUser(user(["panels/wifi"]));
+    expect((await manager.listPanels()).map(({ id }) => id)).toEqual([
+      "vendor.device",
+      "vendor.wifi",
+    ]);
+    setUser(user([]));
+    expect((await manager.listPanels()).map(({ id }) => id)).toEqual([
+      "vendor.device",
+    ]);
+    expect(() => parent.unregister()).toThrow("child panel");
+  });
+
+  it("lets a grantless child inherit its parent's access", async () => {
+    const { manager, setUser } = harness(user([]));
+    const parent = manager.registerPanel(
+      definition({ id: "vendor.root", grant: "panels/root", actions: [] }),
+      { load: async () => ({ sections: [] }) },
+    );
+    manager.registerPanel(
+      { id: "vendor.child", parentId: parent.panelId, title: "Child" },
+      { load: async () => ({ sections: [] }) },
+    );
+
+    expect(await manager.listPanels()).toEqual([]);
+    setUser(user(["panels/root"]));
+    expect((await manager.listPanels()).map(({ id }) => id)).toEqual([
+      "vendor.root",
+      "vendor.child",
+    ]);
+  });
+
   it("rejects reserved, duplicate, malformed, incomplete, and cross-owner registrations", () => {
     const { manager } = harness();
     expect(() =>

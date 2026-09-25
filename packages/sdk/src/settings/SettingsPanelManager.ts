@@ -98,9 +98,6 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
         `Panel ID "${definition.id}" uses an Eden-reserved prefix`,
       );
     }
-    if (!definition.grant?.trim()) {
-      throw new Error("Host settings panels require a panel grant");
-    }
     return this.register(
       definition,
       provider,

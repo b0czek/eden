@@ -87,7 +87,8 @@ export interface SettingsPanelDefinition {
   title: SettingsPanelLocalizedText;
   description?: SettingsPanelLocalizedText;
   icon?: string;
-  grant: SettingsPanelGrant;
+  /** Omit to add no grant requirement beyond the parent panel, if any. */
+  grant?: SettingsPanelGrant;
   actions?: SettingsPanelActionDefinition[];
 }
 
