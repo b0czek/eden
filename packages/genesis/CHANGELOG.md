@@ -1,5 +1,12 @@
 # @edenapp/genesis
 
+## 0.14.0
+
+### Patch Changes
+
+- Updated dependencies [f878857]
+  - @edenapp/types@0.14.0
+
 ## 0.13.0
 
 ### Minor Changes
