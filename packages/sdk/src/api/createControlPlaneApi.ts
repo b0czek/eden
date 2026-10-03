@@ -1,6 +1,7 @@
 import type { AppAssociationManager } from "../app-associations";
 import type { AppearanceManager } from "../appearance/AppearanceManager";
 import type { DaemonManager } from "../daemon";
+import type { VolumeManager } from "../filesystem/VolumeManager";
 import type { PackageManager } from "../package-manager";
 import type { SessionManager } from "../session";
 import type { UserManager } from "../user";
@@ -11,6 +12,7 @@ import type {
   EdenPackagesApi,
   EdenSessionsApi,
   EdenUsersApi,
+  EdenVolumesApi,
 } from "./ControlPlaneApi";
 
 export interface EdenControlPlaneApis {
@@ -20,6 +22,7 @@ export interface EdenControlPlaneApis {
   sessions: EdenSessionsApi;
   appearance: EdenAppearanceApi;
   associations: EdenAssociationsApi;
+  volumes: EdenVolumesApi;
 }
 
 interface Dependencies {
@@ -29,6 +32,7 @@ interface Dependencies {
   sessionManager: SessionManager;
   appearanceManager: AppearanceManager;
   associationManager: AppAssociationManager;
+  volumeManager: VolumeManager;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -40,6 +44,7 @@ export function createControlPlaneApis({
   sessionManager,
   appearanceManager,
   associationManager,
+  volumeManager,
 }: Dependencies): EdenControlPlaneApis {
   const packages: EdenPackagesApi = {
     list: (options) =>
@@ -54,10 +59,10 @@ export function createControlPlaneApis({
     getIcon: (packageId) => packageManager.getPackageIcon(packageId),
     getSize: (packageId) => packageManager.getPackageSize(packageId),
     inspect: async (sourcePath) =>
-      clone(await packageManager.getPackageInfo(sourcePath)),
+      clone(await packageManager.getPackageInfoFromHostPath(sourcePath)),
     install: async (sourcePath, options) =>
       clone(
-        await packageManager.installPackage(
+        await packageManager.installPackageFromHostPath(
           sourcePath,
           options?.replace === true,
         ),
@@ -147,7 +152,18 @@ export function createControlPlaneApis({
     remove: (key) => associationManager.remove(key),
   };
 
+  const volumes: EdenVolumesApi = {
+    register: (input) => volumeManager.register(clone(input)),
+    unregister: (id) => volumeManager.unregister(id),
+    list: () => volumeManager.list(),
+    onChanged: (listener) =>
+      volumeManager.on("volumes-changed", ({ volumes }) =>
+        listener(clone(volumes)),
+      ),
+  };
+
   return {
+    volumes,
     packages,
     daemons,
     users,

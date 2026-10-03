@@ -1,6 +1,7 @@
 import type {
   AppManifest,
   EdenConfig,
+  FilesystemLocation,
   TileLayoutDirection,
   TileLayoutState,
   ViewBounds,
@@ -264,6 +265,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     installPath: string,
     bounds: Bounds | undefined,
     launchArgs?: string[],
+    launchFile?: FilesystemLocation,
   ): number {
     if (!isWindowAlive(this.mainWindow)) {
       throw new Error("Main window not set. Call setMainWindow first.");
@@ -276,6 +278,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       bounds,
       this.views.values(),
       launchArgs,
+      launchFile,
     );
 
     const viewId = viewInfo.id;

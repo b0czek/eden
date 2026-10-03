@@ -110,7 +110,9 @@ describe("FilesystemManager native watch integration", () => {
   };
 
   it("delivers real filesystem changes and stops after unwatch", async () => {
-    const { watchId } = (await invokeFromView("fs/watch", { path: "/" })) as {
+    const { watchId } = (await invokeFromView("fs/watch", {
+      location: { path: "/", volume: "home" },
+    })) as {
       watchId: string;
     };
 
@@ -137,7 +139,7 @@ describe("FilesystemManager native watch integration", () => {
     );
     await expectChange(() =>
       invokeFromView("fs/write", {
-        path: "/eden.txt",
+        location: { path: "/eden.txt", volume: "home" },
         content: "internal",
       }).then(() => undefined),
     );
@@ -158,10 +160,14 @@ describe("FilesystemManager native watch integration", () => {
       "content",
     );
     await expect(
-      invokeFromView("fs/watch", { path: "/file.txt" }),
+      invokeFromView("fs/watch", {
+        location: { path: "/file.txt", volume: "home" },
+      }),
     ).rejects.toThrow("is not a directory");
 
-    const { watchId } = (await invokeFromView("fs/watch", { path: "/" })) as {
+    const { watchId } = (await invokeFromView("fs/watch", {
+      location: { path: "/", volume: "home" },
+    })) as {
       watchId: string;
     };
     eden.runtime.resolve(PackageRegistry).register({
@@ -202,23 +208,27 @@ describe("FilesystemManager native watch integration", () => {
   });
 
   it("refreshes watches for both directories after a cross-directory move", async () => {
-    await invokeFromView("fs/mkdir", { path: "/source" });
-    await invokeFromView("fs/mkdir", { path: "/destination" });
+    await invokeFromView("fs/mkdir", {
+      location: { path: "/source", volume: "home" },
+    });
+    await invokeFromView("fs/mkdir", {
+      location: { path: "/destination", volume: "home" },
+    });
     await invokeFromView("fs/write", {
-      path: "/source/item.txt",
+      location: { path: "/source/item.txt", volume: "home" },
       content: "moved",
     });
     const sourceWatch = (await invokeFromView("fs/watch", {
-      path: "/source",
+      location: { path: "/source", volume: "home" },
     })) as { watchId: string };
     const destinationWatch = (await invokeFromView("fs/watch", {
-      path: "/destination",
+      location: { path: "/destination", volume: "home" },
     })) as { watchId: string };
 
     eden.platform.effects.splice(0);
     await invokeFromView("fs/mv", {
-      from: "/source/item.txt",
-      to: "/destination/item.txt",
+      from: { volume: "home", path: "/source/item.txt" },
+      to: { volume: "home", path: "/destination/item.txt" },
     });
 
     await waitForChange(sourceWatch.watchId);
@@ -259,20 +269,23 @@ describe("FilesystemManager integration", () => {
 
     await eden.execute(
       "fs/write",
-      { path: "/authorized.txt", content: "allowed" },
+      {
+        location: { path: "/authorized.txt", volume: "home" },
+        content: "allowed",
+      },
       caller("authorized-app", profile),
     );
     await expect(
       eden.execute(
         "fs/read",
-        { path: "/authorized.txt" },
+        { location: { path: "/authorized.txt", volume: "home" } },
         caller("authorized-app", profile),
       ),
     ).resolves.toBe("allowed");
     await expect(
       eden.execute(
         "fs/resolve",
-        { path: "/authorized.txt" },
+        { location: { path: "/authorized.txt", volume: "home" } },
         caller("authorized-app", profile),
       ),
     ).rejects.toThrow("Permission denied: fs/resolve");
@@ -285,7 +298,7 @@ describe("FilesystemManager integration", () => {
     await expect(
       eden.execute(
         "fs/resolve",
-        { path: "/authorized.txt" },
+        { location: { path: "/authorized.txt", volume: "home" } },
         caller("authorized-app", profile),
       ),
     ).resolves.toEqual({
@@ -294,7 +307,10 @@ describe("FilesystemManager integration", () => {
     await expect(
       eden.execute(
         "fs/write",
-        { path: "/denied.txt", content: "blocked" },
+        {
+          location: { path: "/denied.txt", volume: "home" },
+          content: "blocked",
+        },
         caller("unauthorized-app", profile),
       ),
     ).rejects.toThrow("Permission denied: fs/write");
@@ -309,7 +325,10 @@ describe("FilesystemManager integration", () => {
 
     await eden.execute(
       "fs/write-binary",
-      { path: "/binary/nested/data.bin", content },
+      {
+        location: { path: "/binary/nested/data.bin", volume: "home" },
+        content,
+      },
       transferCaller,
     );
 
@@ -320,7 +339,7 @@ describe("FilesystemManager integration", () => {
     ).resolves.toEqual(Buffer.from(content));
     const result = await eden.execute<Uint8Array>(
       "fs/read-binary",
-      { path: "/binary/nested/data.bin" },
+      { location: { path: "/binary/nested/data.bin", volume: "home" } },
       transferCaller,
     );
     expect(result).toBeInstanceOf(Uint8Array);
@@ -331,34 +350,56 @@ describe("FilesystemManager integration", () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(
       "fs/write",
-      { path: "/file.txt", content: "file contents" },
+      {
+        location: { path: "/file.txt", volume: "home" },
+        content: "file contents",
+      },
       transferCaller,
     );
-    await eden.execute("fs/mkdir", { path: "/tree/nested" }, transferCaller);
+    await eden.execute(
+      "fs/mkdir",
+      { location: { path: "/tree/nested", volume: "home" } },
+      transferCaller,
+    );
     await eden.execute(
       "fs/write",
-      { path: "/tree/nested/data.txt", content: "nested contents" },
+      {
+        location: { path: "/tree/nested/data.txt", volume: "home" },
+        content: "nested contents",
+      },
       transferCaller,
     );
 
     await eden.execute(
       "fs/cp",
-      { from: "/file.txt", to: "/copies/file.txt" },
+      {
+        from: { volume: "home", path: "/file.txt" },
+        to: { volume: "home", path: "/copies/file.txt" },
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/cp",
-      { from: "/tree", to: "/copies/tree" },
+      {
+        from: { volume: "home", path: "/tree" },
+        to: { volume: "home", path: "/copies/tree" },
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/mv",
-      { from: "/file.txt", to: "/moved/file.txt" },
+      {
+        from: { volume: "home", path: "/file.txt" },
+        to: { volume: "home", path: "/moved/file.txt" },
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/mv",
-      { from: "/tree", to: "/moved/tree" },
+      {
+        from: { volume: "home", path: "/tree" },
+        to: { volume: "home", path: "/moved/tree" },
+      },
       transferCaller,
     );
 
@@ -410,36 +451,54 @@ describe("FilesystemManager integration", () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(
       "fs/write",
-      { path: "/copy-source.txt", content: "new copy" },
+      {
+        location: { path: "/copy-source.txt", volume: "home" },
+        content: "new copy",
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/write",
-      { path: "/copy-target.txt", content: "old copy" },
+      {
+        location: { path: "/copy-target.txt", volume: "home" },
+        content: "old copy",
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/write",
-      { path: "/move-source.txt", content: "new move" },
+      {
+        location: { path: "/move-source.txt", volume: "home" },
+        content: "new move",
+      },
       transferCaller,
     );
     await eden.execute(
       "fs/write",
-      { path: "/move-target.txt", content: "old move" },
+      {
+        location: { path: "/move-target.txt", volume: "home" },
+        content: "old move",
+      },
       transferCaller,
     );
 
     await expect(
       eden.execute(
         "fs/cp",
-        { from: "/copy-source.txt", to: "/copy-target.txt" },
+        {
+          from: { volume: "home", path: "/copy-source.txt" },
+          to: { volume: "home", path: "/copy-target.txt" },
+        },
         transferCaller,
       ),
     ).rejects.toThrow("already exists");
     await expect(
       eden.execute(
         "fs/mv",
-        { from: "/move-source.txt", to: "/move-target.txt" },
+        {
+          from: { volume: "home", path: "/move-source.txt" },
+          to: { volume: "home", path: "/move-target.txt" },
+        },
         transferCaller,
       ),
     ).rejects.toThrow("already exists");
@@ -459,8 +518,8 @@ describe("FilesystemManager integration", () => {
     await eden.execute(
       "fs/cp",
       {
-        from: "/copy-source.txt",
-        to: "/copy-target.txt",
+        from: { volume: "home", path: "/copy-source.txt" },
+        to: { volume: "home", path: "/copy-target.txt" },
         overwrite: true,
       },
       transferCaller,
@@ -468,8 +527,8 @@ describe("FilesystemManager integration", () => {
     await eden.execute(
       "fs/mv",
       {
-        from: "/move-source.txt",
-        to: "/move-target.txt",
+        from: { volume: "home", path: "/move-source.txt" },
+        to: { volume: "home", path: "/move-target.txt" },
         overwrite: true,
       },
       transferCaller,
@@ -494,22 +553,40 @@ describe("FilesystemManager integration", () => {
 
   it("replaces complete directory targets without merging", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    await eden.execute("fs/mkdir", { path: "/source/nested" }, transferCaller);
     await eden.execute(
-      "fs/write",
-      { path: "/source/nested/new.txt", content: "new" },
+      "fs/mkdir",
+      { location: { path: "/source/nested", volume: "home" } },
       transferCaller,
     );
-    await eden.execute("fs/mkdir", { path: "/target/stale" }, transferCaller);
     await eden.execute(
       "fs/write",
-      { path: "/target/stale/old.txt", content: "old" },
+      {
+        location: { path: "/source/nested/new.txt", volume: "home" },
+        content: "new",
+      },
+      transferCaller,
+    );
+    await eden.execute(
+      "fs/mkdir",
+      { location: { path: "/target/stale", volume: "home" } },
+      transferCaller,
+    );
+    await eden.execute(
+      "fs/write",
+      {
+        location: { path: "/target/stale/old.txt", volume: "home" },
+        content: "old",
+      },
       transferCaller,
     );
 
     await eden.execute(
       "fs/cp",
-      { from: "/source", to: "/target", overwrite: true },
+      {
+        from: { volume: "home", path: "/source" },
+        to: { volume: "home", path: "/target" },
+        overwrite: true,
+      },
       transferCaller,
     );
 
@@ -531,30 +608,57 @@ describe("FilesystemManager integration", () => {
 
   it("rejects same-path and descendant directory transfers", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    await eden.execute("fs/mkdir", { path: "/tree/child" }, transferCaller);
+    await eden.execute(
+      "fs/mkdir",
+      { location: { path: "/tree/child", volume: "home" } },
+      transferCaller,
+    );
     await eden.execute(
       "fs/write",
-      { path: "/tree/data.txt", content: "preserved" },
+      {
+        location: { path: "/tree/data.txt", volume: "home" },
+        content: "preserved",
+      },
       transferCaller,
     );
 
     await expect(
-      eden.execute("fs/cp", { from: "/tree", to: "/tree" }, transferCaller),
+      eden.execute(
+        "fs/cp",
+        {
+          from: { volume: "home", path: "/tree" },
+          to: { volume: "home", path: "/tree" },
+        },
+        transferCaller,
+      ),
     ).rejects.toThrow("must be different");
     await expect(
-      eden.execute("fs/mv", { from: "/tree", to: "/tree" }, transferCaller),
+      eden.execute(
+        "fs/mv",
+        {
+          from: { volume: "home", path: "/tree" },
+          to: { volume: "home", path: "/tree" },
+        },
+        transferCaller,
+      ),
     ).rejects.toThrow("must be different");
     await expect(
       eden.execute(
         "fs/cp",
-        { from: "/tree", to: "/tree/child/copy" },
+        {
+          from: { volume: "home", path: "/tree" },
+          to: { volume: "home", path: "/tree/child/copy" },
+        },
         transferCaller,
       ),
     ).rejects.toThrow("descendant");
     await expect(
       eden.execute(
         "fs/mv",
-        { from: "/tree", to: "/tree/child/moved" },
+        {
+          from: { volume: "home", path: "/tree" },
+          to: { volume: "home", path: "/tree/child/moved" },
+        },
         transferCaller,
       ),
     ).rejects.toThrow("descendant");

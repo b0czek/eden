@@ -19,6 +19,7 @@ import type {
   FilePickerFilter,
   FilePickerOpenEvent,
   FilePickerResult,
+  FilesystemLocation,
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
@@ -44,6 +45,10 @@ type FilterOption =
   | { kind: "all-files"; label: string };
 
 const getExplorerLabels = (): FileExplorerLabels => ({
+  volume: t("filePicker.volume"),
+  home: t("filePicker.home"),
+  readOnly: t("filePicker.readOnly"),
+  refresh: t("filePicker.refresh"),
   goBack: t("filePicker.goBack"),
   goForward: t("filePicker.goForward"),
   goUp: t("filePicker.goUp"),
@@ -165,9 +170,8 @@ const App: Component = () => {
     createSignal(false);
   const [showNewFolderDialog, setShowNewFolderDialog] = createSignal(false);
   const [newFolderName, setNewFolderName] = createSignal("");
-  const [pendingOverwritePath, setPendingOverwritePath] = createSignal<
-    string | null
-  >(null);
+  const [pendingOverwritePath, setPendingOverwritePath] =
+    createSignal<FilesystemLocation | null>(null);
 
   const [displayPreferences, setDisplayPreferences] =
     createSignal<DisplayPreferences>({
@@ -203,6 +207,9 @@ const App: Component = () => {
 
   const {
     currentPath,
+    currentVolume,
+    volumes,
+    readOnly,
     items,
     setItems,
     loading,
@@ -216,6 +223,13 @@ const App: Component = () => {
     refresh,
   } = useExplorerNavigation({
     active: () => activeRequest() !== null,
+    allowedVolumes: () => activeRequest()?.allowedVolumes,
+    onVolumeRemoved: () => {
+      clearSelection();
+      setPendingOverwritePath(null);
+      setShowNewFolderDialog(false);
+      setError(t("filePicker.volumeDisconnected"));
+    },
     sortItems,
     onLoadError: setError,
     onPathUnavailable: (path, fallbackPath) => {
@@ -282,7 +296,8 @@ const App: Component = () => {
 
   const canSelectItem = (item: FileItem) => {
     const request = activeRequest();
-    if (!request) return false;
+    if (!request || loading() || (request.mode === "save" && readOnly()))
+      return false;
     if (item.isDirectory) {
       return request.mode === "open" && request.selection === "directory";
     }
@@ -296,9 +311,9 @@ const App: Component = () => {
     setScrollToSelected(false);
   };
 
-  let previousPath = currentPath();
+  let previousPath = JSON.stringify([currentVolume(), currentPath()]);
   createEffect(() => {
-    const nextPath = currentPath();
+    const nextPath = JSON.stringify([currentVolume(), currentPath()]);
     if (nextPath !== previousPath) {
       previousPath = nextPath;
       clearSelection();
@@ -347,10 +362,14 @@ const App: Component = () => {
   };
 
   const resolveInitialPath = async (request: FilePickerOpenEvent) => {
-    const initialPath = request.initialPath || "/";
+    const initialLocation = request.initialLocation ?? {
+      volume: "home",
+      path: "/",
+    };
+    const initialPath = initialLocation.path;
     try {
       const stats = await window.edenAPI.shellCommand("fs/stat", {
-        path: initialPath,
+        location: { ...initialLocation },
       });
       if (stats.isDirectory) {
         return { directory: initialPath, name: request.suggestedName ?? "" };
@@ -376,7 +395,11 @@ const App: Component = () => {
 
     const initial = await resolveInitialPath(request);
     setFileName(request.mode === "save" ? initial.name : "");
-    resetNavigation(initial.directory, initial.selectedPath);
+    resetNavigation(
+      initial.directory,
+      initial.selectedPath,
+      request.initialLocation?.volume ?? "home",
+    );
     if (initial.selectedPath && request.mode === "open") {
       setSelectedItem(initial.selectedPath);
       setSelectedPaths([initial.selectedPath]);
@@ -429,21 +452,32 @@ const App: Component = () => {
   const confirmSave = async (replaceExisting = false) => {
     const request = activeRequest();
     const trimmedName = fileName().trim();
+    if (readOnly() || loading()) return;
     if (!request || !trimmedName) {
       setError(t("filePicker.errors.noFileName"));
       return;
     }
 
     const path = joinPath(currentPath(), appendDefaultExtension(trimmedName));
+    const location = { volume: currentVolume(), path };
+    const directory = currentPath();
     if (request.overwritePrompt !== false && !replaceExisting) {
-      const exists = await window.edenAPI.shellCommand("fs/exists", { path });
+      const exists = await window.edenAPI.shellCommand("fs/exists", {
+        location,
+      });
+      if (
+        activeRequest()?.requestId !== request.requestId ||
+        currentVolume() !== location.volume ||
+        currentPath() !== directory
+      )
+        return;
       if (exists) {
-        setPendingOverwritePath(path);
+        setPendingOverwritePath(location);
         return;
       }
     }
 
-    await resolvePicker({ reason: "select", path, paths: [path] });
+    await resolvePicker({ reason: "select", location, locations: [location] });
   };
 
   const confirmOpen = async () => {
@@ -453,7 +487,11 @@ const App: Component = () => {
     if (request.selection === "directory") {
       const paths =
         selectedPaths().length > 0 ? selectedPaths() : [currentPath()];
-      await resolvePicker({ reason: "select", path: paths[0], paths });
+      await resolvePicker({
+        reason: "select",
+        location: { volume: currentVolume(), path: paths[0] },
+        locations: paths.map((path) => ({ volume: currentVolume(), path })),
+      });
       return;
     }
 
@@ -463,7 +501,11 @@ const App: Component = () => {
       return;
     }
 
-    await resolvePicker({ reason: "select", path: paths[0], paths });
+    await resolvePicker({
+      reason: "select",
+      location: { volume: currentVolume(), path: paths[0] },
+      locations: paths.map((path) => ({ volume: currentVolume(), path })),
+    });
   };
 
   const confirmSelection = () => {
@@ -479,7 +521,7 @@ const App: Component = () => {
     event?: MouseEvent | KeyboardEvent,
   ) => {
     setError(null);
-    setSelectedItem(item.path);
+    setSelectedItem(item.location.path);
     setScrollToSelected(false);
 
     if (!canSelectItem(item)) {
@@ -498,14 +540,14 @@ const App: Component = () => {
 
     if (isToggle) {
       setSelectedPaths((current) =>
-        current.includes(item.path)
-          ? current.filter((path) => path !== item.path)
-          : [...current, item.path],
+        current.includes(item.location.path)
+          ? current.filter((path) => path !== item.location.path)
+          : [...current, item.location.path],
       );
       return;
     }
 
-    setSelectedPaths([item.path]);
+    setSelectedPaths([item.location.path]);
     if (activeRequest()?.mode === "save" && item.isFile) {
       setFileName(item.name);
     }
@@ -513,16 +555,16 @@ const App: Component = () => {
 
   const handleItemActivate = (item: FileItem) => {
     if (item.isDirectory) {
-      navigateTo(item.path);
+      navigateTo(item.location.path);
       return;
     }
 
     if (activeRequest()?.mode === "open" && canSelectItem(item)) {
-      setSelectedPaths([item.path]);
+      setSelectedPaths([item.location.path]);
       void resolvePicker({
         reason: "select",
-        path: item.path,
-        paths: [item.path],
+        location: { volume: item.location.volume, path: item.location.path },
+        locations: [{ volume: item.location.volume, path: item.location.path }],
       });
     } else if (activeRequest()?.mode === "save") {
       setFileName(item.name);
@@ -536,17 +578,19 @@ const App: Component = () => {
       return;
     }
 
+    if (readOnly() || loading()) return;
     const folderPath = joinPath(currentPath(), trimmedName);
+    const location = { volume: currentVolume(), path: folderPath };
     try {
       const exists = await window.edenAPI.shellCommand("fs/exists", {
-        path: folderPath,
+        location: { ...location },
       });
       if (exists) {
         setError(t("filePicker.errors.folderExists"));
         return;
       }
 
-      await window.edenAPI.shellCommand("fs/mkdir", { path: folderPath });
+      await window.edenAPI.shellCommand("fs/mkdir", { location });
       setShowNewFolderDialog(false);
       setNewFolderName("");
       refresh();
@@ -591,7 +635,8 @@ const App: Component = () => {
 
   const canConfirm = createMemo(() => {
     const request = activeRequest();
-    if (!request) return false;
+    if (!request || loading() || (request.mode === "save" && readOnly()))
+      return false;
     if (request.mode === "save") return fileName().trim().length > 0;
     if (request.selection === "directory") return true;
     return selectedPaths().length > 0;
@@ -672,6 +717,16 @@ const App: Component = () => {
             <FileExplorerHeader
               labels={getExplorerLabels()}
               currentPath={currentPath()}
+              currentVolume={currentVolume()}
+              volumes={volumes()}
+              readOnly={readOnly() || loading()}
+              onRefresh={refresh}
+              onVolumeChange={(volume) => {
+                clearSelection();
+                setPendingOverwritePath(null);
+                setShowNewFolderDialog(false);
+                resetNavigation("/", undefined, volume);
+              }}
               historyIndex={historyIndex()}
               historyLength={navigationHistory().length}
               breadcrumbs={buildBreadcrumbs(currentPath())}
@@ -839,7 +894,9 @@ const App: Component = () => {
                     </h2>
                   </div>
                   <div class="eden-modal-body">
-                    <p>{t("filePicker.replaceMessage", { path: path() })}</p>
+                    <p>
+                      {t("filePicker.replaceMessage", { path: path().path })}
+                    </p>
                   </div>
                   <div class="eden-modal-footer">
                     <button

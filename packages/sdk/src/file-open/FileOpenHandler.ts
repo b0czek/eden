@@ -1,6 +1,20 @@
-import type { FileHandlerInfo, FileOpenResult } from "@edenapp/types";
+import type {
+  FileHandlerInfo,
+  FileOpenResult,
+  FilesystemLocation,
+} from "@edenapp/types";
+import * as v from "valibot";
+import {
+  filesystemLocationArgsSchema,
+  filesystemLocationSchema,
+} from "../filesystem/FilesystemLocationSchema";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { FileOpenManager } from "./FileOpenManager";
+
+const handlerArgs = v.object({
+  location: filesystemLocationSchema,
+  appId: v.pipe(v.string(), v.nonEmpty()),
+});
 
 /**
  * FileOpenHandler
@@ -19,9 +33,11 @@ export class FileOpenHandler {
    * Open a file with its default handler
    */
   @EdenHandler("open")
-  async handleOpen(args: { path: string }): Promise<FileOpenResult> {
-    const { path } = args;
-    return this.manager.openFile(path);
+  async handleOpen(args: {
+    location: FilesystemLocation;
+  }): Promise<FileOpenResult> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return this.manager.openFile(location);
   }
 
   /**
@@ -29,11 +45,11 @@ export class FileOpenHandler {
    */
   @EdenHandler("open-with")
   async handleOpenWith(args: {
-    path: string;
+    location: FilesystemLocation;
     appId: string;
   }): Promise<FileOpenResult> {
-    const { path, appId } = args;
-    return this.manager.openFileWith(path, appId);
+    const { location, appId } = v.parse(handlerArgs, args);
+    return this.manager.openFileWith(location, appId);
   }
 
   /**
@@ -41,10 +57,10 @@ export class FileOpenHandler {
    */
   @EdenHandler("get-handler")
   async handleGetHandler(args: {
-    path: string;
+    location: FilesystemLocation;
   }): Promise<{ appId: string | undefined }> {
-    const { path } = args;
-    const appId = await this.manager.getHandlerForPath(path);
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    const appId = await this.manager.getHandlerForPath(location);
     return { appId };
   }
 
@@ -53,20 +69,22 @@ export class FileOpenHandler {
    */
   @EdenHandler("set-default-handler")
   async handleSetDefaultHandler(args: {
-    path: string;
+    location: FilesystemLocation;
     appId: string;
   }): Promise<void> {
-    const { path, appId } = args;
-    await this.manager.setDefaultHandler(path, appId);
+    const { location, appId } = v.parse(handlerArgs, args);
+    await this.manager.setDefaultHandler(location, appId);
   }
 
   /**
    * Remove user preference for a file path (revert to default)
    */
   @EdenHandler("remove-default-handler")
-  async handleRemoveDefaultHandler(args: { path: string }): Promise<void> {
-    const { path } = args;
-    await this.manager.removeDefaultHandler(path);
+  async handleRemoveDefaultHandler(args: {
+    location: FilesystemLocation;
+  }): Promise<void> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    await this.manager.removeDefaultHandler(location);
   }
 
   /**
@@ -74,10 +92,10 @@ export class FileOpenHandler {
    */
   @EdenHandler("get-supported-handlers")
   async handleGetSupportedHandlers(args: {
-    path: string;
+    location: FilesystemLocation;
   }): Promise<FileHandlerInfo[]> {
-    const { path } = args;
-    return this.manager.getSupportedHandlers(path);
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return this.manager.getSupportedHandlers(location);
   }
 
   /**

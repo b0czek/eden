@@ -12,6 +12,7 @@ import {
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { notification } from "@edenapp/tablets";
+import type { FileOpenedEvent, FilesystemLocation } from "@edenapp/types";
 import { FiCheckSquare, FiX } from "solid-icons/fi";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount } from "solid-js";
@@ -27,6 +28,10 @@ import { useFileTransfers } from "./features/useFileTransfers";
 import { initLocale, t } from "./i18n";
 
 const getExplorerLabels = (): FileExplorerLabels => ({
+  volume: t("files.volume"),
+  home: t("files.home"),
+  readOnly: t("files.readOnly"),
+  refresh: t("files.refresh"),
   goBack: t("files.goBack"),
   goForward: t("files.goForward"),
   goUp: t("files.goUp"),
@@ -111,6 +116,11 @@ const App: Component = () => {
 
   const {
     currentPath,
+    currentVolume,
+    currentLocation,
+    volumes,
+    readOnly,
+    resetNavigation,
     items,
     setItems,
     loading,
@@ -124,6 +134,13 @@ const App: Component = () => {
   } = useExplorerNavigation({
     sortItems,
     onLoadError: showError,
+    onVolumeRemoved: () => {
+      selection.exit();
+      transfers.cancelTransfer();
+      void notification.push(t("files.volume"), t("files.volumeDisconnected"), {
+        type: "warning",
+      });
+    },
     onPathUnavailable: (path, fallbackPath) => {
       void notification.push(
         t("files.directoryUnavailableTitle"),
@@ -159,10 +176,14 @@ const App: Component = () => {
     toggleAll: toggleAllItems,
   } = selection;
 
-  const navigateWithSelectionClear = (path: string, selectedPath?: string) => {
+  const navigateWithSelectionClear = (
+    path: string,
+    selectedPath?: string,
+    volume = currentVolume(),
+  ) => {
     selection.clear();
     if (!selectedPath) setSelectedItem(null);
-    navigateTo(path, selectedPath);
+    navigateTo(path, selectedPath, volume);
   };
   const goBackWithSelectionClear = () => {
     selection.exit();
@@ -177,17 +198,18 @@ const App: Component = () => {
     goUp();
   };
 
-  const openPathInExplorer = async (path: string) => {
+  const openPathInExplorer = async (location: FilesystemLocation) => {
+    const { path, volume } = location;
     try {
-      const stats = await window.edenAPI.shellCommand("fs/stat", { path });
+      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
 
       if (stats.isDirectory) {
-        navigateWithSelectionClear(path);
+        navigateWithSelectionClear(path, undefined, volume);
         return;
       }
 
       if (stats.isFile) {
-        navigateWithSelectionClear(getParentPath(path), path);
+        navigateWithSelectionClear(getParentPath(path), path, volume);
       }
     } catch (error) {
       showError(`${t("files.errors.openFailed")}: ${(error as Error).message}`);
@@ -207,18 +229,12 @@ const App: Component = () => {
       console.error("Failed to load display preferences:", error);
     }
 
-    const launchArgs = window.edenAPI.getLaunchArgs();
-    if (launchArgs.length > 0) {
-      void openPathInExplorer(launchArgs[0]);
-    }
+    const launchFile = window.edenAPI.getLaunchFile();
+    if (launchFile) void openPathInExplorer(launchFile);
 
-    const handleFileOpened = (data: {
-      path: string;
-      isDirectory: boolean;
-      appId: string;
-    }) => {
-      if (data.path) {
-        void openPathInExplorer(data.path);
+    const handleFileOpened = (data: FileOpenedEvent) => {
+      if (data.location.path) {
+        void openPathInExplorer(data.location);
       }
     };
 
@@ -266,6 +282,7 @@ const App: Component = () => {
     handleDeleteClick,
     handleDeleteShortcut,
   } = useFileActions({
+    currentVolume,
     currentPath,
     refresh,
     navigateTo: navigateWithSelectionClear,
@@ -295,10 +312,12 @@ const App: Component = () => {
     operation: "copy" | "move",
     selected = selectedFiles(),
   ) => {
+    if (operation === "move" && readOnly()) return;
     if (transfers.beginTransfer(operation, selected)) exitSelectionMode();
   };
 
   const deleteSelected = async () => {
+    if (readOnly()) return;
     const selected = selectedFiles();
     if (await transfers.deleteItems(selected)) exitSelectionMode();
   };
@@ -307,7 +326,7 @@ const App: Component = () => {
     if (selectionMode()) return selectedFiles();
     const path = selectedItem();
     if (!path) return [];
-    const item = items().find((candidate) => candidate.path === path);
+    const item = items().find((candidate) => candidate.location.path === path);
     return item ? [item] : [];
   };
 
@@ -329,6 +348,7 @@ const App: Component = () => {
       moveItem: (item) => {
         startTransfer("move", [item]);
       },
+      readOnly,
       isBusy: () => transfers.busy() || Boolean(transfers.pendingTransfer()),
       clearSelection: exitSelectionMode,
     });
@@ -353,6 +373,14 @@ const App: Component = () => {
       <FileExplorerHeader
         labels={getExplorerLabels()}
         currentPath={currentPath()}
+        currentVolume={currentVolume()}
+        volumes={volumes()}
+        readOnly={readOnly() || loading()}
+        onRefresh={refresh}
+        onVolumeChange={(volume) => {
+          selection.exit();
+          resetNavigation("/", undefined, volume);
+        }}
         historyIndex={historyIndex()}
         historyLength={navigationHistory().length}
         breadcrumbs={buildBreadcrumbs(currentPath())}
@@ -393,6 +421,7 @@ const App: Component = () => {
           itemCount={items().length}
           allItemsSelected={allItemsSelected()}
           busy={transfers.busy()}
+          readOnly={readOnly() || loading()}
           onToggleAll={toggleAllItems}
           onTransfer={startTransfer}
           onDelete={() => void deleteSelected()}
@@ -404,7 +433,8 @@ const App: Component = () => {
           pendingTransfer={transfers.pendingTransfer()}
           progress={transfers.progress()}
           busy={transfers.busy()}
-          onComplete={() => void transfers.completeTransfer(currentPath())}
+          readOnly={readOnly() || loading()}
+          onComplete={() => void transfers.completeTransfer(currentLocation())}
           onCancel={transfers.cancelTransfer}
         />
       )}
@@ -426,9 +456,11 @@ const App: Component = () => {
         activateOnSingleClick={openWithSingleClick()}
         onItemContextMenu={handleItemContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
-        onItemDelete={selectionMode() ? undefined : handleDeleteClick}
+        onItemDelete={
+          selectionMode() || readOnly() ? undefined : handleDeleteClick
+        }
         onItemDeleteShortcut={
-          selectionMode() ? undefined : handleDeleteShortcut
+          selectionMode() || readOnly() ? undefined : handleDeleteShortcut
         }
         onBack={goBackWithSelectionClear}
         disabled={transfers.busy()}

@@ -1,3 +1,4 @@
+import type { FileOpenedEvent } from "@edenapp/types";
 import pdfiumWasmUrl from "@embedpdf/pdfium/pdfium.wasm?url";
 import EmbedPDF, {
   type DocumentManagerPlugin,
@@ -15,12 +16,6 @@ import {
   getFileName,
   installEdenOpenFileDialog,
 } from "./pdfOpen";
-
-interface FileOpenedEvent {
-  path: string;
-  isDirectory: boolean;
-  appId: string;
-}
 
 const MAX_OPEN_DOCUMENTS = 8;
 
@@ -202,8 +197,8 @@ const App: Component = () => {
   };
 
   const handleFileOpened = (data: FileOpenedEvent) => {
-    if (!data.isDirectory && data.path) {
-      pdfOpen.openPdf(data.path);
+    if (!data.isDirectory && data.location.path) {
+      pdfOpen.openPdf(data.location);
     }
   };
 
@@ -212,10 +207,8 @@ const App: Component = () => {
 
     void ensureViewer();
 
-    const launchArgs = window.edenAPI.getLaunchArgs();
-    if (launchArgs[0]) {
-      pdfOpen.openPdf(launchArgs[0]);
-    }
+    const launchFile = window.edenAPI.getLaunchFile();
+    if (launchFile) pdfOpen.openPdf(launchFile);
 
     void window.edenAPI.subscribe(
       "file/opened",

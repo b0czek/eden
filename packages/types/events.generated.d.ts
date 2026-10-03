@@ -32,7 +32,7 @@ export interface DaemonEvents {
  * FileEvents - Events for the "file" namespace
  */
 export interface FileEvents {
-  "file/opened": { path: string; isDirectory: boolean; appId: string };
+  "file/opened": import("./index").FileOpenedEvent;
 }
 
 /**
@@ -48,6 +48,7 @@ export interface FilePickerEvents {
  */
 export interface FsEvents {
   "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind };
+  "fs/volumes-changed": { volumes: import("./index").FilesystemVolume[] };
 }
 
 /**

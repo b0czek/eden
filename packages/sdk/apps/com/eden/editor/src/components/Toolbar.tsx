@@ -18,7 +18,7 @@ export function Toolbar(props: ToolbarProps) {
   return (
     <div class="editor-toolbar">
       <div class="toolbar-info">
-        <span class="file-path">{props.activeTab?.path}</span>
+        <span class="file-path">{props.activeTab?.location.path}</span>
         <span class="file-language">
           {props.activeTab
             ? localizedLanguageName(props.activeTab.languageName, locale())

@@ -74,7 +74,10 @@ describe("EdenRuntime integration", () => {
 
     await first.execute(
       "fs/write",
-      { path: "/runtime.txt", content: "first-root" },
+      {
+        location: { path: "/runtime.txt", volume: "home" },
+        content: "first-root",
+      },
       caller("isolated-app", firstUser),
     );
     await fs.writeFile(

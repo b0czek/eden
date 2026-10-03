@@ -1,10 +1,63 @@
 import type {
   FileStats,
+  FilesystemLocation,
   FilesystemTransferArgs,
+  FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
+import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import {
+  filesystemLocationArgsSchema,
+  filesystemLocationSchema,
+} from "./FilesystemLocationSchema";
 import type { FilesystemManager } from "./FilesystemManager";
+
+const encoding = v.optional(
+  v.picklist([
+    "ascii",
+    "utf8",
+    "utf-8",
+    "utf16le",
+    "utf-16le",
+    "ucs2",
+    "ucs-2",
+    "base64",
+    "base64url",
+    "latin1",
+    "binary",
+    "hex",
+  ]),
+  "utf-8",
+);
+const readArgs = v.object({ location: filesystemLocationSchema, encoding });
+const writeArgs = v.object({
+  location: filesystemLocationSchema,
+  content: v.string(),
+  encoding,
+});
+const writeBinaryArgs = v.object({
+  location: filesystemLocationSchema,
+  content: v.instance(Uint8Array, "Binary file content must be a Uint8Array"),
+});
+const watchArgs = v.object({
+  location: filesystemLocationSchema,
+  _callerWebContentsId: v.optional(v.number()),
+});
+const unwatchArgs = v.object({
+  watchId: v.string(),
+  _callerWebContentsId: v.optional(v.number()),
+});
+const searchArgs = v.object({
+  location: filesystemLocationSchema,
+  pattern: v.string(),
+  limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 10),
+});
+const transferArgs = v.object({
+  from: filesystemLocationSchema,
+  to: filesystemLocationSchema,
+  overwrite: v.optional(v.boolean(), false),
+});
 
 /**
  * FilesystemHandler - Thin IPC layer for filesystem operations.
@@ -14,27 +67,32 @@ import type { FilesystemManager } from "./FilesystemManager";
 export class FilesystemHandler {
   constructor(private fsManager: FilesystemManager) {}
 
+  @EdenHandler("volumes", { permission: "read" })
+  handleVolumes(_args: Record<string, never>): FilesystemVolume[] {
+    return this.fsManager.listVolumes();
+  }
+
   /**
    * Read the contents of a file.
    */
   @EdenHandler("read", { permission: "read" })
   async handleReadFile(args: {
-    path: string;
+    location: FilesystemLocation;
     encoding?: string;
   }): Promise<string> {
-    const { path: targetPath, encoding = "utf-8" } = args;
-    return await this.fsManager.readFile(
-      targetPath,
-      encoding as BufferEncoding,
-    );
+    const { location, encoding } = v.parse(readArgs, args);
+    return await this.fsManager.readFile(location, encoding);
   }
 
   /**
    * Read the raw contents of a file.
    */
   @EdenHandler("read-binary", { permission: "read" })
-  async handleReadBinaryFile(args: { path: string }): Promise<Uint8Array> {
-    return await this.fsManager.readBinaryFile(args.path);
+  async handleReadBinaryFile(args: {
+    location: FilesystemLocation;
+  }): Promise<Uint8Array> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return await this.fsManager.readBinaryFile(location);
   }
 
   /**
@@ -42,16 +100,12 @@ export class FilesystemHandler {
    */
   @EdenHandler("write", { permission: "write" })
   async handleWriteFile(args: {
-    path: string;
+    location: FilesystemLocation;
     content: string;
     encoding?: string;
   }): Promise<void> {
-    const { path: targetPath, content, encoding = "utf-8" } = args;
-    await this.fsManager.writeFile(
-      targetPath,
-      content,
-      encoding as BufferEncoding,
-    );
+    const { location, content, encoding } = v.parse(writeArgs, args);
+    await this.fsManager.writeFile(location, content, encoding);
   }
 
   /**
@@ -59,60 +113,58 @@ export class FilesystemHandler {
    */
   @EdenHandler("write-binary", { permission: "write" })
   async handleWriteBinaryFile(args: {
-    path: string;
+    location: FilesystemLocation;
     content: Uint8Array;
   }): Promise<void> {
-    if (!(args.content instanceof Uint8Array)) {
-      throw new TypeError("Binary file content must be a Uint8Array");
-    }
-    await this.fsManager.writeBinaryFile(args.path, args.content);
+    const { location, content } = v.parse(writeBinaryArgs, args);
+    await this.fsManager.writeBinaryFile(location, content);
   }
 
   /**
    * Check if a file or directory exists.
    */
   @EdenHandler("exists", { permission: "read" })
-  async handleExists(args: { path: string }): Promise<boolean> {
-    const { path: targetPath } = args;
-    return await this.fsManager.exists(targetPath);
+  async handleExists(args: { location: FilesystemLocation }): Promise<boolean> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return await this.fsManager.exists(location);
   }
 
   /**
    * Create a directory and any necessary parent directories.
    */
   @EdenHandler("mkdir", { permission: "write" })
-  async handleMkdir(args: { path: string }): Promise<void> {
-    const { path: targetPath } = args;
-    await this.fsManager.mkdir(targetPath);
+  async handleMkdir(args: { location: FilesystemLocation }): Promise<void> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    await this.fsManager.mkdir(location);
   }
 
   /**
    * List contents of a directory.
    */
   @EdenHandler("readdir", { permission: "read" })
-  async handleReaddir(args: { path: string }): Promise<string[]> {
-    const { path: targetPath } = args;
-    return await this.fsManager.readdir(targetPath);
+  async handleReaddir(args: {
+    location: FilesystemLocation;
+  }): Promise<string[]> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return await this.fsManager.readdir(location);
   }
 
   /**
    * Get file or directory statistics.
    */
   @EdenHandler("stat", { permission: "read" })
-  async handleStat(args: { path: string }): Promise<FileStats> {
-    const { path: targetPath } = args;
-    return await this.fsManager.stat(targetPath);
+  async handleStat(args: { location: FilesystemLocation }): Promise<FileStats> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return await this.fsManager.stat(location);
   }
 
   @EdenHandler("watch", { permission: "read" })
   async handleWatch(args: {
-    path: string;
+    location: FilesystemLocation;
     _callerWebContentsId?: number;
   }): Promise<{ watchId: string }> {
-    return await this.fsManager.watchDirectory(
-      args.path,
-      args._callerWebContentsId,
-    );
+    const { location, _callerWebContentsId } = v.parse(watchArgs, args);
+    return await this.fsManager.watchDirectory(location, _callerWebContentsId);
   }
 
   @EdenHandler("unwatch", { permission: "read" })
@@ -120,16 +172,19 @@ export class FilesystemHandler {
     watchId: string;
     _callerWebContentsId?: number;
   }): void {
-    this.fsManager.unwatch(args.watchId, args._callerWebContentsId);
+    const { watchId, _callerWebContentsId } = v.parse(unwatchArgs, args);
+    this.fsManager.unwatch(watchId, _callerWebContentsId);
   }
 
   /**
    * Resolve an Eden path to the underlying OS path.
    */
   @EdenHandler("resolve", { permission: "resolve" })
-  async handleResolve(args: { path: string }): Promise<{ realPath: string }> {
-    const { path: targetPath } = args;
-    return { realPath: await this.fsManager.resolvePath(targetPath) };
+  async handleResolve(args: {
+    location: FilesystemLocation;
+  }): Promise<{ realPath: string }> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return { realPath: await this.fsManager.resolvePath(location) };
   }
 
   /**
@@ -137,12 +192,12 @@ export class FilesystemHandler {
    */
   @EdenHandler("search", { permission: "read" })
   async handleSearch(args: {
-    path: string;
+    location: FilesystemLocation;
     pattern: string;
     limit?: number;
   }): Promise<SearchResult[]> {
-    const { path: basePath, pattern, limit = 10 } = args;
-    return await this.fsManager.search(basePath, pattern, limit);
+    const { location, pattern, limit } = v.parse(searchArgs, args);
+    return await this.fsManager.search(location, pattern, limit);
   }
 
   /**
@@ -150,9 +205,9 @@ export class FilesystemHandler {
    * For directories, removes recursively.
    */
   @EdenHandler("delete", { permission: "write" })
-  async handleDelete(args: { path: string }): Promise<void> {
-    const { path: targetPath } = args;
-    await this.fsManager.delete(targetPath);
+  async handleDelete(args: { location: FilesystemLocation }): Promise<void> {
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    await this.fsManager.delete(location);
   }
 
   /**
@@ -162,7 +217,8 @@ export class FilesystemHandler {
    */
   @EdenHandler("cp", { permission: "write" })
   async handleCopy(args: FilesystemTransferArgs): Promise<void> {
-    await this.fsManager.copy(args.from, args.to, args.overwrite ?? false);
+    const { from, to, overwrite } = v.parse(transferArgs, args);
+    await this.fsManager.copy(from, to, overwrite);
   }
 
   /**
@@ -171,6 +227,7 @@ export class FilesystemHandler {
    */
   @EdenHandler("mv", { permission: "write" })
   async handleMove(args: FilesystemTransferArgs): Promise<void> {
-    await this.fsManager.move(args.from, args.to, args.overwrite ?? false);
+    const { from, to, overwrite } = v.parse(transferArgs, args);
+    await this.fsManager.move(from, to, overwrite);
   }
 }

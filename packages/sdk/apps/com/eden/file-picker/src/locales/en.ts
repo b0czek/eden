@@ -1,5 +1,11 @@
 export const en = {
   filePicker: {
+    volume: "Volume",
+    home: "Home",
+    readOnly: "Read-only",
+    refresh: "Refresh",
+    volumeDisconnected: "Drive disconnected. Showing Home.",
+
     titleOpenFile: "Open File",
     titleOpenDirectory: "Open Folder",
     titleSaveFile: "Save File",

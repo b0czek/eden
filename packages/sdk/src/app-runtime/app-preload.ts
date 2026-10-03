@@ -11,6 +11,7 @@ import {
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import { parseLaunchFile } from "./common/launch-file";
 import {
   type AppBusPortData,
   createAppBusState,
@@ -144,6 +145,7 @@ const shellTransport: ShellTransport = {
 // Expose edenAPI for shell commands and event subscriptions
 const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
   getLaunchArgs: () => launchArgs,
+  getLaunchFile: () => parseLaunchFile(process.argv),
 });
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);

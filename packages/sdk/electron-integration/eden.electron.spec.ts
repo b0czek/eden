@@ -104,11 +104,37 @@ test.describe
           { recursive: true },
         ),
         fs.cp(
-          path.join(__dirname, "../edencss"),
+          path.join(__dirname, "../dist/edencss"),
           path.join(root, "dist/edencss"),
           { recursive: true },
         ),
+        fs.cp(
+          path.join(__dirname, "../dist/app-frame"),
+          path.join(root, "dist/app-frame"),
+          { recursive: true },
+        ),
       ]);
+      for (const appName of ["files", "file-picker"]) {
+        const source = path.join(__dirname, "../apps/com/eden", appName);
+        const destination = path.join(
+          root,
+          "dist/apps/prebuilt",
+          `com.eden.${appName}`,
+        );
+        await fs.mkdir(destination, { recursive: true });
+        await fs.cp(path.join(source, "dist"), path.join(destination, "dist"), {
+          recursive: true,
+        });
+        await fs.copyFile(
+          path.join(source, "manifest.json"),
+          path.join(destination, "manifest.json"),
+        );
+        await fs.copyFile(
+          path.join(source, "icon.svg"),
+          path.join(destination, "icon.svg"),
+        );
+      }
+
       await fs.cp(path.join(__dirname, "fixtures/app"), fixtureDirectory, {
         recursive: true,
       });
@@ -378,13 +404,8 @@ test.describe
           if (!contents) throw new Error("Integration app view not found");
           return contents.executeJavaScript(`(async () => {
             const content = new Uint8Array([0, 255, 128, 1, 0]);
-            await window.edenAPI.shellCommand("fs/write-binary", {
-              path: "/renderer-output.bin",
-              content,
-            });
-            const result = await window.edenAPI.shellCommand("fs/read-binary", {
-              path: "/renderer-output.bin",
-            });
+            await window.edenAPI.shellCommand("fs/write-binary", { location: { volume: "home", path: "/renderer-output.bin" }, content });
+            const result = await window.edenAPI.shellCommand("fs/read-binary", { location: { volume: "home", path: "/renderer-output.bin" } });
             return {
               bytes: [...result],
               isUint8Array: result instanceof Uint8Array,
@@ -890,6 +911,323 @@ test.describe
       expect(value).toBe("loaded-from-remote-host");
     });
 
+    test("browses and picks a registered drive, then returns Home on unplug", async () => {
+      const running = await executeHostCommand<{ manifest: { id: string } }[]>(
+        "process/list",
+        {},
+      );
+      if (!running.some((process) => process.manifest.id === APP_ID))
+        await executeHostCommand("process/launch", { appId: APP_ID });
+      const driveRoot = path.join(root, "thumb-drive");
+      await fs.mkdir(driveRoot);
+      await fs.writeFile(path.join(driveRoot, "usb-report.txt"), "USB report");
+      await electronApp?.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { volumes: { register(input: unknown): Promise<unknown> } };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register({
+          id: "test-usb",
+          label: "Test USB",
+          kind: "removable",
+          rootPath,
+        });
+      }, driveRoot);
+      await expect(
+        executeHostCommand("file/open", {
+          location: { volume: "test-usb", path: "/" },
+        }),
+      ).resolves.toMatchObject({ success: true, appId: "com.eden.files" });
+      const evaluateApp = async (appId: string, script: string) =>
+        electronApp?.evaluate(
+          async ({ webContents }, input) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(input.appId));
+            if (!contents) return undefined;
+            return contents.executeJavaScript(input.script);
+          },
+          { appId, script },
+        );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.files",
+            `document.querySelector('.explorer-header select')?.value`,
+          ),
+        )
+        .toBe("test-usb");
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.files",
+            `document.querySelector('.omnibox-container')?.getBoundingClientRect().width`,
+          ),
+        )
+        .toBeGreaterThan(100);
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.files",
+            `document.querySelector('.file-list')?.textContent ?? document.body.textContent`,
+          ),
+        )
+        .toContain("usb-report.txt");
+      await evaluateApp(
+        APP_ID,
+        `(async () => {
+        globalThis.__volumePickerResult = undefined;
+        await window.edenAPI.subscribe('file-picker/closed', result => { globalThis.__volumePickerResult = result; });
+        await window.edenAPI.shellCommand('file-picker/open', { mode: 'open', initialLocation: { volume: 'test-usb', path: '/' } });
+      })()`,
+      );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.file-picker",
+            `document.querySelector('.explorer-header select')?.value`,
+          ),
+        )
+        .toBe("test-usb");
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.file-picker",
+            `document.querySelector('.file-item')?.textContent`,
+          ),
+        )
+        .toContain("usb-report.txt");
+      await evaluateApp(
+        "com.eden.file-picker",
+        `document.querySelector('.file-item-main').click()`,
+      );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.file-picker",
+            `document.querySelector('.file-picker-actions .eden-btn-primary')?.disabled`,
+          ),
+        )
+        .toBe(false);
+      await evaluateApp(
+        "com.eden.file-picker",
+        `document.querySelector('.file-picker-actions .eden-btn-primary').click()`,
+      );
+      await expect
+        .poll(() => evaluateApp(APP_ID, `globalThis.__volumePickerResult`))
+        .toMatchObject({
+          reason: "select",
+          location: { volume: "test-usb", path: "/usb-report.txt" },
+        });
+      const screenshot = await electronApp?.evaluate(
+        async ({ webContents }) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes("com.eden.files"));
+          return contents
+            ? (await contents.capturePage()).toPNG().toString("base64")
+            : undefined;
+        },
+      );
+      if (screenshot)
+        await fs.writeFile(
+          test.info().outputPath("files-volumes.png"),
+          Buffer.from(screenshot, "base64"),
+        );
+      await electronApp?.evaluate(() => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { volumes: { unregister(id: string): boolean } };
+          };
+        };
+        integration.__edenIntegration.eden.volumes.unregister("test-usb");
+      });
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.files",
+            `document.querySelector('.explorer-header select')?.value`,
+          ),
+        )
+        .toBe("home");
+      await expect
+        .poll(() =>
+          evaluateApp(
+            "com.eden.files",
+            `Array.from(document.querySelectorAll('.explorer-header option')).map(option => option.value)`,
+          ),
+        )
+        .toEqual(["home"]);
+      await executeHostCommand("process/stop", { appId: "com.eden.files" });
+      await executeHostCommand("process/stop", {
+        appId: "com.eden.file-picker",
+      });
+    });
+
+    test("restores a restricted picker's listing and watch after its drive reconnects", async () => {
+      const running = await executeHostCommand<{ manifest: { id: string } }[]>(
+        "process/list",
+        {},
+      );
+      if (!running.some((process) => process.manifest.id === APP_ID))
+        await executeHostCommand("process/launch", { appId: APP_ID });
+      const driveRoot = path.join(root, "reconnect-drive");
+      await fs.mkdir(driveRoot);
+      await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
+      const setConnected = async (connected: boolean) => {
+        await electronApp?.evaluate(
+          async (_electron, input) => {
+            const integration = globalThis as typeof globalThis & {
+              __edenIntegration: {
+                eden: {
+                  volumes: {
+                    register(input: unknown): Promise<unknown>;
+                    unregister(id: string): boolean;
+                  };
+                };
+              };
+            };
+            if (input.connected) {
+              await integration.__edenIntegration.eden.volumes.register({
+                id: "reconnect-usb",
+                label: "Reconnect USB",
+                kind: "removable",
+                rootPath: input.driveRoot,
+              });
+            } else {
+              integration.__edenIntegration.eden.volumes.unregister(
+                "reconnect-usb",
+              );
+            }
+          },
+          { connected, driveRoot },
+        );
+      };
+      const evaluateApp = async (appId: string, script: string) =>
+        electronApp?.evaluate(
+          async ({ webContents }, input) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(input.appId));
+            return contents?.executeJavaScript(input.script);
+          },
+          { appId, script },
+        );
+      const listing = () =>
+        evaluateApp(
+          "com.eden.file-picker",
+          `document.querySelector('.file-list')?.textContent ?? ''`,
+        );
+      try {
+        await setConnected(true);
+        await evaluateApp(
+          APP_ID,
+          `window.edenAPI.shellCommand('file-picker/open', {
+          mode: 'open', allowedVolumes: ['reconnect-usb'], initialLocation: { volume: 'reconnect-usb', path: '/' }
+        })`,
+        );
+        await expect.poll(listing).toContain("before.txt");
+        await setConnected(false);
+        await expect.poll(listing).not.toContain("before.txt");
+        await fs.writeFile(
+          path.join(driveRoot, "reconnected.txt"),
+          "reconnected",
+        );
+        await setConnected(true);
+        await expect.poll(listing).toContain("reconnected.txt");
+        // A native change after the snapshot proves the new watch is active.
+        await fs.writeFile(path.join(driveRoot, "watched.txt"), "watched");
+        await expect.poll(listing).toContain("watched.txt");
+      } finally {
+        await executeHostCommand("process/stop", {
+          appId: "com.eden.file-picker",
+        });
+        await setConnected(false);
+      }
+    });
+
+    for (const appId of ["com.eden.files", "com.eden.file-picker"]) {
+      test(`${appId} watches the parent after recovering from a deleted directory`, async () => {
+        const running = await executeHostCommand<
+          { manifest: { id: string } }[]
+        >("process/list", {});
+        if (!running.some((process) => process.manifest.id === APP_ID))
+          await executeHostCommand("process/launch", { appId: APP_ID });
+        const driveRoot = path.join(root, `recovery-${appId}`);
+        const directory = path.join(driveRoot, "nested");
+        await fs.mkdir(directory, { recursive: true });
+        await fs.writeFile(path.join(directory, "before.txt"), "before");
+        await fs.writeFile(path.join(driveRoot, "parent.txt"), "parent");
+        await electronApp?.evaluate(async (_electron, rootPath) => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { register(input: unknown): Promise<unknown> } };
+            };
+          };
+          await integration.__edenIntegration.eden.volumes.register({
+            id: "recovery-drive",
+            label: "Recovery drive",
+            kind: "local",
+            rootPath,
+          });
+        }, driveRoot);
+        const evaluateApp = async (targetAppId: string, script: string) =>
+          electronApp?.evaluate(
+            async ({ webContents }, input) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(input.appId));
+              return contents?.executeJavaScript(input.script);
+            },
+            { appId: targetAppId, script },
+          );
+        const listing = () =>
+          evaluateApp(
+            appId,
+            `document.querySelector('.file-list')?.textContent ?? ''`,
+          );
+        try {
+          if (appId === "com.eden.files") {
+            await expect(
+              executeHostCommand("file/open", {
+                location: { volume: "recovery-drive", path: "/nested" },
+              }),
+            ).resolves.toMatchObject({ success: true, appId });
+          } else {
+            await evaluateApp(
+              APP_ID,
+              `window.edenAPI.shellCommand('file-picker/open', {
+                mode: 'open', allowedVolumes: ['recovery-drive'],
+                initialLocation: { volume: 'recovery-drive', path: '/nested' }
+              })`,
+            );
+          }
+          await expect.poll(listing).toContain("before.txt");
+          await fs.rm(directory, { recursive: true });
+          await expect.poll(listing).toContain("parent.txt");
+          // Write after recovery's snapshot to verify the parent has a live watch.
+          await fs.writeFile(
+            path.join(driveRoot, "after-recovery.txt"),
+            "after",
+          );
+          await expect.poll(listing).toContain("after-recovery.txt");
+        } finally {
+          await executeHostCommand("process/stop", { appId });
+          await electronApp?.evaluate(() => {
+            const integration = globalThis as typeof globalThis & {
+              __edenIntegration: {
+                eden: { volumes: { unregister(id: string): boolean } };
+              };
+            };
+            integration.__edenIntegration.eden.volumes.unregister(
+              "recovery-drive",
+            );
+          });
+        }
+      });
+    }
+
     test("delivers native filesystem changes across preload IPC and stops after unwatch", async () => {
       const watchId = await electronApp?.evaluate(
         async ({ webContents }, appId) => {
@@ -900,7 +1238,7 @@ test.describe
           return contents.executeJavaScript(`(async () => {
             globalThis.__fsChanges = [];
             await window.edenAPI.subscribe("fs/changed", (event) => globalThis.__fsChanges.push(event));
-            return (await window.edenAPI.shellCommand("fs/watch", { path: "/" })).watchId;
+            return (await window.edenAPI.shellCommand("fs/watch", { location: { volume: "home", path: "/" } })).watchId;
           })()`);
         },
         APP_ID,

@@ -27,7 +27,7 @@ export function TabBar(props: TabBarProps) {
             role="tab"
             tabIndex={props.activeTabId === tab.id ? 0 : -1}
             aria-selected={props.activeTabId === tab.id}
-            title={tab.path}
+            title={tab.location.path}
             onClick={() => props.onTabClick(tab)}
             onKeyDown={(e) => handleTabKeyDown(tab, e)}
           >

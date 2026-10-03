@@ -12,6 +12,7 @@ interface DirectoryWatch {
 
 interface ViewWatch {
   viewId: number;
+  volume: string;
   hostPath: string;
 }
 
@@ -38,6 +39,7 @@ export class FilesystemWatcher {
   watch(
     hostPath: string,
     callerWebContentsId: number | undefined,
+    volume: string,
   ): { watchId: string } {
     const viewId = this.resolveCallerView(callerWebContentsId);
     let directoryWatch = this.directoryWatches.get(hostPath);
@@ -56,7 +58,7 @@ export class FilesystemWatcher {
 
     const watchId = randomUUID();
     directoryWatch.watchIds.add(watchId);
-    this.viewWatches.set(watchId, { viewId, hostPath });
+    this.viewWatches.set(watchId, { viewId, hostPath, volume });
     return { watchId };
   }
 
@@ -67,6 +69,14 @@ export class FilesystemWatcher {
       throw new Error("Filesystem watch is not owned by the calling view");
     }
     this.removeWatch(watchId);
+  }
+
+  removeUnavailableVolumes(available: ReadonlySet<string>): void {
+    for (const [watchId, watch] of this.viewWatches) {
+      if (available.has(watch.volume)) continue;
+      this.options.notify(watch.viewId, { watchId, kind: "volume-removed" });
+      this.removeWatch(watchId);
+    }
   }
 
   invalidate(hostPath: string): void {

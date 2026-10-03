@@ -1,3 +1,4 @@
+import type { FilesystemLocation } from "@edenapp/types";
 import { FaSolidSpinner } from "solid-icons/fa";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
@@ -9,13 +10,14 @@ import FileGraphic from "./FileGraphic";
 interface Suggestion {
   type: "path" | "file" | "folder";
   name: string;
-  path: string;
+  location: FilesystemLocation;
   icon: string;
 }
 
 interface OmniboxProps {
   labels: FileExplorerLabels;
   currentPath: string;
+  currentVolume: string;
   breadcrumbs: Breadcrumb[];
   onNavigate: (path: string, selectedItem?: string) => void;
 }
@@ -27,11 +29,25 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [isLoading, setIsLoading] = createSignal(false);
 
+  let searchSequence = 0;
+  let previousVolume = props.currentVolume;
+  createEffect(() => {
+    const volume = props.currentVolume;
+    if (volume === previousVolume) return;
+    previousVolume = volume;
+    searchSequence += 1;
+    setIsEditing(false);
+    setSuggestions([]);
+    setIsLoading(false);
+  });
+
   let inputRef: HTMLInputElement | undefined;
   let containerRef: HTMLDivElement | undefined;
 
   // Generate suggestions based on input
   const generateSuggestions = async (value: string) => {
+    const sequence = ++searchSequence;
+    const volume = props.currentVolume;
     setIsLoading(true);
 
     try {
@@ -48,11 +64,13 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         }
 
         const results = await window.edenAPI.shellCommand("fs/search", {
-          path: basePath === "//" ? "/" : basePath,
+          location: { volume, path: basePath === "//" ? "/" : basePath },
           pattern: searchTerm,
           limit: 10,
         });
 
+        if (sequence !== searchSequence || volume !== props.currentVolume)
+          return;
         // Add icons on frontend based on type
         const resultsWithIcons = results.map((r) => ({
           ...r,
@@ -64,11 +82,13 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       } else {
         // Search in current directory (empty value shows all items)
         const results = await window.edenAPI.shellCommand("fs/search", {
-          path: props.currentPath,
+          location: { volume, path: props.currentPath },
           pattern: value.toLowerCase(),
           limit: 10,
         });
 
+        if (sequence !== searchSequence || volume !== props.currentVolume)
+          return;
         // Add icons on frontend based on type
         const resultsWithIcons = results.map((r) => ({
           ...r,
@@ -80,9 +100,9 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       }
     } catch (error) {
       console.error("Error searching:", error);
-      setSuggestions([]);
+      if (sequence === searchSequence) setSuggestions([]);
     } finally {
-      setIsLoading(false);
+      if (sequence === searchSequence) setIsLoading(false);
     }
   };
 
@@ -112,7 +132,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       if (suggestionList.length > 0) {
         const selected = suggestionList[selectedIndex()];
         if (selected) {
-          props.onNavigate(selected.path);
+          props.onNavigate(selected.location.path);
           setIsEditing(false);
           setSuggestions([]);
           setInputValue("");
@@ -168,11 +188,11 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   const handleSuggestionClick = (suggestion: Suggestion) => {
     if (suggestion.type === "file") {
       // For files, navigate to parent directory and select the file
-      const parentPath = getParentPath(suggestion.path);
-      props.onNavigate(parentPath, suggestion.path);
+      const parentPath = getParentPath(suggestion.location.path);
+      props.onNavigate(parentPath, suggestion.location.path);
     } else {
       // For folders, navigate to the folder itself
-      props.onNavigate(suggestion.path);
+      props.onNavigate(suggestion.location.path);
     }
     setIsEditing(false);
     setSuggestions([]);
@@ -244,7 +264,9 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                     <FileGraphic src={suggestion.icon} />
                   </span>
                   <span class="suggestion-name">{suggestion.name}</span>
-                  <span class="suggestion-path">{suggestion.path}</span>
+                  <span class="suggestion-path">
+                    {suggestion.location.path}
+                  </span>
                 </button>
               )}
             </For>

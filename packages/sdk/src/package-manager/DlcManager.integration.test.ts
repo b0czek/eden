@@ -67,6 +67,96 @@ describe("DLC package lifecycle", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
+  it("validates package command addresses and options before accessing files", async () => {
+    const caller = { principal: { kind: "user" as const, profile: vendor } };
+    const invalidLocations = [
+      undefined,
+      null,
+      "/package.edenite",
+      [],
+      {},
+      { volume: "home" },
+      { path: "/package.edenite" },
+      { volume: "", path: "/package.edenite" },
+      { volume: 1, path: "/package.edenite" },
+      { volume: "home", path: null },
+      { volume: "home", path: 1 },
+    ];
+    for (const location of invalidLocations) {
+      await expect(
+        eden.execute("package/get-info", { location }, caller),
+      ).rejects.toThrow("requires volume and path");
+      await expect(
+        eden.execute("package/install", { source: location }, caller),
+      ).rejects.toThrow("requires volume and path");
+    }
+    await expect(
+      eden.execute(
+        "package/install",
+        {
+          source: { volume: "home", path: "/package.edenite" },
+          replace: "yes",
+        },
+        caller,
+      ),
+    ).rejects.toThrow("boolean");
+    expect(eden.runtime.packages.list()).toEqual([]);
+  });
+
+  it("inspects and installs packages through explicit location and host-path APIs", async () => {
+    const driveRoot = path.join(root, "usb");
+    await fs.mkdir(driveRoot);
+    const manifest: AppManifest = {
+      id: "com.example.drive-package",
+      name: "Drive package",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+    };
+    const archive = await makeArchive(root, driveRoot, manifest, {
+      "index.html": "<html></html>",
+    });
+    const hostPath = path.join(driveRoot, path.basename(archive));
+    await eden.runtime.volumes.register({
+      id: "usb",
+      label: "USB",
+      kind: "removable",
+      rootPath: driveRoot,
+    });
+    const location = { volume: "usb", path: archive };
+    const caller = { principal: { kind: "user" as const, profile: vendor } };
+
+    await expect(
+      eden.runtime.packages.inspect(hostPath),
+    ).resolves.toMatchObject({
+      success: true,
+      manifest: { id: manifest.id },
+    });
+    await expect(
+      eden.execute("package/get-info", { location }, caller),
+    ).resolves.toMatchObject({ success: true, manifest: { id: manifest.id } });
+    await expect(
+      eden.execute("package/get-info", { location: hostPath }, caller),
+    ).rejects.toThrow("requires volume and path");
+
+    await expect(
+      eden.runtime.packages.install(hostPath),
+    ).resolves.toMatchObject({
+      id: manifest.id,
+    });
+    await eden.runtime.packages.uninstall(manifest.id);
+    await expect(
+      eden.execute("package/install", { source: location }, caller),
+    ).resolves.toMatchObject({ id: manifest.id });
+
+    eden.runtime.volumes.unregister("usb");
+    await expect(
+      eden.execute("package/get-info", { location }, caller),
+    ).resolves.toMatchObject({
+      success: false,
+      error: expect.stringContaining("unavailable"),
+    });
+  });
+
   it("rejects package IDs owned by runtime storage", async () => {
     const caller = { principal: { kind: "user" as const, profile: vendor } };
     const storagePath = path.join(eden.paths.appsDirectory, "storage.db");
@@ -84,7 +174,11 @@ describe("DLC package lifecycle", () => {
     );
 
     await expect(
-      eden.execute("package/install", { sourcePath: archive }, caller),
+      eden.execute(
+        "package/install",
+        { source: { volume: "home", path: archive } },
+        caller,
+      ),
     ).rejects.toThrow('Package ID "storage.db" is reserved');
     await expect(fs.readFile(storagePath, "utf-8")).resolves.toBe(
       "persistent runtime data",
@@ -146,12 +240,12 @@ describe("DLC package lifecycle", () => {
     );
     await eden.execute(
       "package/install",
-      { sourcePath: hostArchive },
+      { source: { volume: "home", path: hostArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     await eden.execute(
       "package/install",
-      { sourcePath: hostWithoutDlcsArchive },
+      { source: { volume: "home", path: hostWithoutDlcsArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     const settingsChanges: string[] = [];
@@ -162,12 +256,12 @@ describe("DLC package lifecycle", () => {
       });
     await eden.execute(
       "package/install",
-      { sourcePath: dlcArchive },
+      { source: { volume: "home", path: dlcArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     await eden.execute(
       "package/install",
-      { sourcePath: secondDlcArchive },
+      { source: { volume: "home", path: secondDlcArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     stopTrackingSettings();
@@ -409,7 +503,7 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute(
         "package/install",
-        { sourcePath: missingArchive },
+        { source: { volume: "home", path: missingArchive } },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("is not installed");
@@ -431,7 +525,7 @@ describe("DLC package lifecycle", () => {
     );
     await eden.execute(
       "package/install",
-      { sourcePath: hostArchive },
+      { source: { volume: "home", path: hostArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     const incompatible = {
@@ -447,7 +541,7 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute(
         "package/install",
-        { sourcePath: incompatibleArchive },
+        { source: { volume: "home", path: incompatibleArchive } },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("incompatible");
@@ -468,7 +562,7 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute(
         "package/install",
-        { sourcePath: unknownPointArchive },
+        { source: { volume: "home", path: unknownPointArchive } },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("does not declare extension point");
@@ -486,7 +580,7 @@ describe("DLC package lifecycle", () => {
     );
     await eden.execute(
       "package/install",
-      { sourcePath: compatibleArchive },
+      { source: { volume: "home", path: compatibleArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
     await expect(
@@ -513,7 +607,7 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute(
         "package/install",
-        { sourcePath: compatibleArchive, replace: true },
+        { source: { volume: "home", path: compatibleArchive }, replace: true },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("must be stopped");
@@ -552,13 +646,21 @@ describe("DLC package lifecycle", () => {
     const caller = { principal: { kind: "user" as const, profile: vendor } };
     await eden.execute(
       "package/install",
-      { sourcePath: hostV1Archive },
+      { source: { volume: "home", path: hostV1Archive } },
       caller,
     );
-    await eden.execute("package/install", { sourcePath: dlcArchive }, caller);
+    await eden.execute(
+      "package/install",
+      { source: { volume: "home", path: dlcArchive } },
+      caller,
+    );
 
     await expect(
-      eden.execute("package/install", { sourcePath: hostV2Archive }, caller),
+      eden.execute(
+        "package/install",
+        { source: { volume: "home", path: hostV2Archive } },
+        caller,
+      ),
     ).rejects.toThrow("confirmation is required");
     expect(eden.runtime.packages.get(hostV1.id)?.manifest.version).toBe(
       "1.0.0",
@@ -570,7 +672,7 @@ describe("DLC package lifecycle", () => {
 
     await eden.execute(
       "package/install",
-      { sourcePath: hostV2Archive, replace: true },
+      { source: { volume: "home", path: hostV2Archive }, replace: true },
       caller,
     );
     expect(eden.runtime.packages.get(hostV1.id)?.manifest.version).toBe(
@@ -579,16 +681,20 @@ describe("DLC package lifecycle", () => {
     expect(eden.runtime.packages.get(dlc.id)).toBeUndefined();
 
     await expect(
-      eden.execute("package/install", { sourcePath: hostV2Archive }, caller),
+      eden.execute(
+        "package/install",
+        { source: { volume: "home", path: hostV2Archive } },
+        caller,
+      ),
     ).rejects.toThrow("reinstall confirmation");
     await eden.execute(
       "package/install",
-      { sourcePath: hostV2Archive, replace: true },
+      { source: { volume: "home", path: hostV2Archive }, replace: true },
       caller,
     );
     await eden.execute(
       "package/install",
-      { sourcePath: hostV1Archive, replace: true },
+      { source: { volume: "home", path: hostV1Archive }, replace: true },
       caller,
     );
     expect(eden.runtime.packages.get(hostV1.id)?.manifest.version).toBe(
@@ -700,7 +806,7 @@ describe("DLC package lifecycle", () => {
     await expect(
       eden.execute(
         "package/install",
-        { sourcePath: replacementArchive, replace: true },
+        { source: { volume: "home", path: replacementArchive }, replace: true },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("bundled DLC");

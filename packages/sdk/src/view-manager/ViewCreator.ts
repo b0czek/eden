@@ -1,5 +1,9 @@
 import * as path from "node:path";
-import type { AppManifest, WindowConfig } from "@edenapp/types";
+import type {
+  AppManifest,
+  FilesystemLocation,
+  WindowConfig,
+} from "@edenapp/types";
 import { log } from "../logging";
 import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
 import { CachedFileReader } from "../utils/cachedFileReader";
@@ -257,6 +261,7 @@ export class ViewCreator {
     bounds: Bounds | undefined,
     existingViews: Iterable<ViewInfo>,
     launchArgs?: string[],
+    launchFile?: FilesystemLocation,
   ): ViewInfo {
     // Extract manifest properties
     const windowConfig = manifest.window;
@@ -299,6 +304,7 @@ export class ViewCreator {
         additionalArguments: [
           `--app-id=${appId}`,
           `--launch-args=${JSON.stringify(launchArgs || [])}`,
+          ...(launchFile ? [`--eden-file=${JSON.stringify(launchFile)}`] : []),
         ],
       },
       this.windows,

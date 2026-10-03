@@ -1,3 +1,4 @@
+import type { FilesystemLocation } from "@edenapp/types";
 import { openEditorDocument, saveEditorDocument } from "./document-handler";
 import {
   EditorDocumentRegistry,
@@ -35,12 +36,15 @@ export class EditorDlcHost {
   }
 
   async openDocument(
-    path: string,
+    location: FilesystemLocation,
   ): Promise<EditorDlcOpenedDocument | undefined> {
+    const path = location.path;
     const resolved = this.documentRegistry.resolve(path);
     if (!resolved) return undefined;
 
-    const bytes = await window.edenAPI.shellCommand("fs/read-binary", { path });
+    const bytes = await window.edenAPI.shellCommand("fs/read-binary", {
+      location,
+    });
     const opened = await openEditorDocument(path, bytes, resolved);
     return {
       content: opened.content,
@@ -49,10 +53,11 @@ export class EditorDlcHost {
   }
 
   async saveDocument(
-    path: string,
+    location: FilesystemLocation,
     content: string,
     state: EditorDlcDocumentState,
   ): Promise<EditorDlcDocumentState> {
+    const path = location.path;
     const source = await saveEditorDocument(
       path,
       content,
@@ -60,7 +65,7 @@ export class EditorDlcHost {
       state.resolved,
     );
     await window.edenAPI.shellCommand("fs/write-binary", {
-      path,
+      location: { ...location },
       content: source,
     });
     return { ...state, source };

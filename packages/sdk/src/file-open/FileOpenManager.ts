@@ -3,7 +3,9 @@ import * as path from "node:path";
 import type {
   FileHandlerConfig,
   FileHandlerInfo,
+  FileOpenedEvent,
   FileOpenResult,
+  FilesystemLocation,
   RuntimeAppManifest,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
@@ -22,7 +24,7 @@ import { FileOpenHandler } from "./FileOpenHandler";
  * Events emitted by the FileOpenManager
  */
 interface FileNamespaceEvents {
-  opened: { path: string; isDirectory: boolean; appId: string };
+  opened: FileOpenedEvent;
 }
 
 /**
@@ -131,7 +133,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Resolve file metadata used for matching and preference lookup
    */
-  private async getFileContext(filePath: string): Promise<{
+  private async getFileContext(location: FilesystemLocation): Promise<{
     fullPath: string;
     isDirectory: boolean;
     extension: string | undefined;
@@ -139,7 +141,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     preferenceKeys: string[];
     canonicalPreferenceKey: string | undefined;
   }> {
-    const fullPath = await this.fsManager.resolvePath(filePath);
+    const filePath = location.path;
+    const fullPath = await this.fsManager.resolvePath(location);
     const stats = await fs.stat(fullPath);
     const isDirectory = stats.isDirectory();
 
@@ -395,20 +398,25 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Get the default handler app for a file path
    */
-  async getHandlerForPath(filePath: string): Promise<string | undefined> {
-    const fileContext = await this.getFileContext(filePath);
+  async getHandlerForPath(
+    location: FilesystemLocation,
+  ): Promise<string | undefined> {
+    const fileContext = await this.getFileContext(location);
     return this.resolveHandler(fileContext).appId;
   }
 
   /**
    * Set user preference for a file path
    */
-  async setDefaultHandler(filePath: string, appId: string): Promise<void> {
-    const fileContext = await this.getFileContext(filePath);
+  async setDefaultHandler(
+    location: FilesystemLocation,
+    appId: string,
+  ): Promise<void> {
+    const fileContext = await this.getFileContext(location);
     const preferenceKey = fileContext.canonicalPreferenceKey;
 
     if (!preferenceKey) {
-      throw new Error(`Unable to determine file type for ${filePath}`);
+      throw new Error(`Unable to determine file type for ${location}`);
     }
 
     for (const key of fileContext.preferenceKeys) {
@@ -424,8 +432,8 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Remove user preference for a file path (revert to default)
    */
-  async removeDefaultHandler(filePath: string): Promise<void> {
-    const fileContext = await this.getFileContext(filePath);
+  async removeDefaultHandler(location: FilesystemLocation): Promise<void> {
+    const fileContext = await this.getFileContext(location);
 
     for (const key of fileContext.preferenceKeys) {
       await this.appAssociationManager.remove(key);
@@ -448,8 +456,10 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Get all apps that can handle a specific file path
    */
-  async getSupportedHandlers(filePath: string): Promise<FileHandlerInfo[]> {
-    const fileContext = await this.getFileContext(filePath);
+  async getSupportedHandlers(
+    location: FilesystemLocation,
+  ): Promise<FileHandlerInfo[]> {
+    const fileContext = await this.getFileContext(location);
     const handlers = new Map<string, FileHandlerInfo>();
     const locale = await this.i18nManager.getLocale();
 
@@ -556,9 +566,10 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Open a file with its default handler
    */
-  async openFile(filePath: string): Promise<FileOpenResult> {
+  async openFile(location: FilesystemLocation): Promise<FileOpenResult> {
+    const filePath = location.path;
     try {
-      const fileContext = await this.getFileContext(filePath);
+      const fileContext = await this.getFileContext(location);
       const { appId: handlerAppId, mimeType } =
         this.resolveHandler(fileContext);
 
@@ -590,17 +601,20 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Launch the app (or focus if already running)
       const instance = this.processManager.getAppInstance(handlerAppId);
       if (!instance) {
-        // App not running - launch with file path as launch argument
-        await this.processManager.launchApp(handlerAppId, undefined, [
-          filePath,
-        ]);
+        // Start the handler with its typed file address.
+        await this.processManager.launchApp(
+          handlerAppId,
+          undefined,
+          undefined,
+          location,
+        );
       } else {
         // App already running - notify via event (app is already subscribed)
         this.focusRunningApp(handlerAppId);
         const viewIds = this.viewManager.getViewsByAppId(handlerAppId);
         for (const viewId of viewIds) {
           this.notifySubscriber(viewId, "opened", {
-            path: filePath,
+            location: { ...location },
             isDirectory: fileContext.isDirectory,
             appId: handlerAppId,
           });
@@ -622,10 +636,13 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Open a file with a specific app
    */
-  async openFileWith(filePath: string, appId: string): Promise<FileOpenResult> {
+  async openFileWith(
+    location: FilesystemLocation,
+    appId: string,
+  ): Promise<FileOpenResult> {
     try {
       // Resolve masked path to full filesystem path
-      const fullPath = await this.fsManager.resolvePath(filePath);
+      const fullPath = await this.fsManager.resolvePath(location);
 
       // Check if file exists and get stats
       const stats = await fs.stat(fullPath);
@@ -643,15 +660,20 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
       // Launch the app (or focus if already running)
       const instance = this.processManager.getAppInstance(appId);
       if (!instance) {
-        // App not running - launch with file path as launch argument
-        await this.processManager.launchApp(appId, undefined, [filePath]);
+        // Start the handler with its typed file address.
+        await this.processManager.launchApp(
+          appId,
+          undefined,
+          undefined,
+          location,
+        );
       } else {
         // App already running - notify via event (app is already subscribed)
         this.focusRunningApp(appId);
         const viewIds = this.viewManager.getViewsByAppId(appId);
         for (const viewId of viewIds) {
           this.notifySubscriber(viewId, "opened", {
-            path: filePath,
+            location: { ...location },
             isDirectory,
             appId,
           });

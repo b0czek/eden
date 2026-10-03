@@ -4,6 +4,7 @@ import {
   logFromConsole,
   setLogContext,
 } from "../logging";
+import { parseLaunchFile } from "./common/launch-file";
 /**
  * Backend Runtime
  *
@@ -237,6 +238,7 @@ const shellTransport: ShellTransport = {
  */
 const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
   getLaunchArgs: () => launchArgs,
+  getLaunchFile: () => parseLaunchFile(process.argv),
 });
 
 /**

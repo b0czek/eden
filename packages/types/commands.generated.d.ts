@@ -312,7 +312,8 @@ export interface FileCommands {
    * Open a file with its default handler
    */
   "file/open": {
-    args: { path: string };
+    args: {
+    location: import("./index").FilesystemLocation };
     response: import("./index").FileOpenResult;
   };
   /**
@@ -320,7 +321,7 @@ export interface FileCommands {
    */
   "file/open-with": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     appId: string };
     response: import("./index").FileOpenResult;
   };
@@ -329,7 +330,7 @@ export interface FileCommands {
    */
   "file/get-handler": {
     args: {
-    path: string };
+    location: import("./index").FilesystemLocation };
     response: { appId: string | undefined };
   };
   /**
@@ -337,7 +338,7 @@ export interface FileCommands {
    */
   "file/set-default-handler": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     appId: string };
     response: void;
   };
@@ -345,7 +346,8 @@ export interface FileCommands {
    * Remove user preference for a file path (revert to default)
    */
   "file/remove-default-handler": {
-    args: { path: string };
+    args: {
+    location: import("./index").FilesystemLocation };
     response: void;
   };
   /**
@@ -353,7 +355,7 @@ export interface FileCommands {
    */
   "file/get-supported-handlers": {
     args: {
-    path: string };
+    location: import("./index").FilesystemLocation };
     response: import("./index").FileHandlerInfo[];
   };
   /**
@@ -395,12 +397,16 @@ export interface FilePickerCommands {
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
+  "fs/volumes": {
+    args: Record<string, never>;
+    response: import("./index").FilesystemVolume[];
+  };
   /**
    * Read the contents of a file.
    */
   "fs/read": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     encoding?: string };
     response: string;
   };
@@ -408,7 +414,8 @@ export interface FsCommands {
    * Read the raw contents of a file.
    */
   "fs/read-binary": {
-    args: { path: string };
+    args: {
+    location: import("./index").FilesystemLocation };
     response: Uint8Array;
   };
   /**
@@ -416,7 +423,7 @@ export interface FsCommands {
    */
   "fs/write": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     content: string;
     encoding?: string };
     response: void;
@@ -426,7 +433,7 @@ export interface FsCommands {
    */
   "fs/write-binary": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     content: Uint8Array };
     response: void;
   };
@@ -434,33 +441,34 @@ export interface FsCommands {
    * Check if a file or directory exists.
    */
   "fs/exists": {
-    args: { path: string };
+    args: { location: import("./index").FilesystemLocation };
     response: boolean;
   };
   /**
    * Create a directory and any necessary parent directories.
    */
   "fs/mkdir": {
-    args: { path: string };
+    args: { location: import("./index").FilesystemLocation };
     response: void;
   };
   /**
    * List contents of a directory.
    */
   "fs/readdir": {
-    args: { path: string };
+    args: {
+    location: import("./index").FilesystemLocation };
     response: string[];
   };
   /**
    * Get file or directory statistics.
    */
   "fs/stat": {
-    args: { path: string };
+    args: { location: import("./index").FilesystemLocation };
     response: import("./index").FileStats;
   };
   "fs/watch": {
     args: {
-    path: string };
+    location: import("./index").FilesystemLocation };
     response: { watchId: string };
   };
   "fs/unwatch": {
@@ -472,7 +480,8 @@ export interface FsCommands {
    * Resolve an Eden path to the underlying OS path.
    */
   "fs/resolve": {
-    args: { path: string };
+    args: {
+    location: import("./index").FilesystemLocation };
     response: { realPath: string };
   };
   /**
@@ -480,7 +489,7 @@ export interface FsCommands {
    */
   "fs/search": {
     args: {
-    path: string;
+    location: import("./index").FilesystemLocation;
     pattern: string;
     limit?: number };
     response: import("./index").SearchResult[];
@@ -490,7 +499,7 @@ export interface FsCommands {
    * For directories, removes recursively.
    */
   "fs/delete": {
-    args: { path: string };
+    args: { location: import("./index").FilesystemLocation };
     response: void;
   };
   /**
@@ -599,7 +608,7 @@ export interface PackageCommands {
    */
   "package/install": {
     args: {
-    sourcePath: string;
+    source: import("./index").FilesystemLocation;
     replace?: boolean };
     response: import("./index").InstalledPackageManifest;
   };
@@ -664,7 +673,7 @@ export interface PackageCommands {
    * Get info about a package file without installing it
    */
   "package/get-info": {
-    args: { path: string };
+    args: { location: import("./index").FilesystemLocation };
     response: {
     success: boolean;
     manifest?: import("./index").PackageManifest;

@@ -1,5 +1,10 @@
 export const en = {
   files: {
+    volume: "Volume",
+    home: "Home",
+    readOnly: "Read-only",
+    volumeDisconnected: "Drive disconnected. Showing Home.",
+
     newFolder: "New Folder",
     newFile: "New File",
     modified: "Date Modified",

@@ -1,10 +1,17 @@
+import type {
+  FilesystemChangeKind,
+  FilesystemLocation,
+  FilesystemVolume,
+} from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { FileItem } from "../types";
 import { getParentPath, joinPath } from "../utils";
 
 interface UseExplorerNavigationOptions {
-  initialPath?: string;
+  initialLocation?: FilesystemLocation;
+  allowedVolumes?: Accessor<string[] | undefined>;
+  onVolumeRemoved?: (volume: string) => void;
   active?: Accessor<boolean>;
   sortItems: (items: FileItem[]) => FileItem[];
   onLoadError: (message: string) => void;
@@ -17,16 +24,40 @@ interface UseExplorerNavigationOptions {
 export const useExplorerNavigation = (
   options: UseExplorerNavigationOptions,
 ) => {
-  const initialPath = options.initialPath ?? "/";
+  const initialLocation = options.initialLocation ?? {
+    volume: "home",
+    path: "/",
+  };
+  const initialPath = initialLocation.path;
+  const [currentVolume, setCurrentVolume] = createSignal(
+    initialLocation.volume,
+  );
+  const currentLocation = (): FilesystemLocation => ({
+    volume: currentVolume(),
+    path: currentPath(),
+  });
+  const [volumeInventory, setVolumeInventory] = createSignal<
+    FilesystemVolume[]
+  >([]);
+  const volumes = createMemo(() =>
+    volumeInventory().filter(
+      (volume) =>
+        !options.allowedVolumes?.() ||
+        options.allowedVolumes?.()?.includes(volume.id),
+    ),
+  );
+  const readOnly = () =>
+    volumes().find((volume) => volume.id === currentVolume())?.readOnly ?? true;
   const [currentPath, setCurrentPath] = createSignal(initialPath);
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
-  const [navigationHistory, setNavigationHistory] = createSignal<string[]>([
-    initialPath,
-  ]);
+  const [navigationHistory, setNavigationHistory] = createSignal<
+    FilesystemLocation[]
+  >([initialLocation]);
   const [historyIndex, setHistoryIndex] = createSignal(0);
   let watchId: string | undefined;
   let watchedPath: string | undefined;
+  let watchedVolume: string | undefined;
   let requestSequence = 0;
   let watchRequestSequence = 0;
   let refreshQueued = false;
@@ -45,6 +76,7 @@ export const useExplorerNavigation = (
     const staleWatchId = watchId;
     watchId = undefined;
     watchedPath = undefined;
+    watchedVolume = undefined;
     if (staleWatchId) {
       await window.edenAPI
         .shellCommand("fs/unwatch", { watchId: staleWatchId })
@@ -52,17 +84,30 @@ export const useExplorerNavigation = (
     }
   };
 
-  const establishWatch = async (path: string) => {
+  const establishWatch = async (location: FilesystemLocation) => {
+    const { path, volume } = location;
+    if (
+      !volumeInventory().find((entry) => entry.id === volume)?.supportsWatch
+    ) {
+      await stopWatch();
+      return false;
+    }
     if (options.active && !options.active()) return false;
-    if (watchId && watchedPath === path) return true;
+    if (watchId && watchedPath === path && watchedVolume === volume)
+      return true;
     await stopWatch();
+    if (path !== currentPath() || volume !== currentVolume()) return false;
     const watchRequest = ++watchRequestSequence;
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = await window.edenAPI.shellCommand("fs/watch", { path });
+        const result = await window.edenAPI.shellCommand("fs/watch", {
+          location,
+        });
         if (
           disposed ||
+          path !== currentPath() ||
+          volume !== currentVolume() ||
           watchRequest !== watchRequestSequence ||
           (options.active && !options.active())
         ) {
@@ -73,6 +118,7 @@ export const useExplorerNavigation = (
         }
         watchId = result.watchId;
         watchedPath = path;
+        watchedVolume = volume;
         return true;
       } catch (error) {
         lastError = error;
@@ -82,18 +128,23 @@ export const useExplorerNavigation = (
     return false;
   };
 
-  const readDirectory = async (path: string): Promise<FileItem[]> => {
-    const dirItems = await window.edenAPI.shellCommand("fs/readdir", { path });
+  const readDirectory = async (
+    location: FilesystemLocation,
+  ): Promise<FileItem[]> => {
+    const { path, volume } = location;
+    const dirItems = await window.edenAPI.shellCommand("fs/readdir", {
+      location,
+    });
     const itemsWithStats = await Promise.all(
       dirItems.map(async (name: string) => {
         const itemPath = joinPath(path, name);
         try {
           const stats = await window.edenAPI.shellCommand("fs/stat", {
-            path: itemPath,
+            location: { volume, path: itemPath },
           });
           return {
             name,
-            path: itemPath,
+            location: { volume, path: itemPath },
             isDirectory: stats.isDirectory,
             isFile: stats.isFile,
             size: stats.size,
@@ -109,12 +160,12 @@ export const useExplorerNavigation = (
     );
   };
 
-  const findNearestParent = async (unavailablePath: string) => {
+  const findNearestParent = async (unavailablePath: string, volume: string) => {
     let candidate = getParentPath(unavailablePath);
     while (candidate !== unavailablePath) {
       try {
         const stats = await window.edenAPI.shellCommand("fs/stat", {
-          path: candidate,
+          location: { volume, path: candidate },
         });
         if (stats.isDirectory) return candidate;
       } catch {
@@ -127,16 +178,19 @@ export const useExplorerNavigation = (
   };
 
   const loadDirectory = async (
-    path: string,
+    location: FilesystemLocation,
     settings: { background?: boolean; replaceWatch?: boolean } = {},
   ): Promise<boolean> => {
+    const { path, volume } = location;
     const request = ++requestSequence;
     if (!settings.background) setLoading(true);
-    if (settings.replaceWatch !== false) await establishWatch(path);
+    if (settings.replaceWatch !== false) await establishWatch(location);
+    if (request !== requestSequence || disposed) return false;
     try {
-      const nextItems = await readDirectory(path);
+      const nextItems = await readDirectory(location);
       if (request !== requestSequence || disposed) return false;
       setCurrentPath(path);
+      setCurrentVolume(volume);
       setItems(nextItems);
       return true;
     } catch (error) {
@@ -149,8 +203,15 @@ export const useExplorerNavigation = (
   };
 
   const recoverUnavailablePath = async (unavailablePath: string) => {
+    const volume = currentVolume();
     await stopWatch();
-    const fallbackPath = await findNearestParent(unavailablePath);
+    const fallbackPath = await findNearestParent(unavailablePath, volume);
+    if (
+      volume !== currentVolume() ||
+      unavailablePath !== currentPath() ||
+      disposed
+    )
+      return;
     options.onPathUnavailable?.(unavailablePath, fallbackPath);
     if (!fallbackPath) {
       setItems([]);
@@ -159,10 +220,13 @@ export const useExplorerNavigation = (
     }
     setNavigationHistory((history) =>
       history.map((entry, index) =>
-        index === historyIndex() ? fallbackPath : entry,
+        index === historyIndex()
+          ? { volume: currentVolume(), path: fallbackPath }
+          : entry,
       ),
     );
-    await loadDirectory(fallbackPath);
+    setCurrentPath(fallbackPath);
+    await loadDirectory({ volume, path: fallbackPath });
   };
 
   const refresh = () => {
@@ -170,24 +234,35 @@ export const useExplorerNavigation = (
     refreshQueued = true;
     queueMicrotask(async () => {
       refreshQueued = false;
-      const path = currentPath();
-      const loaded = await loadDirectory(path, {
+      const location = currentLocation();
+      const path = location.path;
+      const loaded = await loadDirectory(location, {
         background: true,
-        replaceWatch: false,
+        replaceWatch: !watchId,
       });
-      if (!loaded && path === currentPath()) await recoverUnavailablePath(path);
+      if (
+        !loaded &&
+        path === currentPath() &&
+        location.volume === currentVolume()
+      )
+        await recoverUnavailablePath(path);
     });
   };
 
   const handleChanged = (event: {
     watchId: string;
-    kind: "change" | "watch-error";
+    kind: FilesystemChangeKind;
   }) => {
     if (event.watchId !== watchId) return;
+    if (event.kind === "volume-removed") {
+      void stopWatch();
+      return;
+    }
     if (event.kind === "watch-error") {
-      const path = currentPath();
+      const location = currentLocation();
+      const path = location.path;
       void stopWatch()
-        .then(() => establishWatch(path))
+        .then(() => establishWatch(location))
         .then((watching) => {
           if (!watching && path === currentPath()) refresh();
         });
@@ -196,10 +271,56 @@ export const useExplorerNavigation = (
     refresh();
   };
 
-  const subscribed = window.edenAPI.subscribe("fs/changed", handleChanged);
+  let inventoryVersion = 0;
+  const handleVolumesChanged = ({
+    volumes: inventory,
+  }: {
+    volumes: FilesystemVolume[];
+  }) => {
+    inventoryVersion += 1;
+    const previous = currentVolume();
+    const wasAvailable = volumeInventory().some(
+      (volume) => volume.id === previous,
+    );
+    setVolumeInventory(inventory);
+    if (inventory.some((volume) => volume.id === previous)) {
+      if (!wasAvailable && (!options.active || options.active())) {
+        void loadDirectory(currentLocation());
+      }
+      return;
+    }
+    requestSequence += 1;
+    setItems([]);
+    options.setSelectedItem(null);
+    options.setScrollToSelected(false);
+    options.onVolumeRemoved?.(previous);
+    const available = inventory.filter(
+      (volume) =>
+        !options.allowedVolumes?.() ||
+        options.allowedVolumes?.()?.includes(volume.id),
+    );
+    const fallback =
+      available.find((volume) => volume.id === "home") ?? available[0];
+    if (fallback) resetNavigation("/", undefined, fallback.id);
+    else {
+      void stopWatch();
+      setLoading(false);
+    }
+  };
+  const subscribed = Promise.all([
+    window.edenAPI.subscribe("fs/changed", handleChanged),
+    window.edenAPI.subscribe("fs/volumes-changed", handleVolumesChanged),
+  ])
+    .then(async () => {
+      const version = inventoryVersion;
+      const inventory = await window.edenAPI.shellCommand("fs/volumes", {});
+      if (!disposed && version === inventoryVersion)
+        setVolumeInventory(inventory);
+    })
+    .catch(reportLoadError);
   if (!options.active) {
     void subscribed.then(() => {
-      if (!disposed) void loadDirectory(initialPath);
+      if (!disposed) void loadDirectory(currentLocation());
     });
   }
 
@@ -208,7 +329,7 @@ export const useExplorerNavigation = (
       if (options.active?.()) {
         void subscribed.then(() => {
           if (!disposed && options.active?.())
-            void loadDirectory(currentPath());
+            void loadDirectory(currentLocation());
         });
       } else {
         void stopWatch();
@@ -216,22 +337,40 @@ export const useExplorerNavigation = (
     });
   }
 
-  const navigateTo = (path: string, selectedItem?: string) => {
+  const navigateTo = (
+    path: string,
+    selectedItem?: string,
+    volume = currentVolume(),
+  ) => {
+    const location = { path, volume };
+    setCurrentPath(path);
+    setCurrentVolume(volume);
+    setItems([]);
+    options.setSelectedItem(null);
     const history = navigationHistory();
     const index = historyIndex();
-    setNavigationHistory([...history.slice(0, index + 1), path]);
+    setNavigationHistory([...history.slice(0, index + 1), location]);
     setHistoryIndex(index + 1);
-    void loadDirectory(path);
+    void loadDirectory(location);
     if (selectedItem) {
       options.setScrollToSelected(true);
       options.setSelectedItem(selectedItem);
     }
   };
 
-  const resetNavigation = (path: string, selectedItem?: string) => {
-    setNavigationHistory([path]);
+  const resetNavigation = (
+    path: string,
+    selectedItem?: string,
+    volume = currentVolume(),
+  ) => {
+    const location = { path, volume };
+    setCurrentPath(path);
+    setCurrentVolume(volume);
+    setItems([]);
+    options.setSelectedItem(null);
+    setNavigationHistory([location]);
     setHistoryIndex(0);
-    void loadDirectory(path);
+    void loadDirectory(location);
     if (selectedItem) {
       options.setScrollToSelected(true);
       options.setSelectedItem(selectedItem);
@@ -242,14 +381,24 @@ export const useExplorerNavigation = (
     const index = historyIndex();
     if (index > 0) {
       setHistoryIndex(index - 1);
-      void loadDirectory(navigationHistory()[index - 1]);
+      const location = navigationHistory()[index - 1];
+      setCurrentPath(location.path);
+      setCurrentVolume(location.volume);
+      setItems([]);
+      options.setSelectedItem(null);
+      void loadDirectory(location);
     }
   };
   const goForward = () => {
     const index = historyIndex();
     if (index < navigationHistory().length - 1) {
       setHistoryIndex(index + 1);
-      void loadDirectory(navigationHistory()[index + 1]);
+      const location = navigationHistory()[index + 1];
+      setCurrentPath(location.path);
+      setCurrentVolume(location.volume);
+      setItems([]);
+      options.setSelectedItem(null);
+      void loadDirectory(location);
     }
   };
   const goUp = () => {
@@ -272,10 +421,15 @@ export const useExplorerNavigation = (
     requestSequence += 1;
     document.removeEventListener("mousedown", handleMouseButton);
     window.edenAPI.unsubscribe("fs/changed", handleChanged);
+    window.edenAPI.unsubscribe("fs/volumes-changed", handleVolumesChanged);
     void stopWatch();
   });
 
   return {
+    currentVolume,
+    currentLocation,
+    volumes,
+    readOnly,
     currentPath,
     items,
     setItems,

@@ -6,6 +6,7 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import type { AppAssociationManager } from "../app-associations";
+import { VolumeManager } from "../filesystem/VolumeManager";
 import type { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import type { NotificationManager } from "../notification";
 import type { ProcessManager } from "../process-manager";
@@ -131,6 +132,7 @@ const createManager = () => {
     processManager as unknown as ProcessManager,
     appAssociationManager as unknown as AppAssociationManager,
     permissionRegistry as unknown as PermissionRegistry,
+    new VolumeManager(ipcBridge),
   );
 
   return {
@@ -204,19 +206,31 @@ describe("FilePickerManager", () => {
 
     expect(
       manager.resolvePicker(
-        { requestId, reason: "select", path: "/Documents/readme.md" },
+        {
+          requestId,
+          reason: "select",
+          location: { volume: "home", path: "/Documents/readme.md" },
+        },
         { appId: "com.eden.file-picker", webContentsId: 100 },
       ),
     ).toEqual({ success: true });
     expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
       10,
       "file-picker/closed",
-      { requestId, reason: "select", path: "/Documents/readme.md" },
+      {
+        requestId,
+        reason: "select",
+        location: { volume: "home", path: "/Documents/readme.md" },
+      },
     );
     expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
       20,
       "file-picker/closed",
-      { requestId, reason: "select", path: "/Documents/readme.md" },
+      {
+        requestId,
+        reason: "select",
+        location: { volume: "home", path: "/Documents/readme.md" },
+      },
     );
   });
 

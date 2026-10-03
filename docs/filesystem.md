@@ -3,147 +3,249 @@
 Eden apps access files through typed shell commands. Filesystem operations are
 restricted by the permissions declared in the app manifest:
 
-- `fs/read` permits reading metadata and contents, listing directories, and
-  watching directories.
+- `fs/read` permits reading metadata and contents, listing and searching
+  directories, discovering volumes, and watching directories.
 - `fs/write` permits creating, changing, copying, moving, and deleting files
   and directories.
-- `fs/resolve` permits resolving a virtual path for an external integration.
+- `fs/resolve` permits resolving a location for an external integration.
 - `fs/*` grants all filesystem permissions.
 
-## Virtual Paths
+## File Addresses
 
-Filesystem paths exposed to apps are virtual. `/` maps to the active user's
-configured home directory, or to the configured `userDirectory` root when the
-user has no home restriction. Vendor users always use the root.
+A file address is a `FilesystemLocation`: `{ volume: string, path: string }`.
+Both fields are required. Paths are virtual and `/` means the root of the selected
+volume. Persist and exchange complete addresses so files with the same path on
+different drives remain distinct.
 
-Applications should persist and exchange virtual paths rather than resolved host
-paths. Resolve a host path only when an external integration explicitly needs
-one:
+Keep addresses in a `location: FilesystemLocation` property when combining them
+with command options or file metadata. Single-address commands take `{ location }`.
+Operations with multiple addresses use named properties such as
+`from: FilesystemLocation` and `to: FilesystemLocation`.
 
-```typescript
-const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
-  path: "/Documents/report.txt",
-});
-```
-
-## Reading a Directory
-
-Use `fs/readdir` to list entry names, then request metadata with `fs/stat` when
-needed:
-
-```typescript
-const names = await window.edenAPI.shellCommand("fs/readdir", {
-  path: "/Documents",
-});
-
-const stats = await window.edenAPI.shellCommand("fs/stat", {
-  path: `/Documents/${names[0]}`,
-});
-```
-
-## Opening Files
-
-Use `file/open` to open a file with its configured application:
-
-```typescript
-await window.edenAPI.shellCommand("file/open", {
-  path: "/Documents/report.txt",
-});
-```
-
-## Reading and Writing File Contents
-
-Use `fs/read` and `fs/write` for text. Both commands default to UTF-8 and also
-accept a Node.js encoding name when another text representation is required:
+The built-in `home` volume preserves Eden's user homes. Its `/` maps to the
+caller's configured home directory, or to `userDirectory` for unrestricted users,
+vendors, and system processes. Registered drives are shared across users.
 
 ```typescript
 const content = await window.edenAPI.shellCommand("fs/read", {
-  path: "/Documents/notes.txt",
-});
-await window.edenAPI.shellCommand("fs/write", {
-  path: "/Documents/notes.txt",
-  content: `${content}\nUpdated`,
+  location: { volume: "home", path: "/Documents/notes.txt" },
 });
 ```
 
-Use the binary commands for archives, images, documents, and other byte-based
-formats. They transfer complete files as `Uint8Array` values without applying
-text encoding:
+Unknown or disconnected volumes fail explicitly. Missing files on an available
+volume return `false` from `fs/exists`. Read-only volumes permit reads and copies
+out, but reject writes, deletes, moves out, and transfers into them.
+
+## Registering Mounted Drives
+
+The Electron consumer registers already mounted directories through the
+main-process API. It owns device discovery, mounting, network authentication,
+and OS removal notifications:
 
 ```typescript
+import { Eden } from "@edenapp/sdk";
+
+const eden = new Eden();
+await eden.whenReady();
+
+await eden.volumes.register({
+  id: "usb-work",
+  label: "Work USB",
+  kind: "removable",
+  rootPath: "/media/operator/WORK",
+  readOnly: false,
+});
+
+// When the consumer detects removal:
+eden.volumes.unregister("usb-work");
+```
+
+IDs identify volumes independently of mount paths and labels. Reuse an ID when
+the same drive reconnects. `home` is reserved, and duplicate registrations are
+rejected. A registration root must already exist and be an absolute directory.
+Registrations belong to one Eden runtime and are rebuilt after startup.
+
+Volume kinds are `local`, `removable`, and `network`. A network registration
+points to a share already mounted by the OS. All kinds use the same commands.
+The consumer can set `readOnly` and `supportsWatch`; watch support defaults to
+true for local/removable volumes and false for network volumes.
+
+`eden.volumes.list()` returns metadata. `eden.volumes.onChanged(listener)` passes
+updated inventories and returns an unsubscribe function. Apps receive metadata
+without host mount paths:
+
+```typescript
+const volumes = await window.edenAPI.shellCommand("fs/volumes", {});
+await window.edenAPI.subscribe("fs/volumes-changed", ({ volumes }) => {
+  updateVolumeSelector(volumes);
+});
+```
+
+Files and File Picker update their volume selectors live. If the selected drive
+disconnects, they clear selection and switch to an available allowed volume,
+preferring Home. A picker with no available allowed volume waits for its selected
+drive to reconnect, then reloads the directory and resumes live updates. Open
+documents retain their original volume addresses.
+
+## Reading and Writing
+
+Use `fs/readdir` to list entry names and `fs/stat` for metadata:
+
+```typescript
+const directory = { volume: "usb-work", path: "/Documents" };
+const names = await window.edenAPI.shellCommand("fs/readdir", {
+  location: directory,
+});
+const stats = await window.edenAPI.shellCommand("fs/stat", {
+  location: { volume: directory.volume, path: `${directory.path}/${names[0]}` },
+});
+```
+
+Text reads and writes default to UTF-8 and accept another Node encoding.
+Writes create missing parent directories within an available volume:
+
+```typescript
+await window.edenAPI.shellCommand("fs/write", {
+  location: { volume: "home", path: "/Documents/notes.txt" },
+  content: "Notes\n",
+});
+```
+
+Binary commands transfer whole files as `Uint8Array` values:
+
+```typescript
+const location = { volume: "usb-work", path: "/archive.bin" };
 const bytes = await window.edenAPI.shellCommand("fs/read-binary", {
-  path: "/Documents/archive.bin",
+  location: location,
 });
 await window.edenAPI.shellCommand("fs/write-binary", {
-  path: "/Documents/archive-copy.bin",
+  location: { volume: "home", path: "/archive-copy.bin" },
   content: bytes,
 });
 ```
 
-`fs/read-binary` requires `fs/read`; `fs/write-binary` requires `fs/write`.
-Like the text commands, binary writes create missing parent directories.
+`fs/search` searches the selected volume beneath its given path. Each search
+result includes a `location` with its volume and virtual path.
 
-## Copying and Moving Items
+Resolve a host path only when an external integration needs it:
 
-`fs/cp` copies files and directories recursively. `fs/mv` moves or renames
-them. Both commands reject an existing destination by default:
+```typescript
+const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
+  location: { volume: "usb-work", path: "/Documents/report.txt" },
+});
+```
+
+## Opening Files and Picking Locations
+
+`file/open` selects a configured handler using the file's type:
+
+```typescript
+await window.edenAPI.shellCommand("file/open", {
+  location: { volume: "usb-work", path: "/Documents/report.txt" },
+});
+```
+
+Handlers retrieve the initial address with `getLaunchFile()` and receive further
+addresses in `file/opened` events:
+
+```typescript
+const initial = window.edenAPI.getLaunchFile();
+if (initial) await openDocument(initial);
+await window.edenAPI.subscribe("file/opened", ({ location, isDirectory }) => {
+  if (!isDirectory) void openDocument(location);
+});
+```
+
+The file picker helpers return addresses rather than strings:
+
+```typescript
+import { filePicker } from "@edenapp/tablets";
+
+const location = await filePicker.openFile({
+  initialLocation: { volume: "home", path: "/Documents" },
+});
+if (location) {
+  const text = await window.edenAPI.shellCommand("fs/read", {
+    location: location,
+  });
+}
+```
+
+Pickers start at Home when no initial location is supplied. `allowedVolumes`
+restricts the selector; if it is supplied without an initial location, the picker
+starts at the first allowed volume. Save pickers cannot select read-only volumes
+as write destinations. Raw picker results use `location` and `locations`.
+
+## Copying and Moving
+
+`fs/cp` and `fs/mv` take independent source and destination addresses, supporting
+transfers between volumes. They reject existing destinations by default:
 
 ```typescript
 await window.edenAPI.shellCommand("fs/cp", {
-  from: "/Documents/report.txt",
-  to: "/Archive/report.txt",
+  from: { volume: "home", path: "/Documents/report.txt" },
+  to: { volume: "usb-work", path: "/report.txt" },
 });
 ```
 
-Set `overwrite` to replace the complete destination. Replacing a directory
-does not merge its previous contents with the source:
+`overwrite: true` replaces the complete destination, including directories;
+it does not merge their previous contents. Self-transfers and overlapping
+source/destination trees are rejected. Volume roots cannot be deleted, moved,
+or replaced.
 
-```typescript
-await window.edenAPI.shellCommand("fs/mv", {
-  from: "/Drafts/report",
-  to: "/Published/report",
-  overwrite: true,
-});
-```
+Copies preserve relative symbolic links. Absolute links pointing inside the
+copied tree become relative links to the corresponding destination entries.
+Absolute links outside the tree keep their original targets; access remains
+restricted to the destination volume's sandbox.
 
-Copying or moving an item onto itself is rejected. Directories also cannot be
-copied or moved into one of their descendants.
+If an overwrite fails, the original destination is restored while its volume
+remains available, even if the source disconnects.
 
-## Watching a Directory
+Moves across filesystem boundaries copy before deleting the source. If source
+deletion fails, the completed destination is retained and the command reports
+an incomplete move.
 
-Apps with `fs/read` can watch a virtual directory without polling. Watches are
-non-recursive.
+## Watching Directories
 
-Subscribe before creating the watch so a change cannot occur between watch setup
-and listener registration. Take the initial directory snapshot only after the
-watch has been established:
+Apps with `fs/read` can watch non-recursive directories on volumes advertising
+`supportsWatch`. Subscribe before creating the watch and take the initial
+snapshot after watch creation:
 
 ```typescript
 let watchId: string | undefined;
-
-const handleChanged = ({ watchId: changedWatchId, kind }) => {
-  if (changedWatchId !== watchId) return;
-  if (kind === "change") void refreshDirectory();
-  else reportLiveUpdateFailure();
+const handleChanged = (event) => {
+  if (event.watchId !== watchId) return;
+  if (event.kind === "change") void refreshDirectory();
+  else if (event.kind === "volume-removed") {
+    watchId = undefined;
+    reportDisconnected();
+  } else reportLiveUpdateFailure();
 };
 
 await window.edenAPI.subscribe("fs/changed", handleChanged);
 ({ watchId } = await window.edenAPI.shellCommand("fs/watch", {
-  path: "/Documents",
+  location: { volume: "home", path: "/Documents" },
 }));
 await refreshDirectory();
-```
 
-Each watch ID belongs to the view that created it. When navigating to another
-directory, unwatch the previous directory before replacing its watch. On view
-cleanup, release the watch and event subscription:
-
-```typescript
-if (watchId) {
-  await window.edenAPI.shellCommand("fs/unwatch", { watchId });
-}
+// On cleanup:
+if (watchId) await window.edenAPI.shellCommand("fs/unwatch", { watchId });
 window.edenAPI.unsubscribe("fs/changed", handleChanged);
 ```
 
-Eden also releases outstanding watches automatically when their owning view or
-runtime closes.
+Each watch belongs to the creating view. Eden releases watches when the owning
+view, volume, or runtime closes. Files and File Picker support manual refresh on
+volumes without watching.
+
+## Migrating Existing Apps
+
+Pass `{ location: { volume: "home", path } }` to single-address filesystem and
+file commands, and put any other options alongside `location`.
+Copy/move `from` and `to` are now address objects. Replace picker `initialPath`
+with `initialLocation`, and consume address-valued helper results. Use
+`getLaunchFile()` for file-handler startup and `event.location` for `file/opened`; generic `getLaunchArgs()` remains
+available for other app arguments.
+
+App commands `package/get-info` take `{ location: { volume, path } }` and `package/install`
+takes `{ source: { volume, path }, replace? }`. Trusted main-process
+`eden.packages.inspect()` and `eden.packages.install()` accept host paths.

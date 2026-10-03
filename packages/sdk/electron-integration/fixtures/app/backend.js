@@ -17,7 +17,7 @@ void (async () => {
     const entry = resource.manifest.contributions[0].metadata.entry;
     const module = await import(new URL(entry, resource.rootUrl).href);
     const binary = await worker.edenAPI.shellCommand("fs/read-binary", {
-      path: "/binary-input.bin",
+      location: { volume: "home", path: "/binary-input.bin" },
     });
     await require("node:fs/promises").writeFile(
       resultPath,

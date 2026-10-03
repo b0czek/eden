@@ -1,5 +1,6 @@
 import type { FileItem } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
+import type { FilesystemLocation } from "@edenapp/types";
 import { createSignal } from "solid-js";
 import { openCollisionDialog } from "../dialogs/CollisionDialog";
 import { t } from "../i18n";
@@ -30,7 +31,11 @@ interface UseFileTransfersOptions {
 }
 
 const snapshotItems = (items: FileItem[]): FileItem[] =>
-  items.map((item) => ({ ...item, modified: new Date(item.modified) }));
+  items.map((item) => ({
+    ...item,
+    location: { ...item.location },
+    modified: new Date(item.modified),
+  }));
 
 export const useFileTransfers = (options: UseFileTransfersOptions) => {
   const [pendingTransfer, setPendingTransfer] =
@@ -40,8 +45,8 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   );
   const busy = () => progress() !== null;
 
-  const pathExists = (path: string) =>
-    window.edenAPI.shellCommand("fs/exists", { path });
+  const pathExists = (location: FilesystemLocation) =>
+    window.edenAPI.shellCommand("fs/exists", { location: location });
 
   const showFailureSummary = async (
     failures: TransferFailure[],
@@ -64,7 +69,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   const executeTransfer = async (
     items: FileItem[],
     operation: TransferOperation,
-    destinationDirectory: string,
+    destinationDirectory: FilesystemLocation,
   ): Promise<boolean> => {
     if (busy() || items.length === 0) return false;
 
@@ -82,7 +87,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
         });
 
         try {
-          if (!(await pathExists(item.path))) {
+          if (!(await pathExists(item.location))) {
             failures.push({
               item,
               message: t("files.errors.sourceMissing"),
@@ -111,13 +116,19 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           if (transferPlan.kind === "keep-both") {
             targetPath = await findKeepBothPath(
               item,
-              destinationDirectory,
+              destinationDirectory.path,
               t("files.copySuffix"),
-              pathExists,
+              (path) =>
+                pathExists({ volume: destinationDirectory.volume, path }),
             );
           } else {
             targetPath = transferPlan.targetPath;
-            if (await pathExists(targetPath)) {
+            if (
+              await pathExists({
+                volume: destinationDirectory.volume,
+                path: targetPath,
+              })
+            ) {
               let action = rememberedCollisionAction;
               if (!action) {
                 const decision = await openCollisionDialog({
@@ -137,9 +148,10 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
               if (action === "keep-both") {
                 targetPath = await findKeepBothPath(
                   item,
-                  destinationDirectory,
+                  destinationDirectory.path,
                   t("files.copySuffix"),
-                  pathExists,
+                  (path) =>
+                    pathExists({ volume: destinationDirectory.volume, path }),
                 );
               } else {
                 overwrite = true;
@@ -149,14 +161,14 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
 
           if (operation === "copy") {
             await window.edenAPI.shellCommand("fs/cp", {
-              from: item.path,
-              to: targetPath,
+              from: item.location,
+              to: { volume: destinationDirectory.volume, path: targetPath },
               overwrite,
             });
           } else {
             await window.edenAPI.shellCommand("fs/mv", {
-              from: item.path,
-              to: targetPath,
+              from: item.location,
+              to: { volume: destinationDirectory.volume, path: targetPath },
               overwrite,
             });
           }
@@ -182,7 +194,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     return true;
   };
 
-  const completeTransfer = async (destinationDirectory: string) => {
+  const completeTransfer = async (destinationDirectory: FilesystemLocation) => {
     const request = pendingTransfer();
     if (!request || busy()) return false;
     try {
@@ -220,7 +232,9 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           itemName: item.name,
         });
         try {
-          await window.edenAPI.shellCommand("fs/delete", { path: item.path });
+          await window.edenAPI.shellCommand("fs/delete", {
+            location: item.location,
+          });
         } catch (error) {
           failures.push({ item, message: (error as Error).message });
         }
