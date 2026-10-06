@@ -28,14 +28,10 @@ export const useExplorerNavigation = (
     volume: "home",
     path: "/",
   };
-  const initialPath = initialLocation.path;
-  const [currentVolume, setCurrentVolume] = createSignal(
-    initialLocation.volume,
-  );
-  const currentLocation = (): FilesystemLocation => ({
-    volume: currentVolume(),
-    path: currentPath(),
-  });
+  const [currentLocation, setCurrentLocation] =
+    createSignal<FilesystemLocation>(initialLocation);
+  const currentVolume = createMemo(() => currentLocation().volume);
+  const currentPath = createMemo(() => currentLocation().path);
   const [volumeInventory, setVolumeInventory] = createSignal<
     FilesystemVolume[]
   >([]);
@@ -48,7 +44,6 @@ export const useExplorerNavigation = (
   );
   const readOnly = () =>
     volumes().find((volume) => volume.id === currentVolume())?.readOnly ?? true;
-  const [currentPath, setCurrentPath] = createSignal(initialPath);
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [navigationHistory, setNavigationHistory] = createSignal<
@@ -56,8 +51,7 @@ export const useExplorerNavigation = (
   >([initialLocation]);
   const [historyIndex, setHistoryIndex] = createSignal(0);
   let watchId: string | undefined;
-  let watchedPath: string | undefined;
-  let watchedVolume: string | undefined;
+  let watchedLocation: FilesystemLocation | undefined;
   let requestSequence = 0;
   let watchRequestSequence = 0;
   let refreshQueued = false;
@@ -75,8 +69,7 @@ export const useExplorerNavigation = (
     watchRequestSequence += 1;
     const staleWatchId = watchId;
     watchId = undefined;
-    watchedPath = undefined;
-    watchedVolume = undefined;
+    watchedLocation = undefined;
     if (staleWatchId) {
       await window.edenAPI
         .shellCommand("fs/unwatch", { watchId: staleWatchId })
@@ -93,7 +86,11 @@ export const useExplorerNavigation = (
       return false;
     }
     if (options.active && !options.active()) return false;
-    if (watchId && watchedPath === path && watchedVolume === volume)
+    if (
+      watchId &&
+      watchedLocation?.path === path &&
+      watchedLocation.volume === volume
+    )
       return true;
     await stopWatch();
     if (path !== currentPath() || volume !== currentVolume()) return false;
@@ -117,8 +114,7 @@ export const useExplorerNavigation = (
           return false;
         }
         watchId = result.watchId;
-        watchedPath = path;
-        watchedVolume = volume;
+        watchedLocation = location;
         return true;
       } catch (error) {
         lastError = error;
@@ -181,7 +177,6 @@ export const useExplorerNavigation = (
     location: FilesystemLocation,
     settings: { background?: boolean; replaceWatch?: boolean } = {},
   ): Promise<boolean> => {
-    const { path, volume } = location;
     const request = ++requestSequence;
     if (!settings.background) setLoading(true);
     if (settings.replaceWatch !== false) await establishWatch(location);
@@ -189,8 +184,7 @@ export const useExplorerNavigation = (
     try {
       const nextItems = await readDirectory(location);
       if (request !== requestSequence || disposed) return false;
-      setCurrentPath(path);
-      setCurrentVolume(volume);
+      setCurrentLocation(location);
       setItems(nextItems);
       return true;
     } catch (error) {
@@ -225,7 +219,7 @@ export const useExplorerNavigation = (
           : entry,
       ),
     );
-    setCurrentPath(fallbackPath);
+    setCurrentLocation({ volume, path: fallbackPath });
     await loadDirectory({ volume, path: fallbackPath });
   };
 
@@ -337,25 +331,38 @@ export const useExplorerNavigation = (
     });
   }
 
+  const transitionTo = (
+    location: FilesystemLocation,
+    updateHistory?: () => void,
+    selectedItem?: string,
+  ) => {
+    setCurrentLocation(location);
+    setItems([]);
+    options.setSelectedItem(null);
+    updateHistory?.();
+    void loadDirectory(location);
+    if (selectedItem) {
+      options.setScrollToSelected(true);
+      options.setSelectedItem(selectedItem);
+    }
+  };
+
   const navigateTo = (
     path: string,
     selectedItem?: string,
     volume = currentVolume(),
   ) => {
     const location = { path, volume };
-    setCurrentPath(path);
-    setCurrentVolume(volume);
-    setItems([]);
-    options.setSelectedItem(null);
-    const history = navigationHistory();
-    const index = historyIndex();
-    setNavigationHistory([...history.slice(0, index + 1), location]);
-    setHistoryIndex(index + 1);
-    void loadDirectory(location);
-    if (selectedItem) {
-      options.setScrollToSelected(true);
-      options.setSelectedItem(selectedItem);
-    }
+    transitionTo(
+      location,
+      () => {
+        const history = navigationHistory();
+        const index = historyIndex();
+        setNavigationHistory([...history.slice(0, index + 1), location]);
+        setHistoryIndex(index + 1);
+      },
+      selectedItem,
+    );
   };
 
   const resetNavigation = (
@@ -364,41 +371,28 @@ export const useExplorerNavigation = (
     volume = currentVolume(),
   ) => {
     const location = { path, volume };
-    setCurrentPath(path);
-    setCurrentVolume(volume);
-    setItems([]);
-    options.setSelectedItem(null);
-    setNavigationHistory([location]);
-    setHistoryIndex(0);
-    void loadDirectory(location);
-    if (selectedItem) {
-      options.setScrollToSelected(true);
-      options.setSelectedItem(selectedItem);
-    }
+    transitionTo(
+      location,
+      () => {
+        setNavigationHistory([location]);
+        setHistoryIndex(0);
+      },
+      selectedItem,
+    );
   };
 
   const goBack = () => {
     const index = historyIndex();
     if (index > 0) {
       setHistoryIndex(index - 1);
-      const location = navigationHistory()[index - 1];
-      setCurrentPath(location.path);
-      setCurrentVolume(location.volume);
-      setItems([]);
-      options.setSelectedItem(null);
-      void loadDirectory(location);
+      transitionTo(navigationHistory()[index - 1]);
     }
   };
   const goForward = () => {
     const index = historyIndex();
     if (index < navigationHistory().length - 1) {
       setHistoryIndex(index + 1);
-      const location = navigationHistory()[index + 1];
-      setCurrentPath(location.path);
-      setCurrentVolume(location.volume);
-      setItems([]);
-      options.setSelectedItem(null);
-      void loadDirectory(location);
+      transitionTo(navigationHistory()[index + 1]);
     }
   };
   const goUp = () => {
