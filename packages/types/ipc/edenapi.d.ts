@@ -7,6 +7,7 @@
 
 import type { CommandArgs, CommandName, CommandResult } from "../commands";
 import type { EventData, EventName } from "../events";
+import type { FilesystemLocation } from "../Filesystem";
 
 /**
  * Eden API - shell commands and event subscriptions
@@ -58,4 +59,7 @@ export interface EdenAPI {
    * Get the launch arguments passed to this app.
    */
   getLaunchArgs(): string[];
+
+  /** Initial file address when launched through file/open. */
+  getLaunchFile(): FilesystemLocation | undefined;
 }

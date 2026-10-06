@@ -7,6 +7,7 @@ import {
 import type { EditorState, StateEffect } from "@codemirror/state";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { filePicker } from "@edenapp/tablets";
+import type { FileOpenedEvent, FilesystemLocation } from "@edenapp/types";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import {
@@ -19,7 +20,7 @@ import {
 import { createEditorState } from "./editor-config";
 import { EditorDlcHost, loadEditorDlcs } from "./editor-dlcs";
 import { initLocale, t } from "./i18n";
-import { type EditorTab, type FileOpenedEvent, getFileName } from "./types";
+import { type EditorTab, getFileName } from "./types";
 
 const App: Component = () => {
   const dialogs = createDialogs();
@@ -46,22 +47,28 @@ const App: Component = () => {
     window.edenFrame?.setTitle(tab.name);
   };
 
-  const loadTab = (path: string): Promise<string> => {
-    const existing = tabs().find((tab) => tab.path === path);
+  const loadTab = (location: FilesystemLocation): Promise<string> => {
+    const { path, volume } = location;
+    const key = JSON.stringify([volume, path]);
+    const existing = tabs().find(
+      (tab) => tab.location.path === path && tab.location.volume === volume,
+    );
     if (existing) return Promise.resolve(existing.id);
 
-    const pending = openingFiles.get(path);
+    const pending = openingFiles.get(key);
     if (pending) return pending;
 
     const task = (async () => {
-      const dlcDocument = await editorDlcs.openDocument(path);
+      const dlcDocument = await editorDlcs.openDocument(location);
       const fileContent =
         dlcDocument?.content ??
-        (await window.edenAPI.shellCommand("fs/read", { path }));
+        (await window.edenAPI.shellCommand("fs/read", { location }));
       let tabId = "";
 
       setTabs((currentTabs) => {
-        const alreadyOpen = currentTabs.find((tab) => tab.path === path);
+        const alreadyOpen = currentTabs.find(
+          (tab) => tab.location.path === path && tab.location.volume === volume,
+        );
         if (alreadyOpen) {
           tabId = alreadyOpen.id;
           return currentTabs;
@@ -71,7 +78,7 @@ const App: Component = () => {
         const language = editorDlcs.resolveLanguage(path);
         const newTab: EditorTab = {
           id: tabId,
-          path,
+          location: { path, volume },
           name: getFileName(path),
           content: fileContent,
           originalContent: fileContent,
@@ -87,17 +94,17 @@ const App: Component = () => {
       return tabId;
     })();
 
-    openingFiles.set(path, task);
-    void task.finally(() => openingFiles.delete(path)).catch(() => {});
+    openingFiles.set(key, task);
+    void task.finally(() => openingFiles.delete(key)).catch(() => {});
     return task;
   };
 
-  const openFile = async (path: string) => {
+  const openFile = async (location: FilesystemLocation) => {
     const requestId = ++openRequestSequence;
     try {
       setError(null);
       await editorReady;
-      const tabId = await loadTab(path);
+      const tabId = await loadTab(location);
       if (requestId === openRequestSequence) activateTab(tabId);
     } catch (err) {
       setError(t("editor.failedToLoad", { message: (err as Error).message }));
@@ -170,13 +177,13 @@ const App: Component = () => {
       let savedDocumentHandler: EditorTab["documentHandler"];
       if (active.documentHandler) {
         savedDocumentHandler = await editorDlcs.saveDocument(
-          active.path,
+          active.location,
           currentContent,
           active.documentHandler,
         );
       } else {
         await window.edenAPI.shellCommand("fs/write", {
-          path: active.path,
+          location: active.location,
           content: currentContent,
         });
       }
@@ -255,7 +262,7 @@ const App: Component = () => {
   };
 
   const handleFileOpened = (data: FileOpenedEvent) => {
-    if (!data.isDirectory) void openFile(data.path);
+    if (!data.isDirectory) void openFile(data.location);
   };
 
   const initializeEditorDlcs = async () => {
@@ -275,8 +282,8 @@ const App: Component = () => {
   onMount(() => {
     initLocale();
     editorReady = initializeEditorDlcs();
-    const launchArgs = window.edenAPI.getLaunchArgs();
-    if (launchArgs.length > 0) void openFile(launchArgs[0]);
+    const launchFile = window.edenAPI.getLaunchFile();
+    if (launchFile) void openFile(launchFile);
 
     window.edenAPI.subscribe(
       "file/opened",

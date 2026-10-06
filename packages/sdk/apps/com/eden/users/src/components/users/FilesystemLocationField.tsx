@@ -24,11 +24,12 @@ export default function FilesystemLocationField(
       const selectedPath = await filePicker.openDirectory({
         title: t("settings.users.filesystemLocationPickerTitle"),
         confirmLabel: t("settings.users.chooseLocation"),
-        initialPath,
+        initialLocation: { volume: "home", path: initialPath },
+        allowedVolumes: ["home"],
         canCreateDirectories: true,
       });
       if (selectedPath !== null) {
-        const value = selectedPath.replace(/^[\\/]+/, "");
+        const value = selectedPath.path.replace(/^[\\/]+/, "");
         props.onInput(value);
         props.onCommit?.(value);
       }

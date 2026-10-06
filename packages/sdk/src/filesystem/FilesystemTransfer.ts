@@ -7,33 +7,51 @@ interface TransferRequest {
   destination: string;
   destinationLabel: string;
   overwrite: boolean;
+  assertSourceActive?: () => Promise<void>;
+  assertDestinationActive?: () => Promise<void>;
 }
 
 interface PreparedTransfer {
   source: string;
   destination: string;
   destinationExists: boolean;
+  assertSourceActive?: () => Promise<void>;
+  assertDestinationActive?: () => Promise<void>;
 }
 
 export class FilesystemTransfer {
   async copy(request: TransferRequest): Promise<void> {
     const transfer = await this.prepare(request, "copy");
     await this.runWithDestinationRollback(transfer, () =>
-      this.copyEntry(transfer.source, transfer.destination),
+      this.copyEntry(transfer),
     );
   }
 
   async move(request: TransferRequest): Promise<void> {
     const transfer = await this.prepare(request, "move");
+    let copied = false;
     await this.runWithDestinationRollback(transfer, async () => {
+      await this.assertActive(transfer);
       try {
         await fs.rename(transfer.source, transfer.destination);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-        await this.copyEntry(transfer.source, transfer.destination);
-        await fs.rm(transfer.source, { recursive: true, force: true });
+        await this.copyEntry(transfer);
+        copied = true;
       }
     });
+    if (copied) {
+      // The completed destination must survive an incomplete source deletion.
+      try {
+        await this.assertActive(transfer);
+        await fs.rm(transfer.source, { recursive: true, force: false });
+      } catch (error) {
+        throw new Error(
+          "Move copied the destination but could not completely remove the source",
+          { cause: error },
+        );
+      }
+    }
   }
 
   private async prepare(
@@ -68,11 +86,14 @@ export class FilesystemTransfer {
       );
     }
 
+    await this.assertActive(request);
     await fs.mkdir(path.dirname(request.destination), { recursive: true });
     return {
       source: request.source,
       destination: request.destination,
       destinationExists,
+      assertSourceActive: request.assertSourceActive,
+      assertDestinationActive: request.assertDestinationActive,
     };
   }
 
@@ -80,6 +101,7 @@ export class FilesystemTransfer {
     transfer: PreparedTransfer,
     operation: () => Promise<void>,
   ): Promise<void> {
+    await this.assertActive(transfer);
     const backup = transfer.destinationExists
       ? await this.stageDestination(transfer.destination)
       : undefined;
@@ -89,6 +111,7 @@ export class FilesystemTransfer {
     } catch (error) {
       const rollbackErrors: unknown[] = [];
       try {
+        await transfer.assertDestinationActive?.();
         await fs.rm(transfer.destination, { recursive: true, force: true });
       } catch (cleanupError) {
         rollbackErrors.push(cleanupError);
@@ -96,6 +119,7 @@ export class FilesystemTransfer {
 
       if (backup) {
         try {
+          await transfer.assertDestinationActive?.();
           await fs.rename(backup, transfer.destination);
         } catch (restoreError) {
           rollbackErrors.push(restoreError);
@@ -112,6 +136,7 @@ export class FilesystemTransfer {
     }
 
     if (backup) {
+      await transfer.assertDestinationActive?.();
       await fs.rm(backup, { recursive: true, force: true });
     }
   }
@@ -125,12 +150,24 @@ export class FilesystemTransfer {
     return backup;
   }
 
-  private async copyEntry(source: string, destination: string): Promise<void> {
+  private async assertActive(transfer: TransferRequest | PreparedTransfer) {
+    await transfer.assertSourceActive?.();
+    await transfer.assertDestinationActive?.();
+  }
+
+  private async copyEntry(transfer: PreparedTransfer): Promise<void> {
+    const { source, destination } = transfer;
     await fs.cp(source, destination, {
       recursive: true,
+      verbatimSymlinks: true,
+      filter: async () => {
+        await this.assertActive(transfer);
+        return true;
+      },
       errorOnExist: true,
       force: false,
     });
+    await this.assertActive(transfer);
   }
 
   private async pathExists(hostPath: string): Promise<boolean> {

@@ -29,6 +29,6 @@ Import types in your Eden app:
 ```typescript
 // Use Eden API in your app's frontend
 const files = await window.edenAPI.shellCommand("fs/readdir", {
-  path: "/home/user/documents",
+  location: { volume: "home", path: "/home/user/documents" },
 });
 ```

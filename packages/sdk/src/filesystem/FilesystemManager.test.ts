@@ -8,6 +8,7 @@ import type { ExecutionContext } from "../execution";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemManager } from "./FilesystemManager";
+import { VolumeManager } from "./VolumeManager";
 
 describe("FilesystemManager user roots", () => {
   let root: string;
@@ -42,6 +43,7 @@ describe("FilesystemManager user roots", () => {
       } as unknown as ExecutionContext,
       ipcBridge,
       viewManager,
+      new VolumeManager(ipcBridge),
     );
   });
 
@@ -51,18 +53,18 @@ describe("FilesystemManager user roots", () => {
   });
 
   it("keeps userDirectory as the root for unrestricted users and vendors", async () => {
-    await expect(manager.resolvePath("/Documents")).resolves.toBe(
-      path.join(root, "Documents"),
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/Documents" }),
+    ).resolves.toBe(path.join(root, "Documents"));
 
     currentUser = {
       ...createUser(),
       role: "vendor",
       homeDirectory: "ignored",
     };
-    await expect(manager.resolvePath("/Documents")).resolves.toBe(
-      path.join(root, "Documents"),
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/Documents" }),
+    ).resolves.toBe(path.join(root, "Documents"));
   });
 
   it("maps system daemons to userDirectory", async () => {
@@ -75,11 +77,12 @@ describe("FilesystemManager user roots", () => {
       executionContext,
       ipcBridge,
       viewManager,
+      new VolumeManager(ipcBridge),
     );
 
-    await expect(manager.resolvePath("/state.json")).resolves.toBe(
-      path.join(root, "state.json"),
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/state.json" }),
+    ).resolves.toBe(path.join(root, "state.json"));
   });
 
   it("maps user daemons to the configured home of their fixed account", async () => {
@@ -102,11 +105,12 @@ describe("FilesystemManager user roots", () => {
       } as unknown as ExecutionContext,
       ipcBridge,
       viewManager,
+      new VolumeManager(ipcBridge),
     );
 
-    await expect(manager.resolvePath("/state.json")).resolves.toBe(
-      path.join(root, daemonUser.homeDirectory, "state.json"),
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/state.json" }),
+    ).resolves.toBe(path.join(root, daemonUser.homeDirectory, "state.json"));
   });
 
   it("maps virtual root to a configured relative home", async () => {
@@ -118,16 +122,18 @@ describe("FilesystemManager user roots", () => {
       homeDirectory: "teams/operators",
     };
 
-    await expect(manager.resolvePath("/Documents/report.txt")).resolves.toBe(
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/Documents/report.txt" }),
+    ).resolves.toBe(
       path.join(root, "teams", "operators", "Documents", "report.txt"),
     );
   });
 
   it("denies access without an execution principal", async () => {
     currentUser = null;
-    await expect(manager.resolvePath("/")).rejects.toThrow(
-      "Caller has no filesystem execution principal",
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "/" }),
+    ).rejects.toThrow("Caller has no filesystem execution principal");
   });
 
   it("rejects traversal outside the effective home", async () => {
@@ -137,9 +143,9 @@ describe("FilesystemManager user roots", () => {
       homeDirectory: "homes/operator",
     };
 
-    await expect(manager.resolvePath("../../shared.txt")).rejects.toThrow(
-      "outside of the allowed directory",
-    );
+    await expect(
+      manager.resolvePath({ volume: "home", path: "../../shared.txt" }),
+    ).rejects.toThrow("outside of the allowed directory");
   });
 
   it("rejects symlinks that escape the effective home", async () => {
@@ -153,11 +159,21 @@ describe("FilesystemManager user roots", () => {
       homeDirectory: "homes/operator",
     };
 
-    await expect(manager.resolvePath("/other/private.txt")).rejects.toThrow(
-      "outside of the allowed directory",
-    );
     await expect(
-      manager.writeFile("/other/private.txt", "secret"),
+      manager.resolvePath({ volume: "home", path: "/other/private.txt" }),
     ).rejects.toThrow("outside of the allowed directory");
+    await expect(
+      manager.writeFile(
+        { volume: "home", path: "/other/private.txt" },
+        "secret",
+      ),
+    ).rejects.toThrow("outside of the allowed directory");
+    await expect(
+      manager.writeBinaryFile(
+        { volume: "home", path: "/other/private.bin" },
+        new Uint8Array([1, 2, 3]),
+      ),
+    ).rejects.toThrow("outside of the allowed directory");
+    await expect(fs.readdir(sibling)).resolves.toEqual([]);
   });
 });

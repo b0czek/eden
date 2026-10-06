@@ -4,6 +4,10 @@ export type {
   EdenConfig,
   EdenPowerCapabilities,
   EdenPowerProvider,
+  FilesystemLocation,
+  FilesystemVolume,
+  FilesystemVolumeKind,
+  FilesystemVolumeRegistration,
 } from "@edenapp/types";
 export * from "./api";
 export { Eden } from "./Eden";

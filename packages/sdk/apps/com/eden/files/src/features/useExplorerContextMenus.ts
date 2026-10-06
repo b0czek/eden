@@ -25,6 +25,7 @@ interface UseExplorerContextMenusOptions {
   copyItem: (item: FileItem) => void;
   moveItem: (item: FileItem) => void;
   isBusy: () => boolean;
+  readOnly: () => boolean;
   clearSelection: () => void;
 }
 
@@ -49,6 +50,7 @@ export const useExplorerContextMenus = (
       }),
       button("move", t("files.move"), () => options.moveItem(data.item), {
         icon: "move",
+        disabled: options.readOnly(),
       }),
       separator(),
       button(
@@ -57,6 +59,7 @@ export const useExplorerContextMenus = (
         () => options.promptRename(data.item),
         {
           icon: "edit-2",
+          disabled: options.readOnly(),
         },
       ),
       button(
@@ -65,6 +68,7 @@ export const useExplorerContextMenus = (
         () => options.duplicateItem(data.item),
         {
           icon: "copy",
+          disabled: options.readOnly(),
         },
       ),
       separator(),
@@ -74,6 +78,7 @@ export const useExplorerContextMenus = (
         () => options.promptDelete(data.item),
         {
           icon: "trash",
+          disabled: options.readOnly(),
           danger: true,
         },
       ),
@@ -83,9 +88,11 @@ export const useExplorerContextMenus = (
   const emptyAreaMenu = menu<null>(() => [
     button("new-folder", t("files.newFolder"), options.promptCreateFolder, {
       icon: "folder-plus",
+      disabled: options.readOnly(),
     }),
     button("new-file", t("files.newFile"), options.promptCreateFile, {
       icon: "file-plus",
+      disabled: options.readOnly(),
     }),
     separator(),
     button("refresh", t("files.refresh"), options.refresh, {
@@ -99,7 +106,7 @@ export const useExplorerContextMenus = (
     if (options.isBusy()) return;
     options.clearSelection();
     options.setScrollToSelected(false);
-    options.setSelectedItem(item.path);
+    options.setSelectedItem(item.location.path);
     const openWithItems =
       item.isFile || item.isDirectory
         ? await options.getOpenWithMenuItems(item)

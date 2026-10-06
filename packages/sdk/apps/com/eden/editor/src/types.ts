@@ -1,10 +1,11 @@
 import type { EditorState, StateEffect } from "@codemirror/state";
 import type { EditorLanguageName } from "@edenapp/editor-dlc";
+import type { FilesystemLocation } from "@edenapp/types";
 import type { EditorDlcDocumentState } from "./editor-dlcs";
 
 export interface EditorTab {
+  location: FilesystemLocation;
   id: string;
-  path: string;
   name: string;
   content: string;
   originalContent: string;
@@ -14,13 +15,6 @@ export interface EditorTab {
   state: EditorState;
   documentHandler?: EditorDlcDocumentState;
   scrollSnapshot?: StateEffect<unknown>;
-}
-
-// File opened event type
-export interface FileOpenedEvent {
-  path: string;
-  isDirectory: boolean;
-  appId: string;
 }
 
 export const extensionToLanguage: Record<string, string> = {

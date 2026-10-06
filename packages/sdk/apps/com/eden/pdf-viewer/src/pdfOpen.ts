@@ -1,4 +1,5 @@
 import { filePicker, notification } from "@edenapp/tablets";
+import type { FilesystemLocation } from "@edenapp/types";
 import type {
   DocumentManagerCapability,
   DocumentManagerPlugin,
@@ -180,10 +181,11 @@ export function createPdfOpenController({
     Promise.resolve(undefined);
 
   const openPdfNow = async (
-    path: string,
+    location: FilesystemLocation,
     version: number,
     options?: OpenFileDialogOptions,
   ) => {
+    const path = location.path;
     const registry = await getRegistry();
     const documentManager = await getDocumentManager(registry);
     if (version !== loadVersion) {
@@ -191,7 +193,7 @@ export function createPdfOpenController({
     }
 
     const content = await window.edenAPI.shellCommand("fs/read-binary", {
-      path,
+      location,
     });
     if (version !== loadVersion) {
       return undefined;
@@ -212,14 +214,18 @@ export function createPdfOpenController({
       .toPromise();
   };
 
-  const openPdf = (path: string, options?: OpenFileDialogOptions) => {
+  const openPdf = (
+    location: FilesystemLocation,
+    options?: OpenFileDialogOptions,
+  ) => {
+    const path = location.path;
     const version = loadVersion + 1;
     loadVersion = version;
 
     setLoading(path);
 
     openQueue = openQueue
-      .then(() => openPdfNow(path, version, options))
+      .then(() => openPdfNow(location, version, options))
       .then((result) => {
         if (version !== loadVersion) {
           return undefined;

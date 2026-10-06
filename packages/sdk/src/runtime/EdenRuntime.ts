@@ -16,6 +16,7 @@ import type {
   EdenSessionsApi,
   EdenSettingsApi,
   EdenUsersApi,
+  EdenVolumesApi,
 } from "../api";
 import {
   createControlPlaneApis,
@@ -33,6 +34,7 @@ import { ExecutionContext } from "../execution/ExecutionContext";
 import { FileOpenManager } from "../file-open";
 import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
+import { VolumeManager } from "../filesystem/VolumeManager";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
@@ -199,6 +201,7 @@ export class EdenRuntime {
       "user/manage",
     );
     permissions.registerEventPermission("fs/changed", "fs/read");
+    permissions.registerEventPermission("fs/volumes-changed", "fs/read");
   }
 
   public whenReady(): Promise<void> {
@@ -207,6 +210,10 @@ export class EdenRuntime {
 
   public get state(): EdenLifecycleState {
     return this.lifecycleState;
+  }
+
+  public get volumes(): EdenVolumesApi {
+    return this.requireControlPlaneApis().volumes;
   }
 
   public get packages(): EdenPackagesApi {
@@ -375,6 +382,7 @@ export class EdenRuntime {
       sessionManager: this.sessionManager,
       appearanceManager,
       associationManager: this.appAssociationManager,
+      volumeManager: this.resolveOwned(VolumeManager),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,

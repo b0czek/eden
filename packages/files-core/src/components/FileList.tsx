@@ -45,9 +45,9 @@ const FileList: Component<FileListProps> = (props) => {
   const isItemSelected = (item: FileItem) => {
     const selectedItems = props.selectedPaths ?? props.selectedItems;
     if (selectedItems) {
-      return selectedItems.includes(item.path);
+      return selectedItems.includes(item.location.path);
     }
-    return props.selectedItem === item.path;
+    return props.selectedItem === item.location.path;
   };
 
   const canActivateOnClick = (item: FileItem) =>
@@ -129,7 +129,7 @@ const FileList: Component<FileListProps> = (props) => {
       if (e.key === "Enter" || (props.selectionMode && e.key === " ")) {
         if (selected) {
           e.preventDefault();
-          const item = items.find((i) => i.path === selected);
+          const item = items.find((i) => i.location.path === selected);
           if (item) {
             if (props.selectionMode) {
               (props.onSelectionToggle ?? props.onItemClick)(item, e);
@@ -151,7 +151,7 @@ const FileList: Component<FileListProps> = (props) => {
 
       if (e.key === "Delete") {
         if (!props.selectionMode && selected && props.onItemDeleteShortcut) {
-          const item = items.find((i) => i.path === selected);
+          const item = items.find((i) => i.location.path === selected);
           if (item) {
             e.preventDefault();
             props.onItemDeleteShortcut(item);
@@ -167,7 +167,7 @@ const FileList: Component<FileListProps> = (props) => {
 
       let currentIndex = -1;
       if (selected) {
-        currentIndex = items.findIndex((i) => i.path === selected);
+        currentIndex = items.findIndex((i) => i.location.path === selected);
       }
 
       // If nothing selected, select first
@@ -216,7 +216,7 @@ const FileList: Component<FileListProps> = (props) => {
 
         // Ensure visibility during keyboard navigation
         // We use immediate scroll since the element already exists
-        const el = fileRefs.get(item.path);
+        const el = fileRefs.get(item.location.path);
         if (el) {
           el.scrollIntoView({ block: "nearest" });
         }
@@ -255,10 +255,12 @@ const FileList: Component<FileListProps> = (props) => {
           <For each={props.items}>
             {(item) => (
               <FileItemComponent
-                ref={(el: HTMLDivElement) => fileRefs.set(item.path, el)}
+                ref={(el: HTMLDivElement) =>
+                  fileRefs.set(item.location.path, el)
+                }
                 item={item}
                 isSelected={isItemSelected(item)}
-                isFocused={props.selectedItem === item.path}
+                isFocused={props.selectedItem === item.location.path}
                 selectionMode={props.selectionMode}
                 disabled={props.disabled}
                 viewStyle={props.viewStyle}

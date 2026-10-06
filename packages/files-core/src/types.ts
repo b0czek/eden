@@ -1,6 +1,8 @@
+import type { FilesystemLocation } from "@edenapp/types";
+
 export interface FileItem {
+  location: FilesystemLocation;
   name: string;
-  path: string;
   isDirectory: boolean;
   isFile: boolean;
   size: number;
@@ -25,6 +27,10 @@ export interface Breadcrumb {
 }
 
 export interface FileExplorerLabels {
+  volume: string;
+  home: string;
+  readOnly: string;
+  refresh: string;
   goBack: string;
   goForward: string;
   goUp: string;

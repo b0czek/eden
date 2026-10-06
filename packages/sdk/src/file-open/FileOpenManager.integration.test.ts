@@ -32,15 +32,19 @@ describe("FileOpenManager integration", () => {
       password: "password",
     });
     await eden.runtime.sessions.login(user.username, "password");
-    await eden.execute("fs/mkdir", { path: "/Documents" });
+    await eden.execute("fs/mkdir", {
+      location: { path: "/Documents", volume: "home" },
+    });
 
     await eden.execute("file/set-default-handler", {
-      path: "/Documents",
+      location: { path: "/Documents", volume: "home" },
       appId: filesApp.id,
     });
 
     await expect(
-      eden.execute("file/get-handler", { path: "/Documents" }),
+      eden.execute("file/get-handler", {
+        location: { path: "/Documents", volume: "home" },
+      }),
     ).resolves.toEqual({ appId: filesApp.id });
     await expect(eden.execute("file/get-associations")).resolves.toEqual({
       directory: { default: filesApp.id, userOverride: filesApp.id },
@@ -50,7 +54,9 @@ describe("FileOpenManager integration", () => {
       kind: "file.directory",
     });
 
-    await eden.execute("file/remove-default-handler", { path: "/Documents" });
+    await eden.execute("file/remove-default-handler", {
+      location: { path: "/Documents", volume: "home" },
+    });
     expect(eden.runtime.associations.get("file:directory")).toBeUndefined();
   });
 
@@ -94,12 +100,14 @@ describe("FileOpenManager integration", () => {
     });
     await eden.runtime.sessions.login(user.username, "password");
     await eden.execute("fs/write", {
-      path: "/request.http",
+      location: { path: "/request.http", volume: "home" },
       content: "GET https://example.test",
     });
 
     await expect(
-      eden.execute("file/get-supported-handlers", { path: "/request.http" }),
+      eden.execute("file/get-supported-handlers", {
+        location: { path: "/request.http", volume: "home" },
+      }),
     ).resolves.toEqual([
       {
         appId: editor.id,
@@ -109,19 +117,25 @@ describe("FileOpenManager integration", () => {
       },
     ]);
     await eden.execute("file/set-default-handler", {
-      path: "/request.http",
+      location: { path: "/request.http", volume: "home" },
       appId: editor.id,
     });
     await expect(
-      eden.execute("file/get-handler", { path: "/request.http" }),
+      eden.execute("file/get-handler", {
+        location: { path: "/request.http", volume: "home" },
+      }),
     ).resolves.toEqual({ appId: editor.id });
 
     registry.unregister(highlighter.id);
     await expect(
-      eden.execute("file/get-supported-handlers", { path: "/request.http" }),
+      eden.execute("file/get-supported-handlers", {
+        location: { path: "/request.http", volume: "home" },
+      }),
     ).resolves.toEqual([]);
     await expect(
-      eden.execute("file/get-handler", { path: "/request.http" }),
+      eden.execute("file/get-handler", {
+        location: { path: "/request.http", volume: "home" },
+      }),
     ).resolves.toEqual({ appId: undefined });
   });
 });

@@ -1,3 +1,4 @@
+import type { FilesystemLocation } from "./Filesystem";
 import type { ViewBounds } from "./index";
 
 export type FilePickerMode = "open" | "save";
@@ -17,7 +18,9 @@ export interface FilePickerOpenArgs {
   selection?: FilePickerSelectionMode;
   multiple?: boolean;
   title?: string;
-  initialPath?: string;
+  initialLocation?: FilesystemLocation;
+  /** Limit selection to these volumes; omitted means all registered volumes. */
+  allowedVolumes?: string[];
   suggestedName?: string;
   filters?: FilePickerFilter[];
   confirmLabel?: string;
@@ -37,6 +40,5 @@ export interface FilePickerOpenEvent extends FilePickerOpenArgs {
 export interface FilePickerResult {
   requestId: string;
   reason: FilePickerCloseReason;
-  path?: string;
-  paths?: string[];
+  locations?: FilesystemLocation[];
 }

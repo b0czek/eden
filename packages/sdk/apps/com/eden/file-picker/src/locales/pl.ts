@@ -1,5 +1,11 @@
 export const pl = {
   filePicker: {
+    volume: "Wolumin",
+    home: "Katalog domowy",
+    readOnly: "Tylko do odczytu",
+    refresh: "Odśwież",
+    volumeDisconnected: "Dysk został odłączony. Wyświetlono katalog domowy.",
+
     titleOpenFile: "Otwórz Plik",
     titleOpenDirectory: "Otwórz Folder",
     titleSaveFile: "Zapisz Plik",

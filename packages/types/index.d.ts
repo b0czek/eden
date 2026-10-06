@@ -1,3 +1,5 @@
+import type { FilesystemLocation } from "./Filesystem";
+
 export * from "./AppAssociation";
 export * from "./AppManifest";
 export * from "./Branding";
@@ -86,9 +88,14 @@ export interface LaunchResult {
   appId: string;
 }
 
-/**
- * Result of opening a file
- */
+/** File address and handler context delivered when opening a file. */
+export interface FileOpenedEvent {
+  location: FilesystemLocation;
+  isDirectory: boolean;
+  appId: string;
+}
+
+/** Result of opening a file. */
 export interface FileOpenResult {
   success: boolean;
   appId?: string;
@@ -116,22 +123,16 @@ export interface FileStats {
 }
 
 /** Kind of update delivered by a filesystem watch subscription. */
-export type FilesystemChangeKind = "change" | "watch-error";
+export type FilesystemChangeKind = "change" | "watch-error" | "volume-removed";
 
-/** Arguments shared by the recursive filesystem copy and move commands. */
-export interface FilesystemTransferArgs {
-  from: string;
-  to: string;
-  /** Replace the complete destination when it already exists. */
-  overwrite?: boolean;
-}
+export * from "./Filesystem";
 
 /**
  * Search result for filesystem queries
  */
 export interface SearchResult {
+  location: FilesystemLocation;
   name: string;
-  path: string;
   type: "file" | "folder";
 }
 

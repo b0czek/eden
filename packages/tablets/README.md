@@ -60,16 +60,26 @@ void contextMenu.close();
 ```ts
 import { filePicker } from "@edenapp/tablets";
 
-const path = await filePicker.openFile({
+const location = await filePicker.openFile({
   title: "Open Markdown",
   filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
 });
 
-const savePath = await filePicker.saveFile({
+if (location) {
+  const text = await window.edenAPI.shellCommand("fs/read", {
+    location: location,
+  });
+}
+
+const saveLocation = await filePicker.saveFile({
   suggestedName: "notes.md",
   filters: [{ name: "Markdown", extensions: ["md"] }],
 });
 ```
+
+Picker helpers return `{ volume, path }` addresses (or `null` on cancellation).
+Use `initialLocation` to choose the starting directory and `allowedVolumes` to
+restrict the selector, for example `allowedVolumes: ["home"]`.
 
 ## Notifications
 

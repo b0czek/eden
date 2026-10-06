@@ -39,10 +39,16 @@ describe("ProcessManager session cleanup", () => {
     await expect(manager.launchApp("app.backend")).resolves.toMatchObject({
       appId: "app.backend",
     });
-    expect(launch).toHaveBeenCalledWith("app.backend", undefined, undefined, {
-      owner: { kind: "session", sessionId: "s1", username: "operator" },
-      principal: { kind: "user", username: "operator" },
-    });
+    expect(launch).toHaveBeenCalledWith(
+      "app.backend",
+      undefined,
+      undefined,
+      {
+        owner: { kind: "session", sessionId: "s1", username: "operator" },
+        principal: { kind: "user", username: "operator" },
+      },
+      undefined,
+    );
   });
 
   it("attempts to stop every app and reports aggregate failure", async () => {

@@ -1,4 +1,5 @@
 import type { FileItem } from "@edenapp/files-core";
+import type { FilesystemLocation } from "@edenapp/types";
 
 export type TransferOperation = "copy" | "move";
 export type CollisionAction = "replace" | "keep-both" | "skip";
@@ -48,18 +49,25 @@ export const isSameOrDescendantPath = (
 
 export const planTransfer = (
   item: FileItem,
-  destinationDirectory: string,
+  destinationDirectory: FilesystemLocation,
   operation: TransferOperation,
 ): TransferPlan => {
-  const destination = normalizeVirtualPath(destinationDirectory);
-  const source = normalizeVirtualPath(item.path);
+  const destination = normalizeVirtualPath(destinationDirectory.path);
+  const source = normalizeVirtualPath(item.location.path);
 
-  if (item.isDirectory && isSameOrDescendantPath(source, destination)) {
+  if (
+    item.location.volume === destinationDirectory.volume &&
+    item.isDirectory &&
+    isSameOrDescendantPath(source, destination)
+  ) {
     return { kind: "invalid", reason: "self-or-descendant" };
   }
 
   const targetPath = joinVirtualPath(destination, item.name);
-  if (targetPath === source) {
+  if (
+    item.location.volume === destinationDirectory.volume &&
+    targetPath === source
+  ) {
     return operation === "move" ? { kind: "no-op" } : { kind: "keep-both" };
   }
 

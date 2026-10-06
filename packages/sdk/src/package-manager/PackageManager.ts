@@ -5,15 +5,15 @@ import type {
   AppManifest,
   DlcManifest,
   EdenConfig,
+  FilesystemLocation,
   InstalledPackageInfo,
   InstalledPackageManifest,
   PackageManifest,
-  PackageOperationPreview,
   RuntimeAppManifest,
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { ExecutionContext } from "../execution/ExecutionContext";
+import type { EdenPackageInfo } from "../api/ControlPlaneApi";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { FilesystemManager } from "../filesystem";
 import { normalizeGrantPresets } from "../grants/GrantPresets";
@@ -97,8 +97,6 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     private readonly operations: PackageOperationCoordinator,
     @inject(RuntimeContextRegistry)
     private readonly runtimeContexts: RuntimeContextRegistry,
-    @inject(ExecutionContext)
-    private readonly executionContext: ExecutionContext,
   ) {
     super(ipcBridge);
     this.prebuiltPackagesDirectory = path.join(distPath, "apps", "prebuilt");
@@ -460,14 +458,19 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   /**
    * Get info about a package file without installing it
    */
-  async getPackageInfo(virtualPath: string): Promise<{
-    success: boolean;
-    manifest?: PackageManifest;
-    preview?: PackageOperationPreview;
-    error?: string;
-  }> {
+  async getPackageInfo(location: FilesystemLocation): Promise<EdenPackageInfo> {
     try {
-      const resolvedPath = await this.resolvePackageSource(virtualPath);
+      const hostPath = await this.filesystemManager.resolvePath(location);
+      return await this.getPackageInfoFromHostPath(hostPath);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /** Inspect a package at a trusted host filesystem path. */
+  async getPackageInfoFromHostPath(hostPath: string): Promise<EdenPackageInfo> {
+    try {
+      const resolvedPath = path.resolve(hostPath);
       const info = await genesisBundler.getInfo(resolvedPath);
       if (!info.success || !info.manifest) return info;
       const manifest = info.manifest;
@@ -568,10 +571,19 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
 
   /** Install an app or DLC from a .edenite file. */
   async installPackage(
-    virtualPath: string,
+    location: FilesystemLocation,
     replacementConfirmed = false,
   ): Promise<InstalledPackageManifest> {
-    const edenitePath = await this.resolvePackageSource(virtualPath);
+    const hostPath = await this.filesystemManager.resolvePath(location);
+    return this.installPackageFromHostPath(hostPath, replacementConfirmed);
+  }
+
+  /** Install a package at a trusted host filesystem path. */
+  async installPackageFromHostPath(
+    hostPath: string,
+    replacementConfirmed = false,
+  ): Promise<InstalledPackageManifest> {
+    const edenitePath = path.resolve(hostPath);
     const info = await this.readPackageInfo(edenitePath);
     const rawManifest = info.manifest;
     this.assertPackageIdAvailable(rawManifest.id);
@@ -930,12 +942,6 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       throw new Error(info.error || "Invalid .edenite package");
     }
     return { manifest: info.manifest };
-  }
-
-  private resolvePackageSource(sourcePath: string): Promise<string> {
-    return this.executionContext.get()
-      ? this.filesystemManager.resolvePath(sourcePath)
-      : Promise.resolve(path.resolve(sourcePath));
   }
 
   async isHotReloadEnabled(packageId: string): Promise<boolean> {

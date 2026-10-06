@@ -8,8 +8,8 @@ import {
 } from "./fileTransfers";
 
 const item = (overrides: Partial<FileItem> = {}): FileItem => ({
+  location: { volume: "home", path: "/Documents/report.txt" },
   name: "report.txt",
-  path: "/Documents/report.txt",
   isDirectory: false,
   isFile: true,
   size: 10,
@@ -22,11 +22,18 @@ describe("file transfer planning", () => {
     expect(createCopyName(item(), "copy", 1)).toBe("report-copy.txt");
     expect(createCopyName(item(), "copy", 3)).toBe("report-copy-3.txt");
     expect(
-      createCopyName(item({ name: ".env", path: "/.env" }), "copy", 1),
+      createCopyName(
+        item({ name: ".env", location: { volume: "home", path: "/.env" } }),
+        "copy",
+        1,
+      ),
     ).toBe(".env-copy");
     expect(
       createCopyName(
-        item({ name: "archive.tar.gz", path: "/archive.tar.gz" }),
+        item({
+          name: "archive.tar.gz",
+          location: { volume: "home", path: "/archive.tar.gz" },
+        }),
         "kopia",
         2,
       ),
@@ -48,27 +55,56 @@ describe("file transfer planning", () => {
   it("rejects directory destinations inside the source", () => {
     const folder = item({
       name: "Photos",
-      path: "/Photos",
+      location: { volume: "home", path: "/Photos" },
       isDirectory: true,
       isFile: false,
     });
-    expect(planTransfer(folder, "/Photos", "copy")).toEqual({
+    expect(
+      planTransfer(folder, { volume: "home", path: "/Photos" }, "copy"),
+    ).toEqual({
       kind: "invalid",
       reason: "self-or-descendant",
     });
-    expect(planTransfer(folder, "/Photos/Trips/2026", "move")).toEqual({
+    expect(
+      planTransfer(
+        folder,
+        { volume: "home", path: "/Photos/Trips/2026" },
+        "move",
+      ),
+    ).toEqual({
       kind: "invalid",
       reason: "self-or-descendant",
     });
   });
 
   it("keeps same-folder copies and treats same-folder moves as no-ops", () => {
-    expect(planTransfer(item(), "/Documents", "copy")).toEqual({
+    expect(
+      planTransfer(item(), { volume: "home", path: "/Documents" }, "copy"),
+    ).toEqual({
       kind: "keep-both",
     });
-    expect(planTransfer(item(), "/Documents", "move")).toEqual({
+    expect(
+      planTransfer(item(), { volume: "home", path: "/Documents" }, "move"),
+    ).toEqual({
       kind: "no-op",
     });
+  });
+
+  it("transfers identical paths between different volumes", () => {
+    expect(
+      planTransfer(item(), { volume: "usb", path: "/Documents" }, "move"),
+    ).toEqual({ kind: "transfer", targetPath: "/Documents/report.txt" });
+    expect(
+      planTransfer(
+        item({
+          isDirectory: true,
+          location: { volume: "home", path: "/Photos" },
+          name: "Photos",
+        }),
+        { volume: "usb", path: "/Photos" },
+        "copy",
+      ),
+    ).toEqual({ kind: "transfer", targetPath: "/Photos/Photos" });
   });
 
   it("remembers only apply-to-all collision actions", () => {

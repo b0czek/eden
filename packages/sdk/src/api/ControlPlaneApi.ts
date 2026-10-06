@@ -2,6 +2,8 @@ import type {
   AppAssociation,
   DaemonDefinition,
   DaemonStatus,
+  FilesystemVolume,
+  FilesystemVolumeRegistration,
   InstalledPackageInfo,
   InstalledPackageManifest,
   PackageManifest,
@@ -135,4 +137,12 @@ export interface EdenAssociationsApi {
   list(options?: EdenAssociationListOptions): Record<string, AppAssociation>;
   set(key: string, association: AppAssociation): Promise<void>;
   remove(key: string): Promise<void>;
+}
+
+/** Main-process integration for consumer-managed mounted directories. */
+export interface EdenVolumesApi {
+  register(input: FilesystemVolumeRegistration): Promise<FilesystemVolume>;
+  unregister(id: string): boolean;
+  list(): FilesystemVolume[];
+  onChanged(listener: (volumes: FilesystemVolume[]) => void): EdenUnsubscribe;
 }

@@ -10,6 +10,7 @@ import type {
   EdenSessionsApi,
   EdenSettingsApi,
   EdenUsersApi,
+  EdenVolumesApi,
 } from "./api";
 import { createElectronPlatform } from "./platform/electron";
 import { EdenRuntime } from "./runtime/EdenRuntime";
@@ -54,6 +55,10 @@ export class Eden {
 
   public get state(): EdenLifecycleState {
     return this.runtime.state;
+  }
+
+  public get volumes(): EdenVolumesApi {
+    return this.runtime.volumes;
   }
 
   public get packages(): EdenPackagesApi {

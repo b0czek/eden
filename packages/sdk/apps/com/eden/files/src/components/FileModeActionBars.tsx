@@ -18,6 +18,7 @@ interface SelectionActionBarProps {
   itemCount: number;
   allItemsSelected: boolean;
   busy: boolean;
+  readOnly: boolean;
   onToggleAll: () => void;
   onTransfer: (operation: TransferOperation) => void;
   onDelete: () => void;
@@ -67,7 +68,7 @@ export const SelectionActionBar: Component<SelectionActionBarProps> = (
         <button
           type="button"
           class="eden-btn eden-btn-sm selection-action-button"
-          disabled={props.busy || props.selectedCount === 0}
+          disabled={props.busy || props.readOnly || props.selectedCount === 0}
           onClick={() => props.onTransfer("move")}
         >
           <FiMove aria-hidden="true" />
@@ -76,7 +77,7 @@ export const SelectionActionBar: Component<SelectionActionBarProps> = (
         <button
           type="button"
           class="eden-btn eden-btn-danger eden-btn-sm selection-action-button"
-          disabled={props.busy || props.selectedCount === 0}
+          disabled={props.busy || props.readOnly || props.selectedCount === 0}
           onClick={props.onDelete}
         >
           <FiTrash2 aria-hidden="true" />
@@ -91,6 +92,7 @@ interface TransferActionBarProps {
   pendingTransfer: PendingTransfer | null;
   progress: FileOperationProgress | null;
   busy: boolean;
+  readOnly: boolean;
   onComplete: () => void;
   onCancel: () => void;
 }
@@ -141,7 +143,7 @@ export const TransferActionBar: Component<TransferActionBarProps> = (props) => (
         <button
           type="button"
           class="eden-btn eden-btn-primary eden-btn-sm"
-          disabled={props.busy}
+          disabled={props.busy || props.readOnly}
           onClick={props.onComplete}
         >
           {props.pendingTransfer.operation === "copy"

@@ -1,13 +1,25 @@
 import type {
+  FilesystemLocation,
   InstalledPackageInfo,
   InstalledPackageManifest,
   PackageManifest,
   PackageOperationPreview,
   RuntimeAppManifest,
 } from "@edenapp/types";
+import * as v from "valibot";
+import {
+  filesystemLocationArgsSchema,
+  filesystemLocationSchema,
+} from "../filesystem/FilesystemLocationSchema";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
 import type { PackageManager } from "./PackageManager";
+
+const installPackageArgs = v.object({
+  source: filesystemLocationSchema,
+  replace: v.optional(v.boolean()),
+});
+
 @EdenNamespace("package")
 export class PackageHandler {
   private packageManager: PackageManager;
@@ -19,15 +31,12 @@ export class PackageHandler {
   /** Install an application or DLC from a local path. */
   @EdenHandler("install", { permission: "manage" })
   async handleInstallPackage(args: {
-    sourcePath: string;
+    source: FilesystemLocation;
     replace?: boolean;
   }): Promise<InstalledPackageManifest> {
-    const { sourcePath } = args;
-    log.info(`Installing from path: ${sourcePath}`);
-    return await this.packageManager.installPackage(
-      sourcePath,
-      args.replace === true,
-    );
+    const { source, replace } = v.parse(installPackageArgs, args);
+    log.info(`Installing from volume: ${source.volume}`);
+    return await this.packageManager.installPackage(source, replace === true);
   }
 
   /**
@@ -127,14 +136,14 @@ export class PackageHandler {
    * Get info about a package file without installing it
    */
   @EdenHandler("get-info", { permission: "read" })
-  async handleGetPackageInfo(args: { path: string }): Promise<{
+  async handleGetPackageInfo(args: { location: FilesystemLocation }): Promise<{
     success: boolean;
     manifest?: PackageManifest;
     preview?: PackageOperationPreview;
     error?: string;
   }> {
-    const { path } = args;
-    return await this.packageManager.getPackageInfo(path);
+    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    return await this.packageManager.getPackageInfo(location);
   }
 
   /**

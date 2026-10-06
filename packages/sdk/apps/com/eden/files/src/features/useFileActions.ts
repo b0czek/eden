@@ -1,13 +1,23 @@
-import { type FileItem, isValidName, joinPath } from "@edenapp/files-core";
+import {
+  type FileItem,
+  getParentPath,
+  isValidName,
+  joinPath,
+} from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
-import type { FileHandlerInfo, RuntimeAppManifest } from "@edenapp/types";
+import type {
+  FileHandlerInfo,
+  FilesystemLocation,
+  RuntimeAppManifest,
+} from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
 import { locale, t } from "../i18n";
 
 interface UseFileActionsOptions {
   currentPath: Accessor<string>;
+  currentVolume: Accessor<string>;
   refresh: () => void;
   navigateTo: (path: string) => void;
   showError: (message: string) => void;
@@ -52,25 +62,31 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     return null;
   };
 
-  const tryCreateFolder = async (name: string): Promise<string | null> => {
+  const tryCreateFolder = async (
+    name: string,
+    directory: FilesystemLocation = {
+      volume: options.currentVolume(),
+      path: options.currentPath(),
+    },
+  ): Promise<string | null> => {
     const trimmedName = name.trim();
     const invalid = validateName(trimmedName, "files.errors.invalidFolderName");
     if (invalid) {
       return invalid;
     }
 
-    const folderPath = joinPath(options.currentPath(), trimmedName);
+    const folderPath = joinPath(directory.path, trimmedName);
 
     try {
       const exists = await window.edenAPI.shellCommand("fs/exists", {
-        path: folderPath,
+        location: { path: folderPath, volume: directory.volume },
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");
       }
 
       await window.edenAPI.shellCommand("fs/mkdir", {
-        path: folderPath,
+        location: { path: folderPath, volume: directory.volume },
       });
       options.refresh();
     } catch (error) {
@@ -87,25 +103,31 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
   };
 
-  const tryCreateFile = async (name: string): Promise<string | null> => {
+  const tryCreateFile = async (
+    name: string,
+    directory: FilesystemLocation = {
+      volume: options.currentVolume(),
+      path: options.currentPath(),
+    },
+  ): Promise<string | null> => {
     const trimmedName = name.trim();
     const invalid = validateName(trimmedName, "files.errors.invalidFileName");
     if (invalid) {
       return invalid;
     }
 
-    const filePath = joinPath(options.currentPath(), trimmedName);
+    const filePath = joinPath(directory.path, trimmedName);
 
     try {
       const exists = await window.edenAPI.shellCommand("fs/exists", {
-        path: filePath,
+        location: { path: filePath, volume: directory.volume },
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");
       }
 
       await window.edenAPI.shellCommand("fs/write", {
-        path: filePath,
+        location: { path: filePath, volume: directory.volume },
         content: "",
       });
       options.refresh();
@@ -154,19 +176,21 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     try {
       let duplicateIndex = 1;
       let targetName = getDuplicateName(item, duplicateIndex);
-      let targetPath = joinPath(options.currentPath(), targetName);
+      let targetPath = joinPath(getParentPath(item.location.path), targetName);
 
       while (
-        await window.edenAPI.shellCommand("fs/exists", { path: targetPath })
+        await window.edenAPI.shellCommand("fs/exists", {
+          location: { path: targetPath, volume: item.location.volume },
+        })
       ) {
         duplicateIndex += 1;
         targetName = getDuplicateName(item, duplicateIndex);
-        targetPath = joinPath(options.currentPath(), targetName);
+        targetPath = joinPath(getParentPath(item.location.path), targetName);
       }
 
       await window.edenAPI.shellCommand("fs/cp", {
-        from: item.path,
-        to: targetPath,
+        from: item.location,
+        to: { volume: item.location.volume, path: targetPath },
       });
 
       options.setScrollToSelected(true);
@@ -181,13 +205,13 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const openItem = async (item: FileItem) => {
     if (item.isDirectory) {
-      options.navigateTo(item.path);
+      options.navigateTo(item.location.path);
       return;
     }
 
     try {
       const result = await window.edenAPI.shellCommand("file/open", {
-        path: item.path,
+        location: { path: item.location.path, volume: item.location.volume },
       });
       if (!result.success) {
         options.showError(`${t("files.errors.openFailed")}: ${result.error}`);
@@ -202,7 +226,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const openItemWithApp = async (item: FileItem, appId: string) => {
     try {
       const openResult = await window.edenAPI.shellCommand("file/open-with", {
-        path: item.path,
+        location: { path: item.location.path, volume: item.location.volume },
         appId,
       });
 
@@ -225,7 +249,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const setItemDefaultHandler = async (item: FileItem, appId: string) => {
     try {
       await window.edenAPI.shellCommand("file/set-default-handler", {
-        path: item.path,
+        location: { path: item.location.path, volume: item.location.volume },
         appId,
       });
     } catch (error) {
@@ -240,10 +264,16 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       const [supportedHandlers, currentHandler, installedApps] =
         await Promise.all([
           window.edenAPI.shellCommand("file/get-supported-handlers", {
-            path: item.path,
+            location: {
+              path: item.location.path,
+              volume: item.location.volume,
+            },
           }) as Promise<FileHandlerInfo[]>,
           window.edenAPI.shellCommand("file/get-handler", {
-            path: item.path,
+            location: {
+              path: item.location.path,
+              volume: item.location.volume,
+            },
           }) as Promise<{ appId?: string }>,
           window.edenAPI.shellCommand("package/list", {}) as Promise<
             RuntimeAppManifest[]
@@ -304,7 +334,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     try {
       const [supportedHandlers] = await Promise.all([
         window.edenAPI.shellCommand("file/get-supported-handlers", {
-          path: item.path,
+          location: { path: item.location.path, volume: item.location.volume },
         }) as Promise<FileHandlerInfo[]>,
       ]);
       const menuItems = supportedHandlers
@@ -358,23 +388,23 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       return invalid;
     }
 
-    const targetPath = joinPath(options.currentPath(), trimmedName);
+    const targetPath = joinPath(getParentPath(item.location.path), trimmedName);
 
-    if (targetPath === item.path) {
+    if (targetPath === item.location.path) {
       return null;
     }
 
     try {
       const exists = await window.edenAPI.shellCommand("fs/exists", {
-        path: targetPath,
+        location: { path: targetPath, volume: item.location.volume },
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");
       }
 
       await window.edenAPI.shellCommand("fs/mv", {
-        from: item.path,
-        to: targetPath,
+        from: item.location,
+        to: { volume: item.location.volume, path: targetPath },
       });
 
       options.setScrollToSelected(true);
@@ -397,7 +427,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const deleteItem = async (item: FileItem) => {
     try {
       await window.edenAPI.shellCommand("fs/delete", {
-        path: item.path,
+        location: { path: item.location.path, volume: item.location.volume },
       });
       options.refresh();
     } catch (error) {
@@ -408,6 +438,10 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   };
 
   const promptCreateFolder = async () => {
+    const directory = {
+      volume: options.currentVolume(),
+      path: options.currentPath(),
+    };
     await options.dialogs.form({
       title: t("files.newFolder"),
       fields: [
@@ -425,12 +459,16 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       validate: (values) =>
         validateName(values.name, "files.errors.invalidFolderName"),
       onSubmit: async (values) => {
-        return await tryCreateFolder(values.name);
+        return await tryCreateFolder(values.name, directory);
       },
     });
   };
 
   const promptCreateFile = async () => {
+    const directory = {
+      volume: options.currentVolume(),
+      path: options.currentPath(),
+    };
     await options.dialogs.form({
       title: t("files.newFile"),
       fields: [
@@ -449,7 +487,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       validate: (values) =>
         validateName(values.name, "files.errors.invalidFileName"),
       onSubmit: async (values) => {
-        return await tryCreateFile(values.name);
+        return await tryCreateFile(values.name, directory);
       },
     });
   };
@@ -495,7 +533,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const handleItemClick = (item: FileItem) => {
     options.setScrollToSelected(false);
-    options.setSelectedItem(item.path);
+    options.setSelectedItem(item.location.path);
   };
 
   const handleItemActivate = async (item: FileItem) => {

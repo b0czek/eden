@@ -1,5 +1,6 @@
 import type {
   AppManifest,
+  FilesystemLocation,
   PackageManifest,
   PackageOperationPreview,
 } from "@edenapp/types";
@@ -22,36 +23,36 @@ const App = () => {
   const [preview, setPreview] = createSignal<PackageOperationPreview | null>(
     null,
   );
-  const [packagePath, setPackagePath] = createSignal<string | null>(null);
+  const [packagePath, setPackagePath] = createSignal<FilesystemLocation | null>(
+    null,
+  );
 
   onMount(async () => {
-    const launchArgs = window.edenAPI.getLaunchArgs();
-    if (launchArgs.length > 0) {
-      loadPackage(launchArgs[0]);
+    const launchFile = window.edenAPI.getLaunchFile();
+    if (launchFile) {
+      loadPackage(launchFile);
     } else {
       setLoading(false);
       setError("No package file specified.");
     }
 
     window.edenAPI.subscribe("file/opened", (data) => {
-      if (data.path) {
-        loadPackage(data.path);
+      if (data.location.path) {
+        loadPackage(data.location);
       }
     });
   });
 
-  const loadPackage = async (path: string) => {
+  const loadPackage = async (location: FilesystemLocation) => {
     setLoading(true);
     setError(null);
-    setPackagePath(path);
+    setPackagePath(location);
     setSuccess(false);
 
     try {
       const result: PackageInfoResponse = await window.edenAPI.shellCommand(
         "package/get-info",
-        {
-          path,
-        },
+        { location: { ...location } },
       );
 
       if (result.success && result.manifest) {
@@ -94,7 +95,7 @@ const App = () => {
     setInstalling(true);
     try {
       await window.edenAPI.shellCommand("package/install", {
-        sourcePath: path,
+        source: path,
         replace: !!existingVersion,
       });
       setSuccess(true);

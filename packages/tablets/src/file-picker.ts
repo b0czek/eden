@@ -4,6 +4,7 @@ import type {
   EventData,
   FilePickerOpenArgs,
   FilePickerResult,
+  FilesystemLocation,
 } from "@edenapp/types";
 
 export type FilePickerOptions = Omit<FilePickerOpenArgs, "mode">;
@@ -22,12 +23,18 @@ export type SaveFilePickerOptions = Omit<
 
 export interface EdenFilePickerAPI {
   pick: (options: FilePickerOpenArgs) => Promise<FilePickerResult>;
-  openFile: (options?: OpenFilePickerOptions) => Promise<string | null>;
-  openFiles: (options?: OpenFilePickerOptions) => Promise<string[] | null>;
+  openFile: (
+    options?: OpenFilePickerOptions,
+  ) => Promise<FilesystemLocation | null>;
+  openFiles: (
+    options?: OpenFilePickerOptions,
+  ) => Promise<FilesystemLocation[] | null>;
   openDirectory: (
     options?: OpenDirectoryPickerOptions,
-  ) => Promise<string | null>;
-  saveFile: (options?: SaveFilePickerOptions) => Promise<string | null>;
+  ) => Promise<FilesystemLocation | null>;
+  saveFile: (
+    options?: SaveFilePickerOptions,
+  ) => Promise<FilesystemLocation | null>;
   close: (requestId?: string) => Promise<void>;
 }
 
@@ -77,13 +84,12 @@ const ensureFilePickerSubscribed = async () => {
 
 const selectedPathOrNull = (result: FilePickerResult) => {
   if (result.reason !== "select") return null;
-  return result.path ?? result.paths?.[0] ?? null;
+  return result.locations?.[0] ?? null;
 };
 
 const selectedPathsOrNull = (result: FilePickerResult) => {
   if (result.reason !== "select") return null;
-  if (result.paths) return result.paths;
-  return result.path ? [result.path] : [];
+  return result.locations ?? [];
 };
 
 const pick: EdenFilePickerAPI["pick"] = async (options) => {

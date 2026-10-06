@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import * as path from "node:path";
-import type { AppManifest } from "@edenapp/types";
+import type { AppManifest, FilesystemLocation } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 
 import { log } from "../logging";
@@ -11,6 +11,7 @@ import {
   type PlatformUtilityProcess,
   type UtilityProcessPort,
 } from "../platform/ports";
+import { encodeLaunchContext } from "../utils/appLaunchContext";
 /**
  * BackendManager
  *
@@ -63,6 +64,7 @@ export class BackendManager extends EventEmitter {
     manifest: AppManifest,
     installPath: string,
     launchArgs?: string[],
+    launchFile?: FilesystemLocation,
   ): Promise<{ backend: PlatformUtilityProcess }> {
     // Check if backend already exists
     if (this.backends.has(appId)) {
@@ -87,13 +89,12 @@ export class BackendManager extends EventEmitter {
     // Create utility process with the runtime as entry point
     const backend = this.utilityProcesses.fork(
       runtimePath,
-      [`--launch-args=${JSON.stringify(launchArgs || [])}`],
+      encodeLaunchContext({ appId, args: launchArgs ?? [], file: launchFile }),
       {
         serviceName: `eden-backend-${appId}`,
         stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
-          EDEN_APP_ID: appId,
           EDEN_BACKEND_ENTRY: backendEntryPath,
           EDEN_INSTALL_PATH: installPath,
           EDEN_MANIFEST: JSON.stringify(manifest),

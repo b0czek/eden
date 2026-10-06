@@ -54,7 +54,7 @@ the Users app (App grants), and apps can check them via `user/has-grant`.
 
 ## Filesystem Homes
 
-`EdenConfig.userDirectory` is always the root of Eden's managed filesystem.
+`EdenConfig.userDirectory` backs Eden's built-in `home` volume.
 Users may optionally be assigned a writable home beneath that root:
 
 - Vendor users always see the full `userDirectory`.
@@ -66,8 +66,9 @@ Users may optionally be assigned a writable home beneath that root:
   assigned.
 - Deleting a user does not delete their home directory.
 
-The home boundary applies to Eden-managed filesystem, file-opening, and package
-commands. Node.js app backends remain trusted processes and can access Node APIs
+The home boundary applies to filesystem, file-opening, and package commands
+addressing the `home` volume. Consumer-registered volumes are shared across Eden
+users and remain subject to app permissions and user grants. Node.js app backends remain trusted processes and can access Node APIs
 directly.
 
 ## Sessions and Identity

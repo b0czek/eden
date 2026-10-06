@@ -101,7 +101,7 @@ Inside the sandbox, apps interact with Eden through APIs injected by the host:
 
 ```ts
 const documents = await window.edenAPI.shellCommand("fs/readdir", {
-  path: "/Documents",
+  location: { volume: "home", path: "/Documents" },
 });
 ```
 

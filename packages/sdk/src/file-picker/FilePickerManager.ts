@@ -5,7 +5,10 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
+import * as v from "valibot";
 import { AppAssociationManager } from "../app-associations";
+import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
+import { VolumeManager } from "../filesystem/VolumeManager";
 import {
   CommandRegistry,
   EdenEmitter,
@@ -32,6 +35,8 @@ interface FilePickerCaller {
 
 interface FilePickerRequestContext {
   requestId: string;
+  allowedVolumes?: string[];
+  mode: "open" | "save";
   opener: {
     appId: string;
     viewId: number;
@@ -65,6 +70,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     private appAssociationManager: AppAssociationManager,
     @inject(PermissionRegistry)
     private permissionRegistry: PermissionRegistry,
+    @inject(VolumeManager) private volumes: VolumeManager,
   ) {
     super(ipcBridge);
 
@@ -228,6 +234,24 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     caller?: FilePickerCaller,
   ): Promise<{ requestId: string }> {
     this.pruneStaleState();
+    if (
+      args.allowedVolumes &&
+      (!Array.isArray(args.allowedVolumes) || !args.allowedVolumes.length)
+    ) {
+      throw new Error("File picker requires at least one allowed volume");
+    }
+    for (const id of args.allowedVolumes ?? []) this.volumes.get(id);
+    if (args.initialLocation) {
+      const location = args.initialLocation;
+      if (
+        typeof location.volume !== "string" ||
+        typeof location.path !== "string"
+      )
+        throw new Error("Initial location requires volume and path");
+      this.volumes.get(location.volume);
+      if (args.allowedVolumes && !args.allowedVolumes.includes(location.volume))
+        throw new Error("Initial volume is not allowed");
+    }
 
     const callerAppId = caller?.appId;
     if (!callerAppId) {
@@ -265,6 +289,10 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     const requestId = this.generateId();
     this.activeRequest = {
       requestId,
+      mode: args.mode,
+      allowedVolumes: args.allowedVolumes
+        ? [...args.allowedVolumes]
+        : undefined,
       opener: {
         appId: callerAppId,
         viewId: callerViewId,
@@ -273,6 +301,10 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
 
     const picker: FilePickerOpenEvent = {
       ...args,
+      initialLocation: args.initialLocation ?? {
+        volume: args.allowedVolumes?.[0] ?? "home",
+        path: "/",
+      },
       requestId,
       opener: {
         appId: callerAppId,
@@ -317,6 +349,23 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       return { success: false };
     }
 
+    if (result.reason === "select") {
+      if (!Array.isArray(result.locations) || !result.locations.length)
+        throw new Error(
+          "File picker selection requires a nonempty locations array",
+        );
+      for (const location of result.locations) {
+        v.parse(filesystemLocationSchema, location);
+        const volume = this.volumes.get(location.volume);
+        if (
+          this.activeRequest.allowedVolumes &&
+          !this.activeRequest.allowedVolumes.includes(location.volume)
+        )
+          throw new Error("Selected volume is not allowed");
+        if (this.activeRequest.mode === "save" && volume.readOnly)
+          throw new Error("Selected volume is read-only");
+      }
+    }
     const openerViewId = this.activeRequest.opener.viewId;
     this.activeRequest = null;
 

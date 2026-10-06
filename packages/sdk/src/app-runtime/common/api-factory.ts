@@ -7,6 +7,7 @@ import type {
   EdenAPI,
   EventData,
   EventName,
+  FilesystemLocation,
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
@@ -38,7 +39,10 @@ export interface AppBusConfig {
 export function createEdenAPI(
   transport: ShellTransport,
   eventSubscriptions: Map<string, Set<EventSubscriptionCallback>>,
-  options?: { getLaunchArgs?: () => string[] },
+  options?: {
+    getLaunchArgs?: () => string[];
+    getLaunchFile?: () => FilesystemLocation | undefined;
+  },
 ): EdenAPI {
   return {
     shellCommand: transport.exec,
@@ -81,6 +85,11 @@ export function createEdenAPI(
 
     isEventSupported: (eventName: string) => {
       return transport.exec("event/exists", { eventName });
+    },
+
+    getLaunchFile: () => {
+      const location = options?.getLaunchFile?.();
+      return location ? { ...location } : undefined;
     },
 
     getLaunchArgs: (): string[] => {

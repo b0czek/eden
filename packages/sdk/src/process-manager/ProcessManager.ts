@@ -6,6 +6,7 @@ import type {
   AppInstance,
   EdenConfig,
   ExecutionPrincipal,
+  FilesystemLocation,
   ProcessMetricsSnapshot,
   ProcessOwner,
   UserProfile,
@@ -237,6 +238,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
+    launchFile?: FilesystemLocation,
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
     const developmentApp =
       this.config.development &&
@@ -250,16 +252,24 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     const currentUser = this.sessionContext.getCurrentUser();
-    return await this.launchAppInternal(appId, bounds, launchArgs, {
-      owner: {
-        kind: "session",
-        sessionId: this.sessionContext.getSessionId(),
-        username: currentUser?.username ?? null,
+    return await this.launchAppInternal(
+      appId,
+      bounds,
+      launchArgs,
+      {
+        owner: {
+          kind: "session",
+          sessionId: this.sessionContext.getSessionId(),
+          username: currentUser?.username ?? null,
+        },
+        principal: currentUser
+          ? { kind: "user", username: currentUser.username }
+          : { kind: "system" },
       },
-      principal: currentUser
-        ? { kind: "user", username: currentUser.username }
-        : { kind: "system" },
-    });
+      launchFile
+        ? { volume: launchFile.volume, path: launchFile.path }
+        : undefined,
+    );
   }
 
   async launchDaemon(
@@ -287,6 +297,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       principal: ExecutionPrincipal;
       profile?: UserProfile;
     },
+    launchFile?: FilesystemLocation,
   ): Promise<{ success: boolean; instanceId: string; appId: string }> {
     const manifest = this.packageManager.getAppForLaunch(appId);
     if (!manifest) {
@@ -342,6 +353,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           manifest,
           installPath,
           launchArgs,
+          launchFile,
         );
       }
 
@@ -354,6 +366,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
           installPath,
           bounds,
           launchArgs,
+          launchFile,
         );
       }
 

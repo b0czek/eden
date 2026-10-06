@@ -6,6 +6,7 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import type { AppAssociationManager } from "../app-associations";
+import { VolumeManager } from "../filesystem/VolumeManager";
 import type { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import type { NotificationManager } from "../notification";
 import type { ProcessManager } from "../process-manager";
@@ -131,6 +132,7 @@ const createManager = () => {
     processManager as unknown as ProcessManager,
     appAssociationManager as unknown as AppAssociationManager,
     permissionRegistry as unknown as PermissionRegistry,
+    new VolumeManager(ipcBridge),
   );
 
   return {
@@ -204,20 +206,70 @@ describe("FilePickerManager", () => {
 
     expect(
       manager.resolvePicker(
-        { requestId, reason: "select", path: "/Documents/readme.md" },
+        {
+          requestId,
+          reason: "select",
+          locations: [{ volume: "home", path: "/Documents/readme.md" }],
+        },
         { appId: "com.eden.file-picker", webContentsId: 100 },
       ),
     ).toEqual({ success: true });
     expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
       10,
       "file-picker/closed",
-      { requestId, reason: "select", path: "/Documents/readme.md" },
+      {
+        requestId,
+        reason: "select",
+        locations: [{ volume: "home", path: "/Documents/readme.md" }],
+      },
     );
     expect(eventSubscribers.notifyView).toHaveBeenCalledWith(
       20,
       "file-picker/closed",
-      { requestId, reason: "select", path: "/Documents/readme.md" },
+      {
+        requestId,
+        reason: "select",
+        locations: [{ volume: "home", path: "/Documents/readme.md" }],
+      },
     );
+  });
+
+  it("preserves the active request when selection locations are invalid", async () => {
+    const { manager } = createManager();
+    const provider = { appId: "com.eden.file-picker", webContentsId: 100 };
+    manager.registerDisplayProvider(provider);
+    const { requestId } = await manager.openPicker(
+      { mode: "open", multiple: true },
+      { appId: "com.eden.editor", webContentsId: 200 },
+    );
+    for (const locations of [
+      undefined,
+      null,
+      {},
+      [],
+      [null],
+      [{ volume: "home" }],
+    ]) {
+      expect(() =>
+        manager.resolvePicker(
+          { requestId, reason: "select", locations } as never,
+          provider,
+        ),
+      ).toThrow();
+    }
+    expect(
+      manager.resolvePicker(
+        {
+          requestId,
+          reason: "select",
+          locations: [
+            { volume: "home", path: "/Documents/one.md" },
+            { volume: "home", path: "/Documents/two.md" },
+          ],
+        },
+        provider,
+      ),
+    ).toEqual({ success: true });
   });
 
   it("starts and waits for the display provider when none is registered", async () => {

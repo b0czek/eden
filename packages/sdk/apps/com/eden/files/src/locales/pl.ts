@@ -1,5 +1,10 @@
 export const pl = {
   files: {
+    volume: "Wolumin",
+    home: "Katalog domowy",
+    readOnly: "Tylko do odczytu",
+    volumeDisconnected: "Dysk został odłączony. Wyświetlono katalog domowy.",
+
     newFolder: "Nowy Folder",
     newFile: "Nowy Plik",
     modified: "Data Modyfikacji",
