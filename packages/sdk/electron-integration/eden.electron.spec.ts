@@ -1007,21 +1007,6 @@ test.describe
           reason: "select",
           location: { volume: "test-usb", path: "/usb-report.txt" },
         });
-      const screenshot = await electronApp?.evaluate(
-        async ({ webContents }) => {
-          const contents = webContents
-            .getAllWebContents()
-            .find((candidate) => candidate.getURL().includes("com.eden.files"));
-          return contents
-            ? (await contents.capturePage()).toPNG().toString("base64")
-            : undefined;
-        },
-      );
-      if (screenshot)
-        await fs.writeFile(
-          test.info().outputPath("files-volumes.png"),
-          Buffer.from(screenshot, "base64"),
-        );
       await electronApp?.evaluate(() => {
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
