@@ -220,6 +220,11 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("outside");
     await fs.symlink(eden.paths.userDirectory, path.join(usbRoot, "escape"));
     await expect(
+      execute("fs/exists", {
+        location: { volume: "usb", path: "/escape/report.txt" },
+      }),
+    ).rejects.toThrow("outside");
+    await expect(
       execute("fs/write", {
         location: { volume: "usb", path: "/escape/report.txt" },
         content: "escape",
@@ -256,6 +261,21 @@ describe("consumer-managed filesystem volumes", () => {
     await expect(fs.stat(missingRoot)).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+
+  it("returns false for dangling symlinks on an available volume", async () => {
+    await fs.symlink("missing.txt", path.join(usbRoot, "dangling.txt"));
+
+    await expect(
+      execute("fs/exists", {
+        location: { volume: "usb", path: "/dangling.txt" },
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      execute("fs/exists", {
+        location: { volume: "usb", path: "/missing.txt" },
+      }),
+    ).resolves.toBe(false);
   });
 
   it("enforces permissions and read-only status on both transfer ends", async () => {
@@ -737,6 +757,11 @@ describe("consumer-managed filesystem volumes", () => {
     });
     await expect(lease.assertActive()).rejects.toThrow("unavailable");
     await fs.rename(usbRoot, `${usbRoot}-removed`);
+    await expect(
+      execute("fs/exists", {
+        location: { volume: "usb", path: "/report.txt" },
+      }),
+    ).rejects.toMatchObject({ code: "ENOENT" });
     await expect(
       execute("fs/write", {
         location: { volume: "usb", path: "/nested/report.txt" },

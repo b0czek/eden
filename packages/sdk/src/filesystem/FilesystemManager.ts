@@ -262,12 +262,15 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
    * Check if a file or directory exists.
    */
   async exists(targetPath: FilesystemLocation): Promise<boolean> {
-    const fullPath = await this.resolvePath(targetPath);
     try {
+      const fullPath = await this.resolvePath(targetPath);
       await fs.access(fullPath);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        await this.volumes.getRoot(targetPath.volume)?.assertActive();
+        return false;
+      }
       throw error;
     }
   }
