@@ -193,10 +193,8 @@ it does not merge their previous contents. Self-transfers and overlapping
 source/destination trees are rejected. Volume roots cannot be deleted, moved,
 or replaced.
 
-Copies preserve relative symbolic links. Absolute links pointing inside the
-copied tree become relative links to the corresponding destination entries.
-Absolute links outside the tree keep their original targets; access remains
-restricted to the destination volume's sandbox.
+Copies keep symbolic links and their original targets verbatim. Access through
+copied links remains restricted to the destination volume's sandbox.
 
 If an overwrite fails, the original destination is restored while its volume
 remains available, even if the source disconnects.

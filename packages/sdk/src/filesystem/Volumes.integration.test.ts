@@ -436,7 +436,7 @@ describe("consumer-managed filesystem volumes", () => {
     },
   );
 
-  it("preserves relative links and relocates absolute links inside a copied tree", async () => {
+  it("preserves relative and absolute link text inside a copied tree", async () => {
     const sourceRoot = path.join(usbRoot, "tree");
     await fs.mkdir(path.join(sourceRoot, "nested"), { recursive: true });
     await fs.writeFile(path.join(sourceRoot, "target.txt"), "linked report");
@@ -448,11 +448,6 @@ describe("consumer-managed filesystem volumes", () => {
     await fs.symlink(
       path.join(sourceRoot, "target.txt"),
       path.join(sourceRoot, "absolute.txt"),
-    );
-    await fs.symlink(sourceRoot, path.join(sourceRoot, "self"));
-    await fs.symlink(
-      path.join(sourceRoot, "missing.txt"),
-      path.join(sourceRoot, "dangling.txt"),
     );
     const externalTarget = path.join(usbRoot, "external.txt");
     await fs.writeFile(externalTarget, "external");
@@ -467,12 +462,7 @@ describe("consumer-managed filesystem volumes", () => {
       requireValue(user.homeDirectory),
       "copy",
     );
-    for (const link of [
-      "relative.txt",
-      "nested/relative.txt",
-      "absolute.txt",
-      "self/target.txt",
-    ]) {
+    for (const link of ["relative.txt", "nested/relative.txt"]) {
       await expect(
         execute("fs/read", {
           location: { volume: "home", path: `/copy/${link}` },
@@ -487,10 +477,7 @@ describe("consumer-managed filesystem volumes", () => {
     ).resolves.toBe("../target.txt");
     await expect(
       fs.readlink(path.join(destinationRoot, "absolute.txt")),
-    ).resolves.toBe("target.txt");
-    await expect(
-      fs.readlink(path.join(destinationRoot, "dangling.txt")),
-    ).resolves.toBe("missing.txt");
+    ).resolves.toBe(path.join(sourceRoot, "target.txt"));
     await expect(
       fs.readlink(path.join(destinationRoot, "external.txt")),
     ).resolves.toBe(externalTarget);
@@ -668,16 +655,12 @@ describe("consumer-managed filesystem volumes", () => {
         "cross-device",
       );
       await fs.symlink("report.txt", path.join(sourceRoot, "relative.txt"));
-      await fs.symlink(
-        path.join(sourceRoot, "report.txt"),
-        path.join(sourceRoot, "absolute.txt"),
-      );
       const from = { volume: "home", path: "/cross-device" };
       await execute("fs/mv", {
         from,
         to: { volume: "other-device", path: "/moved" },
       });
-      for (const name of ["report.txt", "relative.txt", "absolute.txt"]) {
+      for (const name of ["report.txt", "relative.txt"]) {
         await expect(
           execute("fs/read", {
             location: { volume: "other-device", path: `/moved/${name}` },
