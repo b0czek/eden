@@ -236,16 +236,3 @@ window.edenAPI.unsubscribe("fs/changed", handleChanged);
 Each watch belongs to the creating view. Eden releases watches when the owning
 view, volume, or runtime closes. Files and File Picker support manual refresh on
 volumes without watching.
-
-## Migrating Existing Apps
-
-Pass `{ location: { volume: "home", path } }` to single-address filesystem and
-file commands, and put any other options alongside `location`.
-Copy/move `from` and `to` are now address objects. Replace picker `initialPath`
-with `initialLocation`, and consume address-valued helper results. Use
-`getLaunchFile()` for file-handler startup and `event.location` for `file/opened`; generic `getLaunchArgs()` remains
-available for other app arguments.
-
-App commands `package/get-info` take `{ location: { volume, path } }` and `package/install`
-takes `{ source: { volume, path }, replace? }`. Trusted main-process
-`eden.packages.inspect()` and `eden.packages.install()` accept host paths.
