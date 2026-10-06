@@ -168,5 +168,12 @@ describe("FilesystemManager user roots", () => {
         "secret",
       ),
     ).rejects.toThrow("outside of the allowed directory");
+    await expect(
+      manager.writeBinaryFile(
+        { volume: "home", path: "/other/private.bin" },
+        new Uint8Array([1, 2, 3]),
+      ),
+    ).rejects.toThrow("outside of the allowed directory");
+    await expect(fs.readdir(sibling)).resolves.toEqual([]);
   });
 });

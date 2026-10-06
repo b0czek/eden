@@ -157,47 +157,16 @@ export class FilesystemTransfer {
 
   private async copyEntry(transfer: PreparedTransfer): Promise<void> {
     const { source, destination } = transfer;
-    const sourceRoots = (await fs.lstat(source)).isDirectory()
-      ? [path.resolve(source), await fs.realpath(source)]
-      : [];
-    const internalLinks: { destination: string; target: string }[] = [];
     await fs.cp(source, destination, {
       recursive: true,
       verbatimSymlinks: true,
-      filter: async (entrySource, entryDestination) => {
+      filter: async () => {
         await this.assertActive(transfer);
-        if ((await fs.lstat(entrySource)).isSymbolicLink()) {
-          const target = await fs.readlink(entrySource);
-          if (path.isAbsolute(target)) {
-            const sourceRoot = sourceRoots.find(
-              (root) => root === target || this.isPathWithin(root, target),
-            );
-            if (sourceRoot) {
-              const copiedTarget = path.join(
-                destination,
-                path.relative(sourceRoot, target),
-              );
-              internalLinks.push({
-                destination: entryDestination,
-                target:
-                  path.relative(path.dirname(entryDestination), copiedTarget) ||
-                  ".",
-              });
-            }
-          }
-        }
         return true;
       },
       errorOnExist: true,
       force: false,
     });
-    // Relative and external absolute links retain their original text. Internal
-    // absolute links become relative so they survive removal of the source tree.
-    for (const link of internalLinks) {
-      await this.assertActive(transfer);
-      await fs.unlink(link.destination);
-      await fs.symlink(link.target, link.destination);
-    }
     await this.assertActive(transfer);
   }
 

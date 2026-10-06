@@ -228,16 +228,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     content: string,
     encoding: BufferEncoding = "utf-8",
   ): Promise<void> {
-    const target = await this.resolveTarget(targetPath, true);
-    const fullPath = target.hostPath;
-    // Ensure directory exists
-    await target.assertActive();
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await target.assertActive();
-    await assertExistingPathWithin(target.rootPath, fullPath);
-    await target.assertActive();
-    await fs.writeFile(fullPath, content, encoding);
-    this.invalidateHostDirectory(path.dirname(fullPath));
+    await this.writeContent(targetPath, content, encoding);
   }
 
   /**
@@ -247,6 +238,14 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     targetPath: FilesystemLocation,
     content: Uint8Array,
   ): Promise<void> {
+    await this.writeContent(targetPath, content);
+  }
+
+  private async writeContent(
+    targetPath: FilesystemLocation,
+    content: string | Uint8Array,
+    encoding?: BufferEncoding,
+  ): Promise<void> {
     const target = await this.resolveTarget(targetPath, true);
     const fullPath = target.hostPath;
     await target.assertActive();
@@ -254,7 +253,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     await target.assertActive();
     await assertExistingPathWithin(target.rootPath, fullPath);
     await target.assertActive();
-    await fs.writeFile(fullPath, content);
+    await fs.writeFile(fullPath, content, encoding);
     this.invalidateHostDirectory(path.dirname(fullPath));
   }
 
