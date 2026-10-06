@@ -477,7 +477,7 @@ const App: Component = () => {
       }
     }
 
-    await resolvePicker({ reason: "select", location, locations: [location] });
+    await resolvePicker({ reason: "select", locations: [location] });
   };
 
   const confirmOpen = async () => {
@@ -489,7 +489,6 @@ const App: Component = () => {
         selectedPaths().length > 0 ? selectedPaths() : [currentPath()];
       await resolvePicker({
         reason: "select",
-        location: { volume: currentVolume(), path: paths[0] },
         locations: paths.map((path) => ({ volume: currentVolume(), path })),
       });
       return;
@@ -503,7 +502,6 @@ const App: Component = () => {
 
     await resolvePicker({
       reason: "select",
-      location: { volume: currentVolume(), path: paths[0] },
       locations: paths.map((path) => ({ volume: currentVolume(), path })),
     });
   };
@@ -563,7 +561,6 @@ const App: Component = () => {
       setSelectedPaths([item.location.path]);
       void resolvePicker({
         reason: "select",
-        location: { volume: item.location.volume, path: item.location.path },
         locations: [{ volume: item.location.volume, path: item.location.path }],
       });
     } else if (activeRequest()?.mode === "save") {

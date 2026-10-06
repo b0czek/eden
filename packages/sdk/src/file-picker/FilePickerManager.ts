@@ -5,7 +5,9 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
+import * as v from "valibot";
 import { AppAssociationManager } from "../app-associations";
+import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import {
   CommandRegistry,
@@ -348,20 +350,12 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     }
 
     if (result.reason === "select") {
-      const selected =
-        result.locations ?? (result.location ? [result.location] : []);
-      if (!selected.length)
-        throw new Error("File picker selection requires a location");
-      for (const location of [
-        ...selected,
-        ...(result.location ? [result.location] : []),
-      ]) {
-        if (
-          !location ||
-          typeof location.volume !== "string" ||
-          typeof location.path !== "string"
-        )
-          throw new Error("Selection requires volume and path");
+      if (!Array.isArray(result.locations) || !result.locations.length)
+        throw new Error(
+          "File picker selection requires a nonempty locations array",
+        );
+      for (const location of result.locations) {
+        v.parse(filesystemLocationSchema, location);
         const volume = this.volumes.get(location.volume);
         if (
           this.activeRequest.allowedVolumes &&

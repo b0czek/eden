@@ -174,7 +174,7 @@ if (location) {
 Pickers start at Home when no initial location is supplied. `allowedVolumes`
 restricts the selector; if it is supplied without an initial location, the picker
 starts at the first allowed volume. Save pickers cannot select read-only volumes
-as write destinations. Raw picker results use `location` and `locations`.
+as write destinations. Raw picker selections use a nonempty `locations` array.
 
 ## Copying and Moving
 

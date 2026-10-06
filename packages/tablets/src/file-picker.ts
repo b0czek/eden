@@ -84,13 +84,12 @@ const ensureFilePickerSubscribed = async () => {
 
 const selectedPathOrNull = (result: FilePickerResult) => {
   if (result.reason !== "select") return null;
-  return result.location ?? result.locations?.[0] ?? null;
+  return result.locations?.[0] ?? null;
 };
 
 const selectedPathsOrNull = (result: FilePickerResult) => {
   if (result.reason !== "select") return null;
-  if (result.locations) return result.locations;
-  return result.location ? [result.location] : [];
+  return result.locations ?? [];
 };
 
 const pick: EdenFilePickerAPI["pick"] = async (options) => {
