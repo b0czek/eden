@@ -4,7 +4,7 @@ import {
   logFromConsole,
   setLogContext,
 } from "../logging";
-import { parseLaunchFile } from "./common/launch-file";
+import { decodeLaunchContext } from "../utils/appLaunchContext";
 /**
  * Backend Runtime
  *
@@ -13,7 +13,6 @@ import { parseLaunchFile } from "./common/launch-file";
  * mirroring the frontend's `window.edenAPI` and `window.appBus`.
  *
  * Environment variables expected:
- * - EDEN_APP_ID: The app's identifier
  * - EDEN_BACKEND_ENTRY: Path to the actual backend entry point
  * - EDEN_INSTALL_PATH: Path to the app's installation directory
  * - EDEN_MANIFEST: JSON-stringified app manifest
@@ -73,8 +72,10 @@ function requireEnv(name: string): string {
   return value;
 }
 
-// Get app info from environment
-const appId = requireEnv("EDEN_APP_ID");
+const launchContext = decodeLaunchContext(process.argv);
+const { appId } = launchContext;
+
+// Get backend configuration from environment
 const backendEntry = requireEnv("EDEN_BACKEND_ENTRY");
 const manifest = JSON.parse(process.env.EDEN_MANIFEST || "{}");
 const dlcBinding = process.env.EDEN_DLC_BINDING;
@@ -135,20 +136,6 @@ console.debug = (...args: unknown[]) =>
   logFromConsole({ level: "debug", args, callsite: captureConsoleCallsite() });
 console.trace = (...args: unknown[]) =>
   logFromConsole({ level: "trace", args, callsite: captureConsoleCallsite() });
-
-// Extract launch args
-let launchArgs: string[] = [];
-const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args="),
-);
-if (launchArgsArg) {
-  try {
-    const jsonStr = launchArgsArg.split("=").slice(1).join("=");
-    launchArgs = JSON.parse(jsonStr);
-  } catch (e) {
-    log.error("Failed to parse launch args:", e);
-  }
-}
 
 // Port for direct frontend<->backend communication (received from main)
 let _frontendPort: Electron.MessagePortMain | null = null;
@@ -237,8 +224,8 @@ const shellTransport: ShellTransport = {
  * Eden API implementation for utility process
  */
 const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
-  getLaunchArgs: () => launchArgs,
-  getLaunchFile: () => parseLaunchFile(process.argv),
+  getLaunchArgs: () => launchContext.args,
+  getLaunchFile: () => launchContext.file,
 });
 
 /**

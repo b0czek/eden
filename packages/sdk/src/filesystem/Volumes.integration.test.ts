@@ -12,6 +12,7 @@ import { PermissionRegistry } from "../ipc";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { decodeLaunchContext } from "../utils/appLaunchContext";
 import { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemTransfer } from "./FilesystemTransfer";
 import { VolumeManager } from "./VolumeManager";
@@ -520,12 +521,11 @@ describe("consumer-managed filesystem volumes", () => {
       .at(-1);
     if (created?.type !== "view-created")
       throw new Error("Handler view was not created");
-    expect(created.options.webPreferences?.additionalArguments).toContain(
-      `--eden-file=${JSON.stringify(usb)}`,
-    );
-    expect(created.options.webPreferences?.additionalArguments).toContain(
-      "--launch-args=[]",
-    );
+    expect(
+      decodeLaunchContext(
+        created.options.webPreferences?.additionalArguments ?? [],
+      ),
+    ).toEqual({ appId: handlerId, args: [], file: usb });
     const instance = requireValue(
       eden.runtime.resolve(ProcessManager).getAppInstance(handlerId),
     );

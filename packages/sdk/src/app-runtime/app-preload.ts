@@ -6,12 +6,12 @@ import type {
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
+import { decodeLaunchContext } from "../utils/appLaunchContext";
 import {
   createAppBusAPI,
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
-import { parseLaunchFile } from "./common/launch-file";
 import {
   type AppBusPortData,
   createAppBusState,
@@ -26,7 +26,8 @@ import { createKeyboardActionController } from "./keyboard/actions";
 import { createKeyboardAutodetection } from "./keyboard/autodetection";
 
 // Per-app state
-let appId: string | null = null;
+const launchContext = decodeLaunchContext(process.argv);
+const { appId } = launchContext;
 
 // MessagePort for direct frontend<->backend communication
 let _backendPort: MessagePort | null = null;
@@ -52,30 +53,8 @@ const KEYBOARD_APPLY_ACTION_CHANNEL = "eden-keyboard:apply-action";
 const KEYBOARD_STATE_CHANGED_CHANNEL = "eden-keyboard:state-changed";
 const KEYBOARD_GET_STATE_CHANNEL = "eden-keyboard:get-state";
 
-// Extract appId from process arguments
-// Arguments are passed as --app-id=com.example.app
-const appIdArg = process.argv.find((arg) => arg.startsWith("--app-id="));
-if (appIdArg) {
-  appId = appIdArg.split("=")[1];
-  setLogContext({ appId });
-  log.info(`Initialized for app: ${appId}`);
-} else {
-  log.warn("No app ID found in arguments");
-}
-
-// Extract launch args
-let launchArgs: string[] = [];
-const launchArgsArg = process.argv.find((arg) =>
-  arg.startsWith("--launch-args="),
-);
-if (launchArgsArg) {
-  try {
-    const jsonStr = launchArgsArg.split("=").slice(1).join("=");
-    launchArgs = JSON.parse(jsonStr);
-  } catch (e) {
-    log.error("Failed to parse launch args:", e);
-  }
-}
+setLogContext({ appId });
+log.info(`Initialized for app: ${appId}`);
 
 // Handle receiving the backend MessagePort
 ipcRenderer.on("backend-port", (event) => {
@@ -144,8 +123,8 @@ const shellTransport: ShellTransport = {
 
 // Expose edenAPI for shell commands and event subscriptions
 const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
-  getLaunchArgs: () => launchArgs,
-  getLaunchFile: () => parseLaunchFile(process.argv),
+  getLaunchArgs: () => launchContext.args,
+  getLaunchFile: () => launchContext.file,
 });
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);

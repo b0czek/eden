@@ -11,6 +11,7 @@ import {
   type PlatformUtilityProcess,
   type UtilityProcessPort,
 } from "../platform/ports";
+import { encodeLaunchContext } from "../utils/appLaunchContext";
 /**
  * BackendManager
  *
@@ -88,16 +89,12 @@ export class BackendManager extends EventEmitter {
     // Create utility process with the runtime as entry point
     const backend = this.utilityProcesses.fork(
       runtimePath,
-      [
-        `--launch-args=${JSON.stringify(launchArgs || [])}`,
-        ...(launchFile ? [`--eden-file=${JSON.stringify(launchFile)}`] : []),
-      ],
+      encodeLaunchContext({ appId, args: launchArgs ?? [], file: launchFile }),
       {
         serviceName: `eden-backend-${appId}`,
         stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
-          EDEN_APP_ID: appId,
           EDEN_BACKEND_ENTRY: backendEntryPath,
           EDEN_INSTALL_PATH: installPath,
           EDEN_MANIFEST: JSON.stringify(manifest),

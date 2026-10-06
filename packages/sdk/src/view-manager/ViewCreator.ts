@@ -6,6 +6,7 @@ import type {
 } from "@edenapp/types";
 import { log } from "../logging";
 import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
+import { encodeLaunchContext } from "../utils/appLaunchContext";
 import { CachedFileReader } from "../utils/cachedFileReader";
 import type { FloatingWindowController } from "./FloatingWindowController";
 import type { TilingController } from "./TilingController";
@@ -301,11 +302,11 @@ export class ViewCreator {
     const view = createView(
       {
         preloadScript,
-        additionalArguments: [
-          `--app-id=${appId}`,
-          `--launch-args=${JSON.stringify(launchArgs || [])}`,
-          ...(launchFile ? [`--eden-file=${JSON.stringify(launchFile)}`] : []),
-        ],
+        additionalArguments: encodeLaunchContext({
+          appId,
+          args: launchArgs ?? [],
+          file: launchFile,
+        }),
       },
       this.windows,
     );
