@@ -29,6 +29,7 @@ import {
   createMemo,
   createSignal,
   For,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -311,15 +312,16 @@ const App: Component = () => {
     setScrollToSelected(false);
   };
 
-  let previousPath = JSON.stringify([currentVolume(), currentPath()]);
-  createEffect(() => {
-    const nextPath = JSON.stringify([currentVolume(), currentPath()]);
-    if (nextPath !== previousPath) {
-      previousPath = nextPath;
-      clearSelection();
-      setError(null);
-    }
-  });
+  createEffect(
+    on(
+      [currentVolume, currentPath],
+      () => {
+        clearSelection();
+        setError(null);
+      },
+      { defer: true },
+    ),
+  );
 
   createEffect(() => {
     if (filterIndex() >= filterOptions().length) {
@@ -609,17 +611,15 @@ const App: Component = () => {
     }
   });
 
-  let previousInterfaceScale = interfaceScale();
-  createEffect(() => {
-    const nextInterfaceScale = interfaceScale();
-    if (
-      nextInterfaceScale !== previousInterfaceScale &&
-      activeRequest() !== null
-    ) {
-      void updateOverlayBounds(true);
-    }
-    previousInterfaceScale = nextInterfaceScale;
-  });
+  createEffect(
+    on(
+      interfaceScale,
+      () => {
+        if (activeRequest() !== null) void updateOverlayBounds(true);
+      },
+      { defer: true },
+    ),
+  );
 
   const confirmLabel = createMemo(() => {
     const request = activeRequest();

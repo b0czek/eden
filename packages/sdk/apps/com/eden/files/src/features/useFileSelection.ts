@@ -1,6 +1,6 @@
 import type { FileItem } from "@edenapp/files-core";
 import type { Accessor, Setter } from "solid-js";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, on } from "solid-js";
 
 interface UseFileSelectionOptions {
   items: Accessor<FileItem[]>;
@@ -118,14 +118,7 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
     return options.items().filter((item) => selected.has(item.location.path));
   });
 
-  let selectionPath = options.currentPath();
-  createEffect(() => {
-    const nextPath = options.currentPath();
-    if (nextPath !== selectionPath) {
-      clear();
-      selectionPath = nextPath;
-    }
-  });
+  createEffect(on(options.currentPath, clear, { defer: true }));
 
   createEffect(() => {
     if (!selectionMode()) return;

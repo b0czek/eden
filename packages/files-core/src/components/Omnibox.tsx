@@ -1,7 +1,7 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import { FaSolidSpinner } from "solid-icons/fa";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { fileIcons } from "../fileIcons";
 import type { Breadcrumb, FileExplorerLabels } from "../types";
 import { getParentPath } from "../utils";
@@ -30,16 +30,18 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   const [isLoading, setIsLoading] = createSignal(false);
 
   let searchSequence = 0;
-  let previousVolume = props.currentVolume;
-  createEffect(() => {
-    const volume = props.currentVolume;
-    if (volume === previousVolume) return;
-    previousVolume = volume;
-    searchSequence += 1;
-    setIsEditing(false);
-    setSuggestions([]);
-    setIsLoading(false);
-  });
+  createEffect(
+    on(
+      () => props.currentVolume,
+      () => {
+        searchSequence += 1;
+        setIsEditing(false);
+        setSuggestions([]);
+        setIsLoading(false);
+      },
+      { defer: true },
+    ),
+  );
 
   let inputRef: HTMLInputElement | undefined;
   let containerRef: HTMLDivElement | undefined;
