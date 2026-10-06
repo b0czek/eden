@@ -40,6 +40,5 @@ export interface FilePickerOpenEvent extends FilePickerOpenArgs {
 export interface FilePickerResult {
   requestId: string;
   reason: FilePickerCloseReason;
-  location?: FilesystemLocation;
   locations?: FilesystemLocation[];
 }

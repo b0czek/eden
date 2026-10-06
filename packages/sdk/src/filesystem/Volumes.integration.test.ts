@@ -610,37 +610,87 @@ describe("consumer-managed filesystem volumes", () => {
     await invoke(providerId, "file-picker/register-display", {});
     const opened = (await invoke(appId, "file-picker/open", {
       mode: "open",
+      multiple: true,
       allowedVolumes: ["home"],
     })) as { requestId: string };
-    await expect(
+    const resolve = (requestId: string, locations: unknown) =>
       invoke(providerId, "file-picker/resolve", {
+        requestId,
+        reason: "select",
+        locations,
+      });
+    const home = { volume: "home", path: "/" };
+    const usb = { volume: "usb", path: "/" };
+    for (const locations of [undefined, null, {}, "home", []]) {
+      await expect(resolve(opened.requestId, locations)).rejects.toThrow(
+        "nonempty locations array",
+      );
+    }
+    for (const location of [
+      null,
+      1,
+      {},
+      { volume: "home" },
+      { volume: "", path: "/" },
+    ]) {
+      await expect(resolve(opened.requestId, [home, location])).rejects.toThrow(
+        "Filesystem location requires volume and path",
+      );
+    }
+    await expect(resolve(opened.requestId, [home, usb])).rejects.toThrow(
+      "not allowed",
+    );
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(appId, ["fs/*", "file-picker/display"]);
+    await expect(
+      invoke(appId, "file-picker/resolve", {
         requestId: opened.requestId,
         reason: "select",
-        location: { volume: "usb", path: "/" },
+        locations: [home],
       }),
-    ).rejects.toThrow("not allowed");
+    ).rejects.toThrow("Only the display provider");
     await expect(
-      invoke(providerId, "file-picker/resolve", {
-        requestId: opened.requestId,
-        reason: "select",
-        location: { volume: "home", path: "/" },
-      }),
+      resolve(opened.requestId, [home, { ...home, path: "/Documents" }]),
     ).resolves.toEqual({ success: true });
+
     const removable = (await invoke(appId, "file-picker/open", {
       mode: "open",
-      initialLocation: { volume: "usb", path: "/" },
+      multiple: true,
+      initialLocation: usb,
     })) as { requestId: string };
     eden.runtime.volumes.unregister("usb");
-    await expect(
-      invoke(providerId, "file-picker/resolve", {
-        requestId: removable.requestId,
-        reason: "select",
-        location: { volume: "usb", path: "/" },
-      }),
-    ).rejects.toThrow("unavailable");
+    await expect(resolve(removable.requestId, [home, usb])).rejects.toThrow(
+      "unavailable",
+    );
     await invoke(providerId, "file-picker/resolve", {
       requestId: removable.requestId,
       reason: "cancel",
+    });
+
+    await eden.runtime.volumes.register({
+      id: "readonly",
+      label: "Read-only drive",
+      kind: "removable",
+      rootPath: usbRoot,
+      readOnly: true,
+    });
+    const readonly = { volume: "readonly", path: "/" };
+    const read = (await invoke(appId, "file-picker/open", {
+      mode: "open",
+      multiple: true,
+    })) as { requestId: string };
+    await expect(resolve(read.requestId, [home, readonly])).resolves.toEqual({
+      success: true,
+    });
+    const save = (await invoke(appId, "file-picker/open", {
+      mode: "save",
+    })) as { requestId: string };
+    await expect(resolve(save.requestId, [home, readonly])).rejects.toThrow(
+      "read-only",
+    );
+    await expect(resolve(save.requestId, [home])).resolves.toEqual({
+      success: true,
     });
   });
 

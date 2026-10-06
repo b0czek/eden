@@ -1005,7 +1005,7 @@ test.describe
         .poll(() => evaluateApp(APP_ID, `globalThis.__volumePickerResult`))
         .toMatchObject({
           reason: "select",
-          location: { volume: "test-usb", path: "/usb-report.txt" },
+          locations: [{ volume: "test-usb", path: "/usb-report.txt" }],
         });
       await electronApp?.evaluate(() => {
         const integration = globalThis as typeof globalThis & {
