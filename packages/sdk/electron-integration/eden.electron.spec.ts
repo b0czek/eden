@@ -115,40 +115,27 @@ test.describe
         ),
       ]);
       for (const appName of ["files", "file-picker"]) {
-        const source = path.join(__dirname, "../apps/com/eden", appName);
+        const source = path.join(
+          __dirname,
+          "../dist/apps/prebuilt",
+          `com.eden.${appName}`,
+        );
         const destination = path.join(
           root,
           "dist/apps/prebuilt",
           `com.eden.${appName}`,
         );
-        await fs.mkdir(destination, { recursive: true });
-        await fs.cp(path.join(source, "dist"), path.join(destination, "dist"), {
-          recursive: true,
-        });
-        await fs.copyFile(
-          path.join(source, "manifest.json"),
-          path.join(destination, "manifest.json"),
-        );
-        await fs.copyFile(
-          path.join(source, "icon.svg"),
-          path.join(destination, "icon.svg"),
-        );
+        await fs.cp(source, destination, { recursive: true });
       }
 
       await fs.cp(path.join(__dirname, "fixtures/app"), fixtureDirectory, {
         recursive: true,
       });
-      await Promise.all([
-        fs.cp(
-          path.join(__dirname, "../apps/com/eden/pdf-viewer/manifest.json"),
-          path.join(pdfViewerFixtureDirectory, "manifest.json"),
-        ),
-        fs.cp(
-          path.join(__dirname, "../apps/com/eden/pdf-viewer/dist"),
-          path.join(pdfViewerFixtureDirectory, "dist"),
-          { recursive: true },
-        ),
-      ]);
+      await fs.cp(
+        path.join(__dirname, "../dist/apps/prebuilt", PDF_VIEWER_APP_ID),
+        pdfViewerFixtureDirectory,
+        { recursive: true },
+      );
       await fs.cp(
         path.join(
           __dirname,
