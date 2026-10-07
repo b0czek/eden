@@ -94,10 +94,12 @@ const App = () => {
 
     setInstalling(true);
     try {
-      await window.edenAPI.shellCommand("package/install", {
-        source: path,
-        replace: !!existingVersion,
-      });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("package/install", {
+          source: path,
+          replace: !!existingVersion,
+        }),
+      );
       setSuccess(true);
       setTimeout(() => {
         // window.close();

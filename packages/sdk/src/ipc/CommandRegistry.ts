@@ -284,6 +284,10 @@ export class CommandRegistry {
   /**
    * Check if a command is registered
    */
+  getMode(fullCommand: string): CommandMetadata["mode"] | undefined {
+    return this.handlers.get(fullCommand)?.mode;
+  }
+
   has(fullCommand: string): boolean {
     return this.handlers.has(fullCommand);
   }

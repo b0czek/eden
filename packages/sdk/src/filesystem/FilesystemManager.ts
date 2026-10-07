@@ -7,6 +7,7 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
+import type { OperationReporter } from "../operations/OperationTask";
 import fg from "fast-glob";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -359,7 +360,11 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
    * Delete a file or directory.
    * For directories, removes recursively.
    */
-  async delete(targetPath: FilesystemLocation): Promise<void> {
+  async delete(
+    targetPath: FilesystemLocation,
+    reporter?: OperationReporter,
+  ): Promise<void> {
+    reporter?.update("validating");
     const target = await this.resolveTarget(targetPath, true);
     const fullPath = target.hostPath;
 
@@ -369,6 +374,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     const stats = await fs.stat(fullPath);
 
     await target.assertActive();
+    reporter?.update("deleting");
     if (stats.isDirectory()) {
       // Remove directory recursively
       await fs.rm(fullPath, { recursive: true, force: true });
@@ -386,7 +392,9 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     fromPath: FilesystemLocation,
     toPath: FilesystemLocation,
     overwrite: boolean = false,
+    reporter?: OperationReporter,
   ): Promise<void> {
+    reporter?.update("validating");
     const sourceTarget = await this.resolveTarget(fromPath);
     const destinationTarget = await this.resolveTarget(toPath, true);
     this.assertNotRoot(destinationTarget);
@@ -399,6 +407,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       assertSourceActive: sourceTarget.assertActive,
       assertDestinationActive: destinationTarget.assertActive,
       overwrite,
+      reporter,
     });
     this.invalidateHostDirectory(path.dirname(destination));
   }
@@ -411,7 +420,9 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     fromPath: FilesystemLocation,
     toPath: FilesystemLocation,
     overwrite: boolean = false,
+    reporter?: OperationReporter,
   ): Promise<void> {
+    reporter?.update("validating");
     const sourceTarget = await this.resolveTarget(fromPath, true);
     const destinationTarget = await this.resolveTarget(toPath, true);
     this.assertNotRoot(sourceTarget);
@@ -425,6 +436,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       assertSourceActive: sourceTarget.assertActive,
       assertDestinationActive: destinationTarget.assertActive,
       overwrite,
+      reporter,
     });
     this.invalidateHostDirectory(path.dirname(source));
     this.invalidateHostDirectory(path.dirname(destination));

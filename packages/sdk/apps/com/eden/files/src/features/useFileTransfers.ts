@@ -1,7 +1,7 @@
 import type { FileItem } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import type { FilesystemLocation } from "@edenapp/types";
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 import { openCollisionDialog } from "../dialogs/CollisionDialog";
 import { t } from "../i18n";
 import {
@@ -38,6 +38,10 @@ const snapshotItems = (items: FileItem[]): FileItem[] =>
   }));
 
 export const useFileTransfers = (options: UseFileTransfersOptions) => {
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
   const [pendingTransfer, setPendingTransfer] =
     createSignal<PendingTransfer | null>(null);
   const [progress, setProgress] = createSignal<FileOperationProgress | null>(
@@ -78,6 +82,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
 
     try {
       for (let index = 0; index < items.length; index += 1) {
+        if (disposed) break;
         const item = items[index];
         setProgress({
           operation,
@@ -159,18 +164,23 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
             }
           }
 
+          if (disposed) break;
           if (operation === "copy") {
-            await window.edenAPI.shellCommand("fs/cp", {
-              from: item.location,
-              to: { volume: destinationDirectory.volume, path: targetPath },
-              overwrite,
-            });
+            await window.edenAPI.operations.wait(
+              await window.edenAPI.shellCommand("fs/cp", {
+                from: item.location,
+                to: { volume: destinationDirectory.volume, path: targetPath },
+                overwrite,
+              }),
+            );
           } else {
-            await window.edenAPI.shellCommand("fs/mv", {
-              from: item.location,
-              to: { volume: destinationDirectory.volume, path: targetPath },
-              overwrite,
-            });
+            await window.edenAPI.operations.wait(
+              await window.edenAPI.shellCommand("fs/mv", {
+                from: item.location,
+                to: { volume: destinationDirectory.volume, path: targetPath },
+                overwrite,
+              }),
+            );
           }
         } catch (error) {
           failures.push({
@@ -224,6 +234,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     const failures: TransferFailure[] = [];
     try {
       for (let index = 0; index < items.length; index += 1) {
+        if (disposed) break;
         const item = items[index];
         setProgress({
           operation: "delete",
@@ -232,9 +243,11 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           itemName: item.name,
         });
         try {
-          await window.edenAPI.shellCommand("fs/delete", {
-            location: item.location,
-          });
+          await window.edenAPI.operations.wait(
+            await window.edenAPI.shellCommand("fs/delete", {
+              location: item.location,
+            }),
+          );
         } catch (error) {
           failures.push({ item, message: (error as Error).message });
         }

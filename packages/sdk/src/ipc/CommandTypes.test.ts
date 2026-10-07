@@ -16,6 +16,8 @@ type Equal<A, B> =
     : false;
 type Assert<T extends true> = T;
 type Contracts = [
+  Assert<Equal<CommandResult<"fs/cp">, OperationHandle<"fs/cp">>>,
+  Assert<Equal<CommandCompletion<"fs/cp">, void>>,
   Assert<Equal<CommandResult<"system/info">, SystemInfo>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
   Assert<Equal<CommandChunk<"system/info">, never>>,

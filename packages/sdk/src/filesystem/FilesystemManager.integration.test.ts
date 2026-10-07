@@ -1,7 +1,12 @@
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import { OperationManager } from "../operations/OperationManager";
+import type {
+  OperationHandle,
+  RuntimeAppManifest,
+  UserProfile,
+} from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
@@ -60,13 +65,19 @@ describe("FilesystemManager native watch integration", () => {
     await eden?.dispose();
   });
 
-  const invokeFromView = (command: string, args: unknown) =>
-    eden.platform.rendererIpc.invoke(
+  const invokeFromView = async (command: string, args: unknown) => {
+    const result = await eden.platform.rendererIpc.invoke(
       "shell-command",
       webContentsId,
       command,
       args,
     );
+    return command === "fs/mv"
+      ? eden.runtime
+          .resolve(OperationManager)
+          .wait(result as OperationHandle, caller(appId, profile))
+      : result;
+  };
 
   const changeMessages = () =>
     eden.platform.effects.filter(
@@ -346,6 +357,56 @@ describe("FilesystemManager integration", () => {
     expect([...result]).toEqual([...content]);
   });
 
+  it("returns a copy handle before I/O and retains real completion phases and failures", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const manager = eden.runtime.resolve(OperationManager);
+    await eden.execute(
+      "fs/write",
+      {
+        location: { volume: "home", path: "/operation-source" },
+        content: "accepted",
+      },
+      transferCaller,
+    );
+    const phases: string[] = [];
+    const off = manager.on("changed", ({ snapshot }) => {
+      if (snapshot.phase) phases.push(snapshot.phase);
+    });
+    const args = {
+      from: { volume: "home", path: "/operation-source" },
+      to: { volume: "home", path: "/operation-destination" },
+    };
+    const handle = await eden.execute<OperationHandle>(
+      "fs/cp",
+      args,
+      transferCaller,
+    );
+    expect(manager.get(handle, transferCaller).status).toBe("queued");
+    await manager.wait(handle, transferCaller);
+    expect(
+      await fs.readFile(
+        path.join(eden.paths.userDirectory, "operation-destination"),
+        "utf8",
+      ),
+    ).toBe("accepted");
+    expect(phases).toEqual(
+      expect.arrayContaining(["validating", "preparing-copy", "copying"]),
+    );
+    const collision = await eden.execute<OperationHandle>(
+      "fs/cp",
+      args,
+      transferCaller,
+    );
+    await expect(manager.wait(collision, transferCaller)).rejects.toThrow(
+      "already exists",
+    );
+    expect(manager.get(collision, transferCaller)).toMatchObject({
+      status: "failed",
+      error: { message: expect.stringContaining("already exists") },
+    });
+    off();
+  });
+
   it("copies and moves files and recursive directories", async () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(
@@ -370,7 +431,7 @@ describe("FilesystemManager integration", () => {
       transferCaller,
     );
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/file.txt" },
@@ -378,7 +439,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/tree" },
@@ -386,7 +447,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/file.txt" },
@@ -394,7 +455,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/tree" },
@@ -483,7 +544,7 @@ describe("FilesystemManager integration", () => {
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/copy-source.txt" },
@@ -493,7 +554,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("already exists");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/move-source.txt" },
@@ -515,7 +576,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).resolves.toBe("old move");
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/copy-source.txt" },
@@ -524,7 +585,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/move-source.txt" },
@@ -580,7 +641,7 @@ describe("FilesystemManager integration", () => {
       transferCaller,
     );
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/source" },
@@ -623,7 +684,7 @@ describe("FilesystemManager integration", () => {
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/tree" },
@@ -633,7 +694,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("must be different");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/tree" },
@@ -643,7 +704,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("must be different");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/tree" },
@@ -653,7 +714,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("descendant");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/tree" },

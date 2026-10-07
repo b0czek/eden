@@ -1,3 +1,4 @@
+import type { OperationReporter } from "../operations/OperationTask";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
@@ -573,26 +574,36 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   async installPackage(
     location: FilesystemLocation,
     replacementConfirmed = false,
+    reporter?: OperationReporter,
   ): Promise<InstalledPackageManifest> {
     const hostPath = await this.filesystemManager.resolvePath(location);
-    return this.installPackageFromHostPath(hostPath, replacementConfirmed);
+    return this.installPackageFromHostPath(
+      hostPath,
+      replacementConfirmed,
+      reporter,
+    );
   }
 
   /** Install a package at a trusted host filesystem path. */
   async installPackageFromHostPath(
     hostPath: string,
     replacementConfirmed = false,
+    reporter?: OperationReporter,
   ): Promise<InstalledPackageManifest> {
     const edenitePath = path.resolve(hostPath);
+    reporter?.update("reading-archive");
     const info = await this.readPackageInfo(edenitePath);
     const rawManifest = info.manifest;
     this.assertPackageIdAvailable(rawManifest.id);
-    return this.operations.runExclusive(() =>
-      this.installPackageExclusive(
-        edenitePath,
-        rawManifest,
-        replacementConfirmed,
-      ),
+    return this.operations.runExclusive(
+      () =>
+        this.installPackageExclusive(
+          edenitePath,
+          rawManifest,
+          replacementConfirmed,
+          reporter,
+        ),
+      reporter,
     );
   }
 
@@ -600,6 +611,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     edenitePath: string,
     rawManifest: PackageManifest,
     replacementConfirmed: boolean,
+    reporter?: OperationReporter,
   ): Promise<InstalledPackageManifest> {
     if (rawManifest.kind === "dlc") {
       if (this.catalog.hasApp(rawManifest.id)) {
@@ -621,6 +633,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
             host,
             existing,
             replacementConfirmed,
+            reporter,
           ),
       );
     }
@@ -629,7 +642,13 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     }
     const existing = this.catalog.getApp(rawManifest.id);
     return this.runWithHostsChanging([rawManifest.id], () =>
-      this.installApp(edenitePath, rawManifest, existing, replacementConfirmed),
+      this.installApp(
+        edenitePath,
+        rawManifest,
+        existing,
+        replacementConfirmed,
+        reporter,
+      ),
     );
   }
 
@@ -638,6 +657,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     rawManifest: AppManifest,
     existing: RuntimeAppManifest | undefined,
     replacementConfirmed: boolean,
+    reporter?: OperationReporter,
   ): Promise<RuntimeAppManifest> {
     if (existing) {
       if (existing.isPrebuilt || existing.isDevelopment) {
@@ -663,24 +683,29 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
     const targetPath = path.join(this.appsDirectory, rawManifest.id);
-    await this.operations.execute([
-      {
-        target: targetPath,
-        prepare: async (stage) => {
-          const result = await genesisBundler.extract({
-            edenitePath,
-            outputDirectory: stage,
-            verifyChecksum: true,
-          });
-          if (!result.success || result.manifest?.kind === "dlc") {
-            throw new Error(result.error || "Failed to extract app package");
-          }
+    await this.operations.execute(
+      [
+        {
+          target: targetPath,
+          prepare: async (stage) => {
+            reporter?.update("extracting-archive");
+            const result = await genesisBundler.extract({
+              edenitePath,
+              outputDirectory: stage,
+              verifyChecksum: true,
+            });
+            if (!result.success || result.manifest?.kind === "dlc") {
+              throw new Error(result.error || "Failed to extract app package");
+            }
+          },
         },
-      },
-      ...incompatibleDlcs.map((dlc) => ({
-        target: path.join(this.catalog.dlcDirectory, dlc.id),
-      })),
-    ]);
+        ...incompatibleDlcs.map((dlc) => ({
+          target: path.join(this.catalog.dlcDirectory, dlc.id),
+        })),
+      ],
+      reporter,
+    );
+    reporter?.update("registering-package");
     for (const dlc of incompatibleDlcs) this.unregisterDlc(dlc);
     const runtimeManifest = this.toRuntimeManifest(rawManifest, false);
     this.registry.register(runtimeManifest);
@@ -696,17 +721,24 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
   }
 
   /** Uninstall an app or DLC by package ID. */
-  async uninstallPackage(packageId: string): Promise<boolean> {
-    return this.operations.runExclusive(() =>
-      this.uninstallPackageExclusive(packageId),
+  async uninstallPackage(
+    packageId: string,
+    reporter?: OperationReporter,
+  ): Promise<boolean> {
+    return this.operations.runExclusive(
+      () => this.uninstallPackageExclusive(packageId, reporter),
+      reporter,
     );
   }
 
-  private async uninstallPackageExclusive(packageId: string): Promise<boolean> {
+  private async uninstallPackageExclusive(
+    packageId: string,
+    reporter?: OperationReporter,
+  ): Promise<boolean> {
     const dlc = this.catalog.getDlc(packageId);
     if (dlc) {
       return this.runWithHostsChanging([dlc.hostAppId], () =>
-        this.uninstallDlc(dlc),
+        this.uninstallDlc(dlc, reporter),
       );
     }
 
@@ -716,11 +748,14 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     }
 
     return this.runWithHostsChanging([manifest.id], () =>
-      this.uninstallApp(manifest),
+      this.uninstallApp(manifest, reporter),
     );
   }
 
-  private async uninstallApp(manifest: RuntimeAppManifest): Promise<boolean> {
+  private async uninstallApp(
+    manifest: RuntimeAppManifest,
+    reporter?: OperationReporter,
+  ): Promise<boolean> {
     if (manifest.isPrebuilt || manifest.isDevelopment) {
       throw new Error(`Cannot uninstall ${manifest.id}: this is a system app.`);
     }
@@ -732,12 +767,16 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
         `Cannot uninstall ${manifest.id}: it owns bundled DLC ${protectedDlc.id}`,
       );
     }
-    await this.operations.execute([
-      { target: path.join(this.appsDirectory, manifest.id) },
-      ...dlcs.map((dlc) => ({
-        target: path.join(this.catalog.dlcDirectory, dlc.id),
-      })),
-    ]);
+    await this.operations.execute(
+      [
+        { target: path.join(this.appsDirectory, manifest.id) },
+        ...dlcs.map((dlc) => ({
+          target: path.join(this.catalog.dlcDirectory, dlc.id),
+        })),
+      ],
+      reporter,
+    );
+    reporter?.update("unregistering-package");
     for (const dlc of dlcs) this.unregisterDlc(dlc);
     this.registry.unregister(manifest.id);
     this.permissionRegistry.unregisterApp(manifest.id);
@@ -815,6 +854,7 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     host: RuntimeAppManifest,
     existing: RuntimeDlcManifest | undefined,
     replacementConfirmed = false,
+    reporter?: OperationReporter,
   ): Promise<RuntimeDlcManifest> {
     const compatibility = genesisBundler.isDlcCompatible(host, manifest);
     if (!compatibility.compatible) {
@@ -833,35 +873,45 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
       );
     }
     const target = path.join(this.catalog.dlcDirectory, manifest.id);
-    await this.operations.execute([
-      {
-        target,
-        prepare: async (stage) => {
-          const result = await genesisBundler.extract({
-            edenitePath,
-            outputDirectory: stage,
-            verifyChecksum: true,
-          });
-          if (!result.success || result.manifest?.kind !== "dlc") {
-            throw new Error(result.error || "Failed to extract DLC package");
-          }
+    await this.operations.execute(
+      [
+        {
+          target,
+          prepare: async (stage) => {
+            reporter?.update("extracting-archive");
+            const result = await genesisBundler.extract({
+              edenitePath,
+              outputDirectory: stage,
+              verifyChecksum: true,
+            });
+            if (!result.success || result.manifest?.kind !== "dlc") {
+              throw new Error(result.error || "Failed to extract DLC package");
+            }
+          },
         },
-      },
-    ]);
+      ],
+      reporter,
+    );
+    reporter?.update("registering-package");
     const runtimeManifest = this.toRuntimeDlcManifest(manifest);
     this.registry.register(runtimeManifest);
     this.notify("installed", { manifest: runtimeManifest });
     return runtimeManifest;
   }
 
-  private async uninstallDlc(manifest: RuntimeDlcManifest): Promise<boolean> {
+  private async uninstallDlc(
+    manifest: RuntimeDlcManifest,
+    reporter?: OperationReporter,
+  ): Promise<boolean> {
     if (manifest.isPrebuilt) {
       throw new Error(`Cannot uninstall ${manifest.id}: it is a bundled DLC`);
     }
     this.assertHostStopped(manifest.hostAppId);
-    await this.operations.execute([
-      { target: path.join(this.catalog.dlcDirectory, manifest.id) },
-    ]);
+    await this.operations.execute(
+      [{ target: path.join(this.catalog.dlcDirectory, manifest.id) }],
+      reporter,
+    );
+    reporter?.update("unregistering-package");
     this.unregisterDlc(manifest);
     return true;
   }

@@ -55,7 +55,7 @@ describe("consumer-managed filesystem volumes", () => {
   });
 
   const execute = <T = unknown>(command: string, args: unknown = {}) =>
-    eden.execute<T>(command, args, {
+    eden.complete<T>(command, args, {
       appId,
       principal: { kind: "user", profile: user },
     });

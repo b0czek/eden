@@ -9,6 +9,8 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenPackageChange } from "../api";
+import { OperationManager } from "../operations/OperationManager";
+import type { OperationHandle } from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
 import { SettingsPanelManager } from "../settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
@@ -67,6 +69,61 @@ describe("DLC package lifecycle", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
+  it("accepts a package operation promptly and exposes real transaction completion", async () => {
+    const manifest: AppManifest = {
+      id: "com.example.operation-package",
+      name: "Operation package",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+    };
+    const archive = await makeArchive(
+      root,
+      eden.paths.userDirectory,
+      manifest,
+      { "index.html": "<html>operation</html>" },
+    );
+    const caller = { principal: { kind: "user" as const, profile: vendor } };
+    const manager = eden.runtime.resolve(OperationManager);
+    const phases: string[] = [];
+    const progress: unknown[] = [];
+    const off = manager.on("changed", ({ snapshot }) => {
+      if (snapshot.phase) phases.push(snapshot.phase);
+      if (snapshot.progress) progress.push(snapshot.progress);
+    });
+    const handle = await eden.execute<OperationHandle>(
+      "package/install",
+      { source: { volume: "home", path: archive } },
+      caller,
+    );
+    expect(manager.get(handle, caller).status).toBe("queued");
+    await expect(manager.wait(handle, caller)).resolves.toMatchObject({
+      id: manifest.id,
+    });
+    expect(phases).toEqual(
+      expect.arrayContaining([
+        "reading-archive",
+        "extracting-archive",
+        "applying-transaction",
+        "committing-transaction",
+        "registering-package",
+      ]),
+    );
+    expect(manager.get(handle, caller)).toMatchObject({ status: "succeeded" });
+    expect(progress).toContainEqual({
+      completed: 1,
+      total: 1,
+      unit: "packages",
+    });
+    const removal = await eden.execute<OperationHandle>(
+      "package/uninstall",
+      { packageId: manifest.id },
+      caller,
+    );
+    await expect(manager.wait(removal, caller)).resolves.toBe(true);
+    expect(eden.runtime.packages.list()).toEqual([]);
+    off();
+  });
+
   it("validates package command addresses and options before accessing files", async () => {
     const caller = { principal: { kind: "user" as const, profile: vendor } };
     const invalidLocations = [
@@ -87,11 +144,11 @@ describe("DLC package lifecycle", () => {
         eden.execute("package/get-info", { location }, caller),
       ).rejects.toThrow("requires volume and path");
       await expect(
-        eden.execute("package/install", { source: location }, caller),
+        eden.complete("package/install", { source: location }, caller),
       ).rejects.toThrow("requires volume and path");
     }
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         {
           source: { volume: "home", path: "/package.edenite" },
@@ -145,7 +202,7 @@ describe("DLC package lifecycle", () => {
     });
     await eden.runtime.packages.uninstall(manifest.id);
     await expect(
-      eden.execute("package/install", { source: location }, caller),
+      eden.complete("package/install", { source: location }, caller),
     ).resolves.toMatchObject({ id: manifest.id });
 
     eden.runtime.volumes.unregister("usb");
@@ -174,7 +231,7 @@ describe("DLC package lifecycle", () => {
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: archive } },
         caller,
@@ -238,12 +295,12 @@ describe("DLC package lifecycle", () => {
       secondDlc,
       { "payload/theme.json": '{"accent":"yellow"}' },
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostWithoutDlcsArchive } },
       { principal: { kind: "user", profile: vendor } },
@@ -254,12 +311,12 @@ describe("DLC package lifecycle", () => {
       .on("panels-changed", ({ reason }) => {
         settingsChanges.push(reason);
       });
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: dlcArchive } },
       { principal: { kind: "user", profile: vendor } },
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: secondDlcArchive } },
       { principal: { kind: "user", profile: vendor } },
@@ -501,7 +558,7 @@ describe("DLC package lifecycle", () => {
       missing,
     );
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: missingArchive } },
         { principal: { kind: "user", profile: vendor } },
@@ -523,7 +580,7 @@ describe("DLC package lifecycle", () => {
         "index.html": "<html></html>",
       },
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostArchive } },
       { principal: { kind: "user", profile: vendor } },
@@ -539,7 +596,7 @@ describe("DLC package lifecycle", () => {
       incompatible,
     );
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: incompatibleArchive } },
         { principal: { kind: "user", profile: vendor } },
@@ -560,7 +617,7 @@ describe("DLC package lifecycle", () => {
       unknownPoint,
     );
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: unknownPointArchive } },
         { principal: { kind: "user", profile: vendor } },
@@ -578,7 +635,7 @@ describe("DLC package lifecycle", () => {
       eden.paths.userDirectory,
       compatible,
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: compatibleArchive } },
       { principal: { kind: "user", profile: vendor } },
@@ -599,13 +656,13 @@ describe("DLC package lifecycle", () => {
     await eden.runtime.sessions.login("runner", "password");
     await eden.execute("process/launch", { appId: host.id });
     await expect(
-      eden.execute("package/uninstall", { packageId: host.id }),
+      eden.complete("package/uninstall", { packageId: host.id }),
     ).rejects.toThrow("must be stopped");
     await expect(
-      eden.execute("package/uninstall", { packageId: compatible.id }),
+      eden.complete("package/uninstall", { packageId: compatible.id }),
     ).rejects.toThrow("must be stopped");
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: compatibleArchive }, replace: true },
         { principal: { kind: "user", profile: vendor } },
@@ -644,19 +701,19 @@ describe("DLC package lifecycle", () => {
       makeArchive(root, eden.paths.userDirectory, dlc),
     ]);
     const caller = { principal: { kind: "user" as const, profile: vendor } };
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostV1Archive } },
       caller,
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: dlcArchive } },
       caller,
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: hostV2Archive } },
         caller,
@@ -670,7 +727,7 @@ describe("DLC package lifecycle", () => {
       dlcs: [],
     });
 
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostV2Archive }, replace: true },
       caller,
@@ -681,18 +738,18 @@ describe("DLC package lifecycle", () => {
     expect(eden.runtime.packages.get(dlc.id)).toBeUndefined();
 
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: hostV2Archive } },
         caller,
       ),
     ).rejects.toThrow("reinstall confirmation");
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostV2Archive }, replace: true },
       caller,
     );
-    await eden.execute(
+    await eden.complete(
       "package/install",
       { source: { volume: "home", path: hostV1Archive }, replace: true },
       caller,
@@ -804,21 +861,21 @@ describe("DLC package lifecycle", () => {
       ],
     });
     await expect(
-      eden.execute(
+      eden.complete(
         "package/install",
         { source: { volume: "home", path: replacementArchive }, replace: true },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("bundled DLC");
     await expect(
-      eden.execute(
+      eden.complete(
         "package/uninstall",
         { packageId: dlc.id },
         { principal: { kind: "user", profile: vendor } },
       ),
     ).rejects.toThrow("bundled DLC");
     await expect(
-      eden.execute(
+      eden.complete(
         "package/uninstall",
         { packageId: host.id },
         { principal: { kind: "user", profile: vendor } },

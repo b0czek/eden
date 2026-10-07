@@ -1,3 +1,4 @@
+import type { OperationReporter } from "../operations/OperationTask";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,6 +8,7 @@ interface TransferRequest {
   destination: string;
   destinationLabel: string;
   overwrite: boolean;
+  reporter?: OperationReporter;
   assertSourceActive?: () => Promise<void>;
   assertDestinationActive?: () => Promise<void>;
 }
@@ -15,12 +17,14 @@ interface PreparedTransfer {
   source: string;
   destination: string;
   destinationExists: boolean;
+  reporter?: OperationReporter;
   assertSourceActive?: () => Promise<void>;
   assertDestinationActive?: () => Promise<void>;
 }
 
 export class FilesystemTransfer {
   async copy(request: TransferRequest): Promise<void> {
+    request.reporter?.update("preparing-copy");
     const transfer = await this.prepare(request, "copy");
     await this.runWithDestinationRollback(transfer, () =>
       this.copyEntry(transfer),
@@ -28,11 +32,13 @@ export class FilesystemTransfer {
   }
 
   async move(request: TransferRequest): Promise<void> {
+    request.reporter?.update("preparing-move");
     const transfer = await this.prepare(request, "move");
     let copied = false;
     await this.runWithDestinationRollback(transfer, async () => {
       await this.assertActive(transfer);
       try {
+        transfer.reporter?.update("moving");
         await fs.rename(transfer.source, transfer.destination);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
@@ -44,6 +50,7 @@ export class FilesystemTransfer {
       // The completed destination must survive an incomplete source deletion.
       try {
         await this.assertActive(transfer);
+        transfer.reporter?.update("removing-source");
         await fs.rm(transfer.source, { recursive: true, force: false });
       } catch (error) {
         throw new Error(
@@ -89,6 +96,7 @@ export class FilesystemTransfer {
     await this.assertActive(request);
     await fs.mkdir(path.dirname(request.destination), { recursive: true });
     return {
+      reporter: request.reporter,
       source: request.source,
       destination: request.destination,
       destinationExists,
@@ -109,6 +117,7 @@ export class FilesystemTransfer {
     try {
       await operation();
     } catch (error) {
+      transfer.reporter?.update("rolling-back");
       const rollbackErrors: unknown[] = [];
       try {
         await transfer.assertDestinationActive?.();
@@ -136,6 +145,7 @@ export class FilesystemTransfer {
     }
 
     if (backup) {
+      transfer.reporter?.update("cleaning-up");
       await transfer.assertDestinationActive?.();
       await fs.rm(backup, { recursive: true, force: true });
     }
@@ -157,6 +167,7 @@ export class FilesystemTransfer {
 
   private async copyEntry(transfer: PreparedTransfer): Promise<void> {
     const { source, destination } = transfer;
+    transfer.reporter?.update("copying");
     await fs.cp(source, destination, {
       recursive: true,
       verbatimSymlinks: true,

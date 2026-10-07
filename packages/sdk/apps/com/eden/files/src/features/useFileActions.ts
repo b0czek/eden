@@ -188,10 +188,12 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         targetPath = joinPath(getParentPath(item.location.path), targetName);
       }
 
-      await window.edenAPI.shellCommand("fs/cp", {
-        from: item.location,
-        to: { volume: item.location.volume, path: targetPath },
-      });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("fs/cp", {
+          from: item.location,
+          to: { volume: item.location.volume, path: targetPath },
+        }),
+      );
 
       options.setScrollToSelected(true);
       options.setSelectedItem(targetPath);
@@ -402,10 +404,12 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         return t("files.errors.itemAlreadyExists");
       }
 
-      await window.edenAPI.shellCommand("fs/mv", {
-        from: item.location,
-        to: { volume: item.location.volume, path: targetPath },
-      });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("fs/mv", {
+          from: item.location,
+          to: { volume: item.location.volume, path: targetPath },
+        }),
+      );
 
       options.setScrollToSelected(true);
       options.setSelectedItem(targetPath);
@@ -426,9 +430,11 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const deleteItem = async (item: FileItem) => {
     try {
-      await window.edenAPI.shellCommand("fs/delete", {
-        location: { path: item.location.path, volume: item.location.volume },
-      });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("fs/delete", {
+          location: { path: item.location.path, volume: item.location.volume },
+        }),
+      );
       options.refresh();
     } catch (error) {
       options.showError(

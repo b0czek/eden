@@ -5,6 +5,7 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
+import { operationTask, type OperationTask } from "../operations/OperationTask";
 import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import {
@@ -204,10 +205,12 @@ export class FilesystemHandler {
    * Delete a file or directory.
    * For directories, removes recursively.
    */
-  @EdenHandler("delete", { permission: "write" })
-  async handleDelete(args: { location: FilesystemLocation }): Promise<void> {
+  @EdenHandler("delete", { permission: "write", mode: "operation" })
+  handleDelete(args: { location: FilesystemLocation }): OperationTask<void> {
     const { location } = v.parse(filesystemLocationArgsSchema, args);
-    await this.fsManager.delete(location);
+    return operationTask((reporter) =>
+      this.fsManager.delete(location, reporter),
+    );
   }
 
   /**
@@ -215,19 +218,23 @@ export class FilesystemHandler {
    * Directories are copied recursively.
    * Existing destinations are replaced only when overwrite is true.
    */
-  @EdenHandler("cp", { permission: "write" })
-  async handleCopy(args: FilesystemTransferArgs): Promise<void> {
+  @EdenHandler("cp", { permission: "write", mode: "operation" })
+  handleCopy(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    await this.fsManager.copy(from, to, overwrite);
+    return operationTask((reporter) =>
+      this.fsManager.copy(from, to, overwrite, reporter),
+    );
   }
 
   /**
    * Move or rename a file or directory.
    * Existing destinations are replaced only when overwrite is true.
    */
-  @EdenHandler("mv", { permission: "write" })
-  async handleMove(args: FilesystemTransferArgs): Promise<void> {
+  @EdenHandler("mv", { permission: "write", mode: "operation" })
+  handleMove(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    await this.fsManager.move(from, to, overwrite);
+    return operationTask((reporter) =>
+      this.fsManager.move(from, to, overwrite, reporter),
+    );
   }
 }

@@ -562,9 +562,10 @@ export interface FsCommands {
    * For directories, removes recursively.
    */
   "fs/delete": {
-    mode: "immediate";
+    mode: "operation";
     args: { location: import("./index").FilesystemLocation };
-    response: void;
+    response: import("./index").OperationHandle<"fs/delete">;
+    completion: void;
   };
   /**
    * Copy a file or directory.
@@ -572,18 +573,20 @@ export interface FsCommands {
    * Existing destinations are replaced only when overwrite is true.
    */
   "fs/cp": {
-    mode: "immediate";
+    mode: "operation";
     args: import("./index").FilesystemTransferArgs;
-    response: void;
+    response: import("./index").OperationHandle<"fs/cp">;
+    completion: void;
   };
   /**
    * Move or rename a file or directory.
    * Existing destinations are replaced only when overwrite is true.
    */
   "fs/mv": {
-    mode: "immediate";
+    mode: "operation";
     args: import("./index").FilesystemTransferArgs;
-    response: void;
+    response: import("./index").OperationHandle<"fs/mv">;
+    completion: void;
   };
 }
 
@@ -698,19 +701,21 @@ export interface PackageCommands {
    * Install an application or DLC from a local path.
    */
   "package/install": {
-    mode: "immediate";
+    mode: "operation";
     args: {
     source: import("./index").FilesystemLocation;
     replace?: boolean };
-    response: import("./index").InstalledPackageManifest;
+    response: import("./index").OperationHandle<"package/install">;
+    completion: import("./index").InstalledPackageManifest;
   };
   /**
    * Uninstall an application or DLC by its package ID.
    */
   "package/uninstall": {
-    mode: "immediate";
+    mode: "operation";
     args: { packageId: string };
-    response: boolean;
+    response: import("./index").OperationHandle<"package/uninstall">;
+    completion: boolean;
   };
   /**
    * List all installed applications.

@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import type {
   OperationHandle,
