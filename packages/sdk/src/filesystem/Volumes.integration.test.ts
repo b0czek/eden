@@ -584,19 +584,20 @@ describe("consumer-managed filesystem volumes", () => {
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(providerId, ["file-picker/display", "fs/read"]);
-    const invoke = (id: string, command: string, args: unknown) => {
+    const invoke = async (id: string, command: string, args: unknown) => {
       const instance = requireValue(
         eden.runtime.resolve(ProcessManager).getAppInstance(id),
       );
       const view = requireValue(
         eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
       );
-      return eden.platform.rendererIpc.invoke(
+      const response = (await eden.platform.rendererIpc.invoke(
         "shell-command",
         view.view.webContents.id,
         command,
         args,
-      );
+      )) as { mode: "immediate"; result: unknown };
+      return response.result;
     };
     await invoke(providerId, "file-picker/register-display", {});
     const opened = (await invoke(appId, "file-picker/open", {
@@ -841,12 +842,16 @@ describe("consumer-managed filesystem volumes", () => {
       );
       const webContentsId = view.view.webContents.id;
       const invoke = async (command: string, args: unknown) => {
-        const result = await eden.platform.rendererIpc.invoke(
+        const response = (await eden.platform.rendererIpc.invoke(
           "shell-command",
           webContentsId,
           command,
           args,
-        );
+        )) as
+          | { mode: "operation"; handle: OperationHandle }
+          | { mode: "immediate"; result: unknown };
+        const result =
+          response.mode === "operation" ? response.handle : response.result;
         return command === "fs/eject"
           ? eden.runtime
               .resolve(OperationManager)

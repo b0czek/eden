@@ -158,7 +158,7 @@ exponential backoff. Intentional stops, reloads, and Eden shutdown are excluded
 from failure restart handling.
 
 App IPC commands `process/launch`, `process/stop`, `process/exit`, and daemon
-start/stop/restart return operation handles. Await `edenAPI.operations.wait(handle)`
+start/stop/restart return operation objects. Await `operation.result()`
 when subsequent work depends on completion. Self-exit only needs to await acceptance;
 Eden queues the response before tearing down the caller. Host daemon methods remain
 awaited convenience APIs.

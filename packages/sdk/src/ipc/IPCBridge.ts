@@ -237,12 +237,17 @@ export class IPCBridge extends EventEmitter {
       this.pendingCommands.set(commandId, { resolve, reject, timeout });
 
       // Execute via CommandRegistry with trusted caller context
+      const mode = this.commandRegistry.getMode(command);
       this.commandRegistry
         .execute(command, args, callerContext, submission)
         .then((result) => {
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);
-          resolve(result);
+          resolve(
+            mode === "operation"
+              ? { mode: "operation", handle: result }
+              : { mode: "immediate", result },
+          );
         })
         .catch((error) => {
           const err = error as Error;

@@ -61,7 +61,7 @@ const launch = await window.edenAPI.shellCommand("process/launch", {
   appId: "com.example.myapp",
   bounds: { x: 0, y: 0, width: 800, height: 600 },
 });
-await window.edenAPI.operations.wait(launch);
+await launch.result();
 
 // Subscribe to system events
 await window.edenAPI.subscribe("process/launched", (data) => {
@@ -70,7 +70,6 @@ await window.edenAPI.subscribe("process/launched", (data) => {
 
 // Check event support
 const hasMinimize = await window.edenAPI.isEventSupported("window/minimize");
-await window.edenAPI.operations.wait(launch);
 ```
 
 ### How It Works
@@ -364,49 +363,52 @@ This provides type declarations for `worker.edenAPI`, `worker.appBus`, and `work
 ## Operations
 
 Commands declare a communication mode. Immediate commands return their result
-from `shellCommand`. Operation commands return a serializable `{ command, id }`
-handle after validation and authorization. Eden executes accepted work independently
+from `shellCommand`. Operation commands return a typed
+operation object after validation and authorization. Eden executes accepted work independently
 of the submitting view or backend and retains its status and completion.
 
 ```typescript
-const handle = await window.edenAPI.shellCommand(
+const copy = await window.edenAPI.shellCommand(
   "fs/cp",
   { from, to, overwrite: false },
   { requestKey: "copy-invoice-2026" },
 );
-const stopWatching = await window.edenAPI.operations.watch(handle, snapshot => {
+const stopWatching = await copy.watch(snapshot => {
   console.log(snapshot.status, snapshot.phase, snapshot.progress);
 });
-await window.edenAPI.operations.wait(handle);
+await copy.result();
 stopWatching();
 ```
 
-`worker.edenAPI.operations` provides the same helpers. `get(handle)` reads a
-snapshot and `list()` lists the caller's operations. Watchers subscribe before
+`worker.edenAPI.shellCommand` returns the same operation objects. `copy.get()` reads a
+snapshot and `operations.list()` lists the caller's operations. Watchers subscribe before
 reading the retained snapshot and reconcile changes using increasing revisions.
 Completion before observation works too. A failed operation preserves a typed
-domain failure response when available; `wait` returns that response. Other
+domain failure response when available; `result()` returns that response. Other
 failures reject with a sanitized error.
 
-For operations with `snapshot.cancellable`, call `operations.cancel(handle)` to
+For operations with `snapshot.cancellable`, call `copy.cancel()` to
 request a stop. Continue observing until cleanup completes. A cancelled operation
-has status `cancelled`, and `wait(handle)` rejects with an `AbortError`. Cancelling
+has status `cancelled`, and `copy.result()` rejects with an `AbortError`. Cancelling
 a filesystem copy removes its incomplete destination and restores the previous
 destination when replacing an existing file. The source remains intact.
 
-Progress watching is optional. `watch(handle, listener)` receives changes for that
-operation, including its current retained snapshot. `wait(handle)` receives only
+Progress watching is optional. `copy.watch(listener)` receives changes for that
+operation, including its current retained snapshot. `copy.result()` receives only
 completion updates. Unchanged phase and progress reports do not produce duplicate
 updates. Work without observers still retains its status and completion for later
 inspection. A direct subscription to `operation/changed` observes all operations
 owned by the caller's app and login session.
 
 Request keys are optional. Within the same app and login session, repeating a key
-with the same command and arguments returns the original retained handle. Reusing
+with the same command and arguments returns the original retained operation. Reusing
 the key with different arguments or another command fails. Callers decide whether
 to resubmit; the API does not retry automatically.
 
-An app can inspect its operations after reopening in the same login session.
+Each operation exposes a serializable `handle` with `{ command, id }`. Persist or
+send that handle when needed, and use `edenAPI.operations.from(handle)` to restore
+its `get`, `watch`, `result`, and `cancel` methods. An app can inspect its operations
+after reopening in the same login session.
 Other apps and sessions cannot inspect them or receive their changes. Hosts can
 use `eden.operations.get`, `list`, and `onChanged` for privileged read-only
 observation. Accepted work drains before session changes and runtime shutdown.

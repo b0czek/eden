@@ -112,16 +112,16 @@ ejected.
 Apps with `fs/eject` permission use the corresponding command:
 
 ```typescript
-const handle = await window.edenAPI.shellCommand("fs/eject", { volume: "usb-work" });
-await window.edenAPI.operations.wait(handle);
+const eject = await window.edenAPI.shellCommand("fs/eject", { volume: "usb-work" });
+await eject.result();
 ```
 
 Removal first changes the volume's `state` from `ready` to `ejecting`, closes its
 directory watches, and rejects new filesystem operations on it. Already admitted
 operations finish before the OS callback runs. Subscribe to `fs/volumes-changed`
 to show pending state while the OS flushes its caches; this may take minutes.
-Frontend and backend eject commands return an operation handle promptly. Use
-`edenAPI.operations.watch` to observe phases and `wait` to await safe removal.
+Frontend and backend eject commands return an operation object promptly. Use
+`eject.watch(listener)` to observe phases and `eject.result()` to await safe removal.
 The volume leaves the inventory after success.
 
 Repeated requests share the same removal. If the callback rejects, the operation
@@ -184,7 +184,6 @@ Resolve a host path only when an external integration needs it:
 const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
   location: { volume: "usb-work", path: "/Documents/report.txt" },
 });
-const result = await window.edenAPI.operations.wait(handle);
 ```
 
 ## Opening Files and Picking Locations
@@ -192,10 +191,10 @@ const result = await window.edenAPI.operations.wait(handle);
 `file/open` selects a configured handler using the file's type:
 
 ```typescript
-const handle = await window.edenAPI.shellCommand("file/open", {
+const open = await window.edenAPI.shellCommand("file/open", {
   location: { volume: "usb-work", path: "/Documents/report.txt" },
 });
-const result = await window.edenAPI.operations.wait(handle);
+const result = await open.result();
 ```
 
 Handlers retrieve the initial address with `getLaunchFile()` and receive further
@@ -235,10 +234,11 @@ as write destinations. Raw picker selections use a nonempty `locations` array.
 transfers between volumes. They reject existing destinations by default:
 
 ```typescript
-await window.edenAPI.shellCommand("fs/cp", {
+const copy = await window.edenAPI.shellCommand("fs/cp", {
   from: { volume: "home", path: "/Documents/report.txt" },
   to: { volume: "usb-work", path: "/report.txt" },
 });
+await copy.result();
 ```
 
 `overwrite: true` replaces the complete destination, including directories;

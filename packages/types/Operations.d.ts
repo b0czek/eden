@@ -92,7 +92,22 @@ export type OperationCompletion<C extends string> = C extends CommandName
   ? CommandCompletion<C>
   : unknown;
 
+/** App-side operation controls. Persist or send only its serializable handle. */
+export interface Operation<C extends string = string> {
+  readonly handle: OperationHandle<C>;
+  get(): Promise<OperationSnapshot<C, OperationCompletion<C>>>;
+  watch(
+    listener: (snapshot: OperationSnapshot<C, OperationCompletion<C>>) => void,
+  ): Promise<() => void>;
+  /** Await completion and return the command's typed result. */
+  result(): Promise<OperationCompletion<C>>;
+  /** Request cancellation, then await result() for cleanup to finish. */
+  cancel(): Promise<void>;
+}
+
 export interface OperationsAPI extends OperationCancellation {
+  /** Restore app-side controls for a retained or shared handle. */
+  from<C extends string>(handle: OperationHandle<C>): Operation<C>;
   get<C extends string>(
     handle: OperationHandle<C>,
   ): Promise<OperationSnapshot<C, OperationCompletion<C>>>;

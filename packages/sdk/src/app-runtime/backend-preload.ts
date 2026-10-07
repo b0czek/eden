@@ -24,10 +24,10 @@ import type {
   AppBusConnection,
   CommandArgs,
   CommandName,
-  CommandResult,
   OperationSubmission,
   EdenAPI,
 } from "@edenapp/types";
+import type { ShellCommandResponse } from "./common/shell-transport";
 
 import type { WorkerGlobal } from "@edenapp/types/worker";
 import {
@@ -155,7 +155,7 @@ const eventSubscriptions: Map<
   Set<(payload: unknown) => void>
 > = new Map();
 
-type PendingCommandResult = CommandResult<CommandName>;
+type PendingCommandResult = ShellCommandResponse<CommandName>;
 
 // Pending shell command requests
 const pendingCommands: Map<
@@ -184,13 +184,13 @@ function shellCommand<T extends CommandName>(
   command: T,
   args: CommandArgs<T>,
   submission?: OperationSubmission,
-): Promise<CommandResult<T>> {
+): Promise<ShellCommandResponse<T>> {
   return new Promise((resolve, reject) => {
     const commandId = generateCommandId();
 
     pendingCommands.set(commandId, {
       resolve: (value) => {
-        resolve(value as CommandResult<T>);
+        resolve(value as ShellCommandResponse<T>);
       },
       reject: (reason) => {
         reject(reason);

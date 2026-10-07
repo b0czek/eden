@@ -390,17 +390,22 @@ describe("runtime-owned operations", () => {
     });
     await tick();
     const response = processes[0].messages.find(
-      (message): message is { commandId: string; result: OperationHandle } =>
+      (
+        message,
+      ): message is {
+        commandId: string;
+        result: { mode: "operation"; handle: OperationHandle };
+      } =>
         !!message &&
         typeof message === "object" &&
         "commandId" in message &&
         message.commandId === "submit",
     );
     expect(response?.result).toMatchObject({
-      command: "integration/work",
-      id: expect.any(String),
+      mode: "operation",
+      handle: { command: "integration/work", id: expect.any(String) },
     });
-    const handle = response!.result;
+    const handle = response!.result.handle;
     expect(manager.get(handle, owner).status).toBe("running");
     blocked.release();
     await manager.wait(handle, owner);
@@ -589,13 +594,17 @@ describe("runtime-owned operations", () => {
         .getViewInfo(
           eden.runtime.resolve(ProcessManager).getAppInstance(id)!.viewId,
         )!.view;
-    const invoke = (id: string, command: string, args: unknown) =>
-      eden.platform.rendererIpc.invoke(
+    const invoke = async (id: string, command: string, args: unknown) => {
+      const response = (await eden.platform.rendererIpc.invoke(
         "shell-command",
         view(id).webContents.id,
         command,
         args,
-      );
+      )) as
+        | { mode: "operation"; handle: OperationHandle }
+        | { mode: "immediate"; result: unknown };
+      return response.mode === "operation" ? response : response.result;
+    };
     for (const id of [owner.appId, "other.app"]) {
       await invoke(id, "event/subscribe", { eventName: "operation/changed" });
       const context = eden.runtime.resolve(RuntimeContextRegistry).get(id)!;
@@ -621,9 +630,10 @@ describe("runtime-owned operations", () => {
     );
     const originalWebContentsId = view(owner.appId).webContents.id;
     const otherWebContentsId = view("other.app").webContents.id;
-    const handle = (await invoke(owner.appId, "integration/work", {
+    const response = (await invoke(owner.appId, "integration/work", {
       value: "item",
-    })) as OperationHandle;
+    })) as { mode: "operation"; handle: OperationHandle };
+    const handle = response.handle;
     await eden.runtime.resolve(ProcessManager).stopApp(owner.appId);
     blocked.release();
     await manager.wait(handle, owner);

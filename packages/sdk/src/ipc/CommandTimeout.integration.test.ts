@@ -99,7 +99,11 @@ describe("one bounded IPC deadline", () => {
   });
 
   it("accepts an operation within the deadline and leaves its execution unbounded", async () => {
-    const handle = (await invoke("operation")) as OperationHandle;
+    const response = (await invoke("operation")) as {
+      mode: "operation";
+      handle: OperationHandle;
+    };
+    const handle = response.handle;
     const manager = eden.runtime.resolve(OperationManager);
     const caller = { appId };
     expect(manager.get(handle, caller).status).toBe("queued");

@@ -1,6 +1,6 @@
 import type {
   OperationCompletion,
-  OperationHandle,
+  Operation,
   OperationSnapshot,
 } from "@edenapp/types";
 import { createSignal, onCleanup } from "solid-js";
@@ -10,7 +10,7 @@ export function createOperation() {
   const [pending, setPending] = createSignal(false);
   const [snapshot, setSnapshot] = createSignal<OperationSnapshot>();
   let disposed = false;
-  let submission: Promise<OperationHandle> | undefined;
+  let submission: Promise<Operation> | undefined;
   let stop: (() => void) | undefined;
   let endObservation: (() => void) | undefined;
 
@@ -21,7 +21,7 @@ export function createOperation() {
   });
 
   const run = async <C extends string>(
-    submit: () => Promise<OperationHandle<C>>,
+    submit: () => Promise<Operation<C>>,
   ): Promise<OperationCompletion<C>> => {
     if (disposed) throw new Error("Operation owner has been disposed");
     if (pending()) throw new Error("An operation is already in progress");
@@ -29,7 +29,7 @@ export function createOperation() {
     setSnapshot(undefined);
     try {
       submission = submit();
-      const handle = (await submission) as OperationHandle<C>;
+      const operation = (await submission) as Operation<C>;
       if (disposed) throw new Error("Operation owner has been disposed");
       let finish!: (
         snapshot?: OperationSnapshot<C, OperationCompletion<C>>,
@@ -41,19 +41,16 @@ export function createOperation() {
       });
       // Resolve on disposal so no listener or suspended observer outlives its UI.
       endObservation = () => finish();
-      const unsubscribe = await window.edenAPI.operations.watch(
-        handle,
-        (update) => {
-          if (disposed) return;
-          setSnapshot(update);
-          if (
-            update.status === "succeeded" ||
-            update.status === "failed" ||
-            update.status === "cancelled"
-          )
-            finish(update);
-        },
-      );
+      const unsubscribe = await operation.watch((update) => {
+        if (disposed) return;
+        setSnapshot(update);
+        if (
+          update.status === "succeeded" ||
+          update.status === "failed" ||
+          update.status === "cancelled"
+        )
+          finish(update);
+      });
       stop = unsubscribe;
       if (disposed) {
         unsubscribe();
@@ -85,8 +82,8 @@ export function createOperation() {
 
   const cancel = async () => {
     if (!submission) return;
-    const handle = await submission;
-    await window.edenAPI.operations.cancel(handle);
+    const operation = await submission;
+    await operation.cancel();
   };
 
   return { run, pending, snapshot, cancel };

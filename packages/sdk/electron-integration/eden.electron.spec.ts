@@ -417,7 +417,11 @@ test.describe
               .find((candidate) => candidate.getURL().includes(appId));
             if (!contents) throw new Error("Integration view missing");
             return contents.executeJavaScript(
-              `window.edenAPI.shellCommand("integration/delayed", {name: "renderer"})`,
+              `(async () => {
+                const operation = await window.edenAPI.shellCommand("integration/delayed", {name: "renderer"});
+                window.__integrationOperation = operation;
+                return operation.handle;
+              })()`,
             );
           },
           APP_ID,
@@ -455,10 +459,11 @@ test.describe
             return contents.executeJavaScript(`(async () => {
           const handle = ${JSON.stringify(handle)};
           const revisions = [];
-          const stop = await window.edenAPI.operations.watch(handle, snapshot => revisions.push(snapshot.revision));
-          const completion = await window.edenAPI.operations.wait(handle);
+          const operation = window.__integrationOperation;
+          const stop = await operation.watch(snapshot => revisions.push(snapshot.revision));
+          const completion = await operation.result();
           stop();
-          const retained = await window.edenAPI.operations.wait(handle);
+          const retained = await window.edenAPI.operations.from(handle).result();
           return {completion, retained, revisions};
         })()`);
           },
@@ -1555,7 +1560,8 @@ test.describe
             .find((candidate) => candidate.getURL().includes(appId));
           if (!contents) throw new Error("Integration app view not found");
           return contents.executeJavaScript(`(async () => {
-          return window.edenAPI.shellCommand("fs/eject", { volume: "slow-eject" });
+          const operation = await window.edenAPI.shellCommand("fs/eject", { volume: "slow-eject" });
+          return operation.handle;
         })()`);
         },
         APP_ID,
@@ -1585,7 +1591,7 @@ test.describe
             .find((candidate) => candidate.getURL().includes(payload.appId));
           if (!contents) throw new Error("Integration app view not found");
           return contents.executeJavaScript(
-            `window.edenAPI.operations.wait(${JSON.stringify(payload.handle)})`,
+            `window.edenAPI.operations.from(${JSON.stringify(payload.handle)}).result()`,
           );
         },
         { appId: APP_ID, handle: rendererHandle },

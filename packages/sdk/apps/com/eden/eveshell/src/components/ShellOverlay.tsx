@@ -6,7 +6,7 @@ import {
 } from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
-  OperationHandle,
+  Operation,
   AppInstance,
   AppManifest,
   EdenPowerCapabilities,
@@ -245,7 +245,7 @@ export default function ShellOverlay() {
   const runAppOperation = async (
     appId: string,
     activity: "launch" | "stop",
-    submit: () => Promise<OperationHandle<"process/launch" | "process/stop">>,
+    submit: () => Promise<Operation<"process/launch" | "process/stop">>,
   ) => {
     if (disposed || busyApps()[appId]) return;
     setBusyApps((current) => ({ ...current, [appId]: activity }));

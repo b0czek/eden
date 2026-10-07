@@ -10,7 +10,7 @@ import type {
   FileHandlerInfo,
   FilesystemLocation,
   RuntimeAppManifest,
-  OperationHandle,
+  Operation,
   OperationCompletion,
 } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
@@ -21,7 +21,7 @@ interface UseFileActionsOptions {
   runOperation: <C extends string>(
     operation: "copy" | "move" | "delete" | "open",
     item: FileItem,
-    submit: () => Promise<OperationHandle<C>>,
+    submit: () => Promise<Operation<C>>,
   ) => Promise<OperationCompletion<C>>;
   currentPath: Accessor<string>;
   currentVolume: Accessor<string>;

@@ -51,7 +51,7 @@ export function createAppBusAPI(
       registeredServices.set(serviceName, onConnect);
 
       // Register with main process
-      const result = await transport.exec("appbus/register", {
+      const { result } = await transport.exec("appbus/register", {
         serviceName,
         description: options?.description,
         allowedClients: options?.allowedClients,
@@ -68,9 +68,10 @@ export function createAppBusAPI(
       serviceName: string,
     ): Promise<{ success: boolean }> => {
       registeredServices.delete(serviceName);
-      return transport.exec("appbus/unregister", {
+      const { result } = await transport.exec("appbus/unregister", {
         serviceName,
       });
+      return result;
     },
 
     connect: async (
@@ -78,7 +79,7 @@ export function createAppBusAPI(
       serviceName: string,
     ): Promise<AppBusConnection | { error: string }> => {
       // Request connection through shell command
-      const result = await transport.exec("appbus/connect", {
+      const { result } = await transport.exec("appbus/connect", {
         targetAppId,
         serviceName,
       });
@@ -114,13 +115,13 @@ export function createAppBusAPI(
     },
 
     listServices: async (): Promise<{ services: ServiceInfo[] }> => {
-      return transport.exec("appbus/list", {});
+      return (await transport.exec("appbus/list", {})).result;
     },
 
     listServicesByApp: async (
       appId: string,
     ): Promise<{ services: ServiceInfo[] }> => {
-      return transport.exec("appbus/list-by-app", { appId });
+      return (await transport.exec("appbus/list-by-app", { appId })).result;
     },
   };
 }

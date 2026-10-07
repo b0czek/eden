@@ -3,7 +3,7 @@ import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { createOperation } from "@edenapp/solid-kit";
 import type {
   FilesystemLocation,
-  OperationHandle,
+  Operation,
   OperationCompletion,
 } from "@edenapp/types";
 import {
@@ -79,7 +79,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   const runOperation = async <C extends string>(
     operation: FileOperationProgress["operation"],
     item: FileItem,
-    submit: () => Promise<OperationHandle<C>>,
+    submit: () => Promise<Operation<C>>,
   ): Promise<OperationCompletion<C>> => {
     if (disposed) throw new Error("File operation owner has been disposed");
     if (busy()) throw new Error("A file operation is already in progress");

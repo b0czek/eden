@@ -1,13 +1,16 @@
-import type { ShellTransport } from "../app-runtime/common/shell-transport";
+import type {
+  ShellCommandResponse,
+  ShellTransport,
+} from "../app-runtime/common/shell-transport";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   CommandArgs,
   CommandName,
-  CommandResult,
   RuntimeAppManifest,
   OperationHandle,
+  OperationSubmission,
   OperationSnapshot,
   UserProfile,
 } from "@edenapp/types";
@@ -93,13 +96,18 @@ describe("client subscriptions across renderer IPC", () => {
       },
     );
     transport = {
-      exec: <C extends CommandName>(command: C, args: CommandArgs<C>) =>
+      exec: <C extends CommandName>(
+        command: C,
+        args: CommandArgs<C>,
+        submission?: OperationSubmission,
+      ) =>
         eden.platform.rendererIpc.invoke(
           "shell-command",
           contents.id,
           command,
           args,
-        ) as Promise<CommandResult<C>>,
+          submission,
+        ) as Promise<ShellCommandResponse<C>>,
     };
   });
   afterEach(async () => {
@@ -375,6 +383,46 @@ describe("client subscriptions across renderer IPC", () => {
     await expect(api.operations.wait(ignored.handle)).resolves.toBe("ignored");
   });
 
+  it("returns bound operation controls and restores them from a retained handle", async () => {
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(owner.appId, ["fs/read", "fs/write"]);
+    await fs.writeFile(
+      path.join(eden.paths.userDirectory, "source.txt"),
+      "copied",
+    );
+    const api = createEdenAPI(transport, listeners);
+    const info = await api.shellCommand("system/info", {});
+    expect(info.runningApps).toContain(owner.appId);
+    const args = {
+      from: { volume: "home", path: "/source.txt" },
+      to: { volume: "home", path: "/destination.txt" },
+    };
+    const copy = await api.shellCommand("fs/cp", args, { requestKey: "copy" });
+    const repeated = await api.shellCommand("fs/cp", args, {
+      requestKey: "copy",
+    });
+    expect(repeated.handle).toEqual(copy.handle);
+    await eden.runtime.resolve(OperationManager).drain();
+    await expect(copy.result()).resolves.toBeUndefined();
+    expect(
+      await fs.readFile(
+        path.join(eden.paths.userDirectory, "destination.txt"),
+        "utf8",
+      ),
+    ).toBe("copied");
+    const restored = api.operations.from(
+      JSON.parse(JSON.stringify(copy.handle)) as OperationHandle<"fs/cp">,
+    );
+    await expect(restored.result()).resolves.toBeUndefined();
+    expect(await restored.get()).toMatchObject({ status: "succeeded" });
+    const snapshots: OperationSnapshot[] = [];
+    const stop = await restored.watch((snapshot) => snapshots.push(snapshot));
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0].status).toBe("succeeded");
+    stop();
+  });
+
   it("cancels a recursive copy through the client API and delivers its terminal cleanup status", async () => {
     eden.runtime
       .resolve(PermissionRegistry)
@@ -387,23 +435,23 @@ describe("client subscriptions across renderer IPC", () => {
       Buffer.alloc(8 * 1024 * 1024),
     );
     const api = createEdenAPI(transport, listeners);
-    const handle = await api.shellCommand("fs/cp", {
+    const copy = await api.shellCommand("fs/cp", {
       from: { volume: "home", path: "/cancel-tree" },
       to: { volume: "home", path: "/cancel-tree-copy" },
     });
-    const completion = expect(
-      api.operations.wait(handle),
-    ).rejects.toMatchObject({ name: "AbortError" });
+    const completion = expect(copy.result()).rejects.toMatchObject({
+      name: "AbortError",
+    });
     const snapshots: OperationSnapshot[] = [];
     let cancellation: Promise<void> | undefined;
-    const stop = await api.operations.watch(handle, (snapshot) => {
+    const stop = await copy.watch((snapshot) => {
       snapshots.push(snapshot);
       if (
         !cancellation &&
         snapshot.phase === "copying" &&
         snapshot.progress!.completed > 0
       ) {
-        cancellation = api.operations.cancel(handle);
+        cancellation = copy.cancel();
       }
     });
     try {
@@ -413,11 +461,11 @@ describe("client subscriptions across renderer IPC", () => {
       expect(
         snapshots.some((snapshot) => snapshot.phase === "rolling-back"),
       ).toBe(true);
-      expect(await api.operations.get(handle)).toMatchObject({
+      expect(await copy.get()).toMatchObject({
         status: "cancelled",
       });
-      // Reconciliation must settle wait even when cancellation predates observation.
-      await expect(api.operations.wait(handle)).rejects.toMatchObject({
+      // Reconciliation must settle the result even when cancellation predates observation.
+      await expect(copy.result()).rejects.toMatchObject({
         name: "AbortError",
       });
       await expect(fs.access(destination)).rejects.toMatchObject({

@@ -1,4 +1,11 @@
-import type { EdenAPI, FilesystemLocation } from "@edenapp/types";
+import type {
+  CommandArgs,
+  CommandName,
+  EdenAPI,
+  FilesystemLocation,
+  OperationSubmission,
+  CommandResult,
+} from "@edenapp/types";
 import { createOperationsAPI } from "./operations-api";
 import {
   EventSubscriptions,
@@ -19,13 +26,22 @@ export function createEdenAPI(
 ): EdenAPI {
   const subscriptions = new EventSubscriptions(transport, eventSubscriptions);
   const api = {
-    shellCommand: transport.exec,
+    shellCommand: async <C extends CommandName>(
+      command: C,
+      args: CommandArgs<C>,
+      submission?: OperationSubmission,
+    ): Promise<CommandResult<C>> => {
+      const response = await transport.exec(command, args, submission);
+      if (response.mode === "operation")
+        return operations.from(response.handle) as CommandResult<C>;
+      return response.result as CommandResult<C>;
+    },
 
     subscribe: subscriptions.subscribe.bind(subscriptions),
     unsubscribe: subscriptions.unsubscribe.bind(subscriptions),
 
-    isEventSupported: (eventName: string) => {
-      return transport.exec("event/exists", { eventName });
+    isEventSupported: async (eventName: string) => {
+      return (await transport.exec("event/exists", { eventName })).result;
     },
 
     getLaunchFile: () => {
@@ -40,5 +56,6 @@ export function createEdenAPI(
       return [];
     },
   };
-  return { ...api, operations: createOperationsAPI(api) };
+  const operations = createOperationsAPI(api);
+  return { ...api, operations };
 }

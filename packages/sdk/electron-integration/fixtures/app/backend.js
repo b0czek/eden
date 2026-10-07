@@ -50,21 +50,24 @@ void (async () => {
     started = true;
     let result;
     try {
-      const handle = await worker.edenAPI.shellCommand("integration/delayed", {
-        name: "backend",
-      });
+      const operation = await worker.edenAPI.shellCommand(
+        "integration/delayed",
+        {
+          name: "backend",
+        },
+      );
       await fs.writeFile(
         path.join(
           process.env.EDEN_INSTALL_PATH,
           "backend-operation-accepted.json",
         ),
-        JSON.stringify(handle),
+        JSON.stringify(operation.handle),
       );
       const revisions = [];
-      const stop = await worker.edenAPI.operations.watch(handle, (snapshot) =>
+      const stop = await operation.watch((snapshot) =>
         revisions.push(snapshot.revision),
       );
-      const completion = await worker.edenAPI.operations.wait(handle);
+      const completion = await operation.result();
       stop();
       result = { completion, revisions };
     } catch (error) {
@@ -93,14 +96,14 @@ void (async () => {
       return;
     let result;
     try {
-      const handle = await worker.edenAPI.shellCommand("fs/eject", {
+      const operation = await worker.edenAPI.shellCommand("fs/eject", {
         volume: "slow-eject",
       });
       await fs.writeFile(
         path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-accepted.json"),
-        JSON.stringify(handle),
+        JSON.stringify(operation.handle),
       );
-      await worker.edenAPI.operations.wait(handle);
+      await operation.result();
       result = { success: true };
     } catch (error) {
       result = { error: String(error) };

@@ -67,12 +67,16 @@ describe("FilesystemManager native watch integration", () => {
   });
 
   const invokeFromView = async (command: string, args: unknown) => {
-    const result = await eden.platform.rendererIpc.invoke(
+    const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
       webContentsId,
       command,
       args,
-    );
+    )) as
+      | { mode: "operation"; handle: OperationHandle }
+      | { mode: "immediate"; result: unknown };
+    const result =
+      response.mode === "operation" ? response.handle : response.result;
     return command === "fs/mv"
       ? eden.runtime
           .resolve(OperationManager)

@@ -28,20 +28,18 @@ describe("ProcessManager integration", () => {
   it("queues renderer self-exit acceptance before destroying the caller", async () => {
     eden = await createTestEden();
     const appId = "com.example.self-exit";
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register({
-        kind: "app",
-        id: appId,
-        name: "Self exit",
-        version: "1.0.0",
-        frontend: { entry: "index.html" },
-        isPrebuilt: false,
-        isDevelopment: false,
-        isCore: false,
-        isRestricted: false,
-        resolvedGrants: [],
-      } as RuntimeAppManifest);
+    eden.runtime.resolve(PackageRegistry).register({
+      kind: "app",
+      id: appId,
+      name: "Self exit",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+      isPrebuilt: false,
+      isDevelopment: false,
+      isCore: false,
+      isRestricted: false,
+      resolvedGrants: [],
+    } as RuntimeAppManifest);
     const profile = await eden.runtime.users.create({
       username: "exiting",
       name: "Exiting",
@@ -55,12 +53,13 @@ describe("ProcessManager integration", () => {
     const view = eden.runtime
       .resolve(ViewManager)
       .getViewInfo(instance.viewId)!.view;
-    const handle = (await eden.platform.rendererIpc.invoke(
+    const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
       view.webContents.id,
       "process/exit",
       {},
-    )) as OperationHandle;
+    )) as { mode: "operation"; handle: OperationHandle };
+    const handle = response.handle;
     expect(handle).toMatchObject({
       command: "process/exit",
       id: expect.any(String),

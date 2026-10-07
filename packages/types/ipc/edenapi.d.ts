@@ -23,10 +23,11 @@ export interface EdenAPI {
    *
    * @example
    * ```typescript
-   * await edenAPI.shellCommand("process/launch", {
+   * const launch = await edenAPI.shellCommand("process/launch", {
    *   appId: "my-app",
    *   bounds: { x: 0, y: 0, width: 800, height: 600 }
    * });
+   * await launch.result();
    * ```
    */
   shellCommand<T extends CommandName>(

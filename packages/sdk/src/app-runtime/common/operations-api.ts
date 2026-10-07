@@ -74,7 +74,17 @@ export function createOperationsAPI(
       throw error;
     }
   };
-  return {
+  const operations: OperationsAPI = {
+    from: (handle) => {
+      const target = { command: handle.command, id: handle.id };
+      return {
+        handle: { ...target },
+        get: () => get(target),
+        watch: (listener) => observe(target, listener),
+        result: () => operations.wait(target),
+        cancel: () => operations.cancel(target),
+      };
+    },
     get,
     cancel: (handle) => api.shellCommand("operation/cancel", { handle }),
     list: () => api.shellCommand("operation/list", {}),
@@ -123,4 +133,5 @@ export function createOperationsAPI(
       }
     },
   };
+  return operations;
 }

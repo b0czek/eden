@@ -65,6 +65,7 @@ export type {
   CommandChunk,
   CommandMap,
   CommandName,
+  CommandResponse,
   CommandResult,
 } from "./commands";
 // Export event types
