@@ -127,7 +127,7 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     await this.volumes.eject(id);
   }
 
-  /** Hold access while a consumer reads an archive at the resolved host path. */
+  /** Hold access until the consumer finishes I/O at the resolved host path. */
   async withVolume<T>(
     location: FilesystemLocation,
     operation: (hostPath: string) => Promise<T>,

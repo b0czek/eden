@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import * as fs from "node:fs/promises";
+import fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   OperationHandle,
@@ -104,6 +104,114 @@ describe("safe volume removal", () => {
     await manager.wait(copy, caller);
     await manager.wait(eject, caller);
     expect(hostContent).toBe("queued work");
+  });
+
+  it("keeps queued file-opening work admitted until its read handle closes", async () => {
+    const closing = deferred();
+    const finishClose = deferred();
+    const filePath = path.join(usbRoot, "metadata.txt");
+    await fs.writeFile(filePath, "File contents for MIME detection");
+    let handle: fs.FileHandle | undefined;
+    let hostCalls = 0;
+    await register({
+      eject: async () => {
+        hostCalls++;
+        expect(handle?.fd).toBe(-1);
+      },
+    });
+    const open = fs.open.bind(fs);
+    jest.spyOn(fs, "open").mockImplementation(async (...args) => {
+      const opened = await open(...args);
+      if (args[0] === filePath) {
+        handle = opened;
+        const close = opened.close.bind(opened);
+        // Pause closure of a real descriptor; metadata detection and reads stay real.
+        jest.spyOn(opened, "close").mockImplementation(async () => {
+          closing.resolve();
+          await finishClose.promise;
+          await close();
+        });
+      }
+      return opened;
+    });
+    const caller = {
+      appId,
+      principal: { kind: "user" as const, profile: user },
+    };
+    const manager = eden.runtime.resolve(OperationManager);
+    try {
+      const opening = await eden.execute<OperationHandle>(
+        "file/open",
+        {
+          location: { volume: "usb", path: "/metadata.txt" },
+        },
+        caller,
+      );
+      expect(manager.get(opening, caller).status).toBe("queued");
+      const ejecting = await eden.execute<OperationHandle>(
+        "fs/eject",
+        { volume: "usb" },
+        caller,
+      );
+      await closing.promise;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(handle!.fd).toBeGreaterThanOrEqual(0);
+      expect(hostCalls).toBe(0);
+      finishClose.resolve();
+      // No handler is installed, but the real metadata read must finish safely.
+      await expect(manager.wait(opening, caller)).resolves.toMatchObject({
+        success: false,
+      });
+      await manager.wait(ejecting, caller);
+      expect(hostCalls).toBe(1);
+    } finally {
+      finishClose.resolve();
+    }
+  });
+
+  it("holds a volume lease through metadata lookup outside an operation", async () => {
+    const closing = deferred();
+    const finishClose = deferred();
+    const filePath = path.join(usbRoot, "lookup.txt");
+    await fs.writeFile(filePath, "Metadata lookup contents");
+    let handle: fs.FileHandle | undefined;
+    let hostCalls = 0;
+    await register({
+      eject: async () => {
+        hostCalls++;
+        expect(handle?.fd).toBe(-1);
+      },
+    });
+    const open = fs.open.bind(fs);
+    jest.spyOn(fs, "open").mockImplementation(async (...args) => {
+      const opened = await open(...args);
+      if (args[0] === filePath) {
+        handle = opened;
+        const close = opened.close.bind(opened);
+        jest.spyOn(opened, "close").mockImplementation(async () => {
+          closing.resolve();
+          await finishClose.promise;
+          await close();
+        });
+      }
+      return opened;
+    });
+    try {
+      const lookup = execute("file/get-handler", {
+        location: { volume: "usb", path: "/lookup.txt" },
+      });
+      await closing.promise;
+      const removal = execute("fs/eject", { volume: "usb" });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(handle!.fd).toBeGreaterThanOrEqual(0);
+      expect(hostCalls).toBe(0);
+      finishClose.resolve();
+      await lookup;
+      await removal;
+      expect(hostCalls).toBe(1);
+    } finally {
+      finishClose.resolve();
+    }
   });
 
   it("reserves eject on acceptance, retains failure, and allows an explicit retry", async () => {

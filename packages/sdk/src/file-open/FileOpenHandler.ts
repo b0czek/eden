@@ -1,4 +1,4 @@
-import { operationTask, type OperationTask } from "../operations/OperationTask";
+import type { OperationTask } from "../operations/OperationTask";
 import type {
   FileHandlerInfo,
   FileOpenResult,
@@ -38,10 +38,7 @@ export class FileOpenHandler {
     location: FilesystemLocation;
   }): OperationTask<FileOpenResult> {
     const { location } = v.parse(filesystemLocationArgsSchema, args);
-    return operationTask(async (reporter) => {
-      reporter.update("opening");
-      return this.manager.openFile(location);
-    });
+    return this.manager.prepareOpen(location);
   }
 
   /**
@@ -53,10 +50,7 @@ export class FileOpenHandler {
     appId: string;
   }): OperationTask<FileOpenResult> {
     const { location, appId } = v.parse(handlerArgs, args);
-    return operationTask(async (reporter) => {
-      reporter.update("opening");
-      return this.manager.openFileWith(location, appId);
-    });
+    return this.manager.prepareOpen(location, appId);
   }
 
   /**
