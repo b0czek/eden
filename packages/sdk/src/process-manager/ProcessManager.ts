@@ -531,6 +531,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
    * Note: If stopApp() was called, the instance is already removed so this is a no-op
    */
   private handleAppExit(appId: string, code: number): void {
+    this.ipcBridge.eventSubscribers.removeBackendSubscriptions(appId);
     const instance = this.runningApps.get(appId);
     if (!instance) {
       // App was already cleaned up by stopApp(), nothing to do

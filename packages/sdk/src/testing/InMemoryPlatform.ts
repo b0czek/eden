@@ -115,6 +115,7 @@ class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
       channel,
       args,
     });
+    this.emit("message-sent", channel, ...args);
   }
 
   postMessage(channel: string): void {

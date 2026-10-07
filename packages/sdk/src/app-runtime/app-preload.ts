@@ -7,6 +7,7 @@ import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
 import { decodeLaunchContext } from "../utils/appLaunchContext";
+import { dispatchEvent } from "./common/event-subscriptions";
 import {
   createAppBusAPI,
   createEdenAPI,
@@ -85,17 +86,7 @@ ipcRenderer.on(
   "shell-message",
   (_event, message: { type: string; payload: unknown }) => {
     const { type, payload } = message;
-    const callbacks = eventSubscriptions.get(type);
-
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(payload);
-        } catch (err) {
-          log.error(`Error in event listener for ${type}:`, err);
-        }
-      });
-    }
+    dispatchEvent(eventSubscriptions, type, payload);
   },
 );
 

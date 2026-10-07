@@ -1,110 +1,21 @@
+export { createEdenAPI } from "./eden-api";
+export type { ShellTransport } from "./shell-transport";
+export type { EventSubscriptionCallback } from "./event-subscriptions";
+import type { ShellTransport } from "./shell-transport";
 import type {
   AppBusAPI,
   AppBusConnection,
-  CommandArgs,
-  CommandName,
-  CommandResult,
-  OperationSubmission,
-  EdenAPI,
-  EventData,
-  EventName,
-  FilesystemLocation,
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
-import { createOperationsAPI } from "./operations-api";
 import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
-
-/**
- * Interface for sending shell commands to the main process
- */
-export interface ShellTransport {
-  exec<T extends CommandName>(
-    command: T,
-    args: CommandArgs<T>,
-    submission?: OperationSubmission,
-  ): Promise<CommandResult<T>>;
-}
-
-export type EventSubscriptionCallback = (payload: unknown) => void;
 
 /**
  * Configuration for AppBus API
  */
 export interface AppBusConfig {
   transport: ShellTransport;
-}
-
-/**
- * Create the EdenAPI object
- */
-export function createEdenAPI(
-  transport: ShellTransport,
-  eventSubscriptions: Map<string, Set<EventSubscriptionCallback>>,
-  options?: {
-    getLaunchArgs?: () => string[];
-    getLaunchFile?: () => FilesystemLocation | undefined;
-  },
-): EdenAPI {
-  const api = {
-    shellCommand: transport.exec,
-
-    subscribe: async <T extends EventName>(
-      eventName: T,
-      callback: (data: EventData<T>) => void,
-    ) => {
-      if (typeof callback !== "function") {
-        throw new Error("Callback must be a function");
-      }
-
-      // Install locally before main can deliver any events.
-      if (!eventSubscriptions.has(eventName))
-        eventSubscriptions.set(eventName, new Set());
-      const callbacks = eventSubscriptions.get(eventName)!;
-      callbacks.add(callback as EventSubscriptionCallback);
-      try {
-        await transport.exec("event/subscribe", { eventName });
-      } catch (error) {
-        callbacks.delete(callback as EventSubscriptionCallback);
-        if (!callbacks.size) eventSubscriptions.delete(eventName);
-        throw error;
-      }
-    },
-
-    unsubscribe: async <T extends EventName>(
-      eventName: T,
-      callback: (data: EventData<T>) => void,
-    ) => {
-      const callbacks = eventSubscriptions.get(eventName);
-      if (callbacks) {
-        callbacks.delete(callback as EventSubscriptionCallback);
-
-        // If no more callbacks, unregister from backend/main
-        if (callbacks.size === 0) {
-          eventSubscriptions.delete(eventName);
-          await transport.exec("event/unsubscribe", { eventName });
-        }
-      }
-    },
-
-    isEventSupported: (eventName: string) => {
-      return transport.exec("event/exists", { eventName });
-    },
-
-    getLaunchFile: () => {
-      const location = options?.getLaunchFile?.();
-      return location ? { ...location } : undefined;
-    },
-
-    getLaunchArgs: (): string[] => {
-      if (options?.getLaunchArgs) {
-        return options.getLaunchArgs();
-      }
-      return [];
-    },
-  };
-  return { ...api, operations: createOperationsAPI(api) };
 }
 
 /**

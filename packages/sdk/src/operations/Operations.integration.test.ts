@@ -403,6 +403,31 @@ describe("runtime-owned operations", () => {
     );
     expect(JSON.stringify(processes[1].messages)).not.toContain(handle.id);
     for (const process of processes) process.kill();
+    const restarting = eden.runtime
+      .resolve(BackendManager)
+      .createBackend(
+        owner.appId,
+        { ...app(owner.appId), backend: { entry: "backend.js" } },
+        eden.paths.root,
+      );
+    await tick();
+    const restartedEffect = eden.platform.effects
+      .filter((effect) => effect.type === "utility-process-started")
+      .at(-1)!;
+    if (restartedEffect.type !== "utility-process-started")
+      throw new Error("Backend did not restart");
+    const restarted = eden.platform.utilityProcesses.get(restartedEffect.pid)!;
+    restarted.emit("message", { type: "backend-ready" });
+    await restarting;
+    const afterRestart = await submit();
+    await manager.wait(afterRestart, owner);
+    expect(restarted.messages).not.toContainEqual(
+      expect.objectContaining({
+        type: "shell-event",
+        eventName: "operation/changed",
+      }),
+    );
+    restarted.kill();
   });
 
   it("keeps work across caller closure and reopening and filters renderer/backend notifications", async () => {

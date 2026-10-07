@@ -5,6 +5,7 @@ import {
   setLogContext,
 } from "../logging";
 import { decodeLaunchContext } from "../utils/appLaunchContext";
+import { dispatchEvent } from "./common/event-subscriptions";
 /**
  * Backend Runtime
  *
@@ -268,16 +269,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
 
     // Event notification from main
     const { eventName, payload } = message;
-    const callbacks = eventSubscriptions.get(eventName);
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(payload);
-        } catch (err) {
-          log.error(`Error in event callback for ${eventName}:`, err);
-        }
-      });
-    }
+    dispatchEvent(eventSubscriptions, eventName, payload);
   } else if (message.type === "appbus-port") {
     // AppBus connection port
     const [port] = event.ports;
