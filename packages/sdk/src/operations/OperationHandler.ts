@@ -13,6 +13,11 @@ export class OperationHandler {
     return this.manager.get(v.parse(handleSchema, args.handle));
   }
 
+  @EdenHandler("cancel")
+  cancel(args: { handle: OperationHandle }): void {
+    this.manager.cancel(v.parse(handleSchema, args.handle));
+  }
+
   @EdenHandler("list")
   list(): OperationSnapshot[] {
     return this.manager.list();

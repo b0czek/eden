@@ -388,6 +388,12 @@ Completion before observation works too. A failed operation preserves a typed
 domain failure response when available; `wait` returns that response. Other
 failures reject with a sanitized error.
 
+For operations with `snapshot.cancellable`, call `operations.cancel(handle)` to
+request a stop. Continue observing until cleanup completes. A cancelled operation
+has status `cancelled`, and `wait(handle)` rejects with an `AbortError`. Cancelling
+a filesystem copy removes its incomplete destination and restores the previous
+destination when replacing an existing file. The source remains intact.
+
 Progress watching is optional. `watch(handle, listener)` receives changes for that
 operation, including its current retained snapshot. `wait(handle)` receives only
 completion updates. Unchanged phase and progress reports do not produce duplicate
@@ -409,9 +415,7 @@ limit of 256 completed records. Active records remain until completion. Operatio
 handles live for one Eden runtime.
 
 IPC responses have a ten-second deadline. Accepted operation execution has no
-transport deadline. Stream command definitions and cancellation capabilities are
-reserved interfaces; this release exposes no stream transport or cancellation
-endpoint.
+transport deadline.
 
 Lifecycle operations accept requests before caller teardown begins. Successful
 session transitions and self-exit can close the caller before it observes

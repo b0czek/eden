@@ -331,6 +331,63 @@ describe("client subscriptions across renderer IPC", () => {
     await expect(api.operations.wait(ignored.handle)).resolves.toBe("ignored");
   });
 
+  it("cancels a recursive copy through the client API and delivers its terminal cleanup status", async () => {
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(owner.appId, ["fs/read", "fs/write"]);
+    const source = path.join(eden.paths.userDirectory, "cancel-tree");
+    const destination = path.join(eden.paths.userDirectory, "cancel-tree-copy");
+    await fs.mkdir(path.join(source, "nested"), { recursive: true });
+    await fs.writeFile(
+      path.join(source, "nested", "large.bin"),
+      Buffer.alloc(8 * 1024 * 1024),
+    );
+    const api = createEdenAPI(transport, listeners);
+    const handle = await api.shellCommand("fs/cp", {
+      from: { volume: "home", path: "/cancel-tree" },
+      to: { volume: "home", path: "/cancel-tree-copy" },
+    });
+    const completion = expect(
+      api.operations.wait(handle),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    const snapshots: OperationSnapshot[] = [];
+    let cancellation: Promise<void> | undefined;
+    const stop = await api.operations.watch(handle, (snapshot) => {
+      snapshots.push(snapshot);
+      if (
+        !cancellation &&
+        snapshot.phase === "copying" &&
+        snapshot.progress!.completed > 0
+      ) {
+        cancellation = api.operations.cancel(handle);
+      }
+    });
+    try {
+      await completion;
+      await cancellation;
+      expect(snapshots.at(-1)?.status).toBe("cancelled");
+      expect(
+        snapshots.some((snapshot) => snapshot.phase === "rolling-back"),
+      ).toBe(true);
+      expect(await api.operations.get(handle)).toMatchObject({
+        status: "cancelled",
+      });
+      // Reconciliation must settle wait even when cancellation predates observation.
+      await expect(api.operations.wait(handle)).rejects.toMatchObject({
+        name: "AbortError",
+      });
+      await expect(fs.access(destination)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      expect(
+        (await fs.stat(path.join(source, "nested", "large.bin"))).size,
+      ).toBe(8 * 1024 * 1024);
+      await eden.runtime.resolve(OperationManager).drain();
+    } finally {
+      stop();
+    }
+  });
+
   it("keeps broad and targeted observers independent and rejects foreign handles", async () => {
     const api = createEdenAPI(transport, listeners);
     const watched = work("shared-interest");

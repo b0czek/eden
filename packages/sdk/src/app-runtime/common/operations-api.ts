@@ -42,7 +42,8 @@ export function createOperationsAPI(
         active &&
         (!terminalOnly ||
           snapshot.status === "succeeded" ||
-          snapshot.status === "failed") &&
+          snapshot.status === "failed" ||
+          snapshot.status === "cancelled") &&
         snapshot.id === target.id &&
         snapshot.command === target.command &&
         snapshot.revision > revision
@@ -69,6 +70,7 @@ export function createOperationsAPI(
   };
   return {
     get,
+    cancel: (handle) => api.shellCommand("operation/cancel", { handle }),
     list: () => api.shellCommand("operation/list", {}),
     watch: observe,
     wait: async <C extends string>(
@@ -85,7 +87,11 @@ export function createOperationsAPI(
       const stop = await observe(
         handle,
         (snapshot) => {
-          if (snapshot.status === "succeeded" || snapshot.status === "failed")
+          if (
+            snapshot.status === "succeeded" ||
+            snapshot.status === "failed" ||
+            snapshot.status === "cancelled"
+          )
             settle(snapshot);
         },
         true,
@@ -93,6 +99,11 @@ export function createOperationsAPI(
       try {
         const snapshot = await terminal;
         if (snapshot.status === "succeeded") return snapshot.result;
+        if (snapshot.status === "cancelled") {
+          const error = new Error("Operation cancelled");
+          error.name = "AbortError";
+          throw error;
+        }
         if (snapshot.status === "failed") {
           if ("response" in snapshot)
             return snapshot.response as OperationCompletion<C>;

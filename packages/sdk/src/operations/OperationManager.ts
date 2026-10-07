@@ -22,6 +22,7 @@ interface OperationNamespaceEvents {
 
 interface RecordEntry {
   snapshot: OperationSnapshot;
+  cancellation?: AbortController;
   owner: { appId?: string; sessionId: string };
   context: CommandCallerContext;
   done: Promise<void>;
@@ -128,12 +129,14 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       snapshot: {
         command,
         id,
+        cancellable: task.cancellable === true,
         revision: 1,
         status: "queued",
         createdAt: now,
         updatedAt: now,
       },
       owner,
+      cancellation: task.cancellable ? new AbortController() : undefined,
       transitionSessionId,
       context: structuredClone({ ...context, sessionId, operationId: id }),
       done,
@@ -171,6 +174,8 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   ): Promise<void> {
     try {
       this.update(record, { status: "running", startedAt: Date.now() });
+      if (task.transition)
+        this.update(record, { phase: "waiting-for-operations" });
       if (task.transition === "session")
         await this.drainSession(
           record.transitionSessionId!,
@@ -178,6 +183,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         );
       if (task.transition === "runtime") await this.drain(record.snapshot.id);
       const result = await task.run({
+        signal: record.cancellation?.signal,
         update: (phase, progress) => {
           const previous = record.snapshot.progress;
           const unchanged =
@@ -217,14 +223,22 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
           result: structuredClone(result),
         });
     } catch (error) {
-      this.update(record, {
-        status: "failed",
-        completedAt: Date.now(),
-        error: {
-          name: error instanceof Error ? error.name : "Error",
-          message: error instanceof Error ? error.message : "Operation failed",
-        },
-      });
+      const failure = Error.isError(error) ? error : undefined;
+      if (
+        record.cancellation?.signal.aborted &&
+        failure?.name === "AbortError"
+      ) {
+        this.update(record, { status: "cancelled", completedAt: Date.now() });
+      } else {
+        this.update(record, {
+          status: "failed",
+          completedAt: Date.now(),
+          error: {
+            name: failure?.name ?? "Error",
+            message: failure?.message ?? "Operation failed",
+          },
+        });
+      }
     } finally {
       if (
         task.transition === "session" &&
@@ -238,7 +252,9 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       ) {
         this.runtimeTransition = undefined;
         this.accepting =
-          record.snapshot.status === "failed" && !this.shuttingDown;
+          (record.snapshot.status === "failed" ||
+            record.snapshot.status === "cancelled") &&
+          !this.shuttingDown;
       }
       record.finish();
       this.prune();
@@ -265,7 +281,8 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
           handle: record.snapshot,
           terminal:
             record.snapshot.status === "succeeded" ||
-            record.snapshot.status === "failed",
+            record.snapshot.status === "failed" ||
+            record.snapshot.status === "cancelled",
         },
       },
     );
@@ -297,6 +314,18 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     return structuredClone(record.snapshot);
   }
 
+  cancel(handle: OperationHandle, context = this.execution.get() ?? {}): void {
+    const snapshot = this.get(handle, context);
+    if (snapshot.status !== "queued" && snapshot.status !== "running") return;
+    const record = this.records.get(handle.id)!;
+    if (!record.cancellation) throw new Error("Operation cannot be cancelled");
+    if (record.cancellation.signal.aborted) return;
+    const error = new Error("Operation cancelled");
+    error.name = "AbortError";
+    record.cancellation.abort(error);
+    this.update(record, { phase: "cancelling" });
+  }
+
   list(context = this.execution.get() ?? {}): OperationSnapshot[] {
     this.prune();
     return [...this.records.values()]
@@ -314,6 +343,11 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     const snapshot = record.snapshot;
     if (snapshot.status === "succeeded")
       return structuredClone(snapshot.result);
+    if (snapshot.status === "cancelled") {
+      const error = new Error("Operation cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
     if (snapshot.status === "failed") {
       if ("response" in snapshot) return structuredClone(snapshot.response);
       const error = new Error(snapshot.error.message);
@@ -408,7 +442,8 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     const completed = [...this.records.values()].filter(
       (record) =>
         record.snapshot.status === "succeeded" ||
-        record.snapshot.status === "failed",
+        record.snapshot.status === "failed" ||
+        record.snapshot.status === "cancelled",
     );
     completed.sort(
       (a, b) =>

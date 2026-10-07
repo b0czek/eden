@@ -112,6 +112,16 @@ describe("runtime-owned operations", () => {
     ).toThrow("Stream handlers are not supported");
   });
 
+  it("rejects cancellation for tasks that do not support it", async () => {
+    register(() => operationTask(async () => "done"));
+    const handle = await submit();
+    expect(manager.get(handle, owner).cancellable).toBe(false);
+    await expect(
+      eden.execute("operation/cancel", { handle }, owner),
+    ).rejects.toThrow("cannot be cancelled");
+    await expect(manager.wait(handle, owner)).resolves.toBe("done");
+  });
+
   it("accepts promptly, queues execution, retains completion and captured context", async () => {
     const blocked = gate();
     const file = path.join(eden.paths.root, "accepted.txt");

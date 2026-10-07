@@ -56,6 +56,10 @@ describe("session operation transactions", () => {
       "draining",
     );
     await tick();
+    expect(manager.get(transition, caller)).toMatchObject({
+      status: "running",
+      phase: "waiting-for-operations",
+    });
     expect(session.getCurrentUser()?.username).toBe("operator");
     release();
     await manager.wait(work, caller);

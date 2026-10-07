@@ -85,6 +85,7 @@ export const COMMAND_NAMES: readonly string[] = [
   "notification/action-clicked",
   "notification/dismissed",
   "operation/get",
+  "operation/cancel",
   "operation/list",
   "package/install",
   "package/uninstall",

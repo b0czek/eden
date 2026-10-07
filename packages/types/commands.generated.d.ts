@@ -703,6 +703,11 @@ export interface OperationCommands {
     args: { handle: import("./index").OperationHandle };
     response: import("./index").OperationSnapshot;
   };
+  "operation/cancel": {
+    mode: "immediate";
+    args: { handle: import("./index").OperationHandle };
+    response: void;
+  };
   "operation/list": {
     mode: "immediate";
     args: Record<string, never>;

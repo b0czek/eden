@@ -230,10 +230,11 @@ export class FilesystemHandler {
   @EdenHandler("cp", { permission: "write", mode: "operation" })
   handleCopy(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    return this.fsManager.prepareVolumeOperation(
+    const task = this.fsManager.prepareVolumeOperation(
       [from.volume, to.volume],
       (reporter) => this.fsManager.copy(from, to, overwrite, reporter),
     );
+    return { ...task, cancellable: true };
   }
 
   /**

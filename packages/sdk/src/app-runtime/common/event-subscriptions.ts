@@ -144,7 +144,11 @@ export function dispatchEvent(
   if (eventName === "operation/changed") {
     const snapshot = (payload as { snapshot: OperationSnapshot }).snapshot;
     keys.push(subscriptionKey(eventName, { handle: snapshot }));
-    if (snapshot.status === "succeeded" || snapshot.status === "failed")
+    if (
+      snapshot.status === "succeeded" ||
+      snapshot.status === "failed" ||
+      snapshot.status === "cancelled"
+    )
       keys.push(
         subscriptionKey(eventName, { handle: snapshot, terminalOnly: true }),
       );

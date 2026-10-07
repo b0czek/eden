@@ -1,6 +1,8 @@
 import type { OperationReporter } from "../operations/OperationTask";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import * as path from "node:path";
 
 interface TransferRequest {
@@ -24,6 +26,7 @@ interface PreparedTransfer {
 
 export class FilesystemTransfer {
   async copy(request: TransferRequest): Promise<void> {
+    request.reporter?.signal?.throwIfAborted();
     request.reporter?.update("preparing-copy");
     const transfer = await this.prepare(request, "copy");
     await this.runWithDestinationRollback(transfer, () =>
@@ -116,6 +119,7 @@ export class FilesystemTransfer {
 
     try {
       await operation();
+      transfer.reporter?.signal?.throwIfAborted();
     } catch (error) {
       transfer.reporter?.update("rolling-back");
       const rollbackErrors: unknown[] = [];
@@ -161,24 +165,62 @@ export class FilesystemTransfer {
   }
 
   private async assertActive(transfer: TransferRequest | PreparedTransfer) {
+    transfer.reporter?.signal?.throwIfAborted();
     await transfer.assertSourceActive?.();
     await transfer.assertDestinationActive?.();
+    transfer.reporter?.signal?.throwIfAborted();
   }
 
   private async copyEntry(transfer: PreparedTransfer): Promise<void> {
     const { source, destination } = transfer;
-    transfer.reporter?.update("copying");
+    const sourceStats = await fs.lstat(source);
+    const total = sourceStats.isFile() ? sourceStats.size : undefined;
+    let completed = 0;
+    let lastReport = 0;
+    const report = () => {
+      transfer.reporter?.update("copying", { completed, total, unit: "bytes" });
+      lastReport = Date.now();
+    };
+    report();
+    lastReport = 0;
     await fs.cp(source, destination, {
       recursive: true,
       verbatimSymlinks: true,
-      filter: async () => {
+      filter: async (entrySource, entryDestination) => {
         await this.assertActive(transfer);
+        if (transfer.reporter) {
+          const stats = await fs.lstat(entrySource);
+          if (stats.isFile()) {
+            // Keep native directory and symlink semantics, but stream regular
+            // files so even a single large file can report transferred bytes.
+            await pipeline(
+              createReadStream(entrySource, { highWaterMark: 1024 * 1024 }),
+              async function* (chunks) {
+                for await (const chunk of chunks) {
+                  yield chunk;
+                  completed += chunk.length;
+                  if (Date.now() - lastReport >= 100) report();
+                }
+              },
+              createWriteStream(entryDestination, {
+                flags: "wx",
+                mode: stats.mode,
+              }),
+              { signal: transfer.reporter.signal },
+            );
+            await fs.chmod(entryDestination, stats.mode);
+            await this.assertActive(transfer);
+            if (Date.now() - lastReport >= 100) report();
+            return false;
+          }
+        }
         return true;
       },
       errorOnExist: true,
       force: false,
     });
     await this.assertActive(transfer);
+    report();
   }
 
   private async pathExists(hostPath: string): Promise<boolean> {

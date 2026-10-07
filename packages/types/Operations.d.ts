@@ -33,9 +33,9 @@ export interface StreamCommand<A, Chunk, R, C extends string = string> {
   completion: R;
 }
 
-/** Reserved capability; this version provides no cancellation transport. */
+/** Request cancellation; observe the operation until cleanup completes. */
 export interface OperationCancellation {
-  cancel(): Promise<void>;
+  cancel(handle: OperationHandle): Promise<void>;
 }
 
 export interface OperationSubmission {
@@ -60,6 +60,7 @@ export interface OperationError {
 }
 
 interface OperationSnapshotBase<C extends string> extends OperationHandle<C> {
+  cancellable: boolean;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -70,6 +71,10 @@ interface OperationSnapshotBase<C extends string> extends OperationHandle<C> {
 
 export type OperationSnapshot<C extends string = string, R = unknown> =
   | (OperationSnapshotBase<C> & { status: "queued" | "running" })
+  | (OperationSnapshotBase<C> & {
+      status: "cancelled";
+      completedAt: number;
+    })
   | (OperationSnapshotBase<C> & {
       status: "succeeded";
       completedAt: number;
@@ -87,7 +92,7 @@ export type OperationCompletion<C extends string> = C extends CommandName
   ? CommandCompletion<C>
   : unknown;
 
-export interface OperationsAPI {
+export interface OperationsAPI extends OperationCancellation {
   get<C extends string>(
     handle: OperationHandle<C>,
   ): Promise<OperationSnapshot<C, OperationCompletion<C>>>;
