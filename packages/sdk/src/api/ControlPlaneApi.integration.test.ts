@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type {
   RuntimeAppManifest,
   RuntimeDlcManifest,
@@ -12,6 +14,59 @@ describe("control-plane API integration", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+  });
+
+  it("keeps host eject awaited and drains it before disposing runtime resources", async () => {
+    eden = await createTestEden();
+    const drive = path.join(eden.paths.root, "host-eject");
+    await fs.mkdir(drive);
+    let begin!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => {
+      begin = resolve;
+    });
+    const completed = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    await eden.runtime.volumes.register(
+      {
+        id: "host-eject",
+        label: "Host eject",
+        kind: "removable",
+        rootPath: drive,
+      },
+      {
+        eject: async () => {
+          begin();
+          await completed;
+        },
+      },
+    );
+    const observed: string[] = [];
+    const off = eden.runtime.operations.onChanged((snapshot) => {
+      if (snapshot.command === "fs/eject") observed.push(snapshot.status);
+    });
+    const removal = eden.runtime.volumes.eject("host-eject");
+    expect(observed).toEqual(["queued"]);
+    await started;
+    const snapshot = eden.runtime.operations
+      .list()
+      .find((snapshot) => snapshot.command === "fs/eject")!;
+    expect(snapshot).toMatchObject({ status: "running", phase: "host-eject" });
+    snapshot.phase = "changed by observer";
+    expect(eden.runtime.operations.get(snapshot)?.phase).toBe("host-eject");
+    let disposed = false;
+    const shutdown = eden.runtime.dispose().then(() => {
+      disposed = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(disposed).toBe(false);
+    finish();
+    await removal;
+    await shutdown;
+    expect(observed.at(-1)).toBe("succeeded");
+    expect(eden.platform.activeResourceCount).toBe(0);
+    off();
   });
 
   it("lists trusted package inventory without a user session", async () => {

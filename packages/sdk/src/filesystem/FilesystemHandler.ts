@@ -5,7 +5,7 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
-import { operationTask, type OperationTask } from "../operations/OperationTask";
+import type { OperationTask } from "../operations/OperationTask";
 import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import {
@@ -54,6 +54,7 @@ const searchArgs = v.object({
   pattern: v.string(),
   limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 10),
 });
+const volumeArgs = v.object({ volume: v.pipe(v.string(), v.nonEmpty()) });
 const transferArgs = v.object({
   from: filesystemLocationSchema,
   to: filesystemLocationSchema,
@@ -71,6 +72,13 @@ export class FilesystemHandler {
   @EdenHandler("volumes", { permission: "read" })
   handleVolumes(_args: Record<string, never>): FilesystemVolume[] {
     return this.fsManager.listVolumes();
+  }
+
+  /** Safely eject a device after draining admitted volume I/O. */
+  @EdenHandler("eject", { permission: "eject", mode: "operation" })
+  handleEject(args: { volume: string }): OperationTask<void> {
+    const { volume } = v.parse(volumeArgs, args);
+    return this.fsManager.prepareEjectVolume(volume);
   }
 
   /**
@@ -208,8 +216,9 @@ export class FilesystemHandler {
   @EdenHandler("delete", { permission: "write", mode: "operation" })
   handleDelete(args: { location: FilesystemLocation }): OperationTask<void> {
     const { location } = v.parse(filesystemLocationArgsSchema, args);
-    return operationTask((reporter) =>
-      this.fsManager.delete(location, reporter),
+    return this.fsManager.prepareVolumeOperation(
+      [location.volume],
+      (reporter) => this.fsManager.delete(location, reporter),
     );
   }
 
@@ -221,8 +230,9 @@ export class FilesystemHandler {
   @EdenHandler("cp", { permission: "write", mode: "operation" })
   handleCopy(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    return operationTask((reporter) =>
-      this.fsManager.copy(from, to, overwrite, reporter),
+    return this.fsManager.prepareVolumeOperation(
+      [from.volume, to.volume],
+      (reporter) => this.fsManager.copy(from, to, overwrite, reporter),
     );
   }
 
@@ -233,8 +243,9 @@ export class FilesystemHandler {
   @EdenHandler("mv", { permission: "write", mode: "operation" })
   handleMove(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    return operationTask((reporter) =>
-      this.fsManager.move(from, to, overwrite, reporter),
+    return this.fsManager.prepareVolumeOperation(
+      [from.volume, to.volume],
+      (reporter) => this.fsManager.move(from, to, overwrite, reporter),
     );
   }
 }

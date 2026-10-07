@@ -1,6 +1,5 @@
 import type {
-  CommandCompletion,
-  CommandName,
+  OperationCompletion,
   EdenAPI,
   OperationHandle,
   OperationSnapshot,
@@ -10,14 +9,14 @@ import type {
 export function createOperationsAPI(
   api: Pick<EdenAPI, "shellCommand" | "subscribe" | "unsubscribe">,
 ): OperationsAPI {
-  const get = async <C extends CommandName>(handle: OperationHandle<C>) =>
+  const get = async <C extends string>(handle: OperationHandle<C>) =>
     (await api.shellCommand("operation/get", { handle })) as OperationSnapshot<
       C,
-      CommandCompletion<C>
+      OperationCompletion<C>
     >;
-  const watch = async <C extends CommandName>(
+  const watch = async <C extends string>(
     handle: OperationHandle<C>,
-    listener: (snapshot: OperationSnapshot<C, CommandCompletion<C>>) => void,
+    listener: (snapshot: OperationSnapshot<C, OperationCompletion<C>>) => void,
   ): Promise<() => void> => {
     let revision = 0;
     let active = true;
@@ -29,7 +28,7 @@ export function createOperationsAPI(
         snapshot.revision > revision
       ) {
         revision = snapshot.revision;
-        listener(snapshot as OperationSnapshot<C, CommandCompletion<C>>);
+        listener(snapshot as OperationSnapshot<C, OperationCompletion<C>>);
       }
     };
     const callback = ({ snapshot }: { snapshot: OperationSnapshot }) =>
@@ -52,17 +51,17 @@ export function createOperationsAPI(
     get,
     list: () => api.shellCommand("operation/list", {}),
     watch,
-    wait: async <C extends CommandName>(
+    wait: async <C extends string>(
       handle: OperationHandle<C>,
-    ): Promise<CommandCompletion<C>> => {
+    ): Promise<OperationCompletion<C>> => {
       let settle!: (
-        snapshot: OperationSnapshot<C, CommandCompletion<C>>,
+        snapshot: OperationSnapshot<C, OperationCompletion<C>>,
       ) => void;
-      const terminal = new Promise<OperationSnapshot<C, CommandCompletion<C>>>(
-        (resolve) => {
-          settle = resolve;
-        },
-      );
+      const terminal = new Promise<
+        OperationSnapshot<C, OperationCompletion<C>>
+      >((resolve) => {
+        settle = resolve;
+      });
       const stop = await watch(handle, (snapshot) => {
         if (snapshot.status === "succeeded" || snapshot.status === "failed")
           settle(snapshot);
@@ -72,7 +71,7 @@ export function createOperationsAPI(
         if (snapshot.status === "succeeded") return snapshot.result;
         if (snapshot.status === "failed") {
           if ("response" in snapshot)
-            return snapshot.response as CommandCompletion<C>;
+            return snapshot.response as OperationCompletion<C>;
           const error = new Error(snapshot.error.message);
           error.name = snapshot.error.name;
           throw error;

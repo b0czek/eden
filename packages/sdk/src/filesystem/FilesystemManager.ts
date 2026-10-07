@@ -7,7 +7,10 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
-import type { OperationReporter } from "../operations/OperationTask";
+import type {
+  OperationReporter,
+  OperationTask,
+} from "../operations/OperationTask";
 import fg from "fast-glob";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -70,7 +73,11 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       "volumes-changed",
       ({ volumes }) => {
         this.watcher.removeUnavailableVolumes(
-          new Set(volumes.map((volume) => volume.id)),
+          new Set(
+            volumes
+              .filter((volume) => volume.state === "ready")
+              .map((volume) => volume.id),
+          ),
         );
       },
     );
@@ -91,13 +98,43 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
    * @throws Error if the path attempts to escape the base directory
    */
   async resolvePath(location: FilesystemLocation): Promise<string> {
-    return (await this.resolveTarget(location)).hostPath;
+    return this.volumes.withVolumes([location.volume], async () => {
+      return (await this.resolveTarget(location)).hostPath;
+    });
   }
 
   listVolumes(): FilesystemVolume[] {
     // Volume discovery is also subject to a valid filesystem principal.
     this.requirePrincipal();
     return this.volumes.list();
+  }
+
+  prepareVolumeOperation<R>(
+    ids: string[],
+    run: (reporter: OperationReporter) => Promise<R>,
+  ): OperationTask<R> {
+    this.requirePrincipal();
+    return this.volumes.prepareOperation(ids, run);
+  }
+
+  prepareEjectVolume(id: string): OperationTask<void> {
+    this.requirePrincipal();
+    return this.volumes.prepareEject(id);
+  }
+
+  async ejectVolume(id: string): Promise<void> {
+    this.requirePrincipal();
+    await this.volumes.eject(id);
+  }
+
+  /** Hold access while a consumer reads an archive at the resolved host path. */
+  async withVolume<T>(
+    location: FilesystemLocation,
+    operation: (hostPath: string) => Promise<T>,
+  ): Promise<T> {
+    return this.volumes.withVolumes([location.volume], async () =>
+      operation(await this.resolvePath(location)),
+    );
   }
 
   private requirePrincipal(): void {
@@ -142,25 +179,28 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     absolutePath: string,
     volume: string,
   ): Promise<FilesystemLocation> {
-    this.requirePrincipal();
-    const mounted = this.volumes.getRoot(volume);
-    await mounted?.assertActive();
-    const effectiveRoot = mounted?.rootPath ?? (await this.getEffectiveRoot());
-    const normalizedAbsolute = path.resolve(absolutePath);
+    return this.volumes.withVolumes([volume], async () => {
+      this.requirePrincipal();
+      const mounted = this.volumes.getRoot(volume);
+      await mounted?.assertActive();
+      const effectiveRoot =
+        mounted?.rootPath ?? (await this.getEffectiveRoot());
+      const normalizedAbsolute = path.resolve(absolutePath);
 
-    assertPathWithin(
-      effectiveRoot,
-      normalizedAbsolute,
-      `Path '${absolutePath}'`,
-    );
-    await assertExistingPathWithin(effectiveRoot, normalizedAbsolute);
+      assertPathWithin(
+        effectiveRoot,
+        normalizedAbsolute,
+        `Path '${absolutePath}'`,
+      );
+      await assertExistingPathWithin(effectiveRoot, normalizedAbsolute);
 
-    const relativePath = normalizedAbsolute.slice(effectiveRoot.length);
-    // Ensure it starts with /
-    return {
-      volume,
-      path: relativePath.startsWith("/") ? relativePath : `/${relativePath}`,
-    };
+      const relativePath = normalizedAbsolute.slice(effectiveRoot.length);
+      // Ensure it starts with /
+      return {
+        volume,
+        path: relativePath.startsWith("/") ? relativePath : `/${relativePath}`,
+      };
+    });
   }
 
   /**
@@ -208,17 +248,21 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     targetPath: FilesystemLocation,
     encoding: BufferEncoding = "utf-8",
   ): Promise<string> {
-    const fullPath = await this.resolvePath(targetPath);
-    return await fs.readFile(fullPath, encoding);
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const fullPath = await this.resolvePath(targetPath);
+      return await fs.readFile(fullPath, encoding);
+    });
   }
 
   /**
    * Read the contents of a file without text encoding.
    */
   async readBinaryFile(targetPath: FilesystemLocation): Promise<Uint8Array> {
-    const fullPath = await this.resolvePath(targetPath);
-    const content = await fs.readFile(fullPath);
-    return new Uint8Array(content);
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const fullPath = await this.resolvePath(targetPath);
+      const content = await fs.readFile(fullPath);
+      return new Uint8Array(content);
+    });
   }
 
   /**
@@ -247,65 +291,75 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     content: string | Uint8Array,
     encoding?: BufferEncoding,
   ): Promise<void> {
-    const target = await this.resolveTarget(targetPath, true);
-    const fullPath = target.hostPath;
-    await target.assertActive();
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await target.assertActive();
-    await assertExistingPathWithin(target.rootPath, fullPath);
-    await target.assertActive();
-    await fs.writeFile(fullPath, content, encoding);
-    this.invalidateHostDirectory(path.dirname(fullPath));
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const target = await this.resolveTarget(targetPath, true);
+      const fullPath = target.hostPath;
+      await target.assertActive();
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await target.assertActive();
+      await assertExistingPathWithin(target.rootPath, fullPath);
+      await target.assertActive();
+      await fs.writeFile(fullPath, content, encoding);
+      this.invalidateHostDirectory(path.dirname(fullPath));
+    });
   }
 
   /**
    * Check if a file or directory exists.
    */
   async exists(targetPath: FilesystemLocation): Promise<boolean> {
-    try {
-      const fullPath = await this.resolvePath(targetPath);
-      await fs.access(fullPath);
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        await this.volumes.getRoot(targetPath.volume)?.assertActive();
-        return false;
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      try {
+        const fullPath = await this.resolvePath(targetPath);
+        await fs.access(fullPath);
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          await this.volumes.getRoot(targetPath.volume)?.assertActive();
+          return false;
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   /**
    * Create a directory and any necessary parent directories.
    */
   async mkdir(targetPath: FilesystemLocation): Promise<void> {
-    const target = await this.resolveTarget(targetPath, true);
-    const fullPath = target.hostPath;
-    await target.assertActive();
-    await fs.mkdir(fullPath, { recursive: true });
-    this.invalidateHostDirectory(path.dirname(fullPath));
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const target = await this.resolveTarget(targetPath, true);
+      const fullPath = target.hostPath;
+      await target.assertActive();
+      await fs.mkdir(fullPath, { recursive: true });
+      this.invalidateHostDirectory(path.dirname(fullPath));
+    });
   }
 
   /**
    * List contents of a directory.
    */
   async readdir(targetPath: FilesystemLocation): Promise<string[]> {
-    const fullPath = await this.resolvePath(targetPath);
-    return await fs.readdir(fullPath);
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const fullPath = await this.resolvePath(targetPath);
+      return await fs.readdir(fullPath);
+    });
   }
 
   /**
    * Get file or directory statistics.
    */
   async stat(targetPath: FilesystemLocation): Promise<FileStats> {
-    const fullPath = await this.resolvePath(targetPath);
-    const stats = await fs.stat(fullPath);
-    return {
-      isFile: stats.isFile(),
-      isDirectory: stats.isDirectory(),
-      size: stats.size,
-      mtime: stats.mtime,
-    };
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const fullPath = await this.resolvePath(targetPath);
+      const stats = await fs.stat(fullPath);
+      return {
+        isFile: stats.isFile(),
+        isDirectory: stats.isDirectory(),
+        size: stats.size,
+        mtime: stats.mtime,
+      };
+    });
   }
 
   /**
@@ -316,44 +370,46 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     pattern: string,
     limit: number = 10,
   ): Promise<SearchResult[]> {
-    const fullPath = await this.resolvePath(location);
+    return this.volumes.withVolumes([location.volume], async () => {
+      const fullPath = await this.resolvePath(location);
 
-    const basePath = location.path;
+      const basePath = location.path;
 
-    // Create glob pattern
-    // If pattern is empty, match everything
-    const globPattern = pattern ? `**/*${pattern}*` : "**/*";
+      // Create glob pattern
+      // If pattern is empty, match everything
+      const globPattern = pattern ? `**/*${pattern}*` : "**/*";
 
-    try {
-      const entries = await fg(globPattern, {
-        cwd: fullPath,
-        onlyFiles: false,
-        deep: 3, // Limit depth for performance
-        suppressErrors: true,
-        stats: true,
-        followSymbolicLinks: false,
-      });
-
-      const results: SearchResult[] = [];
-      for (const entry of entries) {
-        if (results.length >= limit) break;
-
-        const entryPath =
-          basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
-        const isDirectory = entry.stats?.isDirectory() ?? false;
-
-        results.push({
-          location: { volume: location.volume, path: entryPath },
-          name: path.basename(entry.path),
-          type: isDirectory ? "folder" : "file",
+      try {
+        const entries = await fg(globPattern, {
+          cwd: fullPath,
+          onlyFiles: false,
+          deep: 3, // Limit depth for performance
+          suppressErrors: true,
+          stats: true,
+          followSymbolicLinks: false,
         });
-      }
 
-      return results;
-    } catch (error) {
-      log.error("Search error:", error);
-      return [];
-    }
+        const results: SearchResult[] = [];
+        for (const entry of entries) {
+          if (results.length >= limit) break;
+
+          const entryPath =
+            basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
+          const isDirectory = entry.stats?.isDirectory() ?? false;
+
+          results.push({
+            location: { volume: location.volume, path: entryPath },
+            name: path.basename(entry.path),
+            type: isDirectory ? "folder" : "file",
+          });
+        }
+
+        return results;
+      } catch (error) {
+        log.error("Search error:", error);
+        return [];
+      }
+    });
   }
 
   /**
@@ -365,24 +421,26 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     reporter?: OperationReporter,
   ): Promise<void> {
     reporter?.update("validating");
-    const target = await this.resolveTarget(targetPath, true);
-    const fullPath = target.hostPath;
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const target = await this.resolveTarget(targetPath, true);
+      const fullPath = target.hostPath;
 
-    this.assertNotRoot(target);
+      this.assertNotRoot(target);
 
-    // Check if it exists and get stats
-    const stats = await fs.stat(fullPath);
+      // Check if it exists and get stats
+      const stats = await fs.stat(fullPath);
 
-    await target.assertActive();
-    reporter?.update("deleting");
-    if (stats.isDirectory()) {
-      // Remove directory recursively
-      await fs.rm(fullPath, { recursive: true, force: true });
-    } else {
-      // Remove file
-      await fs.unlink(fullPath);
-    }
-    this.invalidateHostDirectory(path.dirname(fullPath));
+      await target.assertActive();
+      reporter?.update("deleting");
+      if (stats.isDirectory()) {
+        // Remove directory recursively
+        await fs.rm(fullPath, { recursive: true, force: true });
+      } else {
+        // Remove file
+        await fs.unlink(fullPath);
+      }
+      this.invalidateHostDirectory(path.dirname(fullPath));
+    });
   }
 
   /**
@@ -395,21 +453,26 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     reporter?: OperationReporter,
   ): Promise<void> {
     reporter?.update("validating");
-    const sourceTarget = await this.resolveTarget(fromPath);
-    const destinationTarget = await this.resolveTarget(toPath, true);
-    this.assertNotRoot(destinationTarget);
-    const source = sourceTarget.hostPath;
-    const destination = destinationTarget.hostPath;
-    await this.transfer.copy({
-      source,
-      destination,
-      destinationLabel: `${toPath.volume}:${toPath.path}`,
-      assertSourceActive: sourceTarget.assertActive,
-      assertDestinationActive: destinationTarget.assertActive,
-      overwrite,
-      reporter,
-    });
-    this.invalidateHostDirectory(path.dirname(destination));
+    return this.volumes.withVolumes(
+      [fromPath.volume, toPath.volume],
+      async () => {
+        const sourceTarget = await this.resolveTarget(fromPath);
+        const destinationTarget = await this.resolveTarget(toPath, true);
+        this.assertNotRoot(destinationTarget);
+        const source = sourceTarget.hostPath;
+        const destination = destinationTarget.hostPath;
+        await this.transfer.copy({
+          source,
+          destination,
+          destinationLabel: `${toPath.volume}:${toPath.path}`,
+          assertSourceActive: sourceTarget.assertActive,
+          assertDestinationActive: destinationTarget.assertActive,
+          overwrite,
+          reporter,
+        });
+        this.invalidateHostDirectory(path.dirname(destination));
+      },
+    );
   }
 
   /**
@@ -423,40 +486,53 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     reporter?: OperationReporter,
   ): Promise<void> {
     reporter?.update("validating");
-    const sourceTarget = await this.resolveTarget(fromPath, true);
-    const destinationTarget = await this.resolveTarget(toPath, true);
-    this.assertNotRoot(sourceTarget);
-    this.assertNotRoot(destinationTarget);
-    const source = sourceTarget.hostPath;
-    const destination = destinationTarget.hostPath;
-    await this.transfer.move({
-      source,
-      destination,
-      destinationLabel: `${toPath.volume}:${toPath.path}`,
-      assertSourceActive: sourceTarget.assertActive,
-      assertDestinationActive: destinationTarget.assertActive,
-      overwrite,
-      reporter,
-    });
-    this.invalidateHostDirectory(path.dirname(source));
-    this.invalidateHostDirectory(path.dirname(destination));
+    return this.volumes.withVolumes(
+      [fromPath.volume, toPath.volume],
+      async () => {
+        const sourceTarget = await this.resolveTarget(fromPath, true);
+        const destinationTarget = await this.resolveTarget(toPath, true);
+        this.assertNotRoot(sourceTarget);
+        this.assertNotRoot(destinationTarget);
+        const source = sourceTarget.hostPath;
+        const destination = destinationTarget.hostPath;
+        await this.transfer.move({
+          source,
+          destination,
+          destinationLabel: `${toPath.volume}:${toPath.path}`,
+          assertSourceActive: sourceTarget.assertActive,
+          assertDestinationActive: destinationTarget.assertActive,
+          overwrite,
+          reporter,
+        });
+        this.invalidateHostDirectory(path.dirname(source));
+        this.invalidateHostDirectory(path.dirname(destination));
+      },
+    );
   }
 
   async watchDirectory(
     targetPath: FilesystemLocation,
     callerWebContentsId: number | undefined,
   ): Promise<{ watchId: string }> {
-    const target = await this.resolveTarget(targetPath);
-    if (!this.volumes.get(targetPath.volume).supportsWatch)
-      throw new Error("Filesystem volume does not support watching");
-    const hostPath = target.hostPath;
-    const stats = await fs.stat(hostPath);
-    await target.assertActive();
-    if (!stats.isDirectory()) {
-      throw new Error(`Path '${targetPath.path}' is not a directory`);
-    }
+    return this.volumes.withVolumes([targetPath.volume], async () => {
+      const target = await this.resolveTarget(targetPath);
+      if (!this.volumes.get(targetPath.volume).supportsWatch)
+        throw new Error("Filesystem volume does not support watching");
+      const hostPath = target.hostPath;
+      const stats = await fs.stat(hostPath);
+      await target.assertActive();
+      if (!stats.isDirectory()) {
+        throw new Error(`Path '${targetPath.path}' is not a directory`);
+      }
 
-    return this.watcher.watch(hostPath, callerWebContentsId, targetPath.volume);
+      if (this.volumes.get(targetPath.volume).state !== "ready")
+        throw new Error("Filesystem volume is being removed");
+      return this.watcher.watch(
+        hostPath,
+        callerWebContentsId,
+        targetPath.volume,
+      );
+    });
   }
 
   unwatch(watchId: string, callerWebContentsId: number | undefined): void {

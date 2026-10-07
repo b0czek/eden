@@ -459,6 +459,15 @@ export interface FsCommands {
     response: import("./index").FilesystemVolume[];
   };
   /**
+   * Safely eject a device after draining admitted volume I/O.
+   */
+  "fs/eject": {
+    mode: "operation";
+    args: { volume: string };
+    response: import("./index").OperationHandle<"fs/eject">;
+    completion: void;
+  };
+  /**
    * Read the contents of a file.
    */
   "fs/read": {

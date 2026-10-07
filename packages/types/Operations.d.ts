@@ -76,16 +76,21 @@ export type OperationSnapshot<C extends string = string, R = unknown> =
       response?: R;
     });
 
+/** Known commands retain their completion type; discovered handles remain inspectable. */
+export type OperationCompletion<C extends string> = C extends CommandName
+  ? CommandCompletion<C>
+  : unknown;
+
 export interface OperationsAPI {
-  get<C extends CommandName>(
+  get<C extends string>(
     handle: OperationHandle<C>,
-  ): Promise<OperationSnapshot<C, CommandCompletion<C>>>;
+  ): Promise<OperationSnapshot<C, OperationCompletion<C>>>;
   list(): Promise<OperationSnapshot[]>;
-  watch<C extends CommandName>(
+  watch<C extends string>(
     handle: OperationHandle<C>,
-    listener: (snapshot: OperationSnapshot<C, CommandCompletion<C>>) => void,
+    listener: (snapshot: OperationSnapshot<C, OperationCompletion<C>>) => void,
   ): Promise<() => void>;
-  wait<C extends CommandName>(
+  wait<C extends string>(
     handle: OperationHandle<C>,
-  ): Promise<CommandCompletion<C>>;
+  ): Promise<OperationCompletion<C>>;
 }

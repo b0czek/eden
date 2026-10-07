@@ -1377,6 +1377,111 @@ test.describe
       );
     });
 
+    test("accepts slow safe eject and observes completion across renderer and backend IPC", async () => {
+      test.setTimeout(45_000);
+      await expect
+        .poll(async () => {
+          try {
+            return await fs.readFile(
+              path.join(fixtureDirectory, "backend-eject-ready"),
+              "utf8",
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toBe("ready");
+      const driveRoot = path.join(root, "slow-eject");
+      await fs.mkdir(driveRoot);
+      await electronApp?.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: {
+              volumes: {
+                register(
+                  input: unknown,
+                  options: { eject: () => Promise<void> },
+                ): Promise<unknown>;
+              };
+            };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register(
+          { id: "slow-eject", label: "Slow USB", kind: "removable", rootPath },
+          {
+            eject: () =>
+              new Promise<void>((resolve) => setTimeout(resolve, 31_000)),
+          },
+        );
+      }, driveRoot);
+      await expect
+        .poll(() =>
+          executeHostCommand<{ id: string; state: string }[]>("fs/volumes", {}),
+        )
+        .toContainEqual(
+          expect.objectContaining({ id: "slow-eject", state: "ejecting" }),
+        );
+      const rendererHandle = await electronApp?.evaluate(
+        async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+          return window.edenAPI.shellCommand("fs/eject", { volume: "slow-eject" });
+        })()`);
+        },
+        APP_ID,
+      );
+      expect(rendererHandle).toMatchObject({
+        command: "fs/eject",
+        id: expect.any(String),
+      });
+      await expect
+        .poll(async () => {
+          try {
+            return JSON.parse(
+              await fs.readFile(
+                path.join(fixtureDirectory, "backend-eject-accepted.json"),
+                "utf8",
+              ),
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toMatchObject({ command: "fs/eject", id: expect.any(String) });
+      await electronApp?.evaluate(
+        async ({ webContents }, payload) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(payload.appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(
+            `window.edenAPI.operations.wait(${JSON.stringify(payload.handle)})`,
+          );
+        },
+        { appId: APP_ID, handle: rendererHandle },
+      );
+      await expect
+        .poll(async () => {
+          try {
+            return JSON.parse(
+              await fs.readFile(
+                path.join(fixtureDirectory, "backend-eject-result.json"),
+                "utf8",
+              ),
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toEqual({ success: true });
+      expect(
+        await executeHostCommand<{ id: string }[]>("fs/volumes", {}),
+      ).not.toContainEqual(expect.objectContaining({ id: "slow-eject" }));
+    });
+
     test("shuts down without orphaning Electron or utility processes", async () => {
       const app = electronApp;
       expect(app).toBeDefined();

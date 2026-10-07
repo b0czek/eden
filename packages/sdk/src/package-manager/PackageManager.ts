@@ -1,4 +1,7 @@
-import type { OperationReporter } from "../operations/OperationTask";
+import type {
+  OperationReporter,
+  OperationTask,
+} from "../operations/OperationTask";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
@@ -461,8 +464,9 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
    */
   async getPackageInfo(location: FilesystemLocation): Promise<EdenPackageInfo> {
     try {
-      const hostPath = await this.filesystemManager.resolvePath(location);
-      return await this.getPackageInfoFromHostPath(hostPath);
+      return await this.filesystemManager.withVolume(location, (hostPath) =>
+        this.getPackageInfoFromHostPath(hostPath),
+      );
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -570,17 +574,25 @@ export class PackageManager extends EdenEmitter<PackageNamespaceEvents> {
     return this.catalog.getSize(packageId);
   }
 
+  prepareInstallPackage(
+    location: FilesystemLocation,
+    replacementConfirmed = false,
+  ): OperationTask<InstalledPackageManifest> {
+    return this.filesystemManager.prepareVolumeOperation(
+      [location.volume],
+      (reporter) =>
+        this.installPackage(location, replacementConfirmed, reporter),
+    );
+  }
+
   /** Install an app or DLC from a .edenite file. */
   async installPackage(
     location: FilesystemLocation,
     replacementConfirmed = false,
     reporter?: OperationReporter,
   ): Promise<InstalledPackageManifest> {
-    const hostPath = await this.filesystemManager.resolvePath(location);
-    return this.installPackageFromHostPath(
-      hostPath,
-      replacementConfirmed,
-      reporter,
+    return this.filesystemManager.withVolume(location, (hostPath) =>
+      this.installPackageFromHostPath(hostPath, replacementConfirmed, reporter),
     );
   }
 

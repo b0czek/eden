@@ -69,6 +69,73 @@ describe("DLC package lifecycle", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
+  it("holds the source-volume lease through archive extraction while eject drains", async () => {
+    const driveRoot = path.join(root, "archive-source-volume");
+    await fs.mkdir(driveRoot);
+    const manifest: AppManifest = {
+      id: "com.example.archive-lease",
+      name: "Archive lease",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+    };
+    const archive = await makeArchive(root, driveRoot, manifest, {
+      "index.html": "<html>archive lease</html>",
+    });
+    let hostSawInstalled = false;
+    await eden.runtime.volumes.register(
+      {
+        id: "archive-source",
+        label: "Archive source",
+        kind: "removable",
+        rootPath: driveRoot,
+      },
+      {
+        eject: async () => {
+          hostSawInstalled =
+            (await fs.readFile(
+              path.join(eden.paths.appsDirectory, manifest.id, "index.html"),
+              "utf8",
+            )) === "<html>archive lease</html>";
+        },
+      },
+    );
+    const manager = eden.runtime.resolve(OperationManager);
+    let archiveReadStarted!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      archiveReadStarted = resolve;
+    });
+    const off = manager.on("changed", ({ snapshot }) => {
+      if (
+        snapshot.command === "package/install" &&
+        snapshot.phase === "extracting-archive"
+      )
+        archiveReadStarted();
+    });
+    const caller = { principal: { kind: "user" as const, profile: vendor } };
+    const handle = await eden.execute<OperationHandle>(
+      "package/install",
+      { source: { volume: "archive-source", path: archive } },
+      caller,
+    );
+    await reading;
+    const removal = eden.runtime.volumes.eject("archive-source");
+    expect(hostSawInstalled).toBe(false);
+    expect(
+      eden.runtime.volumes
+        .list()
+        .find((volume) => volume.id === "archive-source")?.state,
+    ).toBe("ejecting");
+    await expect(manager.wait(handle, caller)).resolves.toMatchObject({
+      id: manifest.id,
+    });
+    await removal;
+    expect(hostSawInstalled).toBe(true);
+    expect(eden.runtime.volumes.list().map((volume) => volume.id)).toEqual([
+      "home",
+    ]);
+    off();
+  });
+
   it("accepts a package operation promptly and exposes real transaction completion", async () => {
     const manifest: AppManifest = {
       id: "com.example.operation-package",

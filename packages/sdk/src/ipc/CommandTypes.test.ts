@@ -4,6 +4,7 @@ import type {
   CommandResult,
   ImmediateCommand,
   OperationCommand,
+  OperationCompletion,
   OperationHandle,
   StreamCommand,
   StreamHandle,
@@ -18,6 +19,8 @@ type Assert<T extends true> = T;
 type Contracts = [
   Assert<Equal<CommandResult<"fs/cp">, OperationHandle<"fs/cp">>>,
   Assert<Equal<CommandCompletion<"fs/cp">, void>>,
+  Assert<Equal<OperationCompletion<"fs/cp">, void>>,
+  Assert<Equal<OperationCompletion<string>, unknown>>,
   Assert<Equal<CommandResult<"system/info">, SystemInfo>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
   Assert<Equal<CommandChunk<"system/info">, never>>,

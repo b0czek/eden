@@ -80,3 +80,38 @@ void (async () => {
     "ready",
   );
 })();
+
+void (async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  await worker.edenAPI.subscribe("fs/volumes-changed", async ({ volumes }) => {
+    if (
+      !volumes.some(
+        (volume) => volume.id === "slow-eject" && volume.state === "ready",
+      )
+    )
+      return;
+    let result;
+    try {
+      const handle = await worker.edenAPI.shellCommand("fs/eject", {
+        volume: "slow-eject",
+      });
+      await fs.writeFile(
+        path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-accepted.json"),
+        JSON.stringify(handle),
+      );
+      await worker.edenAPI.operations.wait(handle);
+      result = { success: true };
+    } catch (error) {
+      result = { error: String(error) };
+    }
+    await fs.writeFile(
+      path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-result.json"),
+      JSON.stringify(result),
+    );
+  });
+  await fs.writeFile(
+    path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-ready"),
+    "ready",
+  );
+})();

@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   OperationHandle,
   OperationSnapshot,
@@ -88,7 +88,9 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     )
       throw new Error("Invalid operation request key");
     const requestIdentity = canonical([sessionId, owner.appId, requestKey]);
-    const fingerprint = canonical([command, args]);
+    const fingerprint = createHash("sha256")
+      .update(canonical([command, args]))
+      .digest("hex");
     if (requestKey !== undefined) {
       const previousId = this.requests.get(requestIdentity);
       const previous = previousId && this.records.get(previousId);
@@ -149,12 +151,26 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     return { command, id };
   }
 
+  /** Awaited host convenience work still belongs to the runtime's operation ledger. */
+  async runHost<R>(
+    command: string,
+    args: unknown,
+    prepare: () => OperationTask<R>,
+  ): Promise<R> {
+    const context: CommandCallerContext = {
+      principal: { kind: "system" },
+      sessionId: this.session.getSessionId(),
+    };
+    const handle = this.submit(command, args, context, prepare);
+    return (await this.wait(handle, context)) as R;
+  }
+
   private async execute(
     record: RecordEntry,
     task: OperationTask<unknown>,
   ): Promise<void> {
-    this.update(record, { status: "running", startedAt: Date.now() });
     try {
+      this.update(record, { status: "running", startedAt: Date.now() });
       if (task.transition === "session")
         await this.drainSession(
           record.transitionSessionId!,
@@ -164,7 +180,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       const result = await task.run({
         update: (phase, progress) => {
           if (record.snapshot.status === "running")
-            this.update(record, { phase, progress });
+            this.update(record, { phase, progress: structuredClone(progress) });
         },
       });
       const failed = task.isFailure
@@ -186,13 +202,13 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
           status: "failed",
           completedAt: Date.now(),
           error: { name: "OperationError", message },
-          response: result,
+          response: structuredClone(result),
         });
       } else
         this.update(record, {
           status: "succeeded",
           completedAt: Date.now(),
-          result,
+          result: structuredClone(result),
         });
     } catch (error) {
       this.update(record, {

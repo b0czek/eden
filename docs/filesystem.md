@@ -8,6 +8,7 @@ restricted by the permissions declared in the app manifest:
 - `fs/write` permits creating, changing, copying, moving, and deleting files
   and directories.
 - `fs/resolve` permits resolving a location for an external integration.
+- `fs/eject` permits safely ejecting devices.
 - `fs/*` grants all filesystem permissions.
 
 ## File Addresses
@@ -80,6 +81,56 @@ await window.edenAPI.subscribe("fs/volumes-changed", ({ volumes }) => {
   updateVolumeSelector(volumes);
 });
 ```
+
+## Safely Removing Volumes
+
+The consumer can supply an `eject` callback as the second argument to registration.
+It uses the consumer's device integration and must resolve only when the OS has
+finished flushing cached writes and releasing the volume. For a mounted share,
+this means unmounting it; for a USB drive, safely ejecting the device. Reject the
+callback when the OS reports a failure, such as a busy device.
+
+```typescript
+await eden.volumes.register(
+  {
+    id: "usb-work",
+    label: "Work USB",
+    kind: "removable",
+    rootPath: mountedDirectory,
+  },
+  { eject: () => volumeProvider.eject(deviceId) },
+);
+
+await eden.volumes.eject("usb-work");
+// The OS has confirmed safe removal.
+```
+
+Here `volumeProvider` is the consumer's OS adapter. The callback is optional.
+Public metadata advertises `supportsEject` when it is supplied. Home cannot be
+ejected.
+
+Apps with `fs/eject` permission use the corresponding command:
+
+```typescript
+const handle = await window.edenAPI.shellCommand("fs/eject", { volume: "usb-work" });
+await window.edenAPI.operations.wait(handle);
+```
+
+Removal first changes the volume's `state` from `ready` to `ejecting`, closes its
+directory watches, and rejects new filesystem operations on it. Already admitted
+operations finish before the OS callback runs. Subscribe to `fs/volumes-changed`
+to show pending state while the OS flushes its caches; this may take minutes.
+Frontend and backend eject commands return an operation handle promptly. Use
+`edenAPI.operations.watch` to observe phases and `wait` to await safe removal.
+The volume leaves the inventory after success.
+
+Repeated requests share the same removal. If the callback rejects, the operation
+retains that error and the volume returns to `ready`; apps can resume access,
+recreate watches, and retry removal with a new submission. Read-only volumes can also be ejected.
+
+`eden.volumes.unregister(id)` removes a registration after the consumer observes
+disconnection. For safe removal, await `eject(id)`, which removes the registration
+after the OS callback completes.
 
 Files and File Picker update their volume selectors live. If the selected drive
 disconnects, they clear selection and switch to an available allowed volume,
@@ -236,3 +287,7 @@ window.edenAPI.unsubscribe("fs/changed", handleChanged);
 Each watch belongs to the creating view. Eden releases watches when the owning
 view, volume, or runtime closes. Files and File Picker support manual refresh on
 volumes without watching.
+
+Package inspection and installation hold their source-volume access throughout
+archive reads, so safe removal waits until those reads and admitted package work
+finish.

@@ -402,6 +402,7 @@ export class EdenRuntime {
       appearanceManager,
       associationManager: this.appAssociationManager,
       volumeManager: this.resolveOwned(VolumeManager),
+      operationManager: this.resolveOwned(OperationManager),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,

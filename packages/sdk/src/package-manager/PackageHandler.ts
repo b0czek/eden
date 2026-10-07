@@ -37,9 +37,7 @@ export class PackageHandler {
   }): OperationTask<InstalledPackageManifest> {
     const { source, replace } = v.parse(installPackageArgs, args);
     log.info(`Installing from volume: ${source.volume}`);
-    return operationTask((reporter) =>
-      this.packageManager.installPackage(source, replace === true, reporter),
-    );
+    return this.packageManager.prepareInstallPackage(source, replace === true);
   }
 
   /**

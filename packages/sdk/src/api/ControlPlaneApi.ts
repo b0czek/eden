@@ -139,9 +139,18 @@ export interface EdenAssociationsApi {
   remove(key: string): Promise<void>;
 }
 
-/** Main-process integration for consumer-managed mounted directories. */
+/** Host operations for a consumer-managed mounted directory. */
+export interface EdenVolumeOptions {
+  /** Resolve only after the OS has finished safely ejecting the device. */
+  eject?: () => Promise<void>;
+}
+
 export interface EdenVolumesApi {
-  register(input: FilesystemVolumeRegistration): Promise<FilesystemVolume>;
+  register(
+    input: FilesystemVolumeRegistration,
+    options?: EdenVolumeOptions,
+  ): Promise<FilesystemVolume>;
+  eject(id: string): Promise<void>;
   unregister(id: string): boolean;
   list(): FilesystemVolume[];
   onChanged(listener: (volumes: FilesystemVolume[]) => void): EdenUnsubscribe;
