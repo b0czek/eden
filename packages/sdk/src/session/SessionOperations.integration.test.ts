@@ -74,6 +74,70 @@ describe("session operation transactions", () => {
     ).toThrow("access denied");
   });
 
+  it("finishes an accepted daemon login before a later refused poweroff", async () => {
+    let userAtHandoff: string | undefined;
+    eden = await createTestEden({
+      config: {
+        powerProvider: {
+          poweroff: async () => {
+            userAtHandoff = eden.runtime
+              .resolve(SessionContext)
+              .getCurrentUser()?.username;
+            throw new Error("Host refused poweroff");
+          },
+        },
+      },
+    });
+    await eden.runtime.users.create({
+      username: "operator",
+      name: "Operator",
+      password: "password",
+    });
+    const caller = {
+      appId: "session.daemon",
+      principal: { kind: "system" as const },
+      // Daemon operations outlive interactive login sessions.
+      sessionId: "daemon:session-controller",
+    };
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(caller.appId, ["session/manage", "system/power"]);
+    const manager = eden.runtime.resolve(OperationManager);
+    const login = await eden.execute<OperationHandle>(
+      "session/login",
+      { username: "operator", password: "password" },
+      caller,
+    );
+    expect(manager.get(login, caller).status).toBe("queued");
+    const power = await eden.execute<OperationHandle>(
+      "system/power",
+      { action: "poweroff" },
+      caller,
+    );
+    const refused = expect(manager.wait(power, caller)).rejects.toThrow(
+      "Host refused poweroff",
+    );
+    await expect(
+      eden.execute(
+        "session/login",
+        { username: "operator", password: "password" },
+        caller,
+      ),
+    ).rejects.toThrow("draining");
+    await expect(manager.wait(login, caller)).resolves.toMatchObject({
+      success: true,
+      user: { username: "operator" },
+    });
+    await refused;
+    expect(userAtHandoff).toBe("operator");
+    expect(
+      eden.runtime.resolve(SessionContext).getCurrentUser()?.username,
+    ).toBe("operator");
+    await expect(eden.complete("session/logout", {}, caller)).resolves.toEqual({
+      success: true,
+    });
+  });
+
   it("retains failed authentication as a typed response and allows a subsequent submission", async () => {
     eden = await createTestEden();
     await eden.runtime.users.create({

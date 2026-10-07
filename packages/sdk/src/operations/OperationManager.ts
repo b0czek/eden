@@ -388,8 +388,9 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   async withSessionTransition<T>(task: () => Promise<T>): Promise<T> {
     const sessionId = this.session.getSessionId();
     const operationId = this.execution.get()?.operationId;
-    if (!this.accepting) throw new Error("Runtime operations are draining");
     const reserved = this.closedSessions.get(sessionId);
+    if (!this.accepting && (!operationId || reserved !== operationId))
+      throw new Error("Runtime operations are draining");
     if (reserved && reserved !== operationId)
       throw new Error("A session transition is already in progress");
     const reservation = operationId ?? randomUUID();
