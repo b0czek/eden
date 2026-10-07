@@ -654,7 +654,7 @@ describe("DLC package lifecycle", () => {
       password: "password",
     });
     await eden.runtime.sessions.login("runner", "password");
-    await eden.execute("process/launch", { appId: host.id });
+    await eden.complete("process/launch", { appId: host.id });
     await expect(
       eden.complete("package/uninstall", { packageId: host.id }),
     ).rejects.toThrow("must be stopped");

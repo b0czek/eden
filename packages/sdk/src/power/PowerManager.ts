@@ -1,3 +1,5 @@
+import { OperationManager } from "../operations/OperationManager";
+import type { OperationReporter } from "../operations/OperationTask";
 import type {
   EdenConfig,
   EdenPowerCapabilities,
@@ -22,6 +24,7 @@ export class PowerManager {
     @inject("EdenConfig") config: EdenConfig,
     @inject(DaemonManager) private daemonManager: DaemonManager,
     @inject(ProcessManager) private processManager: ProcessManager,
+    @inject(OperationManager) private operations: OperationManager,
   ) {
     this.provider = config.powerProvider;
   }
@@ -35,7 +38,7 @@ export class PowerManager {
     };
   }
 
-  async power(args: { action: "poweroff" | "reboot" }): Promise<void> {
+  validatePower(args: { action: "poweroff" | "reboot" }): void {
     if (this.powerActionPending) {
       throw new Error("A system power action is already pending");
     }
@@ -53,14 +56,24 @@ export class PowerManager {
     if (typeof action !== "function") {
       throw new Error(`System ${args.action} is unavailable`);
     }
+  }
 
+  async power(
+    args: { action: "poweroff" | "reboot" },
+    reporter?: OperationReporter,
+  ): Promise<void> {
+    this.validatePower(args);
+    const provider = this.provider!;
+    const action = provider[args.action]!;
     this.powerActionPending = true;
     try {
-      // Power requests are transactional system operations: stop managed work
-      // before handing control to the host integration.
-      await this.daemonManager.shutdown();
-      await this.processManager.shutdown();
-      await action.call(provider);
+      await this.operations.withRuntimeTransition(async () => {
+        reporter?.update("preparing-host-handoff");
+        await this.daemonManager.shutdown();
+        await this.processManager.shutdown();
+        reporter?.update("host-handoff");
+        await action.call(provider);
+      });
     } catch (error) {
       this.powerActionPending = false;
       throw error;

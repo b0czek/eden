@@ -1,3 +1,4 @@
+import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type {
   FileHandlerInfo,
   FileOpenResult,
@@ -32,24 +33,30 @@ export class FileOpenHandler {
   /**
    * Open a file with its default handler
    */
-  @EdenHandler("open")
-  async handleOpen(args: {
+  @EdenHandler("open", { mode: "operation" })
+  handleOpen(args: {
     location: FilesystemLocation;
-  }): Promise<FileOpenResult> {
+  }): OperationTask<FileOpenResult> {
     const { location } = v.parse(filesystemLocationArgsSchema, args);
-    return this.manager.openFile(location);
+    return operationTask(async (reporter) => {
+      reporter.update("opening");
+      return this.manager.openFile(location);
+    });
   }
 
   /**
    * Open a file with a specific app
    */
-  @EdenHandler("open-with")
-  async handleOpenWith(args: {
+  @EdenHandler("open-with", { mode: "operation" })
+  handleOpenWith(args: {
     location: FilesystemLocation;
     appId: string;
-  }): Promise<FileOpenResult> {
+  }): OperationTask<FileOpenResult> {
     const { location, appId } = v.parse(handlerArgs, args);
-    return this.manager.openFileWith(location, appId);
+    return operationTask(async (reporter) => {
+      reporter.update("opening");
+      return this.manager.openFileWith(location, appId);
+    });
   }
 
   /**

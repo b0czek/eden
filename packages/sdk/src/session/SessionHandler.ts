@@ -1,3 +1,5 @@
+import * as v from "valibot";
+import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type { UserProfile } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { SessionManager } from "./SessionManager";
@@ -11,28 +13,41 @@ export class SessionHandler {
     return { user: this.sessionManager.getCurrentUser() };
   }
 
-  @EdenHandler("login", { permission: "manage" })
-  async handleLogin(args: {
+  @EdenHandler("login", { permission: "manage", mode: "operation" })
+  handleLogin(args: {
     username: string;
     password: string;
-  }): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    try {
-      const user = await this.sessionManager.login(
-        args.username,
-        args.password,
-      );
-      return { success: true, user };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Login failed",
-      };
-    }
+  }): OperationTask<{ success: boolean; user?: UserProfile; error?: string }> {
+    const { username, password } = v.parse(
+      v.object({ username: v.string(), password: v.string() }),
+      args,
+    );
+    return operationTask(
+      async (reporter) => {
+        reporter.update("authenticating");
+        try {
+          const user = await this.sessionManager.login(username, password);
+          return { success: true, user };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Login failed",
+          };
+        }
+      },
+      { transition: "session" },
+    );
   }
 
-  @EdenHandler("logout", { permission: "manage" })
-  async handleLogout(): Promise<{ success: boolean }> {
-    await this.sessionManager.logout();
-    return { success: true };
+  @EdenHandler("logout", { permission: "manage", mode: "operation" })
+  handleLogout(): OperationTask<{ success: boolean }> {
+    return operationTask(
+      async (reporter) => {
+        reporter.update("logging-out");
+        await this.sessionManager.logout();
+        return { success: true };
+      },
+      { transition: "session" },
+    );
   }
 }

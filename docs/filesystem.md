@@ -133,6 +133,7 @@ Resolve a host path only when an external integration needs it:
 const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
   location: { volume: "usb-work", path: "/Documents/report.txt" },
 });
+const result = await window.edenAPI.operations.wait(handle);
 ```
 
 ## Opening Files and Picking Locations
@@ -140,9 +141,10 @@ const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
 `file/open` selects a configured handler using the file's type:
 
 ```typescript
-await window.edenAPI.shellCommand("file/open", {
+const handle = await window.edenAPI.shellCommand("file/open", {
   location: { volume: "usb-work", path: "/Documents/report.txt" },
 });
+const result = await window.edenAPI.operations.wait(handle);
 ```
 
 Handlers retrieve the initial address with `getLaunchFile()` and receive further

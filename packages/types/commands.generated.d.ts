@@ -32,9 +32,10 @@ export interface SystemCommands {
     response: import("./index").EdenPowerCapabilities;
   };
   "system/power": {
-    mode: "immediate";
+    mode: "operation";
     args: { action: "poweroff" | "reboot" };
-    response: void;
+    response: import("./index").OperationHandle<"system/power">;
+    completion: void;
   };
 }
 
@@ -209,19 +210,22 @@ export interface DaemonCommands {
     response: { success: true };
   };
   "daemon/start": {
-    mode: "immediate";
+    mode: "operation";
     args: { appId: string };
-    response: { success: true };
+    response: import("./index").OperationHandle<"daemon/start">;
+    completion: { success: true };
   };
   "daemon/stop": {
-    mode: "immediate";
+    mode: "operation";
     args: { appId: string };
-    response: { success: true };
+    response: import("./index").OperationHandle<"daemon/stop">;
+    completion: { success: true };
   };
   "daemon/restart": {
-    mode: "immediate";
+    mode: "operation";
     args: { appId: string };
-    response: { success: true };
+    response: import("./index").OperationHandle<"daemon/restart">;
+    completion: { success: true };
   };
 }
 
@@ -351,20 +355,22 @@ export interface FileCommands {
    * Open a file with its default handler
    */
   "file/open": {
-    mode: "immediate";
+    mode: "operation";
     args: {
     location: import("./index").FilesystemLocation };
-    response: import("./index").FileOpenResult;
+    response: import("./index").OperationHandle<"file/open">;
+    completion: import("./index").FileOpenResult;
   };
   /**
    * Open a file with a specific app
    */
   "file/open-with": {
-    mode: "immediate";
+    mode: "operation";
     args: {
     location: import("./index").FilesystemLocation;
     appId: string };
-    response: import("./index").FileOpenResult;
+    response: import("./index").OperationHandle<"file/open-with">;
+    completion: import("./index").FileOpenResult;
   };
   /**
    * Get the default handler app for a file path
@@ -806,29 +812,32 @@ export interface ProcessCommands {
    * Requires "process/manage" permission.
    */
   "process/launch": {
-    mode: "immediate";
+    mode: "operation";
     args: {
     appId: string;
     bounds?: import("./index").ViewBounds };
-    response: import("./index").LaunchResult;
+    response: import("./index").OperationHandle<"process/launch">;
+    completion: import("./index").LaunchResult;
   };
   /**
    * Stop a running application instance.
    * Requires "process/manage" permission.
    */
   "process/stop": {
-    mode: "immediate";
+    mode: "operation";
     args: { appId: string };
-    response: { success: boolean };
+    response: import("./index").OperationHandle<"process/stop">;
+    completion: { success: boolean };
   };
   /**
    * Stop the caller app instance.
    * No explicit permission required - this endpoint only allows self-exit.
    */
   "process/exit": {
-    mode: "immediate";
+    mode: "operation";
     args: { };
-    response: { success: boolean };
+    response: import("./index").OperationHandle<"process/exit">;
+    completion: { success: boolean };
   };
   /**
    * List all running application processes.
@@ -868,16 +877,18 @@ export interface SessionCommands {
     response: { user: import("./index").UserProfile | null };
   };
   "session/login": {
-    mode: "immediate";
+    mode: "operation";
     args: {
     username: string;
     password: string };
-    response: { success: boolean; user?: import("./index").UserProfile; error?: string };
+    response: import("./index").OperationHandle<"session/login">;
+    completion: { success: boolean; user?: import("./index").UserProfile; error?: string };
   };
   "session/logout": {
-    mode: "immediate";
+    mode: "operation";
     args: Record<string, never>;
-    response: { success: boolean };
+    response: import("./index").OperationHandle<"session/logout">;
+    completion: { success: boolean };
   };
 }
 

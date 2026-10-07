@@ -209,7 +209,9 @@ export default function ShellOverlay() {
     } else {
       // App is not running, launch it
       try {
-        await window.edenAPI.shellCommand("process/launch", { appId });
+        await window.edenAPI.operations.wait(
+          await window.edenAPI.shellCommand("process/launch", { appId }),
+        );
         // Add a small delay before refreshing to let the app start
         setTimeout(() => {
           loadSystemInfo();
@@ -232,7 +234,9 @@ export default function ShellOverlay() {
 
   const handleStopApp = async (appId: string) => {
     try {
-      await window.edenAPI.shellCommand("process/stop", { appId });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("process/stop", { appId }),
+      );
       // Refresh app list
       setTimeout(() => {
         loadSystemInfo();
@@ -253,6 +257,7 @@ export default function ShellOverlay() {
 
   const handleLogout = async () => {
     try {
+      // Acceptance hands the session transition to Eden; it closes this shell.
       await window.edenAPI.shellCommand("session/logout", {});
     } catch (error) {
       console.error("Failed to log out:", error);
@@ -287,7 +292,9 @@ export default function ShellOverlay() {
         role: "alertdialog",
       });
       if (confirmed) {
-        await window.edenAPI.shellCommand("system/power", { action });
+        await window.edenAPI.operations.wait(
+          await window.edenAPI.shellCommand("system/power", { action }),
+        );
       }
     } catch (error) {
       console.error(`Failed to ${action} the system:`, error);

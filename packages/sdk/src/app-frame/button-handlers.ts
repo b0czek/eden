@@ -6,6 +6,7 @@ import { log } from "../logging";
  */
 
 export async function closeAppFrameView(): Promise<void> {
+  // The close action completes when Eden accepts teardown of this caller.
   await window.edenAPI.shellCommand("process/exit", {});
 }
 

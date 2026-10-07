@@ -1,3 +1,5 @@
+import * as v from "valibot";
+import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type { DaemonDefinition, DaemonStatus } from "@edenapp/types";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { DaemonManager } from "./DaemonManager";
@@ -31,21 +33,33 @@ export class DaemonHandler {
     return { success: true };
   }
 
-  @EdenHandler("start", { permission: "manage" })
-  async start(args: { appId: string }): Promise<{ success: true }> {
-    await this.manager.start(args.appId);
-    return { success: true };
+  @EdenHandler("start", { permission: "manage", mode: "operation" })
+  start(args: { appId: string }): OperationTask<{ success: true }> {
+    const appId = v.parse(v.pipe(v.string(), v.nonEmpty()), args.appId);
+    return operationTask(async (reporter) => {
+      reporter.update("starting-daemon");
+      await this.manager.start(appId);
+      return { success: true };
+    });
   }
 
-  @EdenHandler("stop", { permission: "manage" })
-  async stop(args: { appId: string }): Promise<{ success: true }> {
-    await this.manager.stop(args.appId);
-    return { success: true };
+  @EdenHandler("stop", { permission: "manage", mode: "operation" })
+  stop(args: { appId: string }): OperationTask<{ success: true }> {
+    const appId = v.parse(v.pipe(v.string(), v.nonEmpty()), args.appId);
+    return operationTask(async (reporter) => {
+      reporter.update("stopping-daemon");
+      await this.manager.stop(appId);
+      return { success: true };
+    });
   }
 
-  @EdenHandler("restart", { permission: "manage" })
-  async restart(args: { appId: string }): Promise<{ success: true }> {
-    await this.manager.restart(args.appId);
-    return { success: true };
+  @EdenHandler("restart", { permission: "manage", mode: "operation" })
+  restart(args: { appId: string }): OperationTask<{ success: true }> {
+    const appId = v.parse(v.pipe(v.string(), v.nonEmpty()), args.appId);
+    return operationTask(async (reporter) => {
+      reporter.update("restarting-daemon");
+      await this.manager.restart(appId);
+      return { success: true };
+    });
   }
 }

@@ -1,3 +1,4 @@
+import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type { EdenPowerCapabilities } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenHandler, EdenNamespace } from "../ipc";
@@ -19,8 +20,11 @@ export class PowerHandler {
     return this.manager.getCapabilities();
   }
 
-  @EdenHandler("power", { permission: "power" })
-  async power(args: { action: "poweroff" | "reboot" }): Promise<void> {
-    await this.manager.power(args);
+  @EdenHandler("power", { permission: "power", mode: "operation" })
+  power(args: { action: "poweroff" | "reboot" }): OperationTask<void> {
+    this.manager.validatePower(args);
+    return operationTask((reporter) => this.manager.power(args, reporter), {
+      transition: "runtime",
+    });
   }
 }

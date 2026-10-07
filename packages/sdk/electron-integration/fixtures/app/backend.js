@@ -39,3 +39,44 @@ void (async () => {
     );
   }
 })();
+
+void (async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  let started = false;
+  await worker.edenAPI.subscribe("fs/volumes-changed", async ({ volumes }) => {
+    if (started || !volumes.some((volume) => volume.id === "operation-delay"))
+      return;
+    started = true;
+    let result;
+    try {
+      const handle = await worker.edenAPI.shellCommand("integration/delayed", {
+        name: "backend",
+      });
+      await fs.writeFile(
+        path.join(
+          process.env.EDEN_INSTALL_PATH,
+          "backend-operation-accepted.json",
+        ),
+        JSON.stringify(handle),
+      );
+      const revisions = [];
+      const stop = await worker.edenAPI.operations.watch(handle, (snapshot) =>
+        revisions.push(snapshot.revision),
+      );
+      const completion = await worker.edenAPI.operations.wait(handle);
+      stop();
+      result = { completion, revisions };
+    } catch (error) {
+      result = { error: String(error) };
+    }
+    await fs.writeFile(
+      path.join(process.env.EDEN_INSTALL_PATH, "backend-operation-result.json"),
+      JSON.stringify(result),
+    );
+  });
+  await fs.writeFile(
+    path.join(process.env.EDEN_INSTALL_PATH, "backend-operation-ready"),
+    "ready",
+  );
+})();

@@ -575,7 +575,7 @@ describe("consumer-managed filesystem volumes", () => {
         isRestricted: false,
         resolvedGrants: [],
       } as RuntimeAppManifest);
-      await eden.execute("process/launch", { appId: id });
+      await eden.complete("process/launch", { appId: id });
     }
     eden.runtime
       .resolve(PermissionRegistry)
@@ -826,7 +826,7 @@ describe("consumer-managed filesystem volumes", () => {
       resolvedGrants: [],
     } as RuntimeAppManifest;
     eden.runtime.resolve(PackageRegistry).register(app);
-    await eden.execute("process/launch", { appId });
+    await eden.complete("process/launch", { appId });
     const instance = requireValue(
       eden.runtime.resolve(ProcessManager).getAppInstance(appId),
     );

@@ -57,18 +57,20 @@ interface EdenAPI {
 
 ```typescript
 // Execute a shell command
-await window.edenAPI.shellCommand("process/launch", {
+const launch = await window.edenAPI.shellCommand("process/launch", {
   appId: "com.example.myapp",
   bounds: { x: 0, y: 0, width: 800, height: 600 },
 });
+await window.edenAPI.operations.wait(launch);
 
 // Subscribe to system events
-await window.edenAPI.subscribe("window/focus", (data) => {
-  console.log("Window focused:", data);
+await window.edenAPI.subscribe("process/launched", (data) => {
+  console.log("Process launched:", data);
 });
 
 // Check event support
 const hasMinimize = await window.edenAPI.isEventSupported("window/minimize");
+await window.edenAPI.operations.wait(launch);
 ```
 
 ### How It Works
@@ -403,3 +405,9 @@ IPC responses have a ten-second deadline. Accepted operation execution has no
 transport deadline. Stream command definitions and cancellation capabilities are
 reserved interfaces; this release exposes no stream transport or cancellation
 endpoint.
+
+Lifecycle operations accept requests before caller teardown begins. Successful
+session transitions and self-exit can close the caller before it observes
+completion. Power operation completion records preparation and host handoff;
+observe it through the host API when needed. Runtime disappearance does not
+confirm that the operating system has finished powering off.

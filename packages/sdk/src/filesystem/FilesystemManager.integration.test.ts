@@ -50,7 +50,7 @@ describe("FilesystemManager native watch integration", () => {
       grants: [`apps/launch/${appId}`, `apps/launch/${otherAppId}`],
     });
     await eden.runtime.sessions.login(profile.username, "password");
-    await eden.execute("process/launch", { appId });
+    await eden.complete("process/launch", { appId });
     const instance = eden.runtime.resolve(ProcessManager).getAppInstance(appId);
     if (!instance) throw new Error("Filesystem test app was not launched");
     const viewInfo = eden.runtime
@@ -196,7 +196,7 @@ describe("FilesystemManager native watch integration", () => {
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(otherAppId, ["fs/read"]);
-    await eden.execute("process/launch", { appId: otherAppId });
+    await eden.complete("process/launch", { appId: otherAppId });
     const otherInstance = eden.runtime
       .resolve(ProcessManager)
       .getAppInstance(otherAppId);

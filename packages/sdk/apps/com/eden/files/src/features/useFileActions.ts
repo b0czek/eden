@@ -212,9 +212,11 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
 
     try {
-      const result = await window.edenAPI.shellCommand("file/open", {
-        location: { path: item.location.path, volume: item.location.volume },
-      });
+      const result = await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("file/open", {
+          location: { path: item.location.path, volume: item.location.volume },
+        }),
+      );
       if (!result.success) {
         options.showError(`${t("files.errors.openFailed")}: ${result.error}`);
       }
@@ -227,10 +229,12 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const openItemWithApp = async (item: FileItem, appId: string) => {
     try {
-      const openResult = await window.edenAPI.shellCommand("file/open-with", {
-        location: { path: item.location.path, volume: item.location.volume },
-        appId,
-      });
+      const openResult = await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("file/open-with", {
+          location: { path: item.location.path, volume: item.location.volume },
+          appId,
+        }),
+      );
 
       if (!openResult.success) {
         options.showError(

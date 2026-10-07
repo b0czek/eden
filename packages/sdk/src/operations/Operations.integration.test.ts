@@ -90,6 +90,23 @@ describe("runtime-owned operations", () => {
         requestKey,
       });
 
+  it("rejects reserved stream handlers during registration", () => {
+    class StreamFixture {
+      prepare(): void {}
+    }
+    EdenNamespace("stream-fixture")(StreamFixture);
+    EdenHandler("scan", { mode: "stream" })(
+      StreamFixture.prototype,
+      "prepare",
+      Object.getOwnPropertyDescriptor(StreamFixture.prototype, "prepare")!,
+    );
+    expect(() =>
+      eden.runtime
+        .resolve(CommandRegistry)
+        .registerManager(new StreamFixture()),
+    ).toThrow("Stream handlers are not supported");
+  });
+
   it("accepts promptly, queues execution, retains completion and captured context", async () => {
     const blocked = gate();
     const file = path.join(eden.paths.root, "accepted.txt");
@@ -315,16 +332,14 @@ describe("runtime-owned operations", () => {
     );
     const processes = [];
     for (const id of [owner.appId, "other.backend"]) {
-      eden.runtime
-        .resolve(RuntimeContextRegistry)
-        .register(id, {
-          owner: {
-            kind: "session",
-            sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
-            username: null,
-          },
-          principal: { kind: "system" },
-        });
+      eden.runtime.resolve(RuntimeContextRegistry).register(id, {
+        owner: {
+          kind: "session",
+          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          username: null,
+        },
+        principal: { kind: "system" },
+      });
       const manifest = { ...app(id), backend: { entry: "backend.js" } };
       const starting = eden.runtime
         .resolve(BackendManager)

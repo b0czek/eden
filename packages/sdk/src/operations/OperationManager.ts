@@ -28,6 +28,7 @@ interface RecordEntry {
   finish: () => void;
   requestKey?: string;
   fingerprint: string;
+  transitionSessionId?: string;
 }
 
 /** Stable argument identity without caller-supplied metadata. */
@@ -105,7 +106,13 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     if (!task || typeof task.run !== "function" || "then" in task)
       throw new Error("Operation handlers must synchronously prepare a task");
     const id = randomUUID();
-    if (task.transition === "session") this.closedSessions.set(sessionId, id);
+    const transitionSessionId =
+      task.transition === "session" ? this.session.getSessionId() : undefined;
+    if (transitionSessionId) {
+      if (this.closedSessions.has(transitionSessionId))
+        throw new Error("A session transition is already in progress");
+      this.closedSessions.set(transitionSessionId, id);
+    }
     if (task.transition === "runtime") {
       this.accepting = false;
       this.runtimeTransition = id;
@@ -125,7 +132,8 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         updatedAt: now,
       },
       owner,
-      context: { ...context, sessionId, operationId: id },
+      transitionSessionId,
+      context: structuredClone({ ...context, sessionId, operationId: id }),
       done,
       finish,
       fingerprint,
@@ -148,10 +156,16 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     this.update(record, { status: "running", startedAt: Date.now() });
     try {
       if (task.transition === "session")
-        await this.drainSession(record.owner.sessionId, record.snapshot.id);
+        await this.drainSession(
+          record.transitionSessionId!,
+          record.snapshot.id,
+        );
       if (task.transition === "runtime") await this.drain(record.snapshot.id);
       const result = await task.run({
-        update: (phase, progress) => this.update(record, { phase, progress }),
+        update: (phase, progress) => {
+          if (record.snapshot.status === "running")
+            this.update(record, { phase, progress });
+        },
       });
       const failed = task.isFailure
         ? task.isFailure(result)
@@ -192,15 +206,17 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     } finally {
       if (
         task.transition === "session" &&
-        this.closedSessions.get(record.owner.sessionId) === record.snapshot.id
+        this.closedSessions.get(record.transitionSessionId!) ===
+          record.snapshot.id
       )
-        this.closedSessions.delete(record.owner.sessionId);
+        this.closedSessions.delete(record.transitionSessionId!);
       if (
         task.transition === "runtime" &&
         this.runtimeTransition === record.snapshot.id
       ) {
         this.runtimeTransition = undefined;
-        this.accepting = !this.shuttingDown;
+        this.accepting =
+          record.snapshot.status === "failed" && !this.shuttingDown;
       }
       record.finish();
       this.prune();
@@ -308,6 +324,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   async withSessionTransition<T>(task: () => Promise<T>): Promise<T> {
     const sessionId = this.session.getSessionId();
     const operationId = this.execution.get()?.operationId;
+    if (!this.accepting) throw new Error("Runtime operations are draining");
     const reserved = this.closedSessions.get(sessionId);
     if (reserved && reserved !== operationId)
       throw new Error("A session transition is already in progress");
@@ -319,6 +336,27 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     } finally {
       if (this.closedSessions.get(sessionId) === reservation)
         this.closedSessions.delete(sessionId);
+    }
+  }
+
+  async withRuntimeTransition<T>(task: () => Promise<T>): Promise<T> {
+    const operationId = this.execution.get()?.operationId;
+    if (this.runtimeTransition && this.runtimeTransition !== operationId)
+      throw new Error("A runtime transition is already in progress");
+    if (!this.accepting && this.runtimeTransition !== operationId)
+      throw new Error("Runtime operations are draining");
+    const reservation = operationId ?? randomUUID();
+    this.runtimeTransition = reservation;
+    this.accepting = false;
+    try {
+      await this.drain(operationId);
+      return await task();
+    } catch (error) {
+      this.accepting = !this.shuttingDown;
+      throw error;
+    } finally {
+      if (this.runtimeTransition === reservation)
+        this.runtimeTransition = undefined;
     }
   }
 

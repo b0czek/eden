@@ -234,12 +234,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
   /**
    * Launch an app
    */
-  async launchApp(
-    appId: string,
-    bounds?: { x: number; y: number; width: number; height: number },
-    launchArgs?: string[],
-    launchFile?: FilesystemLocation,
-  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+  assertCanLaunch(appId: string): void {
     const developmentApp =
       this.config.development &&
       this.packageCatalog.getApp(appId)?.isDevelopment;
@@ -250,6 +245,15 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     ) {
       throw new Error(`User cannot launch app ${appId}`);
     }
+  }
+
+  async launchApp(
+    appId: string,
+    bounds?: { x: number; y: number; width: number; height: number },
+    launchArgs?: string[],
+    launchFile?: FilesystemLocation,
+  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
+    this.assertCanLaunch(appId);
 
     const currentUser = this.sessionContext.getCurrentUser();
     return await this.launchAppInternal(

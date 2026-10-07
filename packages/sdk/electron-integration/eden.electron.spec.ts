@@ -382,6 +382,136 @@ test.describe
         });
     });
 
+    test("accepts renderer and backend operations and observes work beyond former IPC deadlines", async () => {
+      test.setTimeout(45_000);
+      await expect
+        .poll(async () => {
+          try {
+            return await fs.readFile(
+              path.join(fixtureDirectory, "backend-operation-ready"),
+              "utf8",
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toBe("ready");
+      await electronApp?.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { volumes: { register(input: unknown): Promise<unknown> } };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register({
+          id: "operation-delay",
+          label: "Operation trigger",
+          kind: "local",
+          rootPath,
+        });
+      }, root);
+      try {
+        const rendererHandle = (await electronApp?.evaluate(
+          async ({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) throw new Error("Integration view missing");
+            return contents.executeJavaScript(
+              `window.edenAPI.shellCommand("integration/delayed", {name: "renderer"})`,
+            );
+          },
+          APP_ID,
+        )) as { command: string; id: string };
+        expect(rendererHandle).toMatchObject({
+          command: "integration/delayed",
+          id: expect.any(String),
+        });
+        await expect
+          .poll(async () => {
+            try {
+              return JSON.parse(
+                await fs.readFile(
+                  path.join(
+                    fixtureDirectory,
+                    "backend-operation-accepted.json",
+                  ),
+                  "utf8",
+                ),
+              );
+            } catch {
+              return undefined;
+            }
+          })
+          .toMatchObject({
+            command: "integration/delayed",
+            id: expect.any(String),
+          });
+        const completed = await electronApp?.evaluate(
+          async ({ webContents }, { appId, handle }) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) throw new Error("Integration view missing");
+            return contents.executeJavaScript(`(async () => {
+          const handle = ${JSON.stringify(handle)};
+          const revisions = [];
+          const stop = await window.edenAPI.operations.watch(handle, snapshot => revisions.push(snapshot.revision));
+          const completion = await window.edenAPI.operations.wait(handle);
+          stop();
+          const retained = await window.edenAPI.operations.wait(handle);
+          return {completion, retained, revisions};
+        })()`);
+          },
+          { appId: APP_ID, handle: rendererHandle },
+        );
+        expect(completed).toMatchObject({
+          completion: { name: "renderer" },
+          retained: { name: "renderer" },
+          revisions: expect.any(Array),
+        });
+        await expect
+          .poll(async () => {
+            try {
+              return JSON.parse(
+                await fs.readFile(
+                  path.join(fixtureDirectory, "backend-operation-result.json"),
+                  "utf8",
+                ),
+              );
+            } catch {
+              return undefined;
+            }
+          })
+          .toMatchObject({
+            completion: { name: "backend" },
+            revisions: expect.any(Array),
+          });
+        expect(
+          await fs.readFile(
+            path.join(root, "users", "operation-renderer.txt"),
+            "utf8",
+          ),
+        ).toBe("renderer");
+        expect(
+          await fs.readFile(
+            path.join(root, "users", "operation-backend.txt"),
+            "utf8",
+          ),
+        ).toBe("backend");
+      } finally {
+        await electronApp?.evaluate(() => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { unregister(id: string): boolean } };
+            };
+          };
+          integration.__edenIntegration.eden.volumes.unregister(
+            "operation-delay",
+          );
+        });
+      }
+    });
+
     test("round-trips binary filesystem data across renderer IPC", async () => {
       const result = await electronApp?.evaluate(
         async ({ webContents }, appId) => {

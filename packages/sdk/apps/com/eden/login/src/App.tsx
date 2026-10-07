@@ -135,10 +135,12 @@ const App = () => {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await window.edenAPI.shellCommand("session/login", {
-        username,
-        password: password(),
-      });
+      const result = await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("session/login", {
+          username,
+          password: password(),
+        }),
+      );
       if (!result.success) {
         setError(result.error ?? t("login.loginFailed"));
       } else {
@@ -168,7 +170,9 @@ const App = () => {
     if (!confirmed) return;
 
     try {
-      await window.edenAPI.shellCommand("system/power", { action });
+      await window.edenAPI.operations.wait(
+        await window.edenAPI.shellCommand("system/power", { action }),
+      );
     } catch (error) {
       console.error(`Failed to ${action} the system:`, error);
       await dialogs.alert({
