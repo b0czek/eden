@@ -10,12 +10,19 @@ import type {
   FileHandlerInfo,
   FilesystemLocation,
   RuntimeAppManifest,
+  OperationHandle,
+  OperationCompletion,
 } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
 import { locale, t } from "../i18n";
 
 interface UseFileActionsOptions {
+  runOperation: <C extends string>(
+    operation: "copy" | "move" | "delete" | "open",
+    item: FileItem,
+    submit: () => Promise<OperationHandle<C>>,
+  ) => Promise<OperationCompletion<C>>;
   currentPath: Accessor<string>;
   currentVolume: Accessor<string>;
   refresh: () => void;
@@ -188,8 +195,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         targetPath = joinPath(getParentPath(item.location.path), targetName);
       }
 
-      await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("fs/cp", {
+      await options.runOperation("copy", item, () =>
+        window.edenAPI.shellCommand("fs/cp", {
           from: item.location,
           to: { volume: item.location.volume, path: targetPath },
         }),
@@ -199,6 +206,10 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       options.setSelectedItem(targetPath);
       options.refresh();
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        options.refresh();
+        return;
+      }
       options.showError(
         `${t("files.errors.duplicateFailed")}: ${(error as Error).message}`,
       );
@@ -212,8 +223,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
 
     try {
-      const result = await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("file/open", {
+      const result = await options.runOperation("open", item, () =>
+        window.edenAPI.shellCommand("file/open", {
           location: { path: item.location.path, volume: item.location.volume },
         }),
       );
@@ -229,8 +240,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const openItemWithApp = async (item: FileItem, appId: string) => {
     try {
-      const openResult = await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("file/open-with", {
+      const openResult = await options.runOperation("open", item, () =>
+        window.edenAPI.shellCommand("file/open-with", {
           location: { path: item.location.path, volume: item.location.volume },
           appId,
         }),
@@ -408,8 +419,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         return t("files.errors.itemAlreadyExists");
       }
 
-      await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("fs/mv", {
+      await options.runOperation("move", item, () =>
+        window.edenAPI.shellCommand("fs/mv", {
           from: item.location,
           to: { volume: item.location.volume, path: targetPath },
         }),
@@ -434,8 +445,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const deleteItem = async (item: FileItem) => {
     try {
-      await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("fs/delete", {
+      await options.runOperation("delete", item, () =>
+        window.edenAPI.shellCommand("fs/delete", {
           location: { path: item.location.path, volume: item.location.volume },
         }),
       );
