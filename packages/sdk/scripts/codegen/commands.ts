@@ -17,6 +17,8 @@ export interface CommandInfo {
   command: string;
   argsType: string;
   returnType: string;
+  mode: "immediate" | "operation" | "stream";
+  chunkType?: string;
   docs: string[];
 }
 
@@ -27,6 +29,8 @@ export interface NamespaceCommands {
     command: string;
     argsType: string;
     returnType: string;
+    mode: "immediate" | "operation" | "stream";
+    chunkType?: string;
     docs: string[];
   }>;
 }
@@ -96,7 +100,33 @@ export function extractCommandHandlers(
           }
         }
 
+        const options = args[1];
+        let mode: "immediate" | "operation" | "stream" = "immediate";
+        if (options && Node.isObjectLiteralExpression(options)) {
+          const property = options.getProperty("mode");
+          if (property && Node.isPropertyAssignment(property)) {
+            const value = property.getInitializer();
+            if (value && Node.isStringLiteral(value)) {
+              const name = value.getLiteralText();
+              if (name === "operation" || name === "stream") mode = name;
+            }
+          }
+        }
+        let chunkType: string | undefined;
+        if (mode !== "immediate") {
+          if (!returnTypeNode || !Node.isTypeReference(returnTypeNode)) {
+            throw new Error(
+              `${namespace}/${commandName} requires an explicit task type`,
+            );
+          }
+          const types = returnTypeNode.getTypeArguments();
+          returnType = types[mode === "stream" ? 1 : 0]?.getText() ?? "void";
+          if (mode === "stream") chunkType = types[0]?.getText() ?? "unknown";
+        }
+
         commands.push({
+          mode,
+          chunkType,
           namespace,
           command: commandName,
           argsType,
@@ -127,6 +157,8 @@ export function groupCommandsByNamespace(
       });
     }
     namespaceMap.get(cmd.namespace)?.commands.push({
+      mode: cmd.mode,
+      chunkType: cmd.chunkType,
       command: cmd.command,
       argsType: cmd.argsType,
       returnType: cmd.returnType,
@@ -176,8 +208,22 @@ export function generateCommandsCode(
       );
 
       lines.push(`  "${ns.namespace}/${cmd.command}": {`);
+      lines.push(`    mode: "${cmd.mode}";`);
       lines.push(`    args: ${argsType};`);
-      lines.push(`    response: ${returnType};`);
+      if (cmd.mode === "immediate") {
+        lines.push(`    response: ${returnType};`);
+      } else {
+        const handle =
+          cmd.mode === "operation" ? "OperationHandle" : "StreamHandle";
+        lines.push(
+          `    response: import("./index").${handle}<"${ns.namespace}/${cmd.command}">;`,
+        );
+        lines.push(`    completion: ${returnType};`);
+        if (cmd.mode === "stream")
+          lines.push(
+            `    chunk: ${replaceTypesWithInlineImports(cmd.chunkType ?? "unknown", exportedTypes)};`,
+          );
+      }
       lines.push(`  };`);
     });
 

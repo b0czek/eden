@@ -33,6 +33,7 @@ export interface CommandMetadata {
   command: string;
   handler: CommandHandler;
   target: object; // The instance that owns the handler
+  mode: "immediate" | "operation" | "stream";
   permission?: string; // Full permission: "namespace/action"
   methodName: string; // Original method name for metadata lookup
 }
@@ -87,7 +88,17 @@ export class CommandRegistry {
       }
     }
 
+    const mode = methodName
+      ? (Reflect.getMetadata(
+          "eden:handler:mode",
+          target.constructor.prototype,
+          methodName,
+        ) ?? "immediate")
+      : "immediate";
+    if (mode === "stream") throw new Error("Stream handlers are not supported");
+
     this.handlers.set(fullCommand, {
+      mode,
       namespace,
       command,
       handler,

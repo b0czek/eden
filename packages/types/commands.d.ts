@@ -30,3 +30,17 @@ export type CommandArgs<T extends CommandName> = CommandMap[T]["args"];
  * Get command result type
  */
 export type CommandResult<T extends CommandName> = CommandMap[T]["response"];
+
+/** Eventual completion; immediate commands have no separate completion. */
+export type CommandCompletion<T extends CommandName> = CommandMap[T] extends {
+  completion: infer R;
+}
+  ? R
+  : never;
+
+/** Reserved stream data; non-stream commands have no chunks. */
+export type CommandChunk<T extends CommandName> = CommandMap[T] extends {
+  chunk: infer R;
+}
+  ? R
+  : never;
