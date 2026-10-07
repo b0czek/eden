@@ -122,13 +122,15 @@ describe("runtime-owned operations", () => {
       }),
     );
     const handle = await submit();
-    expect(manager.get(handle, owner).status).toBe("queued");
+    const accepted = manager.get(handle, owner);
+    expect(accepted.status).toBe("queued");
     await tick();
-    expect(manager.get(handle, owner)).toMatchObject({
+    const running = manager.get(handle, owner);
+    expect(running).toMatchObject({
       status: "running",
       phase: "writing",
-      revision: 3,
     });
+    expect(running.revision).toBeGreaterThan(accepted.revision);
     blocked.release();
     await expect(manager.wait(handle, owner)).resolves.toEqual({
       value: "value",
@@ -145,6 +147,7 @@ describe("runtime-owned operations", () => {
     register(() => operationTask(async () => "done"));
     const handle = await submit();
     await manager.wait(handle, owner);
+    const completed = manager.get(handle, owner);
     const callbacks = new Set<
       (data: { snapshot: OperationSnapshot }) => void
     >();
@@ -164,16 +167,17 @@ describe("runtime-owned operations", () => {
         );
       },
     });
-    const typedHandle = handle as OperationHandle<"fs/cp">;
-    await expect(api.wait(typedHandle)).resolves.toBe("done");
+    await expect(api.wait(handle)).resolves.toBe("done");
     expect(callbacks.size).toBe(0);
     const revisions: number[] = [];
-    const stop = await api.watch(typedHandle, (snapshot) =>
+    const stop = await api.watch(handle, (snapshot) =>
       revisions.push(snapshot.revision),
     );
     for (const callback of callbacks)
-      callback({ snapshot: { ...manager.get(handle, owner), revision: 1 } });
-    expect(revisions).toEqual([3]);
+      callback({
+        snapshot: { ...completed, revision: completed.revision - 1 },
+      });
+    expect(revisions).toEqual([completed.revision]);
     stop();
     off();
   });

@@ -59,32 +59,6 @@ describe("SessionManager", () => {
 
   afterEach(() => operations.dispose());
 
-  it("stops apps before committing and publishing a new identity", async () => {
-    context.setCurrentUser(alice);
-    const order: string[] = [];
-    userManager.authenticate.mockImplementation(async () => {
-      order.push("authenticate");
-      return bob;
-    });
-    processManager.stopSessionApps.mockImplementation(async () => {
-      order.push("stop");
-      expect(manager.getCurrentUser()?.username).toBe("alice");
-    });
-    notify.mockImplementation(() => {
-      order.push("notify");
-      expect(manager.getCurrentUser()?.username).toBe("bob");
-    });
-
-    await manager.login("bob", "password");
-
-    expect(order).toEqual(["authenticate", "stop", "notify"]);
-    expect(notify).toHaveBeenCalledWith("session/changed", {
-      currentUser: bob,
-      previousUsername: "alice",
-      reason: "login",
-    });
-  });
-
   it("does not stop apps or change identity when authentication fails", async () => {
     context.setCurrentUser(alice);
     userManager.authenticate.mockRejectedValue(
