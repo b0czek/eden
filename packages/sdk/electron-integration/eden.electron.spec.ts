@@ -1222,6 +1222,9 @@ test.describe
           `document.querySelector('.file-list')?.textContent ?? ''`,
         );
       try {
+        await expect
+          .poll(() => evaluateApp(APP_ID, `typeof window.edenAPI`))
+          .toBe("object");
         await setConnected(true);
         await evaluateApp(
           APP_ID,
@@ -1250,6 +1253,130 @@ test.describe
     });
 
     for (const appId of ["com.eden.files", "com.eden.file-picker"]) {
+      test(`${appId} resumes live updates after a failed eject`, async () => {
+        const running = await executeHostCommand<
+          { manifest: { id: string } }[]
+        >("process/list", {});
+        if (!running.some((process) => process.manifest.id === APP_ID))
+          await executeHostCommand("process/launch", { appId: APP_ID });
+        const driveRoot = path.join(root, `failed-eject-${appId}`);
+        await fs.mkdir(driveRoot);
+        await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
+        await electronApp?.evaluate(async (_electron, rootPath) => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: {
+                volumes: {
+                  register(
+                    input: unknown,
+                    options: { eject(): Promise<void> },
+                  ): Promise<unknown>;
+                };
+              };
+            };
+            __rejectExplorerEject?: () => void;
+          };
+          await integration.__edenIntegration.eden.volumes.register(
+            {
+              id: "failed-eject-drive",
+              label: "Busy drive",
+              kind: "removable",
+              rootPath,
+            },
+            {
+              eject: () =>
+                new Promise<void>((_resolve, reject) => {
+                  integration.__rejectExplorerEject = () =>
+                    reject(new Error("Device is busy"));
+                }),
+            },
+          );
+        }, driveRoot);
+        const evaluateApp = async (targetAppId: string, script: string) =>
+          electronApp?.evaluate(
+            async ({ webContents }, input) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(input.appId));
+              return contents?.executeJavaScript(input.script);
+            },
+            { appId: targetAppId, script },
+          );
+        const listing = () =>
+          evaluateApp(
+            appId,
+            `document.querySelector('.file-list')?.textContent ?? ''`,
+          );
+        try {
+          await expect
+            .poll(() => evaluateApp(APP_ID, `typeof window.edenAPI`))
+            .toBe("object");
+          if (appId === "com.eden.files") {
+            await expect(
+              executeHostCommand("file/open", {
+                location: { volume: "failed-eject-drive", path: "/" },
+              }),
+            ).resolves.toMatchObject({ success: true, appId });
+          } else {
+            await evaluateApp(
+              APP_ID,
+              `window.edenAPI.shellCommand('file-picker/open', {
+              mode: 'open', allowedVolumes: ['failed-eject-drive'], initialLocation: { volume: 'failed-eject-drive', path: '/' }
+            })`,
+            );
+          }
+          await expect.poll(listing).toContain("before.txt");
+          const removal = executeHostCommand("fs/eject", {
+            volume: "failed-eject-drive",
+          });
+          const failure = expect(removal).rejects.toThrow("Device is busy");
+          await expect
+            .poll(() =>
+              electronApp?.evaluate(
+                () =>
+                  typeof (
+                    globalThis as typeof globalThis & {
+                      __rejectExplorerEject?: () => void;
+                    }
+                  ).__rejectExplorerEject,
+              ),
+            )
+            .toBe("function");
+          await fs.writeFile(
+            path.join(driveRoot, "during-eject.txt"),
+            "during",
+          );
+          await electronApp?.evaluate(() =>
+            (
+              globalThis as typeof globalThis & {
+                __rejectExplorerEject?: () => void;
+              }
+            ).__rejectExplorerEject?.(),
+          );
+          await failure;
+          // Recovery reloads changes made while the native watch was closed.
+          await expect.poll(listing).toContain("during-eject.txt");
+          await fs.writeFile(path.join(driveRoot, "after-eject.txt"), "after");
+          // A later native change proves the recreated watch delivers live updates.
+          await expect.poll(listing).toContain("after-eject.txt");
+        } finally {
+          await electronApp?.evaluate(() => {
+            const integration = globalThis as typeof globalThis & {
+              __edenIntegration: {
+                eden: { volumes: { unregister(id: string): boolean } };
+              };
+              __rejectExplorerEject?: () => void;
+            };
+            integration.__rejectExplorerEject?.();
+            delete integration.__rejectExplorerEject;
+            integration.__edenIntegration.eden.volumes.unregister(
+              "failed-eject-drive",
+            );
+          });
+          await executeHostCommand("process/stop", { appId });
+        }
+      });
+
       test(`${appId} watches the parent after recovering from a deleted directory`, async () => {
         const running = await executeHostCommand<
           { manifest: { id: string } }[]

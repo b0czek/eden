@@ -80,7 +80,9 @@ export const useExplorerNavigation = (
   const establishWatch = async (location: FilesystemLocation) => {
     const { path, volume } = location;
     if (
-      !volumeInventory().find((entry) => entry.id === volume)?.supportsWatch
+      !volumeInventory().find(
+        (entry) => entry.id === volume && entry.state === "ready",
+      )?.supportsWatch
     ) {
       await stopWatch();
       return false;
@@ -273,12 +275,19 @@ export const useExplorerNavigation = (
   }) => {
     inventoryVersion += 1;
     const previous = currentVolume();
-    const wasAvailable = volumeInventory().some(
-      (volume) => volume.id === previous,
+    const wasReady = volumeInventory().some(
+      (volume) => volume.id === previous && volume.state === "ready",
     );
     setVolumeInventory(inventory);
-    if (inventory.some((volume) => volume.id === previous)) {
-      if (!wasAvailable && (!options.active || options.active())) {
+    const selectedVolume = inventory.find((volume) => volume.id === previous);
+    if (selectedVolume) {
+      if (selectedVolume.state !== "ready") {
+        requestSequence += 1;
+        void stopWatch();
+        setLoading(false);
+        return;
+      }
+      if (!wasReady && (!options.active || options.active())) {
         void loadDirectory(currentLocation());
       }
       return;
