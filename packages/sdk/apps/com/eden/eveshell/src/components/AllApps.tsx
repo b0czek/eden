@@ -73,12 +73,15 @@ export default function AllApps(props: AllAppsProps) {
                   class="all-apps-tile eden-interactive"
                   classList={{ running: app.isRunning }}
                   onClick={() => handleTileClick(app.id)}
+                  disabled={Boolean(app.activity)}
+                  aria-busy={Boolean(app.activity)}
                   onContextMenu={props.appMenu.handler(app)}
                 >
                   <AppIcon
                     appId={app.id}
                     appName={app.name}
                     isRunning={app.isRunning}
+                    activity={app.activity}
                   />
                 </button>
               )}
