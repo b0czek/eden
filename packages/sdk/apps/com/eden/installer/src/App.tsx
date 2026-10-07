@@ -1,3 +1,5 @@
+import { createOperation, OperationStatus } from "@edenapp/solid-kit";
+import { initLocale, t } from "./i18n";
 import type {
   AppManifest,
   FilesystemLocation,
@@ -16,7 +18,8 @@ interface PackageInfoResponse {
 
 const App = () => {
   const [loading, setLoading] = createSignal(true);
-  const [installing, setInstalling] = createSignal(false);
+  const operation = createOperation();
+  const installing = operation.pending;
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal(false);
   const [manifest, setManifest] = createSignal<PackageManifest | null>(null);
@@ -28,6 +31,7 @@ const App = () => {
   );
 
   onMount(async () => {
+    await initLocale();
     const launchFile = window.edenAPI.getLaunchFile();
     if (launchFile) {
       loadPackage(launchFile);
@@ -44,6 +48,7 @@ const App = () => {
   });
 
   const loadPackage = async (location: FilesystemLocation) => {
+    if (installing()) return;
     setLoading(true);
     setError(null);
     setPackagePath(location);
@@ -71,7 +76,7 @@ const App = () => {
   const installPackage = async () => {
     const path = packagePath();
     const packageManifest = manifest();
-    if (!path || !packageManifest) return;
+    if (!path || !packageManifest || installing()) return;
 
     const currentPreview = preview();
     const existingVersion = currentPreview?.existingVersion;
@@ -92,10 +97,9 @@ const App = () => {
       }
     }
 
-    setInstalling(true);
     try {
-      await window.edenAPI.operations.wait(
-        await window.edenAPI.shellCommand("package/install", {
+      await operation.run(() =>
+        window.edenAPI.shellCommand("package/install", {
           source: path,
           replace: !!existingVersion,
         }),
@@ -106,8 +110,29 @@ const App = () => {
       }, 2000);
     } catch (err) {
       setError((err as Error).message);
-    } finally {
-      setInstalling(false);
+    }
+  };
+
+  const installationPhase = () => {
+    switch (operation.snapshot()?.phase) {
+      case "waiting-for-package-lock":
+        return t("installer.waiting");
+      case "reading-archive":
+        return t("installer.reading");
+      case "extracting-archive":
+        return t("installer.extracting");
+      case "staging-transaction":
+        return t("installer.staging");
+      case "applying-transaction":
+        return t("installer.applying");
+      case "committing-transaction":
+        return t("installer.committing");
+      case "registering-package":
+        return t("installer.registering");
+      case "rolling-back-transaction":
+        return t("installer.rollingBack");
+      default:
+        return t("installer.staging");
     }
   };
 
@@ -286,6 +311,16 @@ const App = () => {
                 </div>
               </Show>
 
+              <Show when={installing()}>
+                <div class="eden-p-md">
+                  <OperationStatus
+                    label={t("installer.installing")}
+                    description={installationPhase()}
+                    snapshot={operation.snapshot()}
+                  />
+                </div>
+              </Show>
+
               <div class="eden-mt-auto eden-flex-end eden-gap-md eden-pt-lg">
                 <button
                   type="button"
@@ -301,7 +336,9 @@ const App = () => {
                   disabled={installing() || success() || !!blockingMessage()}
                   onClick={installPackage}
                 >
-                  {installing() ? "Installing..." : installLabel(app.version)}
+                  {installing()
+                    ? t("installer.installing")
+                    : installLabel(app.version)}
                 </button>
               </div>
             </div>

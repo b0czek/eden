@@ -1,6 +1,8 @@
 ---
 "@edenapp/sdk": minor
 "@edenapp/types": minor
+"@edenapp/solid-kit": minor
+"@edenapp/files-core": patch
 ---
 
-Add typed IPC operations with prompt acceptance, retained completion and failures, scoped renderer and backend observation, request-key deduplication, and draining before session changes and runtime shutdown. Operation watchers receive updates only for their selected operation, while waiting receives completion updates only. Unchanged progress reports produce no duplicate updates, and unobserved work retains its state without building notification payloads. Event listeners share remote subscriptions, recover safely from registration failures, isolate asynchronous callback errors, and release backend subscriptions on exit. Immediate commands keep their existing results; stream and cancellation interfaces are reserved for future support.
+Add typed long-running IPC operations with immediate acceptance and observable progress, completion, and failures. Built-in apps display operation progress and status, and Solid apps can use `createOperation` and `OperationStatus` for their own UI. Accepted work finishes before session changes and runtime shutdown.
