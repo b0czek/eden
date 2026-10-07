@@ -1,12 +1,12 @@
 import type {
-  OperationCompletion,
   EdenAPI,
-  OperationHandle,
-  OperationSnapshot,
-  OperationsAPI,
-  OperationObservation,
   EventData,
   EventName,
+  OperationCompletion,
+  OperationHandle,
+  OperationObservation,
+  OperationSnapshot,
+  OperationsAPI,
 } from "@edenapp/types";
 
 import { invokeEventListener } from "./event-subscriptions";

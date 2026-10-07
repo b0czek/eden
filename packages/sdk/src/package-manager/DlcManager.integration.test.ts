@@ -6,12 +6,12 @@ import type {
   AppManifest,
   DlcManifest,
   InstalledPackageInfo,
+  OperationHandle,
   UserProfile,
 } from "@edenapp/types";
 import type { EdenPackageChange } from "../api";
-import { OperationManager } from "../operations/OperationManager";
-import type { OperationHandle } from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { SettingsPanelManager } from "../settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { ViewManager } from "../view-manager/ViewManager";

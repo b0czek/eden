@@ -1,6 +1,6 @@
 import { createResource, Show } from "solid-js";
-import { fetchAppIcon } from "../icon-cache";
 import { t } from "../i18n";
+import { fetchAppIcon } from "../icon-cache";
 
 interface AppIconProps {
   appId: string;

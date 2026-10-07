@@ -2,10 +2,10 @@ import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle } from "@edenapp/types";
+import { PermissionRegistry } from "../ipc";
 import { OperationManager } from "../operations/OperationManager";
 import { operationTask } from "../operations/OperationTask";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
-import { PermissionRegistry } from "../ipc";
 import { SessionContext } from "./SessionContext";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));

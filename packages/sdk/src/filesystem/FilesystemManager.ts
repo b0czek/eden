@@ -7,15 +7,15 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
-import type {
-  OperationReporter,
-  OperationTask,
-} from "../operations/OperationTask";
 import fg from "fast-glob";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import type {
+  OperationReporter,
+  OperationTask,
+} from "../operations/OperationTask";
 import {
   assertExistingPathWithin,
   assertPathWithin,

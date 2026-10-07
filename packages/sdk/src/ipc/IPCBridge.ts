@@ -1,11 +1,11 @@
-import type { OperationSubmission } from "@edenapp/types";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import { OperationManager } from "../operations/OperationManager";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import type { OperationSubmission } from "@edenapp/types";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
+import { OperationManager } from "../operations/OperationManager";
 import {
   PLATFORM_RENDERER_IPC,
   type PlatformWindow,

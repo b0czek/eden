@@ -1,8 +1,8 @@
 import type {
   CommandArgs,
+  CommandMap,
   CommandName,
   CommandResponse,
-  CommandMap,
   OperationHandle,
   OperationSubmission,
 } from "@edenapp/types";

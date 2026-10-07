@@ -9,9 +9,9 @@ import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
 import type {
   FileHandlerInfo,
   FilesystemLocation,
-  RuntimeAppManifest,
   Operation,
   OperationCompletion,
+  RuntimeAppManifest,
 } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";

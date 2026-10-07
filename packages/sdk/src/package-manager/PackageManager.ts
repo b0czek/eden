@@ -1,7 +1,3 @@
-import type {
-  OperationReporter,
-  OperationTask,
-} from "../operations/OperationTask";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
@@ -36,6 +32,10 @@ import {
   PermissionRegistry,
 } from "../ipc";
 import { log } from "../logging";
+import type {
+  OperationReporter,
+  OperationTask,
+} from "../operations/OperationTask";
 import { normalizeAppIds } from "../utils/normalize";
 import { DlcResourceManager } from "./DlcResourceManager";
 import { PackageCatalog } from "./PackageCatalog";

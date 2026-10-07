@@ -6,7 +6,6 @@ import type {
   PackageOperationPreview,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import { operationTask, type OperationTask } from "../operations/OperationTask";
 import * as v from "valibot";
 import {
   filesystemLocationArgsSchema,
@@ -14,6 +13,7 @@ import {
 } from "../filesystem/FilesystemLocationSchema";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import type { PackageManager } from "./PackageManager";
 
 const installPackageArgs = v.object({

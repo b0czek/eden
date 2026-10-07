@@ -1,9 +1,9 @@
-import type { OperationReporter } from "../operations/OperationTask";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { inject, Lifecycle, scoped } from "tsyringe";
 import { log } from "../logging";
+import type { OperationReporter } from "../operations/OperationTask";
 
 interface TransactionEntry {
   target: string;

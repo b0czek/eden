@@ -1,9 +1,9 @@
-import type { OperationManager } from "../operations/OperationManager";
-import { operationTask } from "../operations/OperationTask";
 import type { AppAssociationManager } from "../app-associations";
 import type { AppearanceManager } from "../appearance/AppearanceManager";
 import type { DaemonManager } from "../daemon";
 import type { VolumeManager } from "../filesystem/VolumeManager";
+import type { OperationManager } from "../operations/OperationManager";
+import { operationTask } from "../operations/OperationTask";
 import type { PackageManager } from "../package-manager";
 import type { SessionManager } from "../session";
 import type { UserManager } from "../user";

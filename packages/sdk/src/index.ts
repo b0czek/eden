@@ -1,6 +1,9 @@
 import "reflect-metadata";
 
 export type {
+  CommandChunk,
+  CommandCompletion,
+  CommunicationMode,
   EdenConfig,
   EdenPowerCapabilities,
   EdenPowerProvider,
@@ -9,22 +12,19 @@ export type {
   FilesystemVolumeKind,
   FilesystemVolumeRegistration,
   FilesystemVolumeState,
-  CommunicationMode,
   ImmediateCommand,
+  OperationCancellation,
   OperationCommand,
-  StreamCommand,
+  OperationCompletion,
+  OperationError,
   OperationHandle,
   OperationObservation,
-  StreamHandle,
-  OperationSnapshot,
-  OperationCompletion,
   OperationProgress,
-  OperationError,
+  OperationSnapshot,
   OperationSubmission,
-  OperationCancellation,
   OperationsAPI,
-  CommandCompletion,
-  CommandChunk,
+  StreamCommand,
+  StreamHandle,
 } from "@edenapp/types";
 export * from "./api";
 export { Eden } from "./Eden";

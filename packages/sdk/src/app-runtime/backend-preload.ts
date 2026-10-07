@@ -24,11 +24,9 @@ import type {
   AppBusConnection,
   CommandArgs,
   CommandName,
-  OperationSubmission,
   EdenAPI,
+  OperationSubmission,
 } from "@edenapp/types";
-import type { ShellCommandResponse } from "./common/shell-transport";
-
 import type { WorkerGlobal } from "@edenapp/types/worker";
 import {
   createAppBusAPI,
@@ -45,6 +43,7 @@ import {
   handleAppBusPort as handlePortSetup,
   wrapElectronPort,
 } from "./common/port-channel";
+import type { ShellCommandResponse } from "./common/shell-transport";
 
 type RuntimeMessage = {
   type: string;

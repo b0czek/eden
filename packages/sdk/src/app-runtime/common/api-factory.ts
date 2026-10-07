@@ -1,7 +1,7 @@
 export { createEdenAPI } from "./eden-api";
-export type { ShellTransport } from "./shell-transport";
 export type { EventSubscriptionCallback } from "./event-subscriptions";
-import type { ShellTransport } from "./shell-transport";
+export type { ShellTransport } from "./shell-transport";
+
 import type {
   AppBusAPI,
   AppBusConnection,
@@ -10,6 +10,7 @@ import type {
 } from "@edenapp/types";
 import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
+import type { ShellTransport } from "./shell-transport";
 
 /**
  * Configuration for AppBus API

@@ -1,12 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { OperationHandle, EdenConfig } from "@edenapp/types";
+import type { EdenConfig, OperationHandle } from "@edenapp/types";
 import type { CommandCallerContext } from "../execution";
 import { CommandRegistry, PermissionRegistry } from "../ipc";
 import { OperationManager } from "../operations/OperationManager";
-import { SessionContext } from "../session/SessionContext";
 import { EdenRuntime, type EdenRuntimePaths } from "../runtime/EdenRuntime";
+import { SessionContext } from "../session/SessionContext";
 import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,

@@ -6,10 +6,10 @@ import {
 } from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
-  Operation,
   AppInstance,
   AppManifest,
   EdenPowerCapabilities,
+  Operation,
   UserProfile,
   WindowSize,
 } from "@edenapp/types";

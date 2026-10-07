@@ -1,7 +1,7 @@
-import * as v from "valibot";
-import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type { DaemonDefinition, DaemonStatus } from "@edenapp/types";
+import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import type { DaemonManager } from "./DaemonManager";
 
 @EdenNamespace("daemon")

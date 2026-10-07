@@ -7,12 +7,12 @@ import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
 import { decodeLaunchContext } from "../utils/appLaunchContext";
-import { dispatchEvent } from "./common/event-subscriptions";
 import {
   createAppBusAPI,
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import { dispatchEvent } from "./common/event-subscriptions";
 import {
   type AppBusPortData,
   createAppBusState,

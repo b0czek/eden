@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
-import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { OperationManager } from "../operations/OperationManager";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 
@@ -16,20 +16,18 @@ describe("daemon operation lifecycle", () => {
   it("retains start, restart, and stop completion across real daemon and process managers", async () => {
     eden = await createTestEden();
     const appId = "com.example.operation-daemon";
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register({
-        kind: "app",
-        id: appId,
-        name: "Operation daemon",
-        version: "1.0.0",
-        backend: { entry: "backend.js" },
-        isPrebuilt: false,
-        isDevelopment: false,
-        isCore: false,
-        isRestricted: false,
-        resolvedGrants: [],
-      } as RuntimeAppManifest);
+    eden.runtime.resolve(PackageRegistry).register({
+      kind: "app",
+      id: appId,
+      name: "Operation daemon",
+      version: "1.0.0",
+      backend: { entry: "backend.js" },
+      isPrebuilt: false,
+      isDevelopment: false,
+      isCore: false,
+      isRestricted: false,
+      resolvedGrants: [],
+    } as RuntimeAppManifest);
     const profile = await eden.runtime.users.create({
       username: "daemon",
       name: "Daemon",

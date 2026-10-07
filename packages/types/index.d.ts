@@ -61,8 +61,8 @@ export * from "./channels";
 // Export new command types
 export type {
   CommandArgs,
-  CommandCompletion,
   CommandChunk,
+  CommandCompletion,
   CommandMap,
   CommandName,
   CommandResponse,

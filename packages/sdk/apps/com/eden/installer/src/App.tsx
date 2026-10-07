@@ -1,5 +1,4 @@
 import { createOperation, OperationStatus } from "@edenapp/solid-kit";
-import { initLocale, t } from "./i18n";
 import type {
   AppManifest,
   FilesystemLocation,
@@ -8,6 +7,7 @@ import type {
 } from "@edenapp/types";
 import { FiAlertTriangle, FiCheck, FiLock, FiPackage } from "solid-icons/fi";
 import { createSignal, For, onMount, Show } from "solid-js";
+import { initLocale, t } from "./i18n";
 
 interface PackageInfoResponse {
   success: boolean;

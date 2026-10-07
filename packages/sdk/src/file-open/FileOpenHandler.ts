@@ -1,4 +1,3 @@
-import type { OperationTask } from "../operations/OperationTask";
 import type {
   FileHandlerInfo,
   FileOpenResult,
@@ -10,6 +9,7 @@ import {
   filesystemLocationSchema,
 } from "../filesystem/FilesystemLocationSchema";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import type { OperationTask } from "../operations/OperationTask";
 import type { FileOpenManager } from "./FileOpenManager";
 
 const handlerArgs = v.object({

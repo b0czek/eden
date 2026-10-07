@@ -1,6 +1,6 @@
 import type { FileItem } from "@edenapp/files-core";
-import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { createOperation } from "@edenapp/solid-kit";
+import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import type {
   FilesystemLocation,
   Operation,

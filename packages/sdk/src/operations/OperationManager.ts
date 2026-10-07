@@ -7,11 +7,11 @@ import type {
 } from "@edenapp/types";
 import { delay, inject, Lifecycle, scoped } from "tsyringe";
 import {
-  ExecutionContext,
   type CommandCallerContext,
+  ExecutionContext,
 } from "../execution/ExecutionContext";
-import { EdenEmitter } from "../ipc/EdenEmitter";
 import { EdenNamespace } from "../ipc/CommandDecorators";
+import { EdenEmitter } from "../ipc/EdenEmitter";
 import type { IPCBridge } from "../ipc/IPCBridge";
 import { SessionContext } from "../session/SessionContext";
 import type { OperationTask } from "./OperationTask";

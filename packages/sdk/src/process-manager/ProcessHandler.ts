@@ -1,13 +1,13 @@
-import * as v from "valibot";
-import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type {
   AppInstance,
   LaunchResult,
   ProcessMetricsSnapshot,
   ViewBounds,
 } from "@edenapp/types";
+import * as v from "valibot";
 import type { ExecutionContext } from "../execution";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import type { ProcessManager } from "./ProcessManager";
 
 @EdenNamespace("process")

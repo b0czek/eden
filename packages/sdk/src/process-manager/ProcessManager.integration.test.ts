@@ -2,15 +2,18 @@ import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import { OperationManager } from "../operations/OperationManager";
-import { ViewManager } from "../view-manager/ViewManager";
-import type { OperationHandle } from "@edenapp/types";
+import type {
+  OperationHandle,
+  RuntimeAppManifest,
+  UserProfile,
+} from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { ViewManager } from "../view-manager/ViewManager";
 import { ProcessManager } from "./ProcessManager";
 
 const caller = (appId: string, profile: UserProfile) => ({

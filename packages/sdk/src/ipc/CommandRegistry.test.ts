@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
-import type { OperationManager } from "../operations/OperationManager";
 import { ExecutionContext } from "../execution";
+import type { OperationManager } from "../operations/OperationManager";
 import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
 import { CommandRegistry } from "./CommandRegistry";
 

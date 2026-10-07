@@ -5,10 +5,10 @@
  * Used by both frontend (window.edenAPI) and backend (worker.edenAPI).
  */
 
-import type { OperationsAPI, OperationSubmission } from "../Operations";
 import type { CommandArgs, CommandName, CommandResult } from "../commands";
 import type { EventData, EventName } from "../events";
 import type { FilesystemLocation } from "../Filesystem";
+import type { OperationSubmission, OperationsAPI } from "../Operations";
 
 /**
  * Eden API - shell commands and event subscriptions

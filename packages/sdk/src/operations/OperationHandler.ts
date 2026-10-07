@@ -2,6 +2,7 @@ import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
 import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc/CommandDecorators";
 import type { OperationManager } from "./OperationManager";
+
 const handleSchema = v.object({ command: v.string(), id: v.string() });
 
 @EdenNamespace("operation")

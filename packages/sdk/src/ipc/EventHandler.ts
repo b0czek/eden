@@ -1,6 +1,6 @@
-import { APP_EVENT_NAMES } from "../generated/runtime";
 import type { OperationObservation } from "@edenapp/types";
 import * as v from "valibot";
+import { APP_EVENT_NAMES } from "../generated/runtime";
 import type { OperationManager } from "../operations/OperationManager";
 import type { ViewManager } from "../view-manager/ViewManager";
 import { EdenHandler, EdenNamespace } from "./CommandDecorators";

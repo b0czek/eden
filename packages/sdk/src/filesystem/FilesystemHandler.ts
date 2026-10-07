@@ -5,9 +5,9 @@ import type {
   FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
-import type { OperationTask } from "../operations/OperationTask";
 import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import type { OperationTask } from "../operations/OperationTask";
 import {
   filesystemLocationArgsSchema,
   filesystemLocationSchema,

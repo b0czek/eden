@@ -1,6 +1,6 @@
 import type {
-  OperationCompletion,
   Operation,
+  OperationCompletion,
   OperationSnapshot,
 } from "@edenapp/types";
 import { createSignal, onCleanup } from "solid-js";

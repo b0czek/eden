@@ -1,8 +1,3 @@
-import {
-  operationTask,
-  type OperationTask,
-  type OperationReporter,
-} from "../operations/OperationTask";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -13,6 +8,11 @@ import type {
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import type { EdenVolumeOptions } from "../api/ControlPlaneApi";
 import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import {
+  type OperationReporter,
+  type OperationTask,
+  operationTask,
+} from "../operations/OperationTask";
 
 interface VolumeEvents {
   "volumes-changed": { volumes: FilesystemVolume[] };

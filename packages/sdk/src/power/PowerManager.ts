@@ -1,5 +1,3 @@
-import { OperationManager } from "../operations/OperationManager";
-import type { OperationReporter } from "../operations/OperationTask";
 import type {
   EdenConfig,
   EdenPowerCapabilities,
@@ -7,6 +5,8 @@ import type {
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { DaemonManager } from "../daemon";
+import { OperationManager } from "../operations/OperationManager";
+import type { OperationReporter } from "../operations/OperationTask";
 import { ProcessManager } from "../process-manager";
 
 const unavailableCapabilities: EdenPowerCapabilities = {

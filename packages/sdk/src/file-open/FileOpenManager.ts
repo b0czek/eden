@@ -15,10 +15,10 @@ import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import type { OperationTask } from "../operations/OperationTask";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
-import type { OperationTask } from "../operations/OperationTask";
 import { FileOpenHandler } from "./FileOpenHandler";
 
 /**

@@ -1,3 +1,6 @@
+import { formatFileSize } from "@edenapp/files-core";
+import { OperationStatus } from "@edenapp/solid-kit";
+import type { OperationSnapshot } from "@edenapp/types";
 import {
   FiCheckSquare,
   FiCopy,
@@ -7,9 +10,6 @@ import {
   FiX,
 } from "solid-icons/fi";
 import type { Component } from "solid-js";
-import { OperationStatus } from "@edenapp/solid-kit";
-import { formatFileSize } from "@edenapp/files-core";
-import type { OperationSnapshot } from "@edenapp/types";
 import type {
   PendingTransfer,
   TransferOperation,

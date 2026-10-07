@@ -1,9 +1,9 @@
 import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import { OperationManager } from "../operations/OperationManager";
-import { ExecutionContext } from "../execution/ExecutionContext";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { UserManager } from "../user/UserManager";
 import { SessionContext } from "./SessionContext";

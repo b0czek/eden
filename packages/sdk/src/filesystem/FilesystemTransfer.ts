@@ -1,9 +1,9 @@
-import type { OperationReporter } from "../operations/OperationTask";
 import { randomUUID } from "node:crypto";
-import * as fs from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
-import { pipeline } from "node:stream/promises";
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { pipeline } from "node:stream/promises";
+import type { OperationReporter } from "../operations/OperationTask";
 
 interface TransferRequest {
   source: string;

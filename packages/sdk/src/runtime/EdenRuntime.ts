@@ -18,6 +18,7 @@ import type {
   EdenUsersApi,
   EdenVolumesApi,
 } from "../api";
+import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
 import {
   createControlPlaneApis,
   type EdenControlPlaneApis,
@@ -40,6 +41,8 @@ import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
 import { log } from "../logging";
 import { NotificationManager } from "../notification";
+import { OperationHandler } from "../operations/OperationHandler";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageManager } from "../package-manager";
 import {
   type EdenPlatform,
@@ -54,9 +57,6 @@ import {
   PLATFORM_WINDOWS,
   type PlatformWindow,
 } from "../platform/ports";
-import { OperationManager } from "../operations/OperationManager";
-import { OperationHandler } from "../operations/OperationHandler";
-import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
 import { PowerHandler } from "../power";
 import {
   AutostartManager,

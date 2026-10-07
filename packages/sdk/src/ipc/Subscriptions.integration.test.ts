@@ -8,10 +8,10 @@ import * as path from "node:path";
 import type {
   CommandArgs,
   CommandName,
-  RuntimeAppManifest,
   OperationHandle,
-  OperationSubmission,
   OperationSnapshot,
+  OperationSubmission,
+  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { createEdenAPI } from "../app-runtime/common/eden-api";
@@ -19,19 +19,19 @@ import {
   dispatchEvent,
   type EventSubscriptionCallback,
 } from "../app-runtime/common/event-subscriptions";
-import { PackageRegistry } from "../package-manager/PackageRegistry";
-import { ProcessManager } from "../process-manager/ProcessManager";
-import { ViewManager } from "../view-manager/ViewManager";
-import { createTestEden, type TestEden } from "../testing/createTestEden";
-import { PermissionRegistry } from "./PermissionRegistry";
 import { OperationManager } from "../operations/OperationManager";
 import {
-  operationTask,
   type OperationReporter,
+  operationTask,
 } from "../operations/OperationTask";
-import { IPCBridge } from "./IPCBridge";
-import { EdenEmitter } from "./EdenEmitter";
+import { PackageRegistry } from "../package-manager/PackageRegistry";
+import { ProcessManager } from "../process-manager/ProcessManager";
+import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { ViewManager } from "../view-manager/ViewManager";
 import { EdenNamespace } from "./CommandDecorators";
+import { EdenEmitter } from "./EdenEmitter";
+import { IPCBridge } from "./IPCBridge";
+import { PermissionRegistry } from "./PermissionRegistry";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 const eventName = "fs/volumes-changed";

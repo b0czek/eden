@@ -5,12 +5,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type {
   FilesystemVolume,
+  OperationHandle,
   RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
-import type { OperationHandle } from "@edenapp/types";
-import { OperationManager } from "../operations/OperationManager";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";

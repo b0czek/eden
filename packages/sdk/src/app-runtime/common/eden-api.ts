@@ -1,16 +1,16 @@
 import type {
   CommandArgs,
   CommandName,
+  CommandResult,
   EdenAPI,
   FilesystemLocation,
   OperationSubmission,
-  CommandResult,
 } from "@edenapp/types";
-import { createOperationsAPI } from "./operations-api";
 import {
-  EventSubscriptions,
   type EventSubscriptionCallback,
+  EventSubscriptions,
 } from "./event-subscriptions";
+import { createOperationsAPI } from "./operations-api";
 import type { ShellTransport } from "./shell-transport";
 
 /**

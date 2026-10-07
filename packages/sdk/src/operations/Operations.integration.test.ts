@@ -6,6 +6,9 @@ import type {
   OperationSnapshot,
   RuntimeAppManifest,
 } from "@edenapp/types";
+import { createOperationsAPI } from "../app-runtime/common/operations-api";
+import { ExecutionContext } from "../execution/ExecutionContext";
+import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import {
   CommandRegistry,
   EdenHandler,
@@ -13,22 +16,19 @@ import {
   IPCBridge,
   PermissionRegistry,
 } from "../ipc";
-import { ExecutionContext } from "../execution/ExecutionContext";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ProcessManager } from "../process-manager/ProcessManager";
-import { ViewManager } from "../view-manager/ViewManager";
-import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { SessionContext } from "../session/SessionContext";
 import { SessionManager } from "../session/SessionManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { ViewManager } from "../view-manager/ViewManager";
 import { OperationManager } from "./OperationManager";
 import {
-  operationTask,
-  type OperationTask,
   type OperationReporter,
+  type OperationTask,
+  operationTask,
 } from "./OperationTask";
-import { createOperationsAPI } from "../app-runtime/common/operations-api";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 function gate() {

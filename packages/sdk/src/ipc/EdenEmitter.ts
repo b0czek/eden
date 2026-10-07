@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import type { EventData, EventName } from "@edenapp/types";
 import { log } from "../logging";
-import type { IPCBridge } from "./IPCBridge";
 import type { EventScope } from "./EventScope";
+import type { IPCBridge } from "./IPCBridge";
 
 type EdenEventListener<T> = (payload: T) => void | Promise<void>;
 

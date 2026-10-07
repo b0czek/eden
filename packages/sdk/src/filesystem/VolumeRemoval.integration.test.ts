@@ -2,13 +2,13 @@ import "reflect-metadata";
 import fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
-  OperationHandle,
   FilesystemVolume,
+  OperationHandle,
   UserProfile,
 } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../api/ControlPlaneApi";
-import { OperationManager } from "../operations/OperationManager";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { VolumeManager } from "./VolumeManager";
 

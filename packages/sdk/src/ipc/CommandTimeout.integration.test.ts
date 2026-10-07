@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
 import { OperationManager } from "../operations/OperationManager";
-import { operationTask, type OperationTask } from "../operations/OperationTask";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";

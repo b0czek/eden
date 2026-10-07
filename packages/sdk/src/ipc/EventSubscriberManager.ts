@@ -4,12 +4,12 @@ import type {
   OperationHandle,
   OperationObservation,
 } from "@edenapp/types";
-import type { EventScope } from "./EventScope";
 import type { ExecutionContext } from "../execution/ExecutionContext";
 import type { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
 import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
+import type { EventScope } from "./EventScope";
 import type { PermissionRegistry } from "./PermissionRegistry";
 
 type OperationSubscriptions<T> = Map<string, Map<T, Set<boolean>>>;

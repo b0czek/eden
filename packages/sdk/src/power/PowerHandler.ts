@@ -1,7 +1,7 @@
-import { operationTask, type OperationTask } from "../operations/OperationTask";
 import type { EdenPowerCapabilities } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenHandler, EdenNamespace } from "../ipc";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import { PowerManager } from "./PowerManager";
 
 @scoped(Lifecycle.ContainerScoped)
