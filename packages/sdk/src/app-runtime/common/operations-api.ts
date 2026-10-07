@@ -4,27 +4,47 @@ import type {
   OperationHandle,
   OperationSnapshot,
   OperationsAPI,
+  OperationObservation,
+  EventData,
+  EventName,
 } from "@edenapp/types";
 
 export function createOperationsAPI(
-  api: Pick<EdenAPI, "shellCommand" | "subscribe" | "unsubscribe">,
+  api: Pick<EdenAPI, "shellCommand"> & {
+    subscribe<T extends EventName>(
+      event: T,
+      callback: (data: EventData<T>) => void,
+      operation?: OperationObservation,
+    ): Promise<void>;
+    unsubscribe<T extends EventName>(
+      event: T,
+      callback: (data: EventData<T>) => void,
+      operation?: OperationObservation,
+    ): void;
+  },
 ): OperationsAPI {
   const get = async <C extends string>(handle: OperationHandle<C>) =>
     (await api.shellCommand("operation/get", { handle })) as OperationSnapshot<
       C,
       OperationCompletion<C>
     >;
-  const watch = async <C extends string>(
+  const observe = async <C extends string>(
     handle: OperationHandle<C>,
     listener: (snapshot: OperationSnapshot<C, OperationCompletion<C>>) => void,
+    terminalOnly = false,
   ): Promise<() => void> => {
     let revision = 0;
     let active = true;
+    const target = { command: handle.command, id: handle.id };
+    const operation = { handle: target, terminalOnly };
     const reconcile = (snapshot: OperationSnapshot) => {
       if (
         active &&
-        snapshot.id === handle.id &&
-        snapshot.command === handle.command &&
+        (!terminalOnly ||
+          snapshot.status === "succeeded" ||
+          snapshot.status === "failed") &&
+        snapshot.id === target.id &&
+        snapshot.command === target.command &&
         snapshot.revision > revision
       ) {
         revision = snapshot.revision;
@@ -36,11 +56,11 @@ export function createOperationsAPI(
     const stop = () => {
       if (!active) return;
       active = false;
-      api.unsubscribe("operation/changed", callback);
+      api.unsubscribe("operation/changed", callback, operation);
     };
     try {
-      await api.subscribe("operation/changed", callback);
-      reconcile(await get(handle));
+      await api.subscribe("operation/changed", callback, operation);
+      reconcile(await get(target));
       return stop;
     } catch (error) {
       stop();
@@ -50,7 +70,7 @@ export function createOperationsAPI(
   return {
     get,
     list: () => api.shellCommand("operation/list", {}),
-    watch,
+    watch: observe,
     wait: async <C extends string>(
       handle: OperationHandle<C>,
     ): Promise<OperationCompletion<C>> => {
@@ -62,10 +82,14 @@ export function createOperationsAPI(
       >((resolve) => {
         settle = resolve;
       });
-      const stop = await watch(handle, (snapshot) => {
-        if (snapshot.status === "succeeded" || snapshot.status === "failed")
-          settle(snapshot);
-      });
+      const stop = await observe(
+        handle,
+        (snapshot) => {
+          if (snapshot.status === "succeeded" || snapshot.status === "failed")
+            settle(snapshot);
+        },
+        true,
+      );
       try {
         const snapshot = await terminal;
         if (snapshot.status === "succeeded") return snapshot.result;

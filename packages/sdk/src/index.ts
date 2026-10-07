@@ -14,6 +14,7 @@ export type {
   OperationCommand,
   StreamCommand,
   OperationHandle,
+  OperationObservation,
   StreamHandle,
   OperationSnapshot,
   OperationCompletion,

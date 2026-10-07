@@ -7,6 +7,9 @@ import type {
   CommandName,
   CommandResult,
   RuntimeAppManifest,
+  OperationHandle,
+  OperationSnapshot,
+  UserProfile,
 } from "@edenapp/types";
 import { createEdenAPI } from "../app-runtime/common/eden-api";
 import {
@@ -18,6 +21,14 @@ import { ProcessManager } from "../process-manager/ProcessManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { PermissionRegistry } from "./PermissionRegistry";
+import { OperationManager } from "../operations/OperationManager";
+import {
+  operationTask,
+  type OperationReporter,
+} from "../operations/OperationTask";
+import { IPCBridge } from "./IPCBridge";
+import { EdenEmitter } from "./EdenEmitter";
+import { EdenNamespace } from "./CommandDecorators";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 const eventName = "fs/volumes-changed";
@@ -33,8 +44,14 @@ function gate() {
 
 describe("client subscriptions across renderer IPC", () => {
   let eden: TestEden;
+  const pendingWork = new Set<() => void>();
   let transport: ShellTransport;
   let listeners: Map<string, Set<EventSubscriptionCallback>>;
+  let owner: {
+    appId: string;
+    principal: { kind: "user"; profile: UserProfile };
+  };
+  let webContentsId: number;
   beforeEach(async () => {
     eden = await createTestEden();
     const appId = "com.example.subscription-observer";
@@ -51,12 +68,13 @@ describe("client subscriptions across renderer IPC", () => {
       resolvedGrants: [],
     } as RuntimeAppManifest);
     eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/read"]);
-    await eden.runtime.users.create({
+    const profile = await eden.runtime.users.create({
       username: "observer",
       name: "Observer",
       password: "password",
       grants: ["*"],
     });
+    owner = { appId, principal: { kind: "user", profile } };
     await eden.runtime.sessions.login("observer", "password");
     await eden.complete("process/launch", { appId });
     const instance = eden.runtime
@@ -65,6 +83,7 @@ describe("client subscriptions across renderer IPC", () => {
     const contents = eden.runtime
       .resolve(ViewManager)
       .getViewInfo(instance.viewId)!.view.webContents;
+    webContentsId = contents.id;
     listeners = new Map();
     contents.on(
       "message-sent",
@@ -84,6 +103,8 @@ describe("client subscriptions across renderer IPC", () => {
     };
   });
   afterEach(async () => {
+    for (const finish of pendingWork) finish();
+    pendingWork.clear();
     await eden?.dispose();
   });
   const change = async (id: string) => {
@@ -96,6 +117,48 @@ describe("client subscriptions across renderer IPC", () => {
       rootPath,
     });
   };
+
+  function work(name: string) {
+    const finish = gate();
+    pendingWork.add(finish.release);
+    const started = gate();
+    let report!: OperationReporter;
+    const handle = eden.runtime
+      .resolve(OperationManager)
+      .submit("integration/observed-work", { name }, owner, () =>
+        operationTask(async (reporter) => {
+          report = reporter;
+          started.release();
+          await finish.promise;
+          await fs.writeFile(path.join(eden.paths.root, name), name);
+          return name;
+        }),
+      );
+    return {
+      handle,
+      started: started.promise,
+      finish: finish.release,
+      update: (phase: string) =>
+        report.update(phase, { completed: 1, total: 2, unit: "files" }),
+    };
+  }
+  const operationMessages = (handle: OperationHandle) =>
+    eden.platform.effects.flatMap((effect) => {
+      if (
+        effect.type !== "message-sent" ||
+        effect.webContentsId !== webContentsId ||
+        effect.channel !== "shell-message"
+      )
+        return [];
+      const message = effect.args[0] as {
+        type: string;
+        payload: { snapshot?: OperationSnapshot };
+      };
+      return message.type === "operation/changed" &&
+        message.payload.snapshot?.id === handle.id
+        ? [message.payload.snapshot]
+        : [];
+    });
 
   it.each([false, true])(
     "preserves a replacement listener after an older request fails (same callback: %s)",
@@ -196,5 +259,169 @@ describe("client subscriptions across renderer IPC", () => {
     expect(delivered).toBe(2);
     api.unsubscribe(eventName, healthy);
     await tick();
+  });
+
+  it("routes by operation and delivers only completion to waiters", async () => {
+    const api = createEdenAPI(transport, listeners);
+    const manager = eden.runtime.resolve(OperationManager);
+    const watched = work("watched");
+    const waited = work("waited");
+    const ignored = work("ignored");
+    await Promise.all([watched.started, waited.started, ignored.started]);
+    const first: OperationSnapshot[] = [];
+    const second: OperationSnapshot[] = [];
+    const stopFirst = await api.operations.watch(watched.handle, (snapshot) => {
+      first.push(snapshot);
+    });
+    const stopSecond = await api.operations.watch(
+      watched.handle,
+      (snapshot) => {
+        second.push(snapshot);
+      },
+    );
+    const completion = api.operations.wait(waited.handle);
+    await tick();
+    const initialRevision = manager.get(watched.handle, owner).revision;
+    watched.update("copying");
+    watched.update("copying");
+    expect(manager.get(watched.handle, owner).revision).toBeGreaterThan(
+      initialRevision,
+    );
+    expect(
+      first.filter((snapshot) => snapshot.phase === "copying"),
+    ).toHaveLength(1);
+    expect(
+      second.filter((snapshot) => snapshot.phase === "copying"),
+    ).toHaveLength(1);
+    expect(
+      operationMessages(watched.handle).filter(
+        (snapshot) => snapshot.phase === "copying",
+      ),
+    ).toHaveLength(1);
+    waited.update("copying");
+    ignored.update("copying");
+    expect(operationMessages(waited.handle)).toEqual([]);
+    expect(operationMessages(ignored.handle)).toEqual([]);
+    expect(manager.get(ignored.handle, owner).phase).toBe("copying");
+    stopFirst();
+    await tick();
+    watched.update("finishing");
+    expect(first.some((snapshot) => snapshot.phase === "finishing")).toBe(
+      false,
+    );
+    expect(second.some((snapshot) => snapshot.phase === "finishing")).toBe(
+      true,
+    );
+    waited.finish();
+    await expect(completion).resolves.toBe("waited");
+    expect(
+      operationMessages(waited.handle).map((snapshot) => snapshot.status),
+    ).toEqual(["succeeded"]);
+    expect(
+      await fs.readFile(path.join(eden.paths.root, "waited"), "utf8"),
+    ).toBe("waited");
+    watched.finish();
+    ignored.finish();
+    await Promise.all([
+      manager.wait(watched.handle, owner),
+      manager.wait(ignored.handle, owner),
+    ]);
+    stopSecond();
+    await tick();
+    await expect(api.operations.wait(ignored.handle)).resolves.toBe("ignored");
+  });
+
+  it("keeps broad and targeted observers independent and rejects foreign handles", async () => {
+    const api = createEdenAPI(transport, listeners);
+    const watched = work("shared-interest");
+    await watched.started;
+    const broad: OperationSnapshot[] = [];
+    const callback = ({ snapshot }: { snapshot: OperationSnapshot }) => {
+      broad.push(snapshot);
+    };
+    await api.subscribe("operation/changed", callback);
+    const targeted: OperationSnapshot[] = [];
+    const stop = await api.operations.watch(watched.handle, (snapshot) => {
+      targeted.push(snapshot);
+    });
+    watched.update("copying");
+    expect(
+      broad.filter((snapshot) => snapshot.phase === "copying"),
+    ).toHaveLength(1);
+    expect(
+      targeted.filter((snapshot) => snapshot.phase === "copying"),
+    ).toHaveLength(1);
+    expect(
+      operationMessages(watched.handle).filter(
+        (snapshot) => snapshot.phase === "copying",
+      ),
+    ).toHaveLength(1);
+    api.unsubscribe("operation/changed", callback);
+    await tick();
+    watched.update("finishing");
+    expect(broad.some((snapshot) => snapshot.phase === "finishing")).toBe(
+      false,
+    );
+    expect(targeted.some((snapshot) => snapshot.phase === "finishing")).toBe(
+      true,
+    );
+    const manager = eden.runtime.resolve(OperationManager);
+    const foreign = manager.submit(
+      "integration/foreign",
+      {},
+      { ...owner, appId: "another.app" },
+      () => operationTask(async () => "private"),
+    );
+    await expect(
+      api.operations.watch(foreign, () => undefined),
+    ).rejects.toThrow("access denied");
+    await expect(
+      api.shellCommand("event/subscribe", {
+        eventName: "operation/changed",
+        operation: { handle: { ...watched.handle, command: "wrong" } },
+      }),
+    ).rejects.toThrow("access denied");
+    watched.finish();
+    await manager.wait(watched.handle, owner);
+    stop();
+    await tick();
+  });
+
+  it("builds lazy notification payloads only when local or external observers exist", async () => {
+    class Producer extends EdenEmitter<{ "volumes-changed": { volumes: [] } }> {
+      publish(payload: () => { volumes: [] }) {
+        this.notify("volumes-changed", payload);
+      }
+    }
+    EdenNamespace("fs")(Producer);
+    const producer = new Producer(eden.runtime.resolve(IPCBridge));
+    expect(() =>
+      producer.publish(() => {
+        throw new Error("Payload should not be built");
+      }),
+    ).not.toThrow();
+    const local: unknown[] = [];
+    const off = producer.on("volumes-changed", (payload) => {
+      local.push(payload);
+    });
+    producer.publish(() => ({ volumes: [] }));
+    expect(local).toEqual([{ volumes: [] }]);
+    off();
+    const api = createEdenAPI(transport, listeners);
+    const external: unknown[] = [];
+    const callback = (payload: unknown) => {
+      external.push(payload);
+    };
+    await api.subscribe(eventName, callback);
+    producer.publish(() => ({ volumes: [] }));
+    expect(external).toEqual([{ volumes: [] }]);
+    api.unsubscribe(eventName, callback);
+    await tick();
+    expect(() =>
+      producer.publish(() => {
+        throw new Error("Payload should no longer be built");
+      }),
+    ).not.toThrow();
+    producer.dispose();
   });
 });

@@ -1,4 +1,9 @@
-import type { EventData, EventName } from "@edenapp/types";
+import type {
+  EventData,
+  EventName,
+  OperationObservation,
+  OperationSnapshot,
+} from "@edenapp/types";
 import { log } from "../../logging";
 import type { ShellTransport } from "./shell-transport";
 
@@ -15,6 +20,20 @@ interface Subscription {
   registered: boolean;
 }
 
+function subscriptionKey(
+  eventName: string,
+  operation?: OperationObservation,
+): string {
+  return operation
+    ? JSON.stringify([
+        eventName,
+        operation.handle.command,
+        operation.handle.id,
+        operation.terminalOnly === true,
+      ])
+    : eventName;
+}
+
 /** Own local listeners and serialize changes to each remote subscription. */
 export class EventSubscriptions {
   private readonly subscriptions = new Map<string, Subscription>();
@@ -27,17 +46,19 @@ export class EventSubscriptions {
   async subscribe<T extends EventName>(
     eventName: T,
     callback: (data: EventData<T>) => void,
+    operation?: OperationObservation,
   ): Promise<void> {
     if (typeof callback !== "function")
       throw new Error("Callback must be a function");
-    let subscription = this.subscriptions.get(eventName);
+    const key = subscriptionKey(eventName, operation);
+    let subscription = this.subscriptions.get(key);
     if (!subscription) {
       subscription = {
         callbacks: new Map(),
         pending: Promise.resolve(),
         registered: false,
       };
-      this.subscriptions.set(eventName, subscription);
+      this.subscriptions.set(key, subscription);
     }
     const listener = callback as EventSubscriptionCallback;
     const existing = subscription.callbacks.get(listener);
@@ -45,19 +66,18 @@ export class EventSubscriptions {
     const entry = subscription;
     const registration: Registration = { ready: Promise.resolve() };
     entry.callbacks.set(listener, registration);
-    if (!this.listeners.has(eventName))
-      this.listeners.set(eventName, new Set());
-    this.listeners.get(eventName)!.add(listener);
-    registration.ready = this.enqueue(eventName, entry, async () => {
+    if (!this.listeners.has(key)) this.listeners.set(key, new Set());
+    this.listeners.get(key)!.add(listener);
+    registration.ready = this.enqueue(key, entry, async () => {
       if (entry.callbacks.get(listener) !== registration) return;
       if (!entry.registered) {
-        await this.transport.exec("event/subscribe", { eventName });
+        await this.transport.exec("event/subscribe", { eventName, operation });
         entry.registered = true;
       }
     }).catch((error) => {
       // A failed older request must not remove a replacement registration.
       if (entry.callbacks.get(listener) === registration)
-        this.remove(eventName, entry, listener);
+        this.remove(key, entry, listener);
       throw error;
     });
     return registration.ready;
@@ -66,15 +86,17 @@ export class EventSubscriptions {
   unsubscribe<T extends EventName>(
     eventName: T,
     callback: (data: EventData<T>) => void,
+    operation?: OperationObservation,
   ): void {
-    const entry = this.subscriptions.get(eventName);
+    const key = subscriptionKey(eventName, operation);
+    const entry = this.subscriptions.get(key);
     const listener = callback as EventSubscriptionCallback;
     if (!entry?.callbacks.has(listener)) return;
-    this.remove(eventName, entry, listener);
-    void this.enqueue(eventName, entry, async () => {
+    this.remove(key, entry, listener);
+    void this.enqueue(key, entry, async () => {
       if (entry.callbacks.size || !entry.registered) return;
       entry.registered = false;
-      await this.transport.exec("event/unsubscribe", { eventName });
+      await this.transport.exec("event/unsubscribe", { eventName, operation });
     }).catch((error) =>
       log.error(`Failed to unsubscribe from ${eventName}:`, error),
     );
@@ -118,18 +140,29 @@ export function dispatchEvent(
   eventName: string,
   payload: unknown,
 ): void {
-  const callbacks = listeners.get(eventName);
-  if (!callbacks) return;
-  for (const callback of [...callbacks]) {
-    if (!callbacks.has(callback)) continue;
-    try {
-      const result = callback(payload);
-      if (result && typeof result.then === "function")
-        void Promise.resolve(result).catch((error) =>
-          log.error(`Error in event listener for ${eventName}:`, error),
-        );
-    } catch (error) {
-      log.error(`Error in event listener for ${eventName}:`, error);
+  const keys = [eventName];
+  if (eventName === "operation/changed") {
+    const snapshot = (payload as { snapshot: OperationSnapshot }).snapshot;
+    keys.push(subscriptionKey(eventName, { handle: snapshot }));
+    if (snapshot.status === "succeeded" || snapshot.status === "failed")
+      keys.push(
+        subscriptionKey(eventName, { handle: snapshot, terminalOnly: true }),
+      );
+  }
+  for (const key of keys) {
+    const callbacks = listeners.get(key);
+    if (!callbacks) continue;
+    for (const callback of [...callbacks]) {
+      if (!callbacks.has(callback)) continue;
+      try {
+        const result = callback(payload);
+        if (result && typeof result.then === "function")
+          void Promise.resolve(result).catch((error) =>
+            log.error(`Error in event listener for ${eventName}:`, error),
+          );
+      } catch (error) {
+        log.error(`Error in event listener for ${eventName}:`, error);
+      }
     }
   }
 }

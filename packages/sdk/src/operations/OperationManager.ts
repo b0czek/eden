@@ -179,7 +179,13 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       if (task.transition === "runtime") await this.drain(record.snapshot.id);
       const result = await task.run({
         update: (phase, progress) => {
-          if (record.snapshot.status === "running")
+          const previous = record.snapshot.progress;
+          const unchanged =
+            record.snapshot.phase === phase &&
+            previous?.completed === progress?.completed &&
+            previous?.total === progress?.total &&
+            previous?.unit === progress?.unit;
+          if (record.snapshot.status === "running" && !unchanged)
             this.update(record, { phase, progress: structuredClone(progress) });
         },
       });
@@ -252,8 +258,16 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   private publish(record: RecordEntry): void {
     this.notify(
       "changed",
-      { snapshot: structuredClone(record.snapshot) },
-      record.owner,
+      () => ({ snapshot: structuredClone(record.snapshot) }),
+      {
+        ...record.owner,
+        operation: {
+          handle: record.snapshot,
+          terminal:
+            record.snapshot.status === "succeeded" ||
+            record.snapshot.status === "failed",
+        },
+      },
     );
   }
 

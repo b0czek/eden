@@ -10,6 +10,7 @@ import {
   CommandRegistry,
   EdenHandler,
   EdenNamespace,
+  IPCBridge,
   PermissionRegistry,
 } from "../ipc";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -22,7 +23,11 @@ import { SessionContext } from "../session/SessionContext";
 import { SessionManager } from "../session/SessionManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { OperationManager } from "./OperationManager";
-import { operationTask, type OperationTask } from "./OperationTask";
+import {
+  operationTask,
+  type OperationTask,
+  type OperationReporter,
+} from "./OperationTask";
 import { createOperationsAPI } from "../app-runtime/common/operations-api";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -428,6 +433,121 @@ describe("runtime-owned operations", () => {
       }),
     );
     restarted.kill();
+  });
+
+  it("delivers completion-only backend observations and clears them on exit", async () => {
+    const blocked = gate();
+    let reporter!: OperationReporter;
+    register(() =>
+      operationTask(async (progress) => {
+        reporter = progress;
+        await blocked.promise;
+        await fs.writeFile(
+          path.join(eden.paths.root, "backend-filtered"),
+          "finished",
+        );
+        return "finished";
+      }),
+    );
+    const handle = await submit();
+    const start = async () => {
+      eden.runtime.resolve(RuntimeContextRegistry).register(owner.appId, {
+        owner: {
+          kind: "session",
+          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          username: null,
+        },
+        principal: { kind: "system" },
+      });
+      const starting = eden.runtime
+        .resolve(BackendManager)
+        .createBackend(
+          owner.appId,
+          { ...app(owner.appId), backend: { entry: "backend.js" } },
+          eden.paths.root,
+        );
+      await tick();
+      const effect = eden.platform.effects
+        .filter((item) => item.type === "utility-process-started")
+        .at(-1)!;
+      if (effect.type !== "utility-process-started")
+        throw new Error("Backend did not start");
+      const process = eden.platform.utilityProcesses.get(effect.pid)!;
+      process.emit("message", { type: "backend-ready" });
+      await starting;
+      return process;
+    };
+    let process: Awaited<ReturnType<typeof start>> | undefined;
+    try {
+      process = await start();
+      process.emit("message", {
+        type: "shell-command",
+        command: "event/subscribe",
+        commandId: "terminal",
+        args: {
+          eventName: "operation/changed",
+          operation: { handle, terminalOnly: true },
+        },
+      });
+      await tick();
+      reporter.update("writing");
+      expect(manager.get(handle, owner).phase).toBe("writing");
+      expect(process.messages).not.toContainEqual(
+        expect.objectContaining({
+          type: "shell-event",
+          eventName: "operation/changed",
+        }),
+      );
+      blocked.release();
+      await expect(manager.wait(handle, owner)).resolves.toBe("finished");
+      expect(
+        await fs.readFile(
+          path.join(eden.paths.root, "backend-filtered"),
+          "utf8",
+        ),
+      ).toBe("finished");
+      expect(
+        process.messages.filter(
+          (message) =>
+            !!message &&
+            typeof message === "object" &&
+            "type" in message &&
+            message.type === "shell-event",
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          eventName: "operation/changed",
+          payload: {
+            snapshot: expect.objectContaining({
+              id: handle.id,
+              status: "succeeded",
+              result: "finished",
+            }),
+          },
+        }),
+      ]);
+      process.kill();
+      process = await start();
+      // A restarted backend must not inherit interest in the previous operation.
+      eden.runtime.resolve(IPCBridge).eventSubscribers.notify(
+        "operation/changed",
+        { snapshot: manager.get(handle, owner) },
+        {
+          appId: owner.appId,
+          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          operation: { handle, terminal: true },
+        },
+      );
+      expect(process.messages).not.toContainEqual(
+        expect.objectContaining({
+          type: "shell-event",
+          eventName: "operation/changed",
+        }),
+      );
+    } finally {
+      blocked.release();
+      process?.kill();
+    }
   });
 
   it("keeps work across caller closure and reopening and filters renderer/backend notifications", async () => {

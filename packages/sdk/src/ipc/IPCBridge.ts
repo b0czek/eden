@@ -1,5 +1,6 @@
 import type { OperationSubmission } from "@edenapp/types";
 import { ExecutionContext } from "../execution/ExecutionContext";
+import { OperationManager } from "../operations/OperationManager";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
@@ -53,6 +54,7 @@ export class IPCBridge extends EventEmitter {
     private runtimeContexts: RuntimeContextRegistry,
     @inject(ExecutionContext) execution: ExecutionContext,
     @inject(PLATFORM_RENDERER_IPC) private rendererIpc: RendererIpcPort,
+    @inject(delay(() => OperationManager)) operations: OperationManager,
   ) {
     super();
 
@@ -66,7 +68,11 @@ export class IPCBridge extends EventEmitter {
     this.eventSubscribers.setPermissionRegistry(permissionRegistry);
 
     // Initialize and register EventHandler
-    this.eventHandler = new EventHandler(this.eventSubscribers, viewManager);
+    this.eventHandler = new EventHandler(
+      this.eventSubscribers,
+      viewManager,
+      operations,
+    );
     this.commandRegistry.registerManager(this.eventHandler);
 
     this.setupIPCHandlers();

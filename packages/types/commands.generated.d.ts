@@ -630,13 +630,15 @@ export interface EventCommands {
   "event/subscribe": {
     mode: "immediate";
     args: {
-    eventName: string };
+    eventName: string;
+    operation?: import("./index").OperationObservation };
     response: void;
   };
   "event/unsubscribe": {
     mode: "immediate";
     args: {
-    eventName: string };
+    eventName: string;
+    operation?: import("./index").OperationObservation };
     response: void;
   };
   "event/exists": {

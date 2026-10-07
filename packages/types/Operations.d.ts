@@ -42,6 +42,12 @@ export interface OperationSubmission {
   requestKey?: string;
 }
 
+/** Select one operation when subscribing to operation/changed. */
+export interface OperationObservation {
+  handle: OperationHandle;
+  terminalOnly?: boolean;
+}
+
 export interface OperationProgress {
   completed: number;
   total?: number;

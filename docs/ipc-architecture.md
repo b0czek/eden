@@ -388,6 +388,13 @@ Completion before observation works too. A failed operation preserves a typed
 domain failure response when available; `wait` returns that response. Other
 failures reject with a sanitized error.
 
+Progress watching is optional. `watch(handle, listener)` receives changes for that
+operation, including its current retained snapshot. `wait(handle)` receives only
+completion updates. Unchanged phase and progress reports do not produce duplicate
+updates. Work without observers still retains its status and completion for later
+inspection. A direct subscription to `operation/changed` observes all operations
+owned by the caller's app and login session.
+
 Request keys are optional. Within the same app and login session, repeating a key
 with the same command and arguments returns the original retained handle. Reusing
 the key with different arguments or another command fails. Callers decide whether
