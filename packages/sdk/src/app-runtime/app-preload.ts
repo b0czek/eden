@@ -116,8 +116,8 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
 
 // Shell transport implementation using ipcRenderer
 const shellTransport: ShellTransport = {
-  exec: (command, args) => {
-    return ipcRenderer.invoke("shell-command", command, args);
+  exec: (command, args, submission) => {
+    return ipcRenderer.invoke("shell-command", command, args, submission);
   },
 };
 

@@ -404,6 +404,7 @@ class InMemoryUtilityProcess
   public readonly stdout = null;
   public readonly stderr = null;
   private active = true;
+  public readonly messages: unknown[] = [];
 
   constructor(
     public readonly pid: number,
@@ -439,7 +440,9 @@ class InMemoryUtilityProcess
     );
   }
 
-  postMessage(): void {}
+  postMessage(message: unknown): void {
+    this.messages.push(structuredClone(message));
+  }
 
   kill(): boolean {
     if (!this.active) return false;
@@ -476,6 +479,10 @@ class InMemoryUtilityProcesses implements UtilityProcessPort {
       port1: new InMemoryMessagePort(),
       port2: new InMemoryMessagePort(),
     };
+  }
+
+  get(pid: number): InMemoryUtilityProcess | undefined {
+    return this.processes.get(pid);
   }
 
   get activeCount(): number {

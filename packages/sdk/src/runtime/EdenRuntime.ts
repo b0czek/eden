@@ -54,6 +54,9 @@ import {
   PLATFORM_WINDOWS,
   type PlatformWindow,
 } from "../platform/ports";
+import { OperationManager } from "../operations/OperationManager";
+import { OperationHandler } from "../operations/OperationHandler";
+import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
 import { PowerHandler } from "../power";
 import {
   AutostartManager,
@@ -188,6 +191,10 @@ export class EdenRuntime {
     this.resolveOwned(CommandRegistry);
     this.resolveOwned(BackendManager);
     this.ipcBridge = this.resolveOwned(IPCBridge);
+    const operations = this.resolveOwned(OperationManager);
+    this.resolveOwned(CommandRegistry).registerManager(
+      new OperationHandler(operations),
+    );
     this.settingsPanelManager = this.resolveOwned(SettingsPanelManager);
     this.settings = createSettingsApi(this.settingsPanelManager);
 
@@ -210,6 +217,18 @@ export class EdenRuntime {
 
   public get state(): EdenLifecycleState {
     return this.lifecycleState;
+  }
+
+  public get operations(): EdenOperationsObserver {
+    const manager = this.resolveOwned(OperationManager);
+    return {
+      get: (handle) => manager.inspect(handle),
+      list: () => manager.inspectAll(),
+      onChanged: (listener) =>
+        manager.on("changed", ({ snapshot }) =>
+          listener(structuredClone(snapshot)),
+        ),
+    };
   }
 
   public get volumes(): EdenVolumesApi {
@@ -492,6 +511,7 @@ export class EdenRuntime {
     if (this.resourcesDisposed) return;
     this.resourcesDisposed = true;
 
+    await this.resolveOwned(OperationManager).shutdown();
     if (this.managersInitialized) {
       await this.autostartManager.dispose();
       await this.daemonManager.shutdown();

@@ -358,3 +358,48 @@ Add `node` and `@edenapp/types/worker` to your backend TypeScript configuration:
 ```
 
 This provides type declarations for `worker.edenAPI`, `worker.appBus`, and `worker.getAppAPI()`.
+
+## Operations
+
+Commands declare a communication mode. Immediate commands return their result
+from `shellCommand`. Operation commands return a serializable `{ command, id }`
+handle after validation and authorization. Eden executes accepted work independently
+of the submitting view or backend and retains its status and completion.
+
+```typescript
+const handle = await window.edenAPI.shellCommand(
+  "fs/cp",
+  { from, to, overwrite: false },
+  { requestKey: "copy-invoice-2026" },
+);
+const stopWatching = await window.edenAPI.operations.watch(handle, snapshot => {
+  console.log(snapshot.status, snapshot.phase, snapshot.progress);
+});
+await window.edenAPI.operations.wait(handle);
+stopWatching();
+```
+
+`worker.edenAPI.operations` provides the same helpers. `get(handle)` reads a
+snapshot and `list()` lists the caller's operations. Watchers subscribe before
+reading the retained snapshot and reconcile changes using increasing revisions.
+Completion before observation works too. A failed operation preserves a typed
+domain failure response when available; `wait` returns that response. Other
+failures reject with a sanitized error.
+
+Request keys are optional. Within the same app and login session, repeating a key
+with the same command and arguments returns the original retained handle. Reusing
+the key with different arguments or another command fails. Callers decide whether
+to resubmit; the API does not retry automatically.
+
+An app can inspect its operations after reopening in the same login session.
+Other apps and sessions cannot inspect them or receive their changes. Hosts can
+use `eden.operations.get`, `list`, and `onChanged` for privileged read-only
+observation. Accepted work drains before session changes and runtime shutdown.
+Completed records remain in memory for fifteen minutes, subject to a runtime-wide
+limit of 256 completed records. Active records remain until completion. Operation
+handles live for one Eden runtime.
+
+IPC responses have a ten-second deadline. Accepted operation execution has no
+transport deadline. Stream command definitions and cancellation capabilities are
+reserved interfaces; this release exposes no stream transport or cancellation
+endpoint.

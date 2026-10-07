@@ -80,7 +80,11 @@ export abstract class EdenEmitter<TEvents> {
    * @param event - Event name (without namespace prefix)
    * @param data - Event payload data
    */
-  protected notify<K extends keyof TEvents>(event: K, data: TEvents[K]): void {
+  protected notify<K extends keyof TEvents>(
+    event: K,
+    data: TEvents[K],
+    scope?: { appId?: string; sessionId: string },
+  ): void {
     // Extract namespace from the @EdenNamespace decorator
     const namespace = Reflect.getMetadata("eden:namespace", this.constructor);
 
@@ -120,6 +124,7 @@ export abstract class EdenEmitter<TEvents> {
     this.ipcBridge.eventSubscribers.notify(
       fullEventName,
       data as EventData<typeof fullEventName>,
+      ...(scope ? [scope] : []),
     );
   }
 

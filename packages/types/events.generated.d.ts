@@ -71,6 +71,13 @@ export interface NotificationEvents {
 }
 
 /**
+ * OperationEvents - Events for the "operation" namespace
+ */
+export interface OperationEvents {
+  "operation/changed": { snapshot: import("./index").OperationSnapshot };
+}
+
+/**
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
@@ -144,4 +151,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, I18nEvents, NotificationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, I18nEvents, NotificationEvents, OperationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}

@@ -57,6 +57,10 @@ export class Eden {
     return this.runtime.state;
   }
 
+  public get operations(): import("./api").EdenOperationsObserver {
+    return this.runtime.operations;
+  }
+
   public get volumes(): EdenVolumesApi {
     return this.runtime.volumes;
   }

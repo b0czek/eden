@@ -675,6 +675,22 @@ export interface NotificationCommands {
 }
 
 /**
+ * OperationCommands - Commands for the "operation" namespace
+ */
+export interface OperationCommands {
+  "operation/get": {
+    mode: "immediate";
+    args: { handle: import("./index").OperationHandle };
+    response: import("./index").OperationSnapshot;
+  };
+  "operation/list": {
+    mode: "immediate";
+    args: Record<string, never>;
+    response: import("./index").OperationSnapshot[];
+  };
+}
+
+/**
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
@@ -1289,4 +1305,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}

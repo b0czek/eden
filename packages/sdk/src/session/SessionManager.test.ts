@@ -2,6 +2,8 @@ import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
 import type { CommandRegistry, IPCBridge } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { UserManager } from "../user/UserManager";
 import { SessionContext } from "./SessionContext";
@@ -27,6 +29,7 @@ describe("SessionManager", () => {
   let processManager: { stopSessionApps: jest.Mock };
   let notify: jest.Mock;
   let manager: SessionManager;
+  let operations: OperationManager;
 
   beforeEach(() => {
     context = new SessionContext();
@@ -38,14 +41,23 @@ describe("SessionManager", () => {
       stopSessionApps: jest.fn().mockResolvedValue(undefined),
     };
     notify = jest.fn();
+    const bridge = { eventSubscribers: { notify } } as unknown as IPCBridge;
+    operations = new OperationManager(
+      bridge,
+      new ExecutionContext({}),
+      context,
+    );
     manager = new SessionManager(
       { eventSubscribers: { notify } } as unknown as IPCBridge,
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       userManager as unknown as UserManager,
       processManager as unknown as ProcessManager,
       context,
+      operations,
     );
   });
+
+  afterEach(() => operations.dispose());
 
   it("stops apps before committing and publishing a new identity", async () => {
     context.setCurrentUser(alice);

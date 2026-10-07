@@ -4,6 +4,7 @@ import type {
   CommandArgs,
   CommandName,
   CommandResult,
+  OperationSubmission,
   EdenAPI,
   EventData,
   EventName,
@@ -11,6 +12,7 @@ import type {
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
+import { createOperationsAPI } from "./operations-api";
 import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
 
@@ -21,6 +23,7 @@ export interface ShellTransport {
   exec<T extends CommandName>(
     command: T,
     args: CommandArgs<T>,
+    submission?: OperationSubmission,
   ): Promise<CommandResult<T>>;
 }
 
@@ -44,7 +47,7 @@ export function createEdenAPI(
     getLaunchFile?: () => FilesystemLocation | undefined;
   },
 ): EdenAPI {
-  return {
+  const api = {
     shellCommand: transport.exec,
 
     subscribe: async <T extends EventName>(
@@ -55,16 +58,18 @@ export function createEdenAPI(
         throw new Error("Callback must be a function");
       }
 
-      // Register with backend/main
-      await transport.exec("event/subscribe", { eventName });
-
-      // Register callback locally
-      if (!eventSubscriptions.has(eventName)) {
+      // Install locally before main can deliver any events.
+      if (!eventSubscriptions.has(eventName))
         eventSubscriptions.set(eventName, new Set());
+      const callbacks = eventSubscriptions.get(eventName)!;
+      callbacks.add(callback as EventSubscriptionCallback);
+      try {
+        await transport.exec("event/subscribe", { eventName });
+      } catch (error) {
+        callbacks.delete(callback as EventSubscriptionCallback);
+        if (!callbacks.size) eventSubscriptions.delete(eventName);
+        throw error;
       }
-      eventSubscriptions
-        .get(eventName)
-        ?.add(callback as EventSubscriptionCallback);
     },
 
     unsubscribe: async <T extends EventName>(
@@ -99,6 +104,7 @@ export function createEdenAPI(
       return [];
     },
   };
+  return { ...api, operations: createOperationsAPI(api) };
 }
 
 /**

@@ -9,6 +9,8 @@ export type EffectivePrincipal =
   | { kind: "user"; profile: UserProfile };
 
 export interface CommandCallerContext {
+  sessionId?: string;
+  operationId?: string;
   appId?: string;
   webContentsId?: number;
   principal?: EffectivePrincipal;

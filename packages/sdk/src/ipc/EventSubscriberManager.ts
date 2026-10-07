@@ -1,4 +1,6 @@
 import type { EventData, EventName } from "@edenapp/types";
+import type { ExecutionContext } from "../execution/ExecutionContext";
+import type { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
 import type { BackendManager } from "../process-manager/BackendManager";
 import type { ViewManager } from "../view-manager/ViewManager";
@@ -11,7 +13,20 @@ export class EventSubscriberManager {
   private foundationSubscriptions: Map<string, boolean> = new Map();
   private permissionRegistry?: PermissionRegistry;
 
-  constructor(viewManager: ViewManager) {
+  private viewScopes = new Map<
+    number,
+    { appId?: string; sessionId?: string }
+  >();
+  private backendScopes = new Map<
+    string,
+    { appId?: string; sessionId?: string }
+  >();
+
+  constructor(
+    viewManager: ViewManager,
+    private execution?: ExecutionContext,
+    private contexts?: RuntimeContextRegistry,
+  ) {
     this.viewManager = viewManager;
   }
 
@@ -60,6 +75,10 @@ export class EventSubscriberManager {
     }
 
     this.subscriptions.get(eventName)?.add(viewId);
+    this.viewScopes.set(viewId, {
+      appId: viewInfo.appId,
+      sessionId: this.execution?.get()?.sessionId,
+    });
     log.info(
       `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
     );
@@ -97,6 +116,10 @@ export class EventSubscriberManager {
     }
 
     this.backendSubscriptions.get(eventName)?.add(appId);
+    this.backendScopes.set(appId, {
+      appId,
+      sessionId: this.execution?.get()?.sessionId,
+    });
     log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
     return true;
   }
@@ -173,9 +196,10 @@ export class EventSubscriberManager {
   public notify<T extends EventName>(
     eventName: T,
     payload: EventData<T>,
+    scope?: { appId?: string; sessionId: string },
   ): void {
     // Notify foundation if subscribed
-    if (this.foundationSubscriptions.has(eventName)) {
+    if (!scope && this.foundationSubscriptions.has(eventName)) {
       this.viewManager.sendToMainWindow("shell-message", {
         type: eventName,
         payload,
@@ -185,6 +209,14 @@ export class EventSubscriberManager {
     // Notify view subscribers
     const subscribedViewIds = this.getSubscribedViews(eventName);
     for (const viewId of subscribedViewIds) {
+      const subscriber = this.viewScopes.get(viewId);
+      if (
+        scope &&
+        (subscriber?.appId !== scope.appId ||
+          subscriber?.sessionId !== scope.sessionId ||
+          !this.contexts?.resolvePrincipal(subscriber.appId!))
+      )
+        continue;
       this.viewManager.sendToView(viewId, "shell-message", {
         type: eventName,
         payload,
@@ -195,6 +227,14 @@ export class EventSubscriberManager {
     if (this.backendManager) {
       const subscribedBackends = this.getSubscribedBackends(eventName);
       for (const appId of subscribedBackends) {
+        const subscriber = this.backendScopes.get(appId);
+        if (
+          scope &&
+          (subscriber?.appId !== scope.appId ||
+            subscriber?.sessionId !== scope.sessionId ||
+            !this.contexts?.resolvePrincipal(appId))
+        )
+          continue;
         this.backendManager.sendMessage(appId, {
           type: "shell-event",
           eventName,
@@ -227,6 +267,7 @@ export class EventSubscriberManager {
    * Remove all subscriptions for a view
    */
   public removeViewSubscriptions(viewId: number): void {
+    this.viewScopes.delete(viewId);
     for (const [eventName, subscribers] of this.subscriptions.entries()) {
       if (subscribers.delete(viewId)) {
         if (subscribers.size === 0) {
@@ -240,6 +281,7 @@ export class EventSubscriberManager {
    * Remove all subscriptions for a backend
    */
   public removeBackendSubscriptions(appId: string): void {
+    this.backendScopes.delete(appId);
     for (const [
       eventName,
       subscribers,
@@ -253,6 +295,8 @@ export class EventSubscriberManager {
   }
 
   dispose(): void {
+    this.viewScopes.clear();
+    this.backendScopes.clear();
     this.subscriptions.clear();
     this.backendSubscriptions.clear();
     this.foundationSubscriptions.clear();

@@ -146,3 +146,14 @@ export interface EdenVolumesApi {
   list(): FilesystemVolume[];
   onChanged(listener: (volumes: FilesystemVolume[]) => void): EdenUnsubscribe;
 }
+
+/** Privileged host observation. Does not submit or cancel operations. */
+export interface EdenOperationsObserver {
+  get(
+    handle: import("@edenapp/types").OperationHandle,
+  ): import("@edenapp/types").OperationSnapshot | undefined;
+  list(): import("@edenapp/types").OperationSnapshot[];
+  onChanged(
+    listener: (snapshot: import("@edenapp/types").OperationSnapshot) => void,
+  ): EdenUnsubscribe;
+}

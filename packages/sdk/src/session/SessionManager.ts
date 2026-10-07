@@ -1,6 +1,7 @@
 import type { UserProfile } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { UserManager } from "../user/UserManager";
 import { SessionContext } from "./SessionContext";
@@ -26,6 +27,7 @@ export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
     @inject(UserManager) private userManager: UserManager,
     @inject(ProcessManager) private processManager: ProcessManager,
     @inject(SessionContext) private context: SessionContext,
+    @inject(OperationManager) private operations: OperationManager,
   ) {
     super(ipcBridge);
     commandRegistry.registerManager(new SessionHandler(this));
@@ -100,7 +102,7 @@ export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
 
     this.transitionInProgress = true;
     try {
-      return await task();
+      return await this.operations.withSessionTransition(task);
     } finally {
       this.transitionInProgress = false;
     }

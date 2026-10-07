@@ -24,6 +24,7 @@ import type {
   CommandArgs,
   CommandName,
   CommandResult,
+  OperationSubmission,
   EdenAPI,
 } from "@edenapp/types";
 
@@ -181,23 +182,16 @@ function generateCommandId(): string {
 function shellCommand<T extends CommandName>(
   command: T,
   args: CommandArgs<T>,
+  submission?: OperationSubmission,
 ): Promise<CommandResult<T>> {
   return new Promise((resolve, reject) => {
     const commandId = generateCommandId();
 
-    // Set timeout
-    const timeout = setTimeout(() => {
-      pendingCommands.delete(commandId);
-      reject(new Error(`Shell command '${command}' timed out`));
-    }, 30000);
-
     pendingCommands.set(commandId, {
       resolve: (value) => {
-        clearTimeout(timeout);
         resolve(value as CommandResult<T>);
       },
       reject: (reason) => {
-        clearTimeout(timeout);
         reject(reason);
       },
     });
@@ -207,6 +201,7 @@ function shellCommand<T extends CommandName>(
       commandId,
       command,
       args,
+      submission,
     });
   });
 }

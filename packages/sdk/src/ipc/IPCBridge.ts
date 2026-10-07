@@ -1,3 +1,5 @@
+import type { OperationSubmission } from "@edenapp/types";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
@@ -49,12 +51,17 @@ export class IPCBridge extends EventEmitter {
     @inject(delay(() => ViewManager)) private viewManager: ViewManager,
     @inject(delay(() => RuntimeContextRegistry))
     private runtimeContexts: RuntimeContextRegistry,
+    @inject(ExecutionContext) execution: ExecutionContext,
     @inject(PLATFORM_RENDERER_IPC) private rendererIpc: RendererIpcPort,
   ) {
     super();
 
     // Initialize event subscriber manager
-    this.eventSubscribers = new EventSubscriberManager(viewManager);
+    this.eventSubscribers = new EventSubscriberManager(
+      viewManager,
+      execution,
+      runtimeContexts,
+    );
     this.eventSubscribers.setBackendManager(this.backendManager);
     this.eventSubscribers.setPermissionRegistry(permissionRegistry);
 
@@ -85,9 +92,14 @@ export class IPCBridge extends EventEmitter {
    */
   private setupIPCHandlers(): void {
     // Handle shell commands
-    this.rendererIpc.handle<[string, unknown], unknown>(
+    this.rendererIpc.handle<[string, unknown, OperationSubmission?], unknown>(
       "shell-command",
-      async (event, command: string, args: unknown) => {
+      async (
+        event,
+        command: string,
+        args: unknown,
+        submission?: OperationSubmission,
+      ) => {
         // Build caller context for commands that need it
         const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
         const isFoundation =
@@ -97,14 +109,20 @@ export class IPCBridge extends EventEmitter {
           throw new Error("Shell command caller is not a registered Eden view");
         }
 
-        return this.handleShellCommand(command, args, {
-          appId,
-          webContentsId: event.sender.id,
-          principal: appId
-            ? this.runtimeContexts.resolvePrincipal(appId)
-            : undefined,
-          foundation: isFoundation,
-        });
+        return this.handleShellCommand(
+          command,
+          args,
+          {
+            sessionId: appId ? this.callerSession(appId) : undefined,
+            appId,
+            webContentsId: event.sender.id,
+            principal: appId
+              ? this.runtimeContexts.resolvePrincipal(appId)
+              : undefined,
+            foundation: isFoundation,
+          },
+          submission,
+        );
       },
     );
   }
@@ -124,6 +142,7 @@ export class IPCBridge extends EventEmitter {
         command?: string;
         commandId?: string;
         args?: unknown;
+        submission?: OperationSubmission;
       };
 
       // Handle different message types from backend
@@ -140,8 +159,10 @@ export class IPCBridge extends EventEmitter {
             backendMessage.args,
             {
               appId,
+              sessionId: this.callerSession(appId),
               principal: this.runtimeContexts.resolvePrincipal(appId),
             },
+            backendMessage.submission,
           );
           // Send response back to backend
           this.sendBackendResponse(appId, backendMessage.commandId, result);
@@ -180,10 +201,20 @@ export class IPCBridge extends EventEmitter {
   /**
    * Handle shell commands (app management, etc.)
    */
+  private callerSession(appId: string): string | undefined {
+    const owner = this.runtimeContexts.get(appId)?.owner;
+    return owner?.kind === "session"
+      ? owner.sessionId
+      : owner?.kind === "system"
+        ? "runtime"
+        : undefined;
+  }
+
   private async handleShellCommand(
     command: string,
     args: unknown,
     callerContext: import("../execution").CommandCallerContext = {},
+    submission?: OperationSubmission,
   ): Promise<unknown> {
     // Create a promise to wait for the command result
     const commandId = randomUUID();
@@ -201,7 +232,7 @@ export class IPCBridge extends EventEmitter {
 
       // Execute via CommandRegistry with trusted caller context
       this.commandRegistry
-        .execute(command, args, callerContext)
+        .execute(command, args, callerContext, submission)
         .then((result) => {
           clearTimeout(timeout);
           this.pendingCommands.delete(commandId);
