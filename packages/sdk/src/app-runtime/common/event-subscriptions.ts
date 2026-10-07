@@ -158,15 +158,24 @@ export function dispatchEvent(
     if (!callbacks) continue;
     for (const callback of [...callbacks]) {
       if (!callbacks.has(callback)) continue;
-      try {
-        const result = callback(payload);
-        if (result && typeof result.then === "function")
-          void Promise.resolve(result).catch((error) =>
-            log.error(`Error in event listener for ${eventName}:`, error),
-          );
-      } catch (error) {
-        log.error(`Error in event listener for ${eventName}:`, error);
-      }
+      invokeEventListener(callback, eventName, payload);
     }
+  }
+}
+
+/** Deliver a snapshot or event without leaking listener failures to its producer. */
+export function invokeEventListener<T>(
+  callback: (payload: T) => void | Promise<void>,
+  eventName: string,
+  payload: T,
+): void {
+  try {
+    const result = callback(payload);
+    if (result && typeof result.then === "function")
+      void Promise.resolve(result).catch((error) =>
+        log.error(`Error in event listener for ${eventName}:`, error),
+      );
+  } catch (error) {
+    log.error(`Error in event listener for ${eventName}:`, error);
   }
 }

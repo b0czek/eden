@@ -9,6 +9,8 @@ import type {
   EventName,
 } from "@edenapp/types";
 
+import { invokeEventListener } from "./event-subscriptions";
+
 export function createOperationsAPI(
   api: Pick<EdenAPI, "shellCommand"> & {
     subscribe<T extends EventName>(
@@ -49,7 +51,11 @@ export function createOperationsAPI(
         snapshot.revision > revision
       ) {
         revision = snapshot.revision;
-        listener(snapshot as OperationSnapshot<C, OperationCompletion<C>>);
+        invokeEventListener(
+          listener,
+          "operation/changed",
+          snapshot as OperationSnapshot<C, OperationCompletion<C>>,
+        );
       }
     };
     const callback = ({ snapshot }: { snapshot: OperationSnapshot }) =>

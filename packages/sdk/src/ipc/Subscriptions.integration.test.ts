@@ -261,6 +261,50 @@ describe("client subscriptions across renderer IPC", () => {
     await tick();
   });
 
+  it.each(["sync", "async"])(
+    "isolates %s operation-watch failures for initial and subsequent snapshots",
+    async (kind) => {
+      const api = createEdenAPI(transport, listeners);
+      const operation = work("watch-failure-" + kind);
+      await operation.started;
+      const broken: number[] = [];
+      const healthy: number[] = [];
+      const fail = (snapshot: OperationSnapshot) => {
+        broken.push(snapshot.revision);
+        throw new Error("Operation listener failed");
+      };
+      const stopBroken = await api.operations.watch(
+        operation.handle,
+        kind === "async" ? async (snapshot) => fail(snapshot) : fail,
+      );
+      const stopHealthy = await api.operations.watch(
+        operation.handle,
+        (snapshot) => {
+          healthy.push(snapshot.revision);
+        },
+      );
+      try {
+        await tick();
+        expect(broken).toEqual(healthy);
+        expect(healthy).toHaveLength(1);
+        operation.update("copying");
+        await tick();
+        expect(broken).toEqual(healthy);
+        expect(healthy).toHaveLength(2);
+        const completion = api.operations.wait(operation.handle);
+        operation.finish();
+        await expect(completion).resolves.toBe("watch-failure-" + kind);
+        await tick();
+        expect(broken).toEqual(healthy);
+        expect(healthy).toHaveLength(3);
+      } finally {
+        stopBroken();
+        stopHealthy();
+        operation.finish();
+      }
+    },
+  );
+
   it("routes by operation and delivers only completion to waiters", async () => {
     const api = createEdenAPI(transport, listeners);
     const manager = eden.runtime.resolve(OperationManager);
