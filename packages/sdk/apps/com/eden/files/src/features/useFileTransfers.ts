@@ -74,7 +74,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     }),
   );
 
-  const runOperation = async <C extends string>(
+  const withProgress = async <C extends string>(
     operation: FileOperationProgress["operation"],
     item: FileItem,
     submit: () => Promise<Operation<C>>,
@@ -82,13 +82,63 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     if (disposed) throw new Error("File operation owner has been disposed");
     if (busy()) throw new Error("A file operation is already in progress");
     resetCancellation();
-    setProgress({ operation, current: 1, total: 1, itemName: item.name });
+    setProgress({
+      operation,
+      current: 1,
+      total: 1,
+      itemName: item.name,
+    });
     try {
       return await observed.run(submit);
     } finally {
       setProgress(null);
       resetCancellation();
     }
+  };
+
+  const submitCopy = (
+    item: FileItem,
+    to: FilesystemLocation,
+    overwrite = false,
+  ) =>
+    window.edenAPI.shellCommand("fs/cp", {
+      from: item.location,
+      to,
+      overwrite,
+    });
+
+  const submitMove = (
+    item: FileItem,
+    to: FilesystemLocation,
+    overwrite = false,
+  ) =>
+    window.edenAPI.shellCommand("fs/mv", {
+      from: item.location,
+      to,
+      overwrite,
+    });
+
+  const submitDelete = (item: FileItem) =>
+    window.edenAPI.shellCommand("fs/delete", { location: item.location });
+
+  const operations = {
+    copy: (item: FileItem, to: FilesystemLocation, overwrite = false) =>
+      withProgress("copy", item, () => submitCopy(item, to, overwrite)),
+    move: (item: FileItem, to: FilesystemLocation, overwrite = false) =>
+      withProgress("move", item, () => submitMove(item, to, overwrite)),
+    delete: (item: FileItem) =>
+      withProgress("delete", item, () => submitDelete(item)),
+    open: (item: FileItem) =>
+      withProgress("open", item, () =>
+        window.edenAPI.shellCommand("file/open", { location: item.location }),
+      ),
+    openWith: (item: FileItem, appId: string) =>
+      withProgress("open", item, () =>
+        window.edenAPI.shellCommand("file/open-with", {
+          location: item.location,
+          appId,
+        }),
+      ),
   };
 
   const pathExists = (location: FilesystemLocation) =>
@@ -208,23 +258,15 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           }
 
           if (disposed || cancelling()) break;
-          if (operation === "copy") {
-            await observed.run(() =>
-              window.edenAPI.shellCommand("fs/cp", {
-                from: item.location,
-                to: { volume: destinationDirectory.volume, path: targetPath },
-                overwrite,
-              }),
-            );
-          } else {
-            await observed.run(() =>
-              window.edenAPI.shellCommand("fs/mv", {
-                from: item.location,
-                to: { volume: destinationDirectory.volume, path: targetPath },
-                overwrite,
-              }),
-            );
-          }
+          const destination = {
+            volume: destinationDirectory.volume,
+            path: targetPath,
+          };
+          await observed.run(() =>
+            operation === "copy"
+              ? submitCopy(item, destination, overwrite)
+              : submitMove(item, destination, overwrite),
+          );
         } catch (error) {
           if (error instanceof Error && error.name === "AbortError") break;
           failures.push({
@@ -288,11 +330,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           itemName: item.name,
         });
         try {
-          await observed.run(() =>
-            window.edenAPI.shellCommand("fs/delete", {
-              location: item.location,
-            }),
-          );
+          await observed.run(() => submitDelete(item));
         } catch (error) {
           failures.push({ item, message: (error as Error).message });
         }
@@ -312,7 +350,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     progress,
     showProgress,
     snapshot: () => (observed.pending() ? observed.snapshot() : undefined),
-    runOperation,
+    operations,
     busy,
     cancelling,
     beginTransfer,
@@ -337,3 +375,5 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     },
   };
 };
+
+export type FileOperations = ReturnType<typeof useFileTransfers>["operations"];

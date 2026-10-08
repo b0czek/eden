@@ -286,7 +286,7 @@ const App: Component = () => {
     currentPath,
     refresh,
     navigateTo: navigateWithSelectionClear,
-    runOperation: transfers.runOperation,
+    operations: transfers.operations,
     showError,
     dialogs,
     setSelectedItem,
