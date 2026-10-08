@@ -85,8 +85,8 @@ export interface EdenHandlerOptions {
    */
   permission?: string;
 
-  /** Communication mode. Stream transport is reserved. */
-  mode?: "immediate" | "operation" | "stream";
+  /** Communication mode. */
+  mode?: "immediate" | "operation";
 
   /**
    * User grant required to execute this handler.

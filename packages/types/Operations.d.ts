@@ -1,13 +1,8 @@
 import type { CommandCompletion, CommandName } from "./commands";
 
-export type CommunicationMode = "immediate" | "operation" | "stream";
+export type CommunicationMode = "immediate" | "operation";
 
 export interface OperationHandle<C extends string = string> {
-  command: C;
-  id: string;
-}
-
-export interface StreamHandle<C extends string = string> {
   command: C;
   id: string;
 }
@@ -22,14 +17,6 @@ export interface OperationCommand<A, R, C extends string = string> {
   mode: "operation";
   args: A;
   response: OperationHandle<C>;
-  completion: R;
-}
-
-export interface StreamCommand<A, Chunk, R, C extends string = string> {
-  mode: "stream";
-  args: A;
-  response: StreamHandle<C>;
-  chunk: Chunk;
   completion: R;
 }
 

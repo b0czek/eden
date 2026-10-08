@@ -95,23 +95,6 @@ describe("runtime-owned operations", () => {
         requestKey,
       });
 
-  it("rejects reserved stream handlers during registration", () => {
-    class StreamFixture {
-      prepare(): void {}
-    }
-    EdenNamespace("stream-fixture")(StreamFixture);
-    EdenHandler("scan", { mode: "stream" })(
-      StreamFixture.prototype,
-      "prepare",
-      Object.getOwnPropertyDescriptor(StreamFixture.prototype, "prepare")!,
-    );
-    expect(() =>
-      eden.runtime
-        .resolve(CommandRegistry)
-        .registerManager(new StreamFixture()),
-    ).toThrow("Stream handlers are not supported");
-  });
-
   it("rejects cancellation for tasks that do not support it", async () => {
     register(() => operationTask(async () => "done"));
     const handle = await submit();

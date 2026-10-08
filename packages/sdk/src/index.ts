@@ -1,7 +1,6 @@
 import "reflect-metadata";
 
 export type {
-  CommandChunk,
   CommandCompletion,
   CommunicationMode,
   EdenConfig,
@@ -23,8 +22,6 @@ export type {
   OperationSnapshot,
   OperationSubmission,
   OperationsAPI,
-  StreamCommand,
-  StreamHandle,
 } from "@edenapp/types";
 export * from "./api";
 export { Eden } from "./Eden";

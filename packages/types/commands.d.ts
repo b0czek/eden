@@ -45,10 +45,3 @@ export type CommandCompletion<T extends CommandName> = CommandMap[T] extends {
 }
   ? R
   : never;
-
-/** Reserved stream data; non-stream commands have no chunks. */
-export type CommandChunk<T extends CommandName> = CommandMap[T] extends {
-  chunk: infer R;
-}
-  ? R
-  : never;

@@ -1,5 +1,4 @@
 import type {
-  CommandChunk,
   CommandCompletion,
   CommandResponse,
   CommandResult,
@@ -8,8 +7,6 @@ import type {
   OperationCommand,
   OperationCompletion,
   OperationHandle,
-  StreamCommand,
-  StreamHandle,
   SystemInfo,
 } from "@edenapp/types";
 
@@ -40,7 +37,6 @@ type Contracts = [
   Assert<Equal<OperationCompletion<string>, unknown>>,
   Assert<Equal<CommandResult<"system/info">, SystemInfo>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
-  Assert<Equal<CommandChunk<"system/info">, never>>,
   Assert<Equal<ImmediateCommand<{}, string>["response"], string>>,
   Assert<
     Equal<
@@ -49,14 +45,6 @@ type Contracts = [
     >
   >,
   Assert<Equal<OperationCommand<{}, number>["completion"], number>>,
-  Assert<
-    Equal<
-      StreamCommand<{}, number, boolean, "scan">["response"],
-      StreamHandle<"scan">
-    >
-  >,
-  Assert<Equal<StreamCommand<{}, number, boolean>["chunk"], number>>,
-  Assert<Equal<StreamCommand<{}, number, boolean>["completion"], boolean>>,
 ];
 
 it("provides serializable typed handles", () => {
