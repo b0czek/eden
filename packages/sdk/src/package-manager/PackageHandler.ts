@@ -13,6 +13,7 @@ import {
 } from "../filesystem/FilesystemLocationSchema";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import { log } from "../logging";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import type { PackageManager } from "./PackageManager";
 
 const installPackageArgs = v.object({
@@ -29,22 +30,28 @@ export class PackageHandler {
   }
 
   /** Install an application or DLC from a local path. */
-  @EdenHandler("install", { permission: "manage" })
-  async handleInstallPackage(args: {
+  @EdenHandler("install", { permission: "manage", mode: "operation" })
+  handleInstallPackage(args: {
     source: FilesystemLocation;
     replace?: boolean;
-  }): Promise<InstalledPackageManifest> {
+  }): OperationTask<InstalledPackageManifest> {
     const { source, replace } = v.parse(installPackageArgs, args);
     log.info(`Installing from volume: ${source.volume}`);
-    return await this.packageManager.installPackage(source, replace === true);
+    return this.packageManager.prepareInstallPackage(source, replace === true);
   }
 
   /**
    * Uninstall an application or DLC by its package ID.
    */
-  @EdenHandler("uninstall", { permission: "manage" })
-  async handleUninstallPackage(args: { packageId: string }): Promise<boolean> {
-    return await this.packageManager.uninstallPackage(args.packageId);
+  @EdenHandler("uninstall", { permission: "manage", mode: "operation" })
+  handleUninstallPackage(args: { packageId: string }): OperationTask<boolean> {
+    const { packageId } = v.parse(
+      v.object({ packageId: v.pipe(v.string(), v.nonEmpty()) }),
+      args,
+    );
+    return operationTask((reporter) =>
+      this.packageManager.uninstallPackage(packageId, reporter),
+    );
   }
 
   /**

@@ -5,10 +5,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type {
   FilesystemVolume,
+  OperationHandle,
   RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
@@ -39,7 +41,9 @@ describe("consumer-managed filesystem volumes", () => {
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/*"]);
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(appId, ["fs/*", "volume/*"]);
     usbRoot = path.join(eden.paths.root, "usb");
     await fs.mkdir(usbRoot);
     await eden.runtime.volumes.register({
@@ -55,7 +59,7 @@ describe("consumer-managed filesystem volumes", () => {
   });
 
   const execute = <T = unknown>(command: string, args: unknown = {}) =>
-    eden.execute<T>(command, args, {
+    eden.complete<T>(command, args, {
       appId,
       principal: { kind: "user", profile: user },
     });
@@ -73,7 +77,7 @@ describe("consumer-managed filesystem volumes", () => {
       kind: "network",
       rootPath: mount,
     });
-    const volumes = await execute<FilesystemVolume[]>("fs/volumes");
+    const volumes = await execute<FilesystemVolume[]>("volume/list");
     expect(volumes.map((volume) => volume.id)).toEqual([
       "home",
       "usb",
@@ -85,6 +89,8 @@ describe("consumer-managed filesystem volumes", () => {
       kind: "network",
       readOnly: false,
       supportsWatch: false,
+      supportsEject: false,
+      state: "ready",
     });
     expect(volumes.some((volume) => "rootPath" in volume)).toBe(false);
     changes[0][0].label = "Changed";
@@ -94,6 +100,40 @@ describe("consumer-managed filesystem volumes", () => {
     stop();
     eden.runtime.volumes.unregister("network");
     expect(changes).toHaveLength(1);
+  });
+
+  it("authorizes volume discovery independently of file access", async () => {
+    const permissions = eden.runtime.resolve(PermissionRegistry);
+    permissions.registerApp(appId, ["fs/*"]);
+    await expect(execute("volume/list")).rejects.toThrow("volume/read");
+    await expect(
+      execute("event/subscribe", { eventName: "volume/changed" }),
+    ).rejects.toThrow("volume/read");
+
+    permissions.registerApp(appId, ["volume/read"]);
+    await expect(execute("volume/list")).resolves.toContainEqual(
+      expect.objectContaining({ id: "usb" }),
+    );
+    await expect(
+      execute("event/subscribe", { eventName: "volume/changed" }),
+    ).resolves.toBeUndefined();
+    await execute("event/unsubscribe", { eventName: "volume/changed" });
+    await expect(
+      execute("fs/readdir", { location: { volume: "usb", path: "/" } }),
+    ).rejects.toThrow("fs/read");
+  });
+
+  it.each([
+    ["volume/list", {}],
+    ["volume/eject", { volume: "usb" }],
+  ])("requires an execution principal for %s", async (command, args) => {
+    await eden.runtime.sessions.logout();
+    await expect(eden.execute(command, args)).rejects.toThrow(
+      "Caller has no volume execution principal",
+    );
+    expect(eden.runtime.volumes.list()).toContainEqual(
+      expect.objectContaining({ id: "usb", state: "ready" }),
+    );
   });
 
   it("keeps home private while sharing registered volumes", async () => {
@@ -113,14 +153,14 @@ describe("consumer-managed filesystem volumes", () => {
       grants: ["*"],
     });
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/read",
         { location: { volume: "usb", path: "/report.txt" } },
         { appId, principal: { kind: "user", profile: second } },
       ),
     ).resolves.toBe("shared");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/exists",
         { location: { volume: "home", path: "/report.txt" } },
         { appId, principal: { kind: "user", profile: second } },
@@ -321,7 +361,7 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("read-only");
     eden.runtime.resolve(PermissionRegistry).registerApp("reader", ["fs/read"]);
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/write",
         { location: { volume: "usb", path: "/file" }, content: "denied" },
         { appId: "reader", principal: { kind: "user", profile: user } },
@@ -575,24 +615,25 @@ describe("consumer-managed filesystem volumes", () => {
         isRestricted: false,
         resolvedGrants: [],
       } as RuntimeAppManifest);
-      await eden.execute("process/launch", { appId: id });
+      await eden.complete("process/launch", { appId: id });
     }
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(providerId, ["file-picker/display", "fs/read"]);
-    const invoke = (id: string, command: string, args: unknown) => {
+    const invoke = async (id: string, command: string, args: unknown) => {
       const instance = requireValue(
         eden.runtime.resolve(ProcessManager).getAppInstance(id),
       );
       const view = requireValue(
         eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
       );
-      return eden.platform.rendererIpc.invoke(
+      const response = (await eden.platform.rendererIpc.invoke(
         "shell-command",
         view.view.webContents.id,
         command,
         args,
-      );
+      )) as { mode: "result"; result: unknown };
+      return response.result;
     };
     await invoke(providerId, "file-picker/register-display", {});
     const opened = (await invoke(appId, "file-picker/open", {
@@ -812,70 +853,106 @@ describe("consumer-managed filesystem volumes", () => {
     await expect(fs.readdir(usbRoot)).resolves.toEqual([]);
   });
 
-  it("invalidates owned watches and sends live volume inventory on unplug", async () => {
-    const app = {
-      kind: "app",
-      id: appId,
-      name: "Volumes",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
-    eden.runtime.resolve(PackageRegistry).register(app);
-    await eden.execute("process/launch", { appId });
-    const instance = requireValue(
-      eden.runtime.resolve(ProcessManager).getAppInstance(appId),
-    );
-    const view = requireValue(
-      eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
-    );
-    const webContentsId = view.view.webContents.id;
-    const invoke = (command: string, args: unknown) =>
-      eden.platform.rendererIpc.invoke(
-        "shell-command",
-        webContentsId,
-        command,
-        args,
+  it.each(["unplug", "eject"])(
+    "invalidates owned watches and sends live volume inventory on %s",
+    async (removal) => {
+      const app = {
+        kind: "app",
+        id: appId,
+        name: "Volumes",
+        version: "1.0.0",
+        frontend: { entry: "index.html" },
+        isPrebuilt: false,
+        isDevelopment: false,
+        isCore: false,
+        isRestricted: false,
+        resolvedGrants: [],
+      } as RuntimeAppManifest;
+      eden.runtime.resolve(PackageRegistry).register(app);
+      await eden.complete("process/launch", { appId });
+      const instance = requireValue(
+        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
       );
-    await invoke("event/subscribe", { eventName: "fs/changed" });
-    await invoke("event/subscribe", { eventName: "fs/volumes-changed" });
-    const result = (await invoke("fs/watch", {
-      location: { volume: "usb", path: "/" },
-    })) as {
-      watchId: string;
-    };
-    eden.runtime.volumes.unregister("usb");
-    const messages = eden.platform.effects.flatMap((effect) =>
-      effect.type === "message-sent" && effect.webContentsId === webContentsId
-        ? effect.args
-        : [],
-    );
-    expect(messages).toContainEqual({
-      type: "fs/changed",
-      payload: { watchId: result.watchId, kind: "volume-removed" },
-    });
-    expect(messages).toContainEqual({
-      type: "fs/volumes-changed",
-      payload: { volumes: [expect.objectContaining({ id: "home" })] },
-    });
-    await expect(
-      invoke("fs/unwatch", { watchId: result.watchId }),
-    ).rejects.toThrow("not owned");
-    await eden.runtime.volumes.register({
-      id: "usb",
-      label: "Mounted network share",
-      kind: "network",
-      rootPath: usbRoot,
-    });
-    await expect(
-      invoke("fs/readdir", { location: { volume: "usb", path: "/" } }),
-    ).resolves.toEqual([]);
-    await expect(
-      invoke("fs/watch", { location: { volume: "usb", path: "/" } }),
-    ).rejects.toThrow("does not support watching");
-  });
+      const view = requireValue(
+        eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
+      );
+      const webContentsId = view.view.webContents.id;
+      const invoke = async (command: string, args: unknown) => {
+        const response = (await eden.platform.rendererIpc.invoke(
+          "shell-command",
+          webContentsId,
+          command,
+          args,
+        )) as
+          | { mode: "operation"; handle: OperationHandle }
+          | { mode: "result"; result: unknown };
+        const result =
+          response.mode === "operation" ? response.handle : response.result;
+        return command === "volume/eject"
+          ? eden.runtime
+              .resolve(OperationManager)
+              .wait(result as OperationHandle, {
+                appId,
+                principal: { kind: "user", profile: user },
+              })
+          : result;
+      };
+      await invoke("event/subscribe", { eventName: "fs/changed" });
+      await invoke("event/subscribe", { eventName: "volume/changed" });
+      if (removal === "eject") {
+        eden.runtime.volumes.unregister("usb");
+        await eden.runtime.volumes.register(
+          {
+            id: "usb",
+            label: "USB",
+            kind: "removable",
+            rootPath: usbRoot,
+          },
+          {
+            eject: async () => {
+              // Native watches are released before the host's OS removal starts.
+              await expect(
+                invoke("fs/unwatch", { watchId: result.watchId }),
+              ).rejects.toThrow("not owned");
+            },
+          },
+        );
+      }
+      const result = (await invoke("fs/watch", {
+        location: { volume: "usb", path: "/" },
+      })) as {
+        watchId: string;
+      };
+      if (removal === "eject") await invoke("volume/eject", { volume: "usb" });
+      else eden.runtime.volumes.unregister("usb");
+      const messages = eden.platform.effects.flatMap((effect) =>
+        effect.type === "message-sent" && effect.webContentsId === webContentsId
+          ? effect.args
+          : [],
+      );
+      expect(messages).toContainEqual({
+        type: "fs/changed",
+        payload: { watchId: result.watchId, kind: "volume-removed" },
+      });
+      expect(messages).toContainEqual({
+        type: "volume/changed",
+        payload: { volumes: [expect.objectContaining({ id: "home" })] },
+      });
+      await expect(
+        invoke("fs/unwatch", { watchId: result.watchId }),
+      ).rejects.toThrow("not owned");
+      await eden.runtime.volumes.register({
+        id: "usb",
+        label: "Mounted network share",
+        kind: "network",
+        rootPath: usbRoot,
+      });
+      await expect(
+        invoke("fs/readdir", { location: { volume: "usb", path: "/" } }),
+      ).resolves.toEqual([]);
+      await expect(
+        invoke("fs/watch", { location: { volume: "usb", path: "/" } }),
+      ).rejects.toThrow("does not support watching");
+    },
+  );
 });

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { ExecutionContext } from "../execution";
+import type { OperationManager } from "../operations/OperationManager";
 import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
 import { CommandRegistry } from "./CommandRegistry";
 
@@ -11,6 +12,7 @@ type PermissionRegistryLike = {
 
 type SessionContextLike = {
   getCurrentUser: jest.Mock;
+  getSessionId: jest.Mock;
 };
 
 describe("CommandRegistry", () => {
@@ -28,6 +30,7 @@ describe("CommandRegistry", () => {
     };
     sessionContext = {
       getCurrentUser: jest.fn().mockReturnValue(null),
+      getSessionId: jest.fn().mockReturnValue("session"),
     };
     executionContext = new ExecutionContext({});
     registry = new CommandRegistry(
@@ -38,6 +41,7 @@ describe("CommandRegistry", () => {
         typeof CommandRegistry
       >[1],
       executionContext,
+      {} as OperationManager,
     );
 
     warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);

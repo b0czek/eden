@@ -4,8 +4,10 @@ import type {
   ProcessMetricsSnapshot,
   ViewBounds,
 } from "@edenapp/types";
+import * as v from "valibot";
 import type { ExecutionContext } from "../execution";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
 import type { ProcessManager } from "./ProcessManager";
 
 @EdenNamespace("process")
@@ -23,42 +25,64 @@ export class ProcessHandler {
    * Launch an application instance.
    * Requires "process/manage" permission.
    */
-  @EdenHandler("launch", { permission: "manage" })
-  async handleLaunchApp(args: {
+  @EdenHandler("launch", { permission: "manage", mode: "operation" })
+  handleLaunchApp(args: {
     appId: string;
     bounds?: ViewBounds;
-  }): Promise<LaunchResult> {
-    const { appId, bounds } = args;
-    return await this.processManager.launchApp(appId, bounds);
+  }): OperationTask<LaunchResult> {
+    const appId = v.parse(v.pipe(v.string(), v.nonEmpty()), args.appId);
+    const bounds =
+      args.bounds === undefined
+        ? undefined
+        : v.parse(
+            v.object({
+              x: v.number(),
+              y: v.number(),
+              width: v.pipe(v.number(), v.minValue(0)),
+              height: v.pipe(v.number(), v.minValue(0)),
+            }),
+            args.bounds,
+          );
+    this.processManager.assertCanLaunch(appId);
+    return operationTask(async (reporter) => {
+      reporter.update("launching");
+      return this.processManager.launchApp(appId, bounds);
+    });
   }
 
   /**
    * Stop a running application instance.
    * Requires "process/manage" permission.
    */
-  @EdenHandler("stop", { permission: "manage" })
-  async handleStopApp(args: { appId: string }): Promise<{ success: boolean }> {
-    const { appId } = args;
+  @EdenHandler("stop", { permission: "manage", mode: "operation" })
+  handleStopApp(args: { appId: string }): OperationTask<{ success: boolean }> {
+    const appId = v.parse(v.pipe(v.string(), v.nonEmpty()), args.appId);
     this.assertCanStop(appId);
-    await this.processManager.stopApp(appId);
-    return { success: true };
+    return operationTask(async (reporter) => {
+      reporter.update("stopping");
+      await this.processManager.stopApp(appId);
+      return { success: true };
+    });
   }
 
   /**
    * Stop the caller app instance.
    * No explicit permission required - this endpoint only allows self-exit.
    */
-  @EdenHandler("exit")
-  async handleExitApp(args: {
+  @EdenHandler("exit", { mode: "operation" })
+  handleExitApp(args: {
     _callerAppId?: string;
-  }): Promise<{ success: boolean }> {
+  }): OperationTask<{ success: boolean }> {
     const { _callerAppId } = args;
     if (!_callerAppId) {
       throw new Error("process/exit requires caller app context");
     }
 
-    await this.processManager.stopApp(_callerAppId);
-    return { success: true };
+    return operationTask(async (reporter) => {
+      reporter.update("stopping");
+      await this.processManager.stopApp(_callerAppId);
+      return { success: true };
+    });
   }
 
   /**

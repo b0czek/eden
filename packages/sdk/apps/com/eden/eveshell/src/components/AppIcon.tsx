@@ -1,4 +1,5 @@
 import { createResource, Show } from "solid-js";
+import { t } from "../i18n";
 import { fetchAppIcon } from "../icon-cache";
 
 interface AppIconProps {
@@ -7,6 +8,7 @@ interface AppIconProps {
   /** Optional direct icon data URL (for built-in icons that don't need fetching) */
   icon?: string;
   isRunning?: boolean;
+  activity?: "launch" | "stop";
   onClick?: () => void;
   onContextMenu?: (e: MouseEvent) => void;
 }
@@ -24,7 +26,13 @@ export default function AppIcon(props: AppIconProps) {
     <>
       <div class="icon-container">
         <img src={iconSrc()} alt={props.appName} draggable={false} />
-        <Show when={props.isRunning}>
+        <Show when={props.activity}>
+          <span
+            class="app-operation-indicator eden-spinner eden-spinner-sm"
+            aria-hidden="true"
+          />
+        </Show>
+        <Show when={props.isRunning && !props.activity}>
           <div class="running-indicator"></div>
         </Show>
       </div>
@@ -48,6 +56,15 @@ export default function AppIcon(props: AppIconProps) {
         onClick={props.onClick}
         onContextMenu={props.onContextMenu}
         title={props.appName}
+        disabled={Boolean(props.activity)}
+        aria-busy={Boolean(props.activity)}
+        aria-label={
+          props.activity === "launch"
+            ? t("shell.launchingApp", { name: props.appName })
+            : props.activity === "stop"
+              ? t("shell.stoppingApp", { name: props.appName })
+              : props.appName
+        }
       >
         {iconContent}
       </button>

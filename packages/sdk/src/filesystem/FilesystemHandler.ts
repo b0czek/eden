@@ -2,11 +2,11 @@ import type {
   FileStats,
   FilesystemLocation,
   FilesystemTransferArgs,
-  FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
 import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
+import type { OperationTask } from "../operations/OperationTask";
 import {
   filesystemLocationArgsSchema,
   filesystemLocationSchema,
@@ -66,11 +66,6 @@ const transferArgs = v.object({
 @EdenNamespace("fs")
 export class FilesystemHandler {
   constructor(private fsManager: FilesystemManager) {}
-
-  @EdenHandler("volumes", { permission: "read" })
-  handleVolumes(_args: Record<string, never>): FilesystemVolume[] {
-    return this.fsManager.listVolumes();
-  }
 
   /**
    * Read the contents of a file.
@@ -204,10 +199,13 @@ export class FilesystemHandler {
    * Delete a file or directory.
    * For directories, removes recursively.
    */
-  @EdenHandler("delete", { permission: "write" })
-  async handleDelete(args: { location: FilesystemLocation }): Promise<void> {
+  @EdenHandler("delete", { permission: "write", mode: "operation" })
+  handleDelete(args: { location: FilesystemLocation }): OperationTask<void> {
     const { location } = v.parse(filesystemLocationArgsSchema, args);
-    await this.fsManager.delete(location);
+    return this.fsManager.prepareVolumeOperation(
+      [location.volume],
+      (reporter) => this.fsManager.delete(location, reporter),
+    );
   }
 
   /**
@@ -215,19 +213,26 @@ export class FilesystemHandler {
    * Directories are copied recursively.
    * Existing destinations are replaced only when overwrite is true.
    */
-  @EdenHandler("cp", { permission: "write" })
-  async handleCopy(args: FilesystemTransferArgs): Promise<void> {
+  @EdenHandler("cp", { permission: "write", mode: "operation" })
+  handleCopy(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    await this.fsManager.copy(from, to, overwrite);
+    const task = this.fsManager.prepareVolumeOperation(
+      [from.volume, to.volume],
+      (reporter) => this.fsManager.copy(from, to, overwrite, reporter),
+    );
+    return { ...task, cancellable: true };
   }
 
   /**
    * Move or rename a file or directory.
    * Existing destinations are replaced only when overwrite is true.
    */
-  @EdenHandler("mv", { permission: "write" })
-  async handleMove(args: FilesystemTransferArgs): Promise<void> {
+  @EdenHandler("mv", { permission: "write", mode: "operation" })
+  handleMove(args: FilesystemTransferArgs): OperationTask<void> {
     const { from, to, overwrite } = v.parse(transferArgs, args);
-    await this.fsManager.move(from, to, overwrite);
+    return this.fsManager.prepareVolumeOperation(
+      [from.volume, to.volume],
+      (reporter) => this.fsManager.move(from, to, overwrite, reporter),
+    );
   }
 }

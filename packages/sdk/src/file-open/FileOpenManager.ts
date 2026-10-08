@@ -15,6 +15,7 @@ import { FilesystemManager } from "../filesystem";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
+import type { OperationTask } from "../operations/OperationTask";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
@@ -141,46 +142,47 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     preferenceKeys: string[];
     canonicalPreferenceKey: string | undefined;
   }> {
-    const filePath = location.path;
-    const fullPath = await this.fsManager.resolvePath(location);
-    const stats = await fs.stat(fullPath);
-    const isDirectory = stats.isDirectory();
+    return this.fsManager.withVolume(location, async (fullPath) => {
+      const filePath = location.path;
+      const stats = await fs.stat(fullPath);
+      const isDirectory = stats.isDirectory();
 
-    if (isDirectory) {
+      if (isDirectory) {
+        return {
+          fullPath,
+          isDirectory: true,
+          extension: undefined,
+          mimeType: undefined,
+          preferenceKeys: [FileOpenManager.DIRECTORY_ASSOCIATION_KEY],
+          canonicalPreferenceKey: FileOpenManager.DIRECTORY_ASSOCIATION_KEY,
+        };
+      }
+
+      const extension = this.getExtension(filePath) || undefined;
+      const mimeType = await this.detectMimeType(fullPath);
+      const preferenceKeys: string[] = [];
+
+      if (mimeType) {
+        preferenceKeys.push(this.getMimePreferenceKey(mimeType));
+      }
+
+      if (extension) {
+        preferenceKeys.push(this.getExtensionPreferenceKey(extension));
+      }
+
       return {
         fullPath,
-        isDirectory: true,
-        extension: undefined,
-        mimeType: undefined,
-        preferenceKeys: [FileOpenManager.DIRECTORY_ASSOCIATION_KEY],
-        canonicalPreferenceKey: FileOpenManager.DIRECTORY_ASSOCIATION_KEY,
+        isDirectory: false,
+        extension,
+        mimeType,
+        preferenceKeys,
+        canonicalPreferenceKey: mimeType
+          ? this.getMimePreferenceKey(mimeType)
+          : extension
+            ? this.getExtensionPreferenceKey(extension)
+            : undefined,
       };
-    }
-
-    const extension = this.getExtension(filePath) || undefined;
-    const mimeType = await this.detectMimeType(fullPath);
-    const preferenceKeys: string[] = [];
-
-    if (mimeType) {
-      preferenceKeys.push(this.getMimePreferenceKey(mimeType));
-    }
-
-    if (extension) {
-      preferenceKeys.push(this.getExtensionPreferenceKey(extension));
-    }
-
-    return {
-      fullPath,
-      isDirectory: false,
-      extension,
-      mimeType,
-      preferenceKeys,
-      canonicalPreferenceKey: mimeType
-        ? this.getMimePreferenceKey(mimeType)
-        : extension
-          ? this.getExtensionPreferenceKey(extension)
-          : undefined,
-    };
+    });
   }
 
   /**
@@ -566,6 +568,21 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   /**
    * Open a file with its default handler
    */
+  prepareOpen(
+    location: FilesystemLocation,
+    appId?: string,
+  ): OperationTask<FileOpenResult> {
+    return this.fsManager.prepareVolumeOperation(
+      [location.volume],
+      async (reporter) => {
+        reporter.update("opening");
+        return appId === undefined
+          ? this.openFile(location)
+          : this.openFileWith(location, appId);
+      },
+    );
+  }
+
   async openFile(location: FilesystemLocation): Promise<FileOpenResult> {
     const filePath = location.path;
     try {
@@ -641,12 +658,10 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
     appId: string,
   ): Promise<FileOpenResult> {
     try {
-      // Resolve masked path to full filesystem path
-      const fullPath = await this.fsManager.resolvePath(location);
-
-      // Check if file exists and get stats
-      const stats = await fs.stat(fullPath);
-      const isDirectory = stats.isDirectory();
+      const isDirectory = await this.fsManager.withVolume(
+        location,
+        async (fullPath) => (await fs.stat(fullPath)).isDirectory(),
+      );
 
       // Check if app is installed
       const manifest = this.packageCatalog.getApp(appId);

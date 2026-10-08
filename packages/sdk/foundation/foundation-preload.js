@@ -43,7 +43,9 @@ ipcRenderer.on("shell-message", (_event, message) => {
 contextBridge.exposeInMainWorld("edenAPI", {
   // Shell commands
   shellCommand: (command, args) => {
-    return ipcRenderer.invoke("shell-command", command, args);
+    return ipcRenderer
+      .invoke("shell-command", command, args)
+      .then((response) => response.result);
   },
 
   // Event subscription

@@ -85,6 +85,9 @@ export interface EdenHandlerOptions {
    */
   permission?: string;
 
+  /** Return the completed result or an operation with completion controls. */
+  mode?: "result" | "operation";
+
   /**
    * User grant required to execute this handler.
    * This is checked against the current user's grants.
@@ -104,6 +107,13 @@ export function EdenHandler(command: string, options?: EdenHandlerOptions) {
       target.constructor as object,
       command,
       String(propertyKey),
+    );
+
+    Reflect.defineMetadata(
+      "eden:handler:mode",
+      options?.mode ?? "result",
+      target,
+      propertyKey,
     );
 
     // Store permission metadata if provided

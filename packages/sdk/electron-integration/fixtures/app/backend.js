@@ -39,3 +39,82 @@ void (async () => {
     );
   }
 })();
+
+void (async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  let started = false;
+  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
+    if (started || !volumes.some((volume) => volume.id === "operation-delay"))
+      return;
+    started = true;
+    let result;
+    try {
+      const operation = await worker.edenAPI.shellCommand(
+        "integration/delayed",
+        {
+          name: "backend",
+        },
+      );
+      await fs.writeFile(
+        path.join(
+          process.env.EDEN_INSTALL_PATH,
+          "backend-operation-accepted.json",
+        ),
+        JSON.stringify(operation.handle),
+      );
+      const revisions = [];
+      const stop = await operation.watch((snapshot) =>
+        revisions.push(snapshot.revision),
+      );
+      const completion = await operation.result();
+      stop();
+      result = { completion, revisions };
+    } catch (error) {
+      result = { error: String(error) };
+    }
+    await fs.writeFile(
+      path.join(process.env.EDEN_INSTALL_PATH, "backend-operation-result.json"),
+      JSON.stringify(result),
+    );
+  });
+  await fs.writeFile(
+    path.join(process.env.EDEN_INSTALL_PATH, "backend-operation-ready"),
+    "ready",
+  );
+})();
+
+void (async () => {
+  const fs = require("node:fs/promises");
+  const path = require("node:path");
+  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
+    if (
+      !volumes.some(
+        (volume) => volume.id === "slow-eject" && volume.state === "ready",
+      )
+    )
+      return;
+    let result;
+    try {
+      const operation = await worker.edenAPI.shellCommand("volume/eject", {
+        volume: "slow-eject",
+      });
+      await fs.writeFile(
+        path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-accepted.json"),
+        JSON.stringify(operation.handle),
+      );
+      await operation.result();
+      result = { success: true };
+    } catch (error) {
+      result = { error: String(error) };
+    }
+    await fs.writeFile(
+      path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-result.json"),
+      JSON.stringify(result),
+    );
+  });
+  await fs.writeFile(
+    path.join(process.env.EDEN_INSTALL_PATH, "backend-eject-ready"),
+    "ready",
+  );
+})();

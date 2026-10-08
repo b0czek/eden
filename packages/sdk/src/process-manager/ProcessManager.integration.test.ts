@@ -2,12 +2,18 @@ import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import type {
+  OperationHandle,
+  RuntimeAppManifest,
+  UserProfile,
+} from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { ViewManager } from "../view-manager/ViewManager";
 import { ProcessManager } from "./ProcessManager";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -20,6 +26,57 @@ describe("ProcessManager integration", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+  });
+
+  it("queues renderer self-exit acceptance before destroying the caller", async () => {
+    eden = await createTestEden();
+    const appId = "com.example.self-exit";
+    eden.runtime.resolve(PackageRegistry).register({
+      kind: "app",
+      id: appId,
+      name: "Self exit",
+      version: "1.0.0",
+      frontend: { entry: "index.html" },
+      isPrebuilt: false,
+      isDevelopment: false,
+      isCore: false,
+      isRestricted: false,
+      resolvedGrants: [],
+    } as RuntimeAppManifest);
+    const profile = await eden.runtime.users.create({
+      username: "exiting",
+      name: "Exiting",
+      password: "password",
+      grants: [`apps/launch/${appId}`],
+    });
+    await eden.runtime.sessions.login(profile.username, "password");
+    await eden.complete("process/launch", { appId });
+    const processes = eden.runtime.resolve(ProcessManager);
+    const instance = processes.getAppInstance(appId)!;
+    const view = eden.runtime
+      .resolve(ViewManager)
+      .getViewInfo(instance.viewId)!.view;
+    const response = (await eden.platform.rendererIpc.invoke(
+      "shell-command",
+      view.webContents.id,
+      "process/exit",
+      {},
+    )) as { mode: "operation"; handle: OperationHandle };
+    const handle = response.handle;
+    expect(handle).toMatchObject({
+      command: "process/exit",
+      id: expect.any(String),
+    });
+    expect(processes.getAppInstance(appId)).toBeDefined();
+    await eden.runtime
+      .resolve(OperationManager)
+      .wait(handle, caller(appId, profile));
+    expect(processes.getAppInstance(appId)).toBeUndefined();
+    expect(view.webContents.isDestroyed()).toBe(true);
+    expect(eden.runtime.operations.get(handle)).toMatchObject({
+      status: "succeeded",
+      result: { success: true },
+    });
   });
 
   it("enforces process ownership through the real command path", async () => {
@@ -53,13 +110,13 @@ describe("ProcessManager integration", () => {
     });
     await eden.runtime.sessions.login(alice.username, "password");
 
-    await eden.execute(
+    await eden.complete(
       "process/launch",
       { appId: target.id },
       caller("com.example.controller", alice),
     );
     await expect(
-      eden.execute(
+      eden.complete(
         "process/stop",
         { appId: target.id },
         caller("com.example.controller", bob),
@@ -70,7 +127,7 @@ describe("ProcessManager integration", () => {
     ).toBeDefined();
 
     await expect(
-      eden.execute(
+      eden.complete(
         "process/stop",
         { appId: target.id },
         caller("com.example.controller", alice),
@@ -119,7 +176,7 @@ describe("ProcessManager integration", () => {
         eden.runtime.resolve(PackageCatalog).getApp(target.id),
       ).toBeDefined();
       await expect(
-        eden.execute(
+        eden.complete(
           "process/launch",
           { appId: target.id },
           caller("com.example.controller", user),
@@ -128,7 +185,7 @@ describe("ProcessManager integration", () => {
       expect(processes.getAppInstance(target.id)).toBeUndefined();
     });
 
-    await eden.execute(
+    await eden.complete(
       "process/launch",
       { appId: target.id },
       caller("com.example.controller", user),

@@ -1,6 +1,8 @@
 import "reflect-metadata";
 
 export type {
+  CommandCompletion,
+  CommunicationMode,
   EdenConfig,
   EdenPowerCapabilities,
   EdenPowerProvider,
@@ -8,6 +10,17 @@ export type {
   FilesystemVolume,
   FilesystemVolumeKind,
   FilesystemVolumeRegistration,
+  FilesystemVolumeState,
+  OperationCommand,
+  OperationCompletion,
+  OperationError,
+  OperationHandle,
+  OperationObservation,
+  OperationProgress,
+  OperationSnapshot,
+  OperationSubmission,
+  OperationsAPI,
+  ResultCommand,
 } from "@edenapp/types";
 export * from "./api";
 export { Eden } from "./Eden";

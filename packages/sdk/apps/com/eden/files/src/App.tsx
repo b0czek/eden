@@ -286,6 +286,7 @@ const App: Component = () => {
     currentPath,
     refresh,
     navigateTo: navigateWithSelectionClear,
+    operations: transfers.operations,
     showError,
     dialogs,
     setSelectedItem,
@@ -428,10 +429,13 @@ const App: Component = () => {
         />
       )}
 
-      {(transfers.pendingTransfer() || transfers.progress()) && (
+      {((transfers.pendingTransfer() && !transfers.busy()) ||
+        transfers.showProgress()) && (
         <TransferActionBar
           pendingTransfer={transfers.pendingTransfer()}
           progress={transfers.progress()}
+          snapshot={transfers.snapshot()}
+          cancelling={transfers.cancelling()}
           busy={transfers.busy()}
           readOnly={readOnly() || loading()}
           onComplete={() => void transfers.completeTransfer(currentLocation())}

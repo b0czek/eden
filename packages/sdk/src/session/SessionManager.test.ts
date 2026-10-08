@@ -1,7 +1,9 @@
 import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
+import { ExecutionContext } from "../execution/ExecutionContext";
 import type { CommandRegistry, IPCBridge } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { UserManager } from "../user/UserManager";
 import { SessionContext } from "./SessionContext";
@@ -27,6 +29,7 @@ describe("SessionManager", () => {
   let processManager: { stopSessionApps: jest.Mock };
   let notify: jest.Mock;
   let manager: SessionManager;
+  let operations: OperationManager;
 
   beforeEach(() => {
     context = new SessionContext();
@@ -38,40 +41,23 @@ describe("SessionManager", () => {
       stopSessionApps: jest.fn().mockResolvedValue(undefined),
     };
     notify = jest.fn();
+    const bridge = { eventSubscribers: { notify } } as unknown as IPCBridge;
+    operations = new OperationManager(
+      bridge,
+      new ExecutionContext({}),
+      context,
+    );
     manager = new SessionManager(
       { eventSubscribers: { notify } } as unknown as IPCBridge,
       { registerManager: jest.fn() } as unknown as CommandRegistry,
       userManager as unknown as UserManager,
       processManager as unknown as ProcessManager,
       context,
+      operations,
     );
   });
 
-  it("stops apps before committing and publishing a new identity", async () => {
-    context.setCurrentUser(alice);
-    const order: string[] = [];
-    userManager.authenticate.mockImplementation(async () => {
-      order.push("authenticate");
-      return bob;
-    });
-    processManager.stopSessionApps.mockImplementation(async () => {
-      order.push("stop");
-      expect(manager.getCurrentUser()?.username).toBe("alice");
-    });
-    notify.mockImplementation(() => {
-      order.push("notify");
-      expect(manager.getCurrentUser()?.username).toBe("bob");
-    });
-
-    await manager.login("bob", "password");
-
-    expect(order).toEqual(["authenticate", "stop", "notify"]);
-    expect(notify).toHaveBeenCalledWith("session/changed", {
-      currentUser: bob,
-      previousUsername: "alice",
-      reason: "login",
-    });
-  });
+  afterEach(() => operations.dispose());
 
   it("does not stop apps or change identity when authentication fails", async () => {
     context.setCurrentUser(alice);

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { DlcResource } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
+import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import {
   PLATFORM_RESOURCES,
   type PlatformProtocolRequest,
@@ -35,7 +35,7 @@ export class DlcResourceManager {
 
   constructor(
     @inject(PackageCatalog) private readonly catalog: PackageCatalog,
-    @inject(ViewManager) private readonly views: ViewManager,
+    @inject(delay(() => ViewManager)) private readonly views: ViewManager,
     @inject(PLATFORM_RESOURCES)
     private readonly protocols: ResourceProtocolPort,
   ) {}

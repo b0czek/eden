@@ -15,6 +15,7 @@
 export * from "./commands.generated";
 
 import { CommandMap } from "./commands.generated";
+import type { Operation } from "./Operations";
 
 /**
  * Type-safe command name
@@ -27,6 +28,20 @@ export type CommandName = keyof CommandMap;
 export type CommandArgs<T extends CommandName> = CommandMap[T]["args"];
 
 /**
- * Get command result type
+ * Serializable command response before app-side operation controls are attached.
  */
-export type CommandResult<T extends CommandName> = CommandMap[T]["response"];
+export type CommandResponse<T extends CommandName> = CommandMap[T]["response"];
+
+/** App-facing result: operation commands expose controls bound to their handle. */
+export type CommandResult<T extends CommandName> = T extends CommandName
+  ? CommandMap[T]["mode"] extends "operation"
+    ? Operation<T>
+    : CommandResponse<T>
+  : never;
+
+/** Eventual completion; result commands have no separate completion. */
+export type CommandCompletion<T extends CommandName> = CommandMap[T] extends {
+  completion: infer R;
+}
+  ? R
+  : never;

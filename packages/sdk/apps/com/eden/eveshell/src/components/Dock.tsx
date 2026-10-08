@@ -98,6 +98,7 @@ export default function Dock(props: DockProps) {
                 appId={app.id}
                 appName={app.name}
                 isRunning={app.isRunning}
+                activity={app.activity}
                 onClick={() => props.onAppClick(app.id)}
                 onContextMenu={props.appMenu.handler(app)}
               />
@@ -118,6 +119,7 @@ export default function Dock(props: DockProps) {
                 appId={app.id}
                 appName={app.name}
                 isRunning={app.isRunning}
+                activity={app.activity}
                 onClick={() => props.onAppClick(app.id)}
                 onContextMenu={props.appMenu.handler(app)}
               />

@@ -1,7 +1,18 @@
 import type { FileItem } from "@edenapp/files-core";
+import { createOperation } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import type { FilesystemLocation } from "@edenapp/types";
-import { createSignal } from "solid-js";
+import type {
+  FilesystemLocation,
+  Operation,
+  OperationCompletion,
+} from "@edenapp/types";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  onCleanup,
+} from "solid-js";
 import { openCollisionDialog } from "../dialogs/CollisionDialog";
 import { t } from "../i18n";
 import {
@@ -14,7 +25,7 @@ import {
 } from "./fileTransfers";
 
 export interface FileOperationProgress {
-  operation: TransferOperation | "delete";
+  operation: TransferOperation | "delete" | "open";
   current: number;
   total: number;
   itemName: string;
@@ -38,12 +49,97 @@ const snapshotItems = (items: FileItem[]): FileItem[] =>
   }));
 
 export const useFileTransfers = (options: UseFileTransfersOptions) => {
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
   const [pendingTransfer, setPendingTransfer] =
     createSignal<PendingTransfer | null>(null);
   const [progress, setProgress] = createSignal<FileOperationProgress | null>(
     null,
   );
-  const busy = () => progress() !== null;
+  const observed = createOperation();
+  const [cancelling, setCancelling] = createSignal(false);
+  const resetCancellation = () => {
+    setCancelling(false);
+  };
+  const busy = createMemo(() => progress() !== null);
+  const [showProgress, setShowProgress] = createSignal(false);
+  createEffect(
+    on(busy, (active) => {
+      setShowProgress(false);
+      if (!active) return;
+      const timer = setTimeout(() => setShowProgress(true), 500);
+      onCleanup(() => clearTimeout(timer));
+    }),
+  );
+
+  const withProgress = async <C extends string>(
+    operation: FileOperationProgress["operation"],
+    item: FileItem,
+    submit: () => Promise<Operation<C>>,
+  ): Promise<OperationCompletion<C>> => {
+    if (disposed) throw new Error("File operation owner has been disposed");
+    if (busy()) throw new Error("A file operation is already in progress");
+    resetCancellation();
+    setProgress({
+      operation,
+      current: 1,
+      total: 1,
+      itemName: item.name,
+    });
+    try {
+      return await observed.run(submit);
+    } finally {
+      setProgress(null);
+      resetCancellation();
+    }
+  };
+
+  const submitCopy = (
+    item: FileItem,
+    to: FilesystemLocation,
+    overwrite = false,
+  ) =>
+    window.edenAPI.shellCommand("fs/cp", {
+      from: item.location,
+      to,
+      overwrite,
+    });
+
+  const submitMove = (
+    item: FileItem,
+    to: FilesystemLocation,
+    overwrite = false,
+  ) =>
+    window.edenAPI.shellCommand("fs/mv", {
+      from: item.location,
+      to,
+      overwrite,
+    });
+
+  const submitDelete = (item: FileItem) =>
+    window.edenAPI.shellCommand("fs/delete", { location: item.location });
+
+  const operations = {
+    copy: (item: FileItem, to: FilesystemLocation, overwrite = false) =>
+      withProgress("copy", item, () => submitCopy(item, to, overwrite)),
+    move: (item: FileItem, to: FilesystemLocation, overwrite = false) =>
+      withProgress("move", item, () => submitMove(item, to, overwrite)),
+    delete: (item: FileItem) =>
+      withProgress("delete", item, () => submitDelete(item)),
+    open: (item: FileItem) =>
+      withProgress("open", item, () =>
+        window.edenAPI.shellCommand("file/open", { location: item.location }),
+      ),
+    openWith: (item: FileItem, appId: string) =>
+      withProgress("open", item, () =>
+        window.edenAPI.shellCommand("file/open-with", {
+          location: item.location,
+          appId,
+        }),
+      ),
+  };
 
   const pathExists = (location: FilesystemLocation) =>
     window.edenAPI.shellCommand("fs/exists", { location: location });
@@ -52,7 +148,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     failures: TransferFailure[],
     total: number,
   ) => {
-    if (failures.length === 0) return;
+    if (disposed || failures.length === 0) return;
     const details = failures
       .map((failure) => `${failure.item.name}: ${failure.message}`)
       .join("; ");
@@ -73,11 +169,13 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   ): Promise<boolean> => {
     if (busy() || items.length === 0) return false;
 
+    resetCancellation();
     const failures: TransferFailure[] = [];
     let rememberedCollisionAction: CollisionAction | undefined;
 
     try {
       for (let index = 0; index < items.length; index += 1) {
+        if (disposed || cancelling()) break;
         const item = items[index];
         setProgress({
           operation,
@@ -159,20 +257,18 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
             }
           }
 
-          if (operation === "copy") {
-            await window.edenAPI.shellCommand("fs/cp", {
-              from: item.location,
-              to: { volume: destinationDirectory.volume, path: targetPath },
-              overwrite,
-            });
-          } else {
-            await window.edenAPI.shellCommand("fs/mv", {
-              from: item.location,
-              to: { volume: destinationDirectory.volume, path: targetPath },
-              overwrite,
-            });
-          }
+          if (disposed || cancelling()) break;
+          const destination = {
+            volume: destinationDirectory.volume,
+            path: targetPath,
+          };
+          await observed.run(() =>
+            operation === "copy"
+              ? submitCopy(item, destination, overwrite)
+              : submitMove(item, destination, overwrite),
+          );
         } catch (error) {
+          if (error instanceof Error && error.name === "AbortError") break;
           failures.push({
             item,
             message: (error as Error).message,
@@ -181,7 +277,8 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
       }
     } finally {
       setProgress(null);
-      options.refresh();
+      resetCancellation();
+      if (!disposed) options.refresh();
     }
 
     await showFailureSummary(failures, items.length);
@@ -219,11 +316,12 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
       cancelLabel: t("common.cancel"),
       tone: "danger",
     });
-    if (!confirmed) return false;
+    if (!confirmed || busy() || disposed) return false;
 
     const failures: TransferFailure[] = [];
     try {
       for (let index = 0; index < items.length; index += 1) {
+        if (disposed || cancelling()) break;
         const item = items[index];
         setProgress({
           operation: "delete",
@@ -232,16 +330,15 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
           itemName: item.name,
         });
         try {
-          await window.edenAPI.shellCommand("fs/delete", {
-            location: item.location,
-          });
+          await observed.run(() => submitDelete(item));
         } catch (error) {
           failures.push({ item, message: (error as Error).message });
         }
       }
     } finally {
       setProgress(null);
-      options.refresh();
+      resetCancellation();
+      if (!disposed) options.refresh();
     }
 
     await showFailureSummary(failures, items.length);
@@ -251,12 +348,32 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   return {
     pendingTransfer,
     progress,
+    showProgress,
+    snapshot: () => (observed.pending() ? observed.snapshot() : undefined),
+    operations,
     busy,
+    cancelling,
     beginTransfer,
     completeTransfer,
     deleteItems,
     cancelTransfer: () => {
-      if (!busy()) setPendingTransfer(null);
+      if (!busy()) {
+        setPendingTransfer(null);
+        return;
+      }
+      if (progress()?.operation !== "copy" || cancelling()) return;
+      setCancelling(true);
+      void observed.cancel().catch((error: Error) => {
+        resetCancellation();
+        if (!disposed)
+          void options.dialogs.alert({
+            title: t("files.cancelFailed"),
+            message: error.message,
+            okLabel: t("common.ok"),
+          });
+      });
     },
   };
 };
+
+export type FileOperations = ReturnType<typeof useFileTransfers>["operations"];

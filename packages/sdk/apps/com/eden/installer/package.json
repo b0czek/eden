@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "solid-js": "catalog:",
-    "solid-icons": "catalog:"
+    "solid-icons": "catalog:",
+    "@edenapp/babel": "workspace:*",
+    "@edenapp/solid-kit": "workspace:*"
   },
   "devDependencies": {
     "vite": "catalog:",

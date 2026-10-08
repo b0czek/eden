@@ -80,7 +80,9 @@ export const useExplorerNavigation = (
   const establishWatch = async (location: FilesystemLocation) => {
     const { path, volume } = location;
     if (
-      !volumeInventory().find((entry) => entry.id === volume)?.supportsWatch
+      !volumeInventory().find(
+        (entry) => entry.id === volume && entry.state === "ready",
+      )?.supportsWatch
     ) {
       await stopWatch();
       return false;
@@ -273,12 +275,19 @@ export const useExplorerNavigation = (
   }) => {
     inventoryVersion += 1;
     const previous = currentVolume();
-    const wasAvailable = volumeInventory().some(
-      (volume) => volume.id === previous,
+    const wasReady = volumeInventory().some(
+      (volume) => volume.id === previous && volume.state === "ready",
     );
     setVolumeInventory(inventory);
-    if (inventory.some((volume) => volume.id === previous)) {
-      if (!wasAvailable && (!options.active || options.active())) {
+    const selectedVolume = inventory.find((volume) => volume.id === previous);
+    if (selectedVolume) {
+      if (selectedVolume.state !== "ready") {
+        requestSequence += 1;
+        void stopWatch();
+        setLoading(false);
+        return;
+      }
+      if (!wasReady && (!options.active || options.active())) {
         void loadDirectory(currentLocation());
       }
       return;
@@ -303,11 +312,11 @@ export const useExplorerNavigation = (
   };
   const subscribed = Promise.all([
     window.edenAPI.subscribe("fs/changed", handleChanged),
-    window.edenAPI.subscribe("fs/volumes-changed", handleVolumesChanged),
+    window.edenAPI.subscribe("volume/changed", handleVolumesChanged),
   ])
     .then(async () => {
       const version = inventoryVersion;
-      const inventory = await window.edenAPI.shellCommand("fs/volumes", {});
+      const inventory = await window.edenAPI.shellCommand("volume/list", {});
       if (!disposed && version === inventoryVersion)
         setVolumeInventory(inventory);
     })
@@ -415,7 +424,7 @@ export const useExplorerNavigation = (
     requestSequence += 1;
     document.removeEventListener("mousedown", handleMouseButton);
     window.edenAPI.unsubscribe("fs/changed", handleChanged);
-    window.edenAPI.unsubscribe("fs/volumes-changed", handleVolumesChanged);
+    window.edenAPI.unsubscribe("volume/changed", handleVolumesChanged);
     void stopWatch();
   });
 

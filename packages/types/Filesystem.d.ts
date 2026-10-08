@@ -5,6 +5,7 @@ export interface FilesystemLocation {
 }
 
 export type FilesystemVolumeKind = "local" | "removable" | "network";
+export type FilesystemVolumeState = "ready" | "ejecting";
 
 /** Public volume metadata. Host mount paths are never sent to apps. */
 export interface FilesystemVolume {
@@ -13,6 +14,8 @@ export interface FilesystemVolume {
   kind: FilesystemVolumeKind;
   readOnly: boolean;
   supportsWatch: boolean;
+  supportsEject: boolean;
+  state: FilesystemVolumeState;
 }
 
 /** Main-process registration of an already mounted directory. */

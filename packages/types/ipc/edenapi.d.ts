@@ -8,11 +8,13 @@
 import type { CommandArgs, CommandName, CommandResult } from "../commands";
 import type { EventData, EventName } from "../events";
 import type { FilesystemLocation } from "../Filesystem";
+import type { OperationSubmission, OperationsAPI } from "../Operations";
 
 /**
  * Eden API - shell commands and event subscriptions
  */
 export interface EdenAPI {
+  operations: OperationsAPI;
   /**
    * Execute a shell command with type-safe arguments
    * @param command - The command name (e.g., "process/launch")
@@ -21,15 +23,17 @@ export interface EdenAPI {
    *
    * @example
    * ```typescript
-   * await edenAPI.shellCommand("process/launch", {
+   * const launch = await edenAPI.shellCommand("process/launch", {
    *   appId: "my-app",
    *   bounds: { x: 0, y: 0, width: 800, height: 600 }
    * });
+   * await launch.result();
    * ```
    */
   shellCommand<T extends CommandName>(
     command: T,
     args: CommandArgs<T>,
+    submission?: OperationSubmission,
   ): Promise<CommandResult<T>>;
 
   /**

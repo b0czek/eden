@@ -1,8 +1,14 @@
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import type {
+  OperationHandle,
+  OperationSnapshot,
+  RuntimeAppManifest,
+  UserProfile,
+} from "@edenapp/types";
 import { PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageRegistry } from "../package-manager/PackageRegistry";
 import { ProcessManager } from "../process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
@@ -45,7 +51,7 @@ describe("FilesystemManager native watch integration", () => {
       grants: [`apps/launch/${appId}`, `apps/launch/${otherAppId}`],
     });
     await eden.runtime.sessions.login(profile.username, "password");
-    await eden.execute("process/launch", { appId });
+    await eden.complete("process/launch", { appId });
     const instance = eden.runtime.resolve(ProcessManager).getAppInstance(appId);
     if (!instance) throw new Error("Filesystem test app was not launched");
     const viewInfo = eden.runtime
@@ -60,13 +66,23 @@ describe("FilesystemManager native watch integration", () => {
     await eden?.dispose();
   });
 
-  const invokeFromView = (command: string, args: unknown) =>
-    eden.platform.rendererIpc.invoke(
+  const invokeFromView = async (command: string, args: unknown) => {
+    const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
       webContentsId,
       command,
       args,
-    );
+    )) as
+      | { mode: "operation"; handle: OperationHandle }
+      | { mode: "result"; result: unknown };
+    const result =
+      response.mode === "operation" ? response.handle : response.result;
+    return command === "fs/mv"
+      ? eden.runtime
+          .resolve(OperationManager)
+          .wait(result as OperationHandle, caller(appId, profile))
+      : result;
+  };
 
   const changeMessages = () =>
     eden.platform.effects.filter(
@@ -185,7 +201,7 @@ describe("FilesystemManager native watch integration", () => {
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(otherAppId, ["fs/read"]);
-    await eden.execute("process/launch", { appId: otherAppId });
+    await eden.complete("process/launch", { appId: otherAppId });
     const otherInstance = eden.runtime
       .resolve(ProcessManager)
       .getAppInstance(otherAppId);
@@ -346,6 +362,56 @@ describe("FilesystemManager integration", () => {
     expect([...result]).toEqual([...content]);
   });
 
+  it("returns a copy handle before I/O and retains real completion phases and failures", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const manager = eden.runtime.resolve(OperationManager);
+    await eden.execute(
+      "fs/write",
+      {
+        location: { volume: "home", path: "/operation-source" },
+        content: "accepted",
+      },
+      transferCaller,
+    );
+    const phases: string[] = [];
+    const off = manager.on("changed", ({ snapshot }) => {
+      if (snapshot.phase) phases.push(snapshot.phase);
+    });
+    const args = {
+      from: { volume: "home", path: "/operation-source" },
+      to: { volume: "home", path: "/operation-destination" },
+    };
+    const handle = await eden.execute<OperationHandle>(
+      "fs/cp",
+      args,
+      transferCaller,
+    );
+    expect(manager.get(handle, transferCaller).status).toBe("queued");
+    await manager.wait(handle, transferCaller);
+    expect(
+      await fs.readFile(
+        path.join(eden.paths.userDirectory, "operation-destination"),
+        "utf8",
+      ),
+    ).toBe("accepted");
+    expect(phases).toEqual(
+      expect.arrayContaining(["validating", "preparing-copy", "copying"]),
+    );
+    const collision = await eden.execute<OperationHandle>(
+      "fs/cp",
+      args,
+      transferCaller,
+    );
+    await expect(manager.wait(collision, transferCaller)).rejects.toThrow(
+      "already exists",
+    );
+    expect(manager.get(collision, transferCaller)).toMatchObject({
+      status: "failed",
+      error: { message: expect.stringContaining("already exists") },
+    });
+    off();
+  });
+
   it("copies and moves files and recursive directories", async () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(
@@ -370,7 +436,7 @@ describe("FilesystemManager integration", () => {
       transferCaller,
     );
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/file.txt" },
@@ -378,7 +444,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/tree" },
@@ -386,7 +452,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/file.txt" },
@@ -394,7 +460,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/tree" },
@@ -447,6 +513,201 @@ describe("FilesystemManager integration", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("reports bytes during a large copy and preserves contents and file mode", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const manager = eden.runtime.resolve(OperationManager);
+    const content = Buffer.alloc(5 * 1024 * 1024, 0xa5);
+    const source = path.join(eden.paths.userDirectory, "large.bin");
+    await fs.writeFile(source, content, { mode: 0o751 });
+    const updates: OperationSnapshot[] = [];
+    const off = manager.on("changed", ({ snapshot }) => {
+      if (snapshot.command === "fs/cp") updates.push(snapshot);
+    });
+    try {
+      await eden.complete(
+        "fs/cp",
+        {
+          from: { volume: "home", path: "/large.bin" },
+          to: { volume: "home", path: "/large-copy.bin" },
+        },
+        transferCaller,
+      );
+      const destination = path.join(eden.paths.userDirectory, "large-copy.bin");
+      expect((await fs.readFile(destination)).equals(content)).toBe(true);
+      expect((await fs.stat(destination)).mode & 0o777).toBe(
+        (await fs.stat(source)).mode & 0o777,
+      );
+      expect(
+        updates.some(
+          (update) =>
+            update.progress?.unit === "bytes" &&
+            update.progress.completed > 0 &&
+            update.progress.completed < content.length,
+        ),
+      ).toBe(true);
+      expect(updates.at(-1)).toMatchObject({
+        status: "succeeded",
+        progress: {
+          completed: content.length,
+          total: content.length,
+          unit: "bytes",
+        },
+      });
+    } finally {
+      off();
+    }
+  });
+
+  it.each([false, true])(
+    "cancels an active copy and rolls back its destination (overwrite=%s)",
+    async (overwrite) => {
+      const transferCaller = await setUpFilesystemCaller();
+      const manager = eden.runtime.resolve(OperationManager);
+      const source = path.join(eden.paths.userDirectory, "cancel-source.bin");
+      const destination = path.join(
+        eden.paths.userDirectory,
+        "cancel-target.bin",
+      );
+      const content = Buffer.alloc(8 * 1024 * 1024, 0xa5);
+      await fs.writeFile(source, content);
+      if (overwrite) await fs.writeFile(destination, "previous contents");
+      let cancellation: Promise<unknown> | undefined;
+      const phases: string[] = [];
+      const off = manager.on("changed", ({ snapshot }) => {
+        if (snapshot.command !== "fs/cp") return;
+        if (snapshot.phase) phases.push(snapshot.phase);
+        if (
+          !cancellation &&
+          snapshot.phase === "copying" &&
+          snapshot.progress!.completed > 0
+        ) {
+          cancellation = eden.execute(
+            "operation/cancel",
+            { handle: snapshot },
+            transferCaller,
+          );
+        }
+      });
+      try {
+        const handle = await eden.execute<OperationHandle>(
+          "fs/cp",
+          {
+            from: { volume: "home", path: "/cancel-source.bin" },
+            to: { volume: "home", path: "/cancel-target.bin" },
+            overwrite,
+          },
+          transferCaller,
+        );
+        await expect(
+          manager.wait(handle, transferCaller),
+        ).rejects.toMatchObject({ name: "AbortError" });
+        await cancellation;
+        expect(manager.get(handle, transferCaller)).toMatchObject({
+          status: "cancelled",
+          cancellable: true,
+        });
+        expect(phases).toContain("rolling-back");
+        expect((await fs.readFile(source)).equals(content)).toBe(true);
+        if (overwrite)
+          expect(await fs.readFile(destination, "utf8")).toBe(
+            "previous contents",
+          );
+        else
+          await expect(fs.access(destination)).rejects.toMatchObject({
+            code: "ENOENT",
+          });
+        expect(
+          (await fs.readdir(eden.paths.userDirectory)).some((name) =>
+            name.includes(".eden-transfer-"),
+          ),
+        ).toBe(false);
+      } finally {
+        off();
+      }
+    },
+  );
+
+  it("cancels a queued copy without changing either file and scopes cancellation to its owner", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const manager = eden.runtime.resolve(OperationManager);
+    const source = path.join(eden.paths.userDirectory, "queued-source");
+    const destination = path.join(eden.paths.userDirectory, "queued-target");
+    await fs.writeFile(source, "source");
+    await fs.writeFile(destination, "destination");
+    const handle = await eden.execute<OperationHandle>(
+      "fs/cp",
+      {
+        from: { volume: "home", path: "/queued-source" },
+        to: { volume: "home", path: "/queued-target" },
+        overwrite: true,
+      },
+      transferCaller,
+    );
+    expect(manager.get(handle, transferCaller).status).toBe("queued");
+    await expect(
+      eden.execute(
+        "operation/cancel",
+        { handle },
+        { ...transferCaller, appId: "other-app" },
+      ),
+    ).rejects.toThrow("access denied");
+    await expect(
+      eden.execute(
+        "operation/cancel",
+        { handle },
+        { ...transferCaller, sessionId: "other-session" },
+      ),
+    ).rejects.toThrow("access denied");
+    await eden.execute("operation/cancel", { handle }, transferCaller);
+    await expect(manager.wait(handle, transferCaller)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(await fs.readFile(source, "utf8")).toBe("source");
+    expect(await fs.readFile(destination, "utf8")).toBe("destination");
+    await expect(
+      eden.execute("operation/cancel", { handle }, transferCaller),
+    ).resolves.toBeUndefined();
+    // Copies can continue after cancellation.
+    await eden.complete(
+      "fs/cp",
+      {
+        from: { volume: "home", path: "/queued-source" },
+        to: { volume: "home", path: "/next-copy" },
+      },
+      transferCaller,
+    );
+  });
+
+  it("reports recursive copy bytes without counting or following symbolic links", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const manager = eden.runtime.resolve(OperationManager);
+    const source = path.join(eden.paths.userDirectory, "tree-progress");
+    await fs.mkdir(path.join(source, "nested"), { recursive: true });
+    await fs.writeFile(path.join(source, "one"), "first");
+    await fs.writeFile(path.join(source, "nested", "two"), "second");
+    await fs.symlink("../one", path.join(source, "nested", "link"));
+    const handle = await eden.execute<OperationHandle>(
+      "fs/cp",
+      {
+        from: { volume: "home", path: "/tree-progress" },
+        to: { volume: "home", path: "/tree-copy" },
+      },
+      transferCaller,
+    );
+    await manager.wait(handle, transferCaller);
+    expect(manager.get(handle, transferCaller)).toMatchObject({
+      status: "succeeded",
+      progress: { completed: 11, unit: "bytes" },
+    });
+    const destination = path.join(eden.paths.userDirectory, "tree-copy");
+    expect(
+      await fs.readFile(path.join(destination, "nested", "two"), "utf8"),
+    ).toBe("second");
+    expect(await fs.readlink(path.join(destination, "nested", "link"))).toBe(
+      "../one",
+    );
+  });
+
   it("rejects existing targets unless replacement is explicit", async () => {
     const transferCaller = await setUpFilesystemCaller();
     await eden.execute(
@@ -483,7 +744,7 @@ describe("FilesystemManager integration", () => {
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/copy-source.txt" },
@@ -493,7 +754,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("already exists");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/move-source.txt" },
@@ -515,7 +776,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).resolves.toBe("old move");
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/copy-source.txt" },
@@ -524,7 +785,7 @@ describe("FilesystemManager integration", () => {
       },
       transferCaller,
     );
-    await eden.execute(
+    await eden.complete(
       "fs/mv",
       {
         from: { volume: "home", path: "/move-source.txt" },
@@ -580,7 +841,7 @@ describe("FilesystemManager integration", () => {
       transferCaller,
     );
 
-    await eden.execute(
+    await eden.complete(
       "fs/cp",
       {
         from: { volume: "home", path: "/source" },
@@ -623,7 +884,7 @@ describe("FilesystemManager integration", () => {
     );
 
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/tree" },
@@ -633,7 +894,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("must be different");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/tree" },
@@ -643,7 +904,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("must be different");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/cp",
         {
           from: { volume: "home", path: "/tree" },
@@ -653,7 +914,7 @@ describe("FilesystemManager integration", () => {
       ),
     ).rejects.toThrow("descendant");
     await expect(
-      eden.execute(
+      eden.complete(
         "fs/mv",
         {
           from: { volume: "home", path: "/tree" },

@@ -1,104 +1,22 @@
+export { createEdenAPI } from "./eden-api";
+export type { EventSubscriptionCallback } from "./event-subscriptions";
+export type { ShellTransport } from "./shell-transport";
+
 import type {
   AppBusAPI,
   AppBusConnection,
-  CommandArgs,
-  CommandName,
-  CommandResult,
-  EdenAPI,
-  EventData,
-  EventName,
-  FilesystemLocation,
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
 import type { AppBusState, IPCPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
-
-/**
- * Interface for sending shell commands to the main process
- */
-export interface ShellTransport {
-  exec<T extends CommandName>(
-    command: T,
-    args: CommandArgs<T>,
-  ): Promise<CommandResult<T>>;
-}
-
-export type EventSubscriptionCallback = (payload: unknown) => void;
+import type { ShellTransport } from "./shell-transport";
 
 /**
  * Configuration for AppBus API
  */
 export interface AppBusConfig {
   transport: ShellTransport;
-}
-
-/**
- * Create the EdenAPI object
- */
-export function createEdenAPI(
-  transport: ShellTransport,
-  eventSubscriptions: Map<string, Set<EventSubscriptionCallback>>,
-  options?: {
-    getLaunchArgs?: () => string[];
-    getLaunchFile?: () => FilesystemLocation | undefined;
-  },
-): EdenAPI {
-  return {
-    shellCommand: transport.exec,
-
-    subscribe: async <T extends EventName>(
-      eventName: T,
-      callback: (data: EventData<T>) => void,
-    ) => {
-      if (typeof callback !== "function") {
-        throw new Error("Callback must be a function");
-      }
-
-      // Register with backend/main
-      await transport.exec("event/subscribe", { eventName });
-
-      // Register callback locally
-      if (!eventSubscriptions.has(eventName)) {
-        eventSubscriptions.set(eventName, new Set());
-      }
-      eventSubscriptions
-        .get(eventName)
-        ?.add(callback as EventSubscriptionCallback);
-    },
-
-    unsubscribe: async <T extends EventName>(
-      eventName: T,
-      callback: (data: EventData<T>) => void,
-    ) => {
-      const callbacks = eventSubscriptions.get(eventName);
-      if (callbacks) {
-        callbacks.delete(callback as EventSubscriptionCallback);
-
-        // If no more callbacks, unregister from backend/main
-        if (callbacks.size === 0) {
-          eventSubscriptions.delete(eventName);
-          await transport.exec("event/unsubscribe", { eventName });
-        }
-      }
-    },
-
-    isEventSupported: (eventName: string) => {
-      return transport.exec("event/exists", { eventName });
-    },
-
-    getLaunchFile: () => {
-      const location = options?.getLaunchFile?.();
-      return location ? { ...location } : undefined;
-    },
-
-    getLaunchArgs: (): string[] => {
-      if (options?.getLaunchArgs) {
-        return options.getLaunchArgs();
-      }
-      return [];
-    },
-  };
 }
 
 /**
@@ -134,7 +52,7 @@ export function createAppBusAPI(
       registeredServices.set(serviceName, onConnect);
 
       // Register with main process
-      const result = await transport.exec("appbus/register", {
+      const { result } = await transport.exec("appbus/register", {
         serviceName,
         description: options?.description,
         allowedClients: options?.allowedClients,
@@ -151,9 +69,10 @@ export function createAppBusAPI(
       serviceName: string,
     ): Promise<{ success: boolean }> => {
       registeredServices.delete(serviceName);
-      return transport.exec("appbus/unregister", {
+      const { result } = await transport.exec("appbus/unregister", {
         serviceName,
       });
+      return result;
     },
 
     connect: async (
@@ -161,7 +80,7 @@ export function createAppBusAPI(
       serviceName: string,
     ): Promise<AppBusConnection | { error: string }> => {
       // Request connection through shell command
-      const result = await transport.exec("appbus/connect", {
+      const { result } = await transport.exec("appbus/connect", {
         targetAppId,
         serviceName,
       });
@@ -197,13 +116,13 @@ export function createAppBusAPI(
     },
 
     listServices: async (): Promise<{ services: ServiceInfo[] }> => {
-      return transport.exec("appbus/list", {});
+      return (await transport.exec("appbus/list", {})).result;
     },
 
     listServicesByApp: async (
       appId: string,
     ): Promise<{ services: ServiceInfo[] }> => {
-      return transport.exec("appbus/list-by-app", { appId });
+      return (await transport.exec("appbus/list-by-app", { appId })).result;
     },
   };
 }

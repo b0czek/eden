@@ -12,6 +12,7 @@ import {
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
+import { dispatchEvent } from "./common/event-subscriptions";
 import {
   type AppBusPortData,
   createAppBusState,
@@ -85,17 +86,7 @@ ipcRenderer.on(
   "shell-message",
   (_event, message: { type: string; payload: unknown }) => {
     const { type, payload } = message;
-    const callbacks = eventSubscriptions.get(type);
-
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(payload);
-        } catch (err) {
-          log.error(`Error in event listener for ${type}:`, err);
-        }
-      });
-    }
+    dispatchEvent(eventSubscriptions, type, payload);
   },
 );
 
@@ -116,8 +107,8 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
 
 // Shell transport implementation using ipcRenderer
 const shellTransport: ShellTransport = {
-  exec: (command, args) => {
-    return ipcRenderer.invoke("shell-command", command, args);
+  exec: (command, args, submission) => {
+    return ipcRenderer.invoke("shell-command", command, args, submission);
   },
 };
 

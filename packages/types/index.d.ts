@@ -61,8 +61,10 @@ export * from "./channels";
 // Export new command types
 export type {
   CommandArgs,
+  CommandCompletion,
   CommandMap,
   CommandName,
+  CommandResponse,
   CommandResult,
 } from "./commands";
 // Export event types
@@ -175,3 +177,5 @@ export interface WallpaperPreset {
 export type WallpaperConfig =
   | { type: "preset"; id: string }
   | { type: "custom"; value: string };
+
+export * from "./Operations";

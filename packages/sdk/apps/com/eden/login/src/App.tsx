@@ -1,4 +1,8 @@
-import { KeyboardButton } from "@edenapp/solid-kit";
+import {
+  createOperation,
+  KeyboardButton,
+  OperationStatus,
+} from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   EdenBrandingInfo,
@@ -32,7 +36,9 @@ const App = () => {
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(true);
-  const [submitting, setSubmitting] = createSignal(false);
+  const operation = createOperation();
+  const submitting = operation.pending;
+  const [powerAction, setPowerAction] = createSignal<"poweroff" | "reboot">();
   const [branding, setBranding] = createSignal<EdenBrandingInfo>({
     name: "Eden",
   });
@@ -132,13 +138,15 @@ const App = () => {
   const handleLogin = async () => {
     const username = selectedUsername();
     if (!username || !password() || submitting()) return;
-    setSubmitting(true);
+    setPowerAction(undefined);
     setError(null);
     try {
-      const result = await window.edenAPI.shellCommand("session/login", {
-        username,
-        password: password(),
-      });
+      const result = await operation.run(() =>
+        window.edenAPI.shellCommand("session/login", {
+          username,
+          password: password(),
+        }),
+      );
       if (!result.success) {
         setError(result.error ?? t("login.loginFailed"));
       } else {
@@ -147,12 +155,11 @@ const App = () => {
     } catch (err) {
       console.error("Login failed:", err);
       setError(t("login.loginFailed"));
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handlePowerAction = async (action: "poweroff" | "reboot") => {
+    if (submitting()) return;
     const confirmed = await dialogs.confirm({
       title: action === "poweroff" ? t("login.poweroff") : t("login.reboot"),
       message:
@@ -165,10 +172,13 @@ const App = () => {
       tone: action === "poweroff" ? "danger" : "default",
       role: "alertdialog",
     });
-    if (!confirmed) return;
+    if (!confirmed || submitting()) return;
 
     try {
-      await window.edenAPI.shellCommand("system/power", { action });
+      setPowerAction(action);
+      await operation.run(() =>
+        window.edenAPI.shellCommand("system/power", { action }),
+      );
     } catch (error) {
       console.error(`Failed to ${action} the system:`, error);
       await dialogs.alert({
@@ -247,10 +257,12 @@ const App = () => {
                               selectedUsername() === user.username,
                           }}
                           onClick={() => {
+                            if (submitting()) return;
                             setSelectedUsername(user.username);
                             setError(null);
                           }}
                           onKeyDown={(event) => {
+                            if (submitting()) return;
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               setSelectedUsername(user.username);
@@ -281,6 +293,7 @@ const App = () => {
                     id="password"
                     class="eden-input"
                     type="password"
+                    disabled={submitting()}
                     value={password()}
                     placeholder={t("login.enterPassword")}
                     onInput={(e) => setPassword(e.currentTarget.value)}
@@ -301,7 +314,7 @@ const App = () => {
                       submitting() || !password() || !selectedUsername()
                     }
                   >
-                    {submitting() ? t("login.signingIn") : t("login.signIn")}
+                    {t("login.signIn")}
                   </button>
                 </div>
               </div>
@@ -316,6 +329,7 @@ const App = () => {
             <button
               type="button"
               class="eden-btn eden-btn-secondary"
+              disabled={submitting()}
               onClick={() => handlePowerAction("reboot")}
             >
               {t("login.reboot")}
@@ -325,11 +339,37 @@ const App = () => {
             <button
               type="button"
               class="eden-btn eden-btn-danger"
+              disabled={submitting()}
               onClick={() => handlePowerAction("poweroff")}
             >
               {t("login.poweroff")}
             </button>
           </Show>
+        </div>
+      </Show>
+
+      <Show when={submitting()}>
+        <div class="eden-overlay eden-flex-center eden-p-lg">
+          <div
+            class="eden-card eden-p-lg"
+            style={{ width: "min(100%, 420px)" }}
+          >
+            <OperationStatus
+              label={
+                powerAction() === "reboot"
+                  ? t("login.restarting")
+                  : powerAction() === "poweroff"
+                    ? t("login.poweringOff")
+                    : t("login.signingIn")
+              }
+              snapshot={operation.snapshot()}
+              description={
+                operation.snapshot()?.phase === "waiting-for-operations"
+                  ? t("login.waitingForOperations")
+                  : undefined
+              }
+            />
+          </div>
         </div>
       </Show>
 

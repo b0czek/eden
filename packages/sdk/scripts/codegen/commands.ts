@@ -17,6 +17,7 @@ export interface CommandInfo {
   command: string;
   argsType: string;
   returnType: string;
+  mode: "result" | "operation";
   docs: string[];
 }
 
@@ -27,6 +28,7 @@ export interface NamespaceCommands {
     command: string;
     argsType: string;
     returnType: string;
+    mode: "result" | "operation";
     docs: string[];
   }>;
 }
@@ -96,7 +98,30 @@ export function extractCommandHandlers(
           }
         }
 
+        const options = args[1];
+        let mode: "result" | "operation" = "result";
+        if (options && Node.isObjectLiteralExpression(options)) {
+          const property = options.getProperty("mode");
+          if (property && Node.isPropertyAssignment(property)) {
+            const value = property.getInitializer();
+            if (value && Node.isStringLiteral(value)) {
+              const name = value.getLiteralText();
+              if (name === "operation") mode = name;
+            }
+          }
+        }
+        if (mode !== "result") {
+          if (!returnTypeNode || !Node.isTypeReference(returnTypeNode)) {
+            throw new Error(
+              `${namespace}/${commandName} requires an explicit task type`,
+            );
+          }
+          const types = returnTypeNode.getTypeArguments();
+          returnType = types[0]?.getText() ?? "void";
+        }
+
         commands.push({
+          mode,
           namespace,
           command: commandName,
           argsType,
@@ -127,6 +152,7 @@ export function groupCommandsByNamespace(
       });
     }
     namespaceMap.get(cmd.namespace)?.commands.push({
+      mode: cmd.mode,
       command: cmd.command,
       argsType: cmd.argsType,
       returnType: cmd.returnType,
@@ -176,8 +202,16 @@ export function generateCommandsCode(
       );
 
       lines.push(`  "${ns.namespace}/${cmd.command}": {`);
+      lines.push(`    mode: "${cmd.mode}";`);
       lines.push(`    args: ${argsType};`);
-      lines.push(`    response: ${returnType};`);
+      if (cmd.mode === "result") {
+        lines.push(`    response: ${returnType};`);
+      } else {
+        lines.push(
+          `    response: import("./index").OperationHandle<"${ns.namespace}/${cmd.command}">;`,
+        );
+        lines.push(`    completion: ${returnType};`);
+      }
       lines.push(`  };`);
     });
 

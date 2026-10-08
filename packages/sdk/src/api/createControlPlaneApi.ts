@@ -2,6 +2,8 @@ import type { AppAssociationManager } from "../app-associations";
 import type { AppearanceManager } from "../appearance/AppearanceManager";
 import type { DaemonManager } from "../daemon";
 import type { VolumeManager } from "../filesystem/VolumeManager";
+import type { OperationManager } from "../operations/OperationManager";
+import { operationTask } from "../operations/OperationTask";
 import type { PackageManager } from "../package-manager";
 import type { SessionManager } from "../session";
 import type { UserManager } from "../user";
@@ -33,6 +35,7 @@ interface Dependencies {
   appearanceManager: AppearanceManager;
   associationManager: AppAssociationManager;
   volumeManager: VolumeManager;
+  operationManager: OperationManager;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -45,6 +48,7 @@ export function createControlPlaneApis({
   appearanceManager,
   associationManager,
   volumeManager,
+  operationManager,
 }: Dependencies): EdenControlPlaneApis {
   const packages: EdenPackagesApi = {
     list: (options) =>
@@ -62,12 +66,25 @@ export function createControlPlaneApis({
       clone(await packageManager.getPackageInfoFromHostPath(sourcePath)),
     install: async (sourcePath, options) =>
       clone(
-        await packageManager.installPackageFromHostPath(
-          sourcePath,
-          options?.replace === true,
+        await operationManager.runHost(
+          "package/install",
+          { sourcePath, replace: options?.replace === true },
+          () =>
+            operationTask((reporter) =>
+              packageManager.installPackageFromHostPath(
+                sourcePath,
+                options?.replace === true,
+                reporter,
+              ),
+            ),
         ),
       ),
-    uninstall: (packageId) => packageManager.uninstallPackage(packageId),
+    uninstall: (packageId) =>
+      operationManager.runHost("package/uninstall", { packageId }, () =>
+        operationTask((reporter) =>
+          packageManager.uninstallPackage(packageId, reporter),
+        ),
+      ),
     reload: (packageId) => packageManager.reloadPackage(packageId),
     isHotReloadEnabled: (packageId) =>
       packageManager.isHotReloadEnabled(packageId),
@@ -92,9 +109,33 @@ export function createControlPlaneApis({
     updateDefinition: (definition) =>
       daemonManager.updateDefinition(clone(definition)),
     setEnabled: (appId, enabled) => daemonManager.setEnabled(appId, enabled),
-    start: (appId) => daemonManager.start(appId),
-    stop: (appId) => daemonManager.stop(appId),
-    restart: (appId) => daemonManager.restart(appId),
+    start: async (appId) => {
+      await operationManager.runHost("daemon/start", { appId }, () =>
+        operationTask(async (reporter) => {
+          reporter.update("starting-daemon");
+          await daemonManager.start(appId);
+          return { success: true };
+        }),
+      );
+    },
+    stop: async (appId) => {
+      await operationManager.runHost("daemon/stop", { appId }, () =>
+        operationTask(async (reporter) => {
+          reporter.update("stopping-daemon");
+          await daemonManager.stop(appId);
+          return { success: true };
+        }),
+      );
+    },
+    restart: async (appId) => {
+      await operationManager.runHost("daemon/restart", { appId }, () =>
+        operationTask(async (reporter) => {
+          reporter.update("restarting-daemon");
+          await daemonManager.restart(appId);
+          return { success: true };
+        }),
+      );
+    },
     onChanged: (listener) =>
       daemonManager.on("changed", ({ status }) => listener(clone(status))),
   };
@@ -125,9 +166,32 @@ export function createControlPlaneApis({
       const user = sessionManager.getCurrentUser();
       return user ? clone(user) : null;
     },
-    login: async (username, password) =>
-      clone(await sessionManager.login(username, password)),
-    logout: () => sessionManager.logout(),
+    login: async (username, password) => {
+      const result = await operationManager.runHost(
+        "session/login",
+        { username },
+        () =>
+          operationTask(
+            async () => ({
+              success: true,
+              user: await sessionManager.login(username, password),
+            }),
+            { transition: "session" },
+          ),
+      );
+      return clone(result.user);
+    },
+    logout: async () => {
+      await operationManager.runHost("session/logout", {}, () =>
+        operationTask(
+          async () => {
+            await sessionManager.logout();
+            return { success: true };
+          },
+          { transition: "session" },
+        ),
+      );
+    },
     onChanged: (listener) =>
       sessionManager.on("changed", (change) => listener(clone(change))),
   };
@@ -153,13 +217,15 @@ export function createControlPlaneApis({
   };
 
   const volumes: EdenVolumesApi = {
-    register: (input) => volumeManager.register(clone(input)),
+    register: (input, options) => volumeManager.register(clone(input), options),
+    eject: (id) =>
+      operationManager.runHost("volume/eject", { volume: id }, () =>
+        volumeManager.prepareEject(id),
+      ),
     unregister: (id) => volumeManager.unregister(id),
     list: () => volumeManager.list(),
     onChanged: (listener) =>
-      volumeManager.on("volumes-changed", ({ volumes }) =>
-        listener(clone(volumes)),
-      ),
+      volumeManager.on("changed", ({ volumes }) => listener(clone(volumes))),
   };
 
   return {

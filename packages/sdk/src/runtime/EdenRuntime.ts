@@ -18,6 +18,7 @@ import type {
   EdenUsersApi,
   EdenVolumesApi,
 } from "../api";
+import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
 import {
   createControlPlaneApis,
   type EdenControlPlaneApis,
@@ -34,12 +35,15 @@ import { ExecutionContext } from "../execution/ExecutionContext";
 import { FileOpenManager } from "../file-open";
 import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
+import { VolumeHandler } from "../filesystem/VolumeHandler";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
 import { log } from "../logging";
 import { NotificationManager } from "../notification";
+import { OperationHandler } from "../operations/OperationHandler";
+import { OperationManager } from "../operations/OperationManager";
 import { PackageManager } from "../package-manager";
 import {
   type EdenPlatform,
@@ -188,6 +192,16 @@ export class EdenRuntime {
     this.resolveOwned(CommandRegistry);
     this.resolveOwned(BackendManager);
     this.ipcBridge = this.resolveOwned(IPCBridge);
+    const operations = this.resolveOwned(OperationManager);
+    this.resolveOwned(CommandRegistry).registerManager(
+      new OperationHandler(operations),
+    );
+    this.resolveOwned(CommandRegistry).registerManager(
+      new VolumeHandler(
+        this.resolveOwned(VolumeManager),
+        this.resolveOwned(ExecutionContext),
+      ),
+    );
     this.settingsPanelManager = this.resolveOwned(SettingsPanelManager);
     this.settings = createSettingsApi(this.settingsPanelManager);
 
@@ -201,7 +215,7 @@ export class EdenRuntime {
       "user/manage",
     );
     permissions.registerEventPermission("fs/changed", "fs/read");
-    permissions.registerEventPermission("fs/volumes-changed", "fs/read");
+    permissions.registerEventPermission("volume/changed", "volume/read");
   }
 
   public whenReady(): Promise<void> {
@@ -210,6 +224,18 @@ export class EdenRuntime {
 
   public get state(): EdenLifecycleState {
     return this.lifecycleState;
+  }
+
+  public get operations(): EdenOperationsObserver {
+    const manager = this.resolveOwned(OperationManager);
+    return {
+      get: (handle) => manager.inspect(handle),
+      list: () => manager.inspectAll(),
+      onChanged: (listener) =>
+        manager.on("changed", ({ snapshot }) =>
+          listener(structuredClone(snapshot)),
+        ),
+    };
   }
 
   public get volumes(): EdenVolumesApi {
@@ -383,6 +409,7 @@ export class EdenRuntime {
       appearanceManager,
       associationManager: this.appAssociationManager,
       volumeManager: this.resolveOwned(VolumeManager),
+      operationManager: this.resolveOwned(OperationManager),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,
@@ -492,6 +519,7 @@ export class EdenRuntime {
     if (this.resourcesDisposed) return;
     this.resourcesDisposed = true;
 
+    await this.resolveOwned(OperationManager).shutdown();
     if (this.managersInitialized) {
       await this.autostartManager.dispose();
       await this.daemonManager.shutdown();

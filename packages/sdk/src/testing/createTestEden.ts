@@ -1,10 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { EdenConfig } from "@edenapp/types";
+import type { EdenConfig, OperationHandle } from "@edenapp/types";
 import type { CommandCallerContext } from "../execution";
 import { CommandRegistry, PermissionRegistry } from "../ipc";
+import { OperationManager } from "../operations/OperationManager";
 import { EdenRuntime, type EdenRuntimePaths } from "../runtime/EdenRuntime";
+import { SessionContext } from "../session/SessionContext";
 import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,
@@ -23,6 +25,12 @@ export interface TestEden {
   readonly paths: EdenRuntimePaths & { root: string };
   start(): Promise<void>;
   execute<TResult = unknown>(
+    command: string,
+    args?: unknown,
+    caller?: CommandCallerContext,
+  ): Promise<TResult>;
+  /** Submit and explicitly await completion when exercising completed effects. */
+  complete<TResult = unknown>(
     command: string,
     args?: unknown,
     caller?: CommandCallerContext,
@@ -73,6 +81,26 @@ export async function createTestEden(
       caller: CommandCallerContext = {},
     ) =>
       runtime.resolve(CommandRegistry).execute<TResult>(command, args, caller),
+    complete: async <TResult>(
+      command: string,
+      args: unknown = {},
+      caller: CommandCallerContext = {},
+    ) => {
+      const context = {
+        ...caller,
+        sessionId:
+          caller.sessionId ?? runtime.resolve(SessionContext).getSessionId(),
+      };
+      const registry = runtime.resolve(CommandRegistry);
+      const result = await registry.execute(command, args, context);
+      return (
+        registry.getMode(command) === "operation"
+          ? await runtime
+              .resolve(OperationManager)
+              .wait(result as OperationHandle, context)
+          : result
+      ) as TResult;
+    },
     dispose: () => {
       cleanupPromise ??= (async () => {
         await runtime.dispose();

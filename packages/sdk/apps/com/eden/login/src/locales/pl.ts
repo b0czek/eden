@@ -15,6 +15,9 @@ export const pl = {
       "Uruchomić system ponownie? Wszystkie otwarte aplikacje zostaną zamknięte.",
     poweroffConfirmation:
       "Wyłączyć system? Wszystkie otwarte aplikacje zostaną zamknięte.",
+    restarting: "Ponowne uruchamianie…",
+    poweringOff: "Wyłączanie…",
+    waitingForOperations: "Oczekiwanie na zakończenie trwających operacji…",
     powerActionFailed: "Nie udało się wykonać żądanej operacji zasilania.",
   },
 } as const;

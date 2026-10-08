@@ -5,6 +5,7 @@ import {
   setLogContext,
 } from "../logging";
 import { decodeLaunchContext } from "../utils/appLaunchContext";
+import { dispatchEvent } from "./common/event-subscriptions";
 /**
  * Backend Runtime
  *
@@ -23,10 +24,9 @@ import type {
   AppBusConnection,
   CommandArgs,
   CommandName,
-  CommandResult,
   EdenAPI,
+  OperationSubmission,
 } from "@edenapp/types";
-
 import type { WorkerGlobal } from "@edenapp/types/worker";
 import {
   createAppBusAPI,
@@ -43,6 +43,7 @@ import {
   handleAppBusPort as handlePortSetup,
   wrapElectronPort,
 } from "./common/port-channel";
+import type { ShellCommandResponse } from "./common/shell-transport";
 
 type RuntimeMessage = {
   type: string;
@@ -153,7 +154,7 @@ const eventSubscriptions: Map<
   Set<(payload: unknown) => void>
 > = new Map();
 
-type PendingCommandResult = CommandResult<CommandName>;
+type PendingCommandResult = ShellCommandResponse<CommandName>;
 
 // Pending shell command requests
 const pendingCommands: Map<
@@ -181,23 +182,16 @@ function generateCommandId(): string {
 function shellCommand<T extends CommandName>(
   command: T,
   args: CommandArgs<T>,
-): Promise<CommandResult<T>> {
+  submission?: OperationSubmission,
+): Promise<ShellCommandResponse<T>> {
   return new Promise((resolve, reject) => {
     const commandId = generateCommandId();
 
-    // Set timeout
-    const timeout = setTimeout(() => {
-      pendingCommands.delete(commandId);
-      reject(new Error(`Shell command '${command}' timed out`));
-    }, 30000);
-
     pendingCommands.set(commandId, {
       resolve: (value) => {
-        clearTimeout(timeout);
-        resolve(value as CommandResult<T>);
+        resolve(value as ShellCommandResponse<T>);
       },
       reject: (reason) => {
-        clearTimeout(timeout);
         reject(reason);
       },
     });
@@ -207,6 +201,7 @@ function shellCommand<T extends CommandName>(
       commandId,
       command,
       args,
+      submission,
     });
   });
 }
@@ -273,16 +268,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
 
     // Event notification from main
     const { eventName, payload } = message;
-    const callbacks = eventSubscriptions.get(eventName);
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(payload);
-        } catch (err) {
-          log.error(`Error in event callback for ${eventName}:`, err);
-        }
-      });
-    }
+    dispatchEvent(eventSubscriptions, eventName, payload);
   } else if (message.type === "appbus-port") {
     // AppBus connection port
     const [port] = event.ports;

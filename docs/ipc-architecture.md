@@ -57,14 +57,15 @@ interface EdenAPI {
 
 ```typescript
 // Execute a shell command
-await window.edenAPI.shellCommand("process/launch", {
+const launch = await window.edenAPI.shellCommand("process/launch", {
   appId: "com.example.myapp",
   bounds: { x: 0, y: 0, width: 800, height: 600 },
 });
+await launch.result();
 
 // Subscribe to system events
-await window.edenAPI.subscribe("window/focus", (data) => {
-  console.log("Window focused:", data);
+await window.edenAPI.subscribe("process/launched", (data) => {
+  console.log("Process launched:", data);
 });
 
 // Check event support
@@ -358,3 +359,73 @@ Add `node` and `@edenapp/types/worker` to your backend TypeScript configuration:
 ```
 
 This provides type declarations for `worker.edenAPI`, `worker.appBus`, and `worker.getAppAPI()`.
+
+## Operations
+
+Commands declare a mode: `result` (the default) or `operation`. Result commands
+complete before `shellCommand` resolves with their result. Operation commands return
+a typed operation object after validation and authorization. Eden executes accepted
+work independently of the submitting view or backend and retains its status and completion.
+
+```typescript
+const copy = await window.edenAPI.shellCommand(
+  "fs/cp",
+  { from, to, overwrite: false },
+  { requestKey: "copy-invoice-2026" },
+);
+const stopWatching = await copy.watch(snapshot => {
+  console.log(snapshot.status, snapshot.phase, snapshot.progress);
+});
+await copy.result();
+stopWatching();
+```
+
+`worker.edenAPI.shellCommand` returns the same operation objects. `copy.get()` reads a
+snapshot and `operations.list()` lists the caller's operations. Watchers subscribe before
+reading the retained snapshot and reconcile changes using increasing revisions.
+Completion before observation works too. A failed operation preserves a typed
+domain failure response when available; `result()` returns that response. Other
+failures reject with a sanitized error.
+
+For operations with `snapshot.cancellable`, call `copy.cancel()` to
+request a stop. Continue observing until cleanup completes. A cancelled operation
+has status `cancelled`, and `copy.result()` rejects with an `AbortError`. Cancelling
+a filesystem copy removes its incomplete destination and restores the previous
+destination when replacing an existing file. The source remains intact.
+
+Progress watching is optional. `copy.watch(listener)` receives changes for that
+operation, including its current retained snapshot. `copy.result()` receives only
+completion updates. Unchanged phase and progress reports do not produce duplicate
+updates. Work without observers still retains its status and completion for later
+inspection. A direct subscription to `operation/changed` observes all operations
+owned by the caller's app and login session.
+
+Request keys are optional. Within the same app and login session, repeating a key
+with the same command and arguments returns the original retained operation. Reusing
+the key with different arguments or another command fails. Callers decide whether
+to resubmit; the API does not retry automatically.
+
+Each operation exposes a serializable `handle` with `{ command, id }`. Persist or
+send that handle when needed, and use `edenAPI.operations.from(handle)` to restore
+its `get`, `watch`, `result`, and `cancel` methods. An app can inspect its operations
+after reopening in the same login session.
+Other apps and sessions cannot inspect them or receive their changes. Hosts can
+use `eden.operations.get`, `list`, and `onChanged` for privileged read-only
+observation. Accepted work drains before session changes and runtime shutdown.
+
+Each app and the host get 32 reserved slots, share 256 burst slots, and can hold
+128 records each. Quotas span login sessions and count active and completed records.
+Full capacity rejects new work; matching retained request keys still deduplicate.
+
+Active records stay until completion. Results and request keys remain in memory for
+fifteen minutes afterward, without early eviction. Expired keys can start new work.
+Operation handles live for one Eden runtime.
+
+IPC responses have a ten-second deadline. Accepted operation execution has no
+transport deadline.
+
+Lifecycle operations accept requests before caller teardown begins. Successful
+session transitions and self-exit can close the caller before it observes
+completion. Power operation completion records preparation and host handoff;
+observe it through the host API when needed. Runtime disappearance does not
+confirm that the operating system has finished powering off.

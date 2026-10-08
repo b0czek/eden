@@ -15,6 +15,9 @@ export const en = {
       "Restart the system now? All open applications will be closed.",
     poweroffConfirmation:
       "Power off the system now? All open applications will be closed.",
+    restarting: "Restarting…",
+    poweringOff: "Powering off…",
+    waitingForOperations: "Waiting for ongoing work to finish…",
     powerActionFailed: "The requested system power action failed.",
   },
 } as const;

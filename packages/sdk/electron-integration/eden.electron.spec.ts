@@ -382,6 +382,141 @@ test.describe
         });
     });
 
+    test("accepts renderer and backend operations and observes work beyond former IPC deadlines", async () => {
+      test.setTimeout(45_000);
+      await expect
+        .poll(async () => {
+          try {
+            return await fs.readFile(
+              path.join(fixtureDirectory, "backend-operation-ready"),
+              "utf8",
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toBe("ready");
+      await electronApp?.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { volumes: { register(input: unknown): Promise<unknown> } };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register({
+          id: "operation-delay",
+          label: "Operation trigger",
+          kind: "local",
+          rootPath,
+        });
+      }, root);
+      try {
+        const rendererHandle = (await electronApp?.evaluate(
+          async ({ webContents }, appId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) throw new Error("Integration view missing");
+            return contents.executeJavaScript(
+              `(async () => {
+                const operation = await window.edenAPI.shellCommand("integration/delayed", {name: "renderer"});
+                window.__integrationOperation = operation;
+                return operation.handle;
+              })()`,
+            );
+          },
+          APP_ID,
+        )) as { command: string; id: string };
+        expect(rendererHandle).toMatchObject({
+          command: "integration/delayed",
+          id: expect.any(String),
+        });
+        await expect
+          .poll(async () => {
+            try {
+              return JSON.parse(
+                await fs.readFile(
+                  path.join(
+                    fixtureDirectory,
+                    "backend-operation-accepted.json",
+                  ),
+                  "utf8",
+                ),
+              );
+            } catch {
+              return undefined;
+            }
+          })
+          .toMatchObject({
+            command: "integration/delayed",
+            id: expect.any(String),
+          });
+        const completed = await electronApp?.evaluate(
+          async ({ webContents }, { appId, handle }) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(appId));
+            if (!contents) throw new Error("Integration view missing");
+            return contents.executeJavaScript(`(async () => {
+          const handle = ${JSON.stringify(handle)};
+          const revisions = [];
+          const operation = window.__integrationOperation;
+          const stop = await operation.watch(snapshot => revisions.push(snapshot.revision));
+          const completion = await operation.result();
+          stop();
+          const retained = await window.edenAPI.operations.from(handle).result();
+          return {completion, retained, revisions};
+        })()`);
+          },
+          { appId: APP_ID, handle: rendererHandle },
+        );
+        expect(completed).toMatchObject({
+          completion: { name: "renderer" },
+          retained: { name: "renderer" },
+          revisions: expect.any(Array),
+        });
+        await expect
+          .poll(async () => {
+            try {
+              return JSON.parse(
+                await fs.readFile(
+                  path.join(fixtureDirectory, "backend-operation-result.json"),
+                  "utf8",
+                ),
+              );
+            } catch {
+              return undefined;
+            }
+          })
+          .toMatchObject({
+            completion: { name: "backend" },
+            revisions: expect.any(Array),
+          });
+        expect(
+          await fs.readFile(
+            path.join(root, "users", "operation-renderer.txt"),
+            "utf8",
+          ),
+        ).toBe("renderer");
+        expect(
+          await fs.readFile(
+            path.join(root, "users", "operation-backend.txt"),
+            "utf8",
+          ),
+        ).toBe("backend");
+      } finally {
+        await electronApp?.evaluate(() => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { unregister(id: string): boolean } };
+            };
+          };
+          integration.__edenIntegration.eden.volumes.unregister(
+            "operation-delay",
+          );
+        });
+      }
+    });
+
     test("round-trips binary filesystem data across renderer IPC", async () => {
       const result = await electronApp?.evaluate(
         async ({ webContents }, appId) => {
@@ -1092,6 +1227,9 @@ test.describe
           `document.querySelector('.file-list')?.textContent ?? ''`,
         );
       try {
+        await expect
+          .poll(() => evaluateApp(APP_ID, `typeof window.edenAPI`))
+          .toBe("object");
         await setConnected(true);
         await evaluateApp(
           APP_ID,
@@ -1120,6 +1258,130 @@ test.describe
     });
 
     for (const appId of ["com.eden.files", "com.eden.file-picker"]) {
+      test(`${appId} resumes live updates after a failed eject`, async () => {
+        const running = await executeHostCommand<
+          { manifest: { id: string } }[]
+        >("process/list", {});
+        if (!running.some((process) => process.manifest.id === APP_ID))
+          await executeHostCommand("process/launch", { appId: APP_ID });
+        const driveRoot = path.join(root, `failed-eject-${appId}`);
+        await fs.mkdir(driveRoot);
+        await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
+        await electronApp?.evaluate(async (_electron, rootPath) => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: {
+                volumes: {
+                  register(
+                    input: unknown,
+                    options: { eject(): Promise<void> },
+                  ): Promise<unknown>;
+                };
+              };
+            };
+            __rejectExplorerEject?: () => void;
+          };
+          await integration.__edenIntegration.eden.volumes.register(
+            {
+              id: "failed-eject-drive",
+              label: "Busy drive",
+              kind: "removable",
+              rootPath,
+            },
+            {
+              eject: () =>
+                new Promise<void>((_resolve, reject) => {
+                  integration.__rejectExplorerEject = () =>
+                    reject(new Error("Device is busy"));
+                }),
+            },
+          );
+        }, driveRoot);
+        const evaluateApp = async (targetAppId: string, script: string) =>
+          electronApp?.evaluate(
+            async ({ webContents }, input) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(input.appId));
+              return contents?.executeJavaScript(input.script);
+            },
+            { appId: targetAppId, script },
+          );
+        const listing = () =>
+          evaluateApp(
+            appId,
+            `document.querySelector('.file-list')?.textContent ?? ''`,
+          );
+        try {
+          await expect
+            .poll(() => evaluateApp(APP_ID, `typeof window.edenAPI`))
+            .toBe("object");
+          if (appId === "com.eden.files") {
+            await expect(
+              executeHostCommand("file/open", {
+                location: { volume: "failed-eject-drive", path: "/" },
+              }),
+            ).resolves.toMatchObject({ success: true, appId });
+          } else {
+            await evaluateApp(
+              APP_ID,
+              `window.edenAPI.shellCommand('file-picker/open', {
+              mode: 'open', allowedVolumes: ['failed-eject-drive'], initialLocation: { volume: 'failed-eject-drive', path: '/' }
+            })`,
+            );
+          }
+          await expect.poll(listing).toContain("before.txt");
+          const removal = executeHostCommand("volume/eject", {
+            volume: "failed-eject-drive",
+          });
+          const failure = expect(removal).rejects.toThrow("Device is busy");
+          await expect
+            .poll(() =>
+              electronApp?.evaluate(
+                () =>
+                  typeof (
+                    globalThis as typeof globalThis & {
+                      __rejectExplorerEject?: () => void;
+                    }
+                  ).__rejectExplorerEject,
+              ),
+            )
+            .toBe("function");
+          await fs.writeFile(
+            path.join(driveRoot, "during-eject.txt"),
+            "during",
+          );
+          await electronApp?.evaluate(() =>
+            (
+              globalThis as typeof globalThis & {
+                __rejectExplorerEject?: () => void;
+              }
+            ).__rejectExplorerEject?.(),
+          );
+          await failure;
+          // Recovery reloads changes made while the native watch was closed.
+          await expect.poll(listing).toContain("during-eject.txt");
+          await fs.writeFile(path.join(driveRoot, "after-eject.txt"), "after");
+          // A later native change proves the recreated watch delivers live updates.
+          await expect.poll(listing).toContain("after-eject.txt");
+        } finally {
+          await electronApp?.evaluate(() => {
+            const integration = globalThis as typeof globalThis & {
+              __edenIntegration: {
+                eden: { volumes: { unregister(id: string): boolean } };
+              };
+              __rejectExplorerEject?: () => void;
+            };
+            integration.__rejectExplorerEject?.();
+            delete integration.__rejectExplorerEject;
+            integration.__edenIntegration.eden.volumes.unregister(
+              "failed-eject-drive",
+            );
+          });
+          await executeHostCommand("process/stop", { appId });
+        }
+      });
+
       test(`${appId} watches the parent after recovering from a deleted directory`, async () => {
         const running = await executeHostCommand<
           { manifest: { id: string } }[]
@@ -1245,6 +1507,115 @@ test.describe
         },
         { appId: APP_ID, watchId },
       );
+    });
+
+    test("accepts slow safe eject and observes completion across renderer and backend IPC", async () => {
+      test.setTimeout(45_000);
+      await expect
+        .poll(async () => {
+          try {
+            return await fs.readFile(
+              path.join(fixtureDirectory, "backend-eject-ready"),
+              "utf8",
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toBe("ready");
+      const driveRoot = path.join(root, "slow-eject");
+      await fs.mkdir(driveRoot);
+      await electronApp?.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: {
+              volumes: {
+                register(
+                  input: unknown,
+                  options: { eject: () => Promise<void> },
+                ): Promise<unknown>;
+              };
+            };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register(
+          { id: "slow-eject", label: "Slow USB", kind: "removable", rootPath },
+          {
+            eject: () =>
+              new Promise<void>((resolve) => setTimeout(resolve, 31_000)),
+          },
+        );
+      }, driveRoot);
+      await expect
+        .poll(() =>
+          executeHostCommand<{ id: string; state: string }[]>(
+            "volume/list",
+            {},
+          ),
+        )
+        .toContainEqual(
+          expect.objectContaining({ id: "slow-eject", state: "ejecting" }),
+        );
+      const rendererHandle = await electronApp?.evaluate(
+        async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+          const operation = await window.edenAPI.shellCommand("volume/eject", { volume: "slow-eject" });
+          return operation.handle;
+        })()`);
+        },
+        APP_ID,
+      );
+      expect(rendererHandle).toMatchObject({
+        command: "volume/eject",
+        id: expect.any(String),
+      });
+      await expect
+        .poll(async () => {
+          try {
+            return JSON.parse(
+              await fs.readFile(
+                path.join(fixtureDirectory, "backend-eject-accepted.json"),
+                "utf8",
+              ),
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toMatchObject({ command: "volume/eject", id: expect.any(String) });
+      await electronApp?.evaluate(
+        async ({ webContents }, payload) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(payload.appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(
+            `window.edenAPI.operations.from(${JSON.stringify(payload.handle)}).result()`,
+          );
+        },
+        { appId: APP_ID, handle: rendererHandle },
+      );
+      await expect
+        .poll(async () => {
+          try {
+            return JSON.parse(
+              await fs.readFile(
+                path.join(fixtureDirectory, "backend-eject-result.json"),
+                "utf8",
+              ),
+            );
+          } catch {
+            return undefined;
+          }
+        })
+        .toEqual({ success: true });
+      expect(
+        await executeHostCommand<{ id: string }[]>("volume/list", {}),
+      ).not.toContainEqual(expect.objectContaining({ id: "slow-eject" }));
     });
 
     test("shuts down without orphaning Electron or utility processes", async () => {

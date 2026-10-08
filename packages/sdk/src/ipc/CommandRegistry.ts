@@ -1,10 +1,13 @@
 import "reflect-metadata";
+import type { OperationSubmission } from "@edenapp/types";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/ExecutionContext";
 import { log } from "../logging";
+import { OperationManager } from "../operations/OperationManager";
+import type { OperationTask } from "../operations/OperationTask";
 import type { SessionContext } from "../session";
 import { getManagerMetadata } from "./CommandMetadata";
 import { assertFoundationCommandAllowed } from "./FoundationPolicy";
@@ -33,6 +36,7 @@ export interface CommandMetadata {
   command: string;
   handler: CommandHandler;
   target: object; // The instance that owns the handler
+  mode: "result" | "operation";
   permission?: string; // Full permission: "namespace/action"
   methodName: string; // Original method name for metadata lookup
 }
@@ -51,6 +55,7 @@ export class CommandRegistry {
     @inject(delay(() => require("../session/SessionContext").SessionContext))
     private sessionContext: SessionContext,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
+    @inject(delay(() => OperationManager)) private operations: OperationManager,
   ) {}
 
   /**
@@ -87,7 +92,16 @@ export class CommandRegistry {
       }
     }
 
+    const mode = methodName
+      ? (Reflect.getMetadata(
+          "eden:handler:mode",
+          target.constructor.prototype,
+          methodName,
+        ) ?? "result")
+      : "result";
+
     this.handlers.set(fullCommand, {
+      mode,
       namespace,
       command,
       handler,
@@ -139,6 +153,7 @@ export class CommandRegistry {
     fullCommand: string,
     args: unknown,
     callerContext: CommandCallerContext = {},
+    submission: OperationSubmission = {},
   ): Promise<TResult> {
     const metadata = this.handlers.get(fullCommand);
 
@@ -190,6 +205,25 @@ export class CommandRegistry {
         }
       }
 
+      if (metadata.mode === "operation") {
+        const preparedArgs = structuredClone(
+          this.withCallerContext(args, context),
+        );
+        const fingerprintArgs = { ...preparedArgs };
+        for (const key of Object.keys(fingerprintArgs))
+          if (key.startsWith("_")) delete fingerprintArgs[key];
+        return this.operations.submit(
+          fullCommand,
+          fingerprintArgs,
+          context,
+          () =>
+            metadata.handler.call(
+              metadata.target,
+              preparedArgs,
+            ) as OperationTask<unknown>,
+          submission,
+        ) as TResult;
+      }
       return (await metadata.handler.call(
         metadata.target,
         this.withCallerContext(args, context),
@@ -200,7 +234,12 @@ export class CommandRegistry {
   private resolveCallerContext(
     callerContext: CommandCallerContext,
   ): CommandCallerContext {
-    if (callerContext.principal) return callerContext;
+    if (callerContext.principal)
+      return {
+        ...callerContext,
+        sessionId:
+          callerContext.sessionId ?? this.sessionContext.getSessionId(),
+      };
     if (callerContext.appId) {
       throw new Error(
         `Caller principal could not be resolved for app ${callerContext.appId}`,
@@ -209,8 +248,12 @@ export class CommandRegistry {
 
     const profile = this.sessionContext.getCurrentUser();
     return profile
-      ? { ...callerContext, principal: { kind: "user", profile } }
-      : callerContext;
+      ? {
+          ...callerContext,
+          sessionId: this.sessionContext.getSessionId(),
+          principal: { kind: "user", profile },
+        }
+      : { ...callerContext, sessionId: this.sessionContext.getSessionId() };
   }
 
   private withCallerContext(
@@ -231,12 +274,19 @@ export class CommandRegistry {
       callerArgs._isFoundation = context.foundation;
     }
 
-    return { ...commandArgs, ...callerArgs };
+    const cleanArgs = { ...commandArgs };
+    for (const key of Object.keys(cleanArgs))
+      if (key.startsWith("_")) delete cleanArgs[key];
+    return { ...cleanArgs, ...callerArgs };
   }
 
   /**
    * Check if a command is registered
    */
+  getMode(fullCommand: string): CommandMetadata["mode"] | undefined {
+    return this.handlers.get(fullCommand)?.mode;
+  }
+
   has(fullCommand: string): boolean {
     return this.handlers.has(fullCommand);
   }

@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { inject, Lifecycle, scoped } from "tsyringe";
 import { log } from "../logging";
+import type { OperationReporter } from "../operations/OperationTask";
 
 interface TransactionEntry {
   target: string;
@@ -58,13 +59,17 @@ export class PackageOperationCoordinator {
     }
   }
 
-  async runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+  async runExclusive<T>(
+    operation: () => Promise<T>,
+    reporter?: OperationReporter,
+  ): Promise<T> {
     const previous = this.mutationTail;
     let release!: () => void;
     this.mutationTail = new Promise<void>((resolve) => {
       release = resolve;
     });
 
+    reporter?.update("waiting-for-package-lock");
     await previous;
     try {
       return await operation();
@@ -73,7 +78,11 @@ export class PackageOperationCoordinator {
     }
   }
 
-  async execute(operations: PackageOperation[]): Promise<void> {
+  async execute(
+    operations: PackageOperation[],
+    reporter?: OperationReporter,
+  ): Promise<void> {
+    reporter?.update("staging-transaction");
     if (operations.length === 0) return;
     const directory = path.join(this.root, randomUUID());
     await fs.mkdir(path.join(directory, "stages"), { recursive: true });
@@ -106,6 +115,8 @@ export class PackageOperationCoordinator {
       journal.state = "applying";
       await this.writeJournal(directory, journal);
 
+      reporter?.update("applying-transaction");
+      let completed = 0;
       for (const entry of journal.entries) {
         if (await this.exists(entry.target)) {
           await fs.rename(entry.target, entry.backup);
@@ -118,12 +129,19 @@ export class PackageOperationCoordinator {
           entry.installed = true;
           await this.writeJournal(directory, journal);
         }
+        reporter?.update("applying-transaction", {
+          completed: ++completed,
+          total: journal.entries.length,
+          unit: "packages",
+        });
       }
 
+      reporter?.update("committing-transaction");
       journal.state = "committed";
       await this.writeJournal(directory, journal);
       await fs.rm(directory, { recursive: true, force: true });
     } catch (error) {
+      reporter?.update("rolling-back-transaction");
       await this.rollback(directory, journal).catch((rollbackError) => {
         log.error("Package transaction rollback failed:", rollbackError);
       });

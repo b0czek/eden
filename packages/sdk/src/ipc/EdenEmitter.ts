@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import type { EventData, EventName } from "@edenapp/types";
 import { log } from "../logging";
+import type { EventScope } from "./EventScope";
 import type { IPCBridge } from "./IPCBridge";
 
 type EdenEventListener<T> = (payload: T) => void | Promise<void>;
@@ -80,7 +81,11 @@ export abstract class EdenEmitter<TEvents> {
    * @param event - Event name (without namespace prefix)
    * @param data - Event payload data
    */
-  protected notify<K extends keyof TEvents>(event: K, data: TEvents[K]): void {
+  protected notify<K extends keyof TEvents>(
+    event: K,
+    data: TEvents[K] | (() => TEvents[K]),
+    scope?: EventScope,
+  ): void {
     // Extract namespace from the @EdenNamespace decorator
     const namespace = Reflect.getMetadata("eden:namespace", this.constructor);
 
@@ -95,6 +100,14 @@ export abstract class EdenEmitter<TEvents> {
     const fullEventName = `${namespace}/${String(event)}` as EventName;
 
     const eventListeners = this.listeners.get(event);
+    if (typeof data === "function") {
+      if (
+        !eventListeners?.size &&
+        !this.ipcBridge.eventSubscribers.hasSubscribers(fullEventName, scope)
+      )
+        return;
+      data = (data as () => TEvents[K])();
+    }
     if (eventListeners) {
       for (const listener of eventListeners) {
         try {
@@ -120,6 +133,7 @@ export abstract class EdenEmitter<TEvents> {
     this.ipcBridge.eventSubscribers.notify(
       fullEventName,
       data as EventData<typeof fullEventName>,
+      ...(scope ? [scope] : []),
     );
   }
 

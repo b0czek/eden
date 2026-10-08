@@ -26,7 +26,13 @@
     "resizable": true,
     "movable": true
   },
-  "permissions": ["fs/*", "db/rw", "package/read", "settings/rw"],
+  "permissions": [
+    "fs/*",
+    "volume/read",
+    "db/rw",
+    "package/read",
+    "settings/rw"
+  ],
   "settings": [
     {
       "id": "behavior",

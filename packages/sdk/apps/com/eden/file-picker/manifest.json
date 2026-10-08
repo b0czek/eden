@@ -31,6 +31,12 @@
       "appFrame": true
     }
   },
-  "permissions": ["file-picker/display", "fs/*", "db/rw", "settings/rw"],
+  "permissions": [
+    "file-picker/display",
+    "fs/*",
+    "volume/read",
+    "db/rw",
+    "settings/rw"
+  ],
   "icon": "icon.svg"
 }
