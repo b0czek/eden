@@ -1,25 +1,22 @@
-import {
-  createOperation,
-  createOverlayLayout,
-  KeyboardButton,
-  OperationStatus,
-} from "@edenapp/solid-kit";
+import { createOverlayLayout, KeyboardButton } from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
   AppInstance,
   AppManifest,
   EdenPowerCapabilities,
-  Operation,
   UserProfile,
   WindowSize,
 } from "@edenapp/types";
-import { createRoot, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
+import { useAppOperations } from "../features/useAppOperations";
+import { useSessionTransition } from "../features/useSessionTransition";
 import { getLocalizedValue, initLocale, locale, t } from "../i18n";
 import type { AppInfo } from "../types";
 import AllApps from "./AllApps";
 import { openChangePasswordDialog } from "./ChangePasswordDialog";
 import Dock from "./Dock";
+import SessionTransitionOverlay from "./SessionTransitionOverlay";
 
 // Constants
 const DOCK_HEIGHT = 72; // Should match --eden-layout-dock-height in CSS pixels
@@ -34,33 +31,20 @@ export default function ShellOverlay() {
   const [pinnedDockApps, setPinnedDockApps] = createSignal<string[]>([]);
   const [showAllApps, setShowAllApps] = createSignal(false);
   const [showChangePassword, setShowChangePassword] = createSignal(false);
-  const [showPowerDialog, setShowPowerDialog] = createSignal(false);
   const [powerCapabilities, setPowerCapabilities] =
     createSignal<EdenPowerCapabilities>({ poweroff: false, reboot: false });
   const [currentUser, setCurrentUser] = createSignal<UserProfile | null>(null);
-  const [busyApps, setBusyApps] = createSignal<
-    Record<string, "launch" | "stop">
-  >({});
-  const appObservers = new Set<() => void>();
-  let disposed = false;
-  onCleanup(() => {
-    disposed = true;
-    for (const dispose of appObservers) dispose();
+  const appOperations = useAppOperations({
+    dialogs,
+    refresh: () => loadSystemInfo(),
   });
-  const [appErrors, setAppErrors] = createSignal(0);
-  const transition = createOperation();
-  const [transitionAction, setTransitionAction] = createSignal<
-    "logout" | "poweroff" | "reboot"
-  >("logout");
-  const [transitionError, setTransitionError] = createSignal<string>();
-  const transitionVisible = () =>
-    transition.pending() || Boolean(transitionError());
+  const sessionTransition = useSessionTransition({ dialogs });
   const isFullscreen = () =>
     showAllApps() ||
     showChangePassword() ||
-    showPowerDialog() ||
-    appErrors() > 0 ||
-    transitionVisible();
+    sessionTransition.confirming() ||
+    appOperations.hasErrorDialog() ||
+    sessionTransition.visible();
   let overlayElement: HTMLDivElement | undefined;
 
   // Load pinned apps from database
@@ -124,11 +108,11 @@ export default function ShellOverlay() {
         id: instance.manifest.id,
         name: getLocalizedValue(instance.manifest.name, locale()),
         isRunning: true,
-        activity: busyApps()[instance.manifest.id],
+        activity: appOperations.activity(instance.manifest.id),
       }));
     const launching = installedApps().filter(
       (app) =>
-        busyApps()[app.id] === "launch" &&
+        appOperations.activity(app.id) === "launch" &&
         !pinnedDockApps().includes(app.id) &&
         !instances.some((instance) => instance.manifest.id === app.id),
     );
@@ -156,7 +140,7 @@ export default function ShellOverlay() {
           id: appId,
           name: getLocalizedValue(manifest.name, locale()),
           isRunning: runningIds.has(appId),
-          activity: busyApps()[appId],
+          activity: appOperations.activity(appId),
         };
       })
       .filter((app): app is AppInfo => app !== null);
@@ -169,7 +153,7 @@ export default function ShellOverlay() {
       id: app.id,
       name: getLocalizedValue(app.name, locale()),
       isRunning: runningIds.has(app.id),
-      activity: busyApps()[app.id],
+      activity: appOperations.activity(app.id),
     }));
   };
 
@@ -242,55 +226,8 @@ export default function ShellOverlay() {
       ),
   });
 
-  const runAppOperation = async (
-    appId: string,
-    activity: "launch" | "stop",
-    submit: () => Promise<Operation<"process/launch" | "process/stop">>,
-  ) => {
-    if (disposed || busyApps()[appId]) return;
-    setBusyApps((current) => ({ ...current, [appId]: activity }));
-    const observer = createRoot((dispose) => ({
-      operation: createOperation(),
-      dispose,
-    }));
-    appObservers.add(observer.dispose);
-    try {
-      const result = await observer.operation.run(submit);
-      if (!result.success)
-        throw new Error(
-          "error" in result && typeof result.error === "string"
-            ? result.error
-            : t("shell.appOperationFailed"),
-        );
-      await loadSystemInfo();
-    } catch (error) {
-      if (disposed) return;
-      setAppErrors((count) => count + 1);
-      try {
-        await dialogs.alert({
-          title: t("common.error"),
-          message:
-            error instanceof Error
-              ? error.message
-              : t("shell.appOperationFailed"),
-          okLabel: t("common.ok"),
-        });
-      } finally {
-        setAppErrors((count) => count - 1);
-      }
-    } finally {
-      observer.dispose();
-      appObservers.delete(observer.dispose);
-      setBusyApps((current) => {
-        const next = { ...current };
-        delete next[appId];
-        return next;
-      });
-    }
-  };
-
   const handleAppClick = async (appId: string) => {
-    if (busyApps()[appId]) return;
+    if (appOperations.activity(appId)) return;
     const isRunning = runningApps().some((app) => app.manifest.id === appId);
 
     if (isRunning) {
@@ -301,9 +238,7 @@ export default function ShellOverlay() {
         console.error("Failed to focus app:", error);
       }
     } else {
-      await runAppOperation(appId, "launch", () =>
-        window.edenAPI.shellCommand("process/launch", { appId }),
-      );
+      await appOperations.launch(appId);
     }
   };
 
@@ -317,36 +252,14 @@ export default function ShellOverlay() {
     }
   };
 
-  const handleStopApp = async (appId: string) => {
-    await runAppOperation(appId, "stop", () =>
-      window.edenAPI.shellCommand("process/stop", { appId }),
-    );
-  };
-
   // Create menu once with actions - just pass app data when opening
   const appMenu = createAppMenu({
     open: handleAppClick,
-    stop: handleStopApp,
+    stop: appOperations.stop,
     addToDock: handleAddToDock,
     removeFromDock: handleRemoveFromDock,
     isPinned: isAppPinned,
   });
-
-  const handleLogout = async () => {
-    if (transition.pending()) return;
-    setTransitionAction("logout");
-    setTransitionError(undefined);
-    try {
-      await transition.run(() =>
-        window.edenAPI.shellCommand("session/logout", {}),
-      );
-    } catch (error) {
-      console.error("Failed to log out:", error);
-      setTransitionError(
-        error instanceof Error ? error.message : t("shell.logoutFailed"),
-      );
-    }
-  };
 
   const handleOpenChangePassword = async () => {
     setShowChangePassword(true);
@@ -360,45 +273,12 @@ export default function ShellOverlay() {
     }
   };
 
-  const handlePowerAction = async (action: "poweroff" | "reboot") => {
-    if (transition.pending() || showPowerDialog()) return;
-    setShowPowerDialog(true);
-    try {
-      const confirmed = await dialogs.confirm({
-        title: action === "poweroff" ? t("shell.poweroff") : t("shell.reboot"),
-        message:
-          action === "poweroff"
-            ? t("shell.poweroffConfirmation")
-            : t("shell.rebootConfirmation"),
-        confirmLabel:
-          action === "poweroff" ? t("shell.poweroff") : t("shell.reboot"),
-        cancelLabel: t("common.cancel"),
-        tone: action === "poweroff" ? "danger" : "default",
-        role: "alertdialog",
-      });
-      if (confirmed) {
-        setTransitionAction(action);
-        setTransitionError(undefined);
-        await transition.run(() =>
-          window.edenAPI.shellCommand("system/power", { action }),
-        );
-      }
-    } catch (error) {
-      console.error(`Failed to ${action} the system:`, error);
-      setTransitionError(
-        error instanceof Error ? error.message : t("shell.powerActionFailed"),
-      );
-    } finally {
-      setShowPowerDialog(false);
-    }
-  };
-
   // Create user menu factory
   const userContextMenu = createUserContextMenu({
     changePassword: handleOpenChangePassword,
-    logout: handleLogout,
-    reboot: () => handlePowerAction("reboot"),
-    poweroff: () => handlePowerAction("poweroff"),
+    logout: () => sessionTransition.request("logout"),
+    reboot: () => sessionTransition.request("reboot"),
+    poweroff: () => sessionTransition.request("poweroff"),
     canReboot: () => powerCapabilities().reboot,
     canPoweroff: () => powerCapabilities().poweroff,
   });
@@ -441,7 +321,7 @@ export default function ShellOverlay() {
       data-mode={isFullscreen() ? "fullscreen" : "dock"}
     >
       {/* AllApps appears above the dock when active */}
-      <Show when={showAllApps() && !transitionVisible()}>
+      <Show when={showAllApps() && !sessionTransition.visible()}>
         <AllApps
           apps={allApps()}
           onClose={handleShowAllApps}
@@ -463,64 +343,20 @@ export default function ShellOverlay() {
         />
       </Show>
 
-      <Show when={isFullscreen() && !transitionVisible()}>
+      <Show when={isFullscreen() && !sessionTransition.visible()}>
         <div class="shell-overlay-keyboard-fab">
           <KeyboardButton label={t("shell.toggleKeyboard")} />
         </div>
       </Show>
 
-      <Show when={transitionVisible()}>
-        <div class="eden-overlay eden-flex-center eden-p-lg">
-          <div
-            class="eden-card eden-p-lg eden-flex-col eden-gap-md"
-            style={{ width: "min(100%, 420px)" }}
-          >
-            <Show
-              when={transitionError()}
-              fallback={
-                <OperationStatus
-                  label={
-                    transitionAction() === "logout"
-                      ? t("shell.loggingOut")
-                      : transitionAction() === "reboot"
-                        ? t("shell.restarting")
-                        : t("shell.poweringOff")
-                  }
-                  snapshot={transition.snapshot()}
-                  description={
-                    transition.snapshot()?.phase === "waiting-for-operations"
-                      ? t("shell.waitingForOperations")
-                      : t("shell.closingApps")
-                  }
-                />
-              }
-            >
-              <p role="alert">{transitionError()}</p>
-              <div class="eden-flex eden-gap-sm">
-                <button
-                  type="button"
-                  class="eden-btn eden-btn-primary"
-                  onClick={() =>
-                    transitionAction() === "logout"
-                      ? handleLogout()
-                      : handlePowerAction(
-                          transitionAction() as "poweroff" | "reboot",
-                        )
-                  }
-                >
-                  {t("common.retry")}
-                </button>
-                <button
-                  type="button"
-                  class="eden-btn"
-                  onClick={() => setTransitionError(undefined)}
-                >
-                  {t("common.close")}
-                </button>
-              </div>
-            </Show>
-          </div>
-        </div>
+      <Show when={sessionTransition.visible()}>
+        <SessionTransitionOverlay
+          action={sessionTransition.action()}
+          snapshot={sessionTransition.snapshot()}
+          error={sessionTransition.error()}
+          onRetry={sessionTransition.retry}
+          onDismiss={sessionTransition.dismiss}
+        />
       </Show>
 
       <DialogHost dialogs={dialogs} />
