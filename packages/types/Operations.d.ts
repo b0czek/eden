@@ -1,14 +1,14 @@
 import type { CommandCompletion, CommandName } from "./commands";
 
-export type CommunicationMode = "immediate" | "operation";
+export type CommunicationMode = "result" | "operation";
 
 export interface OperationHandle<C extends string = string> {
   command: C;
   id: string;
 }
 
-export interface ImmediateCommand<A, R> {
-  mode: "immediate";
+export interface ResultCommand<A, R> {
+  mode: "result";
   args: A;
   response: R;
 }

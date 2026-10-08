@@ -246,7 +246,7 @@ export class IPCBridge extends EventEmitter {
           resolve(
             mode === "operation"
               ? { mode: "operation", handle: result }
-              : { mode: "immediate", result },
+              : { mode: "result", result },
           );
         })
         .catch((error) => {

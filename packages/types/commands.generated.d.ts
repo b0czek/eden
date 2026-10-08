@@ -14,7 +14,7 @@ export interface SystemCommands {
    * Get system information including platform, versions, and running apps.
    */
   "system/info": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").SystemInfo;
   };
@@ -22,12 +22,12 @@ export interface SystemCommands {
    * Get consumer-controlled product branding for SDK-owned interfaces.
    */
   "system/branding": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").EdenBrandingInfo;
   };
   "system/power-capabilities": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").EdenPowerCapabilities;
   };
@@ -44,14 +44,14 @@ export interface SystemCommands {
  */
 export interface AssociationsCommands {
   "associations/get": {
-    mode: "immediate";
+    mode: "result";
     args: { key: string };
     response: {
     association: import("./index").AppAssociation | undefined;
   };
   };
   "associations/set": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string;
     appId: string;
@@ -60,12 +60,12 @@ export interface AssociationsCommands {
     response: { success: boolean };
   };
   "associations/remove": {
-    mode: "immediate";
+    mode: "result";
     args: { key: string };
     response: { success: boolean };
   };
   "associations/list": {
-    mode: "immediate";
+    mode: "result";
     args: { kindPrefix?: string };
     response: {
     associations: Record<string, import("./index").AppAssociation>;
@@ -82,7 +82,7 @@ export interface AppbusCommands {
    * Requires "appbus/expose" permission
    */
   "appbus/register": {
-    mode: "immediate";
+    mode: "result";
     args: {
     serviceName: string;
     description?: string;
@@ -94,7 +94,7 @@ export interface AppbusCommands {
    * Requires "appbus/expose" permission
    */
   "appbus/unregister": {
-    mode: "immediate";
+    mode: "result";
     args: {
     serviceName: string };
     response: { success: boolean };
@@ -104,7 +104,7 @@ export interface AppbusCommands {
    * No permission required
    */
   "appbus/list": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { services: import("./index").ServiceInfo[] };
   };
@@ -113,7 +113,7 @@ export interface AppbusCommands {
    * No permission required
    */
   "appbus/list-by-app": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string };
     response: { services: import("./index").ServiceInfo[] };
@@ -124,7 +124,7 @@ export interface AppbusCommands {
    * Requires "appbus/connect" permission
    */
   "appbus/connect": {
-    mode: "immediate";
+    mode: "result";
     args: {
     targetAppId: string;
     serviceName: string };
@@ -137,18 +137,18 @@ export interface AppbusCommands {
  */
 export interface AppearanceCommands {
   "appearance/set-wallpaper": {
-    mode: "immediate";
+    mode: "result";
     args: {
     wallpaper: import("./index").WallpaperConfig };
     response: void;
   };
   "appearance/get-wallpaper": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { wallpaper: import("./index").WallpaperPreset };
   };
   "appearance/get-presets": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: {
     solid: import("./index").WallpaperPreset[];
@@ -162,22 +162,22 @@ export interface AppearanceCommands {
  */
 export interface ContextMenuCommands {
   "context-menu/register-display": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
   "context-menu/open": {
-    mode: "immediate";
+    mode: "result";
     args: import("./index").ContextMenuOpenArgs & { };
     response: { requestId: string };
   };
   "context-menu/resolve": {
-    mode: "immediate";
+    mode: "result";
     args: import("./index").ContextMenuResult & { };
     response: { success: boolean };
   };
   "context-menu/close": {
-    mode: "immediate";
+    mode: "result";
     args: {
     requestId?: string };
     response: { success: boolean };
@@ -189,23 +189,23 @@ export interface ContextMenuCommands {
  */
 export interface DaemonCommands {
   "daemon/list": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").DaemonStatus[];
   };
   "daemon/update-definition": {
-    mode: "immediate";
+    mode: "result";
     args: {
     definition: import("./index").DaemonDefinition };
     response: { success: true };
   };
   "daemon/enable": {
-    mode: "immediate";
+    mode: "result";
     args: { appId: string };
     response: { success: true };
   };
   "daemon/disable": {
-    mode: "immediate";
+    mode: "result";
     args: { appId: string };
     response: { success: true };
   };
@@ -237,7 +237,7 @@ export interface DbCommands {
    * Get a value from database (scoped to caller's app)
    */
   "db/get": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string };
     response: { value: string | undefined };
@@ -246,7 +246,7 @@ export interface DbCommands {
    * Set a value in database (scoped to caller's app)
    */
   "db/set": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string;
     value: string };
@@ -256,7 +256,7 @@ export interface DbCommands {
    * Delete a key from database (scoped to caller's app)
    */
   "db/delete": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string };
     response: { success: boolean };
@@ -265,7 +265,7 @@ export interface DbCommands {
    * Check if a key exists (scoped to caller's app)
    */
   "db/has": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string };
     response: { exists: boolean };
@@ -274,7 +274,7 @@ export interface DbCommands {
    * Clear all keys (scoped to caller's app)
    */
   "db/clear": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
@@ -282,7 +282,7 @@ export interface DbCommands {
    * List all keys (scoped to caller's app)
    */
   "db/list": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { keys: string[] };
   };
@@ -290,7 +290,7 @@ export interface DbCommands {
    * Get a value from any app's namespace (superuser only)
    */
   "db/get/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string };
@@ -300,7 +300,7 @@ export interface DbCommands {
    * Set a value in any app's namespace (superuser only)
    */
   "db/set/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string;
@@ -311,7 +311,7 @@ export interface DbCommands {
    * Delete a key from any app's namespace (superuser only)
    */
   "db/delete/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string };
@@ -321,7 +321,7 @@ export interface DbCommands {
    * Check if a key exists in any app's namespace (superuser only)
    */
   "db/has/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string };
@@ -331,7 +331,7 @@ export interface DbCommands {
    * Clear all keys in any app's namespace (superuser only)
    */
   "db/clear/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string };
     response: { success: boolean };
@@ -340,7 +340,7 @@ export interface DbCommands {
    * List all keys in any app's namespace (superuser only)
    */
   "db/list/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string };
     response: { keys: string[] };
@@ -376,7 +376,7 @@ export interface FileCommands {
    * Get the default handler app for a file path
    */
   "file/get-handler": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: { appId: string | undefined };
@@ -385,7 +385,7 @@ export interface FileCommands {
    * Set user preference for a file path's default handler
    */
   "file/set-default-handler": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation;
     appId: string };
@@ -395,7 +395,7 @@ export interface FileCommands {
    * Remove user preference for a file path (revert to default)
    */
   "file/remove-default-handler": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: void;
@@ -404,7 +404,7 @@ export interface FileCommands {
    * Get all apps that can handle a specific file path
    */
   "file/get-supported-handlers": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: import("./index").FileHandlerInfo[];
@@ -413,7 +413,7 @@ export interface FileCommands {
    * Get all file type associations
    */
   "file/get-associations": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: Record<
       string,
@@ -427,22 +427,22 @@ export interface FileCommands {
  */
 export interface FilePickerCommands {
   "file-picker/register-display": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
   "file-picker/open": {
-    mode: "immediate";
+    mode: "result";
     args: import("./index").FilePickerOpenArgs & { };
     response: { requestId: string };
   };
   "file-picker/resolve": {
-    mode: "immediate";
+    mode: "result";
     args: import("./index").FilePickerResult & { };
     response: { success: boolean };
   };
   "file-picker/close": {
-    mode: "immediate";
+    mode: "result";
     args: {
     requestId?: string };
     response: { success: boolean };
@@ -454,7 +454,7 @@ export interface FilePickerCommands {
  */
 export interface FsCommands {
   "fs/volumes": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").FilesystemVolume[];
   };
@@ -471,7 +471,7 @@ export interface FsCommands {
    * Read the contents of a file.
    */
   "fs/read": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation;
     encoding?: string };
@@ -481,7 +481,7 @@ export interface FsCommands {
    * Read the raw contents of a file.
    */
   "fs/read-binary": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: Uint8Array;
@@ -490,7 +490,7 @@ export interface FsCommands {
    * Write content to a file, creating directories if needed.
    */
   "fs/write": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation;
     content: string;
@@ -501,7 +501,7 @@ export interface FsCommands {
    * Write raw bytes to a file, creating directories if needed.
    */
   "fs/write-binary": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation;
     content: Uint8Array };
@@ -511,7 +511,7 @@ export interface FsCommands {
    * Check if a file or directory exists.
    */
   "fs/exists": {
-    mode: "immediate";
+    mode: "result";
     args: { location: import("./index").FilesystemLocation };
     response: boolean;
   };
@@ -519,7 +519,7 @@ export interface FsCommands {
    * Create a directory and any necessary parent directories.
    */
   "fs/mkdir": {
-    mode: "immediate";
+    mode: "result";
     args: { location: import("./index").FilesystemLocation };
     response: void;
   };
@@ -527,7 +527,7 @@ export interface FsCommands {
    * List contents of a directory.
    */
   "fs/readdir": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: string[];
@@ -536,18 +536,18 @@ export interface FsCommands {
    * Get file or directory statistics.
    */
   "fs/stat": {
-    mode: "immediate";
+    mode: "result";
     args: { location: import("./index").FilesystemLocation };
     response: import("./index").FileStats;
   };
   "fs/watch": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: { watchId: string };
   };
   "fs/unwatch": {
-    mode: "immediate";
+    mode: "result";
     args: {
     watchId: string };
     response: void;
@@ -556,7 +556,7 @@ export interface FsCommands {
    * Resolve an Eden path to the underlying OS path.
    */
   "fs/resolve": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation };
     response: { realPath: string };
@@ -565,7 +565,7 @@ export interface FsCommands {
    * Search for files and directories using glob patterns.
    */
   "fs/search": {
-    mode: "immediate";
+    mode: "result";
     args: {
     location: import("./index").FilesystemLocation;
     pattern: string;
@@ -610,12 +610,12 @@ export interface FsCommands {
  */
 export interface I18nCommands {
   "i18n/get-locale": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { locale: string };
   };
   "i18n/get-common": {
-    mode: "immediate";
+    mode: "result";
     args: { locale: string };
     response: {
     translations: import("./index").RecursiveObject<string>;
@@ -628,21 +628,21 @@ export interface I18nCommands {
  */
 export interface EventCommands {
   "event/subscribe": {
-    mode: "immediate";
+    mode: "result";
     args: {
     eventName: string;
     operation?: import("./index").OperationObservation };
     response: void;
   };
   "event/unsubscribe": {
-    mode: "immediate";
+    mode: "result";
     args: {
     eventName: string;
     operation?: import("./index").OperationObservation };
     response: void;
   };
   "event/exists": {
-    mode: "immediate";
+    mode: "result";
     args: { eventName: string };
     response: boolean;
   };
@@ -656,7 +656,7 @@ export interface NotificationCommands {
    * Register the notification display provider.
    */
   "notification/register-display": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
@@ -664,7 +664,7 @@ export interface NotificationCommands {
    * Push a new notification to subscribers.
    */
   "notification/push": {
-    mode: "immediate";
+    mode: "result";
     args: {
     title: string;
     message: string;
@@ -677,7 +677,7 @@ export interface NotificationCommands {
    * Report a notification action click from the toaster.
    */
   "notification/action-clicked": {
-    mode: "immediate";
+    mode: "result";
     args: {
     notificationId: string;
     actionId: string };
@@ -687,7 +687,7 @@ export interface NotificationCommands {
    * Report a notification dismissal from the toaster.
    */
   "notification/dismissed": {
-    mode: "immediate";
+    mode: "result";
     args: {
     notificationId: string };
     response: { success: boolean };
@@ -699,17 +699,17 @@ export interface NotificationCommands {
  */
 export interface OperationCommands {
   "operation/get": {
-    mode: "immediate";
+    mode: "result";
     args: { handle: import("./index").OperationHandle };
     response: import("./index").OperationSnapshot;
   };
   "operation/cancel": {
-    mode: "immediate";
+    mode: "result";
     args: { handle: import("./index").OperationHandle };
     response: void;
   };
   "operation/list": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").OperationSnapshot[];
   };
@@ -745,7 +745,7 @@ export interface PackageCommands {
    * @param showRestricted - If true, includes apps the current user cannot launch (hidden by default)
    */
   "package/list": {
-    mode: "immediate";
+    mode: "result";
     args: {
     showHidden?: boolean;
     showRestricted?: boolean };
@@ -755,7 +755,7 @@ export interface PackageCommands {
    * Identify the authenticated app and return its extension resources.
    */
   "package/self": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: import("./index").InstalledPackageInfo;
   };
@@ -763,7 +763,7 @@ export interface PackageCommands {
    * Get an installed package and any extension resources it owns.
    */
   "package/get": {
-    mode: "immediate";
+    mode: "result";
     args: {
     packageId: string };
     response: import("./index").InstalledPackageInfo;
@@ -772,7 +772,7 @@ export interface PackageCommands {
    * Toggle hot reload for an app
    */
   "package/toggle-hot-reload": {
-    mode: "immediate";
+    mode: "result";
     args: {
     packageId: string };
     response: { enabled: boolean };
@@ -781,7 +781,7 @@ export interface PackageCommands {
    * Check if hot reload is enabled for an app
    */
   "package/is-hot-reload-enabled": {
-    mode: "immediate";
+    mode: "result";
     args: {
     packageId: string };
     response: { enabled: boolean };
@@ -790,7 +790,7 @@ export interface PackageCommands {
    * Get the icon for an installed package as a data URL.
    */
   "package/get-icon": {
-    mode: "immediate";
+    mode: "result";
     args: {
     packageId: string };
     response: { icon: string | undefined };
@@ -799,7 +799,7 @@ export interface PackageCommands {
    * Get info about a package file without installing it
    */
   "package/get-info": {
-    mode: "immediate";
+    mode: "result";
     args: { location: import("./index").FilesystemLocation };
     response: {
     success: boolean;
@@ -812,7 +812,7 @@ export interface PackageCommands {
    * Get the installed size of a package in bytes.
    */
   "package/get-size": {
-    mode: "immediate";
+    mode: "result";
     args: {
     packageId: string };
     response: { size: number | undefined };
@@ -861,7 +861,7 @@ export interface ProcessCommands {
    * @param showHidden - If true, includes overlay apps (hidden by default)
    */
   "process/list": {
-    mode: "immediate";
+    mode: "result";
     args: { showHidden?: boolean };
     response: import("./index").AppInstance[];
   };
@@ -874,7 +874,7 @@ export interface ProcessCommands {
    * even before Electron has a full CPU interval
    */
   "process/metrics": {
-    mode: "immediate";
+    mode: "result";
     args: {
     showHidden?: boolean;
     pollingTimeoutMs?: number;
@@ -888,7 +888,7 @@ export interface ProcessCommands {
  */
 export interface SessionCommands {
   "session/get-current": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { user: import("./index").UserProfile | null };
   };
@@ -916,7 +916,7 @@ export interface SettingsCommands {
    * Get a setting value (scoped to caller's app)
    */
   "settings/get": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string;
     appId?: string };
@@ -926,7 +926,7 @@ export interface SettingsCommands {
    * Set a setting value (scoped to caller's app)
    */
   "settings/set": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string;
     value: string };
@@ -936,7 +936,7 @@ export interface SettingsCommands {
    * List all settings keys (scoped to caller's app)
    */
   "settings/list": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { keys: string[] };
   };
@@ -944,7 +944,7 @@ export interface SettingsCommands {
    * Get all settings with values (scoped to caller's app)
    */
   "settings/get-all": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { settings: Record<string, string> };
   };
@@ -952,7 +952,7 @@ export interface SettingsCommands {
    * Reset a setting to default (scoped to caller's app)
    */
   "settings/reset": {
-    mode: "immediate";
+    mode: "result";
     args: {
     key: string;
     schema?: import("./index").SettingsCategory[] };
@@ -962,7 +962,7 @@ export interface SettingsCommands {
    * Get a setting from any app's namespace (superuser only)
    */
   "settings/get/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string };
@@ -972,7 +972,7 @@ export interface SettingsCommands {
    * Set a setting in any app's namespace (superuser only)
    */
   "settings/set/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string;
@@ -984,7 +984,7 @@ export interface SettingsCommands {
    * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   "settings/list/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     showRestricted?: boolean };
@@ -995,7 +995,7 @@ export interface SettingsCommands {
    * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
    */
   "settings/get-all/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     showRestricted?: boolean };
@@ -1005,7 +1005,7 @@ export interface SettingsCommands {
    * Reset a setting for any app (superuser only)
    */
   "settings/reset/su": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     key: string;
@@ -1016,7 +1016,7 @@ export interface SettingsCommands {
    * List the settings panels visible to the active user.
    */
   "settings/panels": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { panels: import("./index").SettingsPanelSummary[] };
   };
@@ -1024,7 +1024,7 @@ export interface SettingsCommands {
    * Load one complete authorized panel snapshot.
    */
   "settings/panel": {
-    mode: "immediate";
+    mode: "result";
     args: { panelId: string };
     response: import("./index").SettingsPanelResponse;
   };
@@ -1032,7 +1032,7 @@ export interface SettingsCommands {
    * Invoke one declared panel-private action.
    */
   "settings/action": {
-    mode: "immediate";
+    mode: "result";
     args: {
     panelId: string;
     actionId: string;
@@ -1046,7 +1046,7 @@ export interface SettingsCommands {
  */
 export interface UserCommands {
   "user/grant-options": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").UserGrantOptionsResponse;
   };
@@ -1054,7 +1054,7 @@ export interface UserCommands {
    * List all users.
    */
   "user/list": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { users: import("./index").UserProfile[] };
   };
@@ -1062,7 +1062,7 @@ export interface UserCommands {
    * Create a new user.
    */
   "user/create": {
-    mode: "immediate";
+    mode: "result";
     args: {
     username?: string;
     name: string;
@@ -1076,7 +1076,7 @@ export interface UserCommands {
    * Update user profile details or grants.
    */
   "user/update": {
-    mode: "immediate";
+    mode: "result";
     args: {
     username: string;
     name?: string;
@@ -1089,7 +1089,7 @@ export interface UserCommands {
    * Delete a user.
    */
   "user/delete": {
-    mode: "immediate";
+    mode: "result";
     args: {
     username: string };
     response: { success: boolean };
@@ -1098,7 +1098,7 @@ export interface UserCommands {
    * Set a user's password.
    */
   "user/set-password": {
-    mode: "immediate";
+    mode: "result";
     args: {
     username: string;
     password: string };
@@ -1108,7 +1108,7 @@ export interface UserCommands {
    * Change the current user's password.
    */
   "user/change-password": {
-    mode: "immediate";
+    mode: "result";
     args: {
     currentPassword: string;
     newPassword: string };
@@ -1118,7 +1118,7 @@ export interface UserCommands {
    * Check whether the current user has a specific grant.
    */
   "user/has-grant": {
-    mode: "immediate";
+    mode: "result";
     args: { grant: string };
     response: { allowed: boolean };
   };
@@ -1126,7 +1126,7 @@ export interface UserCommands {
    * Return the configured default username.
    */
   "user/get-default": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { username: string | null };
   };
@@ -1134,7 +1134,7 @@ export interface UserCommands {
    * Update the configured default username.
    */
   "user/set-default": {
-    mode: "immediate";
+    mode: "result";
     args: {
     username: string | null };
     response: { success: boolean };
@@ -1149,7 +1149,7 @@ export interface ViewCommands {
    * Update bounds for the caller's own view.
    */
   "view/update-bounds": {
-    mode: "immediate";
+    mode: "result";
     args: {
     bounds: import("./index").ViewBounds };
     response: { success: boolean };
@@ -1159,7 +1159,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission.
    */
   "view/update-view-bounds": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     bounds: import("./index").ViewBounds };
@@ -1169,7 +1169,7 @@ export interface ViewCommands {
    * Show or hide the caller's own view.
    */
   "view/set-visibility": {
-    mode: "immediate";
+    mode: "result";
     args: {
     visible: boolean };
     response: { success: boolean };
@@ -1179,7 +1179,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission.
    */
   "view/set-view-visibility": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     visible: boolean };
@@ -1189,7 +1189,7 @@ export interface ViewCommands {
    * Bring caller's own view to the front and focus it.
    */
   "view/focus": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
@@ -1198,7 +1198,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission.
    */
   "view/focus-view": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string };
     response: { success: boolean };
@@ -1208,7 +1208,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission for app callers.
    */
   "view/update-global-bounds": {
-    mode: "immediate";
+    mode: "result";
     args: {
     bounds: import("./index").ViewBounds;
     windowSize: import("./index").WindowSize };
@@ -1218,7 +1218,7 @@ export interface ViewCommands {
    * Toggle caller's own view between floating and tiled window modes.
    */
   "view/toggle-mode": {
-    mode: "immediate";
+    mode: "result";
     args: {
     mode?: "floating" | "tiled" };
     response: { success: boolean };
@@ -1228,7 +1228,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission.
    */
   "view/toggle-view-mode": {
-    mode: "immediate";
+    mode: "result";
     args: {
     appId: string;
     mode?: "floating" | "tiled" };
@@ -1238,7 +1238,7 @@ export interface ViewCommands {
    * Get adjacent tiled windows for the caller's app-frame layout controls.
    */
   "view/tile-layout-state": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: import("./index").TileLayoutState;
   };
@@ -1246,7 +1246,7 @@ export interface ViewCommands {
    * Swap the caller with the tiled window on one edge.
    */
   "view/swap-tile": {
-    mode: "immediate";
+    mode: "result";
     args: {
     direction: import("./index").TileLayoutDirection };
     response: import("./index").TileLayoutState;
@@ -1255,7 +1255,7 @@ export interface ViewCommands {
    * Temporarily cover the tiled window on one edge with the caller.
    */
   "view/expand-tile": {
-    mode: "immediate";
+    mode: "result";
     args: {
     direction: import("./index").TileLayoutDirection };
     response: import("./index").TileLayoutState;
@@ -1264,7 +1264,7 @@ export interface ViewCommands {
    * Start dragging caller's own view.
    */
   "view/start-drag": {
-    mode: "immediate";
+    mode: "result";
     args: {
     startX: number;
     startY: number };
@@ -1274,7 +1274,7 @@ export interface ViewCommands {
    * End drag operation for caller's own view.
    */
   "view/end-drag": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
@@ -1283,7 +1283,7 @@ export interface ViewCommands {
    * Requires "view/manage" permission for app callers.
    */
   "view/global-mouseup": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { success: boolean };
   };
@@ -1291,7 +1291,7 @@ export interface ViewCommands {
    * Start resizing caller's own view.
    */
   "view/start-resize": {
-    mode: "immediate";
+    mode: "result";
     args: {
     startX: number;
     startY: number;
@@ -1302,7 +1302,7 @@ export interface ViewCommands {
    * End resize operation for caller's own view.
    */
   "view/end-resize": {
-    mode: "immediate";
+    mode: "result";
     args: { };
     response: { success: boolean };
   };
@@ -1310,7 +1310,7 @@ export interface ViewCommands {
    * Get the current dimensions of the main window.
    */
   "view/window-size": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: import("./index").WindowSize;
   };
@@ -1319,7 +1319,7 @@ export interface ViewCommands {
    * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
    */
   "view/set-interface-scale": {
-    mode: "immediate";
+    mode: "result";
     args: {
     scale: string };
     response: { success: boolean };
@@ -1328,7 +1328,7 @@ export interface ViewCommands {
    * Get the current interface scale.
    */
   "view/get-interface-scale": {
-    mode: "immediate";
+    mode: "result";
     args: Record<string, never>;
     response: { scale: number };
   };

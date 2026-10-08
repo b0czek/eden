@@ -17,7 +17,7 @@ export interface CommandInfo {
   command: string;
   argsType: string;
   returnType: string;
-  mode: "immediate" | "operation";
+  mode: "result" | "operation";
   docs: string[];
 }
 
@@ -28,7 +28,7 @@ export interface NamespaceCommands {
     command: string;
     argsType: string;
     returnType: string;
-    mode: "immediate" | "operation";
+    mode: "result" | "operation";
     docs: string[];
   }>;
 }
@@ -99,7 +99,7 @@ export function extractCommandHandlers(
         }
 
         const options = args[1];
-        let mode: "immediate" | "operation" = "immediate";
+        let mode: "result" | "operation" = "result";
         if (options && Node.isObjectLiteralExpression(options)) {
           const property = options.getProperty("mode");
           if (property && Node.isPropertyAssignment(property)) {
@@ -110,7 +110,7 @@ export function extractCommandHandlers(
             }
           }
         }
-        if (mode !== "immediate") {
+        if (mode !== "result") {
           if (!returnTypeNode || !Node.isTypeReference(returnTypeNode)) {
             throw new Error(
               `${namespace}/${commandName} requires an explicit task type`,
@@ -204,7 +204,7 @@ export function generateCommandsCode(
       lines.push(`  "${ns.namespace}/${cmd.command}": {`);
       lines.push(`    mode: "${cmd.mode}";`);
       lines.push(`    args: ${argsType};`);
-      if (cmd.mode === "immediate") {
+      if (cmd.mode === "result") {
         lines.push(`    response: ${returnType};`);
       } else {
         lines.push(

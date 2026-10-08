@@ -36,7 +36,7 @@ export interface CommandMetadata {
   command: string;
   handler: CommandHandler;
   target: object; // The instance that owns the handler
-  mode: "immediate" | "operation";
+  mode: "result" | "operation";
   permission?: string; // Full permission: "namespace/action"
   methodName: string; // Original method name for metadata lookup
 }
@@ -97,8 +97,8 @@ export class CommandRegistry {
           "eden:handler:mode",
           target.constructor.prototype,
           methodName,
-        ) ?? "immediate")
-      : "immediate";
+        ) ?? "result")
+      : "result";
 
     this.handlers.set(fullCommand, {
       mode,

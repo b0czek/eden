@@ -362,10 +362,10 @@ This provides type declarations for `worker.edenAPI`, `worker.appBus`, and `work
 
 ## Operations
 
-Commands declare a communication mode. Immediate commands return their result
-from `shellCommand`. Operation commands return a typed
-operation object after validation and authorization. Eden executes accepted work independently
-of the submitting view or backend and retains its status and completion.
+Commands declare a mode: `result` (the default) or `operation`. Result commands
+complete before `shellCommand` resolves with their result. Operation commands return
+a typed operation object after validation and authorization. Eden executes accepted
+work independently of the submitting view or backend and retains its status and completion.
 
 ```typescript
 const copy = await window.edenAPI.shellCommand(

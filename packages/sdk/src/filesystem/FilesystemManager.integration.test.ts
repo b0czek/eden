@@ -74,7 +74,7 @@ describe("FilesystemManager native watch integration", () => {
       args,
     )) as
       | { mode: "operation"; handle: OperationHandle }
-      | { mode: "immediate"; result: unknown };
+      | { mode: "result"; result: unknown };
     const result =
       response.mode === "operation" ? response.handle : response.result;
     return command === "fs/mv"

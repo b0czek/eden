@@ -11,7 +11,7 @@ import { CommandRegistry } from "./CommandRegistry";
 
 class DeadlineFixture {
   constructor(private completion: Promise<string>) {}
-  immediate(): Promise<string> {
+  result(): Promise<string> {
     return this.completion;
   }
   operation(): OperationTask<string> {
@@ -20,7 +20,7 @@ class DeadlineFixture {
 }
 EdenNamespace("deadline-test")(DeadlineFixture);
 for (const [method, mode] of [
-  ["immediate", "immediate"],
+  ["result", "result"],
   ["operation", "operation"],
 ] as const) {
   EdenHandler(method, { mode })(
@@ -84,13 +84,13 @@ describe("one bounded IPC deadline", () => {
       {},
     );
 
-  it("enforces ten seconds for immediate responses", async () => {
+  it("enforces ten seconds for result responses", async () => {
     let settled = false;
-    const request = invoke("immediate").finally(() => {
+    const request = invoke("result").finally(() => {
       settled = true;
     });
     const rejection = expect(request).rejects.toThrow(
-      "Command 'deadline-test/immediate' timed out",
+      "Command 'deadline-test/result' timed out",
     );
     await jest.advanceTimersByTimeAsync(9999);
     expect(settled).toBe(false);
@@ -113,8 +113,8 @@ describe("one bounded IPC deadline", () => {
     await expect(manager.wait(handle, caller)).resolves.toBe("finished");
   });
 
-  it("rejects pending immediate responses when the runtime is disposed", async () => {
-    const request = invoke("immediate");
+  it("rejects pending result responses when the runtime is disposed", async () => {
+    const request = invoke("result");
     const rejection = expect(request).rejects.toThrow("Eden runtime disposed");
     jest.useRealTimers();
     await eden.runtime.dispose();

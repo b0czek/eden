@@ -11,7 +11,6 @@ export type {
   FilesystemVolumeKind,
   FilesystemVolumeRegistration,
   FilesystemVolumeState,
-  ImmediateCommand,
   OperationCancellation,
   OperationCommand,
   OperationCompletion,
@@ -22,6 +21,7 @@ export type {
   OperationSnapshot,
   OperationSubmission,
   OperationsAPI,
+  ResultCommand,
 } from "@edenapp/types";
 export * from "./api";
 export { Eden } from "./Eden";

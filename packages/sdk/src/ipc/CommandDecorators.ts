@@ -85,8 +85,8 @@ export interface EdenHandlerOptions {
    */
   permission?: string;
 
-  /** Communication mode. */
-  mode?: "immediate" | "operation";
+  /** Return the completed result or an operation with completion controls. */
+  mode?: "result" | "operation";
 
   /**
    * User grant required to execute this handler.
@@ -111,7 +111,7 @@ export function EdenHandler(command: string, options?: EdenHandlerOptions) {
 
     Reflect.defineMetadata(
       "eden:handler:mode",
-      options?.mode ?? "immediate",
+      options?.mode ?? "result",
       target,
       propertyKey,
     );

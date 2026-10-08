@@ -2,11 +2,11 @@ import type {
   CommandCompletion,
   CommandResponse,
   CommandResult,
-  ImmediateCommand,
   Operation,
   OperationCommand,
   OperationCompletion,
   OperationHandle,
+  ResultCommand,
   SystemInfo,
 } from "@edenapp/types";
 
@@ -37,7 +37,7 @@ type Contracts = [
   Assert<Equal<OperationCompletion<string>, unknown>>,
   Assert<Equal<CommandResult<"system/info">, SystemInfo>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
-  Assert<Equal<ImmediateCommand<{}, string>["response"], string>>,
+  Assert<Equal<ResultCommand<{}, string>["response"], string>>,
   Assert<
     Equal<
       OperationCommand<{}, number, "copy">["response"],

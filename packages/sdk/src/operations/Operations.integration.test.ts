@@ -585,7 +585,7 @@ describe("runtime-owned operations", () => {
         args,
       )) as
         | { mode: "operation"; handle: OperationHandle }
-        | { mode: "immediate"; result: unknown };
+        | { mode: "result"; result: unknown };
       return response.mode === "operation" ? response : response.result;
     };
     for (const id of [owner.appId, "other.app"]) {

@@ -39,7 +39,7 @@ export type CommandResult<T extends CommandName> = T extends CommandName
     : CommandResponse<T>
   : never;
 
-/** Eventual completion; immediate commands have no separate completion. */
+/** Eventual completion; result commands have no separate completion. */
 export type CommandCompletion<T extends CommandName> = CommandMap[T] extends {
   completion: infer R;
 }

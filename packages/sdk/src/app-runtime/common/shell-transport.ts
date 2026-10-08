@@ -11,7 +11,7 @@ import type {
 export type ShellCommandResponse<C extends CommandName> = C extends CommandName
   ? CommandMap[C]["mode"] extends "operation"
     ? { mode: "operation"; handle: OperationHandle<C> }
-    : { mode: "immediate"; result: CommandResponse<C> }
+    : { mode: "result"; result: CommandResponse<C> }
   : never;
 
 export interface ShellTransport {

@@ -596,7 +596,7 @@ describe("consumer-managed filesystem volumes", () => {
         view.view.webContents.id,
         command,
         args,
-      )) as { mode: "immediate"; result: unknown };
+      )) as { mode: "result"; result: unknown };
       return response.result;
     };
     await invoke(providerId, "file-picker/register-display", {});
@@ -849,7 +849,7 @@ describe("consumer-managed filesystem volumes", () => {
           args,
         )) as
           | { mode: "operation"; handle: OperationHandle }
-          | { mode: "immediate"; result: unknown };
+          | { mode: "result"; result: unknown };
         const result =
           response.mode === "operation" ? response.handle : response.result;
         return command === "fs/eject"
