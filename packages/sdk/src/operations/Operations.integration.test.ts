@@ -301,6 +301,37 @@ describe("runtime-owned operations", () => {
     ).resolves.toBe("changed");
   });
 
+  it("holds a session reservation until the enclosing operation completes", async () => {
+    const transitioned = gate();
+    const blocked = gate();
+    register(() =>
+      operationTask(
+        async () => {
+          await eden.runtime.resolve(SessionManager).logout();
+          transitioned.release();
+          await blocked.promise;
+          return "done";
+        },
+        { transition: "session" },
+      ),
+    );
+    const handle = await submit();
+    try {
+      await transitioned.promise;
+      expect(manager.get(handle, owner).status).toBe("running");
+      await expect(submit()).rejects.toThrow("draining");
+      await expect(
+        eden.runtime.resolve(SessionManager).logout(),
+      ).rejects.toThrow("already in progress");
+    } finally {
+      blocked.release();
+    }
+    await expect(manager.wait(handle, owner)).resolves.toBe("done");
+    await expect(
+      eden.runtime.resolve(SessionManager).logout(),
+    ).resolves.toBeUndefined();
+  });
+
   it("drains accepted work before runtime resource disposal", async () => {
     const blocked = gate();
     register(() =>

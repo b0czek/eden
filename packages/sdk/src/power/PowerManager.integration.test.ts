@@ -3,6 +3,7 @@ import type { OperationHandle } from "@edenapp/types";
 import { OperationManager } from "../operations/OperationManager";
 import { operationTask } from "../operations/OperationTask";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
+import { PowerManager } from "./PowerManager";
 
 describe("PowerManager integration", () => {
   let eden: TestEden;
@@ -56,5 +57,54 @@ describe("PowerManager integration", () => {
       phase: "host-handoff",
     });
     expect(handoffs).toBe(2);
+  });
+
+  it("keeps admission closed after a failed handoff until its operation settles", async () => {
+    eden = await createTestEden({
+      config: {
+        powerProvider: {
+          poweroff: async () => {
+            throw new Error("Host refused poweroff");
+          },
+        },
+      },
+    });
+    const manager = eden.runtime.resolve(OperationManager);
+    const power = eden.runtime.resolve(PowerManager);
+    let handoffFailed!: () => void;
+    const failed = new Promise<void>((resolve) => {
+      handoffFailed = resolve;
+    });
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const handle = manager.submit("integration/power-handoff", {}, {}, () =>
+      operationTask(
+        async () => {
+          try {
+            await power.power({ action: "poweroff" });
+          } catch (error) {
+            handoffFailed();
+            await blocked;
+            throw error;
+          }
+        },
+        { transition: "runtime" },
+      ),
+    );
+    try {
+      await failed;
+      expect(manager.get(handle).status).toBe("running");
+      await expect(
+        eden.execute("system/power", { action: "poweroff" }),
+      ).rejects.toThrow("draining");
+    } finally {
+      release();
+    }
+    await expect(manager.wait(handle)).rejects.toThrow("Host refused poweroff");
+    await expect(eden.complete("session/logout")).resolves.toEqual({
+      success: true,
+    });
   });
 });

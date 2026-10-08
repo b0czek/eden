@@ -388,10 +388,12 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     const sessionId = this.session.getSessionId();
     const operationId = this.execution.get()?.operationId;
     const reserved = this.closedSessions.get(sessionId);
-    if (!this.accepting && (!operationId || reserved !== operationId))
-      throw new Error("Runtime operations are draining");
-    if (reserved && reserved !== operationId)
+    if (reserved) {
+      // Accepted transitions are drained and released by execute().
+      if (reserved === operationId) return task();
       throw new Error("A session transition is already in progress");
+    }
+    if (!this.accepting) throw new Error("Runtime operations are draining");
     const reservation = operationId ?? randomUUID();
     this.closedSessions.set(sessionId, reservation);
     try {
@@ -405,10 +407,12 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
 
   async withRuntimeTransition<T>(task: () => Promise<T>): Promise<T> {
     const operationId = this.execution.get()?.operationId;
-    if (this.runtimeTransition && this.runtimeTransition !== operationId)
+    if (this.runtimeTransition) {
+      // Accepted transitions are drained and released by execute().
+      if (this.runtimeTransition === operationId) return task();
       throw new Error("A runtime transition is already in progress");
-    if (!this.accepting && this.runtimeTransition !== operationId)
-      throw new Error("Runtime operations are draining");
+    }
+    if (!this.accepting) throw new Error("Runtime operations are draining");
     const reservation = operationId ?? randomUUID();
     this.runtimeTransition = reservation;
     this.accepting = false;
