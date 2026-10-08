@@ -20,11 +20,6 @@ export interface OperationCommand<A, R, C extends string = string> {
   completion: R;
 }
 
-/** Request cancellation; observe the operation until cleanup completes. */
-export interface OperationCancellation {
-  cancel(handle: OperationHandle): Promise<void>;
-}
-
 export interface OperationSubmission {
   requestKey?: string;
 }
@@ -92,18 +87,8 @@ export interface Operation<C extends string = string> {
   cancel(): Promise<void>;
 }
 
-export interface OperationsAPI extends OperationCancellation {
+export interface OperationsAPI {
   /** Restore app-side controls for a retained or shared handle. */
   from<C extends string>(handle: OperationHandle<C>): Operation<C>;
-  get<C extends string>(
-    handle: OperationHandle<C>,
-  ): Promise<OperationSnapshot<C, OperationCompletion<C>>>;
   list(): Promise<OperationSnapshot[]>;
-  watch<C extends string>(
-    handle: OperationHandle<C>,
-    listener: (snapshot: OperationSnapshot<C, OperationCompletion<C>>) => void,
-  ): Promise<() => void>;
-  wait<C extends string>(
-    handle: OperationHandle<C>,
-  ): Promise<OperationCompletion<C>>;
 }

@@ -281,16 +281,14 @@ describe("client subscriptions across renderer IPC", () => {
         broken.push(snapshot.revision);
         throw new Error("Operation listener failed");
       };
-      const stopBroken = await api.operations.watch(
-        operation.handle,
-        kind === "async" ? async (snapshot) => fail(snapshot) : fail,
-      );
-      const stopHealthy = await api.operations.watch(
-        operation.handle,
-        (snapshot) => {
+      const stopBroken = await api.operations
+        .from(operation.handle)
+        .watch(kind === "async" ? async (snapshot) => fail(snapshot) : fail);
+      const stopHealthy = await api.operations
+        .from(operation.handle)
+        .watch((snapshot) => {
           healthy.push(snapshot.revision);
-        },
-      );
+        });
       try {
         await tick();
         expect(broken).toEqual(healthy);
@@ -299,7 +297,7 @@ describe("client subscriptions across renderer IPC", () => {
         await tick();
         expect(broken).toEqual(healthy);
         expect(healthy).toHaveLength(2);
-        const completion = api.operations.wait(operation.handle);
+        const completion = api.operations.from(operation.handle).result();
         operation.finish();
         await expect(completion).resolves.toBe("watch-failure-" + kind);
         await tick();
@@ -322,16 +320,17 @@ describe("client subscriptions across renderer IPC", () => {
     await Promise.all([watched.started, waited.started, ignored.started]);
     const first: OperationSnapshot[] = [];
     const second: OperationSnapshot[] = [];
-    const stopFirst = await api.operations.watch(watched.handle, (snapshot) => {
-      first.push(snapshot);
-    });
-    const stopSecond = await api.operations.watch(
-      watched.handle,
-      (snapshot) => {
+    const stopFirst = await api.operations
+      .from(watched.handle)
+      .watch((snapshot) => {
+        first.push(snapshot);
+      });
+    const stopSecond = await api.operations
+      .from(watched.handle)
+      .watch((snapshot) => {
         second.push(snapshot);
-      },
-    );
-    const completion = api.operations.wait(waited.handle);
+      });
+    const completion = api.operations.from(waited.handle).result();
     await tick();
     const initialRevision = manager.get(watched.handle, owner).revision;
     watched.update("copying");
@@ -380,7 +379,9 @@ describe("client subscriptions across renderer IPC", () => {
     ]);
     stopSecond();
     await tick();
-    await expect(api.operations.wait(ignored.handle)).resolves.toBe("ignored");
+    await expect(api.operations.from(ignored.handle).result()).resolves.toBe(
+      "ignored",
+    );
   });
 
   it("returns bound operation controls and restores them from a retained handle", async () => {
@@ -490,7 +491,7 @@ describe("client subscriptions across renderer IPC", () => {
     };
     await api.subscribe("operation/changed", callback);
     const targeted: OperationSnapshot[] = [];
-    const stop = await api.operations.watch(watched.handle, (snapshot) => {
+    const stop = await api.operations.from(watched.handle).watch((snapshot) => {
       targeted.push(snapshot);
     });
     watched.update("copying");
@@ -522,7 +523,7 @@ describe("client subscriptions across renderer IPC", () => {
       () => operationTask(async () => "private"),
     );
     await expect(
-      api.operations.watch(foreign, () => undefined),
+      api.operations.from(foreign).watch(() => undefined),
     ).rejects.toThrow("access denied");
     await expect(
       api.shellCommand("event/subscribe", {

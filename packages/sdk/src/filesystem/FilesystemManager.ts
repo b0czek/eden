@@ -122,11 +122,6 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     return this.volumes.prepareEject(id);
   }
 
-  async ejectVolume(id: string): Promise<void> {
-    this.requirePrincipal();
-    await this.volumes.eject(id);
-  }
-
   /** Hold access until the consumer finishes I/O at the resolved host path. */
   async withVolume<T>(
     location: FilesystemLocation,

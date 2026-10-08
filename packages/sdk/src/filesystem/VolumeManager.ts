@@ -203,10 +203,6 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     });
   }
 
-  async eject(id: string): Promise<void> {
-    await this.prepareEject(id).run({ update: () => undefined });
-  }
-
   private admit(ids: string[]): {
     context: Map<string, VolumeLease>;
     release: () => void;

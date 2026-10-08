@@ -10,7 +10,6 @@ export interface OperationTask<R> {
   run(reporter: OperationReporter): Promise<R>;
   cancellable?: boolean;
   transition?: "session" | "runtime";
-  isFailure?(result: R): boolean;
 }
 
 export function operationTask<R>(

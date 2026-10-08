@@ -11,7 +11,6 @@ export type {
   FilesystemVolumeKind,
   FilesystemVolumeRegistration,
   FilesystemVolumeState,
-  OperationCancellation,
   OperationCommand,
   OperationCompletion,
   OperationError,

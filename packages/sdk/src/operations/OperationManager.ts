@@ -195,13 +195,12 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
             this.update(record, { phase, progress: structuredClone(progress) });
         },
       });
-      const failed = task.isFailure
-        ? task.isFailure(result)
-        : result === false ||
-          (result !== null &&
-            typeof result === "object" &&
-            "success" in result &&
-            result.success === false);
+      const failed =
+        result === false ||
+        (result !== null &&
+          typeof result === "object" &&
+          "success" in result &&
+          result.success === false);
       if (failed) {
         const message =
           result &&

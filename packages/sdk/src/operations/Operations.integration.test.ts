@@ -165,12 +165,12 @@ describe("runtime-owned operations", () => {
         );
       },
     });
-    await expect(api.wait(handle)).resolves.toBe("done");
+    await expect(api.from(handle).result()).resolves.toBe("done");
     expect(callbacks.size).toBe(0);
     const revisions: number[] = [];
-    const stop = await api.watch(handle, (snapshot) =>
-      revisions.push(snapshot.revision),
-    );
+    const stop = await api
+      .from(handle)
+      .watch((snapshot) => revisions.push(snapshot.revision));
     for (const callback of callbacks)
       callback({
         snapshot: { ...completed, revision: completed.revision - 1 },

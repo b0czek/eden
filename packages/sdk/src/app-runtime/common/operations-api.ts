@@ -74,64 +74,60 @@ export function createOperationsAPI(
       throw error;
     }
   };
-  const operations: OperationsAPI = {
+  const wait = async <C extends string>(
+    handle: OperationHandle<C>,
+  ): Promise<OperationCompletion<C>> => {
+    let settle!: (
+      snapshot: OperationSnapshot<C, OperationCompletion<C>>,
+    ) => void;
+    const terminal = new Promise<OperationSnapshot<C, OperationCompletion<C>>>(
+      (resolve) => {
+        settle = resolve;
+      },
+    );
+    const stop = await observe(
+      handle,
+      (snapshot) => {
+        if (
+          snapshot.status === "succeeded" ||
+          snapshot.status === "failed" ||
+          snapshot.status === "cancelled"
+        )
+          settle(snapshot);
+      },
+      true,
+    );
+    try {
+      const snapshot = await terminal;
+      if (snapshot.status === "succeeded") return snapshot.result;
+      if (snapshot.status === "cancelled") {
+        const error = new Error("Operation cancelled");
+        error.name = "AbortError";
+        throw error;
+      }
+      if (snapshot.status === "failed") {
+        if ("response" in snapshot)
+          return snapshot.response as OperationCompletion<C>;
+        const error = new Error(snapshot.error.message);
+        error.name = snapshot.error.name;
+        throw error;
+      }
+      throw new Error("Operation has not completed");
+    } finally {
+      stop();
+    }
+  };
+  return {
     from: (handle) => {
       const target = { command: handle.command, id: handle.id };
       return {
         handle: { ...target },
         get: () => get(target),
         watch: (listener) => observe(target, listener),
-        result: () => operations.wait(target),
-        cancel: () => operations.cancel(target),
+        result: () => wait(target),
+        cancel: () => api.shellCommand("operation/cancel", { handle: target }),
       };
     },
-    get,
-    cancel: (handle) => api.shellCommand("operation/cancel", { handle }),
     list: () => api.shellCommand("operation/list", {}),
-    watch: observe,
-    wait: async <C extends string>(
-      handle: OperationHandle<C>,
-    ): Promise<OperationCompletion<C>> => {
-      let settle!: (
-        snapshot: OperationSnapshot<C, OperationCompletion<C>>,
-      ) => void;
-      const terminal = new Promise<
-        OperationSnapshot<C, OperationCompletion<C>>
-      >((resolve) => {
-        settle = resolve;
-      });
-      const stop = await observe(
-        handle,
-        (snapshot) => {
-          if (
-            snapshot.status === "succeeded" ||
-            snapshot.status === "failed" ||
-            snapshot.status === "cancelled"
-          )
-            settle(snapshot);
-        },
-        true,
-      );
-      try {
-        const snapshot = await terminal;
-        if (snapshot.status === "succeeded") return snapshot.result;
-        if (snapshot.status === "cancelled") {
-          const error = new Error("Operation cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-        if (snapshot.status === "failed") {
-          if ("response" in snapshot)
-            return snapshot.response as OperationCompletion<C>;
-          const error = new Error(snapshot.error.message);
-          error.name = snapshot.error.name;
-          throw error;
-        }
-        throw new Error("Operation has not completed");
-      } finally {
-        stop();
-      }
-    },
   };
-  return operations;
 }

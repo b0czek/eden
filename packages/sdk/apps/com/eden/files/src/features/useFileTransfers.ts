@@ -60,9 +60,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
   );
   const observed = createOperation();
   const [cancelling, setCancelling] = createSignal(false);
-  let cancelRequested = false;
   const resetCancellation = () => {
-    cancelRequested = false;
     setCancelling(false);
   };
   const busy = createMemo(() => progress() !== null);
@@ -127,7 +125,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
 
     try {
       for (let index = 0; index < items.length; index += 1) {
-        if (disposed || cancelRequested) break;
+        if (disposed || cancelling()) break;
         const item = items[index];
         setProgress({
           operation,
@@ -209,7 +207,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
             }
           }
 
-          if (disposed || cancelRequested) break;
+          if (disposed || cancelling()) break;
           if (operation === "copy") {
             await observed.run(() =>
               window.edenAPI.shellCommand("fs/cp", {
@@ -281,7 +279,7 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     const failures: TransferFailure[] = [];
     try {
       for (let index = 0; index < items.length; index += 1) {
-        if (disposed || cancelRequested) break;
+        if (disposed || cancelling()) break;
         const item = items[index];
         setProgress({
           operation: "delete",
@@ -326,7 +324,6 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
         return;
       }
       if (progress()?.operation !== "copy" || cancelling()) return;
-      cancelRequested = true;
       setCancelling(true);
       void observed.cancel().catch((error: Error) => {
         resetCancellation();
