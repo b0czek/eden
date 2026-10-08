@@ -412,9 +412,14 @@ after reopening in the same login session.
 Other apps and sessions cannot inspect them or receive their changes. Hosts can
 use `eden.operations.get`, `list`, and `onChanged` for privileged read-only
 observation. Accepted work drains before session changes and runtime shutdown.
-Completed records remain in memory for fifteen minutes, subject to a runtime-wide
-limit of 256 completed records. Active records remain until completion. Operation
-handles live for one Eden runtime.
+
+Each app and the host get 32 reserved slots, share 256 burst slots, and can hold
+128 records each. Quotas span login sessions and count active and completed records.
+Full capacity rejects new work; matching retained request keys still deduplicate.
+
+Active records stay until completion. Results and request keys remain in memory for
+fifteen minutes afterward, without early eviction. Expired keys can start new work.
+Operation handles live for one Eden runtime.
 
 IPC responses have a ten-second deadline. Accepted operation execution has no
 transport deadline.

@@ -24,6 +24,7 @@ import { SessionManager } from "../session/SessionManager";
 import { createTestEden, type TestEden } from "../testing/createTestEden";
 import { ViewManager } from "../view-manager/ViewManager";
 import { OperationManager } from "./OperationManager";
+import { OperationQuota } from "./OperationQuota";
 import {
   type OperationReporter,
   type OperationTask,
@@ -238,32 +239,186 @@ describe("runtime-owned operations", () => {
     expect(JSON.stringify(manager.get(thrown, owner))).not.toContain("stack");
   });
 
-  it("bounds completed retention without evicting active work and expires records", async () => {
+  it("reserves capacity before preparation and retains results and keys until expiry", async () => {
     const blocked = gate();
+    const now = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(now);
+    let preparations = 0;
+    register(({ value }) => {
+      preparations++;
+      return operationTask(async () => {
+        if (value === "active") await blocked.promise;
+        return value;
+      });
+    });
+    try {
+      const active = await submit("active", "active-key");
+      const handles: OperationHandle[] = [];
+      for (let i = 1; i < OperationQuota.perAppLimit; i++) {
+        const handle = await submit(String(i), `key-${i}`);
+        handles.push(handle);
+        await manager.wait(handle, owner);
+      }
+      await expect(submit("rejected")).rejects.toThrow("capacity exhausted");
+      expect(preparations).toBe(OperationQuota.perAppLimit);
+      expect(await submit("active", "active-key")).toEqual(active);
+      expect(await submit("1", "key-1")).toEqual(handles[0]);
+      await expect(submit("different", "key-1")).rejects.toThrow(
+        "different command or arguments",
+      );
+      // Session changes cannot multiply an app's allowance.
+      await expect(
+        eden.runtime
+          .resolve(CommandRegistry)
+          .execute(
+            "integration/work",
+            { value: "other-session" },
+            { ...owner, sessionId: "other-session" },
+          ),
+      ).rejects.toThrow("capacity exhausted");
+      clock.mockReturnValue(now + OperationManager.retentionMs - 1);
+      expect(manager.list(owner)).toHaveLength(OperationQuota.perAppLimit);
+      expect(await manager.wait(handles[0], owner)).toBe("1");
+      await expect(submit("still-full")).rejects.toThrow("capacity exhausted");
+      clock.mockReturnValue(now + OperationManager.retentionMs);
+      expect(manager.list(owner)).toHaveLength(1);
+      expect(manager.get(active, owner).status).toBe("running");
+      expect(() => manager.get(handles[0], owner)).toThrow("not found");
+      const next = await submit("new-value", "key-1");
+      expect(next.id).not.toBe(handles[0].id);
+      await expect(manager.wait(next, owner)).resolves.toBe("new-value");
+      blocked.release();
+      await manager.wait(active, owner);
+      clock.mockReturnValue(now + 2 * OperationManager.retentionMs - 1);
+      expect(manager.get(active, owner).status).toBe("succeeded");
+      clock.mockReturnValue(now + 2 * OperationManager.retentionMs);
+      expect(manager.list(owner)).toEqual([]);
+    } finally {
+      clock.mockRestore();
+      blocked.release();
+    }
+  });
+
+  it("preserves app and host allowances with a full shared pool and reclaims expired burst capacity", async () => {
+    const blocked = gate();
+    const now = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(now);
     register(({ value }) =>
       operationTask(async () => {
         if (value === "active") await blocked.promise;
         return value;
       }),
     );
-    const active = await submit("active");
-    const handles: OperationHandle[] = [];
-    for (let i = 0; i < 258; i++) {
-      const handle = await submit(String(i));
-      handles.push(handle);
+    const callers = [
+      owner,
+      ...["busy.app", "burst.app", "quiet.app"].map((appId) => ({
+        ...owner,
+        appId,
+      })),
+    ];
+    for (const caller of callers)
+      eden.runtime
+        .resolve(PermissionRegistry)
+        .registerApp(caller.appId, ["integration/work"]);
+    const submitFor = (
+      caller: typeof owner | { principal: typeof owner.principal },
+      value = "active",
+    ) =>
+      eden.runtime
+        .resolve(CommandRegistry)
+        .execute<OperationHandle>("integration/work", { value }, caller);
+    try {
+      let remainingShared = OperationQuota.sharedLimit;
+      for (const caller of callers.slice(0, 3)) {
+        const burst = Math.min(
+          remainingShared,
+          OperationQuota.perAppLimit - OperationQuota.reservedPerApp,
+        );
+        remainingShared -= burst;
+        for (let i = 0; i < OperationQuota.reservedPerApp + burst; i++) {
+          const handle = await submitFor(
+            caller,
+            caller === owner ? "done" : "active",
+          );
+          if (caller === owner) await manager.wait(handle, caller);
+        }
+      }
+      expect(remainingShared).toBe(0);
+      await expect(submitFor(callers[2])).rejects.toThrow(
+        "Shared operation capacity exhausted",
+      );
+      // A new app and the host still get their entire reserved allowance.
+      const host = { principal: owner.principal };
+      for (const caller of [callers[3], host]) {
+        for (let i = 0; i < OperationQuota.reservedPerApp; i++)
+          await submitFor(caller);
+        expect(manager.list(caller)).toHaveLength(
+          OperationQuota.reservedPerApp,
+        );
+        expect(
+          manager
+            .list(caller)
+            .every((snapshot) => snapshot.status === "queued"),
+        ).toBe(true);
+        await expect(submitFor(caller)).rejects.toThrow(
+          "Shared operation capacity exhausted",
+        );
+      }
+      await tick();
+      clock.mockReturnValue(now + OperationManager.retentionMs);
+      // Only the first app's completed records expire; active records stay.
+      expect(manager.list(owner)).toEqual([]);
+      expect(manager.list(callers[1])).toHaveLength(OperationQuota.perAppLimit);
+      for (
+        let i = OperationQuota.reservedPerApp;
+        i < OperationQuota.perAppLimit;
+        i++
+      )
+        await submitFor(callers[3]);
+      expect(manager.list(callers[3])).toHaveLength(OperationQuota.perAppLimit);
+      await expect(submitFor(callers[2])).rejects.toThrow(
+        "Shared operation capacity exhausted",
+      );
+      // Reading or expiring another app's records never removes active work.
+      expect(manager.list(callers[2])).toHaveLength(
+        OperationQuota.reservedPerApp +
+          OperationQuota.sharedLimit -
+          2 * (OperationQuota.perAppLimit - OperationQuota.reservedPerApp),
+      );
+    } finally {
+      clock.mockRestore();
+      blocked.release();
+    }
+    await manager.drain();
+  });
+
+  it("returns reserved and shared capacity when preparation fails", async () => {
+    register(() => {
+      throw new Error("Preparation failed");
+    });
+    await expect(submit("retry", "failed-preparation")).rejects.toThrow(
+      "Preparation failed",
+    );
+    expect(manager.list(owner)).toEqual([]);
+    register(() => operationTask(async () => "done"));
+    for (let i = 1; i < OperationQuota.perAppLimit; i++) {
+      const handle = await submit();
       await manager.wait(handle, owner);
     }
-    expect(manager.list(owner)).toHaveLength(257);
-    expect(() => manager.get(handles[0], owner)).toThrow("not found");
-    expect(manager.get(active, owner).status).toBe("running");
-    const now = Date.now();
-    const clock = jest
-      .spyOn(Date, "now")
-      .mockReturnValue(now + OperationManager.retentionMs + 1);
-    expect(manager.list(owner)).toHaveLength(1);
-    clock.mockRestore();
-    blocked.release();
-    await manager.wait(active, owner);
+    register(() => {
+      throw new Error("Preparation failed");
+    });
+    for (let i = 0; i < 3; i++)
+      await expect(submit("retry", "failed-preparation")).rejects.toThrow(
+        "Preparation failed",
+      );
+    register(() => null as unknown as OperationTask<unknown>);
+    await expect(submit()).rejects.toThrow("synchronously prepare a task");
+    register(() => operationTask(async () => "recovered"));
+    const handle = await submit("retry", "failed-preparation");
+    await expect(manager.wait(handle, owner)).resolves.toBe("recovered");
+    await expect(submit()).rejects.toThrow("capacity exhausted");
+    expect(manager.list(owner)).toHaveLength(OperationQuota.perAppLimit);
   });
 
   it("reserves session transitions before acceptance and drains without waiting on itself", async () => {

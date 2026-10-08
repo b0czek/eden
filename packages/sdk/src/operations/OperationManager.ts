@@ -14,6 +14,7 @@ import { EdenNamespace } from "../ipc/CommandDecorators";
 import { EdenEmitter } from "../ipc/EdenEmitter";
 import type { IPCBridge } from "../ipc/IPCBridge";
 import { SessionContext } from "../session/SessionContext";
+import { OperationQuota } from "./OperationQuota";
 import type { OperationTask } from "./OperationTask";
 
 interface OperationNamespaceEvents {
@@ -51,13 +52,13 @@ function canonical(value: unknown): string {
 export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   private readonly records = new Map<string, RecordEntry>();
   private readonly requests = new Map<string, string>();
+  private readonly quota = new OperationQuota();
   private readonly closedSessions = new Map<string, string>();
   private accepting = true;
   private shuttingDown = false;
   private runtimeTransition?: string;
   private readonly expiryTimer: NodeJS.Timeout;
   static readonly retentionMs = 15 * 60 * 1000;
-  static readonly completedLimit = 256;
 
   constructor(
     @inject(delay(() => require("../ipc/IPCBridge").IPCBridge))
@@ -105,53 +106,67 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     }
     if (!this.accepting || this.closedSessions.has(sessionId))
       throw new Error("Operations are draining; new submissions are closed");
-    const task = prepare();
-    if (!task || typeof task.run !== "function" || "then" in task)
-      throw new Error("Operation handlers must synchronously prepare a task");
-    const id = randomUUID();
-    const transitionSessionId =
-      task.transition === "session" ? this.session.getSessionId() : undefined;
-    if (transitionSessionId) {
-      if (this.closedSessions.has(transitionSessionId))
-        throw new Error("A session transition is already in progress");
-      this.closedSessions.set(transitionSessionId, id);
+    this.quota.reserve(owner.appId);
+    let retained = false;
+    try {
+      const task = prepare();
+      if (!task || typeof task.run !== "function" || "then" in task)
+        throw new Error("Operation handlers must synchronously prepare a task");
+      const id = randomUUID();
+      const capturedContext = structuredClone({
+        ...context,
+        sessionId,
+        operationId: id,
+      });
+      const transitionSessionId =
+        task.transition === "session" ? this.session.getSessionId() : undefined;
+      if (transitionSessionId) {
+        if (this.closedSessions.has(transitionSessionId))
+          throw new Error("A session transition is already in progress");
+        this.closedSessions.set(transitionSessionId, id);
+      }
+      if (task.transition === "runtime") {
+        this.accepting = false;
+        this.runtimeTransition = id;
+      }
+      let finish!: () => void;
+      const done = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const now = Date.now();
+      const record: RecordEntry = {
+        snapshot: {
+          command,
+          id,
+          cancellable: task.cancellable === true,
+          revision: 1,
+          status: "queued",
+          createdAt: now,
+          updatedAt: now,
+        },
+        owner,
+        cancellation: task.cancellable ? new AbortController() : undefined,
+        transitionSessionId,
+        context: capturedContext,
+        done,
+        finish,
+        fingerprint,
+        requestKey: requestKey === undefined ? undefined : requestIdentity,
+      };
+      this.records.set(id, record);
+      retained = true;
+      if (record.requestKey) this.requests.set(record.requestKey, id);
+      this.publish(record);
+      // IPC response delivery is queued before tasks may tear down their caller.
+      setImmediate(() => {
+        void this.execution.run(record.context, () =>
+          this.execute(record, task),
+        );
+      });
+      return { command, id };
+    } finally {
+      if (!retained) this.quota.release(owner.appId);
     }
-    if (task.transition === "runtime") {
-      this.accepting = false;
-      this.runtimeTransition = id;
-    }
-    let finish!: () => void;
-    const done = new Promise<void>((resolve) => {
-      finish = resolve;
-    });
-    const now = Date.now();
-    const record: RecordEntry = {
-      snapshot: {
-        command,
-        id,
-        cancellable: task.cancellable === true,
-        revision: 1,
-        status: "queued",
-        createdAt: now,
-        updatedAt: now,
-      },
-      owner,
-      cancellation: task.cancellable ? new AbortController() : undefined,
-      transitionSessionId,
-      context: structuredClone({ ...context, sessionId, operationId: id }),
-      done,
-      finish,
-      fingerprint,
-      requestKey: requestKey === undefined ? undefined : requestIdentity,
-    };
-    this.records.set(id, record);
-    if (record.requestKey) this.requests.set(record.requestKey, id);
-    this.publish(record);
-    // IPC response delivery is queued before tasks may tear down their caller.
-    setImmediate(() => {
-      void this.execution.run(record.context, () => this.execute(record, task));
-    });
-    return { command, id };
   }
 
   /** Awaited host convenience work still belongs to the runtime's operation ledger. */
@@ -443,27 +458,18 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
   }
 
   private prune(): void {
-    const completed = [...this.records.values()].filter(
-      (record) =>
-        record.snapshot.status === "succeeded" ||
-        record.snapshot.status === "failed" ||
-        record.snapshot.status === "cancelled",
-    );
-    completed.sort(
-      (a, b) =>
-        (a.snapshot as { completedAt: number }).completedAt -
-        (b.snapshot as { completedAt: number }).completedAt,
-    );
     const now = Date.now();
-    for (let index = 0; index < completed.length; index++) {
-      const record = completed[index];
+    for (const record of this.records.values()) {
+      const snapshot = record.snapshot;
       if (
-        index < completed.length - OperationManager.completedLimit ||
-        now - (record.snapshot as { completedAt: number }).completedAt >=
-          OperationManager.retentionMs
+        (snapshot.status === "succeeded" ||
+          snapshot.status === "failed" ||
+          snapshot.status === "cancelled") &&
+        now - snapshot.completedAt >= OperationManager.retentionMs
       ) {
         this.records.delete(record.snapshot.id);
         if (record.requestKey) this.requests.delete(record.requestKey);
+        this.quota.release(record.owner.appId);
       }
     }
   }
@@ -472,6 +478,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     clearInterval(this.expiryTimer);
     this.records.clear();
     this.requests.clear();
+    this.quota.clear();
     super.dispose();
   }
 }
