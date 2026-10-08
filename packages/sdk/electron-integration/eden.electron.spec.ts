@@ -1331,7 +1331,7 @@ test.describe
             );
           }
           await expect.poll(listing).toContain("before.txt");
-          const removal = executeHostCommand("fs/eject", {
+          const removal = executeHostCommand("volume/eject", {
             volume: "failed-eject-drive",
           });
           const failure = expect(removal).rejects.toThrow("Device is busy");
@@ -1548,7 +1548,10 @@ test.describe
       }, driveRoot);
       await expect
         .poll(() =>
-          executeHostCommand<{ id: string; state: string }[]>("fs/volumes", {}),
+          executeHostCommand<{ id: string; state: string }[]>(
+            "volume/list",
+            {},
+          ),
         )
         .toContainEqual(
           expect.objectContaining({ id: "slow-eject", state: "ejecting" }),
@@ -1560,14 +1563,14 @@ test.describe
             .find((candidate) => candidate.getURL().includes(appId));
           if (!contents) throw new Error("Integration app view not found");
           return contents.executeJavaScript(`(async () => {
-          const operation = await window.edenAPI.shellCommand("fs/eject", { volume: "slow-eject" });
+          const operation = await window.edenAPI.shellCommand("volume/eject", { volume: "slow-eject" });
           return operation.handle;
         })()`);
         },
         APP_ID,
       );
       expect(rendererHandle).toMatchObject({
-        command: "fs/eject",
+        command: "volume/eject",
         id: expect.any(String),
       });
       await expect
@@ -1583,7 +1586,7 @@ test.describe
             return undefined;
           }
         })
-        .toMatchObject({ command: "fs/eject", id: expect.any(String) });
+        .toMatchObject({ command: "volume/eject", id: expect.any(String) });
       await electronApp?.evaluate(
         async ({ webContents }, payload) => {
           const contents = webContents
@@ -1611,7 +1614,7 @@ test.describe
         })
         .toEqual({ success: true });
       expect(
-        await executeHostCommand<{ id: string }[]>("fs/volumes", {}),
+        await executeHostCommand<{ id: string }[]>("volume/list", {}),
       ).not.toContainEqual(expect.objectContaining({ id: "slow-eject" }));
     });
 

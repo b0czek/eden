@@ -2,7 +2,6 @@ import type {
   FileStats,
   FilesystemLocation,
   FilesystemTransferArgs,
-  FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
 import * as v from "valibot";
@@ -54,7 +53,6 @@ const searchArgs = v.object({
   pattern: v.string(),
   limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 10),
 });
-const volumeArgs = v.object({ volume: v.pipe(v.string(), v.nonEmpty()) });
 const transferArgs = v.object({
   from: filesystemLocationSchema,
   to: filesystemLocationSchema,
@@ -68,18 +66,6 @@ const transferArgs = v.object({
 @EdenNamespace("fs")
 export class FilesystemHandler {
   constructor(private fsManager: FilesystemManager) {}
-
-  @EdenHandler("volumes", { permission: "read" })
-  handleVolumes(_args: Record<string, never>): FilesystemVolume[] {
-    return this.fsManager.listVolumes();
-  }
-
-  /** Safely eject a device after draining admitted volume I/O. */
-  @EdenHandler("eject", { permission: "eject", mode: "operation" })
-  handleEject(args: { volume: string }): OperationTask<void> {
-    const { volume } = v.parse(volumeArgs, args);
-    return this.fsManager.prepareEjectVolume(volume);
-  }
 
   /**
    * Read the contents of a file.

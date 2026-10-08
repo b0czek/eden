@@ -312,11 +312,11 @@ export const useExplorerNavigation = (
   };
   const subscribed = Promise.all([
     window.edenAPI.subscribe("fs/changed", handleChanged),
-    window.edenAPI.subscribe("fs/volumes-changed", handleVolumesChanged),
+    window.edenAPI.subscribe("volume/changed", handleVolumesChanged),
   ])
     .then(async () => {
       const version = inventoryVersion;
-      const inventory = await window.edenAPI.shellCommand("fs/volumes", {});
+      const inventory = await window.edenAPI.shellCommand("volume/list", {});
       if (!disposed && version === inventoryVersion)
         setVolumeInventory(inventory);
     })
@@ -424,7 +424,7 @@ export const useExplorerNavigation = (
     requestSequence += 1;
     document.removeEventListener("mousedown", handleMouseButton);
     window.edenAPI.unsubscribe("fs/changed", handleChanged);
-    window.edenAPI.unsubscribe("fs/volumes-changed", handleVolumesChanged);
+    window.edenAPI.unsubscribe("volume/changed", handleVolumesChanged);
     void stopWatch();
   });
 

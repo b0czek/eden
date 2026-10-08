@@ -26,7 +26,8 @@
     "fs/read",
     "fs/write",
     "integration/operation",
-    "fs/eject"
+    "volume/read",
+    "volume/eject"
   ],
   "dlc": {
     "extensionPoints": [

@@ -48,7 +48,13 @@ export interface FilePickerEvents {
  */
 export interface FsEvents {
   "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind };
-  "fs/volumes-changed": { volumes: import("./index").FilesystemVolume[] };
+}
+
+/**
+ * VolumeEvents - Events for the "volume" namespace
+ */
+export interface VolumeEvents {
+  "volume/changed": { volumes: import("./index").FilesystemVolume[] };
 }
 
 /**
@@ -151,4 +157,4 @@ export interface ViewEvents {
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, I18nEvents, NotificationEvents, OperationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, VolumeEvents, I18nEvents, NotificationEvents, OperationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}

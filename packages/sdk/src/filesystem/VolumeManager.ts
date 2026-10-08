@@ -15,7 +15,7 @@ import {
 } from "../operations/OperationTask";
 
 interface VolumeEvents {
-  "volumes-changed": { volumes: FilesystemVolume[] };
+  changed: { volumes: FilesystemVolume[] };
 }
 
 interface MountedVolume {
@@ -40,7 +40,7 @@ export interface VolumeRoot {
 
 @scoped(Lifecycle.ContainerScoped)
 @injectable()
-@EdenNamespace("fs")
+@EdenNamespace("volume")
 export class VolumeManager extends EdenEmitter<VolumeEvents> {
   private readonly mounted = new Map<string, MountedVolume>();
   private readonly operationContext = new AsyncLocalStorage<
@@ -130,7 +130,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       eject,
       activeOperations: new Set(),
     });
-    this.notify("volumes-changed", { volumes: this.list() });
+    this.notify("changed", { volumes: this.list() });
     return { ...info };
   }
 
@@ -138,7 +138,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     if (id === "home")
       throw new Error("The home volume cannot be unregistered");
     if (!this.mounted.delete(id)) return false;
-    this.notify("volumes-changed", { volumes: this.list() });
+    this.notify("changed", { volumes: this.list() });
     return true;
   }
 
@@ -173,7 +173,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     void removal.catch(() => undefined);
     entry.removal = removal;
     entry.info.state = "ejecting";
-    this.notify("volumes-changed", { volumes: this.list() });
+    this.notify("changed", { volumes: this.list() });
     let started = false;
     return operationTask(async (reporter) => {
       if (started) {
@@ -195,7 +195,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
         if (!this.disposed && this.mounted.get(id) === entry) {
           entry.removal = undefined;
           entry.info.state = "ready";
-          this.notify("volumes-changed", { volumes: this.list() });
+          this.notify("changed", { volumes: this.list() });
         }
         reject(error);
       }

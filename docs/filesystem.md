@@ -4,12 +4,14 @@ Eden apps access files through typed shell commands. Filesystem operations are
 restricted by the permissions declared in the app manifest:
 
 - `fs/read` permits reading metadata and contents, listing and searching
-  directories, discovering volumes, and watching directories.
+  directories, and watching directories.
 - `fs/write` permits creating, changing, copying, moving, and deleting files
   and directories.
 - `fs/resolve` permits resolving a location for an external integration.
-- `fs/eject` permits safely ejecting devices.
 - `fs/*` grants all filesystem permissions.
+- `volume/read` permits discovering volumes and subscribing to inventory changes.
+- `volume/eject` permits safely ejecting devices.
+- `volume/*` grants all volume permissions.
 
 ## File Addresses
 
@@ -76,8 +78,8 @@ updated inventories and returns an unsubscribe function. Apps receive metadata
 without host mount paths:
 
 ```typescript
-const volumes = await window.edenAPI.shellCommand("fs/volumes", {});
-await window.edenAPI.subscribe("fs/volumes-changed", ({ volumes }) => {
+const volumes = await window.edenAPI.shellCommand("volume/list", {});
+await window.edenAPI.subscribe("volume/changed", ({ volumes }) => {
   updateVolumeSelector(volumes);
 });
 ```
@@ -109,16 +111,16 @@ Here `volumeProvider` is the consumer's OS adapter. The callback is optional.
 Public metadata advertises `supportsEject` when it is supplied. Home cannot be
 ejected.
 
-Apps with `fs/eject` permission use the corresponding command:
+Apps with `volume/eject` permission use the corresponding command:
 
 ```typescript
-const eject = await window.edenAPI.shellCommand("fs/eject", { volume: "usb-work" });
+const eject = await window.edenAPI.shellCommand("volume/eject", { volume: "usb-work" });
 await eject.result();
 ```
 
 Removal first changes the volume's `state` from `ready` to `ejecting`, closes its
 directory watches, and rejects new filesystem operations on it. Already admitted
-operations finish before the OS callback runs. Subscribe to `fs/volumes-changed`
+operations finish before the OS callback runs. Subscribe to `volume/changed`
 to show pending state while the OS flushes its caches; this may take minutes.
 Frontend and backend eject commands return an operation object promptly. Use
 `eject.watch(listener)` to observe phases and `eject.result()` to await safe removal.

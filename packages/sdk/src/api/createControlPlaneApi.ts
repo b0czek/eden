@@ -219,15 +219,13 @@ export function createControlPlaneApis({
   const volumes: EdenVolumesApi = {
     register: (input, options) => volumeManager.register(clone(input), options),
     eject: (id) =>
-      operationManager.runHost("fs/eject", { volume: id }, () =>
+      operationManager.runHost("volume/eject", { volume: id }, () =>
         volumeManager.prepareEject(id),
       ),
     unregister: (id) => volumeManager.unregister(id),
     list: () => volumeManager.list(),
     onChanged: (listener) =>
-      volumeManager.on("volumes-changed", ({ volumes }) =>
-        listener(clone(volumes)),
-      ),
+      volumeManager.on("changed", ({ volumes }) => listener(clone(volumes))),
   };
 
   return {

@@ -4,7 +4,6 @@ import type {
   FileStats,
   FilesystemChangeKind,
   FilesystemLocation,
-  FilesystemVolume,
   SearchResult,
 } from "@edenapp/types";
 import fg from "fast-glob";
@@ -69,18 +68,15 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       notify: (viewId, event) =>
         this.notifySubscriber(viewId, "changed", event),
     });
-    this.stopVolumeListener = this.volumes.on(
-      "volumes-changed",
-      ({ volumes }) => {
-        this.watcher.removeUnavailableVolumes(
-          new Set(
-            volumes
-              .filter((volume) => volume.state === "ready")
-              .map((volume) => volume.id),
-          ),
-        );
-      },
-    );
+    this.stopVolumeListener = this.volumes.on("changed", ({ volumes }) => {
+      this.watcher.removeUnavailableVolumes(
+        new Set(
+          volumes
+            .filter((volume) => volume.state === "ready")
+            .map((volume) => volume.id),
+        ),
+      );
+    });
   }
 
   /**
@@ -103,23 +99,12 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     });
   }
 
-  listVolumes(): FilesystemVolume[] {
-    // Volume discovery is also subject to a valid filesystem principal.
-    this.requirePrincipal();
-    return this.volumes.list();
-  }
-
   prepareVolumeOperation<R>(
     ids: string[],
     run: (reporter: OperationReporter) => Promise<R>,
   ): OperationTask<R> {
     this.requirePrincipal();
     return this.volumes.prepareOperation(ids, run);
-  }
-
-  prepareEjectVolume(id: string): OperationTask<void> {
-    this.requirePrincipal();
-    return this.volumes.prepareEject(id);
   }
 
   /** Hold access until the consumer finishes I/O at the resolved host path. */

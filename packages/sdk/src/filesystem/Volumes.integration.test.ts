@@ -41,7 +41,9 @@ describe("consumer-managed filesystem volumes", () => {
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/*"]);
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(appId, ["fs/*", "volume/*"]);
     usbRoot = path.join(eden.paths.root, "usb");
     await fs.mkdir(usbRoot);
     await eden.runtime.volumes.register({
@@ -75,7 +77,7 @@ describe("consumer-managed filesystem volumes", () => {
       kind: "network",
       rootPath: mount,
     });
-    const volumes = await execute<FilesystemVolume[]>("fs/volumes");
+    const volumes = await execute<FilesystemVolume[]>("volume/list");
     expect(volumes.map((volume) => volume.id)).toEqual([
       "home",
       "usb",
@@ -98,6 +100,40 @@ describe("consumer-managed filesystem volumes", () => {
     stop();
     eden.runtime.volumes.unregister("network");
     expect(changes).toHaveLength(1);
+  });
+
+  it("authorizes volume discovery independently of file access", async () => {
+    const permissions = eden.runtime.resolve(PermissionRegistry);
+    permissions.registerApp(appId, ["fs/*"]);
+    await expect(execute("volume/list")).rejects.toThrow("volume/read");
+    await expect(
+      execute("event/subscribe", { eventName: "volume/changed" }),
+    ).rejects.toThrow("volume/read");
+
+    permissions.registerApp(appId, ["volume/read"]);
+    await expect(execute("volume/list")).resolves.toContainEqual(
+      expect.objectContaining({ id: "usb" }),
+    );
+    await expect(
+      execute("event/subscribe", { eventName: "volume/changed" }),
+    ).resolves.toBeUndefined();
+    await execute("event/unsubscribe", { eventName: "volume/changed" });
+    await expect(
+      execute("fs/readdir", { location: { volume: "usb", path: "/" } }),
+    ).rejects.toThrow("fs/read");
+  });
+
+  it.each([
+    ["volume/list", {}],
+    ["volume/eject", { volume: "usb" }],
+  ])("requires an execution principal for %s", async (command, args) => {
+    await eden.runtime.sessions.logout();
+    await expect(eden.execute(command, args)).rejects.toThrow(
+      "Caller has no volume execution principal",
+    );
+    expect(eden.runtime.volumes.list()).toContainEqual(
+      expect.objectContaining({ id: "usb", state: "ready" }),
+    );
   });
 
   it("keeps home private while sharing registered volumes", async () => {
@@ -852,7 +888,7 @@ describe("consumer-managed filesystem volumes", () => {
           | { mode: "result"; result: unknown };
         const result =
           response.mode === "operation" ? response.handle : response.result;
-        return command === "fs/eject"
+        return command === "volume/eject"
           ? eden.runtime
               .resolve(OperationManager)
               .wait(result as OperationHandle, {
@@ -862,7 +898,7 @@ describe("consumer-managed filesystem volumes", () => {
           : result;
       };
       await invoke("event/subscribe", { eventName: "fs/changed" });
-      await invoke("event/subscribe", { eventName: "fs/volumes-changed" });
+      await invoke("event/subscribe", { eventName: "volume/changed" });
       if (removal === "eject") {
         eden.runtime.volumes.unregister("usb");
         await eden.runtime.volumes.register(
@@ -887,7 +923,7 @@ describe("consumer-managed filesystem volumes", () => {
       })) as {
         watchId: string;
       };
-      if (removal === "eject") await invoke("fs/eject", { volume: "usb" });
+      if (removal === "eject") await invoke("volume/eject", { volume: "usb" });
       else eden.runtime.volumes.unregister("usb");
       const messages = eden.platform.effects.flatMap((effect) =>
         effect.type === "message-sent" && effect.webContentsId === webContentsId
@@ -899,7 +935,7 @@ describe("consumer-managed filesystem volumes", () => {
         payload: { watchId: result.watchId, kind: "volume-removed" },
       });
       expect(messages).toContainEqual({
-        type: "fs/volumes-changed",
+        type: "volume/changed",
         payload: { volumes: [expect.objectContaining({ id: "home" })] },
       });
       await expect(

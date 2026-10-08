@@ -453,20 +453,6 @@ export interface FilePickerCommands {
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
-  "fs/volumes": {
-    mode: "result";
-    args: Record<string, never>;
-    response: import("./index").FilesystemVolume[];
-  };
-  /**
-   * Safely eject a device after draining admitted volume I/O.
-   */
-  "fs/eject": {
-    mode: "operation";
-    args: { volume: string };
-    response: import("./index").OperationHandle<"fs/eject">;
-    completion: void;
-  };
   /**
    * Read the contents of a file.
    */
@@ -601,6 +587,26 @@ export interface FsCommands {
     mode: "operation";
     args: import("./index").FilesystemTransferArgs;
     response: import("./index").OperationHandle<"fs/mv">;
+    completion: void;
+  };
+}
+
+/**
+ * VolumeCommands - Commands for the "volume" namespace
+ */
+export interface VolumeCommands {
+  "volume/list": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").FilesystemVolume[];
+  };
+  /**
+   * Safely eject a device after draining admitted volume I/O.
+   */
+  "volume/eject": {
+    mode: "operation";
+    args: { volume: string };
+    response: import("./index").OperationHandle<"volume/eject">;
     completion: void;
   };
 }
@@ -1337,4 +1343,4 @@ export interface ViewCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, VolumeCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}

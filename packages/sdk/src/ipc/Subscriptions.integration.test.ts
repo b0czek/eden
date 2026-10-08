@@ -34,7 +34,7 @@ import { IPCBridge } from "./IPCBridge";
 import { PermissionRegistry } from "./PermissionRegistry";
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-const eventName = "fs/volumes-changed";
+const eventName = "volume/changed";
 function gate() {
   let release!: () => void;
   return {
@@ -70,7 +70,9 @@ describe("client subscriptions across renderer IPC", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest);
-    eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/read"]);
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(appId, ["volume/read"]);
     const profile = await eden.runtime.users.create({
       username: "observer",
       name: "Observer",
@@ -538,12 +540,12 @@ describe("client subscriptions across renderer IPC", () => {
   });
 
   it("builds lazy notification payloads only when local or external observers exist", async () => {
-    class Producer extends EdenEmitter<{ "volumes-changed": { volumes: [] } }> {
+    class Producer extends EdenEmitter<{ changed: { volumes: [] } }> {
       publish(payload: () => { volumes: [] }) {
-        this.notify("volumes-changed", payload);
+        this.notify("changed", payload);
       }
     }
-    EdenNamespace("fs")(Producer);
+    EdenNamespace("volume")(Producer);
     const producer = new Producer(eden.runtime.resolve(IPCBridge));
     expect(() =>
       producer.publish(() => {
@@ -551,7 +553,7 @@ describe("client subscriptions across renderer IPC", () => {
       }),
     ).not.toThrow();
     const local: unknown[] = [];
-    const off = producer.on("volumes-changed", (payload) => {
+    const off = producer.on("changed", (payload) => {
       local.push(payload);
     });
     producer.publish(() => ({ volumes: [] }));

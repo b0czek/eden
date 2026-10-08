@@ -44,14 +44,14 @@ describe("control-plane API integration", () => {
     );
     const observed: string[] = [];
     const off = eden.runtime.operations.onChanged((snapshot) => {
-      if (snapshot.command === "fs/eject") observed.push(snapshot.status);
+      if (snapshot.command === "volume/eject") observed.push(snapshot.status);
     });
     const removal = eden.runtime.volumes.eject("host-eject");
     expect(observed).toEqual(["queued"]);
     await started;
     const snapshot = eden.runtime.operations
       .list()
-      .find((snapshot) => snapshot.command === "fs/eject")!;
+      .find((snapshot) => snapshot.command === "volume/eject")!;
     expect(snapshot).toMatchObject({ status: "running", phase: "host-eject" });
     snapshot.phase = "changed by observer";
     expect(eden.runtime.operations.get(snapshot)?.phase).toBe("host-eject");

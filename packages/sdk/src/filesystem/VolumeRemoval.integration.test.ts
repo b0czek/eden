@@ -37,7 +37,9 @@ describe("safe volume removal", () => {
       password: "password",
       grants: ["*"],
     });
-    eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/*"]);
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(appId, ["fs/*", "volume/*"]);
     usbRoot = path.join(eden.paths.root, "usb");
     await fs.mkdir(usbRoot);
   });
@@ -93,7 +95,7 @@ describe("safe volume removal", () => {
     );
     expect(manager.get(copy, caller).status).toBe("queued");
     const eject = await eden.execute<OperationHandle>(
-      "fs/eject",
+      "volume/eject",
       { volume: "usb" },
       caller,
     );
@@ -149,7 +151,7 @@ describe("safe volume removal", () => {
       );
       expect(manager.get(opening, caller).status).toBe("queued");
       const ejecting = await eden.execute<OperationHandle>(
-        "fs/eject",
+        "volume/eject",
         { volume: "usb" },
         caller,
       );
@@ -201,7 +203,7 @@ describe("safe volume removal", () => {
         location: { volume: "usb", path: "/lookup.txt" },
       });
       await closing.promise;
-      const removal = execute("fs/eject", { volume: "usb" });
+      const removal = execute("volume/eject", { volume: "usb" });
       await new Promise<void>((resolve) => setImmediate(resolve));
       expect(handle!.fd).toBeGreaterThanOrEqual(0);
       expect(hostCalls).toBe(0);
@@ -227,7 +229,7 @@ describe("safe volume removal", () => {
     };
     const manager = eden.runtime.resolve(OperationManager);
     const handle = await eden.execute<OperationHandle>(
-      "fs/eject",
+      "volume/eject",
       { volume: "usb" },
       caller,
     );
@@ -251,7 +253,7 @@ describe("safe volume removal", () => {
     ).toBe("ready");
     busy = false;
     const retry = await eden.execute<OperationHandle>(
-      "fs/eject",
+      "volume/eject",
       { volume: "usb" },
       caller,
     );
@@ -275,12 +277,12 @@ describe("safe volume removal", () => {
     const inventories: FilesystemVolume[][] = [];
     eden.runtime.volumes.onChanged((volumes) => inventories.push(volumes));
     let completed = false;
-    const removal = execute("fs/eject", { volume: "usb" }).then(() => {
+    const removal = execute("volume/eject", { volume: "usb" }).then(() => {
       completed = true;
     });
     await started.promise;
     expect(completed).toBe(false);
-    expect(await execute("fs/volumes")).toContainEqual({
+    expect(await execute("volume/list")).toContainEqual({
       id: "usb",
       label: "USB",
       kind: "removable",
@@ -396,7 +398,7 @@ describe("safe volume removal", () => {
     eden.runtime.volumes.onChanged((volumes) =>
       states.push(volumes.find((volume) => volume.id === "usb")?.state),
     );
-    await expect(execute("fs/eject", { volume: "usb" })).rejects.toThrow(
+    await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
       "Device is busy",
     );
     await execute("fs/write", {
@@ -463,23 +465,23 @@ describe("safe volume removal", () => {
       },
       true,
     );
-    await execute("fs/eject", { volume: "usb" });
+    await execute("volume/eject", { volume: "usb" });
     expect(ejected).toBe(true);
   });
 
   it("validates requests, capabilities, app permissions, and user grants", async () => {
     await register();
-    await expect(execute("fs/eject", { volume: "home" })).rejects.toThrow(
+    await expect(execute("volume/eject", { volume: "home" })).rejects.toThrow(
       "home volume",
     );
-    await expect(execute("fs/eject", { volume: "missing" })).rejects.toThrow(
-      "unavailable",
-    );
-    await expect(execute("fs/eject", { volume: "usb" })).rejects.toThrow(
+    await expect(
+      execute("volume/eject", { volume: "missing" }),
+    ).rejects.toThrow("unavailable");
+    await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
       "does not support",
     );
     for (const args of [{}, { volume: "" }, { volume: 1 }])
-      await expect(execute("fs/eject", args)).rejects.toMatchObject({
+      await expect(execute("volume/eject", args)).rejects.toMatchObject({
         name: "ValiError",
       });
     eden.runtime.volumes.unregister("usb");
@@ -487,7 +489,7 @@ describe("safe volume removal", () => {
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(appId, ["fs/read", "fs/write"]);
-    await expect(execute("fs/eject", { volume: "usb" })).rejects.toThrow(
+    await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
       "Permission denied",
     );
     eden.runtime.resolve(PermissionRegistry).registerApp(
@@ -498,12 +500,12 @@ describe("safe volume removal", () => {
           id: "remove-volume",
           label: "Remove volumes",
           scope: "app",
-          permissions: ["fs/eject"],
+          permissions: ["volume/eject"],
         },
       ],
     );
     user = { ...user, grants: [] };
-    await expect(execute("fs/eject", { volume: "usb" })).rejects.toThrow(
+    await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
       "Grant denied",
     );
     expect(

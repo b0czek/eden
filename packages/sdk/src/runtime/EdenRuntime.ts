@@ -35,6 +35,7 @@ import { ExecutionContext } from "../execution/ExecutionContext";
 import { FileOpenManager } from "../file-open";
 import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
+import { VolumeHandler } from "../filesystem/VolumeHandler";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
@@ -195,6 +196,12 @@ export class EdenRuntime {
     this.resolveOwned(CommandRegistry).registerManager(
       new OperationHandler(operations),
     );
+    this.resolveOwned(CommandRegistry).registerManager(
+      new VolumeHandler(
+        this.resolveOwned(VolumeManager),
+        this.resolveOwned(ExecutionContext),
+      ),
+    );
     this.settingsPanelManager = this.resolveOwned(SettingsPanelManager);
     this.settings = createSettingsApi(this.settingsPanelManager);
 
@@ -208,7 +215,7 @@ export class EdenRuntime {
       "user/manage",
     );
     permissions.registerEventPermission("fs/changed", "fs/read");
-    permissions.registerEventPermission("fs/volumes-changed", "fs/read");
+    permissions.registerEventPermission("volume/changed", "volume/read");
   }
 
   public whenReady(): Promise<void> {

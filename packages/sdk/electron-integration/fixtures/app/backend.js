@@ -44,7 +44,7 @@ void (async () => {
   const fs = require("node:fs/promises");
   const path = require("node:path");
   let started = false;
-  await worker.edenAPI.subscribe("fs/volumes-changed", async ({ volumes }) => {
+  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
     if (started || !volumes.some((volume) => volume.id === "operation-delay"))
       return;
     started = true;
@@ -87,7 +87,7 @@ void (async () => {
 void (async () => {
   const fs = require("node:fs/promises");
   const path = require("node:path");
-  await worker.edenAPI.subscribe("fs/volumes-changed", async ({ volumes }) => {
+  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
     if (
       !volumes.some(
         (volume) => volume.id === "slow-eject" && volume.state === "ready",
@@ -96,7 +96,7 @@ void (async () => {
       return;
     let result;
     try {
-      const operation = await worker.edenAPI.shellCommand("fs/eject", {
+      const operation = await worker.edenAPI.shellCommand("volume/eject", {
         volume: "slow-eject",
       });
       await fs.writeFile(
