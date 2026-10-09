@@ -357,6 +357,8 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       for (const location of result.locations) {
         v.parse(filesystemLocationSchema, location);
         const volume = this.volumes.get(location.volume);
+        if (volume.state !== "ready")
+          throw new Error("Selected volume is being removed");
         if (
           this.activeRequest.allowedVolumes &&
           !this.activeRequest.allowedVolumes.includes(location.volume)

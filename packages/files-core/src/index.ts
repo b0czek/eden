@@ -8,6 +8,7 @@ export * from "./dialogs/DisplayOptionsModal";
 export * from "./features/breadcrumbs";
 export * from "./features/useExplorerNavigation";
 export * from "./features/useFileActivationPreference";
+export { useVolumeEject } from "./features/useVolumeEject";
 export * from "./fileIcons";
 export * from "./types";
 export * from "./utils";

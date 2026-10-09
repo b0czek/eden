@@ -114,7 +114,7 @@ test.describe
           { recursive: true },
         ),
       ]);
-      for (const appName of ["files", "file-picker"]) {
+      for (const appName of ["files", "file-picker", "toaster"]) {
         const source = path.join(
           __dirname,
           "../dist/apps/prebuilt",
@@ -1046,15 +1046,25 @@ test.describe
       await electronApp?.evaluate(async (_electron, rootPath) => {
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: { volumes: { register(input: unknown): Promise<unknown> } };
+            eden: {
+              volumes: {
+                register(
+                  input: unknown,
+                  options: { eject: () => Promise<void> },
+                ): Promise<unknown>;
+              };
+            };
           };
         };
-        await integration.__edenIntegration.eden.volumes.register({
-          id: "test-usb",
-          label: "Test USB",
-          kind: "removable",
-          rootPath,
-        });
+        await integration.__edenIntegration.eden.volumes.register(
+          {
+            id: "test-usb",
+            label: "Test USB",
+            kind: "removable",
+            rootPath,
+          },
+          { eject: async () => undefined },
+        );
       }, driveRoot);
       await expect(
         executeHostCommand("file/open", {
@@ -1120,6 +1130,18 @@ test.describe
           ),
         )
         .toContain("usb-report.txt");
+      expect(
+        await evaluateApp(
+          "com.eden.file-picker",
+          `document.querySelector('[aria-label="Safely remove drive"]') === null`,
+        ),
+      ).toBe(true);
+      await expect(
+        evaluateApp(
+          "com.eden.file-picker",
+          `window.edenAPI.shellCommand("volume/eject", { volume: "test-usb" })`,
+        ),
+      ).rejects.toThrow("Permission denied: volume/eject");
       await evaluateApp(
         "com.eden.file-picker",
         `document.querySelector('.file-item-main').click()`,
@@ -1507,6 +1529,190 @@ test.describe
         },
         { appId: APP_ID, watchId },
       );
+    });
+
+    test("Files ejects from its toolbar and permits retry after a busy device", async () => {
+      const appId = "com.eden.files";
+      const running = await executeHostCommand<{ manifest: { id: string } }[]>(
+        "process/list",
+        {},
+      );
+      if (!running.some((process) => process.manifest.id === APP_ID))
+        await executeHostCommand("process/launch", { appId: APP_ID });
+      const toasterRunning = await electronApp?.evaluate(({ webContents }) =>
+        webContents
+          .getAllWebContents()
+          .some((candidate) => candidate.getURL().includes("com.eden.toaster")),
+      );
+      if (!toasterRunning)
+        await executeHostCommand("process/launch", {
+          appId: "com.eden.toaster",
+        });
+      const volumeId = `ui-eject-${appId}`;
+      const driveRoot = path.join(root, volumeId);
+      await fs.mkdir(driveRoot);
+      await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
+      const evaluateApp = (script: string) =>
+        electronApp?.evaluate(
+          async ({ webContents }, input) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(input.appId));
+            return contents?.executeJavaScript(input.script);
+          },
+          { appId, script },
+        );
+      await electronApp?.evaluate(
+        async (_electron, input) => {
+          const host = globalThis as typeof globalThis & {
+            __uiEjectFinish?: (busy: boolean) => void;
+            __edenIntegration: {
+              eden: {
+                volumes: {
+                  register(
+                    input: unknown,
+                    options: { eject: () => Promise<void> },
+                  ): Promise<unknown>;
+                };
+              };
+            };
+          };
+          delete host.__uiEjectFinish;
+          await host.__edenIntegration.eden.volumes.register(
+            {
+              id: input.volumeId,
+              label: "Toolbar USB",
+              kind: "removable",
+              rootPath: input.driveRoot,
+            },
+            {
+              eject: () =>
+                new Promise<void>((resolve, reject) => {
+                  host.__uiEjectFinish = (busy) =>
+                    busy ? reject(new Error("Device busy")) : resolve();
+                }),
+            },
+          );
+        },
+        { volumeId, driveRoot },
+      );
+      await executeHostCommand("file/open", {
+        location: { volume: volumeId, path: "/" },
+      });
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('[aria-label="Safely remove drive"]')?.disabled`,
+          ),
+        )
+        .toBe(false);
+      await evaluateApp(
+        `document.querySelector('[aria-label="Safely remove drive"]').click()`,
+      );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('[aria-label="Removing drive…"]')?.disabled`,
+          ),
+        )
+        .toBe(true);
+      await expect
+        .poll(() =>
+          executeHostCommand<{ id: string; state: string }[]>(
+            "volume/list",
+            {},
+          ),
+        )
+        .toContainEqual(
+          expect.objectContaining({ id: volumeId, state: "ejecting" }),
+        );
+      await expect
+        .poll(() =>
+          electronApp?.evaluate(
+            () =>
+              typeof (
+                globalThis as typeof globalThis & {
+                  __uiEjectFinish?: unknown;
+                }
+              ).__uiEjectFinish,
+          ),
+        )
+        .toBe("function");
+      await electronApp?.evaluate(() => {
+        (
+          globalThis as typeof globalThis & {
+            __uiEjectFinish: (busy: boolean) => void;
+          }
+        ).__uiEjectFinish(true);
+      });
+      await expect
+        .poll(() => evaluateApp(`document.body.textContent`))
+        .toContain("Device busy");
+      await evaluateApp(
+        `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'OK')?.click()`,
+      );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('[aria-label="Safely remove drive"]')?.disabled`,
+          ),
+        )
+        .toBe(false);
+      await fs.writeFile(path.join(driveRoot, "after-busy.txt"), "after");
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('.file-list')?.textContent ?? document.body.textContent`,
+          ),
+        )
+        .toContain("after-busy.txt");
+      await electronApp?.evaluate(() => {
+        delete (globalThis as typeof globalThis & { __uiEjectFinish?: unknown })
+          .__uiEjectFinish;
+      });
+      await evaluateApp(
+        `document.querySelector('[aria-label="Safely remove drive"]').click()`,
+      );
+      await expect
+        .poll(() =>
+          executeHostCommand<{ id: string; state: string }[]>(
+            "volume/list",
+            {},
+          ),
+        )
+        .toContainEqual(
+          expect.objectContaining({ id: volumeId, state: "ejecting" }),
+        );
+      await expect
+        .poll(() =>
+          electronApp?.evaluate(
+            () =>
+              typeof (
+                globalThis as typeof globalThis & {
+                  __uiEjectFinish?: unknown;
+                }
+              ).__uiEjectFinish,
+          ),
+        )
+        .toBe("function");
+      await electronApp?.evaluate(() => {
+        (
+          globalThis as typeof globalThis & {
+            __uiEjectFinish: (busy: boolean) => void;
+          }
+        ).__uiEjectFinish(false);
+      });
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('.explorer-header select')?.value`,
+          ),
+        )
+        .toBe("home");
+      expect(
+        await executeHostCommand<{ id: string }[]>("volume/list", {}),
+      ).not.toContainEqual(expect.objectContaining({ id: volumeId }));
+      await executeHostCommand("process/stop", { appId });
     });
 
     test("accepts slow safe eject and observes completion across renderer and backend IPC", async () => {

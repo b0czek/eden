@@ -42,8 +42,10 @@ export const useExplorerNavigation = (
         options.allowedVolumes?.()?.includes(volume.id),
     ),
   );
-  const readOnly = () =>
-    volumes().find((volume) => volume.id === currentVolume())?.readOnly ?? true;
+  const readOnly = () => {
+    const volume = volumes().find((volume) => volume.id === currentVolume());
+    return !volume || volume.readOnly || volume.state !== "ready";
+  };
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [navigationHistory, setNavigationHistory] = createSignal<

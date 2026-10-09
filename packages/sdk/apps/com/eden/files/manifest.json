@@ -29,6 +29,7 @@
   "permissions": [
     "fs/*",
     "volume/read",
+    "volume/eject",
     "db/rw",
     "package/read",
     "settings/rw"

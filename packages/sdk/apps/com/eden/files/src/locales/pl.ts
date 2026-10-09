@@ -1,5 +1,10 @@
 export const pl = {
   files: {
+    eject: "Bezpiecznie usuń dysk",
+    ejecting: "Usuwanie dysku…",
+    safeToRemove: "Można bezpiecznie usunąć dysk {name}.",
+    ejectFailed: "Nie udało się usunąć dysku",
+
     volume: "Wolumin",
     home: "Katalog domowy",
     readOnly: "Tylko do odczytu",

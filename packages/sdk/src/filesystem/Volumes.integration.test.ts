@@ -696,6 +696,41 @@ describe("consumer-managed filesystem volumes", () => {
       reason: "cancel",
     });
 
+    let enteredHost!: () => void;
+    let rejectRemoval!: (error: Error) => void;
+    const hostEntered = new Promise<void>((resolve) => {
+      enteredHost = resolve;
+    });
+    await eden.runtime.volumes.register(
+      {
+        id: "usb",
+        label: "Thumb drive",
+        kind: "removable",
+        rootPath: usbRoot,
+      },
+      {
+        eject: () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectRemoval = reject;
+            enteredHost();
+          }),
+      },
+    );
+    const pending = (await invoke(appId, "file-picker/open", {
+      mode: "open",
+      initialLocation: usb,
+    })) as { requestId: string };
+    const removal = eden.runtime.volumes.eject("usb");
+    await hostEntered;
+    await expect(resolve(pending.requestId, [usb])).rejects.toThrow(
+      "being removed",
+    );
+    rejectRemoval(new Error("Device busy"));
+    await expect(removal).rejects.toThrow("Device busy");
+    await expect(resolve(pending.requestId, [usb])).resolves.toEqual({
+      success: true,
+    });
+
     await eden.runtime.volumes.register({
       id: "readonly",
       label: "Read-only drive",

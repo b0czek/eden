@@ -30,6 +30,8 @@ export interface FileExplorerLabels {
   volume: string;
   home: string;
   readOnly: string;
+  eject: string;
+  ejecting: string;
   refresh: string;
   goBack: string;
   goForward: string;

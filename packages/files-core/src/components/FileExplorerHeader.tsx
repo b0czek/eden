@@ -4,6 +4,7 @@ import {
   FaSolidArrowLeft,
   FaSolidArrowRight,
   FaSolidArrowUp,
+  FaSolidEject,
   FaSolidEllipsis,
   FaSolidFileMedical,
   FaSolidFolderPlus,
@@ -12,7 +13,7 @@ import {
   FaSolidNetworkWired,
   FaSolidRotateRight,
 } from "solid-icons/fa";
-import { type Component, For, type JSX } from "solid-js";
+import { type Component, For, type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { Breadcrumb, FileExplorerLabels } from "../types";
 import Omnibox from "./Omnibox";
@@ -24,6 +25,8 @@ export interface FileExplorerHeaderProps {
   volumes: FilesystemVolume[];
   onVolumeChange: (volume: string) => void;
   onRefresh: () => void;
+  onEject?: () => void;
+  ejectPending?: boolean;
   readOnly?: boolean;
   historyIndex: number;
   historyLength: number;
@@ -39,6 +42,10 @@ export interface FileExplorerHeaderProps {
 }
 
 const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
+  const selectedVolume = () =>
+    props.volumes.find((volume) => volume.id === props.currentVolume);
+  const ejecting = () =>
+    props.ejectPending || selectedVolume()?.state === "ejecting";
   const iconForVolume = (id: string) => {
     if (id === "home") return FaSolidHouse;
     switch (props.volumes.find((volume) => volume.id === id)?.kind) {
@@ -120,6 +127,22 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             )}
           </For>
         </select>
+
+        <Show when={selectedVolume()?.supportsEject && props.onEject}>
+          <button
+            type="button"
+            class="eden-btn eden-btn-sm eden-btn-square"
+            onClick={props.onEject}
+            disabled={ejecting()}
+            aria-busy={ejecting()}
+            aria-label={ejecting() ? props.labels.ejecting : props.labels.eject}
+            title={ejecting() ? props.labels.ejecting : props.labels.eject}
+          >
+            <Show when={ejecting()} fallback={<FaSolidEject />}>
+              <span class="eden-spinner eden-spinner-sm" aria-hidden="true" />
+            </Show>
+          </button>
+        </Show>
 
         <Omnibox
           labels={props.labels}

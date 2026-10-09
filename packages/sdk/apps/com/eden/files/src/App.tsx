@@ -9,6 +9,7 @@ import {
   getParentPath,
   useExplorerNavigation,
   useFileActivationPreference,
+  useVolumeEject,
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { notification } from "@edenapp/tablets";
@@ -31,6 +32,8 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   volume: t("files.volume"),
   home: t("files.home"),
   readOnly: t("files.readOnly"),
+  eject: t("files.eject"),
+  ejecting: t("files.ejecting"),
   refresh: t("files.refresh"),
   goBack: t("files.goBack"),
   goForward: t("files.goForward"),
@@ -90,6 +93,21 @@ const App: Component = () => {
     });
   };
 
+  const volumeRemoval = useVolumeEject({
+    onRemoved: (volume) => {
+      void notification.push(
+        t("files.eject"),
+        t("files.safeToRemove", { name: volume.label }),
+        { type: "success" },
+      );
+    },
+    onError: (error, volume) => {
+      showError(
+        `${t("files.ejectFailed")} (${volume.label}): ${error.message}`,
+      );
+    },
+  });
+
   const sortItems = (items: FileItem[]): FileItem[] => {
     const prefs = displayPreferences();
 
@@ -134,12 +152,17 @@ const App: Component = () => {
   } = useExplorerNavigation({
     sortItems,
     onLoadError: showError,
-    onVolumeRemoved: () => {
+    onVolumeRemoved: (volume) => {
       selection.exit();
       transfers.cancelTransfer();
-      void notification.push(t("files.volume"), t("files.volumeDisconnected"), {
-        type: "warning",
-      });
+      if (!volumeRemoval.isPending(volume))
+        void notification.push(
+          t("files.volume"),
+          t("files.volumeDisconnected"),
+          {
+            type: "warning",
+          },
+        );
     },
     onPathUnavailable: (path, fallbackPath) => {
       void notification.push(
@@ -376,6 +399,13 @@ const App: Component = () => {
         currentPath={currentPath()}
         currentVolume={currentVolume()}
         volumes={volumes()}
+        ejectPending={volumeRemoval.isPending(currentVolume())}
+        onEject={() => {
+          const volume = volumes().find(
+            (entry) => entry.id === currentVolume(),
+          );
+          if (volume) void volumeRemoval.eject(volume);
+        }}
         readOnly={readOnly() || loading()}
         onRefresh={refresh}
         onVolumeChange={(volume) => {
@@ -467,7 +497,13 @@ const App: Component = () => {
           selectionMode() || readOnly() ? undefined : handleDeleteShortcut
         }
         onBack={goBackWithSelectionClear}
-        disabled={transfers.busy()}
+        disabled={
+          transfers.busy() ||
+          !volumes().some(
+            (volume) =>
+              volume.id === currentVolume() && volume.state === "ready",
+          )
+        }
       />
 
       <DialogHost dialogs={dialogs} />

@@ -49,6 +49,8 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   volume: t("filePicker.volume"),
   home: t("filePicker.home"),
   readOnly: t("filePicker.readOnly"),
+  eject: "",
+  ejecting: "",
   refresh: t("filePicker.refresh"),
   goBack: t("filePicker.goBack"),
   goForward: t("filePicker.goForward"),
@@ -295,9 +297,19 @@ const App: Component = () => {
     return Boolean(request?.multiple && request.mode === "open");
   });
 
+  const selectedVolumeReady = () =>
+    volumes().some(
+      (volume) => volume.id === currentVolume() && volume.state === "ready",
+    );
+
   const canSelectItem = (item: FileItem) => {
     const request = activeRequest();
-    if (!request || loading() || (request.mode === "save" && readOnly()))
+    if (
+      !request ||
+      loading() ||
+      !selectedVolumeReady() ||
+      (request.mode === "save" && readOnly())
+    )
       return false;
     if (item.isDirectory) {
       return request.mode === "open" && request.selection === "directory";
@@ -484,7 +496,7 @@ const App: Component = () => {
 
   const confirmOpen = async () => {
     const request = activeRequest();
-    if (!request) return;
+    if (!request || !selectedVolumeReady()) return;
 
     if (request.selection === "directory") {
       const paths =
@@ -632,7 +644,12 @@ const App: Component = () => {
 
   const canConfirm = createMemo(() => {
     const request = activeRequest();
-    if (!request || loading() || (request.mode === "save" && readOnly()))
+    if (
+      !request ||
+      loading() ||
+      !selectedVolumeReady() ||
+      (request.mode === "save" && readOnly())
+    )
       return false;
     if (request.mode === "save") return fileName().trim().length > 0;
     if (request.selection === "directory") return true;
@@ -744,6 +761,7 @@ const App: Component = () => {
             />
 
             <FileList
+              disabled={!selectedVolumeReady()}
               labels={getExplorerLabels()}
               loading={loading()}
               items={visibleItems()}

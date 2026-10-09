@@ -1,5 +1,10 @@
 export const en = {
   files: {
+    eject: "Safely remove drive",
+    ejecting: "Removing drive…",
+    safeToRemove: "{name} is safe to remove.",
+    ejectFailed: "Could not remove drive",
+
     volume: "Volume",
     home: "Home",
     readOnly: "Read-only",
