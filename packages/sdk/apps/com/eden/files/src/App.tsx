@@ -21,6 +21,7 @@ import {
   SelectionActionBar,
   TransferActionBar,
 } from "./components/FileModeActionBars";
+import { FilePlaces } from "./components/FilePlaces";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
 import { useFileActions } from "./features/useFileActions";
 import { useFileSelection } from "./features/useFileSelection";
@@ -32,8 +33,6 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   volume: t("files.volume"),
   home: t("files.home"),
   readOnly: t("files.readOnly"),
-  eject: t("files.eject"),
-  ejecting: t("files.ejecting"),
   refresh: t("files.refresh"),
   goBack: t("files.goBack"),
   goForward: t("files.goForward"),
@@ -354,8 +353,11 @@ const App: Component = () => {
     return item ? [item] : [];
   };
 
-  const { handleItemContextMenu, handleBackgroundContextMenu } =
+  const { handleItemContextMenu, handleBackgroundContextMenu, showVolumeMenu } =
     useExplorerContextMenus({
+      volumes,
+      isVolumeEjectPending: volumeRemoval.isPending,
+      ejectVolume: volumeRemoval.eject,
       openItem,
       getOpenWithMenuItems,
       promptRename,
@@ -393,128 +395,138 @@ const App: Component = () => {
   });
 
   return (
-    <div class="file-explorer">
-      <FileExplorerHeader
-        labels={getExplorerLabels()}
-        currentPath={currentPath()}
-        currentVolume={currentVolume()}
+    <div class="file-explorer files-layout">
+      <FilePlaces
         volumes={volumes()}
-        ejectPending={volumeRemoval.isPending(currentVolume())}
-        onEject={() => {
-          const volume = volumes().find(
-            (entry) => entry.id === currentVolume(),
-          );
-          if (volume) void volumeRemoval.eject(volume);
-        }}
-        readOnly={readOnly() || loading()}
-        onRefresh={refresh}
-        onVolumeChange={(volume) => {
+        currentVolume={currentVolume()}
+        isEjectPending={volumeRemoval.isPending}
+        onActions={showVolumeMenu}
+        onSelect={(volume) => {
           selection.exit();
           resetNavigation("/", undefined, volume);
         }}
-        historyIndex={historyIndex()}
-        historyLength={navigationHistory().length}
-        breadcrumbs={buildBreadcrumbs(currentPath())}
-        onGoBack={goBackWithSelectionClear}
-        onGoForward={goForwardWithSelectionClear}
-        onGoUp={goUpWithSelectionClear}
-        onNavigate={navigateWithSelectionClear}
-        endActions={
-          <button
-            type="button"
-            class="eden-btn eden-btn-square eden-btn-sm file-select-button"
-            aria-label={selectionMode() ? t("files.done") : t("files.select")}
-            title={selectionMode() ? t("files.done") : t("files.select")}
-            disabled={transfers.busy() || Boolean(transfers.pendingTransfer())}
-            onClick={() =>
-              selectionMode() ? exitSelectionMode() : startSelectionMode()
+      />
+      <main class="files-main">
+        <FileExplorerHeader
+          labels={getExplorerLabels()}
+          currentPath={currentPath()}
+          currentVolume={currentVolume()}
+          volumes={volumes()}
+          showVolumeSelector={false}
+          readOnly={readOnly() || loading()}
+          onRefresh={refresh}
+          onVolumeChange={(volume) => {
+            selection.exit();
+            resetNavigation("/", undefined, volume);
+          }}
+          historyIndex={historyIndex()}
+          historyLength={navigationHistory().length}
+          breadcrumbs={buildBreadcrumbs(currentPath())}
+          onGoBack={goBackWithSelectionClear}
+          onGoForward={goForwardWithSelectionClear}
+          onGoUp={goUpWithSelectionClear}
+          onNavigate={navigateWithSelectionClear}
+          endActions={
+            <button
+              type="button"
+              class="eden-btn eden-btn-square eden-btn-sm file-select-button"
+              aria-label={selectionMode() ? t("files.done") : t("files.select")}
+              title={selectionMode() ? t("files.done") : t("files.select")}
+              disabled={
+                transfers.busy() || Boolean(transfers.pendingTransfer())
+              }
+              onClick={() =>
+                selectionMode() ? exitSelectionMode() : startSelectionMode()
+              }
+            >
+              {selectionMode() ? (
+                <FiX aria-hidden="true" />
+              ) : (
+                <FiCheckSquare aria-hidden="true" />
+              )}
+            </button>
+          }
+          onNewFolder={() => {
+            void promptCreateFolder();
+          }}
+          onNewFile={() => {
+            void promptCreateFile();
+          }}
+          onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
+        />
+
+        {selectionMode() && (
+          <SelectionActionBar
+            selectedCount={selectedPaths().length}
+            itemCount={items().length}
+            allItemsSelected={allItemsSelected()}
+            busy={transfers.busy()}
+            readOnly={readOnly() || loading()}
+            onToggleAll={toggleAllItems}
+            onTransfer={startTransfer}
+            onDelete={() => void deleteSelected()}
+          />
+        )}
+
+        {((transfers.pendingTransfer() && !transfers.busy()) ||
+          transfers.showProgress()) && (
+          <TransferActionBar
+            pendingTransfer={transfers.pendingTransfer()}
+            progress={transfers.progress()}
+            snapshot={transfers.snapshot()}
+            cancelling={transfers.cancelling()}
+            busy={transfers.busy()}
+            readOnly={readOnly() || loading()}
+            onComplete={() =>
+              void transfers.completeTransfer(currentLocation())
             }
-          >
-            {selectionMode() ? (
-              <FiX aria-hidden="true" />
-            ) : (
-              <FiCheckSquare aria-hidden="true" />
-            )}
-          </button>
-        }
-        onNewFolder={() => {
-          void promptCreateFolder();
-        }}
-        onNewFile={() => {
-          void promptCreateFile();
-        }}
-        onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
-      />
+            onCancel={transfers.cancelTransfer}
+          />
+        )}
 
-      {selectionMode() && (
-        <SelectionActionBar
-          selectedCount={selectedPaths().length}
-          itemCount={items().length}
-          allItemsSelected={allItemsSelected()}
-          busy={transfers.busy()}
-          readOnly={readOnly() || loading()}
-          onToggleAll={toggleAllItems}
-          onTransfer={startTransfer}
-          onDelete={() => void deleteSelected()}
+        <FileList
+          labels={getExplorerLabels()}
+          loading={loading()}
+          items={items()}
+          selectedItem={selectedItem()}
+          selectedPaths={selectionMode() ? selectedPaths() : undefined}
+          selectionMode={selectionMode()}
+          scrollToSelected={scrollToSelected()}
+          viewStyle={displayPreferences().viewStyle}
+          itemSize={displayPreferences().itemSize}
+          onItemClick={handleExplorerItemClick}
+          onItemFocus={setFocusedItem}
+          onSelectionToggle={toggleItemSelection}
+          onItemActivate={handleItemActivate}
+          activateOnSingleClick={openWithSingleClick()}
+          onItemContextMenu={handleItemContextMenu}
+          onBackgroundContextMenu={handleBackgroundContextMenu}
+          onItemDelete={
+            selectionMode() || readOnly() ? undefined : handleDeleteClick
+          }
+          onItemDeleteShortcut={
+            selectionMode() || readOnly() ? undefined : handleDeleteShortcut
+          }
+          onBack={goBackWithSelectionClear}
+          disabled={
+            transfers.busy() ||
+            !volumes().some(
+              (volume) =>
+                volume.id === currentVolume() && volume.state === "ready",
+            )
+          }
         />
-      )}
 
-      {((transfers.pendingTransfer() && !transfers.busy()) ||
-        transfers.showProgress()) && (
-        <TransferActionBar
-          pendingTransfer={transfers.pendingTransfer()}
-          progress={transfers.progress()}
-          snapshot={transfers.snapshot()}
-          cancelling={transfers.cancelling()}
-          busy={transfers.busy()}
-          readOnly={readOnly() || loading()}
-          onComplete={() => void transfers.completeTransfer(currentLocation())}
-          onCancel={transfers.cancelTransfer}
+        <DialogHost dialogs={dialogs} />
+
+        <DisplayOptionsModal
+          labels={getExplorerLabels()}
+          show={showDisplayOptionsModal()}
+          preferences={displayPreferences()}
+          onClose={() => setShowDisplayOptionsModal(false)}
+          onChange={handlePreferencesChange}
         />
-      )}
-
-      <FileList
-        labels={getExplorerLabels()}
-        loading={loading()}
-        items={items()}
-        selectedItem={selectedItem()}
-        selectedPaths={selectionMode() ? selectedPaths() : undefined}
-        selectionMode={selectionMode()}
-        scrollToSelected={scrollToSelected()}
-        viewStyle={displayPreferences().viewStyle}
-        itemSize={displayPreferences().itemSize}
-        onItemClick={handleExplorerItemClick}
-        onItemFocus={setFocusedItem}
-        onSelectionToggle={toggleItemSelection}
-        onItemActivate={handleItemActivate}
-        activateOnSingleClick={openWithSingleClick()}
-        onItemContextMenu={handleItemContextMenu}
-        onBackgroundContextMenu={handleBackgroundContextMenu}
-        onItemDelete={
-          selectionMode() || readOnly() ? undefined : handleDeleteClick
-        }
-        onItemDeleteShortcut={
-          selectionMode() || readOnly() ? undefined : handleDeleteShortcut
-        }
-        onBack={goBackWithSelectionClear}
-        disabled={
-          transfers.busy() ||
-          !volumes().some(
-            (volume) =>
-              volume.id === currentVolume() && volume.state === "ready",
-          )
-        }
-      />
-
-      <DialogHost dialogs={dialogs} />
-
-      <DisplayOptionsModal
-        labels={getExplorerLabels()}
-        show={showDisplayOptionsModal()}
-        preferences={displayPreferences()}
-        onClose={() => setShowDisplayOptionsModal(false)}
-        onChange={handlePreferencesChange}
-      />
+      </main>
     </div>
   );
 };

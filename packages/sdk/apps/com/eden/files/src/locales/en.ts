@@ -1,5 +1,7 @@
 export const en = {
   files: {
+    places: "Places",
+    driveActions: "Actions for {name}",
     eject: "Safely remove drive",
     ejecting: "Removing drive…",
     safeToRemove: "{name} is safe to remove.",

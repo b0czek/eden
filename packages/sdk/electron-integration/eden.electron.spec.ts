@@ -114,7 +114,12 @@ test.describe
           { recursive: true },
         ),
       ]);
-      for (const appName of ["files", "file-picker", "toaster"]) {
+      for (const appName of [
+        "files",
+        "file-picker",
+        "toaster",
+        "context-menu",
+      ]) {
         const source = path.join(
           __dirname,
           "../dist/apps/prebuilt",
@@ -1086,7 +1091,7 @@ test.describe
         .poll(() =>
           evaluateApp(
             "com.eden.files",
-            `document.querySelector('.explorer-header select')?.value`,
+            `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )
         .toBe("test-usb");
@@ -1176,7 +1181,7 @@ test.describe
         .poll(() =>
           evaluateApp(
             "com.eden.files",
-            `document.querySelector('.explorer-header select')?.value`,
+            `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )
         .toBe("home");
@@ -1184,7 +1189,7 @@ test.describe
         .poll(() =>
           evaluateApp(
             "com.eden.files",
-            `Array.from(document.querySelectorAll('.explorer-header option')).map(option => option.value)`,
+            `Array.from(document.querySelectorAll('.files-places [data-volume]')).map(row => row.getAttribute('data-volume'))`,
           ),
         )
         .toEqual(["home"]);
@@ -1531,7 +1536,7 @@ test.describe
       );
     });
 
-    test("Files ejects from its toolbar and permits retry after a busy device", async () => {
+    test("Files opens drive actions by touch and permits retry after a busy device", async () => {
       const appId = "com.eden.files";
       const running = await executeHostCommand<{ manifest: { id: string } }[]>(
         "process/list",
@@ -1539,6 +1544,14 @@ test.describe
       );
       if (!running.some((process) => process.manifest.id === APP_ID))
         await executeHostCommand("process/launch", { appId: APP_ID });
+      if (
+        !running.some(
+          (process) => process.manifest.id === "com.eden.context-menu",
+        )
+      )
+        await executeHostCommand("process/launch", {
+          appId: "com.eden.context-menu",
+        });
       const toasterRunning = await electronApp?.evaluate(({ webContents }) =>
         webContents
           .getAllWebContents()
@@ -1562,6 +1575,79 @@ test.describe
           },
           { appId, script },
         );
+      const evaluateMenu = (script: string) =>
+        electronApp?.evaluate(async ({ webContents }, script) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) =>
+              candidate.getURL().includes("com.eden.context-menu"),
+            );
+          return contents?.executeJavaScript(script);
+        }, script);
+      const openVolumeMenu = async (
+        inputMethod: "touch" | "context-menu" = "touch",
+      ) => {
+        if (inputMethod === "touch") {
+          const page = electronApp
+            ?.context()
+            .pages()
+            .find((candidate) => candidate.url().includes(appId));
+          if (!page || !electronApp) throw new Error("Files page unavailable");
+          const point = await page
+            .locator(`[data-volume="${volumeId}"] .files-place-actions`)
+            .evaluate((button) => {
+              const bounds = button.getBoundingClientRect();
+              return {
+                x: bounds.left + bounds.width / 2,
+                y: bounds.top + bounds.height / 2,
+              };
+            });
+          const session = await electronApp.context().newCDPSession(page);
+          try {
+            await session.send("Input.dispatchTouchEvent", {
+              type: "touchStart",
+              touchPoints: [point],
+            });
+            await session.send("Input.dispatchTouchEvent", {
+              type: "touchEnd",
+              touchPoints: [],
+            });
+          } finally {
+            await session.detach();
+          }
+        } else {
+          await electronApp?.evaluate(async ({ webContents }, volumeId) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) =>
+                candidate.getURL().includes("com.eden.files"),
+              );
+            if (!contents) throw new Error("Files is not running");
+            const point = await contents.executeJavaScript(`(() => {
+            const bounds = document.querySelector('[data-volume="${volumeId}"] .files-place-actions').getBoundingClientRect();
+            return { x: Math.round(bounds.left + bounds.width / 2), y: Math.round(bounds.top + bounds.height / 2) };
+          })()`);
+            contents.focus();
+            contents.sendInputEvent({
+              type: "mouseDown",
+              button: "right",
+              ...point,
+            });
+            contents.sendInputEvent({
+              type: "mouseUp",
+              button: "right",
+              ...point,
+            });
+          }, volumeId);
+        }
+        await expect
+          .poll(() =>
+            evaluateMenu(
+              `document.querySelector('#context-menu-root.is-open #context-menu-title')?.textContent`,
+            ),
+          )
+          .toBe("Toolbar USB");
+      };
       await electronApp?.evaluate(
         async (_electron, input) => {
           const host = globalThis as typeof globalThis & {
@@ -1602,20 +1688,96 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
-            `document.querySelector('[aria-label="Safely remove drive"]')?.disabled`,
+            `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )
-        .toBe(false);
-      await evaluateApp(
-        `document.querySelector('[aria-label="Safely remove drive"]').click()`,
+        .toBe(volumeId);
+      expect(
+        await evaluateApp(
+          `document.querySelector('[aria-label="Safely remove drive"]') === null`,
+        ),
+      ).toBe(true);
+      await openVolumeMenu();
+      await expect
+        .poll(() =>
+          evaluateMenu(
+            `document.querySelector('.context-menu-item:not(.context-menu-item-disabled)')?.textContent`,
+          ),
+        )
+        .toContain("Safely remove drive");
+      const filesPage = electronApp
+        ?.context()
+        .pages()
+        .find((page) => page.url().includes("com.eden.files"));
+      const menuPage = electronApp
+        ?.context()
+        .pages()
+        .find((page) => page.url().includes("com.eden.context-menu"));
+      await filesPage?.screenshot({
+        path: test.info().outputPath("files-places.png"),
+      });
+      await menuPage?.screenshot({
+        path: test.info().outputPath("files-volume-menu.png"),
+      });
+      if (!filesPage || !electronApp) throw new Error("Files page unavailable");
+      await evaluateMenu(
+        `document.querySelector('#context-menu-overlay').click()`,
+      );
+      const viewport = await electronApp.context().newCDPSession(filesPage);
+      try {
+        await viewport.send("Emulation.setDeviceMetricsOverride", {
+          width: 600,
+          height: 520,
+          deviceScaleFactor: 1,
+          mobile: false,
+        });
+        expect(
+          await filesPage
+            .locator(".files-places")
+            .evaluate((sidebar) => sidebar.getBoundingClientRect().width),
+        ).toBe(64);
+        expect(
+          await filesPage
+            .locator(".omnibox-container")
+            .evaluate((omnibox) => omnibox.getBoundingClientRect().width),
+        ).toBeGreaterThan(100);
+        expect(
+          await filesPage
+            .locator(".toolbar-right")
+            .evaluate(
+              (toolbar) =>
+                toolbar.getBoundingClientRect().right <= window.innerWidth,
+            ),
+        ).toBe(true);
+        await filesPage.screenshot({
+          path: test.info().outputPath("files-places-narrow.png"),
+        });
+        await openVolumeMenu();
+      } finally {
+        await viewport.send("Emulation.clearDeviceMetricsOverride");
+        await viewport.detach();
+      }
+      await evaluateMenu(
+        `document.querySelector('.context-menu-item').click()`,
       );
       await expect
         .poll(() =>
           evaluateApp(
-            `document.querySelector('[aria-label="Removing drive…"]')?.disabled`,
+            `document.querySelector('[data-volume="${volumeId}"]')?.getAttribute('aria-busy')`,
           ),
         )
-        .toBe(true);
+        .toBe("true");
+      await openVolumeMenu("context-menu");
+      await expect
+        .poll(() =>
+          evaluateMenu(
+            `document.querySelector('.context-menu-item-disabled')?.textContent`,
+          ),
+        )
+        .toContain("Removing drive");
+      await evaluateMenu(
+        `document.querySelector('#context-menu-overlay').click()`,
+      );
       await expect
         .poll(() =>
           executeHostCommand<{ id: string; state: string }[]>(
@@ -1654,10 +1816,10 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
-            `document.querySelector('[aria-label="Safely remove drive"]')?.disabled`,
+            `document.querySelector('[data-volume="${volumeId}"]')?.getAttribute('aria-busy')`,
           ),
         )
-        .toBe(false);
+        .toBe("false");
       await fs.writeFile(path.join(driveRoot, "after-busy.txt"), "after");
       await expect
         .poll(() =>
@@ -1666,12 +1828,30 @@ test.describe
           ),
         )
         .toContain("after-busy.txt");
+      await evaluateApp(
+        `document.querySelector('[data-volume="home"] .eden-sidebar-item').click()`,
+      );
+      await expect
+        .poll(() =>
+          evaluateApp(
+            `document.querySelector('.files-places [aria-current="location"]')?.getAttribute('aria-label')`,
+          ),
+        )
+        .toBe("Home");
       await electronApp?.evaluate(() => {
         delete (globalThis as typeof globalThis & { __uiEjectFinish?: unknown })
           .__uiEjectFinish;
       });
-      await evaluateApp(
-        `document.querySelector('[aria-label="Safely remove drive"]').click()`,
+      await openVolumeMenu();
+      await expect
+        .poll(() =>
+          evaluateMenu(
+            `document.querySelector('.context-menu-item:not(.context-menu-item-disabled)')?.textContent`,
+          ),
+        )
+        .toContain("Safely remove drive");
+      await evaluateMenu(
+        `document.querySelector('.context-menu-item').click()`,
       );
       await expect
         .poll(() =>
@@ -1705,7 +1885,7 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
-            `document.querySelector('.explorer-header select')?.value`,
+            `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )
         .toBe("home");

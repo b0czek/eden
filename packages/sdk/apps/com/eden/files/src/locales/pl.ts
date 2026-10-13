@@ -1,5 +1,7 @@
 export const pl = {
   files: {
+    places: "Miejsca",
+    driveActions: "Opcje dysku {name}",
     eject: "Bezpiecznie usuń dysk",
     ejecting: "Usuwanie dysku…",
     safeToRemove: "Można bezpiecznie usunąć dysk {name}.",

@@ -133,3 +133,127 @@
     animation: none;
   }
 }
+.file-explorer.files-layout {
+  flex-direction: row;
+  padding: var(--eden-space-lg);
+  gap: var(--eden-space-lg);
+  box-sizing: border-box;
+}
+
+.files-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.files-places-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.files-place-row {
+  position: relative;
+}
+
+.files-place-row .eden-sidebar-item {
+  min-width: 0;
+}
+
+.files-place-row-with-actions .eden-sidebar-item {
+  padding-right: calc(var(--eden-space-xl) + var(--eden-space-sm));
+}
+
+.files-place-row button:focus-visible {
+  outline: 2px solid var(--eden-color-accent-primary);
+  outline-offset: -2px;
+}
+
+.files-place-actions.eden-btn {
+  position: absolute;
+  top: 50%;
+  right: var(--eden-space-sm);
+  width: 28px;
+  height: 28px;
+  padding: var(--eden-space-xs);
+  transform: translateY(-50%);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.files-place-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+.files-place-actions-narrow {
+  display: none;
+  width: var(--eden-space-xs);
+  height: var(--eden-space-xs);
+  border-radius: var(--eden-radius-round);
+  background: currentColor;
+}
+
+@container (max-width: 600px) {
+  .files-main .explorer-header {
+    padding: var(--eden-space-sm);
+  }
+
+  .files-main .header-content {
+    flex-wrap: wrap;
+    gap: var(--eden-space-sm);
+  }
+
+  .files-main .omnibox-container {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 760px) {
+  .file-explorer.files-layout {
+    padding: var(--eden-space-md);
+    gap: var(--eden-space-md);
+  }
+
+  .files-places.eden-sidebar {
+    width: 72px;
+    min-width: 72px;
+  }
+
+  .files-places .eden-sidebar-section {
+    padding: var(--eden-space-sm);
+  }
+
+  .files-places .eden-sidebar-section-title,
+  .files-places .eden-sidebar-item-details {
+    display: none;
+  }
+
+  .files-place-row .eden-sidebar-item {
+    justify-content: center;
+    gap: 0;
+    padding-inline: var(--eden-space-sm);
+  }
+
+  .files-place-actions.eden-btn {
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 0 var(--eden-radius-md) 0 var(--eden-radius-xs);
+    transform: none;
+  }
+
+  .files-place-actions-wide {
+    display: none;
+  }
+
+  .files-place-actions-narrow {
+    display: block;
+  }
+}

@@ -49,8 +49,6 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   volume: t("filePicker.volume"),
   home: t("filePicker.home"),
   readOnly: t("filePicker.readOnly"),
-  eject: "",
-  ejecting: "",
   refresh: t("filePicker.refresh"),
   goBack: t("filePicker.goBack"),
   goForward: t("filePicker.goForward"),

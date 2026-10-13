@@ -8,10 +8,14 @@ import {
   title,
   when,
 } from "@edenapp/tablets";
+import type { FilesystemVolume } from "@edenapp/types";
 import type { Setter } from "solid-js";
 import { t } from "../i18n";
 
 interface UseExplorerContextMenusOptions {
+  volumes: () => FilesystemVolume[];
+  isVolumeEjectPending: (volume: string) => boolean;
+  ejectVolume: (volume: FilesystemVolume) => Promise<void>;
   openItem: (item: FileItem) => Promise<void>;
   getOpenWithMenuItems: (item: FileItem) => Promise<ContextMenuAction[]>;
   promptRename: (item: FileItem) => Promise<void>;
@@ -32,6 +36,36 @@ interface UseExplorerContextMenusOptions {
 export const useExplorerContextMenus = (
   options: UseExplorerContextMenusOptions,
 ) => {
+  const volumeMenu = menu((volume: FilesystemVolume) => {
+    const pending =
+      options.isVolumeEjectPending(volume.id) || volume.state === "ejecting";
+    return [
+      title(volume.label),
+      button(
+        "eject",
+        pending ? t("files.ejecting") : t("files.eject"),
+        async () => {
+          const current = options
+            .volumes()
+            .find((candidate) => candidate.id === volume.id);
+          if (current) await options.ejectVolume(current);
+        },
+        {
+          icon: "log-out",
+          disabled: pending,
+        },
+      ),
+    ];
+  });
+
+  const showVolumeMenu = (
+    volume: FilesystemVolume,
+    position: { left: number; top: number },
+  ) => {
+    if (!volume.supportsEject) return;
+    void volumeMenu.show(volume, position);
+  };
+
   const fileItemMenu = menu(
     (data: { item: FileItem; openWithItems: ContextMenuAction[] }) => [
       title(data.item.name),
@@ -128,6 +162,7 @@ export const useExplorerContextMenus = (
   };
 
   return {
+    showVolumeMenu,
     handleItemContextMenu,
     handleBackgroundContextMenu,
   };
