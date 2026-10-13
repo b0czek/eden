@@ -5,6 +5,7 @@
  * worker.getAppAPI() returns the connection immediately (ready by the time this runs).
  */
 
+import { user } from "@edenapp/client";
 import type { HostConnection } from "@edenapp/types/ipc";
 import type { HelloProtocol } from "../../shared/protocol";
 
@@ -39,9 +40,7 @@ appAPI.handle("get-status", (_payload) => {
 
 appAPI.handle("hello", async (payload) => {
   const grant = `app/${appId}/${helloGrantId}`;
-  const result = await worker?.edenAPI.shellCommand("user/has-grant", {
-    grant,
-  });
+  const result = await user.hasGrant(grant);
   if (!result?.allowed) {
     throw new Error("Missing grant: say hello");
   }

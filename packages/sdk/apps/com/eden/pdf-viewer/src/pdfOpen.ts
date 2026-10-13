@@ -1,3 +1,4 @@
+import { fs } from "@edenapp/client";
 import { filePicker, notification } from "@edenapp/tablets";
 import type { FilesystemLocation } from "@edenapp/types";
 import type {
@@ -192,9 +193,7 @@ export function createPdfOpenController({
       return undefined;
     }
 
-    const content = await window.edenAPI.shellCommand("fs/read-binary", {
-      location,
-    });
+    const content = await fs.readBinary(location);
     if (version !== loadVersion) {
       return undefined;
     }

@@ -1,0 +1,46 @@
+{
+  "name": "@edenapp/client",
+  "version": "0.14.0",
+  "description": "Generated typed shell-command client for Eden apps",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc && node scripts/build-cjs.mjs",
+    "test": "vitest run && tsc --noEmit -p tsconfig.test.json",
+    "clean": "rm -rf dist",
+    "pretest": "pnpm run build"
+  },
+  "dependencies": {
+    "@edenapp/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "esbuild": "^0.28.1"
+  },
+  "author": "Dariusz Majnert",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b0czek/eden.git",
+    "directory": "packages/client"
+  }
+}

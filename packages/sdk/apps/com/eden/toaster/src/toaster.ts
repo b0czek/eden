@@ -6,6 +6,7 @@
  * Handles timeout/pause logic locally.
  */
 
+import * as eden from "@edenapp/client";
 import type { Notification, ViewBounds, WindowSize } from "@edenapp/types";
 
 // Configuration
@@ -48,7 +49,7 @@ let interfaceScale = 1;
  */
 async function fetchWindowSize(): Promise<WindowSize> {
   try {
-    const size = await window.edenAPI.shellCommand("view/window-size", {});
+    const size = await eden.view.windowSize();
     windowSize = size;
     return size;
   } catch (err) {
@@ -62,10 +63,7 @@ async function fetchWindowSize(): Promise<WindowSize> {
  */
 async function fetchInterfaceScale(): Promise<number> {
   try {
-    const { scale } = await window.edenAPI.shellCommand(
-      "view/get-interface-scale",
-      {},
-    );
+    const { scale } = await eden.view.getInterfaceScale();
     if (Number.isFinite(scale)) {
       interfaceScale = scale;
     }
@@ -162,9 +160,7 @@ function calculateBounds(): ViewBounds {
 async function updateOverlayBounds(): Promise<void> {
   const bounds = calculateBounds();
   try {
-    await window.edenAPI.shellCommand("view/update-bounds", {
-      bounds,
-    });
+    await eden.view.updateBounds(bounds);
   } catch (err) {
     console.error("Failed to update overlay bounds:", err);
   }
@@ -193,11 +189,9 @@ function showNextPendingToast(): void {
 }
 
 function reportNotificationDismissed(notificationId: string): void {
-  void window.edenAPI
-    .shellCommand("notification/dismissed", { notificationId })
-    .catch((error) => {
-      console.error(`Toast dismissal failed: ${notificationId}`, error);
-    });
+  void eden.notification.dismissed(notificationId).catch((error) => {
+    console.error(`Toast dismissal failed: ${notificationId}`, error);
+  });
 }
 
 /**
@@ -418,11 +412,8 @@ function createToastElement(notification: Notification): HTMLElement {
     );
     actionButton?.addEventListener("click", (event) => {
       event.stopPropagation();
-      void window.edenAPI
-        .shellCommand("notification/action-clicked", {
-          notificationId: notification.id,
-          actionId: action.id,
-        })
+      void eden.notification
+        .actionClicked(notification.id, action.id)
         .catch((error) => {
           console.error(`Toast action failed: ${action.id}`, error);
         });
@@ -515,7 +506,7 @@ async function init(): Promise<void> {
   await Promise.all([fetchWindowSize(), fetchInterfaceScale()]);
 
   // Register as the display provider for notifications
-  await window.edenAPI.shellCommand("notification/register-display", {});
+  await eden.notification.registerDisplay();
 
   // Subscribe to notification events
   window.edenAPI.subscribe("notification/added", handleToastAdded);

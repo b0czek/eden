@@ -91,6 +91,22 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/client:
+    dependencies:
+      '@edenapp/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
+
   packages/dev-host:
     dependencies:
       '@edenapp/sdk':
@@ -253,6 +269,9 @@ importers:
         specifier: ^1.0.8
         version: 1.0.8
     devDependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../client
       '@edenapp/scripts':
         specifier: workspace:*
         version: link:../scripts
@@ -313,6 +332,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -446,6 +468,10 @@ importers:
         version: 2.11.14(solid-js@1.9.14)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
 
   packages/sdk/apps/com/eden/example/hello/backend:
+    dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../../../client
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -453,6 +479,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -592,6 +621,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/tablets':
         specifier: workspace:*
         version: link:../../../../../tablets
@@ -675,6 +707,10 @@ importers:
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
 
   packages/sdk/apps/com/eden/toaster:
+    dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*

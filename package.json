@@ -9,7 +9,7 @@
   "description": "Eden Desktop Environment",
   "scripts": {
     "build": "pnpm run build:packages && pnpm install --config.confirmModulesPurge=false",
-    "build:packages": "pnpm -r --filter=!@edenapp/eden --filter=!@edenapp/example --filter=!./packages/sdk/apps/** run build",
+    "build:packages": "pnpm --filter @edenapp/sdk run codegen && pnpm -r --filter=!@edenapp/eden --filter=!@edenapp/example --filter=!./packages/sdk/apps/** run build",
     "clean": "rm -rf dist packages/*/dist",
     "dev": "pnpm --filter @edenapp/sdk dev",
     "dev:example": "cd packages/example && pnpm dev",
