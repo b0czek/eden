@@ -1,18 +1,41 @@
-import type { FilesystemVolume } from "@edenapp/types";
+import {
+  Sidebar,
+  SidebarDivider,
+  SidebarItem,
+  SidebarItemAction,
+  SidebarSection,
+} from "@edenapp/solid-kit/sidebar";
+import type { FilesystemLocation, FilesystemVolume } from "@edenapp/types";
 import {
   FaBrandsUsb,
-  FaSolidEllipsis,
   FaSolidHardDrive,
   FaSolidHouse,
   FaSolidNetworkWired,
 } from "solid-icons/fa";
-import { For, Show } from "solid-js";
+import { FiPlus } from "solid-icons/fi";
+import { For, type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import {
+  PINNED_FOLDER_LIMIT,
+  type PinnedFolder,
+  sameLocation,
+} from "../features/pinnedFolders";
 import { t } from "../i18n";
+import { PinnedFolderMarker } from "./PinnedFolderMarker";
 
 interface FilePlacesProps {
   volumes: FilesystemVolume[];
   currentVolume: string;
+  currentLocation: FilesystemLocation;
+  pins: PinnedFolder[];
+  pinCurrentDisabled: boolean;
+  onPinCurrent: () => void;
+  onSelectPin: (pin: PinnedFolder) => void;
+  onPinActions: (
+    pin: PinnedFolder,
+    position: { left: number; top: number },
+  ) => void;
+  footer?: JSX.Element;
   isEjectPending: (volume: string) => boolean;
   onSelect: (volume: string) => void;
   onActions: (
@@ -32,6 +55,16 @@ export function FilePlaces(props: FilePlacesProps) {
     if (volume.kind === "network") return FaSolidNetworkWired;
     return FaSolidHardDrive;
   };
+  const activePin = () =>
+    props.pins.some((pin) => sameLocation(pin.location, props.currentLocation));
+  const pinTitle = () =>
+    props.pins.length >= PINNED_FOLDER_LIMIT
+      ? t("files.pinLimit", { count: PINNED_FOLDER_LIMIT })
+      : props.currentLocation.path === "/"
+        ? t("files.openFolderToPin")
+        : activePin()
+          ? t("files.folderAlreadyPinned")
+          : t("files.pinCurrentFolder");
   const openContextMenu = (volume: FilesystemVolume, event: MouseEvent) => {
     event.preventDefault();
     if (volume.supportsEject)
@@ -39,77 +72,49 @@ export function FilePlaces(props: FilePlacesProps) {
   };
 
   return (
-    <nav
-      class="eden-sidebar eden-sidebar-compact files-places"
-      aria-label={t("files.places")}
+    <Sidebar
+      class="files-places"
+      size="compact"
+      label={t("files.places")}
+      heading={t("files.places")}
+      footer={props.footer}
+      toggleLabels={{
+        collapse: t("files.collapseSidebar"),
+        expand: t("files.expandSidebar"),
+      }}
     >
-      <div class="files-places-scroll eden-scrollbar">
-        <div class="eden-sidebar-section">
-          <div class="eden-sidebar-section-title">{t("files.places")}</div>
-          <div class="eden-sidebar-items">
-            <For each={props.volumes}>
-              {(volume) => (
-                <div
-                  class="files-place-row"
-                  classList={{
-                    "files-place-row-with-actions": volume.supportsEject,
-                  }}
-                  data-volume={volume.id}
-                  aria-busy={pending(volume)}
-                >
-                  <button
-                    type="button"
-                    class="eden-sidebar-item"
-                    classList={{
-                      "eden-sidebar-item-selected":
-                        props.currentVolume === volume.id,
-                      "eden-sidebar-item-disabled": volume.state !== "ready",
-                    }}
-                    aria-current={
-                      props.currentVolume === volume.id ? "location" : undefined
-                    }
-                    aria-label={label(volume)}
-                    title={`${label(volume)}${volume.readOnly ? ` (${t("files.readOnly")})` : ""}`}
-                    disabled={volume.state !== "ready"}
-                    onClick={() => props.onSelect(volume.id)}
-                    onContextMenu={(event) => openContextMenu(volume, event)}
+      <SidebarSection>
+        <For each={props.volumes}>
+          {(volume) => (
+            <div data-volume={volume.id} aria-busy={pending(volume)}>
+              <SidebarItem
+                label={label(volume)}
+                description={volume.readOnly ? t("files.readOnly") : undefined}
+                selected={props.currentVolume === volume.id && !activePin()}
+                aria-current={
+                  props.currentVolume === volume.id && !activePin()
+                    ? "location"
+                    : undefined
+                }
+                title={`${label(volume)}${volume.readOnly ? ` (${t("files.readOnly")})` : ""}`}
+                disabled={volume.state !== "ready"}
+                onClick={() => props.onSelect(volume.id)}
+                onContextMenu={(event) => openContextMenu(volume, event)}
+                icon={
+                  <Show
+                    when={pending(volume)}
+                    fallback={<Dynamic component={icon(volume)} />}
                   >
-                    <span class="eden-sidebar-item-icon">
-                      <Show
-                        when={pending(volume)}
-                        fallback={
-                          <Dynamic
-                            component={icon(volume)}
-                            aria-hidden="true"
-                          />
-                        }
-                      >
-                        <span
-                          class="eden-spinner eden-spinner-sm"
-                          aria-hidden="true"
-                        />
-                      </Show>
-                    </span>
-                    <span class="eden-sidebar-item-details">
-                      <span class="eden-sidebar-item-title">
-                        {label(volume)}
-                      </span>
-                      <Show when={volume.readOnly}>
-                        <span class="eden-sidebar-item-subtitle">
-                          {t("files.readOnly")}
-                        </span>
-                      </Show>
-                    </span>
-                  </button>
-                  <Show when={volume.supportsEject}>
-                    <button
-                      type="button"
-                      class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-square files-place-actions"
+                    <span class="eden-spinner eden-spinner-sm" />
+                  </Show>
+                }
+                action={
+                  volume.supportsEject ? (
+                    <SidebarItemAction
                       aria-label={t("files.driveActions", {
                         name: label(volume),
                       })}
                       aria-haspopup="menu"
-                      title={t("files.driveActions", { name: label(volume) })}
                       onContextMenu={(event) => openContextMenu(volume, event)}
                       onClick={(event) => {
                         const bounds =
@@ -119,23 +124,83 @@ export function FilePlaces(props: FilePlacesProps) {
                           top: bounds.bottom,
                         });
                       }}
-                    >
-                      <FaSolidEllipsis
-                        class="files-place-actions-wide"
-                        aria-hidden="true"
-                      />
-                      <span
-                        class="files-place-actions-narrow"
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </Show>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-      </div>
-    </nav>
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+          )}
+        </For>
+      </SidebarSection>
+      <SidebarDivider />
+      <SidebarSection
+        title={t("files.pinnedFolderSlots", {
+          count: props.pins.length,
+          max: PINNED_FOLDER_LIMIT,
+        })}
+      >
+        <For each={props.pins}>
+          {(pin) => {
+            const volume = () =>
+              props.volumes.find((volume) => volume.id === pin.location.volume);
+            const available = () => volume()?.state === "ready";
+            const openMenu = (event: MouseEvent) => {
+              event.preventDefault();
+              props.onPinActions(pin, {
+                left: event.clientX,
+                top: event.clientY,
+              });
+            };
+            return (
+              <div
+                data-pin-volume={pin.location.volume}
+                data-pin-path={pin.location.path}
+              >
+                <SidebarItem
+                  label={pin.label}
+                  icon={<PinnedFolderMarker color={pin.color} />}
+                  selected={sameLocation(pin.location, props.currentLocation)}
+                  aria-current={
+                    sameLocation(pin.location, props.currentLocation)
+                      ? "location"
+                      : undefined
+                  }
+                  disabled={!available()}
+                  title={`${pin.label}\n${volume()?.label ?? pin.location.volume}: ${pin.location.path}${available() ? "" : `\n${t("files.pinnedVolumeUnavailable")}`}`}
+                  onClick={() => props.onSelectPin(pin)}
+                  onContextMenu={openMenu}
+                  action={
+                    <SidebarItemAction
+                      aria-label={t("files.pinnedFolderActions", {
+                        name: pin.label,
+                      })}
+                      aria-haspopup="menu"
+                      onContextMenu={openMenu}
+                      onClick={(event) => {
+                        const bounds =
+                          event.currentTarget.getBoundingClientRect();
+                        props.onPinActions(pin, {
+                          left: bounds.left,
+                          top: bounds.bottom,
+                        });
+                      }}
+                    />
+                  }
+                />
+              </div>
+            );
+          }}
+        </For>
+        <Show when={props.pins.length < PINNED_FOLDER_LIMIT}>
+          <SidebarItem
+            label={t("files.pinCurrentFolder")}
+            title={pinTitle()}
+            icon={<FiPlus />}
+            disabled={props.pinCurrentDisabled}
+            onClick={props.onPinCurrent}
+          />
+        </Show>
+      </SidebarSection>
+    </Sidebar>
   );
 }

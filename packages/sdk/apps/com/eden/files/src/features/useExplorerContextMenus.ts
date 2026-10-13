@@ -8,12 +8,19 @@ import {
   title,
   when,
 } from "@edenapp/tablets";
-import type { FilesystemVolume } from "@edenapp/types";
+import type { FilesystemLocation, FilesystemVolume } from "@edenapp/types";
 import type { Setter } from "solid-js";
 import { t } from "../i18n";
+import type { PinnedFolder } from "./pinnedFolders";
 
 interface UseExplorerContextMenusOptions {
   volumes: () => FilesystemVolume[];
+  currentLocation: () => FilesystemLocation;
+  findPin: (location: FilesystemLocation) => PinnedFolder | undefined;
+  canPin: (location: FilesystemLocation) => boolean;
+  pinFolder: (location: FilesystemLocation, label: string) => Promise<void>;
+  unpinFolder: (location: FilesystemLocation) => Promise<void>;
+  pinCurrentFolder: () => Promise<void>;
   isVolumeEjectPending: (volume: string) => boolean;
   ejectVolume: (volume: FilesystemVolume) => Promise<void>;
   openItem: (item: FileItem) => Promise<void>;
@@ -79,6 +86,25 @@ export const useExplorerContextMenus = (
         }),
       ),
       separator(),
+      when(
+        data.item.isDirectory,
+        button(
+          "pin-folder",
+          options.findPin(data.item.location)
+            ? t("files.unpinFolder")
+            : t("files.pinFolder"),
+          () =>
+            options.findPin(data.item.location)
+              ? options.unpinFolder(data.item.location)
+              : options.pinFolder(data.item.location, data.item.name),
+          {
+            icon: "bookmark",
+            disabled:
+              !options.findPin(data.item.location) &&
+              !options.canPin(data.item.location),
+          },
+        ),
+      ),
       button("copy", t("files.copy"), () => options.copyItem(data.item), {
         icon: "copy",
       }),
@@ -120,6 +146,25 @@ export const useExplorerContextMenus = (
   );
 
   const emptyAreaMenu = menu<null>(() => [
+    when(
+      options.currentLocation().path !== "/",
+      button(
+        "pin-current-folder",
+        options.findPin(options.currentLocation())
+          ? t("files.unpinFolder")
+          : t("files.pinCurrentFolder"),
+        () =>
+          options.findPin(options.currentLocation())
+            ? options.unpinFolder(options.currentLocation())
+            : options.pinCurrentFolder(),
+        {
+          icon: "bookmark",
+          disabled:
+            !options.findPin(options.currentLocation()) &&
+            !options.canPin(options.currentLocation()),
+        },
+      ),
+    ),
     button("new-folder", t("files.newFolder"), options.promptCreateFolder, {
       icon: "folder-plus",
       disabled: options.readOnly(),

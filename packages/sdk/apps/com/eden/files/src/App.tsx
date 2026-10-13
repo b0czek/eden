@@ -22,11 +22,13 @@ import {
   TransferActionBar,
 } from "./components/FileModeActionBars";
 import { FilePlaces } from "./components/FilePlaces";
+import { TransferActivity } from "./components/TransferActivity";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
 import { useFileActions } from "./features/useFileActions";
 import { useFileSelection } from "./features/useFileSelection";
 import { useFilesKeyboardShortcuts } from "./features/useFilesKeyboardShortcuts";
 import { useFileTransfers } from "./features/useFileTransfers";
+import { usePinnedFolders } from "./features/usePinnedFolders";
 import { initLocale, t } from "./i18n";
 
 const getExplorerLabels = (): FileExplorerLabels => ({
@@ -238,8 +240,26 @@ const App: Component = () => {
     }
   };
 
+  const pinned = usePinnedFolders({ dialogs, showError });
+  const pinCurrentFolder = () =>
+    pinned.pinFolder(
+      currentLocation(),
+      currentPath().split("/").filter(Boolean).pop() ?? t("files.home"),
+    );
+  const openPinnedFolder = async (location: FilesystemLocation) => {
+    try {
+      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
+      if (!stats.isDirectory) throw new Error("Not a directory");
+      selection.exit();
+      navigateWithSelectionClear(location.path, undefined, location.volume);
+    } catch {
+      showError(t("files.errors.pinnedFolderUnavailable"));
+    }
+  };
+
   onMount(async () => {
-    initLocale();
+    await initLocale();
+    await pinned.load();
     try {
       const result = await window.edenAPI.shellCommand("db/get", {
         key: "display-preferences",
@@ -356,6 +376,12 @@ const App: Component = () => {
   const { handleItemContextMenu, handleBackgroundContextMenu, showVolumeMenu } =
     useExplorerContextMenus({
       volumes,
+      currentLocation,
+      findPin: pinned.find,
+      canPin: pinned.canPin,
+      pinFolder: pinned.pinFolder,
+      unpinFolder: pinned.unpin,
+      pinCurrentFolder,
       isVolumeEjectPending: volumeRemoval.isPending,
       ejectVolume: volumeRemoval.eject,
       openItem,
@@ -399,6 +425,25 @@ const App: Component = () => {
       <FilePlaces
         volumes={volumes()}
         currentVolume={currentVolume()}
+        currentLocation={currentLocation()}
+        pins={pinned.pins()}
+        pinCurrentDisabled={
+          loading() || transfers.busy() || !pinned.canPin(currentLocation())
+        }
+        onPinCurrent={() => void pinCurrentFolder()}
+        onSelectPin={(pin) => void openPinnedFolder(pin.location)}
+        onPinActions={pinned.showMenu}
+        footer={
+          transfers.showProgress() && transfers.progress() ? (
+            <TransferActivity
+              progress={transfers.progress()}
+              snapshot={transfers.snapshot()}
+              cancelling={transfers.cancelling()}
+              onCancel={transfers.cancelTransfer}
+              dialogs={dialogs}
+            />
+          ) : undefined
+        }
         isEjectPending={volumeRemoval.isPending}
         onActions={showVolumeMenu}
         onSelect={(volume) => {
@@ -468,14 +513,9 @@ const App: Component = () => {
           />
         )}
 
-        {((transfers.pendingTransfer() && !transfers.busy()) ||
-          transfers.showProgress()) && (
+        {transfers.pendingTransfer() && !transfers.busy() && (
           <TransferActionBar
             pendingTransfer={transfers.pendingTransfer()}
-            progress={transfers.progress()}
-            snapshot={transfers.snapshot()}
-            cancelling={transfers.cancelling()}
-            busy={transfers.busy()}
             readOnly={readOnly() || loading()}
             onComplete={() =>
               void transfers.completeTransfer(currentLocation())

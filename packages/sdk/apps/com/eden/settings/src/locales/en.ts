@@ -1,6 +1,9 @@
 export const en = {
   settings: {
     sidebar: {
+      navigation: "Settings navigation",
+      collapse: "Collapse sidebar",
+      expand: "Expand sidebar",
       applications: "Applications",
       noAppsWithSettings: "No apps with settings",
     },

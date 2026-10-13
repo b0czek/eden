@@ -147,6 +147,22 @@ preferring Home. A picker with no available allowed volume waits for its selecte
 drive to reconnect, then reloads the directory and resumes live updates. Open
 documents retain their original volume addresses.
 
+## Files navigation
+
+The Places sidebar folds to an icon rail and expands again using its toggle.
+It folds automatically in narrow windows until the user chooses a state, then
+keeps that choice during resizing.
+
+Pin a folder from its context menu or use **Pin current folder** in the sidebar.
+Files keeps up to eight pinned folders, with editable names and color markers
+that remain visible when folded. A pinned folder's action menu lets users edit
+or unpin it. Pins on disconnected drives stay listed and become available when
+their volume reconnects.
+
+Ongoing operations appear in the sidebar's activity area. The folded view shows
+a compact progress indicator; selecting it opens operation details. Copy
+cancellation is available from the expanded activity area or the details dialog.
+
 ## Reading and Writing
 
 Use `fs/readdir` to list entry names and `fs/stat` for metadata:

@@ -29,12 +29,6 @@ body {
 }
 
 /* ===== Main Content ===== */
-.settings-sidebar-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
 .main-content {
   flex: 1;
   display: flex;
@@ -398,30 +392,6 @@ body {
   .settings-app {
     padding: var(--eden-space-md);
     gap: var(--eden-space-md);
-  }
-
-  .settings-app > .eden-sidebar {
-    width: 72px;
-    min-width: 72px;
-  }
-
-  .settings-app .eden-sidebar-section {
-    padding: var(--eden-space-sm);
-  }
-
-  .settings-app .eden-sidebar-section-title,
-  .settings-app .eden-sidebar-item-text {
-    display: none;
-  }
-
-  .settings-app .eden-sidebar-item {
-    justify-content: center;
-    gap: 0;
-    padding-inline: var(--eden-space-sm);
-  }
-
-  .settings-app .eden-sidebar-divider {
-    margin-inline: var(--eden-space-sm);
   }
 }
 

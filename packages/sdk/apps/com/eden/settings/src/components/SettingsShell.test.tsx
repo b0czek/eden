@@ -31,22 +31,63 @@ describe("Settings shell", () => {
     ).map((node) => node.textContent);
     const sections = view.container.querySelectorAll(".eden-sidebar-section");
 
-    expect(sectionTitles).toEqual(["Eden", "Applications"]);
+    expect(sectionTitles).toEqual(["Applications"]);
+    expect(
+      view.container.querySelector(".eden-sidebar-controls-title")?.textContent,
+    ).toBe("Eden");
     expect(sections[0].textContent).toContain("General");
     expect(sections[0].textContent).toContain("Network");
     expect(sections[1].textContent).toContain("Example App");
-    const scrollArea = view.container.querySelector(".settings-sidebar-scroll");
+    const scrollArea = view.container.querySelector(".eden-sidebar-scroll");
     expect(scrollArea?.textContent).toContain("General");
     expect(scrollArea?.textContent).toContain("Example App");
-    expect(
-      view.container.querySelectorAll(".settings-sidebar-scroll").length,
-    ).toBe(1);
+    expect(view.container.querySelectorAll(".eden-sidebar-scroll").length).toBe(
+      1,
+    );
     expect(
       view.getByRole("button", { name: "General" }).getAttribute("title"),
     ).toBe("General");
     expect(
       view.getByRole("button", { name: "Example App" }).getAttribute("title"),
     ).toBe("Example App");
+  });
+
+  it("folds and expands the sidebar while retaining the selected panel", async () => {
+    const [selected, setSelected] = createSignal<string | null>("eden.general");
+    const view = render(() => (
+      <SettingsSidebar
+        brandName={() => "Eden"}
+        panels={() => [
+          { id: "eden.general", title: "General", source: "eden" },
+        ]}
+        selectedPanelId={selected}
+        onSelect={setSelected}
+      />
+    ));
+
+    await fireEvent.click(
+      view.getByRole("button", { name: "Collapse sidebar" }),
+    );
+    const expand = view.getByRole("button", { name: "Expand sidebar" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      view.container.querySelector(".eden-sidebar-collapsed"),
+    ).not.toBeNull();
+    expect(
+      view
+        .getByRole("button", { name: "General" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(selected()).toBe("eden.general");
+
+    await fireEvent.click(expand);
+    expect(
+      view
+        .getByRole("button", { name: "Collapse sidebar" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(view.container.querySelector(".eden-sidebar-collapsed")).toBeNull();
+    expect(selected()).toBe("eden.general");
   });
 
   it("renders loading and retryable errors", async () => {

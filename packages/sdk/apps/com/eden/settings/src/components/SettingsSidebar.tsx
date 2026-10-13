@@ -1,3 +1,9 @@
+import {
+  Sidebar,
+  SidebarDivider,
+  SidebarItem,
+  SidebarSection,
+} from "@edenapp/solid-kit/sidebar";
 import type { SettingsPanelSummary } from "@edenapp/types";
 import { BiSolidKeyboard } from "solid-icons/bi";
 import { FiCode, FiCpu, FiImage, FiPackage, FiSettings } from "solid-icons/fi";
@@ -63,59 +69,43 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
     getLocalizedValue(panel.title, locale());
 
   const item = (panel: SettingsPanelSummary) => (
-    <button
-      type="button"
-      class={`eden-sidebar-item ${
-        selectedRootId() === panel.id ? "eden-sidebar-item-selected" : ""
-      }`}
-      aria-label={panelTitle(panel)}
-      title={panelTitle(panel)}
+    <SidebarItem
+      label={panelTitle(panel)}
+      icon={icon(panel)}
+      selected={selectedRootId() === panel.id}
+      aria-current={selectedRootId() === panel.id ? "page" : undefined}
       onClick={() => props.onSelect(panel.id)}
-    >
-      <div class="eden-sidebar-item-icon">{icon(panel)}</div>
-      <span class="eden-sidebar-item-text">{panelTitle(panel)}</span>
-    </button>
+    />
   );
 
   return (
-    <aside class="eden-sidebar">
-      <div class="settings-sidebar-scroll eden-scrollbar">
-        <div class="eden-sidebar-section">
-          <div class="eden-sidebar-section-title">{props.brandName()}</div>
-          <div class="eden-sidebar-items">
-            <For each={systemPanels()}>{item}</For>
-          </div>
-        </div>
-
-        <div class="eden-sidebar-divider" />
-
-        <div class="eden-sidebar-section">
-          <div class="eden-sidebar-section-title">
-            {t("settings.sidebar.applications")}
-          </div>
-          <div class="eden-sidebar-items">
-            <Show
-              when={applicationPanels().length > 0}
-              fallback={
-                <div
-                  class="eden-sidebar-item eden-sidebar-item-disabled"
-                  title={t("settings.sidebar.noAppsWithSettings")}
-                >
-                  <div class="eden-sidebar-item-icon">
-                    <FiPackage />
-                  </div>
-                  <span class="eden-sidebar-item-text">
-                    {t("settings.sidebar.noAppsWithSettings")}
-                  </span>
-                </div>
-              }
-            >
-              <For each={applicationPanels()}>{item}</For>
-            </Show>
-          </div>
-        </div>
-      </div>
-    </aside>
+    <Sidebar
+      label={t("settings.sidebar.navigation")}
+      heading={props.brandName()}
+      toggleLabels={{
+        collapse: t("settings.sidebar.collapse"),
+        expand: t("settings.sidebar.expand"),
+      }}
+    >
+      <SidebarSection>
+        <For each={systemPanels()}>{item}</For>
+      </SidebarSection>
+      <SidebarDivider />
+      <SidebarSection title={t("settings.sidebar.applications")}>
+        <Show
+          when={applicationPanels().length > 0}
+          fallback={
+            <SidebarItem
+              disabled
+              icon={<FiPackage />}
+              label={t("settings.sidebar.noAppsWithSettings")}
+            />
+          }
+        >
+          <For each={applicationPanels()}>{item}</For>
+        </Show>
+      </SidebarSection>
+    </Sidebar>
   );
 };
 
