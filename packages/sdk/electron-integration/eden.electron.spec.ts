@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
+import { build } from "esbuild";
 
 const APP_ID = "com.eden.integration.fixture";
 const PDF_VIEWER_APP_ID = "com.eden.pdf-viewer";
@@ -135,6 +136,14 @@ test.describe
 
       await fs.cp(path.join(__dirname, "fixtures/app"), fixtureDirectory, {
         recursive: true,
+      });
+      await build({
+        entryPoints: [path.join(__dirname, "../../client/dist/index.js")],
+        outfile: path.join(fixtureDirectory, "client.mjs"),
+        bundle: true,
+        platform: "neutral",
+        format: "esm",
+        target: "es2022",
       });
       await fs.cp(
         path.join(__dirname, "../dist/apps/prebuilt", PDF_VIEWER_APP_ID),
@@ -385,6 +394,96 @@ test.describe
           rootUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           value: "loaded-through-eden-dlc",
         });
+    });
+
+    test("launches Calculator", async () => {
+      const appId = "com.eden.calculator";
+      await executeHostCommand("process/launch", { appId });
+      try {
+        await expect
+          .poll(() =>
+            electronApp?.evaluate(({ webContents }, id) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(id));
+              return contents?.executeJavaScript("document.readyState");
+            }, appId),
+          )
+          .toBe("complete");
+      } finally {
+        await executeHostCommand("process/stop", { appId });
+      }
+    });
+
+    test("handles a Hello request in the app backend", async () => {
+      const appId = "com.eden.example.hello";
+      await executeHostCommand("process/launch", { appId });
+      try {
+        await expect
+          .poll(() =>
+            electronApp?.evaluate(({ webContents }, id) => {
+              const contents = webContents
+                .getAllWebContents()
+                .find((candidate) => candidate.getURL().includes(id));
+              return contents?.executeJavaScript("document.readyState");
+            }, appId),
+          )
+          .toBe("complete");
+        const response = await electronApp?.evaluate(
+          async ({ webContents }, id) => {
+            const contents = webContents
+              .getAllWebContents()
+              .find((candidate) => candidate.getURL().includes(id));
+            if (!contents) throw new Error("Hello example view not found");
+            return contents.executeJavaScript(
+              'window.getAppAPI().request("hello", { message: "generated backend" })',
+            );
+          },
+          appId,
+        );
+        expect(response).toEqual({
+          message: "Hello from backend! You said: generated backend",
+        });
+      } finally {
+        await executeHostCommand("process/stop", { appId });
+      }
+    });
+
+    test("executes generated client methods in the renderer with typed operation controls", async () => {
+      const result = await electronApp?.evaluate(
+        async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+          const eden = window.edenClient;
+          const from = { volume: "home", path: "/generated-renderer.txt" };
+          const to = { volume: "home", path: "/generated-copy.txt" };
+          await eden.fs.write(from, "generated client", { encoding: "utf8" });
+          const options = { submission: { requestKey: "generated-copy" } };
+          const copy = await eden.fs.cp(from, to, options);
+          const repeated = await eden.fs.cp(from, to, options);
+          await copy.result();
+          return {
+            sameHandle: copy.handle.id === repeated.handle.id,
+            contents: await eden.fs.read(to),
+            size: (await eden.fs.stat(to)).size,
+            status: (await copy.get()).status,
+          };
+        })()`);
+        },
+        APP_ID,
+      );
+      expect(result).toEqual({
+        sameHandle: true,
+        contents: "generated client",
+        size: 16,
+        status: "succeeded",
+      });
+      expect(
+        await fs.readFile(path.join(root, "users/generated-copy.txt"), "utf8"),
+      ).toBe("generated client");
     });
 
     test("accepts renderer and backend operations and observes work beyond former IPC deadlines", async () => {

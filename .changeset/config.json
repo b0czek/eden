@@ -12,7 +12,8 @@
       "@edenapp/babel",
       "@edenapp/tablets",
       "@edenapp/solid-kit",
-      "@edenapp/editor-dlc"
+      "@edenapp/editor-dlc",
+      "@edenapp/client"
     ]
   ],
   "linked": [],

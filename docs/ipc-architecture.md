@@ -23,6 +23,25 @@ The **EdenAPI** provides apps with access to system-level operations managed by 
 - **Frontend**: `window.edenAPI`
 - **Backend**: `worker.edenAPI` (exposed via `backend-preload.ts`)
 
+Apps can import generated command methods from `@edenapp/client` in either
+runtime:
+
+```typescript
+import { fs, process } from "@edenapp/client";
+import * as eden from "@edenapp/client";
+
+const stats = await fs.stat({ volume: "home", path: "/notes.txt" });
+const launch = await process.launch("com.example.myapp", {
+  bounds: { x: 0, y: 0, width: 800, height: 600 },
+});
+await launch.result();
+const { value } = await eden.db.get("theme");
+```
+
+Required top-level arguments are positional and optional fields go in a final
+options object. Methods preserve the command's typed result or operation
+controls, permissions, and errors. See the [client guide](../packages/client/README.md).
+
 ### Core Methods
 
 ```typescript

@@ -3,6 +3,7 @@
  *
  * Main entry point that coordinates all code generation:
  * - Commands: @EdenHandler decorators → commands.generated.d.ts
+ * - Client: Command signatures → @edenapp/client command methods
  * - Events: EdenEmitter interfaces → events.generated.d.ts
  * - Runtime: Command/event name arrays → runtime.ts
  * - I18n: SDK locale files → i18n.ts types
@@ -13,14 +14,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Node, Project } from "ts-morph";
-
+import { generateClientCode } from "./client";
 import {
   type CommandInfo,
   extractCommandHandlers,
   generateCommandsCode,
   groupCommandsByNamespace,
 } from "./commands";
-
 import {
   type EventInfo,
   extractEventDeclarations,
@@ -42,6 +42,7 @@ export function generateAll(): void {
   const typesDir = path.join(workspaceRoot, "packages", "types");
 
   const project = new Project({
+    tsConfigFilePath: path.join(projectRoot, "tsconfig.json"),
     skipAddingFilesFromTsConfig: true,
   });
 
@@ -104,6 +105,8 @@ export function generateAll(): void {
   // Group by namespace
   const namespaceCommands = groupCommandsByNamespace(allCommands);
   const namespaceEvents = groupEventsByNamespace(allEvents);
+  // Validate the complete client contract before writing any generated files.
+  const clientCode = generateClientCode(namespaceCommands);
 
   console.log(
     `📋 Grouped commands into ${namespaceCommands.length} namespaces:`,
@@ -140,6 +143,12 @@ export function generateAll(): void {
   const runtimeOutputPath = path.join(generatedDir, "runtime.ts");
   fs.writeFileSync(runtimeOutputPath, runtimeCode);
   console.log(`✅ Generated ${path.relative(projectRoot, runtimeOutputPath)}`);
+
+  const clientDir = path.join(workspaceRoot, "packages", "client", "src");
+  fs.mkdirSync(clientDir, { recursive: true });
+  const clientOutputPath = path.join(clientDir, "commands.generated.ts");
+  fs.writeFileSync(clientOutputPath, clientCode);
+  console.log(`✅ Generated ${path.relative(projectRoot, clientOutputPath)}`);
 
   // Generate i18n types
   generateI18nTypes(projectRoot);

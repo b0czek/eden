@@ -78,13 +78,33 @@ The `manifest.json` is the heart of an Eden app. It tells the system how to run 
   - `fs/*`: Full filesystem access. See [Filesystem Access](filesystem.md).
   - `db/rw`: Read/write access to the app's database.
 
-## interacting with Eden (`window.edenAPI`)
+## Interacting with Eden
 
 Eden apps run in a sandboxed environment but can interact with the system via the global `edenAPI` object. This API provides secure access to system features based on the requested permissions.
 
 ### Shell Commands
 
-The primary way to interact is `edenAPI.shellCommand`.
+Install `@edenapp/client` to call typed shell-command methods:
+
+```sh
+npm install @edenapp/client
+```
+
+```typescript
+import { db, fs } from "@edenapp/client";
+
+await db.set("preferences", JSON.stringify({ theme: "dark" }));
+const stats = await fs.stat({ volume: "home", path: "/notes.txt" });
+```
+
+Required arguments are positional; optional fields go in a final options
+object. Empty commands take no arguments. You can also use
+`import * as eden from "@edenapp/client"` and call `eden.db.get("preferences")`.
+The same imports work in backend apps. Bundle the client with the backend entry
+so its dependencies are included in the packaged app.
+
+See the [client guide](../packages/client/README.md) for argument conventions
+and operation controls. The injected `edenAPI.shellCommand` is also available:
 
 ```typescript
 // Example: Writing to a database

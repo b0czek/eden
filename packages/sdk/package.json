@@ -12,7 +12,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:keyboard-ui && pnpm run build:apps && pnpm run copy-assets",
+    "build": "pnpm run tokens:build && pnpm run css:build && pnpm run build:client && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:keyboard-ui && pnpm run build:apps && pnpm run copy-assets",
     "build:apps": "ts-node scripts/build-prebuilt-apps.ts",
     "build:keyboard-ui": "vite build --config keyboard-ui/vite.config.mts",
     "build:main": "tsc",
@@ -25,17 +25,19 @@
     "build:electron-test-dependencies": "pnpm --filter '@edenapp/sdk^...' --filter 'com.eden.*^...' run build",
     "dev": "node ./scripts/dev.mjs",
     "dev:electron": "NODE_ENV=development electron dist/dev-host.js",
-    "dev:prepare": "pnpm run tokens:build && pnpm run css:build && pnpm run codegen && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets && eden-build seed -c eden.dev.config.json -o dist",
+    "dev:prepare": "pnpm run tokens:build && pnpm run css:build && pnpm run build:client && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets && eden-build seed -c eden.dev.config.json -o dist",
     "dev:watch": "eden-build watch -c eden.dev.config.json --sdk-source-path .",
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",
     "test": "pnpm run test:unit && pnpm run test:integration:node",
     "pretest:unit": "pnpm run build:test-dependencies",
-    "test:unit": "jest --runInBand --testPathIgnorePatterns=integration.test.ts",
+    "test:unit": "pnpm run test:codegen && jest --runInBand --testPathIgnorePatterns=integration.test.ts",
     "pretest:integration:node": "pnpm run build:test-dependencies",
     "test:integration:node": "jest --runInBand --silent --testPathPatterns=integration.test.ts",
     "pretest:integration:electron": "pnpm run build:electron-test-dependencies && pnpm run build",
-    "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts"
+    "test:integration:electron": "playwright test -c electron-integration/playwright.config.ts",
+    "build:client": "pnpm run codegen && pnpm --filter @edenapp/client run build",
+    "test:codegen": "jest --runInBand --config scripts/codegen/jest.config.cjs"
   },
   "keywords": [
     "eden",
@@ -85,6 +87,7 @@
     "ts-node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-solid": "catalog:"
+    "vite-plugin-solid": "catalog:",
+    "@edenapp/client": "workspace:*"
   }
 }

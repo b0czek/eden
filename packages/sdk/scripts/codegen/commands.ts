@@ -19,6 +19,12 @@ export interface CommandInfo {
   returnType: string;
   mode: "result" | "operation";
   docs: string[];
+  fields: CommandField[];
+}
+
+export interface CommandField {
+  name: string;
+  optional: boolean;
 }
 
 export interface NamespaceCommands {
@@ -30,6 +36,7 @@ export interface NamespaceCommands {
     returnType: string;
     mode: "result" | "operation";
     docs: string[];
+    fields: CommandField[];
   }>;
 }
 
@@ -52,6 +59,29 @@ export function extractCommandHandlers(
         // Extract argument type from first parameter
         let argsType = "Record<string, never>";
         const params = method.getParameters();
+        const argumentType = params[0]?.getType();
+        const stringIndex = argumentType?.getStringIndexType();
+        const commandId = `${namespace}/${commandName}`;
+        if (
+          argumentType &&
+          (argumentType.isUnion() ||
+            argumentType.isArray() ||
+            argumentType.isTuple() ||
+            (!argumentType.isObject() && !argumentType.isIntersection()) ||
+            argumentType.getCallSignatures().length > 0 ||
+            (stringIndex && !stringIndex.isNever()) ||
+            argumentType.getNumberIndexType())
+        ) {
+          throw new Error(
+            `${commandId}: client arguments require an object with declared fields`,
+          );
+        }
+        const fields = (argumentType?.getProperties() ?? [])
+          .filter((field) => !field.getName().startsWith("_"))
+          .map((field) => ({
+            name: field.getName(),
+            optional: field.isOptional(),
+          }));
         if (params.length > 0) {
           const param = params[0];
           const typeNode = param.getTypeNode();
@@ -127,6 +157,7 @@ export function extractCommandHandlers(
           argsType,
           returnType,
           docs: extractDocs(method),
+          fields,
         });
       }
     }
@@ -157,6 +188,7 @@ export function groupCommandsByNamespace(
       argsType: cmd.argsType,
       returnType: cmd.returnType,
       docs: cmd.docs,
+      fields: cmd.fields,
     });
   });
 

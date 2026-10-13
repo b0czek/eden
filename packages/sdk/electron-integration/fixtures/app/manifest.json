@@ -5,7 +5,7 @@
   "description": "Internal real-Electron integration fixture",
   "author": "Eden",
   "backend": {
-    "entry": "backend.js"
+    "entry": "backend.mjs"
   },
   "frontend": {
     "entry": "index.html"

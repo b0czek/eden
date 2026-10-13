@@ -1,3 +1,4 @@
+import { settings } from "@edenapp/client";
 import type { Component } from "solid-js";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { initLocale, t } from "./i18n";
@@ -95,9 +96,7 @@ const App: Component = () => {
     try {
       // scientificMode setting is removed, handled by window size now
 
-      const angleResult = await window.edenAPI.shellCommand("settings/get", {
-        key: "angleUnit",
-      });
+      const angleResult = await settings.get("angleUnit");
       if (angleResult.value === "rad" || angleResult.value === "deg") {
         setAngleUnit(angleResult.value);
       }
