@@ -47,22 +47,33 @@ export function createAppBusAPI(
         throw new Error("onConnect callback must be a function");
       }
 
-      // Store the onConnect callback locally
-      // When a client connects, handleAppBusPort will call this with the connection
-      registeredServices.set(serviceName, onConnect);
-
-      // Register with main process
-      const { result } = await transport.exec("appbus/register", {
-        serviceName,
-        description: options?.description,
-        allowedClients: options?.allowedClients,
-      });
-
-      if (!result.success) {
-        registeredServices.delete(serviceName);
+      if (registeredServices.has(serviceName)) {
+        return {
+          success: false,
+          error: `Service "${serviceName}" is already registered`,
+        };
       }
 
-      return result;
+      // Reserve the callback before advertising the service: a port can arrive
+      // before the registration response, or another exposure can be attempted.
+      registeredServices.set(serviceName, onConnect);
+      try {
+        const { result } = await transport.exec("appbus/register", {
+          serviceName,
+          description: options?.description,
+          allowedClients: options?.allowedClients,
+        });
+        if (
+          !result.success &&
+          registeredServices.get(serviceName) === onConnect
+        )
+          registeredServices.delete(serviceName);
+        return result;
+      } catch (error) {
+        if (registeredServices.get(serviceName) === onConnect)
+          registeredServices.delete(serviceName);
+        throw error;
+      }
     },
 
     unexposeService: async (

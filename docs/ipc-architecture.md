@@ -245,6 +245,8 @@ interface AppBusAPI {
 }
 ```
 
+A rejected duplicate registration leaves the existing service active. If registration fails, the app can retry exposing the service. Stopping a provider removes its services and closes its peers' connections; clients must reconnect after the provider restarts.
+
 ### Usage Example
 
 **Exposing a Service (App A)**

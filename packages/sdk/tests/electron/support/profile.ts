@@ -22,7 +22,9 @@ export interface ElectronProfile {
   remoteServer: http.Server;
 }
 
-export async function createElectronProfile(): Promise<ElectronProfile> {
+export async function createElectronProfile(
+  options: { additionalAppsDirectory?: string } = {},
+): Promise<ElectronProfile> {
   const electronDirectory = path.join(__dirname, "..");
   let root = "";
   let fixtureDirectory = "";
@@ -110,6 +112,14 @@ export async function createElectronProfile(): Promise<ElectronProfile> {
         `com.eden.${appName}`,
       );
       await fs.cp(source, destination, { recursive: true });
+    }
+
+    if (options.additionalAppsDirectory) {
+      await fs.cp(
+        options.additionalAppsDirectory,
+        path.join(root, "dist/apps/prebuilt"),
+        { recursive: true },
+      );
     }
 
     await fs.cp(

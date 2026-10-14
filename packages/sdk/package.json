@@ -31,7 +31,7 @@
     "clean": "rm -rf dist",
     "test": "pnpm run test:unit && pnpm run test:integration:node",
     "pretest:unit": "pnpm run build:test-dependencies",
-    "test:types": "tsc --noEmit -p tsconfig.test.json",
+    "test:types": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p src/app-runtime/tsconfig.test.json",
     "test:unit": "pnpm run test:types && pnpm run test:codegen && jest --runInBand --testPathPatterns=src/",
     "pretest:integration:node": "pnpm run build:test-dependencies",
     "test:integration:node": "jest --runInBand --silent --testPathPatterns=tests/integration/",

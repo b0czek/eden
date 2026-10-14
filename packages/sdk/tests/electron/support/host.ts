@@ -1,8 +1,9 @@
+import * as path from "node:path";
 import {
   _electron as electron,
   expect,
-  test,
   type TestInfo,
+  test,
 } from "@playwright/test";
 import {
   APP_ID,
@@ -10,7 +11,6 @@ import {
   disposeElectronProfile,
   type ElectronProfile,
 } from "./profile";
-import * as path from "node:path";
 
 export type ElectronApplication = Awaited<ReturnType<typeof electron.launch>>;
 export type ElectronPage = Awaited<
@@ -27,8 +27,10 @@ export interface ElectronHost extends ElectronProfile {
   dispose(testInfo: TestInfo): Promise<void>;
 }
 
-export async function createElectronHost(): Promise<ElectronHost> {
-  const profile = await createElectronProfile();
+export async function createElectronHost(
+  options: { additionalAppsDirectory?: string } = {},
+): Promise<ElectronHost> {
+  const profile = await createElectronProfile(options);
   const { root, appsDirectory, userDirectory, seedPath } = profile;
   const logs: string[] = [];
   let electronApp: ElectronApplication | undefined;
@@ -149,10 +151,12 @@ export async function createElectronHost(): Promise<ElectronHost> {
   return host;
 }
 
-export function useElectronHost(options: { launchFixture?: boolean } = {}) {
+export function useElectronHost(
+  options: { launchFixture?: boolean; additionalAppsDirectory?: string } = {},
+) {
   let host: ElectronHost | undefined;
   test.beforeAll(async () => {
-    host = await createElectronHost();
+    host = await createElectronHost(options);
     if (options.launchFixture !== false) await host.launchFixture();
   });
   // biome-ignore lint/correctness/noEmptyPattern: Playwright requires fixture destructuring.
