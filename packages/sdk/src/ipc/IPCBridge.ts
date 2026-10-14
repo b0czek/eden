@@ -46,7 +46,7 @@ export class IPCBridge extends EventEmitter {
   }) => void;
 
   constructor(
-    @inject(BackendManager) private backendManager: BackendManager,
+    @inject(delay(() => BackendManager)) private backendManager: BackendManager,
     @inject(CommandRegistry) private commandRegistry: CommandRegistry,
     @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
     @inject(delay(() => ViewManager)) private viewManager: ViewManager,
