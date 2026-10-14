@@ -9,9 +9,9 @@ import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
 import { PackageManager } from "../../../src/package-manager/PackageManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,

@@ -8,10 +8,10 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../../../src/api/ControlPlaneApi";
-import { createTestCaller } from "../../support/callers";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
+import { OperationManager } from "../../../src/operations/OperationManager";
+import { createTestCaller } from "../../support/callers";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const appId = "com.example.volume-removal";
 

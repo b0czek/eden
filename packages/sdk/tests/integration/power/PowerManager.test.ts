@@ -2,8 +2,8 @@ import "reflect-metadata";
 import type { OperationHandle } from "@edenapp/types";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { operationTask } from "../../../src/operations/OperationTask";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { PowerManager } from "../../../src/power/PowerManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("PowerManager integration", () => {
   let eden: TestEden;

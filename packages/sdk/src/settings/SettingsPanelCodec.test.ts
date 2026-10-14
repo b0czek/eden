@@ -1,11 +1,11 @@
 import type { SettingsPanelView } from "@edenapp/types";
+import { panelDefinition } from "../../tests/support/settings/panels";
 import {
   cloneAndValidatePanelActionInvocation,
   cloneAndValidatePanelDefinition,
   cloneAndValidatePanelView,
   validatePanelProvider,
 } from "./SettingsPanelCodec";
-import { panelDefinition } from "../../tests/support/settings/panels";
 
 const definition = () =>
   panelDefinition({

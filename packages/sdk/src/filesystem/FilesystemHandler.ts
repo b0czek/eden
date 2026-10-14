@@ -37,7 +37,9 @@ const encoding = v.optional(
   "utf-8",
 );
 const readArgs = v.object({ location: filesystemSourceSchema, encoding });
-const openMode = v.picklist(["read"]) satisfies v.GenericSchema<FilesystemOpenMode>;
+const openMode = v.picklist([
+  "read",
+]) satisfies v.GenericSchema<FilesystemOpenMode>;
 const openArgs = v.object({
   location: filesystemLocationSchema,
   mode: v.optional(openMode, "read"),

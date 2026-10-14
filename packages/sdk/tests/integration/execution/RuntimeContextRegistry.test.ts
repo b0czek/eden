@@ -1,8 +1,8 @@
 import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
-import { SessionContext } from "../../../src/session";
 import { RuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
+import { SessionContext } from "../../../src/session";
 
 const user: UserProfile = {
   username: "operator",

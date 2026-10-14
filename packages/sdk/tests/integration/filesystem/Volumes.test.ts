@@ -9,17 +9,17 @@ import type {
   OperationHandle,
   UserProfile,
 } from "@edenapp/types";
+import { FilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
+import { VolumeManager } from "../../../src/filesystem/VolumeManager";
 import { PermissionRegistry } from "../../../src/ipc";
-import { createTestCaller } from "../../support/callers";
-import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { decodeLaunchContext } from "../../../src/utils/appLaunchContext";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
-import { FilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
-import { VolumeManager } from "../../../src/filesystem/VolumeManager";
+import { createTestCaller } from "../../support/callers";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { registerTestVolume } from "../../support/filesystem";
 
 const appId = "com.example.volumes";
 

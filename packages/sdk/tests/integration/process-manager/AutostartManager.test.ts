@@ -1,11 +1,11 @@
-import { gate } from "../../support/async";
 import { testApp } from "../../support/apps";
+import { gate } from "../../support/async";
 import "reflect-metadata";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { SettingsManager } from "../../../src/settings";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { AutostartManager } from "../../../src/process-manager/AutostartManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import { SettingsManager } from "../../../src/settings";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("AutostartManager integration", () => {
   let eden: TestEden;

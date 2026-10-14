@@ -1,10 +1,10 @@
-import { createTestCaller } from "../../support/callers";
-import { gate, tick } from "../../support/async";
-import { testApp } from "../../support/apps";
 import type {
   ShellCommandResponse,
   ShellTransport,
 } from "../../../src/app-runtime/common/shell-transport";
+import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
+import { createTestCaller } from "../../support/callers";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -21,6 +21,10 @@ import {
   dispatchEvent,
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
+import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
+import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
+import { IPCBridge } from "../../../src/ipc/IPCBridge";
+import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import {
   type OperationReporter,
@@ -28,12 +32,8 @@ import {
 } from "../../../src/operations/OperationTask";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
-import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
-import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
-import { IPCBridge } from "../../../src/ipc/IPCBridge";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const eventName = "volume/changed";
 

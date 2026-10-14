@@ -3,11 +3,11 @@ import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
 import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
-import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
 import {
   ensureDirectoryRestriction,
   normalizeDirectoryRestriction,
 } from "./UserDirectoryRestriction";
+import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
 import { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 

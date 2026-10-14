@@ -3,10 +3,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { createTestCaller } from "../../support/callers";
-import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
+import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { registerTestVolume } from "../../support/filesystem";
 
 const appId = "com.example.native-reader";
 function deferred() {

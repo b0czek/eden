@@ -1,5 +1,5 @@
-import { createTestCaller } from "../../support/callers";
 import { testApp } from "../../support/apps";
+import { createTestCaller } from "../../support/callers";
 import "reflect-metadata";
 import * as nodeFs from "node:fs/promises";
 import * as path from "node:path";
@@ -16,11 +16,11 @@ import {
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
 import type { ShellCommandResponse } from "../../../src/app-runtime/common/shell-transport";
+import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe.each(["window", "worker"])(
   "generated %s client over production shell IPC",

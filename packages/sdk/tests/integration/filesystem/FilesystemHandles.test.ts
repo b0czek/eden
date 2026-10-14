@@ -8,14 +8,14 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
-import { createTestCaller } from "../../support/callers";
-import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { createTestCaller } from "../../support/callers";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { registerTestVolume } from "../../support/filesystem";
 
 describe("file handle access and lifetime", () => {
   let eden: TestEden;

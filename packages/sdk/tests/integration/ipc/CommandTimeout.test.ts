@@ -1,6 +1,8 @@
 import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import type { OperationHandle } from "@edenapp/types";
+import { EdenHandler, EdenNamespace } from "../../../src/ipc/CommandDecorators";
+import { CommandRegistry } from "../../../src/ipc/CommandRegistry";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import {
   type OperationTask,
@@ -8,10 +10,8 @@ import {
 } from "../../../src/operations/OperationTask";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
-import { EdenHandler, EdenNamespace } from "../../../src/ipc/CommandDecorators";
-import { CommandRegistry } from "../../../src/ipc/CommandRegistry";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 class DeadlineFixture {
   constructor(private completion: Promise<string>) {}

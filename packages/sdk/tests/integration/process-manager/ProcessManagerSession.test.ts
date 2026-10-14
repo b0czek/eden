@@ -1,12 +1,12 @@
 import "reflect-metadata";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { SessionContext } from "../../../src/session/SessionContext";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { testApp } from "../../support/apps";
 import { tick } from "../../support/async";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 async function readyBackend(eden: TestEden, appId: string) {
   await tick();

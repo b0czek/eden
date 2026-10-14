@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
-import { useElectronHost, isProcessAlive } from "./support/host";
+import { isProcessAlive, useElectronHost } from "./support/host";
 import { APP_ID } from "./support/profile";
 
 test.describe

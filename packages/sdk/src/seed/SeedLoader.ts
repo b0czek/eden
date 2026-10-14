@@ -12,8 +12,8 @@ import * as path from "node:path";
 import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
-import { defaultGrantsForRole } from "../user/UserGrants";
 import { ensureDirectoryRestriction } from "../user/UserDirectoryRestriction";
+import { defaultGrantsForRole } from "../user/UserGrants";
 
 // Key constants matching UserManager and SettingsManager schemas
 const USERS_SEED_VERSION_KEY = "_seed:users:version";

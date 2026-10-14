@@ -12,10 +12,10 @@ import type {
 import type { EdenPackageChange } from "../../../src/api";
 import { PermissionRegistry } from "../../../src/ipc";
 import { OperationManager } from "../../../src/operations/OperationManager";
-import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
+import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
+import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const vendor: UserProfile = {
   username: "vendor",

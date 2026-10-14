@@ -1,5 +1,5 @@
-import { gate, tick } from "../../support/async";
 import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -14,13 +14,6 @@ import {
   IPCBridge,
   PermissionRegistry,
 } from "../../../src/ipc";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { BackendManager } from "../../../src/process-manager/BackendManager";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { SessionContext } from "../../../src/session/SessionContext";
-import { SessionManager } from "../../../src/session/SessionManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { OperationQuota } from "../../../src/operations/OperationQuota";
 import {
@@ -28,6 +21,13 @@ import {
   type OperationTask,
   operationTask,
 } from "../../../src/operations/OperationTask";
+import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { BackendManager } from "../../../src/process-manager/BackendManager";
+import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import { SessionContext } from "../../../src/session/SessionContext";
+import { SessionManager } from "../../../src/session/SessionManager";
+import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 // Register through production metadata without adding test commands to codegen.
 class Work {

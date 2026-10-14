@@ -11,9 +11,9 @@ import { PermissionRegistry } from "../../../src/ipc";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { createTestCaller } from "../../support/callers";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { createTestCaller } from "../../support/callers";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,

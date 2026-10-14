@@ -1,5 +1,5 @@
-import { createTestCaller } from "../../support/callers";
 import { gate, tick } from "../../support/async";
+import { createTestCaller } from "../../support/callers";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,8 +7,8 @@ import type { OperationHandle } from "@edenapp/types";
 import { PermissionRegistry } from "../../../src/ipc";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { operationTask } from "../../../src/operations/OperationTask";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { SessionContext } from "../../../src/session/SessionContext";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("session operation transactions", () => {
   let eden: TestEden;

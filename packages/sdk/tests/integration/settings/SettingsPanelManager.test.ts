@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import type { SettingsPanelResponse } from "@edenapp/types";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { SettingsManager } from "../../../src/settings/SettingsManager";
 import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("SettingsPanelManager integration", () => {
   let eden: TestEden;

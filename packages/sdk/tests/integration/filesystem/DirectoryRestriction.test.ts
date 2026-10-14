@@ -5,10 +5,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import type { ExecutionContext } from "../../../src/execution";
-import type { CommandRegistry, IPCBridge } from "../../../src/ipc";
-import type { ViewManager } from "../../../src/view-manager/ViewManager";
 import { FilesystemManager } from "../../../src/filesystem/FilesystemManager";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
+import type { CommandRegistry, IPCBridge } from "../../../src/ipc";
+import type { ViewManager } from "../../../src/view-manager/ViewManager";
 
 describe("FilesystemManager shared addresses and folder restrictions", () => {
   let root: string;

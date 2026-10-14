@@ -4,9 +4,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { RuntimeAppManifest } from "@edenapp/types";
+import { AppAssociationManager } from "../../../src/app-associations/AppAssociationManager";
 import type { CommandRegistry } from "../../../src/ipc";
 import type { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { AppAssociationManager } from "../../../src/app-associations/AppAssociationManager";
 
 const manifest = (id: string): RuntimeAppManifest =>
   ({

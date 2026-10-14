@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
 import { PackageManager } from "../../../src/package-manager/PackageManager";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("PackageManager development packages", () => {
   let eden: TestEden;
