@@ -66,20 +66,24 @@ const getEdenAPI = (): EdenAPITransport => {
 };
 
 const pendingPickers = new Map<string, (result: FilePickerResult) => void>();
-let filePickerSubscribed = false;
+let filePickerSubscription: Promise<void> | undefined;
 
-const ensureFilePickerSubscribed = async () => {
-  if (filePickerSubscribed) return;
-  filePickerSubscribed = true;
-
-  const edenAPI = getEdenAPI();
-  await edenAPI.subscribe("file-picker/closed", (payload) => {
-    const resolver = pendingPickers.get(payload.requestId);
-    if (resolver) {
-      pendingPickers.delete(payload.requestId);
-      resolver(payload);
-    }
-  });
+const ensureFilePickerSubscribed = () => {
+  filePickerSubscription ??= Promise.resolve()
+    .then(() =>
+      getEdenAPI().subscribe("file-picker/closed", (payload) => {
+        const resolver = pendingPickers.get(payload.requestId);
+        if (resolver) {
+          pendingPickers.delete(payload.requestId);
+          resolver(payload);
+        }
+      }),
+    )
+    .catch((error) => {
+      filePickerSubscription = undefined;
+      throw error;
+    });
+  return filePickerSubscription;
 };
 
 const selectedPathOrNull = (result: FilePickerResult) => {

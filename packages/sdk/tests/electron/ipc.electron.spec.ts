@@ -119,6 +119,49 @@ test.describe
             command: "integration/delayed",
             id: expect.any(String),
           });
+        await host.evaluateApp(
+          APP_ID,
+          `(async () => {
+          window.__operationSnapshots = [];
+          window.__stopOperationWatch = await window.__integrationOperation.watch(snapshot => window.__operationSnapshots.push(snapshot));
+        })()`,
+        );
+        await expect
+          .poll(() =>
+            host.evaluateApp(
+              APP_ID,
+              `window.__operationSnapshots.some(snapshot => snapshot.status === "running" && snapshot.phase === "waiting-for-fixture")`,
+            ),
+          )
+          .toBe(true);
+        await expect
+          .poll(async () => {
+            try {
+              return JSON.parse(
+                await fs.readFile(
+                  path.join(
+                    host.fixtureDirectory,
+                    "backend-operation-progress.json",
+                  ),
+                  "utf8",
+                ),
+              );
+            } catch {
+              return undefined;
+            }
+          })
+          .toMatchObject({
+            status: "running",
+            phase: "waiting-for-fixture",
+            revision: expect.any(Number),
+          });
+        await host.electronApp?.evaluate(() => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: { releaseOperation(name: string): void };
+          };
+          integration.__edenIntegration.releaseOperation("renderer");
+          integration.__edenIntegration.releaseOperation("backend");
+        });
         const completed = await host.electronApp?.evaluate(
           async ({ webContents }, { appId, handle }) => {
             const contents = webContents
@@ -127,11 +170,10 @@ test.describe
             if (!contents) throw new Error("Integration view missing");
             return contents.executeJavaScript(`(async () => {
           const handle = ${JSON.stringify(handle)};
-          const revisions = [];
           const operation = window.__integrationOperation;
-          const stop = await operation.watch(snapshot => revisions.push(snapshot.revision));
           const completion = await operation.result();
-          stop();
+          window.__stopOperationWatch();
+          const revisions = window.__operationSnapshots.map(snapshot => snapshot.revision);
           const retained = await window.edenAPI.operations.from(handle).result();
           return {completion, retained, revisions};
         })()`);
@@ -141,7 +183,7 @@ test.describe
         expect(completed).toMatchObject({
           completion: { name: "renderer" },
           retained: { name: "renderer" },
-          revisions: expect.any(Array),
+          revisions: expect.arrayContaining([expect.any(Number)]),
         });
         await expect
           .poll(async () => {
@@ -161,7 +203,7 @@ test.describe
           })
           .toMatchObject({
             completion: { name: "backend" },
-            revisions: expect.any(Array),
+            revisions: expect.arrayContaining([expect.any(Number)]),
           });
         expect(
           await fs.readFile(
@@ -180,8 +222,11 @@ test.describe
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
               eden: { volumes: { unregister(id: string): boolean } };
+              releaseOperation(name: string): void;
             };
           };
+          integration.__edenIntegration.releaseOperation("renderer");
+          integration.__edenIntegration.releaseOperation("backend");
           integration.__edenIntegration.eden.volumes.unregister(
             "operation-delay",
           );
@@ -259,6 +304,12 @@ test.describe
         )
         .toBe(true);
 
+      const controlWatchId = await host.evaluateApp(
+        APP_ID,
+        `(async () => {
+        return (await window.edenAPI.shellCommand("fs/watch", { location: { volume: "home", path: "/" } })).watchId;
+      })()`,
+      );
       await host.electronApp?.evaluate(
         async ({ webContents }, { appId, watchId: activeWatchId }) => {
           const contents = webContents
@@ -270,5 +321,33 @@ test.describe
         },
         { appId: APP_ID, watchId },
       );
+      await host.evaluateApp(APP_ID, "globalThis.__fsChanges = []");
+      try {
+        await fs.writeFile(
+          path.join(host.root, "users", "after-unwatch.txt"),
+          "still observed",
+        );
+        await expect
+          .poll(() =>
+            host.evaluateApp(
+              APP_ID,
+              `globalThis.__fsChanges.some(event => event.watchId === ${JSON.stringify(controlWatchId)} && event.kind === "change")`,
+            ),
+          )
+          .toBe(true);
+        // Allow native watcher callbacks queued after the control event to arrive.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(
+          await host.evaluateApp(
+            APP_ID,
+            `globalThis.__fsChanges.filter(event => event.watchId === ${JSON.stringify(watchId)})`,
+          ),
+        ).toEqual([]);
+      } finally {
+        await host.evaluateApp(
+          APP_ID,
+          `window.edenAPI.shellCommand("fs/unwatch", { watchId: ${JSON.stringify(controlWatchId)} })`,
+        );
+      }
     });
   });

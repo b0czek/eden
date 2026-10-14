@@ -64,9 +64,21 @@ void (async () => {
         JSON.stringify(operation.handle),
       );
       const revisions = [];
-      const stop = await operation.watch((snapshot) =>
-        revisions.push(snapshot.revision),
-      );
+      const stop = await operation.watch((snapshot) => {
+        revisions.push(snapshot.revision);
+        if (
+          snapshot.status === "running" &&
+          snapshot.phase === "waiting-for-fixture"
+        ) {
+          void fs.writeFile(
+            path.join(
+              process.env.EDEN_INSTALL_PATH,
+              "backend-operation-progress.json",
+            ),
+            JSON.stringify(snapshot),
+          );
+        }
+      });
       const completion = await operation.result();
       stop();
       result = { completion, revisions };

@@ -14,7 +14,10 @@ const eden = new Eden({
   },
 });
 
+const operationReleases = new Map();
+
 globalThis.__edenIntegration = {
+  releaseOperation: (name) => operationReleases.get(name)?.(),
   eden,
   execute: async (command, args) => {
     const registry = eden.runtime.ipcBridge.commandRegistry;
@@ -54,8 +57,13 @@ class IntegrationOperations {
       throw new Error("Invalid integration operation name");
     return {
       run: async (reporter) => {
+        const released = new Promise((resolve) =>
+          operationReleases.set(args.name, resolve),
+        );
         reporter.update("waiting-for-fixture");
         await new Promise((resolve) => setTimeout(resolve, 31_000));
+        await released;
+        operationReleases.delete(args.name);
         reporter.update("writing-fixture");
         await eden.runtime
           .resolve(FilesystemManager)

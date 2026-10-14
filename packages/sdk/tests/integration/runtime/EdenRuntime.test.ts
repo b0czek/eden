@@ -1,11 +1,14 @@
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import { CommandRegistry, PermissionRegistry } from "../../../src/ipc";
 import { SessionManager } from "../../../src/session";
 import { SettingsManager } from "../../../src/settings";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { UserManager } from "../../../src/user";
+import { hashPassword } from "../../../src/user/UserAuth";
+import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,
@@ -150,6 +153,76 @@ describe("EdenRuntime integration", () => {
     expect(
       eden.platform.effects.some((effect) => effect.type === "window-created"),
     ).toBe(false);
+  });
+
+  it("preserves changed credentials, default account, and settings when restarting the same seeded profile", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-restart-"));
+    try {
+      const seedPath = path.join(root, "eden-seed.json");
+      await fs.writeFile(
+        seedPath,
+        JSON.stringify({
+          users: [
+            {
+              username: "vendor",
+              name: "Vendor",
+              role: "vendor",
+              ...(await hashPassword("seed-password")),
+            },
+          ],
+          defaultUsername: "vendor",
+          settings: { "restart-app": { theme: "seed-theme" } },
+        }),
+      );
+      const first = await createTestEden({ root, config: { seedPath } });
+      active.push(first);
+      const users = first.runtime.resolve(UserManager);
+      expect(users.getDefaultUsername()).toBe("vendor");
+      await expect(
+        users.authenticate("vendor", "seed-password"),
+      ).resolves.toMatchObject({ username: "vendor" });
+      expect(
+        await first.runtime
+          .resolve(SettingsManager)
+          .get("restart-app", "theme"),
+      ).toBe("seed-theme");
+      await users.setPassword("vendor", "changed-password");
+      const operator = await users.createUser({
+        username: "operator",
+        name: "Operator",
+        password: "operator-password",
+      });
+      await users.setDefaultUsername(operator.username);
+      await first.runtime
+        .resolve(SettingsManager)
+        .set("restart-app", "theme", "changed-theme");
+      await first.dispose();
+
+      const second = await createTestEden({ root, config: { seedPath } });
+      active.push(second);
+      const restored = second.runtime.resolve(UserManager);
+      await expect(
+        restored.authenticate("vendor", "changed-password"),
+      ).resolves.toMatchObject({ username: "vendor" });
+      await expect(
+        restored.authenticate("vendor", "seed-password"),
+      ).rejects.toThrow("Invalid credentials");
+      await expect(
+        restored.authenticate("operator", "operator-password"),
+      ).resolves.toEqual(operator);
+      expect(restored.getDefaultUsername()).toBe("operator");
+      expect(
+        second.runtime.resolve(SessionManager).getCurrentUser()?.username,
+      ).toBe("operator");
+      expect(
+        await second.runtime
+          .resolve(SettingsManager)
+          .get("restart-app", "theme"),
+      ).toBe("changed-theme");
+    } finally {
+      await Promise.all(active.splice(0).map((eden) => eden.dispose()));
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it("does not retain platform resources or temporary roots across repeated cycles", async () => {
