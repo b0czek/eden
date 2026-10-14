@@ -2103,6 +2103,152 @@ test.describe
       ).not.toContainEqual(expect.objectContaining({ id: "slow-eject" }));
     });
 
+    test("Files and File Picker use full shared paths within an account folder restriction", async () => {
+      const app = electronApp;
+      if (!app) throw new Error("Electron app is not running");
+      const directory = path.join(root, "users/projects/design");
+      const driveRoot = path.join(root, "scope-usb");
+      await fs.mkdir(directory, { recursive: true });
+      await fs.mkdir(driveRoot);
+      await fs.writeFile(path.join(directory, "notes.txt"), "project notes");
+      await fs.writeFile(path.join(root, "users/notes.txt"), "root decoy");
+      await fs.writeFile(
+        path.join(driveRoot, "drive-notes.txt"),
+        "drive notes",
+      );
+
+      await app.evaluate(async () => {
+        const { eden } = (
+          globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: {
+                users: { create(args: unknown): Promise<unknown> };
+                sessions: {
+                  login(username: string, password: string): Promise<unknown>;
+                };
+              };
+            };
+          }
+        ).__edenIntegration;
+        await eden.users.create({
+          username: "designer",
+          name: "Designer",
+          password: "password",
+          directoryRestriction: "projects/design",
+        });
+        await eden.sessions.login("designer", "password");
+      });
+      await executeHostCommand("process/launch", { appId: "com.eden.files" });
+      await expect
+        .poll(() =>
+          app.windows().some((page) => page.url().includes("com.eden.files")),
+        )
+        .toBe(true);
+      const files = app
+        .windows()
+        .find((page) => page.url().includes("com.eden.files"));
+      if (!files) throw new Error("Files page unavailable");
+      await expect(files.locator(".omnibox-display")).toHaveText(
+        "/projects/design",
+      );
+      await expect(
+        files.locator(".file-item").filter({ hasText: "notes.txt" }),
+      ).toBeVisible();
+      await expect(
+        files.getByRole("button", { name: "Go Up", exact: true }),
+      ).toBeDisabled();
+
+      const rejected =
+        await files.evaluate(`window.edenAPI.shellCommand('file-picker/open', {
+        mode: 'open', initialLocation: { volume: 'home', path: '/projects/research' }
+      }).then(() => '', error => error.message)`);
+      expect(rejected).toContain("outside of the allowed directory");
+      await files.evaluate(
+        `window.edenAPI.shellCommand('file-picker/open', { mode: 'open' })`,
+      );
+      await expect
+        .poll(() =>
+          app
+            .windows()
+            .some((page) => page.url().includes("com.eden.file-picker")),
+        )
+        .toBe(true);
+      const picker = app
+        .windows()
+        .find((page) => page.url().includes("com.eden.file-picker"));
+      if (!picker) throw new Error("File Picker page unavailable");
+      await expect(picker.locator(".omnibox-display")).toHaveText(
+        "/projects/design",
+      );
+      await expect(
+        picker.getByRole("button", { name: "Go Up", exact: true }),
+      ).toBeDisabled();
+      await files.evaluate(
+        `window.edenAPI.shellCommand('file-picker/close', {})`,
+      );
+
+      await app.evaluate(async (_electron, rootPath) => {
+        const { eden } = (
+          globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { register(args: unknown): Promise<unknown> } };
+            };
+          }
+        ).__edenIntegration;
+        await eden.volumes.register({
+          id: "scope-usb",
+          label: "Scope USB",
+          kind: "removable",
+          rootPath,
+        });
+      }, driveRoot);
+      await executeHostCommand("file/open", {
+        location: { volume: "scope-usb", path: "/" },
+      });
+      await expect(
+        files.locator(".file-item").filter({ hasText: "drive-notes.txt" }),
+      ).toBeVisible();
+      await files.evaluate(`(async () => {
+        await window.edenAPI.subscribe('file-picker/closed', result => { globalThis.__scopePickerResult = result; });
+        await window.edenAPI.shellCommand('file-picker/open', {
+          mode: 'open', initialLocation: { volume: 'scope-usb', path: '/' }
+        });
+      })()`);
+      await expect(
+        picker.locator(".file-item").filter({ hasText: "drive-notes.txt" }),
+      ).toBeVisible();
+      await app.evaluate(() => {
+        (
+          globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { unregister(id: string): void } };
+            };
+          }
+        ).__edenIntegration.eden.volumes.unregister("scope-usb");
+      });
+      for (const page of [files, picker]) {
+        await expect(page.locator(".omnibox-display")).toHaveText(
+          "/projects/design",
+        );
+        await expect(
+          page.locator(".file-item").filter({ hasText: "notes.txt" }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole("button", { name: "Go Up", exact: true }),
+        ).toBeDisabled();
+      }
+      await picker
+        .locator(".file-item")
+        .filter({ hasText: "notes.txt" })
+        .click();
+      await picker.locator(".file-picker-actions .eden-btn-primary").click();
+      await expect
+        .poll(() => files.evaluate("globalThis.__scopePickerResult"))
+        .toMatchObject({
+          locations: [{ volume: "home", path: "/projects/design/notes.txt" }],
+        });
+    });
+
     test("shuts down without orphaning Electron or utility processes", async () => {
       const app = electronApp;
       expect(app).toBeDefined();

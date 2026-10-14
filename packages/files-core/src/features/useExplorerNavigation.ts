@@ -35,6 +35,19 @@ export const useExplorerNavigation = (
   const [volumeInventory, setVolumeInventory] = createSignal<
     FilesystemVolume[]
   >([]);
+  const [homeScope, setHomeScope] = createSignal<string>();
+  const accessScope = (volume = currentVolume()) =>
+    volume === "home" ? homeScope() : "/";
+  const canNavigate = (path: string, volume = currentVolume()) => {
+    const boundary = accessScope(volume);
+    return (
+      boundary !== undefined &&
+      (boundary === "/" || path === boundary || path.startsWith(`${boundary}/`))
+    );
+  };
+  const canGoUp = () =>
+    canNavigate(getParentPath(currentPath())) &&
+    currentPath() !== accessScope();
   const volumes = createMemo(() =>
     volumeInventory().filter(
       (volume) =>
@@ -58,6 +71,7 @@ export const useExplorerNavigation = (
   let watchRequestSequence = 0;
   let refreshQueued = false;
   let disposed = false;
+  let scopesLoaded = false;
 
   const reportLoadError = (error: unknown) => {
     const loadError = error instanceof Error ? error : new Error(String(error));
@@ -162,7 +176,7 @@ export const useExplorerNavigation = (
 
   const findNearestParent = async (unavailablePath: string, volume: string) => {
     let candidate = getParentPath(unavailablePath);
-    while (candidate !== unavailablePath) {
+    while (candidate !== unavailablePath && canNavigate(candidate, volume)) {
       try {
         const stats = await window.edenAPI.shellCommand("fs/stat", {
           location: { volume, path: candidate },
@@ -182,6 +196,8 @@ export const useExplorerNavigation = (
     settings: { background?: boolean; replaceWatch?: boolean } = {},
   ): Promise<boolean> => {
     const request = ++requestSequence;
+    await subscribed;
+    if (request !== requestSequence || disposed) return false;
     if (!settings.background) setLoading(true);
     if (settings.replaceWatch !== false) await establishWatch(location);
     if (request !== requestSequence || disposed) return false;
@@ -306,7 +322,7 @@ export const useExplorerNavigation = (
     );
     const fallback =
       available.find((volume) => volume.id === "home") ?? available[0];
-    if (fallback) resetNavigation("/", undefined, fallback.id);
+    if (fallback) navigateToScope(fallback.id);
     else {
       void stopWatch();
       setLoading(false);
@@ -318,11 +334,23 @@ export const useExplorerNavigation = (
   ])
     .then(async () => {
       const version = inventoryVersion;
-      const inventory = await window.edenAPI.shellCommand("volume/list", {});
-      if (!disposed && version === inventoryVersion)
-        setVolumeInventory(inventory);
+      const [inventory, scope] = await Promise.all([
+        window.edenAPI.shellCommand("volume/list", {}),
+        window.edenAPI.shellCommand("fs/access-scope", { volume: "home" }),
+      ]);
+      if (disposed) return;
+      setHomeScope(scope.path);
+      if (!options.initialLocation && requestSequence === 0) {
+        const initial = { volume: "home", path: scope.path };
+        setCurrentLocation(initial);
+        setNavigationHistory([initial]);
+      }
+      if (version === inventoryVersion) setVolumeInventory(inventory);
     })
-    .catch(reportLoadError);
+    .catch(reportLoadError)
+    .finally(() => {
+      scopesLoaded = true;
+    });
   if (!options.active) {
     void subscribed.then(() => {
       if (!disposed) void loadDirectory(currentLocation());
@@ -363,6 +391,16 @@ export const useExplorerNavigation = (
     selectedItem?: string,
     volume = currentVolume(),
   ) => {
+    if (!scopesLoaded) {
+      void subscribed.then(() => {
+        if (!disposed) navigateTo(path, selectedItem, volume);
+      });
+      return;
+    }
+    if (!canNavigate(path, volume)) {
+      reportLoadError(new Error("Path is outside of the allowed directory"));
+      return;
+    }
     const location = { path, volume };
     transitionTo(
       location,
@@ -381,6 +419,16 @@ export const useExplorerNavigation = (
     selectedItem?: string,
     volume = currentVolume(),
   ) => {
+    if (!scopesLoaded) {
+      void subscribed.then(() => {
+        if (!disposed) resetNavigation(path, selectedItem, volume);
+      });
+      return;
+    }
+    if (!canNavigate(path, volume)) {
+      reportLoadError(new Error("Path is outside of the allowed directory"));
+      return;
+    }
     const location = { path, volume };
     transitionTo(
       location,
@@ -390,6 +438,14 @@ export const useExplorerNavigation = (
       },
       selectedItem,
     );
+  };
+
+  const navigateToScope = (volume: string) => {
+    void subscribed.then(() => {
+      if (disposed) return;
+      const boundary = accessScope(volume);
+      if (boundary !== undefined) resetNavigation(boundary, undefined, volume);
+    });
   };
 
   const goBack = () => {
@@ -407,6 +463,7 @@ export const useExplorerNavigation = (
     }
   };
   const goUp = () => {
+    if (!canGoUp()) return;
     const parentPath = getParentPath(currentPath());
     if (parentPath !== currentPath()) navigateTo(parentPath);
   };
@@ -433,6 +490,9 @@ export const useExplorerNavigation = (
   return {
     currentVolume,
     currentLocation,
+    accessScope,
+    canGoUp,
+    navigateToScope,
     volumes,
     readOnly,
     currentPath,

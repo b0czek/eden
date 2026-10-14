@@ -67,6 +67,16 @@ const transferArgs = v.object({
 export class FilesystemHandler {
   constructor(private fsManager: FilesystemManager) {}
 
+  /** Return the caller's accessible starting folder within a volume. */
+  @EdenHandler("access-scope", { permission: "read" })
+  handleAccessScope(args: { volume: string }): FilesystemLocation {
+    const { volume } = v.parse(
+      v.object({ volume: v.pipe(v.string(), v.nonEmpty()) }),
+      args,
+    );
+    return this.fsManager.accessScope(volume);
+  }
+
   /**
    * Read the contents of a file.
    */

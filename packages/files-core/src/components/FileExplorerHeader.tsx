@@ -21,6 +21,7 @@ export interface FileExplorerHeaderProps {
   labels: FileExplorerLabels;
   currentPath: string;
   currentVolume: string;
+  canGoUp?: boolean;
   volumes: FilesystemVolume[];
   showVolumeSelector?: boolean;
   onVolumeChange: (volume: string) => void;
@@ -90,7 +91,7 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
-            disabled={props.currentPath === "/"}
+            disabled={props.canGoUp === false || props.currentPath === "/"}
             title={props.labels.goUp}
           >
             <FaSolidArrowUp />

@@ -139,7 +139,8 @@ const App: Component = () => {
     currentLocation,
     volumes,
     readOnly,
-    resetNavigation,
+    navigateToScope,
+    canGoUp,
     items,
     setItems,
     loading,
@@ -448,7 +449,7 @@ const App: Component = () => {
         onActions={showVolumeMenu}
         onSelect={(volume) => {
           selection.exit();
-          resetNavigation("/", undefined, volume);
+          navigateToScope(volume);
         }}
       />
       <main class="files-main">
@@ -456,13 +457,14 @@ const App: Component = () => {
           labels={getExplorerLabels()}
           currentPath={currentPath()}
           currentVolume={currentVolume()}
+          canGoUp={canGoUp()}
           volumes={volumes()}
           showVolumeSelector={false}
           readOnly={readOnly() || loading()}
           onRefresh={refresh}
           onVolumeChange={(volume) => {
             selection.exit();
-            resetNavigation("/", undefined, volume);
+            navigateToScope(volume);
           }}
           historyIndex={historyIndex()}
           historyLength={navigationHistory().length}

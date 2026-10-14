@@ -49,7 +49,7 @@ export class UserHandler {
     role?: UserRole;
     password: string;
     grants?: string[];
-    homeDirectory?: string;
+    directoryRestriction?: string;
   }): Promise<{ user: UserProfile }> {
     this.assertVendor();
     const user = await this.userManager.createUser(args);
@@ -65,7 +65,7 @@ export class UserHandler {
     name?: string;
     role?: UserRole;
     grants?: string[];
-    homeDirectory?: string | null;
+    directoryRestriction?: string | null;
   }): Promise<{ user: UserProfile }> {
     this.assertVendor();
     const user = await this.userManager.updateUser(args);

@@ -18,9 +18,9 @@ import type {
 import {
   assertExistingPathWithin,
   assertPathWithin,
-  normalizeHomeDirectory,
-  resolveHomeDirectory,
-} from "../user/UserHomeDirectory";
+  normalizeDirectoryRestriction,
+  resolveDirectoryRestriction,
+} from "../user/UserDirectoryRestriction";
 import { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemHandler } from "./FilesystemHandler";
 import { FilesystemTransfer } from "./FilesystemTransfer";
@@ -130,7 +130,8 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     if (write && info.readOnly)
       throw new Error(`Filesystem volume '${address.volume}' is read-only`);
     const mounted = this.volumes.getRoot(address.volume);
-    const rootPath = mounted?.rootPath ?? (await this.getEffectiveRoot());
+    const rootPath = mounted?.rootPath ?? this.baseDir;
+    const accessPath = mounted?.rootPath ?? this.getHomeAccessPath();
     const assertActive = async () => {
       await mounted?.assertActive();
     };
@@ -138,14 +139,23 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     const relativePath = address.path.replace(/^[\\/]+/, "");
     const hostPath = path.resolve(rootPath, relativePath);
     assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
+    assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
     await assertExistingPathWithin(rootPath, hostPath);
+    if (accessPath !== rootPath)
+      await assertExistingPathWithin(accessPath, hostPath);
     await assertActive();
-    return { hostPath, rootPath, assertActive };
+    return { hostPath, rootPath, accessPath, assertActive };
   }
 
-  private assertNotRoot(target: { hostPath: string; rootPath: string }): void {
+  private assertNotRoot(target: {
+    hostPath: string;
+    rootPath: string;
+    accessPath: string;
+  }): void {
     if (target.hostPath === target.rootPath)
       throw new Error("Cannot delete, move, or replace a volume root");
+    if (target.hostPath === target.accessPath)
+      throw new Error("Cannot delete, move, or replace an access root");
   }
 
   /**
@@ -163,23 +173,16 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       this.requirePrincipal();
       const mounted = this.volumes.getRoot(volume);
       await mounted?.assertActive();
-      const effectiveRoot =
-        mounted?.rootPath ?? (await this.getEffectiveRoot());
+      const rootPath = mounted?.rootPath ?? this.baseDir;
       const normalizedAbsolute = path.resolve(absolutePath);
-
-      assertPathWithin(
-        effectiveRoot,
-        normalizedAbsolute,
-        `Path '${absolutePath}'`,
-      );
-      await assertExistingPathWithin(effectiveRoot, normalizedAbsolute);
-
-      const relativePath = normalizedAbsolute.slice(effectiveRoot.length);
-      // Ensure it starts with /
-      return {
+      assertPathWithin(rootPath, normalizedAbsolute, `Path '${absolutePath}'`);
+      const relativePath = path.relative(rootPath, normalizedAbsolute);
+      const location = {
         volume,
-        path: relativePath.startsWith("/") ? relativePath : `/${relativePath}`,
+        path: `/${relativePath.split(path.sep).join("/")}`,
       };
+      await this.resolveTarget(location);
+      return location;
     });
   }
 
@@ -195,7 +198,18 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     }
   }
 
-  private async getEffectiveRoot(): Promise<string> {
+  /** Accessible starting directory; addresses remain relative to the volume root. */
+  accessScope(volume: string): FilesystemLocation {
+    this.requirePrincipal();
+    this.volumes.get(volume);
+    const accessPath = volume === "home" ? this.getHomeAccessPath() : undefined;
+    const relativePath = accessPath
+      ? path.relative(this.baseDir, accessPath)
+      : "";
+    return { volume, path: `/${relativePath.split(path.sep).join("/")}` };
+  }
+
+  private getHomeAccessPath(): string {
     const principal = this.executionContext.getPrincipal();
     if (principal?.kind === "system") {
       return this.baseDir;
@@ -209,12 +223,14 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       return this.baseDir;
     }
 
-    const homeDirectory = normalizeHomeDirectory(user.homeDirectory);
-    if (!homeDirectory) {
+    const directoryRestriction = normalizeDirectoryRestriction(
+      user.directoryRestriction,
+    );
+    if (!directoryRestriction) {
       return this.baseDir;
     }
 
-    return resolveHomeDirectory(this.baseDir, homeDirectory);
+    return resolveDirectoryRestriction(this.baseDir, directoryRestriction);
   }
 
   // =====================
@@ -278,6 +294,8 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await target.assertActive();
       await assertExistingPathWithin(target.rootPath, fullPath);
+      if (target.accessPath !== target.rootPath)
+        await assertExistingPathWithin(target.accessPath, fullPath);
       await target.assertActive();
       await fs.writeFile(fullPath, content, encoding);
       this.invalidateHostDirectory(path.dirname(fullPath));

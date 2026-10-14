@@ -32,15 +32,14 @@ export const en = {
       appGrants: "App grants",
       systemGrants: "System grants",
       rawWarning: "Caution: modifying raw grants can break application access.",
-      filesystemLocation: "Filesystem location",
+      filesystemLocation: "Folder restriction",
       filesystemLocationPlaceholder:
         "Relative path, for example teams/operators",
       filesystemLocationHelp:
-        "Limits this user's filesystem access to this folder. Leave blank for the shared root; users may share the same location.",
-      filesystemLocationUpdateFailed:
-        "Failed to update the filesystem location",
+        "Limits access within Home to this folder. Leave blank for the full shared tree. Users may share the same folder or overlapping folders, such as projects and projects/design.",
+      filesystemLocationUpdateFailed: "Failed to update the folder restriction",
       filesystemLocationPickerFailed: "Failed to open the folder picker",
-      filesystemLocationPickerTitle: "Choose filesystem location",
+      filesystemLocationPickerTitle: "Choose allowed folder",
       chooseLocation: "Choose folder",
       vendorFilesystemDescription:
         "Vendor users always have access to the full filesystem root.",

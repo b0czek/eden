@@ -24,12 +24,12 @@ describe("UserManager accounts", () => {
     await fs.rm(userDirectory, { recursive: true, force: true });
   });
 
-  it("creates assigned homes and preserves them when deleting a user", async () => {
+  it("creates assigned restriction folders and preserves them when deleting a user", async () => {
     await manager.createUser({
       username: "operator",
       name: "Operator",
       password: "password",
-      homeDirectory: "teams/operators",
+      directoryRestriction: "teams/operators",
     });
     const marker = path.join(userDirectory, "teams", "operators", "keep.txt");
     await fs.writeFile(marker, "keep");

@@ -106,6 +106,10 @@ describe.each(["window", "worker"])(
     });
 
     it("executes positional, optional, binary, and empty-argument commands with real effects", async () => {
+      expect(await client.fs.accessScope("home")).toEqual({
+        volume: "home",
+        path: "/",
+      });
       const location = { volume: "home", path: "/client.txt" };
       await client.fs.write(location, "hello", { encoding: "utf8" });
       expect(await client.fs.read(location)).toBe("hello");

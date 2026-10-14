@@ -218,6 +218,8 @@ const App: Component = () => {
     historyIndex,
     navigateTo,
     resetNavigation,
+    navigateToScope,
+    canGoUp,
     goBack,
     goForward,
     goUp,
@@ -374,10 +376,11 @@ const App: Component = () => {
   };
 
   const resolveInitialPath = async (request: FilePickerOpenEvent) => {
-    const initialLocation = request.initialLocation ?? {
-      volume: "home",
-      path: "/",
-    };
+    const volume = request.initialLocation?.volume ?? "home";
+    const scope = await window.edenAPI.shellCommand("fs/access-scope", {
+      volume,
+    });
+    const initialLocation = request.initialLocation ?? scope;
     const initialPath = initialLocation.path;
     try {
       const stats = await window.edenAPI.shellCommand("fs/stat", {
@@ -392,7 +395,7 @@ const App: Component = () => {
         selectedPath: initialPath,
       };
     } catch {
-      return { directory: "/", name: request.suggestedName ?? "" };
+      return { directory: scope.path, name: request.suggestedName ?? "" };
     }
   };
 
@@ -730,6 +733,7 @@ const App: Component = () => {
               labels={getExplorerLabels()}
               currentPath={currentPath()}
               currentVolume={currentVolume()}
+              canGoUp={canGoUp()}
               volumes={volumes()}
               readOnly={readOnly() || loading()}
               onRefresh={refresh}
@@ -737,7 +741,7 @@ const App: Component = () => {
                 clearSelection();
                 setPendingOverwritePath(null);
                 setShowNewFolderDialog(false);
-                resetNavigation("/", undefined, volume);
+                navigateToScope(volume);
               }}
               historyIndex={historyIndex()}
               historyLength={navigationHistory().length}

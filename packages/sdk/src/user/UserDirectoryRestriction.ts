@@ -2,47 +2,50 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserRole } from "@edenapp/types";
 
-export function normalizeHomeDirectory(
-  homeDirectory: string | null | undefined,
+export function normalizeDirectoryRestriction(
+  directoryRestriction: string | null | undefined,
 ): string | undefined {
-  const value = homeDirectory?.trim();
+  const value = directoryRestriction?.trim();
   if (!value || value === ".") {
     return undefined;
   }
 
   if (value.includes("\0")) {
-    throw new Error("Home directory contains an invalid character");
+    throw new Error("Directory restriction contains an invalid character");
   }
 
   const portablePath = value.replaceAll("\\", "/");
   if (path.posix.isAbsolute(portablePath) || path.win32.isAbsolute(value)) {
-    throw new Error("Home directory must be relative to userDirectory");
+    throw new Error("Directory restriction must be relative to userDirectory");
   }
 
   const normalized = path.posix.normalize(portablePath);
   if (normalized === ".." || normalized.startsWith("../")) {
-    throw new Error("Home directory cannot leave userDirectory");
+    throw new Error("Directory restriction cannot leave userDirectory");
   }
 
   return normalized === "." ? undefined : normalized;
 }
 
-export function resolveHomeDirectory(
+export function resolveDirectoryRestriction(
   userDirectory: string,
-  homeDirectory: string,
+  directoryRestriction: string,
 ): string {
   const resolvedRoot = path.resolve(userDirectory);
-  const resolvedHome = path.resolve(resolvedRoot, ...homeDirectory.split("/"));
-  assertPathWithin(resolvedRoot, resolvedHome, "Home directory");
-  return resolvedHome;
+  const resolvedDirectory = path.resolve(
+    resolvedRoot,
+    ...directoryRestriction.split("/"),
+  );
+  assertPathWithin(resolvedRoot, resolvedDirectory, "Directory restriction");
+  return resolvedDirectory;
 }
 
-export async function ensureHomeDirectory(
+export async function ensureDirectoryRestriction(
   userDirectory: string,
   role: UserRole,
-  homeDirectory: string | null | undefined,
+  directoryRestriction: string | null | undefined,
 ): Promise<string | undefined> {
-  const normalized = normalizeHomeDirectory(homeDirectory);
+  const normalized = normalizeDirectoryRestriction(directoryRestriction);
   if (role === "vendor") {
     if (normalized) {
       throw new Error("Vendor users always use the userDirectory root");
@@ -55,10 +58,10 @@ export async function ensureHomeDirectory(
   }
 
   const root = path.resolve(userDirectory);
-  const home = resolveHomeDirectory(root, normalized);
-  await assertExistingPathWithin(root, home);
-  await fs.mkdir(home, { recursive: true });
-  await assertExistingPathWithin(root, home);
+  const directory = resolveDirectoryRestriction(root, normalized);
+  await assertExistingPathWithin(root, directory);
+  await fs.mkdir(directory, { recursive: true });
+  await assertExistingPathWithin(root, directory);
   return normalized;
 }
 

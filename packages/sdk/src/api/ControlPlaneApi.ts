@@ -81,7 +81,7 @@ export interface EdenCreateUserInput {
   role?: UserRole;
   password: string;
   grants?: string[];
-  homeDirectory?: string;
+  directoryRestriction?: string;
 }
 
 export interface EdenUpdateUserInput {
@@ -89,7 +89,7 @@ export interface EdenUpdateUserInput {
   name?: string;
   role?: UserRole;
   grants?: string[];
-  homeDirectory?: string | null;
+  directoryRestriction?: string | null;
 }
 
 export interface EdenUsersApi {

@@ -62,16 +62,16 @@ resolution:
 
 - `{ kind: "system" }` uses manifest base permissions.
 - `{ kind: "user", username }` uses a launch-time snapshot of that Eden
-  account's role, grants, and home configuration.
+  account's role, grants, and folder restriction.
 
 Every daemon is system-owned, regardless of its principal. A daemon configured
 to run as an Eden user keeps that launch-time identity across session changes.
-Account or home changes take effect after the daemon restarts.
+Account or restriction changes take effect after the daemon restarts.
 
 These principals affect Eden command authorization and Eden-managed filesystem
-paths. System principals use the configured `userDirectory`; user principals
-use the account home rules described in
-[Filesystem Homes](users.md#filesystem-homes). Backend code remains trusted
+paths. All principals resolve Home addresses against the configured `userDirectory`.
+User principals enforce the account folder restrictions described in
+[Shared Filesystem and Folder Restrictions](users.md#shared-filesystem-and-folder-restrictions). Backend code remains trusted
 Node.js code and retains its host-process UID and GID.
 
 ### Execution Context

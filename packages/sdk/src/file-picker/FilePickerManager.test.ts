@@ -6,6 +6,7 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import type { AppAssociationManager } from "../app-associations";
+import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import type { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import type { NotificationManager } from "../notification";
@@ -133,6 +134,10 @@ const createManager = () => {
     appAssociationManager as unknown as AppAssociationManager,
     permissionRegistry as unknown as PermissionRegistry,
     new VolumeManager(ipcBridge),
+    {
+      resolvePath: jest.fn(async () => "/selected"),
+      accessScope: (volume: string) => ({ volume, path: "/" }),
+    } as unknown as FilesystemManager,
   );
 
   return {

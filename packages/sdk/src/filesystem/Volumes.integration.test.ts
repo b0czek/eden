@@ -37,7 +37,7 @@ describe("consumer-managed filesystem volumes", () => {
       username: "operator",
       name: "Operator",
       password: "password",
-      homeDirectory: "operators/one",
+      directoryRestriction: "operators/one",
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
@@ -136,9 +136,9 @@ describe("consumer-managed filesystem volumes", () => {
     );
   });
 
-  it("keeps home private while sharing registered volumes", async () => {
+  it("enforces folder restrictions while sharing registered volumes", async () => {
     await execute("fs/write", {
-      location: { volume: "home", path: "/report.txt" },
+      location: { volume: "home", path: "/operators/one/report.txt" },
       content: "private",
     });
     await execute("fs/write", {
@@ -149,7 +149,7 @@ describe("consumer-managed filesystem volumes", () => {
       username: "second",
       name: "Second",
       password: "password",
-      homeDirectory: "operators/two",
+      directoryRestriction: "operators/two",
       grants: ["*"],
     });
     await expect(
@@ -162,10 +162,10 @@ describe("consumer-managed filesystem volumes", () => {
     await expect(
       eden.complete(
         "fs/exists",
-        { location: { volume: "home", path: "/report.txt" } },
+        { location: { volume: "home", path: "/operators/one/report.txt" } },
         { appId, principal: { kind: "user", profile: second } },
       ),
-    ).resolves.toBe(false);
+    ).rejects.toThrow("outside of the allowed directory");
     await expect(
       fs.readFile(
         path.join(eden.paths.userDirectory, "operators/one/report.txt"),
@@ -331,7 +331,7 @@ describe("consumer-managed filesystem volumes", () => {
       readOnly: true,
     });
     const source = { volume: "readonly", path: "/report.txt" };
-    const destination = { volume: "home", path: "/report.txt" };
+    const destination = { volume: "home", path: "/operators/one/report.txt" };
     await execute("fs/cp", { from: source, to: destination });
     await expect(execute("fs/read", { location: destination })).resolves.toBe(
       "read-only source",
@@ -339,7 +339,7 @@ describe("consumer-managed filesystem volumes", () => {
     await expect(
       execute("fs/mv", {
         from: source,
-        to: { volume: "home", path: "/moved.txt" },
+        to: { volume: "home", path: "/operators/one/moved.txt" },
       }),
     ).rejects.toThrow("read-only");
     await expect(
@@ -369,8 +369,8 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("Permission denied");
   });
 
-  it("copies and moves identical virtual paths across volumes", async () => {
-    const home = { volume: "home", path: "/nested/report.txt" };
+  it("copies and moves files across Home and registered volumes", async () => {
+    const home = { volume: "home", path: "/operators/one/nested/report.txt" };
     const usb = { volume: "usb", path: "/nested/report.txt" };
     await execute("fs/write", { location: { ...home }, content: "report" });
     await execute("fs/cp", { from: home, to: usb });
@@ -401,7 +401,7 @@ describe("consumer-managed filesystem volumes", () => {
       const source = path.join(usbRoot, "source.txt");
       const destinationRoot = path.join(
         eden.paths.userDirectory,
-        requireValue(user.homeDirectory),
+        requireValue(user.directoryRestriction),
       );
       await fs.mkdir(destinationRoot, { recursive: true });
       const destination = path.join(destinationRoot, "original.txt");
@@ -415,7 +415,7 @@ describe("consumer-managed filesystem volumes", () => {
         transfer[operation]({
           source,
           destination,
-          destinationLabel: "home:/original.txt",
+          destinationLabel: "home:/operators/one/original.txt",
           overwrite: true,
           assertSourceActive: async () => {
             // Disconnect after the original has been staged, before copying starts.
@@ -453,14 +453,17 @@ describe("consumer-managed filesystem volumes", () => {
       for (const volume of ["usb", "home"]) {
         await execute("fs/cp", {
           from: { volume: "usb", path: "/link" },
-          to: { volume, path: "/copy" },
+          to: {
+            volume,
+            path: volume === "home" ? "/operators/one/copy" : "/copy",
+          },
         });
         const root =
           volume === "usb"
             ? usbRoot
             : path.join(
                 eden.paths.userDirectory,
-                requireValue(user.homeDirectory),
+                requireValue(user.directoryRestriction),
               );
         await expect(fs.readlink(path.join(root, "copy"))).resolves.toBe(
           target,
@@ -469,7 +472,10 @@ describe("consumer-managed filesystem volumes", () => {
           fs.readFile(`${path.join(root, "copy")}${contentPath}`, "utf8"),
         ).resolves.toBe("linked report");
         const read = execute("fs/read", {
-          location: { volume, path: `/copy${contentPath}` },
+          location: {
+            volume,
+            path: `${volume === "home" ? "/operators/one" : ""}/copy${contentPath}`,
+          },
         });
         if (volume === "usb") await expect(read).resolves.toBe("linked report");
         else await expect(read).rejects.toThrow("outside");
@@ -495,18 +501,18 @@ describe("consumer-managed filesystem volumes", () => {
     await fs.symlink(externalTarget, path.join(sourceRoot, "external.txt"));
     await execute("fs/cp", {
       from: { volume: "usb", path: "/tree" },
-      to: { volume: "home", path: "/copy" },
+      to: { volume: "home", path: "/operators/one/copy" },
     });
     await fs.rm(sourceRoot, { recursive: true });
     const destinationRoot = path.join(
       eden.paths.userDirectory,
-      requireValue(user.homeDirectory),
+      requireValue(user.directoryRestriction),
       "copy",
     );
     for (const link of ["relative.txt", "nested/relative.txt"]) {
       await expect(
         execute("fs/read", {
-          location: { volume: "home", path: `/copy/${link}` },
+          location: { volume: "home", path: `/operators/one/copy/${link}` },
         }),
       ).resolves.toBe("linked report");
     }
@@ -524,7 +530,7 @@ describe("consumer-managed filesystem volumes", () => {
     ).resolves.toBe(externalTarget);
     await expect(
       execute("fs/read", {
-        location: { volume: "home", path: "/copy/external.txt" },
+        location: { volume: "home", path: "/operators/one/copy/external.txt" },
       }),
     ).rejects.toThrow("outside");
   });
@@ -549,7 +555,7 @@ describe("consumer-managed filesystem volumes", () => {
       location: { volume: "usb", path: "/same-path" },
     });
     await execute("fs/mkdir", {
-      location: { volume: "home", path: "/same-path" },
+      location: { volume: "home", path: "/operators/one/same-path" },
     });
     const usb = { volume: "usb", path: "/same-path" };
     await expect(execute("file/open", { location: usb })).resolves.toEqual({
@@ -580,7 +586,7 @@ describe("consumer-managed filesystem volumes", () => {
     );
     await expect(
       execute("file/open", {
-        location: { volume: "home", path: "/same-path" },
+        location: { volume: "home", path: "/operators/one/same-path" },
       }),
     ).resolves.toEqual({ success: true, appId: handlerId });
     const messages = eden.platform.effects.flatMap((effect) =>
@@ -592,7 +598,7 @@ describe("consumer-managed filesystem volumes", () => {
     expect(messages).toContainEqual({
       type: "file/opened",
       payload: {
-        location: { volume: "home", path: "/same-path" },
+        location: { volume: "home", path: "/operators/one/same-path" },
         isDirectory: true,
         appId: handlerId,
       },
@@ -647,7 +653,7 @@ describe("consumer-managed filesystem volumes", () => {
         reason: "select",
         locations,
       });
-    const home = { volume: "home", path: "/" };
+    const home = { volume: "home", path: "/operators/one" };
     const usb = { volume: "usb", path: "/" };
     for (const locations of [undefined, null, {}, "home", []]) {
       await expect(resolve(opened.requestId, locations)).rejects.toThrow(
@@ -770,18 +776,21 @@ describe("consumer-managed filesystem volumes", () => {
         kind: "local",
         rootPath: otherRoot,
       });
-      const source = { volume: "home", path: "/cross-device/report.txt" };
+      const source = {
+        volume: "home",
+        path: "/operators/one/cross-device/report.txt",
+      };
       await execute("fs/write", {
         location: { ...source },
         content: "cross-device report",
       });
       const sourceRoot = path.join(
         eden.paths.userDirectory,
-        requireValue(user.homeDirectory),
+        requireValue(user.directoryRestriction),
         "cross-device",
       );
       await fs.symlink("report.txt", path.join(sourceRoot, "relative.txt"));
-      const from = { volume: "home", path: "/cross-device" };
+      const from = { volume: "home", path: "/operators/one/cross-device" };
       await execute("fs/mv", {
         from,
         to: { volume: "other-device", path: "/moved" },
@@ -824,7 +833,10 @@ describe("consumer-managed filesystem volumes", () => {
           kind: "local",
           rootPath: otherRoot,
         });
-        const source = { volume: "home", path: "/locked/report.txt" };
+        const source = {
+          volume: "home",
+          path: "/operators/one/locked/report.txt",
+        };
         const destination = { volume: "other-device", path: "/report.txt" };
         await execute("fs/write", {
           location: { ...source },

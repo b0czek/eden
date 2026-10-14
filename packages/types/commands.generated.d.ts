@@ -454,6 +454,14 @@ export interface FilePickerCommands {
  */
 export interface FsCommands {
   /**
+   * Return the caller's accessible starting folder within a volume.
+   */
+  "fs/access-scope": {
+    mode: "result";
+    args: { volume: string };
+    response: import("./index").FilesystemLocation;
+  };
+  /**
    * Read the contents of a file.
    */
   "fs/read": {
@@ -1075,7 +1083,7 @@ export interface UserCommands {
     role?: import("./index").UserRole;
     password: string;
     grants?: string[];
-    homeDirectory?: string };
+    directoryRestriction?: string };
     response: { user: import("./index").UserProfile };
   };
   /**
@@ -1088,7 +1096,7 @@ export interface UserCommands {
     name?: string;
     role?: import("./index").UserRole;
     grants?: string[];
-    homeDirectory?: string | null };
+    directoryRestriction?: string | null };
     response: { user: import("./index").UserProfile };
   };
   /**

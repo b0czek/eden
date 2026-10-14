@@ -25,9 +25,17 @@ with command options or file metadata. Single-address commands take `{ location 
 Operations with multiple addresses use named properties such as
 `from: FilesystemLocation` and `to: FilesystemLocation`.
 
-The built-in `home` volume preserves Eden's user homes. Its `/` maps to the
-caller's configured home directory, or to `userDirectory` for unrestricted users,
-vendors, and system processes. Registered drives are shared across users.
+The built-in `home` volume maps `/` to `EdenConfig.userDirectory` for every
+caller. Account folder restrictions limit access without changing addresses.
+For example, a restriction of `"projects/design"` allows
+`home:/projects/design/notes.txt`.
+Accounts may share the same folder or overlapping folders. Registered drives
+are shared across users and are independent of Home restrictions.
+
+`fs/access-scope({ volume })` returns the caller's accessible starting folder
+as a `FilesystemLocation`. Files and File Picker use it for initial navigation,
+Home actions, and fallback after drive removal. Explicit initial locations
+remain full addresses and must be accessible to the caller.
 
 ```typescript
 const content = await window.edenAPI.shellCommand("fs/read", {

@@ -2,11 +2,11 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  ensureHomeDirectory,
-  normalizeHomeDirectory,
-} from "./UserHomeDirectory";
+  ensureDirectoryRestriction,
+  normalizeDirectoryRestriction,
+} from "./UserDirectoryRestriction";
 
-describe("user home directories", () => {
+describe("user directory restrictions", () => {
   let root: string;
 
   beforeEach(async () => {
@@ -18,46 +18,46 @@ describe("user home directories", () => {
   });
 
   it("normalizes blank and portable relative paths", () => {
-    expect(normalizeHomeDirectory("")).toBeUndefined();
-    expect(normalizeHomeDirectory(".")).toBeUndefined();
-    expect(normalizeHomeDirectory(" teams\\operators ")).toBe(
+    expect(normalizeDirectoryRestriction("")).toBeUndefined();
+    expect(normalizeDirectoryRestriction(".")).toBeUndefined();
+    expect(normalizeDirectoryRestriction(" teams\\operators ")).toBe(
       "teams/operators",
     );
   });
 
   it("rejects absolute and escaping paths", () => {
-    expect(() => normalizeHomeDirectory("/tmp/home")).toThrow(
+    expect(() => normalizeDirectoryRestriction("/tmp/home")).toThrow(
       "must be relative",
     );
-    expect(() => normalizeHomeDirectory("C:\\Users\\operator")).toThrow(
+    expect(() => normalizeDirectoryRestriction("C:\\Users\\operator")).toThrow(
       "must be relative",
     );
-    expect(() => normalizeHomeDirectory("../../outside")).toThrow(
+    expect(() => normalizeDirectoryRestriction("../../outside")).toThrow(
       "cannot leave",
     );
   });
 
-  it("creates a missing standard-user home", async () => {
+  it("creates a missing restricted folder", async () => {
     await expect(
-      ensureHomeDirectory(root, "standard", "teams/operators"),
+      ensureDirectoryRestriction(root, "standard", "teams/operators"),
     ).resolves.toBe("teams/operators");
     await expect(
       fs.stat(path.join(root, "teams", "operators")),
     ).resolves.toEqual(expect.objectContaining({}));
   });
 
-  it("rejects configured homes for vendors", async () => {
+  it("rejects folder restrictions for vendors", async () => {
     await expect(
-      ensureHomeDirectory(root, "vendor", "homes/vendor"),
+      ensureDirectoryRestriction(root, "vendor", "homes/vendor"),
     ).rejects.toThrow("always use the userDirectory root");
   });
 
-  it("rejects a home reached through a symlink outside userDirectory", async () => {
+  it("rejects a restriction reached through a symlink outside userDirectory", async () => {
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), "eden-outside-"));
     try {
       await fs.symlink(outside, path.join(root, "escape"));
       await expect(
-        ensureHomeDirectory(root, "standard", "escape/home"),
+        ensureDirectoryRestriction(root, "standard", "escape/home"),
       ).rejects.toThrow("outside of the allowed directory");
     } finally {
       await fs.rm(outside, { recursive: true, force: true });

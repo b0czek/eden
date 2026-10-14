@@ -36,15 +36,15 @@ export const pl = {
       systemGrants: "Uprawnienia systemowe",
       rawWarning:
         "Uwaga: modyfikowanie surowych grantów może zepsuć dostęp do aplikacji.",
-      filesystemLocation: "Lokalizacja systemu plików",
+      filesystemLocation: "Ograniczenie do folderu",
       filesystemLocationPlaceholder:
         "Ścieżka względna, na przykład teams/operators",
       filesystemLocationHelp:
-        "Ogranicza dostęp tego użytkownika do systemu plików do wybranego folderu. Pozostaw puste dla wspólnego katalogu głównego; użytkownicy mogą współdzielić lokalizację.",
+        "Ogranicza dostęp w katalogu domowym do tego folderu. Pozostaw puste, aby udostępnić całe wspólne drzewo. Użytkownicy mogą współdzielić ten sam folder lub foldery zagnieżdżone, np. projects i projects/design.",
       filesystemLocationUpdateFailed:
-        "Nie udało się zaktualizować lokalizacji systemu plików",
+        "Nie udało się zaktualizować ograniczenia do folderu",
       filesystemLocationPickerFailed: "Nie udało się otworzyć wyboru folderu",
-      filesystemLocationPickerTitle: "Wybierz lokalizację systemu plików",
+      filesystemLocationPickerTitle: "Wybierz dozwolony folder",
       chooseLocation: "Wybierz folder",
       vendorFilesystemDescription:
         "Użytkownicy vendor zawsze mają dostęp do całego systemu plików.",
