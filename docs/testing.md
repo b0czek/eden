@@ -11,6 +11,12 @@ does not make a test an integration test; the behavior being exercised does.
 Shared test helpers live under `packages/sdk/tests/support`. Real Electron
 workflows live in `packages/sdk/tests/electron`.
 
+Electron suites are grouped by host lifecycle, IPC, keyboard, DLC resources,
+file browsing, and drive eject behavior. Each suite creates and disposes its own
+host through `tests/electron/support/host.ts`; profile and asset preparation live
+in `tests/electron/support/profile.ts`. Suites can run independently by passing
+their filename to Playwright.
+
 The SDK's Jest commands select unit and Node integration suites by directory.
 Production builds exclude test files and test support code. Compile-time SDK
 contracts live in `packages/sdk/tests/types` and run through the SDK
