@@ -38,6 +38,12 @@ export interface VolumeRoot {
   assertActive(): Promise<void>;
 }
 
+/** Explicit admission for resources whose lifetime spans several commands. */
+export interface VolumeAccess {
+  run<T>(operation: () => Promise<T>): Promise<T>;
+  release(): void;
+}
+
 @scoped(Lifecycle.ContainerScoped)
 @injectable()
 @EdenNamespace("volume")
@@ -203,11 +209,16 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     });
   }
 
-  private admit(ids: string[]): {
+  private admit(
+    ids: string[],
+    inherit: boolean,
+  ): {
     context: Map<string, VolumeLease>;
     release: () => void;
   } {
-    const context = new Map(this.operationContext.getStore());
+    const context = new Map(
+      inherit ? this.operationContext.getStore() : undefined,
+    );
     const entries = new Map<string, MountedVolume>();
     for (const id of new Set(ids)) {
       this.get(id);
@@ -248,29 +259,43 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     ids: string[],
     run: (reporter: OperationReporter) => Promise<R>,
   ): OperationTask<R> {
-    const admitted = this.admit(ids);
+    const access = this.acquire(ids, true);
     let started = false;
     return operationTask(async (reporter) => {
       if (started) throw new Error("Volume operation has already started");
       started = true;
       try {
-        return await this.operationContext.run(admitted.context, () =>
-          run(reporter),
-        );
+        return await access.run(() => run(reporter));
       } finally {
-        admitted.release();
+        access.release();
       }
     });
   }
 
   /** Admit awaited filesystem I/O and let removal wait for it to finish. */
   async withVolumes<T>(ids: string[], operation: () => Promise<T>): Promise<T> {
-    const admitted = this.admit(ids);
+    const access = this.acquire(ids, true);
     try {
-      return await this.operationContext.run(admitted.context, operation);
+      return await access.run(operation);
     } finally {
-      admitted.release();
+      access.release();
     }
+  }
+
+  acquire(ids: string[], inherit = false): VolumeAccess {
+    const admitted = this.admit(ids, inherit);
+    let released = false;
+    return {
+      run: (operation) => {
+        if (released) throw new Error("Filesystem volume access is closed");
+        return this.operationContext.run(admitted.context, operation);
+      },
+      release: () => {
+        if (released) return;
+        released = true;
+        admitted.release();
+      },
+    };
   }
 
   private async assertMounted(id: string, entry: MountedVolume): Promise<void> {

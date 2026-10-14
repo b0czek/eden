@@ -4,6 +4,17 @@ export interface FilesystemLocation {
   path: string;
 }
 
+/** Access mode selected when opening a file. */
+export type FilesystemOpenMode = "read";
+
+/** Runtime-owned open file. The identifier conveys no authority by itself. */
+export interface FilesystemHandle {
+  handleId: string;
+}
+
+/** One-shot access by location, or repeated access to an opened file. */
+export type FilesystemSource = FilesystemLocation | FilesystemHandle;
+
 export type FilesystemVolumeKind = "local" | "removable" | "network";
 export type FilesystemVolumeState = "ready" | "ejecting";
 

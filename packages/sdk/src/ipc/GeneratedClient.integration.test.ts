@@ -127,6 +127,18 @@ describe.each(["window", "worker"])(
       expect(await client.fs.readBinary(location)).toEqual(
         new Uint8Array([0, 255, 128]),
       );
+      const handle = await client.fs.open(location, { mode: "read" });
+      try {
+        expect(await client.fs.stat(handle)).toMatchObject({
+          isFile: true,
+          size: 3,
+        });
+        expect(await client.fs.readBinary(handle)).toEqual(
+          new Uint8Array([0, 255, 128]),
+        );
+      } finally {
+        await client.fs.close(handle);
+      }
       await client.db.set("theme", "dark");
       expect(await client.db.get("theme")).toEqual({ value: "dark" });
       expect(await client.db.list()).toEqual({ keys: ["theme"] });

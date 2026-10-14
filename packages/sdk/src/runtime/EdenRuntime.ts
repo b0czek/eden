@@ -379,6 +379,7 @@ export class EdenRuntime {
     this.resolveOwned(I18nManager);
     this.packageManager = this.resolveOwned(PackageManager);
     this.processManager = this.resolveOwned(ProcessManager);
+    this.resolveOwned(FilesystemManager).connectLifecycle(this.processManager);
     this.sessionManager = this.resolveOwned(SessionManager);
     this.daemonManager = this.resolveOwned(DaemonManager);
     this.resolveOwned(CommandRegistry).registerManager(
@@ -519,6 +520,8 @@ export class EdenRuntime {
     if (this.resourcesDisposed) return;
     this.resourcesDisposed = true;
 
+    if (this.managersInitialized)
+      await this.resolveOwned(FilesystemManager).closeHandles();
     await this.resolveOwned(OperationManager).shutdown();
     if (this.managersInitialized) {
       await this.autostartManager.dispose();

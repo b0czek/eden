@@ -195,6 +195,50 @@ await window.edenAPI.shellCommand("fs/write-binary", {
 });
 ```
 
+### File handles
+
+The generated client accepts either a location or an open handle for `fs.read`,
+`fs.readBinary`, and `fs.stat`. Location-based reads acquire access for one
+operation and release it automatically. Open a handle when several operations
+must use the same opened file:
+
+```typescript
+import { fs } from "@edenapp/client";
+
+const location = { volume: "usb-work", path: "/notes.txt" };
+const handle = await fs.open(location, { mode: "read" });
+try {
+  const metadata = await fs.stat(handle);
+  const content = await fs.readBinary(handle);
+} finally {
+  await fs.close(handle);
+}
+```
+
+`fs.open` opens a regular file and returns a serializable `{ handleId }` value
+with no methods. The example above selects `"read"`, which is also the default
+mode. Whole-file reads start at byte zero on every call, including concurrent
+reads. The opened file survives pathname replacement or deletion, while a location-based read
+uses the current file at that address. Handles do not provide a content snapshot
+or block another writer from modifying the opened file.
+
+Handles belong to the opening app, account, and session. They can be used by
+that app's frontend or backend under the same identity; passing the value to
+another app does not grant access. A frontend-created handle closes when its
+view is removed. App stop and runtime shutdown close remaining handles. Each
+runtime permits at most 1,024 open handles. Reading, querying, or closing an
+unknown or closed handle fails explicitly.
+
+An open handle retains its volume's access until it closes. Safe eject blocks
+new opens and location-based reads, waits for existing handles, and lets those
+handles continue reading during removal. Close handles promptly when work
+finishes. Physical removal or replacement of the registered volume makes reads
+fail; the old handle does not attach to a reconnected volume.
+
+Raw shell commands keep the `location` argument for reads and stat, accepting
+either a location or handle there. Opening uses
+`fs/open({ location, mode })`; closing uses `fs/close({ handle })`.
+
 `fs/search` searches the selected volume beneath its given path. Each search
 result includes a `location` with its volume and virtual path.
 

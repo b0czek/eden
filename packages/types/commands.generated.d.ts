@@ -462,12 +462,30 @@ export interface FsCommands {
     response: import("./index").FilesystemLocation;
   };
   /**
+   * Open a file and hold volume access until close or owner teardown.
+   */
+  "fs/open": {
+    mode: "result";
+    args: {
+    location: import("./index").FilesystemLocation;
+    mode?: import("./index").FilesystemOpenMode };
+    response: import("./index").FilesystemHandle;
+  };
+  /**
+   * Close an owned file handle after its accepted operations finish.
+   */
+  "fs/close": {
+    mode: "result";
+    args: { handle: import("./index").FilesystemHandle };
+    response: void;
+  };
+  /**
    * Read the contents of a file.
    */
   "fs/read": {
     mode: "result";
     args: {
-    location: import("./index").FilesystemLocation;
+    location: import("./index").FilesystemSource;
     encoding?: string };
     response: string;
   };
@@ -477,7 +495,7 @@ export interface FsCommands {
   "fs/read-binary": {
     mode: "result";
     args: {
-    location: import("./index").FilesystemLocation };
+    location: import("./index").FilesystemSource };
     response: Uint8Array;
   };
   /**
@@ -531,7 +549,7 @@ export interface FsCommands {
    */
   "fs/stat": {
     mode: "result";
-    args: { location: import("./index").FilesystemLocation };
+    args: { location: import("./index").FilesystemSource };
     response: import("./index").FileStats;
   };
   "fs/watch": {

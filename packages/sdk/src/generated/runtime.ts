@@ -59,6 +59,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "file-picker/resolve",
   "file-picker/close",
   "fs/access-scope",
+  "fs/open",
+  "fs/close",
   "fs/read",
   "fs/read-binary",
   "fs/write",

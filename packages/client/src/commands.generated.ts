@@ -236,6 +236,16 @@ const fsCommands = {
   ["accessScope"]: (volume: CommandArgs<"fs/access-scope">["volume"]): Promise<CommandResult<"fs/access-scope">> =>
     invoke("fs/access-scope", { ["volume"]: volume }),
   /**
+   * Open a file and hold volume access until close or owner teardown.
+   */
+  ["open"]: (location: CommandArgs<"fs/open">["location"], options?: Pick<CommandArgs<"fs/open">, "mode">): Promise<CommandResult<"fs/open">> =>
+    invoke("fs/open", { ["location"]: location, ["mode"]: options?.["mode"] }),
+  /**
+   * Close an owned file handle after its accepted operations finish.
+   */
+  ["close"]: (handle: CommandArgs<"fs/close">["handle"]): Promise<CommandResult<"fs/close">> =>
+    invoke("fs/close", { ["handle"]: handle }),
+  /**
    * Read the contents of a file.
    */
   ["read"]: (location: CommandArgs<"fs/read">["location"], options?: Pick<CommandArgs<"fs/read">, "encoding">): Promise<CommandResult<"fs/read">> =>
