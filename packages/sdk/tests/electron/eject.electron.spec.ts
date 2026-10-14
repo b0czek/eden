@@ -202,16 +202,28 @@ test.describe
       await evaluateMenu(
         `document.querySelector('#context-menu-overlay').click()`,
       );
-      const viewport = await host.electronApp
-        .context()
-        .newCDPSession(filesPage);
+      const originalBounds = await host.electronApp.evaluate(
+        ({ BrowserWindow }, appId) => {
+          const view = BrowserWindow.getAllWindows()
+            .flatMap((window) => window.contentView.children)
+            .find(
+              (view) =>
+                "webContents" in view &&
+                (view as import("electron").WebContentsView).webContents
+                  .getURL()
+                  .includes(appId),
+            );
+          if (!view) throw new Error("Files view unavailable");
+          return view.getBounds();
+        },
+        appId,
+      );
       try {
-        await viewport.send("Emulation.setDeviceMetricsOverride", {
-          width: 600,
-          height: 520,
-          deviceScaleFactor: 1,
-          mobile: false,
+        await host.executeHostCommand("view/update-view-bounds", {
+          appId,
+          bounds: { ...originalBounds, width: 600, height: 520 },
         });
+        await expect.poll(() => filesPage.evaluate(() => innerWidth)).toBe(600);
         const driveActions = filesPage.locator(
           `[data-volume="${volumeId}"] button[aria-haspopup="menu"]`,
         );
@@ -261,8 +273,10 @@ test.describe
         });
         await openVolumeMenu();
       } finally {
-        await viewport.send("Emulation.clearDeviceMetricsOverride");
-        await viewport.detach();
+        await host.executeHostCommand("view/update-view-bounds", {
+          appId,
+          bounds: originalBounds,
+        });
       }
       await evaluateMenu(
         `document.querySelector('.context-menu-item').click()`,
