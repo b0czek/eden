@@ -1693,7 +1693,7 @@ test.describe
             .find((candidate) => candidate.url().includes(appId));
           if (!page || !electronApp) throw new Error("Files page unavailable");
           const point = await page
-            .locator(`[data-volume="${volumeId}"] .files-place-actions`)
+            .locator(`[data-volume="${volumeId}"] button[aria-haspopup="menu"]`)
             .evaluate((button) => {
               const bounds = button.getBoundingClientRect();
               return {
@@ -1723,7 +1723,7 @@ test.describe
               );
             if (!contents) throw new Error("Files is not running");
             const point = await contents.executeJavaScript(`(() => {
-            const bounds = document.querySelector('[data-volume="${volumeId}"] .files-place-actions').getBoundingClientRect();
+            const bounds = document.querySelector('[data-volume="${volumeId}"] button[aria-haspopup="menu"]').getBoundingClientRect();
             return { x: Math.round(bounds.left + bounds.width / 2), y: Math.round(bounds.top + bounds.height / 2) };
           })()`);
             contents.focus();
@@ -1830,24 +1830,50 @@ test.describe
           deviceScaleFactor: 1,
           mobile: false,
         });
+        const driveActions = filesPage.locator(
+          `[data-volume="${volumeId}"] button[aria-haspopup="menu"]`,
+        );
+        await expect(driveActions).toBeVisible();
+        await expect(driveActions).toBeEnabled();
+        await expect(driveActions).toHaveAccessibleName(/.+/);
         expect(
-          await filesPage
-            .locator(".files-places")
-            .evaluate((sidebar) => sidebar.getBoundingClientRect().width),
-        ).toBe(64);
-        expect(
-          await filesPage
-            .locator(".omnibox-container")
-            .evaluate((omnibox) => omnibox.getBoundingClientRect().width),
-        ).toBeGreaterThan(100);
-        expect(
-          await filesPage
-            .locator(".toolbar-right")
-            .evaluate(
-              (toolbar) =>
-                toolbar.getBoundingClientRect().right <= window.innerWidth,
-            ),
+          await driveActions.evaluate((button) => {
+            const bounds = button.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              bounds.left + bounds.width / 2,
+              bounds.top + bounds.height / 2,
+            );
+            return hit !== null && button.contains(hit);
+          }),
         ).toBe(true);
+        for (const selector of [
+          ".omnibox-container",
+          ".toolbar-left",
+          ".toolbar-right",
+          ".explorer-content",
+        ]) {
+          const region = filesPage.locator(selector);
+          await expect(region).toBeVisible();
+          expect(
+            await region.evaluate((element) => {
+              const bounds = element.getBoundingClientRect();
+              const main = element
+                .closest(".files-main")
+                ?.getBoundingClientRect();
+              return (
+                main !== undefined &&
+                bounds.width > 0 &&
+                bounds.height > 0 &&
+                bounds.left >= main.left &&
+                bounds.right <= main.right &&
+                bounds.left >= 0 &&
+                bounds.right <= window.innerWidth &&
+                bounds.top >= 0 &&
+                bounds.bottom <= window.innerHeight
+              );
+            }),
+          ).toBe(true);
+        }
         await filesPage.screenshot({
           path: test.info().outputPath("files-places-narrow.png"),
         });
