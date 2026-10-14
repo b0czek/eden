@@ -24,6 +24,7 @@ interface MountedVolume {
   device: number;
   inode: number;
   eject?: () => Promise<void>;
+  ejectGroup?: string;
   activeOperations: Set<Promise<void>>;
   removal?: Promise<void>;
 }
@@ -111,6 +112,15 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     }
     if (options.eject !== undefined && typeof options.eject !== "function")
       throw new TypeError("Volume eject operation must be a function");
+    if (
+      options.ejectGroup !== undefined &&
+      (typeof options.ejectGroup !== "string" ||
+        !options.ejectGroup.trim() ||
+        !options.eject)
+    )
+      throw new TypeError(
+        "An eject group requires a nonempty key and an eject operation",
+      );
     const eject = options.eject?.bind(options);
     const rootPath = await fs.realpath(input.rootPath);
     const stats = await fs.stat(rootPath);
@@ -119,6 +129,15 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     if (this.disposed) throw new Error("Filesystem volumes are disposed");
     if (this.mounted.has(input.id))
       throw new Error(`Volume '${input.id}' is already registered`);
+    if (
+      options.ejectGroup &&
+      [...this.mounted.values()].some(
+        (entry) => entry.ejectGroup === options.ejectGroup && entry.removal,
+      )
+    )
+      throw new Error(
+        "Cannot register a volume while its eject group is being removed",
+      );
     const info: FilesystemVolume = {
       id: input.id,
       label: input.label,
@@ -134,6 +153,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       device: stats.dev,
       inode: stats.ino,
       eject,
+      ejectGroup: options.ejectGroup,
       activeOperations: new Set(),
     });
     this.notify("changed", { volumes: this.list() });
@@ -157,8 +177,17 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     const operation = entry.eject;
     if (!operation)
       throw new Error(`Filesystem volume '${id}' does not support eject`);
-    const lease = this.operationContext.getStore()?.get(id);
-    if (lease?.entry === entry && !lease.released)
+    const group = entry.ejectGroup
+      ? [...this.mounted.entries()].filter(
+          ([, sibling]) => sibling.ejectGroup === entry.ejectGroup,
+        )
+      : [[id, entry] as const];
+    if (
+      group.some(([volumeId, sibling]) => {
+        const lease = this.operationContext.getStore()?.get(volumeId);
+        return lease?.entry === sibling && !lease.released;
+      })
+    )
       throw new Error(
         "Cannot remove a volume from an active filesystem operation",
       );
@@ -177,8 +206,10 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     });
     // Reservation may precede execution; attach an owned rejection observer.
     void removal.catch(() => undefined);
-    entry.removal = removal;
-    entry.info.state = "ejecting";
+    for (const [, sibling] of group) {
+      sibling.removal = removal;
+      sibling.info.state = "ejecting";
+    }
     this.notify("changed", { volumes: this.list() });
     let started = false;
     return operationTask(async (reporter) => {
@@ -189,20 +220,24 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       started = true;
       try {
         reporter.update("draining-volume-io");
-        await Promise.all(entry.activeOperations);
-        await this.assertMounted(id, entry);
-        if (this.disposed || this.mounted.get(id) !== entry)
-          throw new Error(`Filesystem volume '${id}' is unavailable`);
+        await Promise.all(
+          group.flatMap(([, sibling]) => [...sibling.activeOperations]),
+        );
+        for (const [volumeId, sibling] of group)
+          await this.assertMounted(volumeId, sibling);
         reporter.update("host-eject");
         await operation();
-        if (this.mounted.get(id) === entry) this.unregister(id);
+        for (const [volumeId, sibling] of group)
+          if (this.mounted.get(volumeId) === sibling) this.unregister(volumeId);
         resolve();
       } catch (error) {
-        if (!this.disposed && this.mounted.get(id) === entry) {
-          entry.removal = undefined;
-          entry.info.state = "ready";
-          this.notify("changed", { volumes: this.list() });
+        for (const [volumeId, sibling] of group) {
+          if (!this.disposed && this.mounted.get(volumeId) === sibling) {
+            sibling.removal = undefined;
+            sibling.info.state = "ready";
+          }
         }
+        if (!this.disposed) this.notify("changed", { volumes: this.list() });
         reject(error);
       }
       await removal;

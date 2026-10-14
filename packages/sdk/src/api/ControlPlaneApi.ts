@@ -141,6 +141,8 @@ export interface EdenAssociationsApi {
 
 /** Host operations for a consumer-managed mounted directory. */
 export interface EdenVolumeOptions {
+  /** Volumes sharing this key drain and leave the runtime as one removal. */
+  ejectGroup?: string;
   /** Resolve only after the OS has finished safely ejecting the device. */
   eject?: () => Promise<void>;
 }

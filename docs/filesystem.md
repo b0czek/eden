@@ -250,6 +250,13 @@ const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
 });
 ```
 
+## Removing related volumes
+
+Volumes registered with the same `ejectGroup` key are removed together. Ejecting
+one member blocks new access to every member, waits for their existing I/O, and
+calls the requested member's host eject callback once. That callback removes the
+complete physical group. Failed removal restores access to remaining members.
+
 ## Opening Files and Picking Locations
 
 `file/open` selects a configured handler using the file's type:
