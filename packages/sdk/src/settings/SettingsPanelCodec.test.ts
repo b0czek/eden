@@ -5,7 +5,7 @@ import {
   cloneAndValidatePanelView,
   validatePanelProvider,
 } from "./SettingsPanelCodec";
-import { panelDefinition } from "./SettingsPanelTestHarness";
+import { panelDefinition } from "../../tests/support/settings/SettingsPanelTestHarness";
 
 const definition = () =>
   panelDefinition({

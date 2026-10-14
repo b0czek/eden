@@ -2,7 +2,7 @@ import type { RuntimeAppManifest } from "@edenapp/types";
 import {
   createSettingsPanelHarness as harness,
   panelUser as user,
-} from "./SettingsPanelTestHarness";
+} from "../../tests/support/settings/SettingsPanelTestHarness";
 
 describe("SettingsPanelManager manifest panels", () => {
   it("normalizes one app panel and reads only setting-granted keys", async () => {

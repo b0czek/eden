@@ -117,17 +117,17 @@ jobs:
       - name: Capture process diagnostics
         if: failure()
         run: |
-          mkdir -p packages/sdk/electron-integration/test-results/diagnostics
-          ps -ef > packages/sdk/electron-integration/test-results/diagnostics/processes.txt
-          pgrep -a -f 'electron|eden-backend' > packages/sdk/electron-integration/test-results/diagnostics/eden-processes.txt || true
+          mkdir -p packages/sdk/tests/electron/test-results/diagnostics
+          ps -ef > packages/sdk/tests/electron/test-results/diagnostics/processes.txt
+          pgrep -a -f 'electron|eden-backend' > packages/sdk/tests/electron/test-results/diagnostics/eden-processes.txt || true
 
       - name: Clean up Electron processes
         if: always()
         run: |
-          pkill -TERM -f '[e]lectron-integration/host.cjs' || true
+          pkill -TERM -f 'tests/[e]lectron/host.cjs' || true
           pkill -TERM -f '[e]den-backend' || true
           pkill -TERM -f '[e]lectron.*--type=' || true
-          pkill -KILL -f '[e]lectron-integration/host.cjs' || true
+          pkill -KILL -f 'tests/[e]lectron/host.cjs' || true
           pkill -KILL -f '[e]den-backend' || true
           pkill -KILL -f '[e]lectron.*--type=' || true
 
@@ -137,7 +137,7 @@ jobs:
         with:
           name: eden-electron-integration-${{ github.run_id }}
           path: |
-            packages/sdk/electron-integration/test-results
+            packages/sdk/tests/electron/test-results
             packages/sdk/playwright-report
           if-no-files-found: warn
           retention-days: 3

@@ -6,7 +6,10 @@ import {
   hasUserGrant,
 } from "./SettingsPanelAuthorization";
 import type { SettingsPanelRecord } from "./SettingsPanelRecord";
-import { panelDefinition, panelUser } from "./SettingsPanelTestHarness";
+import {
+  panelDefinition,
+  panelUser,
+} from "../../tests/support/settings/SettingsPanelTestHarness";
 
 const record = (
   overrides: Partial<SettingsPanelRecord> = {},

@@ -26,6 +26,8 @@
     "edencss",
     "foundation",
     "src/app-frame",
-    "src/app-runtime"
+    "src/app-runtime",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ]
 }
