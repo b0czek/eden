@@ -134,12 +134,6 @@ Frontend and backend eject commands return an operation object promptly. Use
 `eject.watch(listener)` to observe phases and `eject.result()` to await safe removal.
 The volume leaves the inventory after success.
 
-In Files, the Places sidebar lists Home and connected drives. Tap the actions
-button beside a drive, or right-click its row, and choose **Safely remove drive**.
-The drive row shows pending removal, and the menu action
-stays disabled while the OS finishes. Success confirms that the drive is safe to
-unplug; a failure is shown so removal can be retried.
-
 Repeated requests share the same removal. If the callback rejects, the operation
 retains that error and the volume returns to `ready`; apps can resume access,
 recreate watches, and retry removal with a new submission. Read-only volumes can also be ejected.
@@ -147,13 +141,6 @@ recreate watches, and retry removal with a new submission. Read-only volumes can
 `eden.volumes.unregister(id)` removes a registration after the consumer observes
 disconnection. For safe removal, await `eject(id)`, which removes the registration
 after the OS callback completes.
-
-Files updates its Places sidebar live; File Picker uses a compact volume selector.
-If the selected drive
-disconnects, they clear selection and switch to an available allowed volume,
-preferring Home. A picker with no available allowed volume waits for its selected
-drive to reconnect, then reloads the directory and resumes live updates. Open
-documents retain their original volume addresses.
 
 ## Files navigation
 
@@ -318,8 +305,8 @@ window.edenAPI.unsubscribe("fs/changed", handleChanged);
 ```
 
 Each watch belongs to the creating view. Eden releases watches when the owning
-view, volume, or runtime closes. Files and File Picker support manual refresh on
-volumes without watching.
+view, volume, or runtime closes. Provide manual refresh for volumes without
+watching.
 
 Package inspection and installation hold their source-volume access throughout
 archive reads, so safe removal waits until those reads and admitted package work
