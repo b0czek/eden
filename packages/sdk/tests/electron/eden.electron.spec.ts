@@ -2020,8 +2020,7 @@ test.describe
       await executeHostCommand("process/stop", { appId });
     });
 
-    test("accepts slow safe eject and observes completion across renderer and backend IPC", async () => {
-      test.setTimeout(45_000);
+    test("shares pending safe eject completion across renderer and backend IPC", async () => {
       await expect
         .poll(async () => {
           try {
@@ -2053,7 +2052,13 @@ test.describe
           { id: "slow-eject", label: "Slow USB", kind: "removable", rootPath },
           {
             eject: () =>
-              new Promise<void>((resolve) => setTimeout(resolve, 31_000)),
+              new Promise<void>((resolve) => {
+                (
+                  globalThis as typeof globalThis & {
+                    __finishIntegrationEject?: () => void;
+                  }
+                ).__finishIntegrationEject = resolve;
+              }),
           },
         );
       }, driveRoot);
@@ -2098,6 +2103,15 @@ test.describe
           }
         })
         .toMatchObject({ command: "volume/eject", id: expect.any(String) });
+      await electronApp?.evaluate(() => {
+        const state = globalThis as typeof globalThis & {
+          __finishIntegrationEject?: () => void;
+        };
+        if (!state.__finishIntegrationEject)
+          throw new Error("Host eject has not started");
+        state.__finishIntegrationEject();
+        delete state.__finishIntegrationEject;
+      });
       await electronApp?.evaluate(
         async ({ webContents }, payload) => {
           const contents = webContents
@@ -2184,11 +2198,6 @@ test.describe
         files.getByRole("button", { name: "Go Up", exact: true }),
       ).toBeDisabled();
 
-      const rejected =
-        await files.evaluate(`window.edenAPI.shellCommand('file-picker/open', {
-        mode: 'open', initialLocation: { volume: 'home', path: '/projects/research' }
-      }).then(() => '', error => error.message)`);
-      expect(rejected).toContain("outside of the allowed directory");
       await files.evaluate(
         `window.edenAPI.shellCommand('file-picker/open', { mode: 'open' })`,
       );

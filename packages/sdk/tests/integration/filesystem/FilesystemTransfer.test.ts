@@ -185,3 +185,92 @@ test("concurrent overwrite copies publish complete content and remove their back
     ]);
   });
 });
+
+for (const operation of ["copy", "move"] as const) {
+  test(`${operation} preserves file and recursive directory contents`, async () => {
+    await fixture(async (root) => {
+      const transfer = new FilesystemTransfer();
+      for (const kind of ["file", "directory"] as const) {
+        const source = path.join(root, kind);
+        const destination = path.join(root, "nested", kind);
+        const suffix = kind === "directory" ? "/nested/data.txt" : "";
+        await fs.mkdir(path.dirname(source + suffix), { recursive: true });
+        await fs.writeFile(source + suffix, "preserved contents");
+        await transfer[operation]({
+          source,
+          destination,
+          destinationLabel: destination,
+          overwrite: false,
+        });
+        assert.equal(
+          await fs.readFile(destination + suffix, "utf8"),
+          "preserved contents",
+        );
+        if (operation === "copy")
+          assert.equal(
+            await fs.readFile(source + suffix, "utf8"),
+            "preserved contents",
+          );
+        else await assert.rejects(fs.stat(source), { code: "ENOENT" });
+      }
+    });
+  });
+
+  test(`${operation} replaces a directory completely instead of merging it`, async () => {
+    await fixture(async (root) => {
+      const source = path.join(root, "source");
+      const destination = path.join(root, "target");
+      await fs.mkdir(path.join(source, "nested"), { recursive: true });
+      await fs.mkdir(path.join(destination, "stale"), { recursive: true });
+      await fs.writeFile(path.join(source, "nested/new.txt"), "new");
+      await fs.writeFile(path.join(destination, "stale/old.txt"), "old");
+      await new FilesystemTransfer()[operation]({
+        source,
+        destination,
+        destinationLabel: destination,
+        overwrite: true,
+      });
+      assert.equal(
+        await fs.readFile(path.join(destination, "nested/new.txt"), "utf8"),
+        "new",
+      );
+      await assert.rejects(fs.stat(path.join(destination, "stale")), {
+        code: "ENOENT",
+      });
+      assert.equal(
+        (await fs.readdir(root)).some((name) =>
+          name.includes(".eden-transfer-"),
+        ),
+        false,
+      );
+    });
+  });
+
+  test(`${operation} rejects same-path and descendant directory destinations without changing the source`, async () => {
+    await fixture(async (root) => {
+      const source = path.join(root, "tree");
+      await fs.mkdir(path.join(source, "child"), { recursive: true });
+      await fs.writeFile(path.join(source, "data.txt"), "preserved");
+      const transfer = new FilesystemTransfer();
+      for (const [destination, error] of [
+        [source, /must be different/],
+        [path.join(source, "child/nested"), /descendant/],
+      ] as const) {
+        await assert.rejects(
+          transfer[operation]({
+            source,
+            destination,
+            destinationLabel: destination,
+            overwrite: false,
+          }),
+          error,
+        );
+      }
+      assert.equal(
+        await fs.readFile(path.join(source, "data.txt"), "utf8"),
+        "preserved",
+      );
+      assert.equal((await fs.readdir(path.join(source, "child"))).length, 0);
+    });
+  });
+}

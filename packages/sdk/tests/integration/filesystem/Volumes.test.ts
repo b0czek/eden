@@ -10,6 +10,10 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { PermissionRegistry } from "../../../src/ipc";
+import {
+  createFilesystemCaller,
+  registerTestVolume,
+} from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
@@ -33,24 +37,19 @@ describe("consumer-managed filesystem volumes", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      directoryRestriction: "operators/one",
-      grants: ["*"],
-    });
+    ({ user } = await createFilesystemCaller(
+      eden,
+      appId,
+      ["fs/*", "volume/*"],
+      {
+        directoryRestriction: "operators/one",
+      },
+    ));
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/*", "volume/*"]);
-    usbRoot = path.join(eden.paths.root, "usb");
-    await fs.mkdir(usbRoot);
-    await eden.runtime.volumes.register({
+    usbRoot = await registerTestVolume(eden, {
       id: "usb",
       label: "Thumb drive",
       kind: "removable",
-      rootPath: usbRoot,
     });
   });
 
@@ -642,6 +641,12 @@ describe("consumer-managed filesystem volumes", () => {
       return response.result;
     };
     await invoke(providerId, "file-picker/register-display", {});
+    await expect(
+      invoke(appId, "file-picker/open", {
+        mode: "open",
+        initialLocation: { volume: "home", path: "/operators/two" },
+      }),
+    ).rejects.toThrow("outside of the allowed directory");
     const opened = (await invoke(appId, "file-picker/open", {
       mode: "open",
       multiple: true,

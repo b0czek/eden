@@ -3,7 +3,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { PermissionRegistry } from "../../../src/ipc";
+import {
+  createFilesystemCaller,
+  registerTestVolume,
+} from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -21,16 +24,18 @@ describe("grouped volume removal", () => {
   let user: UserProfile;
   beforeEach(async () => {
     eden = await createTestEden();
-    user = await eden.runtime.users.create({
-      username: "reader",
-      name: "Reader",
-      password: "password",
-      directoryRestriction: "reader",
-    });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/read", "volume/eject"]);
+    ({ user } = await createFilesystemCaller(
+      eden,
+      appId,
+      ["fs/read", "volume/eject"],
+      {
+        username: "reader",
+        name: "Reader",
+        directoryRestriction: "reader",
+      },
+    ));
   });
+
   afterEach(async () => {
     await eden?.dispose();
   });
@@ -45,11 +50,9 @@ describe("grouped volume removal", () => {
     let hostCalls = 0;
     let content: string | undefined;
     for (const id of ["first", "second"]) {
-      const root = path.join(eden.paths.root, id);
-      await fs.mkdir(root);
-      await fs.writeFile(path.join(root, "notes.txt"), id);
-      await eden.runtime.volumes.register(
-        { id, label: id, kind: "removable", rootPath: root },
+      const root = await registerTestVolume(
+        eden,
+        { id, label: id, kind: "removable" },
         {
           ejectGroup: "physical-drive",
           eject: async () => {
@@ -58,6 +61,7 @@ describe("grouped volume removal", () => {
           },
         },
       );
+      await fs.writeFile(path.join(root, "notes.txt"), id);
     }
     const file = path.join(eden.paths.root, "second", "notes.txt");
     const reading = eden.runtime
@@ -106,10 +110,9 @@ describe("grouped volume removal", () => {
     let failing = true;
     let calls = 0;
     for (const id of ["first", "second"]) {
-      const root = path.join(eden.paths.root, id);
-      await fs.mkdir(root);
-      await eden.runtime.volumes.register(
-        { id, label: id, kind: "removable", rootPath: root },
+      await registerTestVolume(
+        eden,
+        { id, label: id, kind: "removable" },
         {
           ejectGroup: "physical-drive",
           eject: async () => {

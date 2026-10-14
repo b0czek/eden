@@ -12,6 +12,7 @@ import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createFilesystemCaller } from "../../support/filesystem";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -257,15 +258,16 @@ describe("FilesystemManager integration", () => {
 
   const setUpFilesystemCaller = async () => {
     eden = await createTestEden();
-    const profile = await eden.runtime.users.create({
-      username: "filesystem-transfer-user",
-      name: "Filesystem Transfer User",
-      password: "password",
-    });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("filesystem-transfer-app", ["fs/write", "fs/read"]);
-    return caller("filesystem-transfer-app", profile);
+    const { caller } = await createFilesystemCaller(
+      eden,
+      "filesystem-transfer-app",
+      ["fs/write", "fs/read"],
+      {
+        username: "filesystem-transfer-user",
+        name: "Filesystem Transfer User",
+      },
+    );
+    return caller;
   };
 
   afterEach(async () => {
@@ -410,107 +412,6 @@ describe("FilesystemManager integration", () => {
       error: { message: expect.stringContaining("already exists") },
     });
     off();
-  });
-
-  it("copies and moves files and recursive directories", async () => {
-    const transferCaller = await setUpFilesystemCaller();
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/file.txt", volume: "home" },
-        content: "file contents",
-      },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/mkdir",
-      { location: { path: "/tree/nested", volume: "home" } },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/tree/nested/data.txt", volume: "home" },
-        content: "nested contents",
-      },
-      transferCaller,
-    );
-
-    await eden.complete(
-      "fs/cp",
-      {
-        from: { volume: "home", path: "/file.txt" },
-        to: { volume: "home", path: "/copies/file.txt" },
-      },
-      transferCaller,
-    );
-    await eden.complete(
-      "fs/cp",
-      {
-        from: { volume: "home", path: "/tree" },
-        to: { volume: "home", path: "/copies/tree" },
-      },
-      transferCaller,
-    );
-    await eden.complete(
-      "fs/mv",
-      {
-        from: { volume: "home", path: "/file.txt" },
-        to: { volume: "home", path: "/moved/file.txt" },
-      },
-      transferCaller,
-    );
-    await eden.complete(
-      "fs/mv",
-      {
-        from: { volume: "home", path: "/tree" },
-        to: { volume: "home", path: "/moved/tree" },
-      },
-      transferCaller,
-    );
-
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "copies", "file.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("file contents");
-    await expect(
-      fs.readFile(
-        path.join(
-          eden.paths.userDirectory,
-          "copies",
-          "tree",
-          "nested",
-          "data.txt",
-        ),
-        "utf8",
-      ),
-    ).resolves.toBe("nested contents");
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "moved", "file.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("file contents");
-    await expect(
-      fs.readFile(
-        path.join(
-          eden.paths.userDirectory,
-          "moved",
-          "tree",
-          "nested",
-          "data.txt",
-        ),
-        "utf8",
-      ),
-    ).resolves.toBe("nested contents");
-    await expect(
-      fs.access(path.join(eden.paths.userDirectory, "file.txt")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(
-      fs.access(path.join(eden.paths.userDirectory, "tree")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("reports bytes during a large copy and preserves contents and file mode", async () => {
@@ -708,225 +609,34 @@ describe("FilesystemManager integration", () => {
     );
   });
 
-  it("rejects existing targets unless replacement is explicit", async () => {
-    const transferCaller = await setUpFilesystemCaller();
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/copy-source.txt", volume: "home" },
-        content: "new copy",
-      },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/copy-target.txt", volume: "home" },
-        content: "old copy",
-      },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/move-source.txt", volume: "home" },
-        content: "new move",
-      },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/move-target.txt", volume: "home" },
-        content: "old move",
-      },
-      transferCaller,
-    );
-
-    await expect(
-      eden.complete(
-        "fs/cp",
-        {
-          from: { volume: "home", path: "/copy-source.txt" },
-          to: { volume: "home", path: "/copy-target.txt" },
-        },
+  it.each(["cp", "mv"] as const)(
+    "forwards locations and explicit overwrite through fs/%s",
+    async (command) => {
+      const transferCaller = await setUpFilesystemCaller();
+      const source = path.join(eden.paths.userDirectory, "source.txt");
+      const destination = path.join(eden.paths.userDirectory, "target.txt");
+      await fs.writeFile(source, "replacement");
+      await fs.writeFile(destination, "original");
+      const args = {
+        from: { volume: "home", path: "/source.txt" },
+        to: { volume: "home", path: "/target.txt" },
+      };
+      await expect(
+        eden.complete(`fs/${command}`, args, transferCaller),
+      ).rejects.toThrow("already exists");
+      await expect(fs.readFile(destination, "utf8")).resolves.toBe("original");
+      await eden.complete(
+        `fs/${command}`,
+        { ...args, overwrite: true },
         transferCaller,
-      ),
-    ).rejects.toThrow("already exists");
-    await expect(
-      eden.complete(
-        "fs/mv",
-        {
-          from: { volume: "home", path: "/move-source.txt" },
-          to: { volume: "home", path: "/move-target.txt" },
-        },
-        transferCaller,
-      ),
-    ).rejects.toThrow("already exists");
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "copy-target.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("old copy");
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "move-target.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("old move");
-
-    await eden.complete(
-      "fs/cp",
-      {
-        from: { volume: "home", path: "/copy-source.txt" },
-        to: { volume: "home", path: "/copy-target.txt" },
-        overwrite: true,
-      },
-      transferCaller,
-    );
-    await eden.complete(
-      "fs/mv",
-      {
-        from: { volume: "home", path: "/move-source.txt" },
-        to: { volume: "home", path: "/move-target.txt" },
-        overwrite: true,
-      },
-      transferCaller,
-    );
-
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "copy-target.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("new copy");
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "move-target.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("new move");
-    await expect(
-      fs.access(path.join(eden.paths.userDirectory, "move-source.txt")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("replaces complete directory targets without merging", async () => {
-    const transferCaller = await setUpFilesystemCaller();
-    await eden.execute(
-      "fs/mkdir",
-      { location: { path: "/source/nested", volume: "home" } },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/source/nested/new.txt", volume: "home" },
-        content: "new",
-      },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/mkdir",
-      { location: { path: "/target/stale", volume: "home" } },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/target/stale/old.txt", volume: "home" },
-        content: "old",
-      },
-      transferCaller,
-    );
-
-    await eden.complete(
-      "fs/cp",
-      {
-        from: { volume: "home", path: "/source" },
-        to: { volume: "home", path: "/target" },
-        overwrite: true,
-      },
-      transferCaller,
-    );
-
-    await expect(
-      fs.readFile(
-        path.join(eden.paths.userDirectory, "target", "nested", "new.txt"),
-        "utf8",
-      ),
-    ).resolves.toBe("new");
-    await expect(
-      fs.access(
-        path.join(eden.paths.userDirectory, "target", "stale", "old.txt"),
-      ),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(fs.readdir(eden.paths.userDirectory)).resolves.not.toEqual(
-      expect.arrayContaining([expect.stringContaining(".eden-transfer-")]),
-    );
-  });
-
-  it("rejects same-path and descendant directory transfers", async () => {
-    const transferCaller = await setUpFilesystemCaller();
-    await eden.execute(
-      "fs/mkdir",
-      { location: { path: "/tree/child", volume: "home" } },
-      transferCaller,
-    );
-    await eden.execute(
-      "fs/write",
-      {
-        location: { path: "/tree/data.txt", volume: "home" },
-        content: "preserved",
-      },
-      transferCaller,
-    );
-
-    await expect(
-      eden.complete(
-        "fs/cp",
-        {
-          from: { volume: "home", path: "/tree" },
-          to: { volume: "home", path: "/tree" },
-        },
-        transferCaller,
-      ),
-    ).rejects.toThrow("must be different");
-    await expect(
-      eden.complete(
-        "fs/mv",
-        {
-          from: { volume: "home", path: "/tree" },
-          to: { volume: "home", path: "/tree" },
-        },
-        transferCaller,
-      ),
-    ).rejects.toThrow("must be different");
-    await expect(
-      eden.complete(
-        "fs/cp",
-        {
-          from: { volume: "home", path: "/tree" },
-          to: { volume: "home", path: "/tree/child/copy" },
-        },
-        transferCaller,
-      ),
-    ).rejects.toThrow("descendant");
-    await expect(
-      eden.complete(
-        "fs/mv",
-        {
-          from: { volume: "home", path: "/tree" },
-          to: { volume: "home", path: "/tree/child/moved" },
-        },
-        transferCaller,
-      ),
-    ).rejects.toThrow("descendant");
-    await expect(
-      fs.readFile(path.join(eden.paths.userDirectory, "tree", "data.txt"), {
-        encoding: "utf8",
-      }),
-    ).resolves.toBe("preserved");
-  });
+      );
+      await expect(fs.readFile(destination, "utf8")).resolves.toBe(
+        "replacement",
+      );
+      if (command === "cp")
+        await expect(fs.readFile(source, "utf8")).resolves.toBe("replacement");
+      else
+        await expect(fs.stat(source)).rejects.toMatchObject({ code: "ENOENT" });
+    },
+  );
 });

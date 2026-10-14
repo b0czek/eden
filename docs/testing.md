@@ -14,6 +14,13 @@ workflows live in `packages/sdk/tests/electron`.
 The SDK's Jest commands select unit and Node integration suites by directory.
 Production builds exclude test files and test support code.
 
+Give each behavior one owning suite. Command and UI tests should cover their
+argument adaptation, permissions, transport, and lifecycle integration rather
+than repeat a dependency's edge-case matrix. Share small setup helpers, keep
+scenario actions and assertions visible, and parameterize cases with equivalent
+setup and outcomes. Use controlled release signals for pending work; retain real
+elapsed-time tests only where elapsed time is the behavior being checked.
+
 ```bash
 pnpm test:unit                  # SDK unit tests and other package test suites
 pnpm test:integration:node      # real Eden services with in-memory platform edges

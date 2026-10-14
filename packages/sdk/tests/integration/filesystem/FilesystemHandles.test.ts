@@ -1,3 +1,4 @@
+import { PermissionRegistry } from "../../../src/ipc";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,7 +8,10 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
-import { PermissionRegistry } from "../../../src/ipc";
+import {
+  createFilesystemCaller,
+  registerTestVolume,
+} from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
@@ -31,33 +35,23 @@ describe("file handle access and lifetime", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    const user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: ["*"],
-    });
-    await eden.runtime.sessions.login("operator", "password");
-    caller = {
-      appId,
-      principal: { kind: "user", profile: user },
-      sessionId: "file-session",
-    };
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/read", "volume/*"]);
-    root = path.join(eden.paths.root, "usb");
-    await fs.mkdir(root);
-    await fs.writeFile(path.join(root, "part.txt"), "original");
+    const { user, caller: owner } = await createFilesystemCaller(eden, appId, [
+      "fs/read",
+      "volume/*",
+    ]);
+    await eden.runtime.sessions.login(user.username, "password");
+    caller = { ...owner, sessionId: "file-session" };
     ejected = false;
-    await eden.runtime.volumes.register(
-      { id: "usb", label: "USB", kind: "removable", rootPath: root },
+    root = await registerTestVolume(
+      eden,
+      { id: "usb", label: "USB", kind: "removable" },
       {
         eject: async () => {
           ejected = true;
         },
       },
     );
+    await fs.writeFile(path.join(root, "part.txt"), "original");
   });
 
   afterEach(async () => {

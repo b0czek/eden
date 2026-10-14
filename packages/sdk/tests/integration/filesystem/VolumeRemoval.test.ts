@@ -1,3 +1,4 @@
+import { PermissionRegistry } from "../../../src/ipc";
 import "reflect-metadata";
 import fs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,7 +8,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../../../src/api/ControlPlaneApi";
-import { PermissionRegistry } from "../../../src/ipc";
+import { createFilesystemCaller } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
@@ -31,15 +32,10 @@ describe("safe volume removal", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: ["*"],
-    });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/*", "volume/*"]);
+    ({ user } = await createFilesystemCaller(eden, appId, [
+      "fs/*",
+      "volume/*",
+    ]));
     usbRoot = path.join(eden.paths.root, "usb");
     await fs.mkdir(usbRoot);
   });
@@ -223,6 +219,10 @@ describe("safe volume removal", () => {
         if (busy) throw new Error("Device is busy");
       },
     });
+    const states: (string | undefined)[] = [];
+    const stop = eden.runtime.volumes.onChanged((volumes) =>
+      states.push(volumes.find((volume) => volume.id === "usb")?.state),
+    );
     const caller = {
       appId,
       principal: { kind: "user" as const, profile: user },
@@ -251,6 +251,13 @@ describe("safe volume removal", () => {
     expect(
       eden.runtime.volumes.list().find((volume) => volume.id === "usb")?.state,
     ).toBe("ready");
+    await execute("fs/write", {
+      location: { volume: "usb", path: "/after-failure.txt" },
+      content: "accessible",
+    });
+    await expect(
+      fs.readFile(path.join(usbRoot, "after-failure.txt"), "utf8"),
+    ).resolves.toBe("accessible");
     busy = false;
     const retry = await eden.execute<OperationHandle>(
       "volume/eject",
@@ -261,6 +268,8 @@ describe("safe volume removal", () => {
     await manager.wait(retry, caller);
     expect(manager.get(retry, caller)).toMatchObject({ status: "succeeded" });
     expect(manager.get(handle, caller).status).toBe("failed");
+    expect(states).toEqual(["ejecting", "ready", "ejecting", undefined]);
+    stop();
   });
 
   it("keeps eject pending until the host confirms safe removal", async () => {
@@ -386,32 +395,6 @@ describe("safe volume removal", () => {
       ]);
     },
   );
-
-  it("restores access after host failure and allows retry", async () => {
-    let busy = true;
-    await register({
-      eject: async () => {
-        if (busy) throw new Error("Device is busy");
-      },
-    });
-    const states: (string | undefined)[] = [];
-    eden.runtime.volumes.onChanged((volumes) =>
-      states.push(volumes.find((volume) => volume.id === "usb")?.state),
-    );
-    await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
-      "Device is busy",
-    );
-    await execute("fs/write", {
-      location: { volume: "usb", path: "/after-failure.txt" },
-      content: "accessible",
-    });
-    await expect(
-      fs.readFile(path.join(usbRoot, "after-failure.txt"), "utf8"),
-    ).resolves.toBe("accessible");
-    busy = false;
-    await eden.runtime.volumes.eject("usb");
-    expect(states).toEqual(["ejecting", "ready", "ejecting", undefined]);
-  });
 
   it.each(["resolve", "reject"] as const)(
     "does not alter a reconnected drive when an earlier removal %ss",
