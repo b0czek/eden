@@ -1,3 +1,6 @@
+import { createTestCaller } from "../../support/callers";
+import { gate, tick } from "../../support/async";
+import { testApp } from "../../support/apps";
 import type {
   ShellCommandResponse,
   ShellTransport,
@@ -11,7 +14,6 @@ import type {
   OperationHandle,
   OperationSnapshot,
   OperationSubmission,
-  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { createEdenAPI } from "../../../src/app-runtime/common/eden-api";
@@ -33,17 +35,7 @@ import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
 import { IPCBridge } from "../../../src/ipc/IPCBridge";
 import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 const eventName = "volume/changed";
-function gate() {
-  let release!: () => void;
-  return {
-    promise: new Promise<void>((resolve) => {
-      release = resolve;
-    }),
-    release: () => release(),
-  };
-}
 
 describe("client subscriptions across renderer IPC", () => {
   let eden: TestEden;
@@ -58,29 +50,17 @@ describe("client subscriptions across renderer IPC", () => {
   beforeEach(async () => {
     eden = await createTestEden();
     const appId = "com.example.subscription-observer";
-    eden.runtime.resolve(PackageRegistry).register({
-      kind: "app",
-      id: appId,
-      name: "Observer",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest);
     eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["volume/read"]);
-    const profile = await eden.runtime.users.create({
-      username: "observer",
-      name: "Observer",
-      password: "password",
-      grants: ["*"],
-    });
-    owner = { appId, principal: { kind: "user", profile } };
-    await eden.runtime.sessions.login("observer", "password");
+      .resolve(PackageRegistry)
+      .register(testApp(appId, { name: "Observer" }));
+    const { user: profile, caller } = await createTestCaller(
+      eden,
+      appId,
+      ["volume/read"],
+      { username: "observer", name: "Observer" },
+    );
+    owner = caller;
+    await eden.runtime.sessions.login(profile.username, "password");
     await eden.complete("process/launch", { appId });
     const instance = eden.runtime
       .resolve(ProcessManager)

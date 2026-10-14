@@ -8,10 +8,8 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
-import {
-  createFilesystemCaller,
-  registerTestVolume,
-} from "../../support/filesystem";
+import { createTestCaller } from "../../support/callers";
+import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
@@ -35,7 +33,7 @@ describe("file handle access and lifetime", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    const { user, caller: owner } = await createFilesystemCaller(eden, appId, [
+    const { user, caller: owner } = await createTestCaller(eden, appId, [
       "fs/read",
       "volume/*",
     ]);

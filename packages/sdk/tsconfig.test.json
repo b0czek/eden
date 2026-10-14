@@ -9,7 +9,8 @@
   "include": [
     "src/**/*.ts",
     "tests/integration/**/*.ts",
-    "tests/support/**/*.ts"
+    "tests/support/**/*.ts",
+    "tests/types/**/*.ts"
   ],
   "exclude": ["node_modules", "dist", "src/app-frame", "src/app-runtime"]
 }

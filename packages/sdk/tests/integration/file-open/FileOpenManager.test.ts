@@ -1,5 +1,6 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
-import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
+import type { RuntimeDlcManifest } from "@edenapp/types";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -12,19 +13,10 @@ describe("FileOpenManager integration", () => {
 
   it("persists associations through commands and reports compatibility data", async () => {
     eden = await createTestEden();
-    const filesApp = {
-      kind: "app",
-      id: "com.eden.files",
+    const filesApp = testApp("com.eden.files", {
       name: "Files",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
       fileHandlers: [{ name: "Directories", directories: true }],
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    });
     eden.runtime.resolve(PackageRegistry).register(filesApp);
     const user = await eden.runtime.users.create({
       username: "files-user",
@@ -63,18 +55,7 @@ describe("FileOpenManager integration", () => {
   it("exposes DLC file handlers through their host only while installed", async () => {
     eden = await createTestEden();
     const registry = eden.runtime.resolve(PackageRegistry);
-    const editor = {
-      kind: "app",
-      id: "com.example.editor",
-      name: "Editor",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    const editor = testApp("com.example.editor", { name: "Editor" });
     const highlighter = {
       kind: "dlc",
       id: "com.example.editor.http",

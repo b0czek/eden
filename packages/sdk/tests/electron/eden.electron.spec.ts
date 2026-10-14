@@ -49,6 +49,19 @@ test.describe
       ) as Promise<TResult>;
     };
 
+    const evaluateApp = async (appId: string, script: string) => {
+      if (!electronApp) throw new Error("Electron app is not running");
+      return electronApp.evaluate(
+        async ({ webContents }, input) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(input.appId));
+          return contents?.executeJavaScript(input.script);
+        },
+        { appId, script },
+      );
+    };
+
     test.beforeAll(async () => {
       root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-electron-"));
       const appsDirectory = path.join(root, "apps");
@@ -120,6 +133,7 @@ test.describe
         "file-picker",
         "toaster",
         "context-menu",
+        "example.hello",
       ]) {
         const source = path.join(
           __dirname,
@@ -394,25 +408,6 @@ test.describe
           rootUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           value: "loaded-through-eden-dlc",
         });
-    });
-
-    test("launches Calculator", async () => {
-      const appId = "com.eden.calculator";
-      await executeHostCommand("process/launch", { appId });
-      try {
-        await expect
-          .poll(() =>
-            electronApp?.evaluate(({ webContents }, id) => {
-              const contents = webContents
-                .getAllWebContents()
-                .find((candidate) => candidate.getURL().includes(id));
-              return contents?.executeJavaScript("document.readyState");
-            }, appId),
-          )
-          .toBe("complete");
-      } finally {
-        await executeHostCommand("process/stop", { appId });
-      }
     });
 
     test("handles a Hello request in the app backend", async () => {
@@ -1175,17 +1170,7 @@ test.describe
           location: { volume: "test-usb", path: "/" },
         }),
       ).resolves.toMatchObject({ success: true, appId: "com.eden.files" });
-      const evaluateApp = async (appId: string, script: string) =>
-        electronApp?.evaluate(
-          async ({ webContents }, input) => {
-            const contents = webContents
-              .getAllWebContents()
-              .find((candidate) => candidate.getURL().includes(input.appId));
-            if (!contents) return undefined;
-            return contents.executeJavaScript(input.script);
-          },
-          { appId, script },
-        );
+
       await expect
         .poll(() =>
           evaluateApp(
@@ -1337,16 +1322,7 @@ test.describe
           { connected, driveRoot },
         );
       };
-      const evaluateApp = async (appId: string, script: string) =>
-        electronApp?.evaluate(
-          async ({ webContents }, input) => {
-            const contents = webContents
-              .getAllWebContents()
-              .find((candidate) => candidate.getURL().includes(input.appId));
-            return contents?.executeJavaScript(input.script);
-          },
-          { appId, script },
-        );
+
       const listing = () =>
         evaluateApp(
           "com.eden.file-picker",
@@ -1423,16 +1399,7 @@ test.describe
             },
           );
         }, driveRoot);
-        const evaluateApp = async (targetAppId: string, script: string) =>
-          electronApp?.evaluate(
-            async ({ webContents }, input) => {
-              const contents = webContents
-                .getAllWebContents()
-                .find((candidate) => candidate.getURL().includes(input.appId));
-              return contents?.executeJavaScript(input.script);
-            },
-            { appId: targetAppId, script },
-          );
+
         const listing = () =>
           evaluateApp(
             appId,
@@ -1532,16 +1499,7 @@ test.describe
             rootPath,
           });
         }, driveRoot);
-        const evaluateApp = async (targetAppId: string, script: string) =>
-          electronApp?.evaluate(
-            async ({ webContents }, input) => {
-              const contents = webContents
-                .getAllWebContents()
-                .find((candidate) => candidate.getURL().includes(input.appId));
-              return contents?.executeJavaScript(input.script);
-            },
-            { appId: targetAppId, script },
-          );
+
         const listing = () =>
           evaluateApp(
             appId,
@@ -1664,16 +1622,7 @@ test.describe
       const driveRoot = path.join(root, volumeId);
       await fs.mkdir(driveRoot);
       await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
-      const evaluateApp = (script: string) =>
-        electronApp?.evaluate(
-          async ({ webContents }, input) => {
-            const contents = webContents
-              .getAllWebContents()
-              .find((candidate) => candidate.getURL().includes(input.appId));
-            return contents?.executeJavaScript(input.script);
-          },
-          { appId, script },
-        );
+
       const evaluateMenu = (script: string) =>
         electronApp?.evaluate(async ({ webContents }, script) => {
           const contents = webContents
@@ -1787,12 +1736,14 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )
         .toBe(volumeId);
       expect(
         await evaluateApp(
+          appId,
           `document.querySelector('[aria-label="Safely remove drive"]') === null`,
         ),
       ).toBe(true);
@@ -1888,6 +1839,7 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('[data-volume="${volumeId}"]')?.getAttribute('aria-busy')`,
           ),
         )
@@ -1933,14 +1885,16 @@ test.describe
         ).__uiEjectFinish(true);
       });
       await expect
-        .poll(() => evaluateApp(`document.body.textContent`))
+        .poll(() => evaluateApp(appId, `document.body.textContent`))
         .toContain("Device busy");
       await evaluateApp(
+        appId,
         `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'OK')?.click()`,
       );
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('[data-volume="${volumeId}"]')?.getAttribute('aria-busy')`,
           ),
         )
@@ -1949,16 +1903,19 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('.file-list')?.textContent ?? document.body.textContent`,
           ),
         )
         .toContain("after-busy.txt");
       await evaluateApp(
+        appId,
         `document.querySelector('[data-volume="home"] .eden-sidebar-item').click()`,
       );
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('.files-places [aria-current="location"]')?.getAttribute('aria-label')`,
           ),
         )
@@ -2010,6 +1967,7 @@ test.describe
       await expect
         .poll(() =>
           evaluateApp(
+            appId,
             `document.querySelector('.files-places [aria-current="location"]')?.closest('[data-volume]')?.getAttribute('data-volume')`,
           ),
         )

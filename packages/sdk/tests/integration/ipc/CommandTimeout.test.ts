@@ -1,5 +1,6 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
-import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
+import type { OperationHandle } from "@edenapp/types";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import {
   type OperationTask,
@@ -47,18 +48,9 @@ describe("one bounded IPC deadline", () => {
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime.resolve(PackageRegistry).register({
-      kind: "app",
-      id: appId,
-      name: "Deadlines",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest);
+    eden.runtime
+      .resolve(PackageRegistry)
+      .register(testApp(appId, { name: "Deadlines" }));
     await eden.complete("process/launch", { appId });
     const instance = eden.runtime
       .resolve(ProcessManager)

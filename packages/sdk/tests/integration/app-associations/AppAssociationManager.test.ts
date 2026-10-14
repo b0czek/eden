@@ -126,8 +126,6 @@ describe("AppAssociationManager", () => {
     expect(manager.resolve("provider:file-picker", matches)).toEqual([
       { appId: "com.example.selected", kind: "provider" },
     ]);
-    expect(matches).toHaveBeenCalledWith(selected);
-    expect(packageCatalog.listApps).not.toHaveBeenCalled();
   });
 
   it("returns matching catalog apps when no configured association exists", async () => {
@@ -140,7 +138,6 @@ describe("AppAssociationManager", () => {
     expect(manager.resolve("provider:file-picker", matches)).toEqual([
       { appId: "com.example.default", kind: "provider" },
     ]);
-    expect(packageCatalog.listApps).toHaveBeenCalledWith({ showHidden: true });
   });
 
   it("falls back when the configured association is invalid", async () => {

@@ -1,3 +1,5 @@
+import { createTestCaller } from "../../support/callers";
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import * as nodeFs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,7 +9,6 @@ import type {
   CommandName,
   OperationSnapshot,
   OperationSubmission,
-  RuntimeAppManifest,
 } from "@edenapp/types";
 import { createEdenAPI } from "../../../src/app-runtime/common/eden-api";
 import {
@@ -31,30 +32,18 @@ describe.each(["window", "worker"])(
     beforeEach(async () => {
       original = Object.getOwnPropertyDescriptor(globalThis, globalName);
       eden = await createTestEden();
-      eden.runtime.resolve(PackageRegistry).register({
-        kind: "app",
-        id: appId,
-        name: "Generated Client",
-        version: "1.0.0",
-        frontend: { entry: "index.html" },
-        window: {
-          mode: "floating",
-          injections: { appFrame: "none", css: "none" },
-        },
-        isPrebuilt: false,
-        isDevelopment: false,
-        isCore: false,
-        isRestricted: false,
-        resolvedGrants: [],
-      } as RuntimeAppManifest);
-      eden.runtime
-        .resolve(PermissionRegistry)
-        .registerApp(appId, ["fs/read", "fs/write", "db/rw"]);
-      await eden.runtime.users.create({
+      eden.runtime.resolve(PackageRegistry).register(
+        testApp(appId, {
+          name: "Generated Client",
+          window: {
+            mode: "floating",
+            injections: { appFrame: "none", css: "none" },
+          },
+        }),
+      );
+      await createTestCaller(eden, appId, ["fs/read", "fs/write", "db/rw"], {
         username: "client",
         name: "Client",
-        password: "password",
-        grants: ["*"],
       });
       await eden.runtime.sessions.login("client", "password");
       await eden.complete("process/launch", { appId });

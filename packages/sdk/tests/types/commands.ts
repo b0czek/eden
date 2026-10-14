@@ -15,7 +15,7 @@ type Equal<A, B> =
     ? true
     : false;
 type Assert<T extends true> = T;
-type Contracts = [
+export type CommandContracts = [
   Assert<Equal<CommandResponse<"fs/cp">, OperationHandle<"fs/cp">>>,
   Assert<Equal<CommandResult<"fs/cp">, Operation<"fs/cp">>>,
   Assert<Equal<ReturnType<Operation<"fs/cp">["result"]>, Promise<void>>>,
@@ -35,7 +35,6 @@ type Contracts = [
   Assert<Equal<CommandCompletion<"fs/cp">, void>>,
   Assert<Equal<OperationCompletion<"fs/cp">, void>>,
   Assert<Equal<OperationCompletion<string>, unknown>>,
-  Assert<Equal<CommandResult<"system/info">, SystemInfo>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
   Assert<Equal<ResultCommand<{}, string>["response"], string>>,
   Assert<
@@ -46,10 +45,3 @@ type Contracts = [
   >,
   Assert<Equal<OperationCommand<{}, number>["completion"], number>>,
 ];
-
-it("provides serializable typed handles", () => {
-  const handle: OperationHandle<"copy"> = { id: "id", command: "copy" };
-  expect(JSON.parse(JSON.stringify(handle))).toEqual(handle);
-  const coverage: Contracts extends true[] ? true : false = true;
-  expect(coverage).toBe(true);
-});

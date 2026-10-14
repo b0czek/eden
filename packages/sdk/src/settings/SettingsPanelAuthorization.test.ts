@@ -9,7 +9,7 @@ import type { SettingsPanelRecord } from "./SettingsPanelRecord";
 import {
   panelDefinition,
   panelUser,
-} from "../../tests/support/settings/SettingsPanelTestHarness";
+} from "../../tests/support/settings/panels";
 
 const record = (
   overrides: Partial<SettingsPanelRecord> = {},

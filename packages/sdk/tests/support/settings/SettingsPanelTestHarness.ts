@@ -1,43 +1,12 @@
+import { panelUser } from "./panels";
 import "reflect-metadata";
-import type {
-  RuntimeAppManifest,
-  SettingsPanelDefinition,
-  UserProfile,
-} from "@edenapp/types";
+import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import type { ExecutionContext } from "../../../src/execution";
 import type { CommandRegistry, IPCBridge } from "../../../src/ipc";
 import type { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
 import type { SessionContext } from "../../../src/session";
 import type { SettingsManager } from "../../../src/settings/SettingsManager";
 import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
-
-export const panelUser = (
-  grants: string[],
-  overrides: Partial<UserProfile> = {},
-): UserProfile => ({
-  username: "alice",
-  name: "Alice",
-  role: "standard",
-  grants,
-  createdAt: 1,
-  updatedAt: 1,
-  ...overrides,
-});
-
-export const panelDefinition = (
-  overrides: Partial<SettingsPanelDefinition> = {},
-): SettingsPanelDefinition => ({
-  id: "vendor.network",
-  title: { en: "Network" },
-  grant: "panels/network",
-  actions: [
-    {
-      id: "toggle",
-      value: { type: "boolean", required: true },
-    },
-  ],
-  ...overrides,
-});
 
 export function createSettingsPanelHarness(
   initialUser = panelUser(["panels/network"]),

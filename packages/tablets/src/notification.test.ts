@@ -78,57 +78,38 @@ describe("notification", () => {
     expect(secondAction).toHaveBeenCalledOnce();
   });
 
-  it("keeps non-dismissing actions active until notification removal", async () => {
-    const transport = createTransport();
-    const onClick = vi.fn();
-    const notification = await loadNotification();
-
-    const pushed = await notification.push("Progress", "Still working", [
-      { label: "Refresh", onClick, dismissOnClick: false },
-    ]);
-    const payload = transport.shellCommand.mock.calls[0]?.[1] as {
-      actions: Array<{ id: string }>;
-    };
-    const actionId = payload.actions[0]?.id;
-
-    transport.handlers.get("notification/action-clicked")?.({
-      notificationId: pushed.id,
-      actionId,
-    });
-    transport.handlers.get("notification/action-clicked")?.({
-      notificationId: pushed.id,
-      actionId,
-    });
-    expect(onClick).toHaveBeenCalledTimes(2);
-
-    transport.handlers.get("notification/removed")?.({ id: pushed.id });
-    transport.handlers.get("notification/action-clicked")?.({
-      notificationId: pushed.id,
-      actionId,
-    });
-    expect(onClick).toHaveBeenCalledTimes(2);
-  });
-
-  it("cleans up dismissing actions after their first click", async () => {
-    const transport = createTransport();
-    const onClick = vi.fn();
-    const notification = await loadNotification();
-
-    await notification.push("Question", "Continue?", [
-      { label: "Continue", onClick },
-    ]);
-    const payload = transport.shellCommand.mock.calls[0]?.[1] as {
-      actions: Array<{ id: string }>;
-    };
-    const event = {
-      notificationId: "notification-1",
-      actionId: payload.actions[0]?.id,
-    };
-
-    transport.handlers.get("notification/action-clicked")?.(event);
-    transport.handlers.get("notification/action-clicked")?.(event);
-    expect(onClick).toHaveBeenCalledOnce();
-  });
+  it.each([
+    { dismissOnClick: false, clicks: 2 },
+    { dismissOnClick: undefined, clicks: 1 },
+  ])(
+    "retains $clicks callbacks with dismissOnClick=$dismissOnClick and stops on removal",
+    async ({ dismissOnClick, clicks }) => {
+      const transport = createTransport();
+      const onClick = vi.fn();
+      const notification = await loadNotification();
+      const pushed = await notification.push("Progress", "Still working", [
+        {
+          label: "Refresh",
+          onClick,
+          ...(dismissOnClick === undefined ? {} : { dismissOnClick }),
+        },
+      ]);
+      const payload = transport.shellCommand.mock.calls[0]?.[1] as {
+        actions: Array<{ id: string }>;
+      };
+      const event = {
+        notificationId: pushed.id,
+        actionId: payload.actions[0]?.id,
+      };
+      const clicked = transport.handlers.get("notification/action-clicked");
+      clicked?.(event);
+      clicked?.(event);
+      expect(onClick).toHaveBeenCalledTimes(clicks);
+      transport.handlers.get("notification/removed")?.({ id: pushed.id });
+      clicked?.(event);
+      expect(onClick).toHaveBeenCalledTimes(clicks);
+    },
+  );
 
   it("handles an action event before the push response resolves", async () => {
     const transport = createTransport();

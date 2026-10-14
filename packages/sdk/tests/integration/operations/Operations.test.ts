@@ -1,11 +1,9 @@
+import { gate, tick } from "../../support/async";
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type {
-  OperationHandle,
-  OperationSnapshot,
-  RuntimeAppManifest,
-} from "@edenapp/types";
+import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { ExecutionContext } from "../../../src/execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
@@ -31,17 +29,6 @@ import {
   operationTask,
 } from "../../../src/operations/OperationTask";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-function gate() {
-  let release!: () => void;
-  return {
-    promise: new Promise<void>((resolve) => {
-      release = resolve;
-    }),
-    release: () => release(),
-  };
-}
-
 // Register through production metadata without adding test commands to codegen.
 class Work {
   constructor(
@@ -57,21 +44,6 @@ EdenHandler("work", { mode: "operation", permission: "work" })(
   "prepare",
   Object.getOwnPropertyDescriptor(Work.prototype, "prepare")!,
 );
-
-function app(appId: string): RuntimeAppManifest {
-  return {
-    kind: "app",
-    id: appId,
-    name: appId,
-    version: "1.0.0",
-    frontend: { entry: "index.html" },
-    isPrebuilt: false,
-    isDevelopment: false,
-    isCore: false,
-    isRestricted: false,
-    resolvedGrants: [],
-  } as RuntimeAppManifest;
-}
 
 describe("runtime-owned operations", () => {
   let eden: TestEden;
@@ -528,7 +500,7 @@ describe("runtime-owned operations", () => {
         },
         principal: { kind: "system" },
       });
-      const manifest = { ...app(id), backend: { entry: "backend.js" } };
+      const manifest = { ...testApp(id), backend: { entry: "backend.js" } };
       const starting = eden.runtime
         .resolve(BackendManager)
         .createBackend(id, manifest, eden.paths.root);
@@ -596,7 +568,7 @@ describe("runtime-owned operations", () => {
       .resolve(BackendManager)
       .createBackend(
         owner.appId,
-        { ...app(owner.appId), backend: { entry: "backend.js" } },
+        { ...testApp(owner.appId), backend: { entry: "backend.js" } },
         eden.paths.root,
       );
     await tick();
@@ -647,7 +619,7 @@ describe("runtime-owned operations", () => {
         .resolve(BackendManager)
         .createBackend(
           owner.appId,
-          { ...app(owner.appId), backend: { entry: "backend.js" } },
+          { ...testApp(owner.appId), backend: { entry: "backend.js" } },
           eden.paths.root,
         );
       await tick();
@@ -754,7 +726,7 @@ describe("runtime-owned operations", () => {
         );
     for (const id of [owner.appId, "other.app"]) {
       permissions.registerApp(id, ["integration/work"]);
-      registry.register(app(id));
+      registry.register(testApp(id));
       await launch(id);
     }
     const view = (id: string) =>

@@ -1,3 +1,4 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -104,18 +105,9 @@ describe("control-plane API integration", () => {
 
   it("returns detached data and synchronizes session changes", async () => {
     eden = await createTestEden();
-    const app = {
-      kind: "app",
-      id: "com.example.control-plane",
+    const app = testApp("com.example.control-plane", {
       name: "Control Plane App",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    });
     eden.runtime.resolve(PackageRegistry).register(app);
 
     const user = await eden.runtime.users.create({

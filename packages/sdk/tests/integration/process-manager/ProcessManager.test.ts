@@ -1,12 +1,9 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type {
-  OperationHandle,
-  RuntimeAppManifest,
-  UserProfile,
-} from "@edenapp/types";
+import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { PermissionRegistry } from "../../../src/ipc";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
@@ -31,18 +28,9 @@ describe("ProcessManager integration", () => {
   it("queues renderer self-exit acceptance before destroying the caller", async () => {
     eden = await createTestEden();
     const appId = "com.example.self-exit";
-    eden.runtime.resolve(PackageRegistry).register({
-      kind: "app",
-      id: appId,
-      name: "Self exit",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest);
+    eden.runtime
+      .resolve(PackageRegistry)
+      .register(testApp(appId, { name: "Self exit" }));
     const profile = await eden.runtime.users.create({
       username: "exiting",
       name: "Exiting",
@@ -81,18 +69,7 @@ describe("ProcessManager integration", () => {
 
   it("enforces process ownership through the real command path", async () => {
     eden = await createTestEden();
-    const target = {
-      kind: "app",
-      id: "com.example.target",
-      name: "Target App",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    const target = testApp("com.example.target", { name: "Target App" });
     eden.runtime.resolve(PackageRegistry).register(target);
     eden.runtime
       .resolve(PermissionRegistry)
@@ -140,18 +117,7 @@ describe("ProcessManager integration", () => {
 
   it("rejects launches while the package manager marks a host as changing", async () => {
     eden = await createTestEden();
-    const target = {
-      kind: "app",
-      id: "com.example.guarded",
-      name: "Guarded App",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    const target = testApp("com.example.guarded", { name: "Guarded App" });
     eden.runtime.resolve(PackageRegistry).register(target);
     eden.runtime
       .resolve(PermissionRegistry)

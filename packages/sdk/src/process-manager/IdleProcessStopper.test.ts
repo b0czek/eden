@@ -108,25 +108,22 @@ describe("IdleProcessStopper", () => {
     expect(processManager.stopApp).not.toHaveBeenCalled();
   });
 
-  it("logs and swallows stop errors", async () => {
+  it("isolates stop errors and permits later scheduled stops", async () => {
     const warnSpy = jest
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
     const processManager = createProcessManager();
-    processManager.stopApp.mockRejectedValue(new Error("stop failed"));
+    processManager.stopApp.mockRejectedValueOnce(new Error("stop failed"));
     const stopper = new IdleProcessStopper(processManager, 1000, "test app");
 
     try {
       stopper.setTarget("com.example.app");
       stopper.schedule();
-      jest.advanceTimersByTime(1000);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "Failed to stop idle test app com.example.app:",
-        expect.any(Error),
-      );
+      await jest.advanceTimersByTimeAsync(1000);
+      stopper.setTarget("com.example.next");
+      stopper.schedule();
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(processManager.stopApp).toHaveBeenCalledWith("com.example.next");
     } finally {
       warnSpy.mockRestore();
     }

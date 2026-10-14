@@ -1,3 +1,4 @@
+import { gate } from "../../tests/support/async";
 import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
@@ -88,18 +89,14 @@ describe("SessionManager", () => {
   });
 
   it("rejects concurrent transitions", async () => {
-    let resolveAuthentication: ((user: UserProfile) => void) | undefined;
-    userManager.authenticate.mockReturnValue(
-      new Promise<UserProfile>((resolve) => {
-        resolveAuthentication = resolve;
-      }),
-    );
+    const authentication = gate<UserProfile>();
+    userManager.authenticate.mockReturnValue(authentication.promise);
 
     const login = manager.login("alice", "password");
     await expect(manager.logout()).rejects.toThrow(
       "A session transition is already in progress",
     );
-    resolveAuthentication?.(alice);
+    authentication.release(alice);
     await login;
   });
 

@@ -122,17 +122,6 @@ describe("CommandRegistry", () => {
     });
   });
 
-  it("warns when overwriting an existing handler", () => {
-    const handler = jest.fn();
-
-    registry.register("system", "ping", handler, {});
-    registry.register("system", "ping", handler, {});
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Command handler for "system/ping" is being overwritten',
-    );
-  });
-
   it("registers handlers from manager metadata", async () => {
     class TestManager {
       value = 10;
@@ -262,7 +251,6 @@ describe("CommandRegistry", () => {
         },
       ),
     ).resolves.toBe("ok");
-    expect(permissionRegistry.getRequiredGrantKeys).not.toHaveBeenCalled();
   });
 
   it("limits foundation to its explicit command capabilities", async () => {

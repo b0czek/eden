@@ -8,7 +8,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../../../src/api/ControlPlaneApi";
-import { createFilesystemCaller } from "../../support/filesystem";
+import { createTestCaller } from "../../support/callers";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
@@ -32,10 +32,7 @@ describe("safe volume removal", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    ({ user } = await createFilesystemCaller(eden, appId, [
-      "fs/*",
-      "volume/*",
-    ]));
+    ({ user } = await createTestCaller(eden, appId, ["fs/*", "volume/*"]));
     usbRoot = path.join(eden.paths.root, "usb");
     await fs.mkdir(usbRoot);
   });

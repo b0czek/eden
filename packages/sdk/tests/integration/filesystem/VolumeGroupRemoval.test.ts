@@ -3,10 +3,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import {
-  createFilesystemCaller,
-  registerTestVolume,
-} from "../../support/filesystem";
+import { createTestCaller } from "../../support/callers";
+import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -24,7 +22,7 @@ describe("grouped volume removal", () => {
   let user: UserProfile;
   beforeEach(async () => {
     eden = await createTestEden();
-    ({ user } = await createFilesystemCaller(
+    ({ user } = await createTestCaller(
       eden,
       appId,
       ["fs/read", "volume/eject"],

@@ -1,11 +1,10 @@
+import { tick } from "../../support/async";
 import "reflect-metadata";
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
-
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe("daemon operation lifecycle", () => {
   let eden: TestEden;

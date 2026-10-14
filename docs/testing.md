@@ -12,7 +12,9 @@ Shared test helpers live under `packages/sdk/tests/support`. Real Electron
 workflows live in `packages/sdk/tests/electron`.
 
 The SDK's Jest commands select unit and Node integration suites by directory.
-Production builds exclude test files and test support code.
+Production builds exclude test files and test support code. Compile-time SDK
+contracts live in `packages/sdk/tests/types` and run through the SDK
+`test:types` command as part of its unit test workflow.
 
 Give each behavior one owning suite. Command and UI tests should cover their
 argument adaptation, permissions, transport, and lifecycle integration rather
@@ -22,7 +24,7 @@ setup and outcomes. Use controlled release signals for pending work; retain real
 elapsed-time tests only where elapsed time is the behavior being checked.
 
 ```bash
-pnpm test:unit                  # SDK unit tests and other package test suites
+pnpm test:unit                  # SDK type contracts, unit tests, and other packages
 pnpm test:integration:node      # real Eden services with in-memory platform edges
 pnpm test:integration:electron  # built host, preload IPC, views, and utility processes
 pnpm test                       # unit plus Node integration coverage

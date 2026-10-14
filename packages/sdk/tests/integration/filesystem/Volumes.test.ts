@@ -1,3 +1,4 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import { statSync } from "node:fs";
 import * as fs from "node:fs/promises";
@@ -6,14 +7,11 @@ import * as path from "node:path";
 import type {
   FilesystemVolume,
   OperationHandle,
-  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { PermissionRegistry } from "../../../src/ipc";
-import {
-  createFilesystemCaller,
-  registerTestVolume,
-} from "../../support/filesystem";
+import { createTestCaller } from "../../support/callers";
+import { registerTestVolume } from "../../support/filesystem";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
@@ -37,14 +35,9 @@ describe("consumer-managed filesystem volumes", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    ({ user } = await createFilesystemCaller(
-      eden,
-      appId,
-      ["fs/*", "volume/*"],
-      {
-        directoryRestriction: "operators/one",
-      },
-    ));
+    ({ user } = await createTestCaller(eden, appId, ["fs/*", "volume/*"], {
+      directoryRestriction: "operators/one",
+    }));
     await eden.runtime.sessions.login(user.username, "password");
     usbRoot = await registerTestVolume(eden, {
       id: "usb",
@@ -536,19 +529,10 @@ describe("consumer-managed filesystem volumes", () => {
 
   it("passes complete addresses to stopped and running file handlers", async () => {
     const handlerId = "com.example.volume-handler";
-    const handler = {
-      kind: "app",
-      id: handlerId,
+    const handler = testApp(handlerId, {
       name: "Handler",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
       fileHandlers: [{ name: "Folders", directories: true }],
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    });
     eden.runtime.resolve(PackageRegistry).register(handler);
     await execute("fs/mkdir", {
       location: { volume: "usb", path: "/same-path" },
@@ -608,18 +592,7 @@ describe("consumer-managed filesystem volumes", () => {
     const providerId = "com.example.volume-picker";
     const registry = eden.runtime.resolve(PackageRegistry);
     for (const id of [appId, providerId]) {
-      registry.register({
-        kind: "app",
-        id,
-        name: "Picker test",
-        version: "1.0.0",
-        frontend: { entry: "index.html" },
-        isPrebuilt: false,
-        isDevelopment: false,
-        isCore: false,
-        isRestricted: false,
-        resolvedGrants: [],
-      } as RuntimeAppManifest);
+      registry.register(testApp(id, { name: "Picker test" }));
       await eden.complete("process/launch", { appId: id });
     }
     eden.runtime
@@ -908,18 +881,7 @@ describe("consumer-managed filesystem volumes", () => {
   it.each(["unplug", "eject"])(
     "invalidates owned watches and sends live volume inventory on %s",
     async (removal) => {
-      const app = {
-        kind: "app",
-        id: appId,
-        name: "Volumes",
-        version: "1.0.0",
-        frontend: { entry: "index.html" },
-        isPrebuilt: false,
-        isDevelopment: false,
-        isCore: false,
-        isRestricted: false,
-        resolvedGrants: [],
-      } as RuntimeAppManifest;
+      const app = testApp(appId, { name: "Volumes" });
       eden.runtime.resolve(PackageRegistry).register(app);
       await eden.complete("process/launch", { appId });
       const instance = requireValue(

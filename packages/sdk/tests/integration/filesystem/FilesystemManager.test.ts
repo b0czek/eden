@@ -1,10 +1,10 @@
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   OperationHandle,
   OperationSnapshot,
-  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import { PermissionRegistry } from "../../../src/ipc";
@@ -12,7 +12,7 @@ import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { createFilesystemCaller } from "../../support/filesystem";
+import { createTestCaller } from "../../support/callers";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -29,18 +29,7 @@ describe("FilesystemManager native watch integration", () => {
 
   beforeEach(async () => {
     eden = await createTestEden();
-    const manifest = {
-      kind: "app",
-      id: appId,
-      name: "Filesystem Watch Test",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    const manifest = testApp(appId, { name: "Filesystem Watch Test" });
     eden.runtime.resolve(PackageRegistry).register(manifest);
     eden.runtime
       .resolve(PermissionRegistry)
@@ -187,18 +176,9 @@ describe("FilesystemManager native watch integration", () => {
     })) as {
       watchId: string;
     };
-    eden.runtime.resolve(PackageRegistry).register({
-      kind: "app",
-      id: otherAppId,
-      name: "Other Filesystem Watch Test",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest);
+    eden.runtime
+      .resolve(PackageRegistry)
+      .register(testApp(otherAppId, { name: "Other Filesystem Watch Test" }));
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(otherAppId, ["fs/read"]);
@@ -258,7 +238,7 @@ describe("FilesystemManager integration", () => {
 
   const setUpFilesystemCaller = async () => {
     eden = await createTestEden();
-    const { caller } = await createFilesystemCaller(
+    const { caller } = await createTestCaller(
       eden,
       "filesystem-transfer-app",
       ["fs/write", "fs/read"],

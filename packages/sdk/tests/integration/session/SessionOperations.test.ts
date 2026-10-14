@@ -1,3 +1,5 @@
+import { createTestCaller } from "../../support/callers";
+import { gate, tick } from "../../support/async";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -8,8 +10,6 @@ import { operationTask } from "../../../src/operations/OperationTask";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { SessionContext } from "../../../src/session/SessionContext";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-
 describe("session operation transactions", () => {
   let eden: TestEden;
   afterEach(async () => {
@@ -18,31 +18,21 @@ describe("session operation transactions", () => {
 
   it("reserves logout before enqueueing and drains accepted session I/O without a self-deadlock", async () => {
     eden = await createTestEden();
-    const profile = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-    });
+    const { user: profile, caller: owner } = await createTestCaller(
+      eden,
+      "session.controller",
+      ["session/manage"],
+    );
     await eden.runtime.sessions.login(profile.username, "password");
     const session = eden.runtime.resolve(SessionContext);
     const sessionId = session.getSessionId();
-    const caller = {
-      appId: "session.controller",
-      principal: { kind: "user" as const, profile },
-      sessionId,
-    };
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(caller.appId, ["session/manage"]);
+    const caller = { ...owner, sessionId };
     const manager = eden.runtime.resolve(OperationManager);
-    let release!: () => void;
-    const blocked = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const blocked = gate();
     const file = path.join(eden.paths.root, "session-work");
     const work = manager.submit("integration/session-work", {}, caller, () =>
       operationTask(async () => {
-        await blocked;
+        await blocked.promise;
         await fs.writeFile(file, "drained");
       }),
     );
@@ -61,7 +51,7 @@ describe("session operation transactions", () => {
       phase: "waiting-for-operations",
     });
     expect(session.getCurrentUser()?.username).toBe("operator");
-    release();
+    blocked.release();
     await manager.wait(work, caller);
     await expect(manager.wait(transition, caller)).resolves.toEqual({
       success: true,

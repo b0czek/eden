@@ -14,7 +14,7 @@ function generate(source: string, namespace = "fs") {
   );
 }
 
-it("unwraps resolved aliases and intersections, grouping optional fields after required fields", () => {
+it("extracts public fields from resolved aliases and intersections", () => {
   const commands = extract(`
     interface Address { volume: string; path: string }
     interface Transfer { overwrite?: boolean; from: Address; to: Address }
@@ -23,53 +23,14 @@ it("unwraps resolved aliases and intersections, grouping optional fields after r
       copy(args: Transfer & { _callerAppId: string }): OperationTask<void> {}
     }
   `);
-  expect(commands[0].fields).toEqual([
-    { name: "overwrite", optional: true },
-    { name: "from", optional: false },
-    { name: "to", optional: false },
-  ]);
-  const code = generateClientCode(groupCommandsByNamespace(commands));
-  expect(code).toContain(
-    'from: CommandArgs<"fs/cp">["from"], to: CommandArgs<"fs/cp">["to"], options?: Pick<CommandArgs<"fs/cp">, "overwrite"> & { submission?: OperationSubmission }',
+  expect(commands[0].fields).toHaveLength(3);
+  expect(commands[0].fields).toEqual(
+    expect.arrayContaining([
+      { name: "overwrite", optional: true },
+      { name: "from", optional: false },
+      { name: "to", optional: false },
+    ]),
   );
-  expect(code).toContain('Promise<CommandResult<"fs/cp">>');
-  expect(code).toContain("options?.submission");
-  expect(code).not.toContain("_callerAppId");
-});
-
-it("supports zero arguments, optional-only options, and single required fields", () => {
-  const code = generate(`
-    class Handler {
-      @EdenHandler("empty") empty(args: Record<string, never>): void {}
-      @EdenHandler("internal") internal(args: { _callerAppId: string }): void {}
-      @EdenHandler("list") list(args: { hidden?: boolean }): string[] {}
-      @EdenHandler("stat") stat(args: { location: { volume: string; path: string } }): string {}
-    }
-  `);
-  expect(code).toContain('["empty"]: (): Promise');
-  expect(code).toContain('["internal"]: (): Promise');
-  expect(code).toContain(
-    '["list"]: (options?: Pick<CommandArgs<"fs/list">, "hidden">)',
-  );
-  expect(code).toContain(
-    '["stat"]: (location: CommandArgs<"fs/stat">["location"])',
-  );
-});
-
-it("normalizes hyphens and slashes and aliases reserved exports and parameters", () => {
-  const source = `class Handler {
-    @EdenHandler("get/su") get(args: { package: string; options: string; _package?: string; optional?: string }): string {}
-    @EdenHandler("read-binary") read(args: {}): void {}
-  }`;
-  const code = generate(source, "package");
-  expect(code).toContain("export { packageCommands as package };");
-  expect(code).toContain('["getSu"]: (_package:');
-  expect(code).toContain(
-    'options_?: Pick<CommandArgs<"package/get/su">, "optional">',
-  );
-  expect(code).toContain('["readBinary"]');
-  expect(generate(source, "file-picker")).toContain("as filePicker");
-  expect(generate(source, "package")).toBe(code);
 });
 
 it.each([

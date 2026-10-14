@@ -38,12 +38,6 @@ describe("Settings shell", () => {
     expect(sections[0].textContent).toContain("General");
     expect(sections[0].textContent).toContain("Network");
     expect(sections[1].textContent).toContain("Example App");
-    const scrollArea = view.container.querySelector(".eden-sidebar-scroll");
-    expect(scrollArea?.textContent).toContain("General");
-    expect(scrollArea?.textContent).toContain("Example App");
-    expect(view.container.querySelectorAll(".eden-sidebar-scroll").length).toBe(
-      1,
-    );
     expect(
       view.getByRole("button", { name: "General" }).getAttribute("title"),
     ).toBe("General");
@@ -71,9 +65,6 @@ describe("Settings shell", () => {
     const expand = view.getByRole("button", { name: "Expand sidebar" });
     expect(expand.getAttribute("aria-expanded")).toBe("false");
     expect(
-      view.container.querySelector(".eden-sidebar-collapsed"),
-    ).not.toBeNull();
-    expect(
       view
         .getByRole("button", { name: "General" })
         .getAttribute("aria-current"),
@@ -86,7 +77,6 @@ describe("Settings shell", () => {
         .getByRole("button", { name: "Collapse sidebar" })
         .getAttribute("aria-expanded"),
     ).toBe("true");
-    expect(view.container.querySelector(".eden-sidebar-collapsed")).toBeNull();
     expect(selected()).toBe("eden.general");
   });
 

@@ -1,5 +1,6 @@
+import { gate } from "../../support/async";
+import { testApp } from "../../support/apps";
 import "reflect-metadata";
-import type { RuntimeAppManifest } from "@edenapp/types";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { SettingsManager } from "../../../src/settings";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -15,18 +16,7 @@ describe("AutostartManager integration", () => {
 
   it("launches an enabled app after a real session transition", async () => {
     eden = await createTestEden();
-    const app = {
-      kind: "app",
-      id: "com.example.autostart",
-      name: "Autostart App",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    const app = testApp("com.example.autostart", { name: "Autostart App" });
     eden.runtime.resolve(PackageRegistry).register(app);
     await eden.runtime
       .resolve(SettingsManager)
@@ -55,18 +45,9 @@ describe("AutostartManager integration", () => {
 
   it("cancels and drains a queued launch before process shutdown", async () => {
     eden = await createTestEden();
-    const app = {
-      kind: "app",
-      id: "com.example.delayed-autostart",
+    const app = testApp("com.example.delayed-autostart", {
       name: "Delayed Autostart App",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    } as RuntimeAppManifest;
+    });
     eden.runtime.resolve(PackageRegistry).register(app);
     const settings = eden.runtime.resolve(SettingsManager);
     await settings.set("com.eden", `autostart.${app.id}`, "true");
@@ -77,19 +58,15 @@ describe("AutostartManager integration", () => {
       grants: [`apps/launch/${app.id}`],
     });
 
-    let releaseSettings!: (keys: string[]) => void;
-    const settingsPending = new Promise<string[]>((resolve) => {
-      releaseSettings = resolve;
-    });
-    const listStarted = new Promise<void>((resolve) => {
-      jest.spyOn(settings, "list").mockImplementationOnce(async () => {
-        resolve();
-        return settingsPending;
-      });
+    const settingsPending = gate<string[]>();
+    const listStarted = gate();
+    jest.spyOn(settings, "list").mockImplementationOnce(async () => {
+      listStarted.release();
+      return settingsPending.promise;
     });
 
     await eden.runtime.sessions.login(user.username, "password");
-    await listStarted;
+    await listStarted.promise;
 
     const autostart = eden.runtime.resolve(AutostartManager);
     let disposalSettled = false;
@@ -99,7 +76,7 @@ describe("AutostartManager integration", () => {
     await Promise.resolve();
     expect(disposalSettled).toBe(false);
 
-    releaseSettings([`autostart.${app.id}`]);
+    settingsPending.release([`autostart.${app.id}`]);
     await disposal;
 
     expect(eden.runtime.resolve(ProcessManager).getAppInstance(app.id)).toBe(
