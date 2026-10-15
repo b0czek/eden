@@ -305,7 +305,7 @@ export const useExplorerNavigation = (
         setLoading(false);
         return;
       }
-      if (!wasReady && (!options.active || options.active())) {
+      if (scopesLoaded && !wasReady && (!options.active || options.active())) {
         void loadDirectory(currentLocation());
       }
       return;
@@ -340,7 +340,7 @@ export const useExplorerNavigation = (
       ]);
       if (disposed) return;
       setHomeScope(scope.path);
-      if (!options.initialLocation && requestSequence === 0) {
+      if (!options.initialLocation) {
         const initial = { volume: "home", path: scope.path };
         setCurrentLocation(initial);
         setNavigationHistory([initial]);

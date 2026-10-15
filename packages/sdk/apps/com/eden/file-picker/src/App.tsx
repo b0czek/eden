@@ -408,20 +408,26 @@ const App: Component = () => {
     setPendingOverwritePath(null);
     clearSelection();
 
-    const initial = await resolveInitialPath(request);
-    setFileName(request.mode === "save" ? initial.name : "");
-    resetNavigation(
-      initial.directory,
-      initial.selectedPath,
-      request.initialLocation?.volume ?? "home",
-    );
-    if (initial.selectedPath && request.mode === "open") {
-      setSelectedItem(initial.selectedPath);
-      setSelectedPaths([initial.selectedPath]);
-      setScrollToSelected(true);
-    }
+    try {
+      const initial = await resolveInitialPath(request);
+      if (activeRequest()?.requestId !== request.requestId) return;
+      setFileName(request.mode === "save" ? initial.name : "");
+      resetNavigation(
+        initial.directory,
+        initial.selectedPath,
+        request.initialLocation?.volume ?? "home",
+      );
+      if (initial.selectedPath && request.mode === "open") {
+        setSelectedItem(initial.selectedPath);
+        setSelectedPaths([initial.selectedPath]);
+        setScrollToSelected(true);
+      }
 
-    await updateOverlayBounds(true, request);
+      await updateOverlayBounds(true, request);
+    } catch {
+      if (activeRequest()?.requestId === request.requestId)
+        await cancelPicker();
+    }
   };
 
   const hidePicker = () => {

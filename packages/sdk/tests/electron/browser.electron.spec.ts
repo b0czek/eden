@@ -1,8 +1,91 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
-import { useElectronHost } from "./support/host";
+import { type ElectronHost, useElectronHost } from "./support/host";
 import { APP_ID } from "./support/profile";
+
+async function pauseScopeQuery(
+  host: ElectronHost,
+  appId: string,
+  volume: string,
+) {
+  const app = host.electronApp;
+  if (!app) throw new Error("Electron app is not running");
+  await app.evaluate(
+    (_electron, target) => {
+      const integration = globalThis as typeof globalThis & {
+        __edenIntegration: {
+          eden: {
+            runtime: {
+              ipcBridge: {
+                commandRegistry: {
+                  execute(
+                    command: string,
+                    args: { volume?: string },
+                    caller?: { appId?: string },
+                    submission?: unknown,
+                  ): Promise<unknown>;
+                };
+              };
+            };
+          };
+        };
+        __scopeQuery?: { pending: boolean; release(): void };
+      };
+      const registry =
+        integration.__edenIntegration.eden.runtime.ipcBridge.commandRegistry;
+      const execute = registry.execute;
+      let release = () => {};
+      const resumed = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const state = {
+        pending: false,
+        release: () => {
+          registry.execute = execute;
+          release();
+        },
+      };
+      integration.__scopeQuery = state;
+      registry.execute = async (command, args, caller, submission) => {
+        if (
+          command === "fs/access-scope" &&
+          args.volume === target.volume &&
+          caller?.appId === target.appId
+        ) {
+          registry.execute = execute;
+          state.pending = true;
+          await resumed;
+        }
+        return execute.call(registry, command, args, caller, submission);
+      };
+    },
+    { appId, volume },
+  );
+  return {
+    waitUntilPending: () =>
+      expect
+        .poll(() =>
+          app.evaluate(
+            () =>
+              (
+                globalThis as typeof globalThis & {
+                  __scopeQuery?: { pending: boolean };
+                }
+              ).__scopeQuery?.pending,
+          ),
+        )
+        .toBe(true),
+    release: () =>
+      app.evaluate(() => {
+        (
+          globalThis as typeof globalThis & {
+            __scopeQuery?: { release(): void };
+          }
+        ).__scopeQuery?.release();
+      }),
+  };
+}
 
 test.describe
   .serial("browser through Electron", () => {
@@ -429,7 +512,94 @@ test.describe
       });
     }
 
-    test("Files and File Picker use full shared paths within an account folder restriction", async () => {
+    test("closes a picker unplugged during its initial scope query and accepts another request", async () => {
+      const host = getHost();
+      const app = host.electronApp;
+      if (!app) throw new Error("Electron app is not running");
+      const running = await host.executeHostCommand<
+        { manifest: { id: string } }[]
+      >("process/list", {});
+      if (!running.some((process) => process.manifest.id === APP_ID))
+        await host.launchFixture();
+      const driveRoot = path.join(host.root, "initializing-drive");
+      await fs.mkdir(driveRoot);
+      await app.evaluate(async (_electron, rootPath) => {
+        const integration = globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { volumes: { register(args: unknown): Promise<unknown> } };
+          };
+        };
+        await integration.__edenIntegration.eden.volumes.register({
+          id: "initializing-drive",
+          label: "Initializing drive",
+          kind: "removable",
+          rootPath,
+        });
+      }, driveRoot);
+      const scope = await pauseScopeQuery(
+        host,
+        "com.eden.file-picker",
+        "initializing-drive",
+      );
+      try {
+        await host.evaluateApp(
+          APP_ID,
+          `(async () => {
+          globalThis.__initializingPickerResult = undefined;
+          await window.edenAPI.subscribe('file-picker/closed', result => { globalThis.__initializingPickerResult = result; });
+          await window.edenAPI.shellCommand('file-picker/open', {
+            mode: 'open', allowedVolumes: ['initializing-drive'],
+            initialLocation: { volume: 'initializing-drive', path: '/' }
+          });
+        })()`,
+        );
+        await scope.waitUntilPending();
+        await app.evaluate(() => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { unregister(id: string): boolean } };
+            };
+          };
+          integration.__edenIntegration.eden.volumes.unregister(
+            "initializing-drive",
+          );
+        });
+        await scope.release();
+        await expect
+          .poll(() =>
+            host.evaluateApp(APP_ID, "globalThis.__initializingPickerResult"),
+          )
+          .toMatchObject({ reason: "cancel" });
+        await host.evaluateApp(
+          APP_ID,
+          `window.edenAPI.shellCommand('file-picker/open', { mode: 'open' })`,
+        );
+        await expect
+          .poll(() =>
+            host.evaluateApp("com.eden.file-picker", "window.innerWidth"),
+          )
+          .toBeGreaterThan(100);
+        await expect
+          .poll(() =>
+            host.evaluateApp(
+              "com.eden.file-picker",
+              `document.querySelector('.omnibox-display')?.textContent`,
+            ),
+          )
+          .toBe("/");
+        await host.evaluateApp(
+          APP_ID,
+          `window.edenAPI.shellCommand('file-picker/close', {})`,
+        );
+      } finally {
+        await scope.release();
+        await host.executeHostCommand("process/stop", {
+          appId: "com.eden.file-picker",
+        });
+      }
+    });
+
+    test("Files and File Picker initialize restricted Home despite an inventory event and keep shared paths", async () => {
       const host = getHost();
 
       const app = host.electronApp;
@@ -466,6 +636,7 @@ test.describe
         });
         await eden.sessions.login("designer", "password");
       });
+      const scope = await pauseScopeQuery(host, "com.eden.files", "home");
       await host.executeHostCommand("process/launch", {
         appId: "com.eden.files",
       });
@@ -478,6 +649,37 @@ test.describe
         .windows()
         .find((page) => page.url().includes("com.eden.files"));
       if (!files) throw new Error("Files page unavailable");
+      try {
+        await scope.waitUntilPending();
+        await app.evaluate(async (_electron, rootPath) => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { register(args: unknown): Promise<unknown> } };
+            };
+          };
+          await integration.__edenIntegration.eden.volumes.register({
+            id: "initial-inventory",
+            label: "Initial inventory",
+            kind: "removable",
+            rootPath,
+          });
+        }, driveRoot);
+        await expect(
+          files.locator('[data-volume="initial-inventory"]'),
+        ).toBeVisible();
+      } finally {
+        await scope.release();
+        await app.evaluate(() => {
+          const integration = globalThis as typeof globalThis & {
+            __edenIntegration: {
+              eden: { volumes: { unregister(id: string): boolean } };
+            };
+          };
+          integration.__edenIntegration.eden.volumes.unregister(
+            "initial-inventory",
+          );
+        });
+      }
       await expect(files.locator(".omnibox-display")).toHaveText(
         "/projects/design",
       );
