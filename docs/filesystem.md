@@ -225,7 +225,10 @@ or block another writer from modifying the opened file.
 Handles belong to the opening app, account, and session. They can be used by
 that app's frontend or backend under the same identity; passing the value to
 another app does not grant access. A frontend-created handle closes when its
-view is removed. App stop and runtime shutdown close remaining handles. Each
+view is removed. App stop closes remaining handles. Session transitions release
+the outgoing session's handles before waiting for accepted operations, so a
+pending eject can finish before apps stop. Power transitions release all retained
+handles before waiting; runtime shutdown also closes remaining handles. Each
 runtime permits at most 1,024 open handles. Reading, querying, or closing an
 unknown or closed handle fails explicitly.
 

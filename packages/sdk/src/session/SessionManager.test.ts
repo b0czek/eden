@@ -3,6 +3,7 @@ import "reflect-metadata";
 
 import type { UserProfile } from "@edenapp/types";
 import { ExecutionContext } from "../execution/ExecutionContext";
+import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import type { CommandRegistry, IPCBridge } from "../ipc";
 import { OperationManager } from "../operations/OperationManager";
 import type { ProcessManager } from "../process-manager/ProcessManager";
@@ -47,6 +48,9 @@ describe("SessionManager", () => {
       bridge,
       new ExecutionContext({}),
       context,
+      {
+        releaseHandles: jest.fn().mockResolvedValue(undefined),
+      } as unknown as FilesystemManager,
     );
     manager = new SessionManager(
       { eventSubscribers: { notify } } as unknown as IPCBridge,

@@ -111,12 +111,15 @@ export class FilesystemHandles {
   async closeOwner(owner: {
     appId?: string;
     webContentsId?: number;
+    sessionId?: string;
   }): Promise<void> {
     await Promise.all(
       [...this.handles]
         .filter(
           ([, entry]) =>
             (owner.appId === undefined || entry.owner.appId === owner.appId) &&
+            (owner.sessionId === undefined ||
+              entry.owner.sessionId === owner.sessionId) &&
             (owner.webContentsId === undefined ||
               entry.owner.webContentsId === owner.webContentsId),
         )

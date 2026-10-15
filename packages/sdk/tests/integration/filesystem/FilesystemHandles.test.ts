@@ -10,8 +10,10 @@ import type {
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { PowerManager } from "../../../src/power/PowerManager";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import { SessionContext } from "../../../src/session/SessionContext";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -24,6 +26,8 @@ describe("file handle access and lifetime", () => {
   const location = { volume: "usb", path: "/part.txt" };
   const appId = "com.example.file-handles";
   let ejected: boolean;
+  let powerHandoffs: number;
+  let powerFailure: Error | undefined;
 
   const execute = <T = unknown>(
     command: string,
@@ -32,7 +36,20 @@ describe("file handle access and lifetime", () => {
   ) => eden.complete<T>(command, args, owner);
 
   beforeEach(async () => {
-    eden = await createTestEden();
+    powerHandoffs = 0;
+    powerFailure = undefined;
+    const handoff = async () => {
+      powerHandoffs++;
+      if (powerFailure) throw powerFailure;
+    };
+    eden = await createTestEden({
+      config: {
+        powerProvider: {
+          poweroff: handoff,
+          reboot: handoff,
+        },
+      },
+    });
     const { user, caller: owner } = await createTestCaller(eden, appId, [
       "fs/read",
       "volume/*",
@@ -283,4 +300,130 @@ describe("file handle access and lifetime", () => {
     await eden.runtime.dispose();
     expect(ejected).toBe(true);
   });
+
+  it.each(["operation", "host"] as const)(
+    "releases session handles before logout drains an eject via %s",
+    async (entry) => {
+      caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+      await launchOwner(true);
+      await execute("fs/open", { location });
+      const eject = await eden.execute<OperationHandle>(
+        "volume/eject",
+        { volume: "usb" },
+        caller,
+      );
+      if (entry === "operation") await eden.complete("session/logout");
+      else await eden.runtime.sessions.logout();
+      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      expect(ejected).toBe(true);
+      expect(eden.runtime.sessions.current()).toBeNull();
+      expect(
+        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each(["operation", "host"] as const)(
+    "releases session handles before switching users drains an eject via %s",
+    async (entry) => {
+      caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+      await eden.runtime.users.create({
+        username: "other",
+        name: "Other",
+        password: "password",
+      });
+      await launchOwner(true);
+      await execute("fs/open", { location });
+      const eject = await eden.execute<OperationHandle>(
+        "volume/eject",
+        { volume: "usb" },
+        caller,
+      );
+      if (entry === "operation")
+        await eden.complete("session/login", {
+          username: "other",
+          password: "password",
+        });
+      else await eden.runtime.sessions.login("other", "password");
+      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      expect(ejected).toBe(true);
+      expect(eden.runtime.sessions.current()?.username).toBe("other");
+      expect(
+        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["operation", "poweroff"],
+    ["operation", "reboot"],
+    ["host", "poweroff"],
+    ["host", "reboot"],
+  ] as const)(
+    "releases retained handles before %s %s drains an eject",
+    async (entry, action) => {
+      await launchOwner(true);
+      await execute("fs/open", { location });
+      const eject = await eden.execute<OperationHandle>(
+        "volume/eject",
+        { volume: "usb" },
+        caller,
+      );
+      if (entry === "operation")
+        await eden.complete("system/power", { action });
+      else await eden.runtime.resolve(PowerManager).power({ action });
+      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      expect(ejected).toBe(true);
+      expect(powerHandoffs).toBe(1);
+      expect(
+        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+      ).toBeUndefined();
+    },
+  );
+
+  it("preserves runtime-owned handles across logout and accepts handles in the next session", async () => {
+    caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+    const runtimeOwner = {
+      ...caller,
+      sessionId: "daemon:file-reader",
+      principal: { kind: "system" as const },
+    };
+    const sessionHandle = await execute<FilesystemHandle>("fs/open", {
+      location,
+    });
+    const runtimeHandle = await execute<FilesystemHandle>(
+      "fs/open",
+      { location },
+      runtimeOwner,
+    );
+    await eden.runtime.sessions.logout();
+    await expect(
+      execute("fs/read", { location: sessionHandle }),
+    ).rejects.toThrow(/unavailable/);
+    expect(
+      await execute("fs/read", { location: runtimeHandle }, runtimeOwner),
+    ).toBe("original");
+    await eden.runtime.sessions.login("operator", "password");
+    caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+    const nextHandle = await execute<FilesystemHandle>("fs/open", { location });
+    expect(await execute("fs/read", { location: nextHandle })).toBe("original");
+  });
+
+  it.each(["operation", "host"] as const)(
+    "allows new handles after a failed power handoff via %s",
+    async (entry) => {
+      const handle = await execute<FilesystemHandle>("fs/open", { location });
+      powerFailure = new Error("Host refused poweroff");
+      const transition =
+        entry === "operation"
+          ? eden.complete("system/power", { action: "poweroff" })
+          : eden.runtime.resolve(PowerManager).power({ action: "poweroff" });
+      await expect(transition).rejects.toThrow("Host refused poweroff");
+      await expect(execute("fs/read", { location: handle })).rejects.toThrow(
+        /unavailable/,
+      );
+      const reopened = await execute<FilesystemHandle>("fs/open", { location });
+      expect(await execute("fs/read", { location: reopened })).toBe("original");
+    },
+  );
 });

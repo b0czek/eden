@@ -134,6 +134,11 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     return this.handles.close(handle);
   }
 
+  /** Release retained access for a session transition, or the whole runtime. */
+  releaseHandles(sessionId?: string): Promise<void> {
+    return this.handles.closeOwner({ sessionId });
+  }
+
   /** Release open handles before draining operations which may be waiting to eject. */
   closeHandles(): Promise<void> {
     return this.handles.dispose();
