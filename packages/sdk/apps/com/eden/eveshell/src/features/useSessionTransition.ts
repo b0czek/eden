@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createOperation } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { createSignal, onCleanup } from "solid-js";
@@ -40,8 +41,8 @@ export function useSessionTransition(options: { dialogs: DialogController }) {
       setError(undefined);
       await operation.run(() =>
         nextAction === "logout"
-          ? window.edenAPI.shellCommand("session/logout", {})
-          : window.edenAPI.shellCommand("system/power", { action: nextAction }),
+          ? eden.session.logout()
+          : eden.system.power(nextAction),
       );
     } catch (cause) {
       if (disposed) return;

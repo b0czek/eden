@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createSignal, onCleanup, onMount } from "solid-js";
 
 export const FILES_APP_ID = "com.eden.files";
@@ -26,8 +27,7 @@ export const useFileActivationPreference = (ownerAppId?: string) => {
   onMount(async () => {
     try {
       await window.edenAPI.subscribe("settings/changed", handleChanged);
-      const result = await window.edenAPI.shellCommand("settings/get", {
-        key: SINGLE_CLICK_SETTING_KEY,
+      const result = await eden.settings.get(SINGLE_CLICK_SETTING_KEY, {
         ...(ownerAppId ? { appId: ownerAppId } : {}),
       });
       applyValue(result.value);

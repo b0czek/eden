@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { log } from "../logging";
 /**
  * App Frame Button Handlers
@@ -7,17 +8,15 @@ import { log } from "../logging";
 
 export async function closeAppFrameView(): Promise<void> {
   // The close action completes when Eden accepts teardown of this caller.
-  await window.edenAPI.shellCommand("process/exit", {});
+  await eden.process.exit();
 }
 
 export async function minimizeAppFrameView(): Promise<void> {
-  await window.edenAPI.shellCommand("view/set-visibility", {
-    visible: false,
-  });
+  await eden.view.setVisibility(false);
 }
 
 export async function toggleAppFrameViewMode(): Promise<void> {
-  await window.edenAPI.shellCommand("view/toggle-mode", {});
+  await eden.view.toggleMode();
 }
 
 /**

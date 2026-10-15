@@ -8,10 +8,17 @@ vi.mock("../../i18n", () => ({ t: (key: string) => key }));
 vi.mock("../../dialogs/CreateUserDialog", () => ({ default: () => null }));
 vi.mock("../../dialogs/SetPasswordDialog", () => ({ default: () => null }));
 vi.mock("./UsersList", () => ({
-  default: (props: { onSelect: (username: string) => void }) => (
-    <button type="button" onClick={() => props.onSelect("vendor")}>
-      Select vendor
-    </button>
+  default: (props: {
+    users: Array<{ username: string }>;
+    onSelect: (username: string) => void;
+  }) => (
+    <For each={props.users}>
+      {(user) => (
+        <button type="button" onClick={() => props.onSelect(user.username)}>
+          Select {user.username}
+        </button>
+      )}
+    </For>
   ),
 }));
 vi.mock("./UserDetail", () => ({

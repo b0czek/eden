@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   EventData,
   SettingsPanelActionInvocation,
@@ -33,7 +34,7 @@ const App: Component = () => {
 
   const loadBranding = async () => {
     try {
-      const branding = await window.edenAPI.shellCommand("system/branding", {});
+      const branding = await eden.system.branding();
       setBrandName(branding.name);
     } catch {
       // The product name fallback remains usable.
@@ -42,8 +43,7 @@ const App: Component = () => {
 
   const loadCatalog = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("settings/panels", {});
-      const panels = Array.isArray(result.panels) ? result.panels : [];
+      const { panels } = await eden.settings.panels();
       setCatalog(panels);
       const selected = selectedPanelId();
       if (selected && !panels.some((panel) => panel.id === selected)) {
@@ -75,10 +75,8 @@ const App: Component = () => {
     if (showLoading) setLoadingPanel(true);
     setPanelError(null);
     try {
-      const response: SettingsPanelResponse = await window.edenAPI.shellCommand(
-        "settings/panel",
-        { panelId },
-      );
+      const response: SettingsPanelResponse =
+        await eden.settings.panel(panelId);
       if (request !== panelRequest || selectedPanelId() !== panelId) return;
       if (response.error || !response.panel) {
         setLoadedPanel(null);
@@ -148,11 +146,7 @@ const App: Component = () => {
     setOperationError(null);
     let result: SettingsPanelActionResponse;
     try {
-      result = await window.edenAPI.shellCommand("settings/action", {
-        panelId,
-        actionId,
-        invocation,
-      });
+      result = await eden.settings.action(panelId, actionId, { invocation });
       if (result.error) setOperationError(result.error);
     } catch {
       result = {

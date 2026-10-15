@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   RuntimeAppManifest,
   RuntimeDlcManifest,
@@ -83,9 +84,7 @@ const AppsTab: Component<{
     if (loadedSizes.has(key) || sizeLoading()[key]) return;
     setSizeLoading((current) => ({ ...current, [key]: true }));
     try {
-      const result = await window.edenAPI.shellCommand("package/get-size", {
-        packageId: selected.id,
-      });
+      const result = await eden.package.getSize(selected.id);
       setSizes((current) => ({ ...current, [key]: result.size }));
     } finally {
       loadedSizes.add(key);

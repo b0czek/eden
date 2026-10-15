@@ -1,10 +1,5 @@
-import type {
-  CommandArgs,
-  CommandResult,
-  EventData,
-  Notification,
-  NotificationType,
-} from "@edenapp/types";
+import * as eden from "@edenapp/client";
+import type { EventData, Notification, NotificationType } from "@edenapp/types";
 
 export interface NotificationActionOptions {
   label: string;
@@ -31,20 +26,6 @@ export interface EdenNotificationAPI {
   ): Promise<Notification>;
 }
 
-type NotificationCommand = "notification/push";
-type NotificationEvent = "notification/action-clicked" | "notification/removed";
-
-type EdenAPITransport = {
-  shellCommand: <T extends NotificationCommand>(
-    command: T,
-    args: CommandArgs<T>,
-  ) => Promise<CommandResult<T>>;
-  subscribe: <T extends NotificationEvent>(
-    event: T,
-    handler: (payload: EventData<T>) => void,
-  ) => Promise<void> | void;
-};
-
 interface PendingNotification {
   active: boolean;
   actionIds: Set<string>;
@@ -61,19 +42,6 @@ const actionsById = new Map<string, RoutedAction>();
 const notificationsById = new Map<string, PendingNotification>();
 let actionIdCounter = 0;
 let subscriptionPromise: Promise<void> | undefined;
-
-const getEdenAPI = (): EdenAPITransport => {
-  if (typeof window === "undefined") {
-    throw new Error("notification can only be used in a browser environment.");
-  }
-
-  const api = (window as { edenAPI?: EdenAPITransport }).edenAPI;
-  if (!api) {
-    throw new Error("edenAPI is not available on window.");
-  }
-
-  return api;
-};
 
 const forgetNotification = (pending: PendingNotification) => {
   pending.active = false;
@@ -124,10 +92,15 @@ const handleNotificationRemoved = (
 
 const ensureSubscribed = async () => {
   if (!subscriptionPromise) {
-    const edenAPI = getEdenAPI();
     subscriptionPromise = Promise.all([
-      edenAPI.subscribe("notification/action-clicked", handleActionClicked),
-      edenAPI.subscribe("notification/removed", handleNotificationRemoved),
+      window.edenAPI.subscribe(
+        "notification/action-clicked",
+        handleActionClicked,
+      ),
+      window.edenAPI.subscribe(
+        "notification/removed",
+        handleNotificationRemoved,
+      ),
     ])
       .then(() => undefined)
       .catch((error) => {
@@ -174,9 +147,7 @@ const push: EdenNotificationAPI["push"] = async (
   });
 
   try {
-    const result = await getEdenAPI().shellCommand("notification/push", {
-      title,
-      message,
+    const result = await eden.notification.push(title, message, {
       ...options,
       ...(transportActions.length > 0 ? { actions: transportActions } : {}),
     });

@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   UserGrantOption,
   UserGrantOptionsResponse,
@@ -35,7 +36,7 @@ export default function UsersTab() {
 
   const loadUsers = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("user/list", {});
+      const result = await eden.user.list();
       setUsers(result.users ?? []);
     } catch (error) {
       console.error("Failed to load users:", error);
@@ -44,10 +45,7 @@ export default function UsersTab() {
 
   const loadCurrentUser = async () => {
     try {
-      const result = await window.edenAPI.shellCommand(
-        "session/get-current",
-        {},
-      );
+      const result = await eden.session.getCurrent();
       setCurrentUser(result.user ?? null);
     } catch (error) {
       console.error("Failed to load current user:", error);
@@ -56,8 +54,7 @@ export default function UsersTab() {
 
   const loadGrantOptions = async () => {
     try {
-      const result: UserGrantOptionsResponse =
-        await window.edenAPI.shellCommand("user/grant-options", {});
+      const result: UserGrantOptionsResponse = await eden.user.grantOptions();
       if (result.revision < grantOptionsRevision) return;
       grantOptionsRevision = result.revision;
       setGrantOptions(result.options);
@@ -68,7 +65,7 @@ export default function UsersTab() {
 
   const loadDefaultUser = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("user/get-default", {});
+      const result = await eden.user.getDefault();
       setDefaultUsername(result.username ?? null);
     } catch (error) {
       console.error("Failed to load default user:", error);
@@ -137,9 +134,7 @@ export default function UsersTab() {
   ): Promise<boolean> => {
     if (!name || !password) return false;
     try {
-      const result = await window.edenAPI.shellCommand("user/create", {
-        name,
-        password,
+      const result = await eden.user.create(name, password, {
         directoryRestriction,
       });
       setShowCreateDialog(false);
@@ -159,8 +154,7 @@ export default function UsersTab() {
     directoryRestriction: string,
   ): Promise<boolean> => {
     try {
-      const result = await window.edenAPI.shellCommand("user/update", {
-        username,
+      const result = await eden.user.update(username, {
         directoryRestriction: directoryRestriction.trim() || null,
       });
       setUsers((current) =>
@@ -178,7 +172,7 @@ export default function UsersTab() {
   const handleDeleteUser = async (username: string) => {
     if (!confirm(t("settings.users.deleteConfirm"))) return;
     try {
-      await window.edenAPI.shellCommand("user/delete", { username });
+      await eden.user.delete(username);
       await loadUsers();
       if (selectedUsername() === username) {
         setSelectedUsername(null);
@@ -194,10 +188,7 @@ export default function UsersTab() {
   ): Promise<boolean> => {
     if (!password) return false;
     try {
-      await window.edenAPI.shellCommand("user/set-password", {
-        username,
-        password,
-      });
+      await eden.user.setPassword(username, password);
       return true;
     } catch (error) {
       console.error("Failed to set password:", error);
@@ -213,10 +204,7 @@ export default function UsersTab() {
     if (!user) return;
     const grants = updater(new Set(user.grants ?? []));
     try {
-      await window.edenAPI.shellCommand("user/update", {
-        username,
-        grants: Array.from(grants),
-      });
+      await eden.user.update(username, { grants: Array.from(grants) });
       await loadUsers();
     } catch (error) {
       console.error("Failed to update grants:", error);
@@ -229,9 +217,7 @@ export default function UsersTab() {
   ) => {
     try {
       const next = enabled ? username : null;
-      await window.edenAPI.shellCommand("user/set-default", {
-        username: next,
-      });
+      await eden.user.setDefault(next);
       setDefaultUsername(next);
     } catch (error) {
       console.error("Failed to update default user:", error);

@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@edenapp/babel": "workspace:*",
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "@edenapp/client": "workspace:*"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",

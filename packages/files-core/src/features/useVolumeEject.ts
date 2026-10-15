@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { FilesystemVolume } from "@edenapp/types";
 import { createSignal } from "solid-js";
 
@@ -16,9 +17,7 @@ export function useVolumeEject(options: {
       return;
     setPending((ids) => new Set([...ids, volume.id]));
     try {
-      const removal = await window.edenAPI.shellCommand("volume/eject", {
-        volume: volume.id,
-      });
+      const removal = await eden.volume.eject(volume.id);
       await removal.result();
       options.onRemoved(volume);
     } catch (error) {

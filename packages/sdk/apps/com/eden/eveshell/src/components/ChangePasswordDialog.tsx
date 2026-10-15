@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { field } from "@edenapp/solid-kit/dialogs";
 import { t } from "../i18n";
@@ -20,7 +21,10 @@ const submitChangePassword = async (
   args: ChangePasswordSubmitArgs,
 ): Promise<ChangePasswordSubmitResult> => {
   try {
-    return await window.edenAPI.shellCommand("user/change-password", args);
+    return await eden.user.changePassword(
+      args.currentPassword,
+      args.newPassword,
+    );
   } catch (error) {
     console.error("Failed to change password:", error);
     return { success: false, error: t("shell.passwordUpdateFailed") };

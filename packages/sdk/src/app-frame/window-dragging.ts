@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { log } from "../logging";
 /**
  * Window Dragging
@@ -48,11 +49,7 @@ export function setupWindowDragging(
   // Animation frame update function - throttles IPC to 60fps
   const updatePosition = () => {
     if (pendingBounds) {
-      window.edenAPI
-        .shellCommand("view/update-bounds", {
-          bounds: pendingBounds,
-        })
-        .catch(log.error);
+      eden.view.updateBounds(pendingBounds).catch(log.error);
 
       pendingBounds = null;
     }
@@ -117,12 +114,7 @@ export function setupWindowDragging(
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
     if (!isTouch) {
-      window.edenAPI
-        .shellCommand("view/start-drag", {
-          startX: coords.x,
-          startY: coords.y,
-        })
-        .catch(log.error);
+      eden.view.startDrag(coords.x, coords.y).catch(log.error);
     }
 
     // Add mouseup listener when drag starts (removed when drag ends)
@@ -185,11 +177,7 @@ export function setupWindowDragging(
 
       // Send final pending bounds immediately
       if (pendingBounds) {
-        window.edenAPI
-          .shellCommand("view/update-bounds", {
-            bounds: pendingBounds,
-          })
-          .catch(log.error);
+        eden.view.updateBounds(pendingBounds).catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
         syncEdenFrameBounds(pendingBounds);
@@ -204,10 +192,10 @@ export function setupWindowDragging(
 
     // Stop global drag tracking in main process (for mouse events)
     if (!isTouch) {
-      window.edenAPI.shellCommand("view/end-drag", {}).catch(log.error);
+      eden.view.endDrag().catch(log.error);
     }
 
-    window.edenAPI.shellCommand("view/focus", {}).catch(log.error);
+    eden.view.focus().catch(log.error);
   };
 
   // Mouse events

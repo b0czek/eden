@@ -11,7 +11,8 @@
     "solid-js": "catalog:",
     "solid-icons": "catalog:",
     "@edenapp/babel": "workspace:*",
-    "@edenapp/solid-kit": "workspace:*"
+    "@edenapp/solid-kit": "workspace:*",
+    "@edenapp/client": "workspace:*"
   },
   "devDependencies": {
     "vite": "catalog:",

@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   ContextMenuItem,
   ContextMenuOpenEvent,
@@ -35,7 +36,7 @@ let openSubmenuPath: number[] = [];
 
 async function fetchWindowSize(): Promise<WindowSize> {
   try {
-    const size = await window.edenAPI.shellCommand("view/window-size", {});
+    const size = await eden.view.windowSize();
     windowSize = size;
     return size;
   } catch (err) {
@@ -51,9 +52,7 @@ async function updateOverlayBounds(visible: boolean): Promise<void> {
     : { x: 0, y: 0, width: 0, height: 0 };
 
   try {
-    await window.edenAPI.shellCommand("view/update-bounds", {
-      bounds,
-    });
+    await eden.view.updateBounds(bounds);
   } catch (err) {
     console.error("Failed to update context menu bounds:", err);
   }
@@ -165,11 +164,7 @@ function closeMenu(
   void updateOverlayBounds(false);
 
   if (notify) {
-    void window.edenAPI.shellCommand("context-menu/resolve", {
-      requestId,
-      itemId,
-      reason,
-    });
+    void eden.contextMenu.resolve(requestId, reason, { itemId });
   }
 }
 
@@ -195,7 +190,7 @@ async function openMenu(openData: ContextMenuOpenEvent): Promise<void> {
 
 async function init(): Promise<void> {
   // Register as the display provider for context menus
-  await window.edenAPI.shellCommand("context-menu/register-display", {});
+  await eden.contextMenu.registerDisplay();
 
   await fetchWindowSize();
   await updateOverlayBounds(false);

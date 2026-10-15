@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { initLocale, t } from "../i18n";
@@ -51,7 +52,7 @@ export const useProcessMetrics = () => {
 
     try {
       const nextSnapshot = normalizeSnapshot(
-        await window.edenAPI.shellCommand("process/metrics", {
+        await eden.process.metrics({
           showHidden: true,
           pollingTimeoutMs: POLLING_TIMEOUT_MS,
           waitForAccurateCpu: false,
@@ -95,9 +96,7 @@ export const useProcessMetrics = () => {
     void Promise.all(
       missingAppIds.map(async (appId) => {
         try {
-          const result = await window.edenAPI.shellCommand("package/get-icon", {
-            packageId: appId,
-          });
+          const result = await eden.package.getIcon(appId);
           return [appId, result.icon] as const;
         } catch (caughtError) {
           console.warn(`Failed to load icon for ${appId}:`, caughtError);

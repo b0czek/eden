@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { log } from "../logging";
 /**
  * Window Resizing
@@ -98,11 +99,7 @@ export function setupWindowResizing(
   // Animation frame update function - throttles IPC to 60fps
   const updateResizePosition = () => {
     if (pendingBounds) {
-      window.edenAPI
-        .shellCommand("view/update-bounds", {
-          bounds: pendingBounds,
-        })
-        .catch(log.error);
+      eden.view.updateBounds(pendingBounds).catch(log.error);
 
       pendingBounds = null;
     }
@@ -155,13 +152,7 @@ export function setupWindowResizing(
     // For mouse events, use global tracking in main process
     // For touch events, we'll handle updates in touchmove
     if (!isTouch) {
-      window.edenAPI
-        .shellCommand("view/start-resize", {
-          startX: coords.x,
-          startY: coords.y,
-          direction,
-        })
-        .catch(log.error);
+      eden.view.startResize(coords.x, coords.y, { direction }).catch(log.error);
     }
 
     // Add mouseup listener when resize starts (removed when resize ends)
@@ -221,11 +212,7 @@ export function setupWindowResizing(
 
       // Send final pending bounds immediately
       if (pendingBounds) {
-        window.edenAPI
-          .shellCommand("view/update-bounds", {
-            bounds: pendingBounds,
-          })
-          .catch(log.error);
+        eden.view.updateBounds(pendingBounds).catch(log.error);
 
         // Update edenFrame._internal.bounds so next interaction starts from correct position
         syncEdenFrameBounds(pendingBounds);
@@ -240,10 +227,10 @@ export function setupWindowResizing(
 
     // Stop global resize tracking in main process (for mouse events)
     if (!isTouch) {
-      window.edenAPI.shellCommand("view/end-resize", {}).catch(log.error);
+      eden.view.endResize().catch(log.error);
     }
 
-    window.edenAPI.shellCommand("view/focus", {}).catch(log.error);
+    eden.view.focus().catch(log.error);
   };
 
   const handleListeners = resizeHandles.map(({ direction, handle }) => {

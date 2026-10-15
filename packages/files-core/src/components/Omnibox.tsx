@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { FilesystemLocation } from "@edenapp/types";
 import { FaSolidSpinner } from "solid-icons/fa";
 import type { Component } from "solid-js";
@@ -65,11 +66,11 @@ const Omnibox: Component<OmniboxProps> = (props) => {
           searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
         }
 
-        const results = await window.edenAPI.shellCommand("fs/search", {
-          location: { volume, path: basePath === "//" ? "/" : basePath },
-          pattern: searchTerm,
-          limit: 10,
-        });
+        const results = await eden.fs.search(
+          { volume, path: basePath === "//" ? "/" : basePath },
+          searchTerm,
+          { limit: 10 },
+        );
 
         if (sequence !== searchSequence || volume !== props.currentVolume)
           return;
@@ -83,11 +84,11 @@ const Omnibox: Component<OmniboxProps> = (props) => {
         setSelectedIndex(0);
       } else {
         // Search in current directory (empty value shows all items)
-        const results = await window.edenAPI.shellCommand("fs/search", {
-          location: { volume, path: props.currentPath },
-          pattern: value.toLowerCase(),
-          limit: 10,
-        });
+        const results = await eden.fs.search(
+          { volume, path: props.currentPath },
+          value.toLowerCase(),
+          { limit: 10 },
+        );
 
         if (sequence !== searchSequence || volume !== props.currentVolume)
           return;

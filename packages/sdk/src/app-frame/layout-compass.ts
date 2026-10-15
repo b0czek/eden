@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   TileLayoutDirection,
   TileLayoutNeighbor,
@@ -139,10 +140,7 @@ export function setupLayoutCompass(
     busy = true;
 
     try {
-      const nextState = await window.edenAPI.shellCommand(
-        "view/tile-layout-state",
-        {},
-      );
+      const nextState = await eden.view.tileLayoutState();
       busy = false;
       if (nextState.mode !== "tiled" || options.getMode() !== "tiled") {
         close();
@@ -171,10 +169,9 @@ export function setupLayoutCompass(
     if (state) render(state);
 
     try {
-      const nextState = await window.edenAPI.shellCommand(
-        `view/${action}-tile`,
-        { direction },
-      );
+      const nextState = await (action === "expand"
+        ? eden.view.expandTile(direction)
+        : eden.view.swapTile(direction));
       busy = false;
       if (!Object.values(nextState.neighbors).some(Boolean)) {
         close();

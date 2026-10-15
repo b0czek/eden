@@ -58,6 +58,7 @@ void contextMenu.close();
 ## File picker
 
 ```ts
+import { fs } from "@edenapp/client";
 import { filePicker } from "@edenapp/tablets";
 
 const location = await filePicker.openFile({
@@ -66,9 +67,7 @@ const location = await filePicker.openFile({
 });
 
 if (location) {
-  const text = await window.edenAPI.shellCommand("fs/read", {
-    location: location,
-  });
+  const text = await fs.read(location);
 }
 
 const saveLocation = await filePicker.saveFile({

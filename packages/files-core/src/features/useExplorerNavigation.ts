@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type {
   FilesystemChangeKind,
   FilesystemLocation,
@@ -88,9 +89,7 @@ export const useExplorerNavigation = (
     watchId = undefined;
     watchedLocation = undefined;
     if (staleWatchId) {
-      await window.edenAPI
-        .shellCommand("fs/unwatch", { watchId: staleWatchId })
-        .catch(() => undefined);
+      await eden.fs.unwatch(staleWatchId).catch(() => undefined);
     }
   };
 
@@ -117,9 +116,7 @@ export const useExplorerNavigation = (
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = await window.edenAPI.shellCommand("fs/watch", {
-          location,
-        });
+        const result = await eden.fs.watch(location);
         if (
           disposed ||
           path !== currentPath() ||
@@ -127,9 +124,7 @@ export const useExplorerNavigation = (
           watchRequest !== watchRequestSequence ||
           (options.active && !options.active())
         ) {
-          await window.edenAPI
-            .shellCommand("fs/unwatch", { watchId: result.watchId })
-            .catch(() => undefined);
+          await eden.fs.unwatch(result.watchId).catch(() => undefined);
           return false;
         }
         watchId = result.watchId;
@@ -147,16 +142,12 @@ export const useExplorerNavigation = (
     location: FilesystemLocation,
   ): Promise<FileItem[]> => {
     const { path, volume } = location;
-    const dirItems = await window.edenAPI.shellCommand("fs/readdir", {
-      location,
-    });
+    const dirItems = await eden.fs.readdir(location);
     const itemsWithStats = await Promise.all(
       dirItems.map(async (name: string) => {
         const itemPath = joinPath(path, name);
         try {
-          const stats = await window.edenAPI.shellCommand("fs/stat", {
-            location: { volume, path: itemPath },
-          });
+          const stats = await eden.fs.stat({ volume, path: itemPath });
           return {
             name,
             location: { volume, path: itemPath },
@@ -179,9 +170,7 @@ export const useExplorerNavigation = (
     let candidate = getParentPath(unavailablePath);
     while (candidate !== unavailablePath && canNavigate(candidate, volume)) {
       try {
-        const stats = await window.edenAPI.shellCommand("fs/stat", {
-          location: { volume, path: candidate },
-        });
+        const stats = await eden.fs.stat({ volume, path: candidate });
         if (stats.isDirectory) return candidate;
       } catch {
         // Continue toward the virtual root.
@@ -336,8 +325,8 @@ export const useExplorerNavigation = (
     .then(async () => {
       const version = inventoryVersion;
       const [inventory, scope] = await Promise.all([
-        window.edenAPI.shellCommand("volume/list", {}),
-        window.edenAPI.shellCommand("fs/access-scope", { volume: "home" }),
+        eden.volume.list(),
+        eden.fs.accessScope("home"),
       ]);
       if (disposed) return;
       setHomeScope(scope.path);
@@ -456,7 +445,7 @@ export const useExplorerNavigation = (
     try {
       await subscribed;
       if (disposed || navigation !== navigationSequence) return false;
-      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
+      const stats = await eden.fs.stat(location);
       if (disposed || navigation !== navigationSequence) return false;
       if (!stats.isDirectory) throw new Error("Not a directory");
       navigateTo(location.path, undefined, location.volume);

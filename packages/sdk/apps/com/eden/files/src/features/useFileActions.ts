@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   type FileItem,
   getParentPath,
@@ -6,11 +7,7 @@ import {
 } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
-import type {
-  FileHandlerInfo,
-  FilesystemLocation,
-  RuntimeAppManifest,
-} from "@edenapp/types";
+import type { FilesystemLocation, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
 import { locale, t } from "../i18n";
@@ -80,16 +77,15 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     const folderPath = joinPath(directory.path, trimmedName);
 
     try {
-      const exists = await window.edenAPI.shellCommand("fs/exists", {
-        location: { path: folderPath, volume: directory.volume },
+      const exists = await eden.fs.exists({
+        path: folderPath,
+        volume: directory.volume,
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");
       }
 
-      await window.edenAPI.shellCommand("fs/mkdir", {
-        location: { path: folderPath, volume: directory.volume },
-      });
+      await eden.fs.mkdir({ path: folderPath, volume: directory.volume });
       options.refresh();
     } catch (error) {
       return `${t("files.errors.createFolderFailed")}: ${(error as Error).message}`;
@@ -121,17 +117,15 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     const filePath = joinPath(directory.path, trimmedName);
 
     try {
-      const exists = await window.edenAPI.shellCommand("fs/exists", {
-        location: { path: filePath, volume: directory.volume },
+      const exists = await eden.fs.exists({
+        path: filePath,
+        volume: directory.volume,
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");
       }
 
-      await window.edenAPI.shellCommand("fs/write", {
-        location: { path: filePath, volume: directory.volume },
-        content: "",
-      });
+      await eden.fs.write({ path: filePath, volume: directory.volume }, "");
       options.refresh();
     } catch (error) {
       return `${t("files.errors.createFileFailed")}: ${(error as Error).message}`;
@@ -181,9 +175,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       let targetPath = joinPath(getParentPath(item.location.path), targetName);
 
       while (
-        await window.edenAPI.shellCommand("fs/exists", {
-          location: { path: targetPath, volume: item.location.volume },
-        })
+        await eden.fs.exists({ path: targetPath, volume: item.location.volume })
       ) {
         duplicateIndex += 1;
         targetName = getDuplicateName(item, duplicateIndex);
@@ -249,10 +241,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
   const setItemDefaultHandler = async (item: FileItem, appId: string) => {
     try {
-      await window.edenAPI.shellCommand("file/set-default-handler", {
-        location: { path: item.location.path, volume: item.location.volume },
-        appId,
-      });
+      await eden.file.setDefaultHandler(item.location, appId);
     } catch (error) {
       options.showError(
         `${t("files.errors.setDefaultHandlerFailed")}: ${(error as Error).message}`,
@@ -264,21 +253,9 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     try {
       const [supportedHandlers, currentHandler, installedApps] =
         await Promise.all([
-          window.edenAPI.shellCommand("file/get-supported-handlers", {
-            location: {
-              path: item.location.path,
-              volume: item.location.volume,
-            },
-          }) as Promise<FileHandlerInfo[]>,
-          window.edenAPI.shellCommand("file/get-handler", {
-            location: {
-              path: item.location.path,
-              volume: item.location.volume,
-            },
-          }) as Promise<{ appId?: string }>,
-          window.edenAPI.shellCommand("package/list", {}) as Promise<
-            RuntimeAppManifest[]
-          >,
+          eden.file.getSupportedHandlers(item.location),
+          eden.file.getHandler(item.location),
+          eden.package.list(),
         ]);
 
       const supportedAppIds = new Set(
@@ -333,11 +310,9 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
 
     try {
-      const [supportedHandlers] = await Promise.all([
-        window.edenAPI.shellCommand("file/get-supported-handlers", {
-          location: { path: item.location.path, volume: item.location.volume },
-        }) as Promise<FileHandlerInfo[]>,
-      ]);
+      const supportedHandlers = await eden.file.getSupportedHandlers(
+        item.location,
+      );
       const menuItems = supportedHandlers
         .map((handler) => ({
           appId: handler.appId,
@@ -396,8 +371,9 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     }
 
     try {
-      const exists = await window.edenAPI.shellCommand("fs/exists", {
-        location: { path: targetPath, volume: item.location.volume },
+      const exists = await eden.fs.exists({
+        path: targetPath,
+        volume: item.location.volume,
       });
       if (exists) {
         return t("files.errors.itemAlreadyExists");

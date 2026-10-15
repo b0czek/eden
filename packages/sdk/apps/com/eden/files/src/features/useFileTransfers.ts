@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { FileItem } from "@edenapp/files-core";
 import { createOperation } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
@@ -100,26 +101,15 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     item: FileItem,
     to: FilesystemLocation,
     overwrite = false,
-  ) =>
-    window.edenAPI.shellCommand("fs/cp", {
-      from: item.location,
-      to,
-      overwrite,
-    });
+  ) => eden.fs.cp(item.location, to, { overwrite });
 
   const submitMove = (
     item: FileItem,
     to: FilesystemLocation,
     overwrite = false,
-  ) =>
-    window.edenAPI.shellCommand("fs/mv", {
-      from: item.location,
-      to,
-      overwrite,
-    });
+  ) => eden.fs.mv(item.location, to, { overwrite });
 
-  const submitDelete = (item: FileItem) =>
-    window.edenAPI.shellCommand("fs/delete", { location: item.location });
+  const submitDelete = (item: FileItem) => eden.fs.delete(item.location);
 
   const operations = {
     copy: (item: FileItem, to: FilesystemLocation, overwrite = false) =>
@@ -129,20 +119,14 @@ export const useFileTransfers = (options: UseFileTransfersOptions) => {
     delete: (item: FileItem) =>
       withProgress("delete", item, () => submitDelete(item)),
     open: (item: FileItem) =>
-      withProgress("open", item, () =>
-        window.edenAPI.shellCommand("file/open", { location: item.location }),
-      ),
+      withProgress("open", item, () => eden.file.open(item.location)),
     openWith: (item: FileItem, appId: string) =>
       withProgress("open", item, () =>
-        window.edenAPI.shellCommand("file/open-with", {
-          location: item.location,
-          appId,
-        }),
+        eden.file.openWith(item.location, appId),
       ),
   };
 
-  const pathExists = (location: FilesystemLocation) =>
-    window.edenAPI.shellCommand("fs/exists", { location: location });
+  const pathExists = (location: FilesystemLocation) => eden.fs.exists(location);
 
   const showFailureSummary = async (
     failures: TransferFailure[],

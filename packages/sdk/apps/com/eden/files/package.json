@@ -22,6 +22,7 @@
     "@edenapp/files-core": "workspace:*",
     "@edenapp/solid-kit": "workspace:*",
     "@edenapp/tablets": "workspace:*",
-    "solid-icons": "catalog:"
+    "solid-icons": "catalog:",
+    "@edenapp/client": "workspace:*"
   }
 }

@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { ViewBounds, WindowSize } from "@edenapp/types";
 import {
   type Accessor,
@@ -56,8 +57,8 @@ export function createInterfaceScale(): Accessor<number> {
       }
     };
 
-    void window.edenAPI
-      .shellCommand("view/get-interface-scale", {})
+    void eden.view
+      .getInterfaceScale()
       .then((result) => {
         if (Number.isFinite(result.scale)) {
           setScale(result.scale);
@@ -122,11 +123,9 @@ export function createOverlayLayout(
     }
 
     lastBounds = bounds;
-    void window.edenAPI
-      .shellCommand("view/update-bounds", { bounds })
-      .catch((error) => {
-        console.error("Failed to update overlay bounds:", error);
-      });
+    void eden.view.updateBounds(bounds).catch((error) => {
+      console.error("Failed to update overlay bounds:", error);
+    });
   };
 
   const scheduleRefresh = () => {
@@ -173,8 +172,8 @@ export function createOverlayLayout(
       setWindowSize(data.windowSize);
     };
 
-    void window.edenAPI
-      .shellCommand("view/window-size", {})
+    void eden.view
+      .windowSize()
       .then(setWindowSize)
       .catch((error) => {
         console.error("Failed to load window size:", error);

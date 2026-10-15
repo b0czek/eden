@@ -1,11 +1,9 @@
+import * as eden from "@edenapp/client";
 import type {
-  CommandArgs,
-  CommandResult,
   ContextMenuItem,
   ContextMenuOpenArgs,
   ContextMenuPosition,
   ContextMenuResult,
-  EventData,
 } from "@edenapp/types";
 
 export type ContextMenuActionItem = Omit<
@@ -41,33 +39,6 @@ export interface EdenContextMenuAPI {
   ) => (event: MouseEvent | TouchEvent | PointerEvent) => void;
   close: (requestId?: string) => Promise<void>;
 }
-
-type ContextMenuCommand = "context-menu/open" | "context-menu/close";
-type ContextMenuEvent = "context-menu/closed";
-
-type EdenAPITransport = {
-  shellCommand: <T extends ContextMenuCommand>(
-    command: T,
-    args: CommandArgs<T>,
-  ) => Promise<CommandResult<T>>;
-  subscribe: <T extends ContextMenuEvent>(
-    event: T,
-    handler: (payload: EventData<T>) => void,
-  ) => Promise<void> | void;
-};
-
-const getEdenAPI = (): EdenAPITransport => {
-  if (typeof window === "undefined") {
-    throw new Error("contextMenu can only be used in a browser environment.");
-  }
-
-  const api = (window as { edenAPI?: EdenAPITransport }).edenAPI;
-  if (!api) {
-    throw new Error("edenAPI is not available on window.");
-  }
-
-  return api;
-};
 
 const contextMenuPending = new Map<
   string,
@@ -147,8 +118,7 @@ const ensureContextMenuSubscribed = async () => {
   if (contextMenuSubscribed) return;
   contextMenuSubscribed = true;
 
-  const edenAPI = getEdenAPI();
-  await edenAPI.subscribe("context-menu/closed", (payload) => {
+  await window.edenAPI.subscribe("context-menu/closed", (payload) => {
     const resolver = contextMenuPending.get(payload.requestId);
     if (resolver) {
       contextMenuPending.delete(payload.requestId);
@@ -168,12 +138,11 @@ const openContextMenu: EdenContextMenuAPI["open"] = async (options) => {
       top: Math.round(window.innerHeight / 2),
     };
 
-  const edenAPI = getEdenAPI();
-  const { requestId } = await edenAPI.shellCommand("context-menu/open", {
-    title: options.title,
+  const { requestId } = await eden.contextMenu.open(
     position,
-    items: options.items.map(stripAction),
-  });
+    options.items.map(stripAction),
+    { title: options.title },
+  );
 
   return new Promise((resolve) => {
     contextMenuPending.set(requestId, (result) => {
@@ -237,8 +206,7 @@ const createContextMenuHandler: EdenContextMenuAPI["createHandler"] = (
 };
 
 const closeContextMenu: EdenContextMenuAPI["close"] = async (requestId) => {
-  const edenAPI = getEdenAPI();
-  await edenAPI.shellCommand("context-menu/close", { requestId });
+  await eden.contextMenu.close({ requestId });
 };
 
 export const contextMenu: EdenContextMenuAPI = {

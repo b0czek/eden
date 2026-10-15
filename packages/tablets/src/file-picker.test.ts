@@ -24,8 +24,8 @@ const createTransport = (subscriptionFailures = 0) => {
   return {
     resolve: async (result: Omit<FilePickerResult, "requestId">) => {
       await ready;
-      // Let pick register its resolver after receiving the open response.
-      await Promise.resolve();
+      // Deliver the event on a later turn, after the open response is received.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
       closed?.({ requestId: "picker-1", ...result });
     },
   };

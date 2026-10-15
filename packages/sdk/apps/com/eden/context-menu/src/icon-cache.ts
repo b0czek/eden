@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { ContextMenuIcon, ContextMenuItem } from "@edenapp/types";
 
 const iconCache = new Map<string, string | undefined>();
@@ -40,9 +41,7 @@ export async function fetchAppIcon(appId: string): Promise<string | undefined> {
   }
 
   try {
-    const result = await window.edenAPI.shellCommand("package/get-icon", {
-      packageId: appId,
-    });
+    const result = await eden.package.getIcon(appId);
     iconCache.set(appId, result.icon);
     return result.icon;
   } catch (error) {

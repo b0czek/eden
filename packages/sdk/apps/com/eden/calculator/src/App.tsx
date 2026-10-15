@@ -67,18 +67,13 @@ const App: Component = () => {
     window.addEventListener("resize", checkSize);
 
     // Subscribe to settings changes
-    if (window.edenAPI) {
-      try {
-        await window.edenAPI.subscribe(
-          "settings/changed",
-          handleSettingsChanged,
-        );
+    try {
+      await window.edenAPI.subscribe("settings/changed", handleSettingsChanged);
 
-        // Load initial settings
-        await loadSettings();
-      } catch (error) {
-        console.error("Failed to initialize:", error);
-      }
+      // Load initial settings
+      await loadSettings();
+    } catch (error) {
+      console.error("Failed to initialize:", error);
     }
 
     onCleanup(() => {
@@ -91,11 +86,7 @@ const App: Component = () => {
   });
 
   const loadSettings = async () => {
-    if (!window.edenAPI) return;
-
     try {
-      // scientificMode setting is removed, handled by window size now
-
       const angleResult = await settings.get("angleUnit");
       if (angleResult.value === "rad" || angleResult.value === "deg") {
         setAngleUnit(angleResult.value);

@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { ViewBounds } from "@edenapp/types";
 
 /**
@@ -142,8 +143,8 @@ import { setupWindowResizing } from "./window-resizing.js";
 
       if (includeSystemTopBar) {
         // Async fetch locale for title text
-        window.edenAPI
-          .shellCommand("i18n/get-locale", {})
+        eden.i18n
+          .getLocale()
           .then((response: { locale: string }) => {
             const locale = response?.locale;
             currentLocale = locale || "en";

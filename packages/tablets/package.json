@@ -20,7 +20,9 @@
     "clean": "rm -rf dist",
     "test": "vitest run src"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@edenapp/client": "workspace:*"
+  },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
     "typescript": "catalog:",

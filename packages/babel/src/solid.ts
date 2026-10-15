@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   type Accessor,
   createResource,
@@ -69,13 +70,6 @@ export function setupI18n<T extends object = Record<string, void>>(
 
     const initLocale = async () => {
       try {
-        // @ts-expect-error - access global window
-        const edenAPI = window.edenAPI;
-        if (!edenAPI) {
-          console.warn("Eden API not found, using default locale");
-          return;
-        }
-
         // Listen for changes
         const onLocaleChanged = (event: { locale: string }) => {
           updateLocale(event.locale);
@@ -83,17 +77,14 @@ export function setupI18n<T extends object = Record<string, void>>(
 
         // Register cleanup synchronously before any await
         onCleanup(() => {
-          edenAPI.unsubscribe("i18n/locale-changed", onLocaleChanged);
+          window.edenAPI.unsubscribe("i18n/locale-changed", onLocaleChanged);
         });
 
         // Initial load
-        const result = await edenAPI.shellCommand("i18n/get-locale", {});
+        const { locale } = await eden.i18n.getLocale();
+        await updateLocale(locale);
 
-        if (result?.locale) {
-          await updateLocale(result.locale);
-        }
-
-        await edenAPI.subscribe("i18n/locale-changed", onLocaleChanged);
+        await window.edenAPI.subscribe("i18n/locale-changed", onLocaleChanged);
       } catch (e) {
         console.error("Failed to load system locale", e);
       }

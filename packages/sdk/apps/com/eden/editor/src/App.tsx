@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   redo as redoCommand,
   redoDepth,
@@ -61,8 +62,7 @@ const App: Component = () => {
     const task = (async () => {
       const dlcDocument = await editorDlcs.openDocument(location);
       const fileContent =
-        dlcDocument?.content ??
-        (await window.edenAPI.shellCommand("fs/read", { location }));
+        dlcDocument?.content ?? (await eden.fs.read(location));
       let tabId = "";
 
       setTabs((currentTabs) => {
@@ -182,10 +182,7 @@ const App: Component = () => {
           active.documentHandler,
         );
       } else {
-        await window.edenAPI.shellCommand("fs/write", {
-          location: active.location,
-          content: currentContent,
-        });
+        await eden.fs.write(active.location, currentContent);
       }
       setTabs((currentTabs) =>
         currentTabs.map((tab) =>

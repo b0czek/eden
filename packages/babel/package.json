@@ -40,7 +40,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "i18next": "^26.3.6"
+    "i18next": "^26.3.6",
+    "@edenapp/client": "workspace:*"
   },
   "peerDependencies": {
     "solid-js": "catalog:"

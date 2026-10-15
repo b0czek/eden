@@ -77,6 +77,9 @@ importers:
 
   packages/babel:
     dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../client
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@6.0.3)
@@ -145,6 +148,9 @@ importers:
 
   packages/files-core:
     dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../client
       solid-icons:
         specifier: 'catalog:'
         version: 1.2.0(solid-js@1.9.14)
@@ -353,6 +359,10 @@ importers:
         version: 2.11.14(solid-js@1.9.14)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
 
   packages/sdk/apps/com/eden/context-menu:
+    dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*
@@ -402,6 +412,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.8
         version: 6.43.8
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/editor-dlc':
         specifier: workspace:*
         version: link:../../../../../editor-dlc
@@ -441,6 +454,10 @@ importers:
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@7.3.6(@types/node@26.1.2)(yaml@2.9.0))
 
   packages/sdk/apps/com/eden/eveshell:
+    dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
     devDependencies:
       '@edenapp/babel':
         specifier: workspace:*
@@ -503,6 +520,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/files-core':
         specifier: workspace:*
         version: link:../../../../../files-core
@@ -534,6 +554,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/files-core':
         specifier: workspace:*
         version: link:../../../../../files-core
@@ -571,6 +594,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/solid-kit':
         specifier: workspace:*
         version: link:../../../../../solid-kit
@@ -596,6 +622,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/solid-kit':
         specifier: workspace:*
         version: link:../../../../../solid-kit
@@ -655,6 +684,9 @@ importers:
       '@edenapp/babel':
         specifier: workspace:*
         version: link:../../../../../babel
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       solid-js:
         specifier: 'catalog:'
         version: 1.9.14
@@ -674,6 +706,9 @@ importers:
 
   packages/sdk/apps/com/eden/settings:
     dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/solid-kit':
         specifier: workspace:*
         version: link:../../../../../solid-kit
@@ -724,6 +759,9 @@ importers:
 
   packages/sdk/apps/com/eden/users:
     dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../../../../../client
       '@edenapp/tablets':
         specifier: workspace:*
         version: link:../../../../../tablets
@@ -773,6 +811,9 @@ importers:
 
   packages/solid-kit:
     dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../client
       solid-icons:
         specifier: 'catalog:'
         version: 1.2.0(solid-js@1.9.14)
@@ -788,6 +829,10 @@ importers:
         version: 6.0.3
 
   packages/tablets:
+    dependencies:
+      '@edenapp/client':
+        specifier: workspace:*
+        version: link:../client
     devDependencies:
       '@edenapp/types':
         specifier: workspace:*

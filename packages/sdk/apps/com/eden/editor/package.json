@@ -36,6 +36,7 @@
     "@edenapp/solid-kit": "workspace:*",
     "@edenapp/tablets": "workspace:*",
     "@lezer/highlight": "^1.2.3",
-    "solid-icons": "catalog:"
+    "solid-icons": "catalog:",
+    "@edenapp/client": "workspace:*"
   }
 }

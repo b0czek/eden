@@ -12,7 +12,8 @@
   "dependencies": {
     "@edenapp/solid-kit": "workspace:*",
     "solid-icons": "catalog:",
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "@edenapp/client": "workspace:*"
   },
   "devDependencies": {
     "@edenapp/babel": "workspace:*",

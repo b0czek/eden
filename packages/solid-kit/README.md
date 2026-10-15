@@ -56,6 +56,7 @@ failures can be displayed by your app's error UI. It stops observing when the
 component is disposed while accepted work continues in Eden.
 
 ```tsx
+import { fs } from "@edenapp/client";
 import { createOperation, OperationStatus } from "@edenapp/solid-kit";
 import { Show } from "solid-js";
 
@@ -63,10 +64,10 @@ function CopyButton() {
   const copy = createOperation();
   const startCopy = async () => {
     try {
-      await copy.run(() => window.edenAPI.shellCommand("fs/cp", {
-        from: { volume: "home", path: "/report.pdf" },
-        to: { volume: "home", path: "/backup/report.pdf" },
-      }));
+      await copy.run(() => fs.cp(
+        { volume: "home", path: "/report.pdf" },
+        { volume: "home", path: "/backup/report.pdf" },
+      ));
     } catch (error) {
       // Display the error in the app's UI.
     }

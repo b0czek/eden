@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   buildBreadcrumbs,
   DisplayOptionsModal,
@@ -227,7 +228,7 @@ const App: Component = () => {
   const openPathInExplorer = async (location: FilesystemLocation) => {
     const { path, volume } = location;
     try {
-      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
+      const stats = await eden.fs.stat(location);
 
       if (stats.isDirectory) {
         navigateWithSelectionClear(path, undefined, volume);
@@ -260,9 +261,7 @@ const App: Component = () => {
     await initLocale();
     await pinned.load();
     try {
-      const result = await window.edenAPI.shellCommand("db/get", {
-        key: "display-preferences",
-      });
+      const result = await eden.db.get("display-preferences");
       if (result.value) {
         setDisplayPreferences(JSON.parse(result.value));
       }
@@ -296,10 +295,7 @@ const App: Component = () => {
     }
 
     try {
-      await window.edenAPI.shellCommand("db/set", {
-        key: "display-preferences",
-        value: JSON.stringify(newPreferences),
-      });
+      await eden.db.set("display-preferences", JSON.stringify(newPreferences));
     } catch (error) {
       console.error("Failed to save display preferences:", error);
     }

@@ -50,9 +50,13 @@ describe("AppsTab", () => {
     expect(shellCommand).not.toHaveBeenCalled();
     await fireEvent.click(view.getByText("Example"));
     await waitFor(() =>
-      expect(shellCommand).toHaveBeenCalledWith("package/get-size", {
-        packageId: manifest.id,
-      }),
+      expect(shellCommand).toHaveBeenCalledWith(
+        "package/get-size",
+        {
+          packageId: manifest.id,
+        },
+        undefined,
+      ),
     );
   });
 

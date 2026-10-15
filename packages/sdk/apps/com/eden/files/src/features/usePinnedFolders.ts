@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { button, menu, title } from "@edenapp/tablets";
 import type { FilesystemLocation } from "@edenapp/types";
@@ -32,9 +33,7 @@ export function usePinnedFolders(options: {
 
   const load = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("db/get", {
-        key: storageKey,
-      });
+      const result = await eden.db.get(storageKey);
       setPins(parsePinnedFolders(result.value));
       setLoaded(true);
     } catch {
@@ -43,10 +42,7 @@ export function usePinnedFolders(options: {
   };
 
   const save = async (next: PinnedFolder[]) => {
-    const result = await window.edenAPI.shellCommand("db/set", {
-      key: storageKey,
-      value: JSON.stringify(next),
-    });
+    const result = await eden.db.set(storageKey, JSON.stringify(next));
     if (!result.success) throw new Error(t("files.errors.savePinsFailed"));
     setPins(next);
   };

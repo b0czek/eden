@@ -17,5 +17,8 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-solid": "catalog:"
+  },
+  "dependencies": {
+    "@edenapp/client": "workspace:*"
   }
 }

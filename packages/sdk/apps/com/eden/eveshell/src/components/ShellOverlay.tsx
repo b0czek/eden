@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createOverlayLayout, KeyboardButton } from "@edenapp/solid-kit";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import type {
@@ -50,9 +51,7 @@ export default function ShellOverlay() {
   // Load pinned apps from database
   const loadPinnedApps = async () => {
     try {
-      const result = await window.edenAPI.shellCommand("db/get", {
-        key: PINNED_DOCK_APPS_KEY,
-      });
+      const result = await eden.db.get(PINNED_DOCK_APPS_KEY);
       if (result.value) {
         const parsed = JSON.parse(result.value);
         if (Array.isArray(parsed)) {
@@ -67,10 +66,7 @@ export default function ShellOverlay() {
   // Save pinned apps to database
   const savePinnedApps = async (appIds: string[]) => {
     try {
-      await window.edenAPI.shellCommand("db/set", {
-        key: PINNED_DOCK_APPS_KEY,
-        value: JSON.stringify(appIds),
-      });
+      await eden.db.set(PINNED_DOCK_APPS_KEY, JSON.stringify(appIds));
     } catch (error) {
       console.error("Failed to save pinned dock apps:", error);
     }
@@ -160,16 +156,10 @@ export default function ShellOverlay() {
   const loadSystemInfo = async () => {
     try {
       // Fetch installed apps from package manager
-      const installed = await window.edenAPI.shellCommand("package/list", {});
-      if (Array.isArray(installed)) {
-        setInstalledApps(installed);
-      }
+      setInstalledApps(await eden.package.list());
 
       // Fetch running apps from process manager
-      const running = await window.edenAPI.shellCommand("process/list", {});
-      if (Array.isArray(running)) {
-        setRunningApps(running);
-      }
+      setRunningApps(await eden.process.list());
     } catch (error) {
       console.error("Failed to load system info:", error);
     }
@@ -177,10 +167,7 @@ export default function ShellOverlay() {
 
   const loadCurrentUser = async () => {
     try {
-      const result = await window.edenAPI.shellCommand(
-        "session/get-current",
-        {},
-      );
+      const result = await eden.session.getCurrent();
       setCurrentUser(result.user ?? null);
     } catch (error) {
       console.error("Failed to load current user:", error);
@@ -189,9 +176,7 @@ export default function ShellOverlay() {
 
   const loadPowerCapabilities = async () => {
     try {
-      setPowerCapabilities(
-        await window.edenAPI.shellCommand("system/power-capabilities", {}),
-      );
+      setPowerCapabilities(await eden.system.powerCapabilities());
     } catch (error) {
       console.error("Failed to load power capabilities:", error);
     }
@@ -233,7 +218,7 @@ export default function ShellOverlay() {
     if (isRunning) {
       // App is running, focus/show it
       try {
-        await window.edenAPI.shellCommand("view/focus-view", { appId });
+        await eden.view.focusView(appId);
       } catch (error) {
         console.error("Failed to focus app:", error);
       }

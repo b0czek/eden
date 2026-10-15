@@ -32,7 +32,8 @@
     "solid-js": "catalog:"
   },
   "dependencies": {
-    "solid-icons": "catalog:"
+    "solid-icons": "catalog:",
+    "@edenapp/client": "workspace:*"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",

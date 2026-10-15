@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createOperation } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { createRoot, createSignal, onCleanup } from "solid-js";
@@ -39,8 +40,8 @@ export function useAppOperations(options: {
     try {
       const result = await observer.operation.run(() =>
         action === "launch"
-          ? window.edenAPI.shellCommand("process/launch", { appId })
-          : window.edenAPI.shellCommand("process/stop", { appId }),
+          ? eden.process.launch(appId)
+          : eden.process.stop(appId),
       );
       if (!result.success) {
         throw new Error(

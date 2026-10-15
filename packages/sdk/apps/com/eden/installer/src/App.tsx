@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import { createOperation, OperationStatus } from "@edenapp/solid-kit";
 import type {
   AppManifest,
@@ -55,10 +56,9 @@ const App = () => {
     setSuccess(false);
 
     try {
-      const result: PackageInfoResponse = await window.edenAPI.shellCommand(
-        "package/get-info",
-        { location: { ...location } },
-      );
+      const result: PackageInfoResponse = await eden.package.getInfo({
+        ...location,
+      });
 
       if (result.success && result.manifest) {
         setManifest(result.manifest);
@@ -99,10 +99,7 @@ const App = () => {
 
     try {
       await operation.run(() =>
-        window.edenAPI.shellCommand("package/install", {
-          source: path,
-          replace: !!existingVersion,
-        }),
+        eden.package.install(path, { replace: !!existingVersion }),
       );
       setSuccess(true);
       setTimeout(() => {

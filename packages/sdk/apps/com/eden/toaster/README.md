@@ -58,31 +58,24 @@ const CONFIG = {
 Push notifications from any Eden app:
 
 ```typescript
+import { notification } from "@edenapp/client";
+
 // Basic notification
-window.edenAPI.shellCommand("notification/push", {
-  title: "Hello",
-  message: "This is a notification",
-});
+notification.push("Hello", "This is a notification");
 
 // With type
-window.edenAPI.shellCommand("notification/push", {
-  title: "Success!",
-  message: "Operation completed successfully",
+notification.push("Success!", "Operation completed successfully", {
   type: "success",
 });
 
 // With custom timeout (ms)
-window.edenAPI.shellCommand("notification/push", {
-  title: "Warning",
-  message: "This will stay for 10 seconds",
+notification.push("Warning", "This will stay for 10 seconds", {
   type: "warning",
   timeout: 10000,
 });
 
 // Persistent notification (no auto-dismiss)
-window.edenAPI.shellCommand("notification/push", {
-  title: "Action Required",
-  message: "This stays until you click × to dismiss",
+notification.push("Action Required", "This stays until you click × to dismiss", {
   type: "danger",
   timeout: 0, // 0 or omit for persistent
 });

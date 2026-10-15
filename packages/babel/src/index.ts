@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import i18next, { type InitOptions, type i18n } from "i18next";
 
 export interface EdenI18nConfig {
@@ -41,21 +42,9 @@ export async function createEdenI18n(
  */
 export async function loadCommonTranslations(instance: i18n, locale: string) {
   try {
-    // @ts-expect-error
-    const edenAPI = window.edenAPI;
-    if (!edenAPI) return;
-
-    const result = await edenAPI.shellCommand("i18n/get-common", { locale });
-    if (result?.translations) {
-      // Merge into the default 'translation' namespace so t("common.ok") works
-      instance.addResourceBundle(
-        locale,
-        "translation",
-        result.translations,
-        true,
-        true,
-      );
-    }
+    const { translations } = await eden.i18n.getCommon(locale);
+    // Merge into the default 'translation' namespace so t("common.ok") works
+    instance.addResourceBundle(locale, "translation", translations, true, true);
   } catch (e) {
     console.error("Failed to load common translations", e);
   }

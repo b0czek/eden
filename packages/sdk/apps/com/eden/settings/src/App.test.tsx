@@ -109,6 +109,7 @@ describe("Settings app transport", () => {
         actionId: "toggle",
         invocation: { value: true },
       }),
+      undefined,
     );
 
     const panelReadsBeforeInvalidation = panelReads;

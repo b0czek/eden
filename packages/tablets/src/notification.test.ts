@@ -39,12 +39,16 @@ describe("notification", () => {
       type: "warning",
     });
 
-    expect(transport.shellCommand).toHaveBeenCalledWith("notification/push", {
-      title: "Warning",
-      message: "Mind the gap",
-      timeout: 10_000,
-      type: "warning",
-    });
+    expect(transport.shellCommand).toHaveBeenCalledWith(
+      "notification/push",
+      {
+        title: "Warning",
+        message: "Mind the gap",
+        timeout: 10_000,
+        type: "warning",
+      },
+      undefined,
+    );
     expect(transport.subscribe).not.toHaveBeenCalled();
   });
 

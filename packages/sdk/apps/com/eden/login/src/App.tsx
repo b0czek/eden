@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   createOperation,
   KeyboardButton,
@@ -54,9 +55,7 @@ const App = () => {
       height: windowSize.height,
     };
     try {
-      await window.edenAPI.shellCommand("view/update-bounds", {
-        bounds,
-      });
+      await eden.view.updateBounds(bounds);
     } catch (error) {
       console.error("Failed to update view bounds:", error);
     }
@@ -66,7 +65,7 @@ const App = () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.edenAPI.shellCommand("user/list", {});
+      const result = await eden.user.list();
       setUsers(result.users ?? []);
     } catch (err) {
       console.error("Failed to load users:", err);
@@ -78,7 +77,7 @@ const App = () => {
 
   const loadBranding = async () => {
     try {
-      setBranding(await window.edenAPI.shellCommand("system/branding", {}));
+      setBranding(await eden.system.branding());
     } catch (error) {
       console.error("Failed to load product branding:", error);
     }
@@ -86,9 +85,7 @@ const App = () => {
 
   const loadPowerCapabilities = async () => {
     try {
-      setPowerCapabilities(
-        await window.edenAPI.shellCommand("system/power-capabilities", {}),
-      );
+      setPowerCapabilities(await eden.system.powerCapabilities());
     } catch (error) {
       console.error("Failed to load power capabilities:", error);
     }
@@ -108,10 +105,7 @@ const App = () => {
 
       // Set initial bounds
       try {
-        const windowSize = await window.edenAPI.shellCommand(
-          "view/window-size",
-          {},
-        );
+        const windowSize = await eden.view.windowSize();
         await updateViewBounds({ windowSize });
       } catch (error) {
         console.error("Failed to get initial window size:", error);
@@ -142,10 +136,7 @@ const App = () => {
     setError(null);
     try {
       const result = await operation.run(() =>
-        window.edenAPI.shellCommand("session/login", {
-          username,
-          password: password(),
-        }),
+        eden.session.login(username, password()),
       );
       if (!result.success) {
         setError(result.error ?? t("login.loginFailed"));
@@ -176,9 +167,7 @@ const App = () => {
 
     try {
       setPowerAction(action);
-      await operation.run(() =>
-        window.edenAPI.shellCommand("system/power", { action }),
-      );
+      await operation.run(() => eden.system.power(action));
     } catch (error) {
       console.error(`Failed to ${action} the system:`, error);
       await dialogs.alert({

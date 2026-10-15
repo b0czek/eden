@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import {
   buildBreadcrumbs,
   DisplayOptionsModal,
@@ -352,7 +353,7 @@ const App: Component = () => {
   const getWindowSize = async () => {
     const cached = windowSize();
     if (cached) return cached;
-    const size = await window.edenAPI.shellCommand("view/window-size", {});
+    const size = await eden.view.windowSize();
     setWindowSize(size);
     return size;
   };
@@ -369,23 +370,19 @@ const App: Component = () => {
         )
       : HIDDEN_BOUNDS;
 
-    await window.edenAPI.shellCommand("view/update-bounds", { bounds });
+    await eden.view.updateBounds(bounds);
     if (visible) {
-      await window.edenAPI.shellCommand("view/focus", {});
+      await eden.view.focus();
     }
   };
 
   const resolveInitialPath = async (request: FilePickerOpenEvent) => {
     const volume = request.initialLocation?.volume ?? "home";
-    const scope = await window.edenAPI.shellCommand("fs/access-scope", {
-      volume,
-    });
+    const scope = await eden.fs.accessScope(volume);
     const initialLocation = request.initialLocation ?? scope;
     const initialPath = initialLocation.path;
     try {
-      const stats = await window.edenAPI.shellCommand("fs/stat", {
-        location: { ...initialLocation },
-      });
+      const stats = await eden.fs.stat({ ...initialLocation });
       if (stats.isDirectory) {
         return { directory: initialPath, name: request.suggestedName ?? "" };
       }
@@ -446,9 +443,8 @@ const App: Component = () => {
     if (!request) return;
 
     try {
-      await window.edenAPI.shellCommand("file-picker/resolve", {
-        requestId: request.requestId,
-        ...result,
+      await eden.filePicker.resolve(request.requestId, result.reason, {
+        locations: result.locations,
       });
       hidePicker();
     } catch (resolveError) {
@@ -483,9 +479,7 @@ const App: Component = () => {
     const location = { volume: currentVolume(), path };
     const directory = currentPath();
     if (request.overwritePrompt !== false && !replaceExisting) {
-      const exists = await window.edenAPI.shellCommand("fs/exists", {
-        location,
-      });
+      const exists = await eden.fs.exists(location);
       if (
         activeRequest()?.requestId !== request.requestId ||
         currentVolume() !== location.volume ||
@@ -600,15 +594,13 @@ const App: Component = () => {
     const folderPath = joinPath(currentPath(), trimmedName);
     const location = { volume: currentVolume(), path: folderPath };
     try {
-      const exists = await window.edenAPI.shellCommand("fs/exists", {
-        location: { ...location },
-      });
+      const exists = await eden.fs.exists({ ...location });
       if (exists) {
         setError(t("filePicker.errors.folderExists"));
         return;
       }
 
-      await window.edenAPI.shellCommand("fs/mkdir", { location });
+      await eden.fs.mkdir(location);
       setShowNewFolderDialog(false);
       setNewFolderName("");
       refresh();
@@ -672,9 +664,7 @@ const App: Component = () => {
 
     await cancelPicker();
     if (activeRequest()?.requestId === request.requestId) {
-      await window.edenAPI.shellCommand("file-picker/close", {
-        requestId: request.requestId,
-      });
+      await eden.filePicker.close({ requestId: request.requestId });
     }
   };
 
@@ -714,7 +704,7 @@ const App: Component = () => {
         "view/global-bounds-changed",
         handleBoundsChanged,
       );
-      await window.edenAPI.shellCommand("file-picker/register-display", {});
+      await eden.filePicker.registerDisplay();
       await updateOverlayBounds(false, null);
     })();
 

@@ -11,5 +11,8 @@
   "devDependencies": {
     "@edenapp/types": "workspace:*",
     "vite": "catalog:"
+  },
+  "dependencies": {
+    "@edenapp/client": "workspace:*"
   }
 }

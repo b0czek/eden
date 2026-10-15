@@ -1,7 +1,5 @@
+import * as eden from "@edenapp/client";
 import type {
-  CommandArgs,
-  CommandResult,
-  EventData,
   FilePickerOpenArgs,
   FilePickerResult,
   FilesystemLocation,
@@ -38,40 +36,13 @@ export interface EdenFilePickerAPI {
   close: (requestId?: string) => Promise<void>;
 }
 
-type FilePickerCommand = "file-picker/open" | "file-picker/close";
-type FilePickerEvent = "file-picker/closed";
-
-type EdenAPITransport = {
-  shellCommand: <T extends FilePickerCommand>(
-    command: T,
-    args: CommandArgs<T>,
-  ) => Promise<CommandResult<T>>;
-  subscribe: <T extends FilePickerEvent>(
-    event: T,
-    handler: (payload: EventData<T>) => void,
-  ) => Promise<void> | void;
-};
-
-const getEdenAPI = (): EdenAPITransport => {
-  if (typeof window === "undefined") {
-    throw new Error("filePicker can only be used in a browser environment.");
-  }
-
-  const api = (window as { edenAPI?: EdenAPITransport }).edenAPI;
-  if (!api) {
-    throw new Error("edenAPI is not available on window.");
-  }
-
-  return api;
-};
-
 const pendingPickers = new Map<string, (result: FilePickerResult) => void>();
 let filePickerSubscription: Promise<void> | undefined;
 
 const ensureFilePickerSubscribed = () => {
   filePickerSubscription ??= Promise.resolve()
     .then(() =>
-      getEdenAPI().subscribe("file-picker/closed", (payload) => {
+      window.edenAPI.subscribe("file-picker/closed", (payload) => {
         const resolver = pendingPickers.get(payload.requestId);
         if (resolver) {
           pendingPickers.delete(payload.requestId);
@@ -99,8 +70,7 @@ const selectedPathsOrNull = (result: FilePickerResult) => {
 const pick: EdenFilePickerAPI["pick"] = async (options) => {
   await ensureFilePickerSubscribed();
 
-  const edenAPI = getEdenAPI();
-  const { requestId } = await edenAPI.shellCommand("file-picker/open", options);
+  const { requestId } = await eden.filePicker.open(options.mode, options);
 
   return new Promise((resolve) => {
     pendingPickers.set(requestId, resolve);
@@ -150,8 +120,7 @@ const saveFile: EdenFilePickerAPI["saveFile"] = async (options = {}) => {
 };
 
 const close: EdenFilePickerAPI["close"] = async (requestId) => {
-  const edenAPI = getEdenAPI();
-  await edenAPI.shellCommand("file-picker/close", { requestId });
+  await eden.filePicker.close({ requestId });
 };
 
 export const filePicker: EdenFilePickerAPI = {
