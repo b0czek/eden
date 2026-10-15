@@ -66,15 +66,18 @@ test.describe
               .find((contents) => contents.getURL().includes(appId))
               ?.focus();
           }, appId);
-          const point = await page
-            .locator(`[data-volume="${volumeId}"] button[aria-haspopup="menu"]`)
-            .evaluate((button) => {
-              const bounds = button.getBoundingClientRect();
-              return {
-                x: bounds.left + bounds.width / 2,
-                y: bounds.top + bounds.height / 2,
-              };
-            });
+          const button = page.locator(
+            `[data-volume="${volumeId}"] button[aria-haspopup="menu"]`,
+          );
+          // Resizing animates the sidebar; wait for a stable touch target.
+          await button.click({ trial: true });
+          const point = await button.evaluate((button) => {
+            const bounds = button.getBoundingClientRect();
+            return {
+              x: bounds.left + bounds.width / 2,
+              y: bounds.top + bounds.height / 2,
+            };
+          });
           const session = await host.electronApp.context().newCDPSession(page);
           try {
             await session.send("Input.dispatchTouchEvent", {
