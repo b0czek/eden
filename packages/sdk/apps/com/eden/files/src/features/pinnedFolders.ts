@@ -1,4 +1,4 @@
-import { joinPath } from "@edenapp/files-core";
+import { joinPath } from "@edenapp/files-core/utils";
 import type { FilesystemLocation } from "@edenapp/types";
 
 export const PINNED_FOLDER_LIMIT = 8;

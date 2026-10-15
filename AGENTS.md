@@ -8,6 +8,9 @@ A changeset summary is a concise release note, not a work log or an inventory of
 
 # Testing
 
+When adding or relocating tests, follow the dependency sets and test boundaries
+in [Contributor testing](docs/testing.md#test-dependencies).
+
 Do not emulate integration tests with heavily mocked unit tests. Tests that mostly verify mock wiring, delegated calls, or an implementation's current call order are not a substitute for exercising real behavior across component boundaries. If meaningful integration coverage is impractical, prefer documenting the verification gap and using focused manual validation over adding low-value mock-heavy tests.
 
 # Apps

@@ -1,12 +1,14 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
+import { APP_ID } from "./support/fixtures";
 import { isProcessAlive, useElectronHost } from "./support/host";
-import { APP_ID } from "./support/profile";
 
 test.describe
   .serial("host through Electron", () => {
-    const getHost = useElectronHost({ launchFixture: false });
+    const getHost = useElectronHost({
+      fixtures: ["integration"],
+    });
     test("reaches ready state and loads the foundation window", async () => {
       const host = getHost();
 
@@ -121,42 +123,6 @@ test.describe
           rootUrl: expect.stringMatching(/^eden-dlc:\/\/resource\//),
           value: "loaded-through-eden-dlc",
         });
-    });
-
-    test("handles a Hello request in the app backend", async () => {
-      const host = getHost();
-
-      const appId = "com.eden.example.hello";
-      await host.executeHostCommand("process/launch", { appId });
-      try {
-        await expect
-          .poll(() =>
-            host.electronApp?.evaluate(({ webContents }, id) => {
-              const contents = webContents
-                .getAllWebContents()
-                .find((candidate) => candidate.getURL().includes(id));
-              return contents?.executeJavaScript("document.readyState");
-            }, appId),
-          )
-          .toBe("complete");
-        const response = await host.electronApp?.evaluate(
-          async ({ webContents }, id) => {
-            const contents = webContents
-              .getAllWebContents()
-              .find((candidate) => candidate.getURL().includes(id));
-            if (!contents) throw new Error("Hello example view not found");
-            return contents.executeJavaScript(
-              'window.getAppAPI().request("hello", { message: "generated backend" })',
-            );
-          },
-          appId,
-        );
-        expect(response).toEqual({
-          message: "Hello from backend! You said: generated backend",
-        });
-      } finally {
-        await host.executeHostCommand("process/stop", { appId });
-      }
     });
 
     test("shuts down without orphaning Electron or utility processes", async () => {

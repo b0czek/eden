@@ -1,12 +1,15 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
+import { APP_ID } from "./support/fixtures";
 import { useElectronHost } from "./support/host";
-import { APP_ID } from "./support/profile";
 
 test.describe
   .serial("ipc through Electron", () => {
-    const getHost = useElectronHost();
+    const getHost = useElectronHost({
+      fixtures: ["integration"],
+      launchFixture: true,
+    });
     test("executes generated client methods in the renderer with typed operation controls", async () => {
       const host = getHost();
 

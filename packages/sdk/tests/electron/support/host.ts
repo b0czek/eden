@@ -5,11 +5,12 @@ import {
   type TestInfo,
   test,
 } from "@playwright/test";
+import { APP_ID } from "./fixtures";
 import {
-  APP_ID,
   createElectronProfile,
   disposeElectronProfile,
   type ElectronProfile,
+  type ElectronProfileOptions,
 } from "./profile";
 
 export type ElectronApplication = Awaited<ReturnType<typeof electron.launch>>;
@@ -23,12 +24,13 @@ export interface ElectronHost extends ElectronProfile {
   utilityPids: number[];
   executeHostCommand<TResult>(command: string, args: unknown): Promise<TResult>;
   evaluateApp(appId: string, script: string): Promise<unknown>;
+  launchApp(appId: string): Promise<ElectronPage>;
   launchFixture(): Promise<void>;
   dispose(testInfo: TestInfo): Promise<void>;
 }
 
 export async function createElectronHost(
-  options: { additionalAppsDirectory?: string } = {},
+  options: ElectronProfileOptions = {},
 ): Promise<ElectronHost> {
   const profile = await createElectronProfile(options);
   const { root, appsDirectory, userDirectory, seedPath } = profile;
@@ -127,6 +129,25 @@ export async function createElectronHost(
         .poll(() => host.evaluateApp(APP_ID, "typeof window.edenClient"))
         .toBe("object");
     },
+    async launchApp(appId) {
+      if (!host.electronApp) throw new Error("Electron app is not running");
+      await host.executeHostCommand("process/launch", { appId });
+      await expect
+        .poll(() =>
+          host.electronApp
+            ?.context()
+            .pages()
+            .some((page) => page.url().includes(appId)),
+        )
+        .toBe(true);
+      const page = host.electronApp
+        .context()
+        .pages()
+        .find((page) => page.url().includes(appId));
+      if (!page) throw new Error(`App page unavailable: ${appId}`);
+      await page.waitForLoadState("domcontentloaded");
+      return page;
+    },
     async dispose(testInfo) {
       try {
         await host.electronApp?.close().catch(() => undefined);
@@ -152,12 +173,12 @@ export async function createElectronHost(
 }
 
 export function useElectronHost(
-  options: { launchFixture?: boolean; additionalAppsDirectory?: string } = {},
+  options: ElectronProfileOptions & { launchFixture?: boolean } = {},
 ) {
   let host: ElectronHost | undefined;
   test.beforeAll(async () => {
     host = await createElectronHost(options);
-    if (options.launchFixture !== false) await host.launchFixture();
+    if (options.launchFixture) await host.launchFixture();
   });
   // biome-ignore lint/correctness/noEmptyPattern: Playwright requires fixture destructuring.
   test.afterAll(async ({}, testInfo) => {

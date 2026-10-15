@@ -1,15 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { useElectronHost } from "./support/host";
 import {
   APP_ID,
   DLC_ID,
   REMOTE_APP_ID,
   REMOTE_DLC_ID,
-} from "./support/profile";
+} from "./support/fixtures";
+import { useElectronHost } from "./support/host";
 
 test.describe
   .serial("dlc through Electron", () => {
-    const getHost = useElectronHost();
+    const getHost = useElectronHost({
+      fixtures: ["integration", "remote-dlc"],
+      launchFixture: true,
+    });
     test("loads a host-bound DLC module and rejects the same URL from another view", async () => {
       const host = getHost();
 
