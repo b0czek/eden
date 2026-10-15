@@ -10,19 +10,19 @@ interface CreateUserDialogProps {
   onCreate: (args: {
     name: string;
     password: string;
-    homeDirectory?: string;
+    directoryRestriction?: string;
   }) => boolean | Promise<boolean>;
 }
 
 const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
   const [name, setName] = createSignal("");
   const [password, setPassword] = createSignal("");
-  const [homeDirectory, setHomeDirectory] = createSignal("");
+  const [directoryRestriction, setDirectoryRestriction] = createSignal("");
 
   const reset = () => {
     setName("");
     setPassword("");
-    setHomeDirectory("");
+    setDirectoryRestriction("");
   };
 
   const handleCreate = async () => {
@@ -31,7 +31,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
     const success = await props.onCreate({
       name: trimmedName,
       password: password(),
-      homeDirectory: homeDirectory().trim() || undefined,
+      directoryRestriction: directoryRestriction().trim() || undefined,
     });
     if (success) {
       reset();
@@ -90,8 +90,8 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
         </label>
         <FilesystemLocationField
           id="create-user-filesystem-location"
-          value={homeDirectory()}
-          onInput={setHomeDirectory}
+          value={directoryRestriction()}
+          onInput={setDirectoryRestriction}
         />
         <span class="eden-form-help">
           {t("settings.users.filesystemLocationHelp")}

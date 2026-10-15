@@ -1,20 +1,15 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
-import {
-  createSettingsPanelHarness as harness,
-  panelUser as user,
-} from "./SettingsPanelTestHarness";
+import { testApp } from "../../tests/support/apps";
+import { panelUser as user } from "../../tests/support/settings/panels";
+import { createSettingsPanelHarness as harness } from "../../tests/support/settings/SettingsPanelTestHarness";
 
 describe("SettingsPanelManager manifest panels", () => {
   it("normalizes one app panel and reads only setting-granted keys", async () => {
     const { manager, settings, catalog } = harness(
       user(["settings/com.example.app/visible"]),
     );
-    const manifest: RuntimeAppManifest = {
-      kind: "app",
-      id: "com.example.app",
+    const manifest: RuntimeAppManifest = testApp("com.example.app", {
       name: "Example",
-      version: "1.0.0",
-      frontend: { entry: "index.html" },
       settings: [
         {
           id: "general",
@@ -25,12 +20,7 @@ describe("SettingsPanelManager manifest panels", () => {
           ],
         },
       ],
-      isPrebuilt: false,
-      isDevelopment: false,
-      isCore: false,
-      isRestricted: false,
-      resolvedGrants: [],
-    };
+    });
     catalog.allApps.mockReturnValue([manifest]);
     settings.get.mockImplementation(
       async (_appId: string, key: string) => `${key}-value`,

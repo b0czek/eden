@@ -8,10 +8,21 @@ import {
   title,
   when,
 } from "@edenapp/tablets";
+import type { FilesystemLocation, FilesystemVolume } from "@edenapp/types";
 import type { Setter } from "solid-js";
 import { t } from "../i18n";
+import type { PinnedFolder } from "./pinnedFolders";
 
 interface UseExplorerContextMenusOptions {
+  volumes: () => FilesystemVolume[];
+  currentLocation: () => FilesystemLocation;
+  findPin: (location: FilesystemLocation) => PinnedFolder | undefined;
+  canPin: (location: FilesystemLocation) => boolean;
+  pinFolder: (location: FilesystemLocation, label: string) => Promise<void>;
+  unpinFolder: (location: FilesystemLocation) => Promise<void>;
+  pinCurrentFolder: () => Promise<void>;
+  isVolumeEjectPending: (volume: string) => boolean;
+  ejectVolume: (volume: FilesystemVolume) => Promise<void>;
   openItem: (item: FileItem) => Promise<void>;
   getOpenWithMenuItems: (item: FileItem) => Promise<ContextMenuAction[]>;
   promptRename: (item: FileItem) => Promise<void>;
@@ -32,6 +43,36 @@ interface UseExplorerContextMenusOptions {
 export const useExplorerContextMenus = (
   options: UseExplorerContextMenusOptions,
 ) => {
+  const volumeMenu = menu((volume: FilesystemVolume) => {
+    const pending =
+      options.isVolumeEjectPending(volume.id) || volume.state === "ejecting";
+    return [
+      title(volume.label),
+      button(
+        "eject",
+        pending ? t("files.ejecting") : t("files.eject"),
+        async () => {
+          const current = options
+            .volumes()
+            .find((candidate) => candidate.id === volume.id);
+          if (current) await options.ejectVolume(current);
+        },
+        {
+          icon: "log-out",
+          disabled: pending,
+        },
+      ),
+    ];
+  });
+
+  const showVolumeMenu = (
+    volume: FilesystemVolume,
+    position: { left: number; top: number },
+  ) => {
+    if (!volume.supportsEject) return;
+    void volumeMenu.show(volume, position);
+  };
+
   const fileItemMenu = menu(
     (data: { item: FileItem; openWithItems: ContextMenuAction[] }) => [
       title(data.item.name),
@@ -45,6 +86,25 @@ export const useExplorerContextMenus = (
         }),
       ),
       separator(),
+      when(
+        data.item.isDirectory,
+        button(
+          "pin-folder",
+          options.findPin(data.item.location)
+            ? t("files.unpinFolder")
+            : t("files.pinFolder"),
+          () =>
+            options.findPin(data.item.location)
+              ? options.unpinFolder(data.item.location)
+              : options.pinFolder(data.item.location, data.item.name),
+          {
+            icon: "bookmark",
+            disabled:
+              !options.findPin(data.item.location) &&
+              !options.canPin(data.item.location),
+          },
+        ),
+      ),
       button("copy", t("files.copy"), () => options.copyItem(data.item), {
         icon: "copy",
       }),
@@ -86,6 +146,25 @@ export const useExplorerContextMenus = (
   );
 
   const emptyAreaMenu = menu<null>(() => [
+    when(
+      options.currentLocation().path !== "/",
+      button(
+        "pin-current-folder",
+        options.findPin(options.currentLocation())
+          ? t("files.unpinFolder")
+          : t("files.pinCurrentFolder"),
+        () =>
+          options.findPin(options.currentLocation())
+            ? options.unpinFolder(options.currentLocation())
+            : options.pinCurrentFolder(),
+        {
+          icon: "bookmark",
+          disabled:
+            !options.findPin(options.currentLocation()) &&
+            !options.canPin(options.currentLocation()),
+        },
+      ),
+    ),
     button("new-folder", t("files.newFolder"), options.promptCreateFolder, {
       icon: "folder-plus",
       disabled: options.readOnly(),
@@ -128,6 +207,7 @@ export const useExplorerContextMenus = (
   };
 
   return {
+    showVolumeMenu,
     handleItemContextMenu,
     handleBackgroundContextMenu,
   };

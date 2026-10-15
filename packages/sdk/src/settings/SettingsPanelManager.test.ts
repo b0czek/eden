@@ -1,8 +1,8 @@
 import {
   panelDefinition as definition,
-  createSettingsPanelHarness as harness,
   panelUser as user,
-} from "./SettingsPanelTestHarness";
+} from "../../tests/support/settings/panels";
+import { createSettingsPanelHarness as harness } from "../../tests/support/settings/SettingsPanelTestHarness";
 
 const emptyProvider = () => ({
   load: async () => ({ sections: [] }),

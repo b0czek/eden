@@ -4,7 +4,6 @@ import {
   FaSolidArrowLeft,
   FaSolidArrowRight,
   FaSolidArrowUp,
-  FaSolidEject,
   FaSolidEllipsis,
   FaSolidFileMedical,
   FaSolidFolderPlus,
@@ -22,11 +21,11 @@ export interface FileExplorerHeaderProps {
   labels: FileExplorerLabels;
   currentPath: string;
   currentVolume: string;
+  canGoUp?: boolean;
   volumes: FilesystemVolume[];
+  showVolumeSelector?: boolean;
   onVolumeChange: (volume: string) => void;
   onRefresh: () => void;
-  onEject?: () => void;
-  ejectPending?: boolean;
   readOnly?: boolean;
   historyIndex: number;
   historyLength: number;
@@ -44,8 +43,7 @@ export interface FileExplorerHeaderProps {
 const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
   const selectedVolume = () =>
     props.volumes.find((volume) => volume.id === props.currentVolume);
-  const ejecting = () =>
-    props.ejectPending || selectedVolume()?.state === "ejecting";
+  const ejecting = () => selectedVolume()?.state === "ejecting";
   const iconForVolume = (id: string) => {
     if (id === "home") return FaSolidHouse;
     switch (props.volumes.find((volume) => volume.id === id)?.kind) {
@@ -93,55 +91,51 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             type="button"
             class="eden-btn eden-btn-sm eden-btn-square"
             onClick={props.onGoUp}
-            disabled={props.currentPath === "/"}
+            disabled={props.canGoUp === false || props.currentPath === "/"}
             title={props.labels.goUp}
           >
             <FaSolidArrowUp />
           </button>
         </div>
 
-        <select
-          class="eden-select explorer-volume-select"
-          aria-label={props.labels.volume}
-          value={props.currentVolume}
-          onChange={(event) => props.onVolumeChange(event.currentTarget.value)}
-        >
-          <button type="button">
-            <Dynamic
-              component={iconForVolume(props.currentVolume)}
-              class="explorer-volume-icon"
-              aria-hidden="true"
-            />
-            <span>{selectedLabel()}</span>
-          </button>
-          <For each={props.volumes}>
-            {(volume) => (
-              <option value={volume.id} label={volumeLabel(volume)}>
-                <Dynamic
-                  component={iconForVolume(volume.id)}
-                  class="explorer-volume-icon"
-                  aria-hidden="true"
-                />
-                <span>{volumeLabel(volume)}</span>
-              </option>
-            )}
-          </For>
-        </select>
-
-        <Show when={selectedVolume()?.supportsEject && props.onEject}>
-          <button
-            type="button"
-            class="eden-btn eden-btn-sm eden-btn-square"
-            onClick={props.onEject}
-            disabled={ejecting()}
+        <Show when={props.showVolumeSelector !== false}>
+          <select
+            class="eden-select explorer-volume-select"
+            aria-label={props.labels.volume}
             aria-busy={ejecting()}
-            aria-label={ejecting() ? props.labels.ejecting : props.labels.eject}
-            title={ejecting() ? props.labels.ejecting : props.labels.eject}
+            value={props.currentVolume}
+            onChange={(event) =>
+              props.onVolumeChange(event.currentTarget.value)
+            }
           >
-            <Show when={ejecting()} fallback={<FaSolidEject />}>
-              <span class="eden-spinner eden-spinner-sm" aria-hidden="true" />
-            </Show>
-          </button>
+            <button type="button">
+              <Show
+                when={ejecting()}
+                fallback={
+                  <Dynamic
+                    component={iconForVolume(props.currentVolume)}
+                    class="explorer-volume-icon"
+                    aria-hidden="true"
+                  />
+                }
+              >
+                <span class="eden-spinner eden-spinner-sm" aria-hidden="true" />
+              </Show>
+              <span>{selectedLabel()}</span>
+            </button>
+            <For each={props.volumes}>
+              {(volume) => (
+                <option value={volume.id} label={volumeLabel(volume)}>
+                  <Dynamic
+                    component={iconForVolume(volume.id)}
+                    class="explorer-volume-icon"
+                    aria-hidden="true"
+                  />
+                  <span>{volumeLabel(volume)}</span>
+                </option>
+              )}
+            </For>
+          </select>
         </Show>
 
         <Omnibox

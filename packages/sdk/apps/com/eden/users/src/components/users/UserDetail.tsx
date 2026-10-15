@@ -16,9 +16,9 @@ interface UserDetailProps {
   onDelete: (username: string) => void;
   onOpenPasswordModal: (user: UserProfile) => void;
   onToggleDefaultUser: (username: string, enabled: boolean) => void;
-  onSaveHomeDirectory: (
+  onSaveDirectoryRestriction: (
     username: string,
-    homeDirectory: string,
+    directoryRestriction: string,
   ) => Promise<boolean>;
   updateGrants: (
     username: string,
@@ -29,20 +29,21 @@ interface UserDetailProps {
 const UserDetail = (props: UserDetailProps) => {
   const [mode, setMode] = createSignal<"easy" | "raw">("easy");
   const [rawGrantText, setRawGrantText] = createSignal("");
-  const [homeDirectory, setHomeDirectory] = createSignal("");
-  const [homeDirectoryError, setHomeDirectoryError] = createSignal(false);
+  const [directoryRestriction, setDirectoryRestriction] = createSignal("");
+  const [directoryRestrictionError, setDirectoryRestrictionError] =
+    createSignal(false);
   let displayedUsername: string | undefined;
-  let lastSavedHomeDirectory = "";
-  let homeDirectorySaveQueue = Promise.resolve();
+  let lastSavedDirectoryRestriction = "";
+  let directoryRestrictionSaveQueue = Promise.resolve();
 
   // Sync raw text when user changes
   createEffect(() => {
     setRawGrantText((props.user.grants || []).join("\n"));
     if (displayedUsername !== props.user.username) {
       displayedUsername = props.user.username;
-      lastSavedHomeDirectory = props.user.homeDirectory ?? "";
-      setHomeDirectory(lastSavedHomeDirectory);
-      setHomeDirectoryError(false);
+      lastSavedDirectoryRestriction = props.user.directoryRestriction ?? "";
+      setDirectoryRestriction(lastSavedDirectoryRestriction);
+      setDirectoryRestrictionError(false);
     }
   });
 
@@ -71,30 +72,32 @@ const UserDetail = (props: UserDetailProps) => {
     });
   };
 
-  const saveHomeDirectory = (value: string) => {
+  const saveDirectoryRestriction = (value: string) => {
     const username = props.user.username;
-    const nextHomeDirectory = value.trim();
-    if (nextHomeDirectory === lastSavedHomeDirectory) return;
+    const nextDirectoryRestriction = value.trim();
+    if (nextDirectoryRestriction === lastSavedDirectoryRestriction) return;
 
-    homeDirectorySaveQueue = homeDirectorySaveQueue.then(async () => {
-      const success = await props.onSaveHomeDirectory(
-        username,
-        nextHomeDirectory,
-      );
-      if (displayedUsername !== username) return;
+    directoryRestrictionSaveQueue = directoryRestrictionSaveQueue.then(
+      async () => {
+        const success = await props.onSaveDirectoryRestriction(
+          username,
+          nextDirectoryRestriction,
+        );
+        if (displayedUsername !== username) return;
 
-      if (success) {
-        lastSavedHomeDirectory = nextHomeDirectory;
-      }
-      if (homeDirectory().trim() === nextHomeDirectory) {
-        setHomeDirectoryError(!success);
-      }
-    });
+        if (success) {
+          lastSavedDirectoryRestriction = nextDirectoryRestriction;
+        }
+        if (directoryRestriction().trim() === nextDirectoryRestriction) {
+          setDirectoryRestrictionError(!success);
+        }
+      },
+    );
   };
 
-  const updateHomeDirectory = (value: string) => {
-    setHomeDirectory(value);
-    setHomeDirectoryError(false);
+  const updateDirectoryRestriction = (value: string) => {
+    setDirectoryRestriction(value);
+    setDirectoryRestrictionError(false);
   };
 
   const isCurrent = () => props.currentUser?.username === props.user.username;
@@ -138,14 +141,14 @@ const UserDetail = (props: UserDetailProps) => {
             </label>
             <FilesystemLocationField
               id="user-filesystem-location"
-              value={homeDirectory()}
-              onInput={updateHomeDirectory}
-              onCommit={saveHomeDirectory}
+              value={directoryRestriction()}
+              onInput={updateDirectoryRestriction}
+              onCommit={saveDirectoryRestriction}
             />
             <span class="eden-form-help">
               {t("settings.users.filesystemLocationHelp")}
             </span>
-            <Show when={homeDirectoryError()}>
+            <Show when={directoryRestrictionError()}>
               <span class="eden-form-error">
                 {t("settings.users.filesystemLocationUpdateFailed")}
               </span>

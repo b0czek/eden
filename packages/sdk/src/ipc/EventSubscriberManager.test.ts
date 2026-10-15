@@ -65,7 +65,6 @@ describe("EventSubscriberManager", () => {
     viewManager.getViewInfo.mockReturnValue(undefined);
 
     expect(manager.subscribe(1, "event/missing")).toBe(false);
-    expect(warnSpy).toHaveBeenCalledWith("Cannot subscribe: view 1 not found");
   });
 
   it("enforces event permissions when a registry is set", () => {

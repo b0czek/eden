@@ -674,6 +674,9 @@ importers:
 
   packages/sdk/apps/com/eden/settings:
     dependencies:
+      '@edenapp/solid-kit':
+        specifier: workspace:*
+        version: link:../../../../../solid-kit
       solid-icons:
         specifier: 'catalog:'
         version: 1.2.0(solid-js@1.9.14)

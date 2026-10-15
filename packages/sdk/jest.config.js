@@ -1,7 +1,8 @@
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
-  roots: ["<rootDir>/src"],
+  setupFiles: ["reflect-metadata"],
+  roots: ["<rootDir>/src", "<rootDir>/tests/integration"],
   testMatch: ["**/?(*.)+(spec|test).ts"],
   collectCoverageFrom: [
     "src/**/*.ts",

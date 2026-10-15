@@ -65,6 +65,10 @@ try {
 `submission` is available for operation commands and supports the existing
 request-key deduplication behavior. See [IPC operations](../../docs/ipc-architecture.md#operations).
 
+File reads accept locations for one-shot access or plain handles returned by
+`fs.open`. See [file handles](../../docs/filesystem.md#file-handles)
+for repeated reads, close, and safe-removal lifetimes.
+
 ## Frontend and backend
 
 The same imports work in both runtimes. Methods use the frontend's

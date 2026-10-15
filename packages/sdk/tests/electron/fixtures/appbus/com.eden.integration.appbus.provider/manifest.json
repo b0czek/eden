@@ -1,0 +1,21 @@
+{
+  "id": "com.eden.integration.appbus.provider",
+  "name": "AppBus provider",
+  "version": "1.0.0",
+  "description": "AppBus integration fixture",
+  "author": "Eden",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "injections": {
+      "appFrame": "none",
+      "css": "none"
+    }
+  },
+  "permissions": ["appbus/expose", "appbus/connect"],
+  "backend": {
+    "entry": "backend.mjs"
+  }
+}

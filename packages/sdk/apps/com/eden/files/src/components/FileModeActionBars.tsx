@@ -1,6 +1,3 @@
-import { formatFileSize } from "@edenapp/files-core";
-import { OperationStatus } from "@edenapp/solid-kit";
-import type { OperationSnapshot } from "@edenapp/types";
 import {
   FiCheckSquare,
   FiCopy,
@@ -14,7 +11,6 @@ import type {
   PendingTransfer,
   TransferOperation,
 } from "../features/fileTransfers";
-import type { FileOperationProgress } from "../features/useFileTransfers";
 import { t } from "../i18n";
 
 interface SelectionActionBarProps {
@@ -94,49 +90,10 @@ export const SelectionActionBar: Component<SelectionActionBarProps> = (
 
 interface TransferActionBarProps {
   pendingTransfer: PendingTransfer | null;
-  progress: FileOperationProgress | null;
-  snapshot?: OperationSnapshot;
-  cancelling: boolean;
-  busy: boolean;
   readOnly: boolean;
   onComplete: () => void;
   onCancel: () => void;
 }
-
-const progressLabel = (progress: FileOperationProgress): string => {
-  const values = {
-    current: progress.current,
-    total: progress.total,
-    name: progress.itemName,
-  };
-  if (progress.operation === "copy") return t("files.progressCopy", values);
-  if (progress.operation === "move") return t("files.progressMove", values);
-  if (progress.operation === "open") return t("files.progressOpen", values);
-  return t("files.progressDelete", values);
-};
-
-const progressDetail = (snapshot?: OperationSnapshot): string | undefined => {
-  switch (snapshot?.phase) {
-    case "rolling-back":
-      return t("files.restoringDestination");
-    case "cleaning-up":
-      return t("files.cleaningUp");
-    case "removing-source":
-      return t("files.removingSource");
-    case "validating":
-    case "preparing-copy":
-    case "preparing-move":
-      return t("files.preparingOperation");
-  }
-  const progress = snapshot?.progress;
-  if (progress?.unit !== "bytes") return undefined;
-  return progress.total === undefined
-    ? t("files.bytesTransferred", { size: formatFileSize(progress.completed) })
-    : t("files.bytesProgress", {
-        size: formatFileSize(progress.completed),
-        total: formatFileSize(progress.total),
-      });
-};
 
 export const TransferActionBar: Component<TransferActionBarProps> = (props) => (
   <section
@@ -144,54 +101,36 @@ export const TransferActionBar: Component<TransferActionBarProps> = (props) => (
     aria-live="polite"
   >
     <div class="transfer-status">
-      {props.progress ? (
-        <OperationStatus
-          label={
-            props.cancelling
-              ? t("files.cancellingCopy")
-              : progressLabel(props.progress)
-          }
-          snapshot={props.snapshot}
-          description={progressDetail(props.snapshot)}
-        />
-      ) : (
-        <strong>
-          {props.pendingTransfer?.operation === "copy"
-            ? t("files.chooseCopyDestination", {
-                count: props.pendingTransfer?.items.length ?? 0,
-              })
-            : t("files.chooseMoveDestination", {
-                count: props.pendingTransfer?.items.length ?? 0,
-              })}
-        </strong>
-      )}
+      <strong>
+        {props.pendingTransfer?.operation === "copy"
+          ? t("files.chooseCopyDestination", {
+              count: props.pendingTransfer.items.length,
+            })
+          : t("files.chooseMoveDestination", {
+              count: props.pendingTransfer?.items.length ?? 0,
+            })}
+      </strong>
     </div>
-    {((props.pendingTransfer && !props.busy) ||
-      props.progress?.operation === "copy") && (
-      <div class="file-action-bar-actions">
-        {props.pendingTransfer && !props.busy && (
-          <button
-            type="button"
-            class="eden-btn eden-btn-primary eden-btn-sm"
-            disabled={props.readOnly}
-            onClick={props.onComplete}
-          >
-            {props.pendingTransfer.operation === "copy"
-              ? t("files.copyHere")
-              : t("files.moveHere")}
-          </button>
-        )}
-        <button
-          type="button"
-          class="eden-btn eden-btn-square eden-btn-sm"
-          aria-label={t("common.cancel")}
-          title={t("common.cancel")}
-          disabled={props.cancelling}
-          onClick={props.onCancel}
-        >
-          <FiX aria-hidden="true" />
-        </button>
-      </div>
-    )}
+    <div class="file-action-bar-actions">
+      <button
+        type="button"
+        class="eden-btn eden-btn-primary eden-btn-sm"
+        disabled={props.readOnly}
+        onClick={props.onComplete}
+      >
+        {props.pendingTransfer?.operation === "copy"
+          ? t("files.copyHere")
+          : t("files.moveHere")}
+      </button>
+      <button
+        type="button"
+        class="eden-btn eden-btn-square eden-btn-sm"
+        aria-label={t("common.cancel")}
+        title={t("common.cancel")}
+        onClick={props.onCancel}
+      >
+        <FiX aria-hidden="true" />
+      </button>
+    </div>
   </section>
 );

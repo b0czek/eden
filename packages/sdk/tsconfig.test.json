@@ -2,8 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "isolatedModules": true,
+    "rootDir": ".",
     "types": ["jest", "node"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/integration/**/*.ts",
+    "tests/support/**/*.ts",
+    "tests/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "src/app-frame", "src/app-runtime"]
 }

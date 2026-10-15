@@ -10,6 +10,7 @@ import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/ExecutionContext";
+import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import { EdenNamespace } from "../ipc/CommandDecorators";
 import { EdenEmitter } from "../ipc/EdenEmitter";
 import type { IPCBridge } from "../ipc/IPCBridge";
@@ -65,6 +66,10 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     bridge: IPCBridge,
     @inject(ExecutionContext) private execution: ExecutionContext,
     @inject(SessionContext) private session: SessionContext,
+    @inject(
+      delay(() => require("../filesystem/FilesystemManager").FilesystemManager),
+    )
+    private filesystem: FilesystemManager,
   ) {
     super(bridge);
     this.expiryTimer = setInterval(() => this.prune(), 60_000);
@@ -191,12 +196,14 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       this.update(record, { status: "running", startedAt: Date.now() });
       if (task.transition)
         this.update(record, { phase: "waiting-for-operations" });
-      if (task.transition === "session")
-        await this.drainSession(
-          record.transitionSessionId!,
-          record.snapshot.id,
-        );
-      if (task.transition === "runtime") await this.drain(record.snapshot.id);
+      if (record.transitionSessionId) {
+        await this.filesystem.releaseHandles(record.transitionSessionId);
+        await this.drainSession(record.transitionSessionId, record.snapshot.id);
+      }
+      if (task.transition === "runtime") {
+        await this.filesystem.releaseHandles();
+        await this.drain(record.snapshot.id);
+      }
       const result = await task.run({
         signal: record.cancellation?.signal,
         update: (phase, progress) => {
@@ -412,6 +419,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     const reservation = operationId ?? randomUUID();
     this.closedSessions.set(sessionId, reservation);
     try {
+      await this.filesystem.releaseHandles(sessionId);
       await this.drainSession(sessionId, operationId);
       return await task();
     } finally {
@@ -432,6 +440,7 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     this.runtimeTransition = reservation;
     this.accepting = false;
     try {
+      await this.filesystem.releaseHandles();
       await this.drain(operationId);
       return await task();
     } catch (error) {

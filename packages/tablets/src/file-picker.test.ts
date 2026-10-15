@@ -1,7 +1,7 @@
 import type { FilePickerResult } from "@edenapp/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createTransport = () => {
+const createTransport = (subscriptionFailures = 0) => {
   let closed: ((result: FilePickerResult) => void) | undefined;
   let opened: (() => void) | undefined;
   const ready = new Promise<void>((resolve) => {
@@ -10,6 +10,9 @@ const createTransport = () => {
   vi.stubGlobal("window", {
     edenAPI: {
       subscribe: async (_event: string, handler: typeof closed) => {
+        if (subscriptionFailures-- > 0) {
+          throw new Error("Subscription failed");
+        }
         closed = handler;
       },
       shellCommand: async () => {
@@ -33,6 +36,26 @@ describe("filePicker selection helpers", () => {
     vi.resetModules();
     vi.unstubAllGlobals();
   });
+
+  it.each(["select", "cancel"] as const)(
+    "retries a rejected subscription and resolves a subsequent %s",
+    async (reason) => {
+      const transport = createTransport(1);
+      const { filePicker } = await import("./file-picker");
+      await expect(filePicker.openFile()).rejects.toThrow(
+        "Subscription failed",
+      );
+      const selected = filePicker.openFile();
+      const location = { volume: "home", path: "/retry.txt" };
+      await transport.resolve({
+        reason,
+        locations: reason === "select" ? [location] : undefined,
+      });
+      await expect(selected).resolves.toEqual(
+        reason === "select" ? location : null,
+      );
+    },
+  );
 
   it.each(["openFile", "openDirectory", "saveFile"] as const)(
     "%s returns the first location from a selection",

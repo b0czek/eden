@@ -12,8 +12,8 @@ import * as path from "node:path";
 import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
 import KeyvSqlite from "@keyv/sqlite";
 import Keyv from "keyv";
+import { ensureDirectoryRestriction } from "../user/UserDirectoryRestriction";
 import { defaultGrantsForRole } from "../user/UserGrants";
-import { ensureHomeDirectory } from "../user/UserHomeDirectory";
 
 // Key constants matching UserManager and SettingsManager schemas
 const USERS_SEED_VERSION_KEY = "_seed:users:version";
@@ -120,16 +120,16 @@ async function seedUsers(
 
     const now = Date.now();
     const role = user.role ?? "standard";
-    const homeDirectory = await ensureHomeDirectory(
+    const directoryRestriction = await ensureDirectoryRestriction(
       userDirectory,
       role,
-      user.homeDirectory,
+      user.directoryRestriction,
     );
     const storedUser = {
       username: user.username,
       name: user.name,
       role,
-      homeDirectory,
+      directoryRestriction,
       grants: user.grants ?? defaultGrantsForRole(role),
       createdAt: now,
       updatedAt: now,

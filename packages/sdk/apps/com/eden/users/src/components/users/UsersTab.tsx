@@ -133,14 +133,14 @@ export default function UsersTab() {
   const handleCreateUser = async (
     name: string,
     password: string,
-    homeDirectory?: string,
+    directoryRestriction?: string,
   ): Promise<boolean> => {
     if (!name || !password) return false;
     try {
       const result = await window.edenAPI.shellCommand("user/create", {
         name,
         password,
-        homeDirectory,
+        directoryRestriction,
       });
       setShowCreateDialog(false);
       await loadUsers();
@@ -154,14 +154,14 @@ export default function UsersTab() {
     }
   };
 
-  const handleHomeDirectorySave = async (
+  const handleDirectoryRestrictionSave = async (
     username: string,
-    homeDirectory: string,
+    directoryRestriction: string,
   ): Promise<boolean> => {
     try {
       const result = await window.edenAPI.shellCommand("user/update", {
         username,
-        homeDirectory: homeDirectory.trim() || null,
+        directoryRestriction: directoryRestriction.trim() || null,
       });
       setUsers((current) =>
         current.map((user) =>
@@ -170,7 +170,7 @@ export default function UsersTab() {
       );
       return true;
     } catch (error) {
-      console.error("Failed to update home directory:", error);
+      console.error("Failed to update folder restriction:", error);
       return false;
     }
   };
@@ -263,7 +263,7 @@ export default function UsersTab() {
               onDelete={handleDeleteUser}
               onOpenPasswordModal={(target) => setPasswordModalUser(target)}
               onToggleDefaultUser={handleToggleDefaultUser}
-              onSaveHomeDirectory={handleHomeDirectorySave}
+              onSaveDirectoryRestriction={handleDirectoryRestrictionSave}
               updateGrants={updateGrants}
             />
           )}
@@ -273,8 +273,8 @@ export default function UsersTab() {
       <CreateUserDialog
         show={showCreateDialog()}
         onClose={() => setShowCreateDialog(false)}
-        onCreate={({ name, password, homeDirectory }) =>
-          handleCreateUser(name, password, homeDirectory)
+        onCreate={({ name, password, directoryRestriction }) =>
+          handleCreateUser(name, password, directoryRestriction)
         }
       />
       <SetPasswordDialog

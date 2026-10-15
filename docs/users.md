@@ -46,30 +46,37 @@ the Users app (App grants), and apps can check them via `user/has-grant`.
   - `users:default` (default username)
   - `user:${username}` (full user record)
 - Stored record includes: `username`, `name`, `role`, `grants`,
-  optional `homeDirectory`,
+  optional `directoryRestriction`,
   `passwordHash`, `passwordSalt`, `createdAt`, `updatedAt`.
 - Public user profile exposes: `username`, `name`, `role`, `grants`,
-  optional `homeDirectory`,
+  optional `directoryRestriction`,
   `createdAt`, `updatedAt`.
 
-## Filesystem Homes
+## Shared Filesystem and Folder Restrictions
 
-`EdenConfig.userDirectory` backs Eden's built-in `home` volume.
-Users may optionally be assigned a writable home beneath that root:
+`EdenConfig.userDirectory` backs the built-in `home` volume. Its virtual `/`
+always maps to that shared root. Every complete address identifies the same
+file for all users and daemon accounts.
 
-- Vendor users always see the full `userDirectory`.
-- Standard users with no `homeDirectory` also see the full root.
-- A standard user with `homeDirectory: "teams/operators"` sees that directory
-  as virtual `/`.
-- Assigning the same home to multiple users intentionally shares its contents.
-- Home paths are relative, cannot escape `userDirectory`, and are created when
-  assigned.
-- Deleting a user does not delete their home directory.
+Standard accounts may have an optional `directoryRestriction`, relative to
+`userDirectory`. For example, `directoryRestriction: "projects/design"` permits
+access to `home:/projects/design` and its descendants. Files and File Picker start
+there and show full paths such as `home:/projects/design/notes.txt`.
 
-The home boundary applies to filesystem, file-opening, and package commands
-addressing the `home` volume. Consumer-registered volumes are shared across Eden
-users and remain subject to app permissions and user grants. Node.js app backends remain trusted processes and can access Node APIs
-directly.
+- Blank or `"."` means access to the full shared tree. Vendor accounts and
+  system principals have full-tree access.
+- Accounts may share the same restriction or overlapping restrictions:
+  `"projects"` and `"projects/design"` share the latter folder's contents.
+- Restrictions apply to both reads and writes, including metadata, listing,
+  search, watching, file opening, and package operations. App permissions and
+  user grants still apply.
+- Restriction paths cannot escape `userDirectory`, including through symlinks.
+  Assigned directories are created if necessary. Deleting an account leaves
+  the files intact.
+- Consumer-registered volumes remain shared across users, subject to app
+  permissions and user grants. A Home restriction does not restrict those drives.
+
+Node.js app backends remain trusted processes and can access Node APIs directly.
 
 ## Sessions and Identity
 

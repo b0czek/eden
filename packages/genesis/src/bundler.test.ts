@@ -162,49 +162,42 @@ describe("bundler module", () => {
       expect(result.manifest?.version).toBe("3.0.0");
     });
 
-    it("explains when a missing app version cannot be inferred", async () => {
-      const manifestPath = path.join(tempDir, "manifest.json");
-      await fs.writeFile(
-        manifestPath,
-        JSON.stringify({
-          id: "com.example.missing-version",
-          name: "Missing Version",
-          frontend: { entry: "index.html" },
-        }),
-      );
-
-      const result = await bundler.validateManifest(manifestPath);
-
-      expect(result.valid).toBe(false);
-      expect(result.errors[0]).toContain(
-        "Could not infer app version from package.json",
-      );
-    });
-
-    it("rejects a package.json without a usable version", async () => {
-      const manifestPath = path.join(tempDir, "manifest.json");
-      await fs.writeFile(
-        manifestPath,
-        JSON.stringify({
-          id: "com.example.invalid-package-version",
-          name: "Invalid Package Version",
-          frontend: { entry: "index.html" },
-        }),
-      );
-      await fs.writeFile(
-        path.join(tempDir, "package.json"),
-        JSON.stringify({ version: "" }),
-      );
-
-      const result = await bundler.validateManifest(manifestPath);
-
-      expect(result).toEqual({
-        valid: false,
-        errors: [
+    it.each([
+      {
+        name: "missing package.json",
+        packageJson: undefined,
+        error: "Could not infer app version from package.json",
+      },
+      {
+        name: "empty package version",
+        packageJson: { version: "" },
+        error:
           "Could not infer app version from package.json: version must be a non-empty string",
-        ],
-      });
-    });
+      },
+    ])(
+      "explains version inference failure for $name",
+      async ({ packageJson, error }) => {
+        const manifestPath = path.join(tempDir, "manifest.json");
+        await fs.writeFile(
+          manifestPath,
+          JSON.stringify({
+            id: "com.example.missing-version",
+            name: "Missing Version",
+            frontend: { entry: "index.html" },
+          }),
+        );
+        if (packageJson !== undefined)
+          await fs.writeFile(
+            path.join(tempDir, "package.json"),
+            JSON.stringify(packageJson),
+          );
+        const result = await bundler.validateManifest(manifestPath);
+        expect(result.valid).toBe(false);
+        if (packageJson === undefined)
+          expect(result.errors[0]).toContain(error);
+        else expect(result.errors).toEqual([error]);
+      },
+    );
 
     it("validates the build concurrency hint", () => {
       const manifest: AppManifest = {

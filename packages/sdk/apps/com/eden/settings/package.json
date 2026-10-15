@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@edenapp/solid-kit": "workspace:*",
     "solid-icons": "catalog:",
     "solid-js": "catalog:"
   },

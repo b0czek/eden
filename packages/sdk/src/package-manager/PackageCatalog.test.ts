@@ -1,3 +1,4 @@
+import { testApp } from "../../tests/support/apps";
 import "reflect-metadata";
 
 import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
@@ -8,17 +9,8 @@ const manifest = (
   id: string,
   options: Partial<RuntimeAppManifest> = {},
 ): RuntimeAppManifest =>
-  ({
-    kind: "app",
-    id,
-    name: id,
-    version: "1.0.0",
+  testApp(id, {
     frontend: { entry: "dist/index.html" },
-    isPrebuilt: false,
-    isDevelopment: false,
-    isCore: false,
-    isRestricted: false,
-    resolvedGrants: [],
     ...options,
   }) as RuntimeAppManifest;
 

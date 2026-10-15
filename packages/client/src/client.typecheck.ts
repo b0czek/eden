@@ -6,11 +6,24 @@ import {
   settings,
   system,
 } from "@edenapp/client";
-import type { FileStats, Operation, SystemInfo } from "@edenapp/types";
+import type {
+  FileStats,
+  FilesystemHandle,
+  FilesystemLocation,
+  Operation,
+  SystemInfo,
+} from "@edenapp/types";
 
 function signatures() {
   const location = { volume: "home", path: "/file.txt" };
+  const scope: Promise<FilesystemLocation> = fs.accessScope("home");
   const stat: Promise<FileStats> = fs.stat(location);
+  const opened: Promise<FilesystemHandle> = fs.open(location, { mode: "read" });
+  const handle = { handleId: "example" };
+  const handleStat: Promise<FileStats> = fs.stat(handle);
+  const handleText: Promise<string> = fs.read(handle, { encoding: "utf8" });
+  const handleBytes: Promise<Uint8Array> = fs.readBinary(handle);
+  const closed: Promise<void> = fs.close(handle);
   const info: Promise<SystemInfo> = system.info();
   const copy: Promise<Operation<"fs/cp">> = fs.cp(location, location, {
     overwrite: true,
@@ -42,6 +55,16 @@ function signatures() {
   system.info({});
   // @ts-expect-error invalid normalized method
   fs.readbinary(location);
-  return { stat, info, completion };
+  return {
+    stat,
+    scope,
+    info,
+    completion,
+    opened,
+    handleStat,
+    handleText,
+    handleBytes,
+    closed,
+  };
 }
 void signatures;

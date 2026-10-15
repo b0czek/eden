@@ -1,4 +1,8 @@
 import {
+  panelDefinition,
+  panelUser,
+} from "../../tests/support/settings/panels";
+import {
   actionAuthorization,
   applyActionAuthorization,
   canOpenPanel,
@@ -6,7 +10,6 @@ import {
   hasUserGrant,
 } from "./SettingsPanelAuthorization";
 import type { SettingsPanelRecord } from "./SettingsPanelRecord";
-import { panelDefinition, panelUser } from "./SettingsPanelTestHarness";
 
 const record = (
   overrides: Partial<SettingsPanelRecord> = {},

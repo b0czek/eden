@@ -15,6 +15,11 @@
       "types": "./src/dialogs.ts",
       "import": "./src/dialogs.ts",
       "default": "./src/dialogs.ts"
+    },
+    "./sidebar": {
+      "types": "./src/sidebar.tsx",
+      "import": "./src/sidebar.tsx",
+      "default": "./src/sidebar.tsx"
     }
   },
   "files": [

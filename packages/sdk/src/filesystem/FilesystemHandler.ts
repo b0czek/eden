@@ -1,6 +1,9 @@
 import type {
   FileStats,
+  FilesystemHandle,
   FilesystemLocation,
+  FilesystemOpenMode,
+  FilesystemSource,
   FilesystemTransferArgs,
   SearchResult,
 } from "@edenapp/types";
@@ -8,8 +11,11 @@ import * as v from "valibot";
 import { EdenHandler, EdenNamespace } from "../ipc";
 import type { OperationTask } from "../operations/OperationTask";
 import {
+  filesystemHandleSchema,
   filesystemLocationArgsSchema,
   filesystemLocationSchema,
+  filesystemSourceArgsSchema,
+  filesystemSourceSchema,
 } from "./FilesystemLocationSchema";
 import type { FilesystemManager } from "./FilesystemManager";
 
@@ -30,7 +36,15 @@ const encoding = v.optional(
   ]),
   "utf-8",
 );
-const readArgs = v.object({ location: filesystemLocationSchema, encoding });
+const readArgs = v.object({ location: filesystemSourceSchema, encoding });
+const openMode = v.picklist([
+  "read",
+]) satisfies v.GenericSchema<FilesystemOpenMode>;
+const openArgs = v.object({
+  location: filesystemLocationSchema,
+  mode: v.optional(openMode, "read"),
+});
+const closeArgs = v.object({ handle: filesystemHandleSchema });
 const writeArgs = v.object({
   location: filesystemLocationSchema,
   content: v.string(),
@@ -67,12 +81,39 @@ const transferArgs = v.object({
 export class FilesystemHandler {
   constructor(private fsManager: FilesystemManager) {}
 
+  /** Return the caller's accessible starting folder within a volume. */
+  @EdenHandler("access-scope", { permission: "read" })
+  handleAccessScope(args: { volume: string }): FilesystemLocation {
+    const { volume } = v.parse(
+      v.object({ volume: v.pipe(v.string(), v.nonEmpty()) }),
+      args,
+    );
+    return this.fsManager.accessScope(volume);
+  }
+
+  /** Open a file and hold volume access until close or owner teardown. */
+  @EdenHandler("open", { permission: "read" })
+  async handleOpen(args: {
+    location: FilesystemLocation;
+    mode?: FilesystemOpenMode;
+  }): Promise<FilesystemHandle> {
+    const { location, mode } = v.parse(openArgs, args);
+    return this.fsManager.open(location, mode);
+  }
+
+  /** Close an owned file handle after its accepted operations finish. */
+  @EdenHandler("close", { permission: "read" })
+  async handleClose(args: { handle: FilesystemHandle }): Promise<void> {
+    const { handle } = v.parse(closeArgs, args);
+    await this.fsManager.close(handle);
+  }
+
   /**
    * Read the contents of a file.
    */
   @EdenHandler("read", { permission: "read" })
   async handleReadFile(args: {
-    location: FilesystemLocation;
+    location: FilesystemSource;
     encoding?: string;
   }): Promise<string> {
     const { location, encoding } = v.parse(readArgs, args);
@@ -84,9 +125,9 @@ export class FilesystemHandler {
    */
   @EdenHandler("read-binary", { permission: "read" })
   async handleReadBinaryFile(args: {
-    location: FilesystemLocation;
+    location: FilesystemSource;
   }): Promise<Uint8Array> {
-    const { location } = v.parse(filesystemLocationArgsSchema, args);
+    const { location } = v.parse(filesystemSourceArgsSchema, args);
     return await this.fsManager.readBinaryFile(location);
   }
 
@@ -148,8 +189,8 @@ export class FilesystemHandler {
    * Get file or directory statistics.
    */
   @EdenHandler("stat", { permission: "read" })
-  async handleStat(args: { location: FilesystemLocation }): Promise<FileStats> {
-    const { location } = v.parse(filesystemLocationArgsSchema, args);
+  async handleStat(args: { location: FilesystemSource }): Promise<FileStats> {
+    const { location } = v.parse(filesystemSourceArgsSchema, args);
     return await this.fsManager.stat(location);
   }
 

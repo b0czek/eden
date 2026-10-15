@@ -22,6 +22,22 @@ Shared frontend styling for Eden apps.
 - Reuse nearby Eden apps under `packages/sdk/apps/com/eden/` before inventing new frontend patterns.
 - Use `@edenapp/tablets` for app context menus; do not treat EdenCSS popover styles as the app-side context-menu authoring API.
 
+## Sidebars
+
+`.eden-sidebar` supports `.eden-sidebar-compact` and `.eden-sidebar-wide` sizes.
+Add `.eden-sidebar-collapsed` to fold any size to a 72px icon rail, hiding section
+headings and item labels while keeping navigation icons visible. Remove the
+class to expand it again. `.eden-sidebar-controls` holds a heading and toggle;
+`.eden-sidebar-scroll` keeps navigation scrollable independently of the toggle.
+Folding and expanding animate smoothly and respect reduced-motion preferences.
+Use `.eden-sidebar-row` and `.eden-sidebar-row-action` for an item with a separate
+action control.
+
+JavaScript owns the folded state and the toggle's accessible label and
+`aria-expanded` value. Solid apps can use `@edenapp/solid-kit/sidebar` for these
+behaviors and the corresponding EdenCSS markup; see the
+[Solid Kit sidebar guide](../../solid-kit/README.md#sidebars).
+
 ## Tokens
 
 All tokens are defined in `tokens.css`.

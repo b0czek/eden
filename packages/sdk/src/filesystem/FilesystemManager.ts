@@ -1,9 +1,13 @@
+import { constants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   FileStats,
   FilesystemChangeKind,
+  FilesystemHandle,
   FilesystemLocation,
+  FilesystemOpenMode,
+  FilesystemSource,
   SearchResult,
 } from "@edenapp/types";
 import fg from "fast-glob";
@@ -15,14 +19,20 @@ import type {
   OperationReporter,
   OperationTask,
 } from "../operations/OperationTask";
+import type { ProcessManager } from "../process-manager/ProcessManager";
 import {
   assertExistingPathWithin,
   assertPathWithin,
-  normalizeHomeDirectory,
-  resolveHomeDirectory,
-} from "../user/UserHomeDirectory";
+  normalizeDirectoryRestriction,
+  resolveDirectoryRestriction,
+} from "../user/UserDirectoryRestriction";
 import { ViewManager } from "../view-manager/ViewManager";
 import { FilesystemHandler } from "./FilesystemHandler";
+import {
+  FilesystemHandles,
+  type OpenedFilesystemFile,
+  readOpenedFile,
+} from "./FilesystemHandles";
 import { FilesystemTransfer } from "./FilesystemTransfer";
 import { FilesystemWatcher } from "./FilesystemWatcher";
 import { VolumeManager } from "./VolumeManager";
@@ -30,6 +40,10 @@ import { VolumeManager } from "./VolumeManager";
 interface FilesystemEvents {
   changed: { watchId: string; kind: FilesystemChangeKind };
 }
+
+const openFlags: Record<FilesystemOpenMode, number> = {
+  read: constants.O_RDONLY | constants.O_NONBLOCK,
+};
 /**
  * FilesystemManager
  *
@@ -44,6 +58,9 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
   private readonly transfer = new FilesystemTransfer();
   private readonly watcher: FilesystemWatcher;
   private readonly stopVolumeListener: () => void;
+  private readonly handles: FilesystemHandles;
+  private readonly stopHandleViewListener: () => void;
+  private stopHandleAppListener?: () => void;
 
   constructor(
     @inject("userDirectory") baseDir: string,
@@ -56,6 +73,14 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     super(ipcBridge);
     // Normalize baseDir to an absolute path to ensure proper path resolution
     this.baseDir = path.resolve(baseDir);
+    this.handles = new FilesystemHandles(
+      this.executionContext,
+      (location, mode, retained) => this.openFile(location, mode, retained),
+    );
+    this.stopHandleViewListener = this.viewManager.on(
+      "view-removed",
+      ({ webContentsId }) => this.handles.closeOwner({ webContentsId }),
+    );
 
     // Create and register handler
     this.handler = new FilesystemHandler(this);
@@ -84,6 +109,82 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
    */
   getBaseDir(): string {
     return this.baseDir;
+  }
+
+  connectLifecycle(processes: ProcessManager): void {
+    this.stopHandleAppListener?.();
+    const closeOwner = ({ appId }: { appId: string }) =>
+      this.handles.closeOwner({ appId });
+    const stop = processes.on("stopped", closeOwner);
+    const exit = processes.on("exited", closeOwner);
+    this.stopHandleAppListener = () => {
+      stop();
+      exit();
+    };
+  }
+
+  open(
+    location: FilesystemLocation,
+    mode: FilesystemOpenMode = "read",
+  ): Promise<FilesystemHandle> {
+    return this.handles.open(location, mode);
+  }
+
+  close(handle: FilesystemHandle): Promise<void> {
+    return this.handles.close(handle);
+  }
+
+  /** Release retained access for a session transition, or the whole runtime. */
+  releaseHandles(sessionId?: string): Promise<void> {
+    return this.handles.closeOwner({ sessionId });
+  }
+
+  /** Release open handles before draining operations which may be waiting to eject. */
+  closeHandles(): Promise<void> {
+    return this.handles.dispose();
+  }
+
+  private async openFile(
+    location: FilesystemLocation,
+    mode: FilesystemOpenMode,
+    retained: boolean,
+  ): Promise<OpenedFilesystemFile> {
+    this.requirePrincipal();
+    const access = this.volumes.acquire([location.volume], !retained);
+    let file: fs.FileHandle | undefined;
+    try {
+      return await access.run(async () => {
+        const target = await this.resolveTarget(location);
+        file = await fs.open(target.hostPath, openFlags[mode]);
+        if (!(await file.stat()).isFile())
+          throw new Error("Filesystem source is not a regular file");
+        await target.assertActive();
+        const descriptor = file;
+        return {
+          use: (operation) =>
+            access.run(async () => {
+              await target.assertActive();
+              const result = await operation(descriptor);
+              await target.assertActive();
+              return result;
+            }),
+          close: async () => {
+            try {
+              await descriptor.close();
+            } finally {
+              access.release();
+            }
+          },
+        };
+      });
+    } catch (error) {
+      try {
+        await file?.close();
+      } finally {
+        access.release();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -130,7 +231,8 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     if (write && info.readOnly)
       throw new Error(`Filesystem volume '${address.volume}' is read-only`);
     const mounted = this.volumes.getRoot(address.volume);
-    const rootPath = mounted?.rootPath ?? (await this.getEffectiveRoot());
+    const rootPath = mounted?.rootPath ?? this.baseDir;
+    const accessPath = mounted?.rootPath ?? this.getHomeAccessPath();
     const assertActive = async () => {
       await mounted?.assertActive();
     };
@@ -138,14 +240,23 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     const relativePath = address.path.replace(/^[\\/]+/, "");
     const hostPath = path.resolve(rootPath, relativePath);
     assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
+    assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
     await assertExistingPathWithin(rootPath, hostPath);
+    if (accessPath !== rootPath)
+      await assertExistingPathWithin(accessPath, hostPath);
     await assertActive();
-    return { hostPath, rootPath, assertActive };
+    return { hostPath, rootPath, accessPath, assertActive };
   }
 
-  private assertNotRoot(target: { hostPath: string; rootPath: string }): void {
+  private assertNotRoot(target: {
+    hostPath: string;
+    rootPath: string;
+    accessPath: string;
+  }): void {
     if (target.hostPath === target.rootPath)
       throw new Error("Cannot delete, move, or replace a volume root");
+    if (target.hostPath === target.accessPath)
+      throw new Error("Cannot delete, move, or replace an access root");
   }
 
   /**
@@ -163,23 +274,16 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       this.requirePrincipal();
       const mounted = this.volumes.getRoot(volume);
       await mounted?.assertActive();
-      const effectiveRoot =
-        mounted?.rootPath ?? (await this.getEffectiveRoot());
+      const rootPath = mounted?.rootPath ?? this.baseDir;
       const normalizedAbsolute = path.resolve(absolutePath);
-
-      assertPathWithin(
-        effectiveRoot,
-        normalizedAbsolute,
-        `Path '${absolutePath}'`,
-      );
-      await assertExistingPathWithin(effectiveRoot, normalizedAbsolute);
-
-      const relativePath = normalizedAbsolute.slice(effectiveRoot.length);
-      // Ensure it starts with /
-      return {
+      assertPathWithin(rootPath, normalizedAbsolute, `Path '${absolutePath}'`);
+      const relativePath = path.relative(rootPath, normalizedAbsolute);
+      const location = {
         volume,
-        path: relativePath.startsWith("/") ? relativePath : `/${relativePath}`,
+        path: `/${relativePath.split(path.sep).join("/")}`,
       };
+      await this.resolveTarget(location);
+      return location;
     });
   }
 
@@ -195,7 +299,18 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     }
   }
 
-  private async getEffectiveRoot(): Promise<string> {
+  /** Accessible starting directory; addresses remain relative to the volume root. */
+  accessScope(volume: string): FilesystemLocation {
+    this.requirePrincipal();
+    this.volumes.get(volume);
+    const accessPath = volume === "home" ? this.getHomeAccessPath() : undefined;
+    const relativePath = accessPath
+      ? path.relative(this.baseDir, accessPath)
+      : "";
+    return { volume, path: `/${relativePath.split(path.sep).join("/")}` };
+  }
+
+  private getHomeAccessPath(): string {
     const principal = this.executionContext.getPrincipal();
     if (principal?.kind === "system") {
       return this.baseDir;
@@ -209,12 +324,14 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       return this.baseDir;
     }
 
-    const homeDirectory = normalizeHomeDirectory(user.homeDirectory);
-    if (!homeDirectory) {
+    const directoryRestriction = normalizeDirectoryRestriction(
+      user.directoryRestriction,
+    );
+    if (!directoryRestriction) {
       return this.baseDir;
     }
 
-    return resolveHomeDirectory(this.baseDir, homeDirectory);
+    return resolveDirectoryRestriction(this.baseDir, directoryRestriction);
   }
 
   // =====================
@@ -225,24 +342,22 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
    * Read the contents of a file.
    */
   async readFile(
-    targetPath: FilesystemLocation,
+    targetPath: FilesystemSource,
     encoding: BufferEncoding = "utf-8",
   ): Promise<string> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const fullPath = await this.resolvePath(targetPath);
-      return await fs.readFile(fullPath, encoding);
-    });
+    return this.handles.use(targetPath, async (file) =>
+      (await readOpenedFile(file)).toString(encoding),
+    );
   }
 
   /**
    * Read the contents of a file without text encoding.
    */
-  async readBinaryFile(targetPath: FilesystemLocation): Promise<Uint8Array> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const fullPath = await this.resolvePath(targetPath);
-      const content = await fs.readFile(fullPath);
-      return new Uint8Array(content);
-    });
+  async readBinaryFile(targetPath: FilesystemSource): Promise<Uint8Array> {
+    return this.handles.use(
+      targetPath,
+      async (file) => new Uint8Array(await readOpenedFile(file)),
+    );
   }
 
   /**
@@ -278,6 +393,8 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await target.assertActive();
       await assertExistingPathWithin(target.rootPath, fullPath);
+      if (target.accessPath !== target.rootPath)
+        await assertExistingPathWithin(target.accessPath, fullPath);
       await target.assertActive();
       await fs.writeFile(fullPath, content, encoding);
       this.invalidateHostDirectory(path.dirname(fullPath));
@@ -329,17 +446,19 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
   /**
    * Get file or directory statistics.
    */
-  async stat(targetPath: FilesystemLocation): Promise<FileStats> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const fullPath = await this.resolvePath(targetPath);
-      const stats = await fs.stat(fullPath);
-      return {
-        isFile: stats.isFile(),
-        isDirectory: stats.isDirectory(),
-        size: stats.size,
-        mtime: stats.mtime,
-      };
-    });
+  async stat(targetPath: FilesystemSource): Promise<FileStats> {
+    const stats =
+      "handleId" in targetPath
+        ? await this.handles.use(targetPath, (file) => file.stat())
+        : await this.volumes.withVolumes([targetPath.volume], async () =>
+            fs.stat(await this.resolvePath(targetPath)),
+          );
+    return {
+      isFile: stats.isFile(),
+      isDirectory: stats.isDirectory(),
+      size: stats.size,
+      mtime: stats.mtime,
+    };
   }
 
   /**
@@ -523,9 +642,12 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
     this.watcher.invalidate(hostPath);
   }
 
-  override dispose(): void {
+  override async dispose(): Promise<void> {
+    this.stopHandleViewListener();
+    this.stopHandleAppListener?.();
     this.stopVolumeListener();
     this.watcher.dispose();
     super.dispose();
+    await this.closeHandles();
   }
 }

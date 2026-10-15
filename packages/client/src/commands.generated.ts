@@ -231,6 +231,21 @@ export { filePickerCommands as filePicker };
 
 const fsCommands = {
   /**
+   * Return the caller's accessible starting folder within a volume.
+   */
+  ["accessScope"]: (volume: CommandArgs<"fs/access-scope">["volume"]): Promise<CommandResult<"fs/access-scope">> =>
+    invoke("fs/access-scope", { ["volume"]: volume }),
+  /**
+   * Open a file and hold volume access until close or owner teardown.
+   */
+  ["open"]: (location: CommandArgs<"fs/open">["location"], options?: Pick<CommandArgs<"fs/open">, "mode">): Promise<CommandResult<"fs/open">> =>
+    invoke("fs/open", { ["location"]: location, ["mode"]: options?.["mode"] }),
+  /**
+   * Close an owned file handle after its accepted operations finish.
+   */
+  ["close"]: (handle: CommandArgs<"fs/close">["handle"]): Promise<CommandResult<"fs/close">> =>
+    invoke("fs/close", { ["handle"]: handle }),
+  /**
    * Read the contents of a file.
    */
   ["read"]: (location: CommandArgs<"fs/read">["location"], options?: Pick<CommandArgs<"fs/read">, "encoding">): Promise<CommandResult<"fs/read">> =>
@@ -556,13 +571,13 @@ const userCommands = {
   /**
    * Create a new user.
    */
-  ["create"]: (name: CommandArgs<"user/create">["name"], password: CommandArgs<"user/create">["password"], options?: Pick<CommandArgs<"user/create">, "username" | "role" | "grants" | "homeDirectory">): Promise<CommandResult<"user/create">> =>
-    invoke("user/create", { ["name"]: name, ["password"]: password, ["username"]: options?.["username"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["homeDirectory"]: options?.["homeDirectory"] }),
+  ["create"]: (name: CommandArgs<"user/create">["name"], password: CommandArgs<"user/create">["password"], options?: Pick<CommandArgs<"user/create">, "username" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/create">> =>
+    invoke("user/create", { ["name"]: name, ["password"]: password, ["username"]: options?.["username"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
   /**
    * Update user profile details or grants.
    */
-  ["update"]: (username: CommandArgs<"user/update">["username"], options?: Pick<CommandArgs<"user/update">, "name" | "role" | "grants" | "homeDirectory">): Promise<CommandResult<"user/update">> =>
-    invoke("user/update", { ["username"]: username, ["name"]: options?.["name"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["homeDirectory"]: options?.["homeDirectory"] }),
+  ["update"]: (username: CommandArgs<"user/update">["username"], options?: Pick<CommandArgs<"user/update">, "name" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/update">> =>
+    invoke("user/update", { ["username"]: username, ["name"]: options?.["name"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
   /**
    * Delete a user.
    */

@@ -8,6 +8,7 @@ import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import * as v from "valibot";
 import { AppAssociationManager } from "../app-associations";
 import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
+import { FilesystemManager } from "../filesystem/FilesystemManager";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import {
   CommandRegistry,
@@ -71,6 +72,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
     @inject(PermissionRegistry)
     private permissionRegistry: PermissionRegistry,
     @inject(VolumeManager) private volumes: VolumeManager,
+    @inject(FilesystemManager) private files: FilesystemManager,
   ) {
     super(ipcBridge);
 
@@ -251,6 +253,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       this.volumes.get(location.volume);
       if (args.allowedVolumes && !args.allowedVolumes.includes(location.volume))
         throw new Error("Initial volume is not allowed");
+      await this.files.resolvePath(location);
     }
 
     const callerAppId = caller?.appId;
@@ -284,6 +287,10 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       );
     }
 
+    const initialLocation =
+      args.initialLocation ??
+      this.files.accessScope(args.allowedVolumes?.[0] ?? "home");
+
     this.idleProviderStopper.cancel();
 
     const requestId = this.generateId();
@@ -301,10 +308,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
 
     const picker: FilePickerOpenEvent = {
       ...args,
-      initialLocation: args.initialLocation ?? {
-        volume: args.allowedVolumes?.[0] ?? "home",
-        path: "/",
-      },
+      initialLocation,
       requestId,
       opener: {
         appId: callerAppId,

@@ -11,5 +11,6 @@
     "rootDir": "..",
     "lib": ["dom", "esnext"]
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts"]
 }

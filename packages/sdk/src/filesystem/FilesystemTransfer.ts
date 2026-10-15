@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { addAbortListener } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -24,8 +25,78 @@ interface PreparedTransfer {
   assertDestinationActive?: () => Promise<void>;
 }
 
+interface PathReservation {
+  paths: string[];
+  completed: Promise<void>;
+}
+
 export class FilesystemTransfer {
+  private readonly reservations = new Set<PathReservation>();
+
   async copy(request: TransferRequest): Promise<void> {
+    await this.withReservedPaths(request, () => this.copyReserved(request));
+  }
+
+  async move(request: TransferRequest): Promise<void> {
+    await this.withReservedPaths(request, () => this.moveReserved(request));
+  }
+
+  private async withReservedPaths(
+    request: TransferRequest,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    const paths = [
+      path.resolve(request.source),
+      path.resolve(request.destination),
+      await this.resolveCanonicalPath(request.source),
+      await this.resolveCanonicalPath(request.destination),
+    ];
+    const predecessors = [...this.reservations].filter((reservation) =>
+      reservation.paths.some((reserved) =>
+        paths.some(
+          (candidate) =>
+            reserved === candidate ||
+            this.isPathWithin(reserved, candidate) ||
+            this.isPathWithin(candidate, reserved),
+        ),
+      ),
+    );
+    let release!: () => void;
+    const reservation = {
+      paths,
+      completed: new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    };
+    // Reserve before waiting so later conflicting requests also wait for us.
+    // Preparation and rollback must observe the destination under the same
+    // reservation, including source removal after a cross-device move.
+    this.reservations.add(reservation);
+    try {
+      await this.waitForPredecessors(predecessors, request.reporter?.signal);
+      await operation();
+    } finally {
+      this.reservations.delete(reservation);
+      release();
+    }
+  }
+
+  private waitForPredecessors(
+    predecessors: PathReservation[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      signal?.throwIfAborted();
+      const abortListener = signal
+        ? addAbortListener(signal, () => reject(signal.reason))
+        : undefined;
+      Promise.all(predecessors.map((entry) => entry.completed))
+        .finally(() => abortListener?.[Symbol.dispose]())
+        .then(() => resolve(), reject);
+    });
+  }
+
+  private async copyReserved(request: TransferRequest): Promise<void> {
     request.reporter?.signal?.throwIfAborted();
     request.reporter?.update("preparing-copy");
     const transfer = await this.prepare(request, "copy");
@@ -34,7 +105,7 @@ export class FilesystemTransfer {
     );
   }
 
-  async move(request: TransferRequest): Promise<void> {
+  private async moveReserved(request: TransferRequest): Promise<void> {
     request.reporter?.update("preparing-move");
     const transfer = await this.prepare(request, "move");
     let copied = false;

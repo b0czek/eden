@@ -1,11 +1,11 @@
 import type { SettingsPanelView } from "@edenapp/types";
+import { panelDefinition } from "../../tests/support/settings/panels";
 import {
   cloneAndValidatePanelActionInvocation,
   cloneAndValidatePanelDefinition,
   cloneAndValidatePanelView,
   validatePanelProvider,
 } from "./SettingsPanelCodec";
-import { panelDefinition } from "./SettingsPanelTestHarness";
 
 const definition = () =>
   panelDefinition({
@@ -198,106 +198,58 @@ describe("SettingsPanelCodec", () => {
     ),
   );
 
-  it("rejects wrong values, missing choices, password values, unknown properties, actions, and params", () => {
-    const cases: unknown[] = [
-      {
-        sections: [
-          {
-            id: "main",
-            nodes: [
-              {
-                kind: "toggle",
-                id: "x",
-                label: "X",
-                value: "yes",
-                action: { actionId: "toggle" },
-              },
-            ],
-          },
-        ],
+  it.each<[string, (value: SettingsPanelView) => void]>([
+    [
+      "wrong toggle values",
+      (value) => {
+        const node = value.sections[0]?.nodes[1];
+        if (node?.kind === "toggle") node.value = "yes" as never;
       },
-      {
-        sections: [
-          {
-            id: "main",
-            nodes: [
-              {
-                kind: "input",
-                input: "select",
-                id: "x",
-                label: "X",
-                value: "a",
-                action: { actionId: "button", params: { deviceId: "one" } },
-              },
-            ],
-          },
-        ],
+    ],
+    [
+      "missing select choices",
+      (value) => {
+        const node = value.sections[0]?.nodes[3];
+        if (
+          node?.kind === "input" &&
+          (node.input === "select" || node.input === "radio")
+        )
+          Reflect.deleteProperty(node, "options");
       },
-      {
-        sections: [
-          {
-            id: "main",
-            nodes: [
-              {
-                kind: "dialog",
-                id: "x",
-                label: "X",
-                buttonLabel: "X",
-                action: { actionId: "dialog" },
-                dialog: {
-                  title: "X",
-                  fields: [
-                    {
-                      id: "password",
-                      label: "Password",
-                      input: "password",
-                      value: "secret",
-                    },
-                  ],
-                  submitLabel: "X",
-                  cancelLabel: "X",
-                },
-              },
-            ],
-          },
-        ],
+    ],
+    [
+      "password values",
+      (value) => {
+        const node = value.sections[0]?.nodes[4];
+        if (node?.kind === "dialog")
+          Object.assign(node.dialog.fields[0], { value: "secret" });
       },
-      { sections: [], extra: true },
-      {
-        sections: [
-          {
-            id: "main",
-            nodes: [
-              {
-                kind: "button",
-                id: "x",
-                label: "X",
-                action: { actionId: "missing" },
-              },
-            ],
-          },
-        ],
+    ],
+    [
+      "unknown properties",
+      (value) => {
+        Object.assign(value, { extra: true });
       },
-      {
-        sections: [
-          {
-            id: "main",
-            nodes: [
-              {
-                kind: "button",
-                id: "x",
-                label: "X",
-                action: { actionId: "button", params: { deviceId: 4 } },
-              },
-            ],
-          },
-        ],
+    ],
+    [
+      "unknown actions",
+      (value) => {
+        const node = value.sections[0]?.nodes[2];
+        if (node?.kind === "button") node.action = { actionId: "missing" };
       },
-    ];
-    for (const candidate of cases)
-      expect(() =>
-        cloneAndValidatePanelView(definition(), candidate as SettingsPanelView),
-      ).toThrow();
+    ],
+    [
+      "invalid action params",
+      (value) => {
+        const node = value.sections[0]?.nodes[2];
+        if (node?.kind === "button")
+          node.action = { actionId: "button", params: { deviceId: 4 } };
+      },
+    ],
+  ])("rejects %s", (_name, mutate) => {
+    const candidate = view();
+    mutate(candidate);
+    expect(() => cloneAndValidatePanelView(definition(), candidate)).toThrow();
   });
 
   it("validates invocation channels independently with channel paths", () => {

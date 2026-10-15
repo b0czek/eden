@@ -394,7 +394,7 @@ export interface AppManifest extends PackageManifestBase {
    * Additional files or directories to include in the bundle.
    * Use this to include files that are normally excluded (e.g., node_modules with native bindings).
    * Paths are relative to the app root.
-   * @example ["node_modules/@linuxcnc-node/core", "node_modules/better-sqlite3"]
+   * @example ["node_modules/@example/native-addon", "node_modules/better-sqlite3"]
    */
   include?: string[];
 

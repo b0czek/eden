@@ -3,11 +3,11 @@ import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
 import { inject, Lifecycle, scoped } from "tsyringe";
 import { normalizeAppIds } from "../utils/normalize";
 import { hashPassword, verifyPassword } from "./UserAuth";
-import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
 import {
-  ensureHomeDirectory,
-  normalizeHomeDirectory,
-} from "./UserHomeDirectory";
+  ensureDirectoryRestriction,
+  normalizeDirectoryRestriction,
+} from "./UserDirectoryRestriction";
+import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
 import { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 
@@ -58,7 +58,7 @@ export class UserManager {
     role?: UserRole;
     password: string;
     grants?: string[];
-    homeDirectory?: string;
+    directoryRestriction?: string;
   }): Promise<UserProfile> {
     const username = this.normalizeUsername(args.username, args.name);
     const existing = await this.store.getUserRecord(username);
@@ -77,17 +77,17 @@ export class UserManager {
       role,
       args.grants ?? defaultGrantsForRole(role),
     );
-    const homeDirectory = await ensureHomeDirectory(
+    const directoryRestriction = await ensureDirectoryRestriction(
       this.userDirectory,
       role,
-      args.homeDirectory,
+      args.directoryRestriction,
     );
 
     const user: StoredUser = {
       username,
       name: args.name,
       role,
-      homeDirectory,
+      directoryRestriction,
       grants,
       createdAt: now,
       updatedAt: now,
@@ -104,7 +104,7 @@ export class UserManager {
     name?: string;
     role?: UserRole;
     grants?: string[];
-    homeDirectory?: string | null;
+    directoryRestriction?: string | null;
   }): Promise<UserProfile> {
     const user = await this.requireUserRecord(args.username);
 
@@ -128,19 +128,21 @@ export class UserManager {
       user.grants = this.normalizeUserGrants(user.role, args.grants);
     }
 
-    if (args.homeDirectory !== undefined) {
-      const homeDirectory = await ensureHomeDirectory(
+    if (args.directoryRestriction !== undefined) {
+      const directoryRestriction = await ensureDirectoryRestriction(
         this.userDirectory,
         user.role,
-        args.homeDirectory,
+        args.directoryRestriction,
       );
-      if (homeDirectory) {
-        user.homeDirectory = homeDirectory;
+      if (directoryRestriction) {
+        user.directoryRestriction = directoryRestriction;
       } else {
-        delete user.homeDirectory;
+        delete user.directoryRestriction;
       }
-    } else if (user.homeDirectory) {
-      user.homeDirectory = normalizeHomeDirectory(user.homeDirectory);
+    } else if (user.directoryRestriction) {
+      user.directoryRestriction = normalizeDirectoryRestriction(
+        user.directoryRestriction,
+      );
     }
 
     user.updatedAt = Date.now();
@@ -252,7 +254,7 @@ export class UserManager {
       username: user.username,
       name: user.name,
       role: user.role,
-      homeDirectory: user.homeDirectory,
+      directoryRestriction: user.directoryRestriction,
       grants: user.grants,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

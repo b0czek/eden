@@ -1,0 +1,18 @@
+{
+  "id": "com.eden.integration.appbus.client",
+  "name": "AppBus client",
+  "version": "1.0.0",
+  "description": "AppBus integration fixture",
+  "author": "Eden",
+  "frontend": {
+    "entry": "index.html"
+  },
+  "window": {
+    "mode": "floating",
+    "injections": {
+      "appFrame": "none",
+      "css": "none"
+    }
+  },
+  "permissions": ["appbus/expose", "appbus/connect"]
+}

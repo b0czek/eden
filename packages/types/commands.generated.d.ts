@@ -454,12 +454,38 @@ export interface FilePickerCommands {
  */
 export interface FsCommands {
   /**
+   * Return the caller's accessible starting folder within a volume.
+   */
+  "fs/access-scope": {
+    mode: "result";
+    args: { volume: string };
+    response: import("./index").FilesystemLocation;
+  };
+  /**
+   * Open a file and hold volume access until close or owner teardown.
+   */
+  "fs/open": {
+    mode: "result";
+    args: {
+    location: import("./index").FilesystemLocation;
+    mode?: import("./index").FilesystemOpenMode };
+    response: import("./index").FilesystemHandle;
+  };
+  /**
+   * Close an owned file handle after its accepted operations finish.
+   */
+  "fs/close": {
+    mode: "result";
+    args: { handle: import("./index").FilesystemHandle };
+    response: void;
+  };
+  /**
    * Read the contents of a file.
    */
   "fs/read": {
     mode: "result";
     args: {
-    location: import("./index").FilesystemLocation;
+    location: import("./index").FilesystemSource;
     encoding?: string };
     response: string;
   };
@@ -469,7 +495,7 @@ export interface FsCommands {
   "fs/read-binary": {
     mode: "result";
     args: {
-    location: import("./index").FilesystemLocation };
+    location: import("./index").FilesystemSource };
     response: Uint8Array;
   };
   /**
@@ -523,7 +549,7 @@ export interface FsCommands {
    */
   "fs/stat": {
     mode: "result";
-    args: { location: import("./index").FilesystemLocation };
+    args: { location: import("./index").FilesystemSource };
     response: import("./index").FileStats;
   };
   "fs/watch": {
@@ -1075,7 +1101,7 @@ export interface UserCommands {
     role?: import("./index").UserRole;
     password: string;
     grants?: string[];
-    homeDirectory?: string };
+    directoryRestriction?: string };
     response: { user: import("./index").UserProfile };
   };
   /**
@@ -1088,7 +1114,7 @@ export interface UserCommands {
     name?: string;
     role?: import("./index").UserRole;
     grants?: string[];
-    homeDirectory?: string | null };
+    directoryRestriction?: string | null };
     response: { user: import("./index").UserProfile };
   };
   /**

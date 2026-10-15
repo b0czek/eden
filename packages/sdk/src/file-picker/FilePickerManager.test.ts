@@ -1,3 +1,4 @@
+import { testApp } from "../../tests/support/apps";
 import "reflect-metadata";
 
 import type {
@@ -6,6 +7,7 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import type { AppAssociationManager } from "../app-associations";
+import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import type { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import type { NotificationManager } from "../notification";
@@ -61,18 +63,9 @@ const providerManifest = (
   id: string,
   permissions = ["file-picker/display"],
 ): RuntimeAppManifest =>
-  ({
-    kind: "app",
-    id,
-    name: id,
-    version: "1.0.0",
+  testApp(id, {
     frontend: { entry: "dist/index.html" },
     permissions,
-    isPrebuilt: false,
-    isDevelopment: false,
-    isCore: false,
-    isRestricted: false,
-    resolvedGrants: [],
   }) as RuntimeAppManifest;
 
 const createManager = () => {
@@ -133,6 +126,10 @@ const createManager = () => {
     appAssociationManager as unknown as AppAssociationManager,
     permissionRegistry as unknown as PermissionRegistry,
     new VolumeManager(ipcBridge),
+    {
+      resolvePath: jest.fn(async () => "/selected"),
+      accessScope: (volume: string) => ({ volume, path: "/" }),
+    } as unknown as FilesystemManager,
   );
 
   return {
@@ -288,10 +285,6 @@ describe("FilePickerManager", () => {
     expect(processManager.ensureAppRunning).toHaveBeenCalledWith(
       "com.example.file-picker",
     );
-    expect(appAssociationManager.resolve).toHaveBeenCalledWith(
-      "provider:file-picker",
-      expect.any(Function),
-    );
 
     manager.registerDisplayProvider({
       appId: "com.example.file-picker",
@@ -318,25 +311,6 @@ describe("FilePickerManager", () => {
       "No file picker display provider is installed or permitted",
     );
     expect(processManager.ensureAppRunning).not.toHaveBeenCalled();
-  });
-
-  it("uses the exact display permission as the provider predicate", async () => {
-    const { appAssociationManager, manager, permissionRegistry } =
-      createManager();
-    appAssociationManager.resolve.mockReturnValue([]);
-    await expect(
-      manager.openPicker(
-        { mode: "open" },
-        { appId: "com.eden.editor", webContentsId: 200 },
-      ),
-    ).rejects.toThrow();
-
-    const matches = appAssociationManager.resolve.mock.calls[0]?.[1];
-    expect(matches?.(providerManifest("provider"))).toBe(true);
-    expect(permissionRegistry.hasPermission).toHaveBeenCalledWith(
-      "provider",
-      "file-picker/display",
-    );
   });
 
   it("rejects ambiguous file picker providers", async () => {

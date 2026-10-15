@@ -2,6 +2,52 @@
 
 High-level SolidJS UI utilities for Eden renderer apps.
 
+## Sidebars
+
+`@edenapp/solid-kit/sidebar` wraps EdenCSS sidebar classes with Solid components.
+EdenCSS supplies the styles; the components manage folding, accessible controls,
+and navigation markup. Eden apps already receive the stylesheet automatically.
+
+```tsx
+import { Sidebar, SidebarItem, SidebarSection } from "@edenapp/solid-kit/sidebar";
+import { FiHome } from "solid-icons/fi";
+
+<Sidebar
+  label="Navigation"
+  heading="Places"
+  size="compact"
+  toggleLabels={{ collapse: "Collapse sidebar", expand: "Expand sidebar" }}
+>
+  <SidebarSection>
+    <SidebarItem
+      icon={<FiHome />}
+      label="Home"
+      selected={currentPage() === "home"}
+      aria-current={currentPage() === "home" ? "page" : undefined}
+      onClick={() => setCurrentPage("home")}
+    />
+  </SidebarSection>
+</Sidebar>
+```
+
+Pass localized labels from your app. Items retain their accessible names and
+tooltips when folded. `SidebarSection` accepts an optional `title`;
+`SidebarDivider` separates sections. `SidebarItem` supports `description`,
+`disabled`, and an optional `action` containing a `SidebarItemAction`. Action
+buttons show an ellipsis when expanded and a corner dot when folded; supply
+their accessible label and click handler in the app.
+
+Use the optional `footer` slot for activity or controls that should stay visible
+while the navigation list scrolls. It inherits the sidebar's folded styling.
+
+Sidebars automatically fold at viewport widths of 760px or less until the user
+toggles them. A deliberate choice lasts for the component's lifetime, including
+window resizes. Set `collapseBelow={0}` to disable the responsive default or
+`defaultCollapsed` to choose an initial state. For app-managed state, pass
+`collapsed` and `onCollapsedChange`. Sizes are `default` (280px), `compact`
+(240px), and `wide` (320px); all fold to a 72px icon rail. Standard DOM attributes,
+event handlers, `class`, and `classList` remain available.
+
 ## Operation progress
 
 Create an observer in your component, submit work through `run`, and render its

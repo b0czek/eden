@@ -49,8 +49,6 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   volume: t("filePicker.volume"),
   home: t("filePicker.home"),
   readOnly: t("filePicker.readOnly"),
-  eject: "",
-  ejecting: "",
   refresh: t("filePicker.refresh"),
   goBack: t("filePicker.goBack"),
   goForward: t("filePicker.goForward"),
@@ -220,6 +218,8 @@ const App: Component = () => {
     historyIndex,
     navigateTo,
     resetNavigation,
+    navigateToScope,
+    canGoUp,
     goBack,
     goForward,
     goUp,
@@ -376,10 +376,11 @@ const App: Component = () => {
   };
 
   const resolveInitialPath = async (request: FilePickerOpenEvent) => {
-    const initialLocation = request.initialLocation ?? {
-      volume: "home",
-      path: "/",
-    };
+    const volume = request.initialLocation?.volume ?? "home";
+    const scope = await window.edenAPI.shellCommand("fs/access-scope", {
+      volume,
+    });
+    const initialLocation = request.initialLocation ?? scope;
     const initialPath = initialLocation.path;
     try {
       const stats = await window.edenAPI.shellCommand("fs/stat", {
@@ -394,7 +395,7 @@ const App: Component = () => {
         selectedPath: initialPath,
       };
     } catch {
-      return { directory: "/", name: request.suggestedName ?? "" };
+      return { directory: scope.path, name: request.suggestedName ?? "" };
     }
   };
 
@@ -407,20 +408,26 @@ const App: Component = () => {
     setPendingOverwritePath(null);
     clearSelection();
 
-    const initial = await resolveInitialPath(request);
-    setFileName(request.mode === "save" ? initial.name : "");
-    resetNavigation(
-      initial.directory,
-      initial.selectedPath,
-      request.initialLocation?.volume ?? "home",
-    );
-    if (initial.selectedPath && request.mode === "open") {
-      setSelectedItem(initial.selectedPath);
-      setSelectedPaths([initial.selectedPath]);
-      setScrollToSelected(true);
-    }
+    try {
+      const initial = await resolveInitialPath(request);
+      if (activeRequest()?.requestId !== request.requestId) return;
+      setFileName(request.mode === "save" ? initial.name : "");
+      resetNavigation(
+        initial.directory,
+        initial.selectedPath,
+        request.initialLocation?.volume ?? "home",
+      );
+      if (initial.selectedPath && request.mode === "open") {
+        setSelectedItem(initial.selectedPath);
+        setSelectedPaths([initial.selectedPath]);
+        setScrollToSelected(true);
+      }
 
-    await updateOverlayBounds(true, request);
+      await updateOverlayBounds(true, request);
+    } catch {
+      if (activeRequest()?.requestId === request.requestId)
+        await cancelPicker();
+    }
   };
 
   const hidePicker = () => {
@@ -732,6 +739,7 @@ const App: Component = () => {
               labels={getExplorerLabels()}
               currentPath={currentPath()}
               currentVolume={currentVolume()}
+              canGoUp={canGoUp()}
               volumes={volumes()}
               readOnly={readOnly() || loading()}
               onRefresh={refresh}
@@ -739,7 +747,7 @@ const App: Component = () => {
                 clearSelection();
                 setPendingOverwritePath(null);
                 setShowNewFolderDialog(false);
-                resetNavigation("/", undefined, volume);
+                navigateToScope(volume);
               }}
               historyIndex={historyIndex()}
               historyLength={navigationHistory().length}
