@@ -140,6 +140,7 @@ const App: Component = () => {
     volumes,
     readOnly,
     navigateToScope,
+    navigateToDirectory,
     canGoUp,
     items,
     setItems,
@@ -249,10 +250,7 @@ const App: Component = () => {
     );
   const openPinnedFolder = async (location: FilesystemLocation) => {
     try {
-      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
-      if (!stats.isDirectory) throw new Error("Not a directory");
-      selection.exit();
-      navigateWithSelectionClear(location.path, undefined, location.volume);
+      if (await navigateToDirectory(location)) selection.exit();
     } catch {
       showError(t("files.errors.pinnedFolderUnavailable"));
     }

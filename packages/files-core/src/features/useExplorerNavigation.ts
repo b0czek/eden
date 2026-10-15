@@ -68,6 +68,7 @@ export const useExplorerNavigation = (
   let watchId: string | undefined;
   let watchedLocation: FilesystemLocation | undefined;
   let requestSequence = 0;
+  let navigationSequence = 0;
   let watchRequestSequence = 0;
   let refreshQueued = false;
   let disposed = false;
@@ -375,6 +376,7 @@ export const useExplorerNavigation = (
     updateHistory?: () => void,
     selectedItem?: string,
   ) => {
+    navigationSequence += 1;
     setCurrentLocation(location);
     setItems([]);
     options.setSelectedItem(null);
@@ -441,11 +443,28 @@ export const useExplorerNavigation = (
   };
 
   const navigateToScope = (volume: string) => {
+    const navigation = ++navigationSequence;
     void subscribed.then(() => {
-      if (disposed) return;
+      if (disposed || navigation !== navigationSequence) return;
       const boundary = accessScope(volume);
       if (boundary !== undefined) resetNavigation(boundary, undefined, volume);
     });
+  };
+
+  const navigateToDirectory = async (location: FilesystemLocation) => {
+    const navigation = ++navigationSequence;
+    try {
+      await subscribed;
+      if (disposed || navigation !== navigationSequence) return false;
+      const stats = await window.edenAPI.shellCommand("fs/stat", { location });
+      if (disposed || navigation !== navigationSequence) return false;
+      if (!stats.isDirectory) throw new Error("Not a directory");
+      navigateTo(location.path, undefined, location.volume);
+      return true;
+    } catch (error) {
+      if (disposed || navigation !== navigationSequence) return false;
+      throw error;
+    }
   };
 
   const goBack = () => {
@@ -493,6 +512,7 @@ export const useExplorerNavigation = (
     accessScope,
     canGoUp,
     navigateToScope,
+    navigateToDirectory,
     volumes,
     readOnly,
     currentPath,

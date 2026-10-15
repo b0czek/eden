@@ -12,6 +12,7 @@ export function editPinnedFolder(options: {
   return options.dialogs.custom<PinnedFolder>({
     title: options.adding ? t("files.pinFolder") : t("files.editPinnedFolder"),
     initialValue: options.pin,
+    onEnter: "ignore",
     render: (ctx) => (
       <div class="eden-flex-col eden-gap-md">
         <label class="eden-form-group">
