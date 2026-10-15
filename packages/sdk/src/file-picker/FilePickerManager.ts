@@ -287,6 +287,10 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
       );
     }
 
+    const initialLocation =
+      args.initialLocation ??
+      this.files.accessScope(args.allowedVolumes?.[0] ?? "home");
+
     this.idleProviderStopper.cancel();
 
     const requestId = this.generateId();
@@ -304,9 +308,7 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
 
     const picker: FilePickerOpenEvent = {
       ...args,
-      initialLocation:
-        args.initialLocation ??
-        this.files.accessScope(args.allowedVolumes?.[0] ?? "home"),
+      initialLocation,
       requestId,
       opener: {
         appId: callerAppId,

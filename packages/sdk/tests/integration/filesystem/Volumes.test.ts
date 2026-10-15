@@ -17,6 +17,7 @@ import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { decodeLaunchContext } from "../../../src/utils/appLaunchContext";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { registerTestVolume } from "../../support/filesystem";
@@ -55,6 +56,22 @@ describe("consumer-managed filesystem volumes", () => {
       appId,
       principal: { kind: "user", profile: user },
     });
+
+  const invoke = async (id: string, command: string, args: unknown) => {
+    const instance = requireValue(
+      eden.runtime.resolve(ProcessManager).getAppInstance(id),
+    );
+    const view = requireValue(
+      eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
+    );
+    const response = (await eden.platform.rendererIpc.invoke(
+      "shell-command",
+      view.view.webContents.id,
+      command,
+      args,
+    )) as { mode: "result"; result: unknown };
+    return response.result;
+  };
 
   it("publishes detached metadata without revealing mount paths", async () => {
     const changes: FilesystemVolume[][] = [];
@@ -588,6 +605,67 @@ describe("consumer-managed filesystem volumes", () => {
     });
   });
 
+  it("allows another picker after a drive disconnects during provider startup", async () => {
+    const providerId = "com.example.volume-picker";
+    const registry = eden.runtime.resolve(PackageRegistry);
+    registry.register(testApp(appId));
+    registry.register(testApp(providerId));
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(providerId, ["file-picker/display"]);
+    await eden.complete("process/launch", { appId });
+
+    const launched = gate();
+    const stop = eden.runtime
+      .resolve(ProcessManager)
+      .on("launched", ({ instance }) => {
+        if (instance.manifest.id === providerId) launched.release();
+      });
+    try {
+      const opening = invoke(appId, "file-picker/open", {
+        mode: "open",
+        allowedVolumes: ["usb"],
+      });
+      const failed = expect(opening).rejects.toThrow("unavailable");
+      await launched.promise;
+      eden.runtime.volumes.unregister("usb");
+      await invoke(providerId, "event/subscribe", {
+        eventName: "file-picker/opened",
+      });
+      await invoke(providerId, "file-picker/register-display", {});
+      await failed;
+      const messages = () =>
+        eden.platform.effects.flatMap((effect) =>
+          effect.type === "message-sent" ? effect.args : [],
+        );
+      expect(messages()).not.toContainEqual(
+        expect.objectContaining({ type: "file-picker/opened" }),
+      );
+
+      const opened = (await invoke(appId, "file-picker/open", {
+        mode: "open",
+        allowedVolumes: ["home"],
+      })) as { requestId: string };
+      expect(messages()).toContainEqual({
+        type: "file-picker/opened",
+        payload: {
+          picker: expect.objectContaining({
+            requestId: opened.requestId,
+            initialLocation: { volume: "home", path: "/operators/one" },
+          }),
+        },
+      });
+      await expect(
+        invoke(providerId, "file-picker/resolve", {
+          requestId: opened.requestId,
+          reason: "cancel",
+        }),
+      ).resolves.toEqual({ success: true });
+    } finally {
+      stop();
+    }
+  });
+
   it("keeps picker selections within allowed, available volumes", async () => {
     const providerId = "com.example.volume-picker";
     const registry = eden.runtime.resolve(PackageRegistry);
@@ -598,21 +676,6 @@ describe("consumer-managed filesystem volumes", () => {
     eden.runtime
       .resolve(PermissionRegistry)
       .registerApp(providerId, ["file-picker/display", "fs/read"]);
-    const invoke = async (id: string, command: string, args: unknown) => {
-      const instance = requireValue(
-        eden.runtime.resolve(ProcessManager).getAppInstance(id),
-      );
-      const view = requireValue(
-        eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
-      );
-      const response = (await eden.platform.rendererIpc.invoke(
-        "shell-command",
-        view.view.webContents.id,
-        command,
-        args,
-      )) as { mode: "result"; result: unknown };
-      return response.result;
-    };
     await invoke(providerId, "file-picker/register-display", {});
     await expect(
       invoke(appId, "file-picker/open", {
