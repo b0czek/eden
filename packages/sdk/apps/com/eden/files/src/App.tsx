@@ -278,9 +278,9 @@ const App: Component = () => {
       }
     };
 
-    await window.edenAPI.subscribe("file/opened", handleFileOpened);
+    await eden.file.subscribe("opened", handleFileOpened);
     onCleanup(() => {
-      window.edenAPI.unsubscribe("file/opened", handleFileOpened);
+      eden.file.unsubscribe("opened", handleFileOpened);
     });
   });
 

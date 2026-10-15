@@ -698,24 +698,18 @@ const App: Component = () => {
     };
 
     void (async () => {
-      await window.edenAPI.subscribe("file-picker/opened", handleOpened);
-      await window.edenAPI.subscribe("file-picker/closed", handleClosed);
-      await window.edenAPI.subscribe(
-        "view/global-bounds-changed",
-        handleBoundsChanged,
-      );
+      await eden.filePicker.subscribe("opened", handleOpened);
+      await eden.filePicker.subscribe("closed", handleClosed);
+      await eden.view.subscribe("global-bounds-changed", handleBoundsChanged);
       await eden.filePicker.registerDisplay();
       await updateOverlayBounds(false, null);
     })();
 
     window.addEventListener("keydown", handleKeyDown);
     onCleanup(() => {
-      window.edenAPI.unsubscribe("file-picker/opened", handleOpened);
-      window.edenAPI.unsubscribe("file-picker/closed", handleClosed);
-      window.edenAPI.unsubscribe(
-        "view/global-bounds-changed",
-        handleBoundsChanged,
-      );
+      eden.filePicker.unsubscribe("opened", handleOpened);
+      eden.filePicker.unsubscribe("closed", handleClosed);
+      eden.view.unsubscribe("global-bounds-changed", handleBoundsChanged);
       window.removeEventListener("keydown", handleKeyDown);
     });
   });

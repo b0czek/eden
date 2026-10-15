@@ -117,6 +117,23 @@ await window.edenAPI.shellCommand("db/set", {
 For virtual paths, filesystem commands, opening files, and directory watching,
 see [Filesystem Access](filesystem.md).
 
+### Event subscriptions
+
+Use the same client domains to subscribe to system events:
+
+```typescript
+import { process } from "@edenapp/client";
+
+await process.subscribe("launched", ({ instance }) => {
+  console.log("App launched:", instance.manifest.id);
+});
+```
+
+Event names are local to the domain and payloads are inferred. Pair subscriptions
+with `domain.unsubscribe(event, callback)` using the same callback reference when
+the owner is disposed. See the [client subscription guide](../packages/client/README.md#event-subscriptions)
+for setup and cleanup lifetimes.
+
 ## Styling
 
 Eden provides a set of CSS variables and utility classes to ensure your app fits the system theme. For detailed usage instructions and a full list of available tokens, please refer to the [EdenCSS Documentation](../packages/sdk/edencss/README.md).

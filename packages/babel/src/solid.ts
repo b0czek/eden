@@ -77,14 +77,14 @@ export function setupI18n<T extends object = Record<string, void>>(
 
         // Register cleanup synchronously before any await
         onCleanup(() => {
-          window.edenAPI.unsubscribe("i18n/locale-changed", onLocaleChanged);
+          eden.i18n.unsubscribe("locale-changed", onLocaleChanged);
         });
 
         // Initial load
         const { locale } = await eden.i18n.getLocale();
         await updateLocale(locale);
 
-        await window.edenAPI.subscribe("i18n/locale-changed", onLocaleChanged);
+        await eden.i18n.subscribe("locale-changed", onLocaleChanged);
       } catch (e) {
         console.error("Failed to load system locale", e);
       }

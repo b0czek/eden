@@ -42,7 +42,7 @@ let filePickerSubscription: Promise<void> | undefined;
 const ensureFilePickerSubscribed = () => {
   filePickerSubscription ??= Promise.resolve()
     .then(() =>
-      window.edenAPI.subscribe("file-picker/closed", (payload) => {
+      eden.filePicker.subscribe("closed", (payload) => {
         const resolver = pendingPickers.get(payload.requestId);
         if (resolver) {
           pendingPickers.delete(payload.requestId);

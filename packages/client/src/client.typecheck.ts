@@ -7,6 +7,7 @@ import {
   system,
 } from "@edenapp/client";
 import type {
+  EventData,
   FileStats,
   FilesystemHandle,
   FilesystemLocation,
@@ -39,6 +40,29 @@ function signatures() {
   eden.db.getSu("app.id", "theme");
   packages.list();
   eden.package.list();
+  const changed = (event: EventData<"settings/panels-changed">) => {
+    const panelId: string | undefined = event.panelId;
+    return panelId;
+  };
+  const subscribed: Promise<void> = settings.subscribe(
+    "panels-changed",
+    changed,
+  );
+  const unsubscribed: void = settings.unsubscribe("panels-changed", changed);
+  fs.subscribe("changed", (event) => {
+    const watchId: string = event.watchId;
+    // @ts-expect-error payloads belong to the selected event
+    event.panelId;
+    return watchId;
+  });
+  // @ts-expect-error event names are local to the domain
+  settings.subscribe("settings/changed", () => {});
+  // @ts-expect-error events from other domains are not accepted
+  settings.subscribe("launched", () => {});
+  // @ts-expect-error callbacks must accept the selected event's payload
+  fs.subscribe("changed", (event: { panelId: string }) => {});
+  // @ts-expect-error command-only domains do not expose subscriptions
+  system.subscribe("changed", () => {});
   // @ts-expect-error a location is required
   fs.stat();
   // @ts-expect-error positional arguments unwrap the top-level args object
@@ -65,6 +89,8 @@ function signatures() {
     handleText,
     handleBytes,
     closed,
+    subscribed,
+    unsubscribed,
   };
 }
 void signatures;

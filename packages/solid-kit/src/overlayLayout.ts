@@ -68,17 +68,14 @@ export function createInterfaceScale(): Accessor<number> {
         console.error("Failed to load interface scale:", error);
       });
 
-    void window.edenAPI
-      .subscribe("view/interface-scale-changed", handleScaleChanged)
+    void eden.view
+      .subscribe("interface-scale-changed", handleScaleChanged)
       .catch((error) => {
         console.error("Failed to subscribe to interface scale changes:", error);
       });
 
     onCleanup(() => {
-      window.edenAPI.unsubscribe(
-        "view/interface-scale-changed",
-        handleScaleChanged,
-      );
+      eden.view.unsubscribe("interface-scale-changed", handleScaleChanged);
     });
   });
 
@@ -180,17 +177,14 @@ export function createOverlayLayout(
         setWindowSize(DEFAULT_WINDOW_SIZE);
       });
 
-    void window.edenAPI
-      .subscribe("view/global-bounds-changed", handleBoundsChanged)
+    void eden.view
+      .subscribe("global-bounds-changed", handleBoundsChanged)
       .catch((error) => {
         console.error("Failed to subscribe to window bounds changes:", error);
       });
 
     onCleanup(() => {
-      window.edenAPI.unsubscribe(
-        "view/global-bounds-changed",
-        handleBoundsChanged,
-      );
+      eden.view.unsubscribe("global-bounds-changed", handleBoundsChanged);
       if (animationFrame !== null) {
         window.cancelAnimationFrame(animationFrame);
       }

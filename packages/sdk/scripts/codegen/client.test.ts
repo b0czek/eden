@@ -1,6 +1,7 @@
 import { Project } from "ts-morph";
 import { generateClientCode } from "./client";
 import { extractCommandHandlers, groupCommandsByNamespace } from "./commands";
+import type { NamespaceEvents } from "./events";
 
 function extract(source: string, namespace = "fs") {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -72,4 +73,91 @@ it("rejects operation submission field collisions", () => {
     @EdenHandler("copy", { mode: "operation" }) copy(args: { submission?: string }): OperationTask<void> {}
   }`),
   ).toThrow("fs/copy: argument submission conflicts");
+});
+
+const events: NamespaceEvents[] = [
+  {
+    namespace: "file-picker",
+    interfaceName: "FilePickerEvents",
+    events: [
+      { eventName: "closed", payloadType: "{ requestId: string }", docs: [] },
+    ],
+  },
+];
+
+it.each(["subscribe", "unsubscribe"])(
+  "rejects a command that would replace the generated %s method",
+  (method) => {
+    const commands = groupCommandsByNamespace(
+      extract(
+        `class Handler { @EdenHandler("${method}") command(args: {}): void {} }`,
+        "file-picker",
+      ),
+    );
+    expect(() => generateClientCode(commands, events)).toThrow(
+      `file-picker/${method}: client method filePicker.${method} is reserved for event subscriptions`,
+    );
+  },
+);
+
+it("rejects normalized namespace collisions between command and event domains", () => {
+  const commands = groupCommandsByNamespace(
+    extract(
+      'class Handler { @EdenHandler("get") get(args: {}): void {} }',
+      "filePicker",
+    ),
+  );
+  expect(() => generateClientCode(commands, events)).toThrow(
+    "duplicate client namespace filePicker",
+  );
+});
+
+it("generates a typed client for an event-only domain", () => {
+  const project = new Project({
+    useInMemoryFileSystem: true,
+    compilerOptions: { strict: true },
+  });
+  project.createSourceFile(
+    "/types.d.ts",
+    `
+    declare module "@edenapp/types" {
+      export type CommandArgs<C> = {};
+      export type CommandResult<C> = void;
+      export type OperationSubmission = {};
+      export type EventData<E extends "file-picker/closed"> = { requestId: string };
+    }
+  `,
+  );
+  project.createSourceFile(
+    "/invoke.ts",
+    "export declare function invoke(command: string, args: unknown): Promise<void>;",
+  );
+  project.createSourceFile(
+    "/subscriptions.ts",
+    `
+    export declare function subscribe(event: "file-picker/closed", callback: (data: { requestId: string }) => void): Promise<void>;
+    export declare function unsubscribe(event: "file-picker/closed", callback: (data: { requestId: string }) => void): void;
+  `,
+  );
+  project.createSourceFile("/client.ts", generateClientCode([], events));
+  project.createSourceFile(
+    "/consumer.ts",
+    `
+    import { filePicker } from "./client";
+    const handler = (event: { requestId: string }) => {};
+    const ready: Promise<void> = filePicker.subscribe("closed", event => {
+      const requestId: string = event.requestId;
+      // @ts-expect-error payloads are inferred from the event declaration
+      event.missing;
+    });
+    const stopped: void = filePicker.unsubscribe("closed", handler);
+    // @ts-expect-error undeclared events are unavailable
+    filePicker.subscribe("opened", handler);
+  `,
+  );
+  expect(
+    project
+      .getPreEmitDiagnostics()
+      .map((diagnostic) => diagnostic.getMessageText()),
+  ).toEqual([]);
 });

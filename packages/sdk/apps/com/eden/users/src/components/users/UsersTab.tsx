@@ -90,8 +90,8 @@ export default function UsersTab() {
 
     const subscribe = async () => {
       try {
-        await window.edenAPI.subscribe(
-          "user/grant-options-changed",
+        await eden.user.subscribe(
+          "grant-options-changed",
           handleGrantOptionsChanged,
         );
       } catch (error) {
@@ -102,10 +102,7 @@ export default function UsersTab() {
     subscribe();
 
     onCleanup(() => {
-      window.edenAPI.unsubscribe(
-        "user/grant-options-changed",
-        handleGrantOptionsChanged,
-      );
+      eden.user.unsubscribe("grant-options-changed", handleGrantOptionsChanged);
     });
   });
 

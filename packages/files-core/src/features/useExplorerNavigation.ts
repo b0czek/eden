@@ -319,8 +319,8 @@ export const useExplorerNavigation = (
     }
   };
   const subscribed = Promise.all([
-    window.edenAPI.subscribe("fs/changed", handleChanged),
-    window.edenAPI.subscribe("volume/changed", handleVolumesChanged),
+    eden.fs.subscribe("changed", handleChanged),
+    eden.volume.subscribe("changed", handleVolumesChanged),
   ])
     .then(async () => {
       const version = inventoryVersion;
@@ -490,8 +490,8 @@ export const useExplorerNavigation = (
     disposed = true;
     requestSequence += 1;
     document.removeEventListener("mousedown", handleMouseButton);
-    window.edenAPI.unsubscribe("fs/changed", handleChanged);
-    window.edenAPI.unsubscribe("volume/changed", handleVolumesChanged);
+    eden.fs.unsubscribe("changed", handleChanged);
+    eden.volume.unsubscribe("changed", handleVolumesChanged);
     void stopWatch();
   });
 

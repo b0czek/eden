@@ -93,14 +93,8 @@ const handleNotificationRemoved = (
 const ensureSubscribed = async () => {
   if (!subscriptionPromise) {
     subscriptionPromise = Promise.all([
-      window.edenAPI.subscribe(
-        "notification/action-clicked",
-        handleActionClicked,
-      ),
-      window.edenAPI.subscribe(
-        "notification/removed",
-        handleNotificationRemoved,
-      ),
+      eden.notification.subscribe("action-clicked", handleActionClicked),
+      eden.notification.subscribe("removed", handleNotificationRemoved),
     ])
       .then(() => undefined)
       .catch((error) => {

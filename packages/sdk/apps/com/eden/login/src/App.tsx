@@ -93,10 +93,7 @@ const App = () => {
 
   onMount(() => {
     onCleanup(() => {
-      window.edenAPI.unsubscribe(
-        "view/global-bounds-changed",
-        updateViewBounds,
-      );
+      eden.view.unsubscribe("global-bounds-changed", updateViewBounds);
     });
 
     (async () => {
@@ -113,10 +110,7 @@ const App = () => {
 
       // Subscribe to resize events
       try {
-        await window.edenAPI.subscribe(
-          "view/global-bounds-changed",
-          updateViewBounds,
-        );
+        await eden.view.subscribe("global-bounds-changed", updateViewBounds);
       } catch (error) {
         console.error("Failed to subscribe to bounds change:", error);
       }

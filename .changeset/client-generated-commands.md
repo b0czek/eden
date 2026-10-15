@@ -3,4 +3,4 @@
 "@edenapp/sdk": minor
 ---
 
-Add `@edenapp/client` with generated, typed methods for Eden shell commands, positional required arguments, optional settings, and operation controls in frontend and backend apps.
+Add `@edenapp/client` with generated, typed system commands and event subscriptions for frontend and backend apps, including positional required arguments, optional settings, and operation controls.

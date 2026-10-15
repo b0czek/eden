@@ -282,10 +282,7 @@ const App: Component = () => {
     const launchFile = window.edenAPI.getLaunchFile();
     if (launchFile) void openFile(launchFile);
 
-    window.edenAPI.subscribe(
-      "file/opened",
-      handleFileOpened as (data: unknown) => void,
-    );
+    eden.file.subscribe("opened", handleFileOpened);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
@@ -306,10 +303,7 @@ const App: Component = () => {
 
     onCleanup(() => {
       document.removeEventListener("keydown", handleKeyDown);
-      window.edenAPI.unsubscribe(
-        "file/opened",
-        handleFileOpened as (data: unknown) => void,
-      );
+      eden.file.unsubscribe("opened", handleFileOpened);
     });
   });
 

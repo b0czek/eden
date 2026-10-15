@@ -118,7 +118,7 @@ const ensureContextMenuSubscribed = async () => {
   if (contextMenuSubscribed) return;
   contextMenuSubscribed = true;
 
-  await window.edenAPI.subscribe("context-menu/closed", (payload) => {
+  await eden.contextMenu.subscribe("closed", (payload) => {
     const resolver = contextMenuPending.get(payload.requestId);
     if (resolver) {
       contextMenuPending.delete(payload.requestId);

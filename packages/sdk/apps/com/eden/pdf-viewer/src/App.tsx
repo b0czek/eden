@@ -1,3 +1,4 @@
+import * as eden from "@edenapp/client";
 import type { FileOpenedEvent } from "@edenapp/types";
 import pdfiumWasmUrl from "@embedpdf/pdfium/pdfium.wasm?url";
 import EmbedPDF, {
@@ -210,16 +211,10 @@ const App: Component = () => {
     const launchFile = window.edenAPI.getLaunchFile();
     if (launchFile) pdfOpen.openPdf(launchFile);
 
-    void window.edenAPI.subscribe(
-      "file/opened",
-      handleFileOpened as (data: unknown) => void,
-    );
+    void eden.file.subscribe("opened", handleFileOpened);
 
     onCleanup(() => {
-      void window.edenAPI.unsubscribe(
-        "file/opened",
-        handleFileOpened as (data: unknown) => void,
-      );
+      void eden.file.unsubscribe("opened", handleFileOpened);
 
       destroyViewer();
     });

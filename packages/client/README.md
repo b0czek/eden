@@ -1,6 +1,6 @@
 # @edenapp/client
 
-Typed shell-command methods for Eden frontend and backend apps.
+Typed system commands and event subscriptions for Eden frontend and backend apps.
 
 ```sh
 npm install @edenapp/client
@@ -69,6 +69,33 @@ File reads accept locations for one-shot access or plain handles returned by
 `fs.open`. See [file handles](../../docs/filesystem.md#file-handles)
 for repeated reads, close, and safe-removal lifetimes.
 
+## Event subscriptions
+
+Domains that declare events expose `subscribe` and `unsubscribe`. Event names
+are local to the domain: `settings/panels-changed` becomes
+`settings.subscribe("panels-changed", callback)`. Callback payloads are inferred
+from the selected event.
+
+```ts
+import { settings } from "@edenapp/client";
+import type { EventData } from "@edenapp/types";
+
+const handleChanged = (event: EventData<"settings/panels-changed">) => {
+  console.log(event.reason, event.panelId);
+};
+
+await settings.subscribe("panels-changed", handleChanged);
+
+// When the owner is disposed, remove the same callback reference.
+settings.unsubscribe("panels-changed", handleChanged);
+```
+
+`subscribe` returns `Promise<void>` and rejects if setup fails. `unsubscribe`
+returns immediately and stops local delivery synchronously; remote cleanup
+follows asynchronously. It can be called while setup is still pending. Register
+component cleanup before awaiting setup so disposal always removes the listener.
+Removing one callback leaves other listeners for the event active.
+
 ## Frontend and backend
 
 The same imports work in both runtimes. Methods use the frontend's
@@ -81,8 +108,8 @@ esbuild src/backend.ts --bundle --platform=node --format=esm --outfile=dist/back
 
 Client imports do not require a running Eden environment. Calling a method
 requires the injected API. Permissions and errors follow the shell-command
-contract. Event subscriptions, AppBus, launch helpers, and restoring operation
-controls remain available through the injected APIs.
+contract. AppBus, launch helpers, and restoring operation controls remain
+available through the injected APIs.
 
 For development in this repository, regenerate the client with
 `pnpm --filter @edenapp/sdk run codegen`, then build it with

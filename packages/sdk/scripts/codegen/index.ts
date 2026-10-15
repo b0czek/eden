@@ -3,7 +3,7 @@
  *
  * Main entry point that coordinates all code generation:
  * - Commands: @EdenHandler decorators → commands.generated.d.ts
- * - Client: Command signatures → @edenapp/client command methods
+ * - Client: Commands/events → @edenapp/client methods
  * - Events: EdenEmitter interfaces → events.generated.d.ts
  * - Runtime: Command/event name arrays → runtime.ts
  * - I18n: SDK locale files → i18n.ts types
@@ -106,7 +106,7 @@ export function generateAll(): void {
   const namespaceCommands = groupCommandsByNamespace(allCommands);
   const namespaceEvents = groupEventsByNamespace(allEvents);
   // Validate the complete client contract before writing any generated files.
-  const clientCode = generateClientCode(namespaceCommands);
+  const clientCode = generateClientCode(namespaceCommands, namespaceEvents);
 
   console.log(
     `📋 Grouped commands into ${namespaceCommands.length} namespaces:`,

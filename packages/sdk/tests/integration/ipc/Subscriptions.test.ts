@@ -8,9 +8,11 @@ import { createTestCaller } from "../../support/callers";
 import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { volume as volumeClient } from "@edenapp/client";
 import type {
   CommandArgs,
   CommandName,
+  EdenAPI,
   OperationHandle,
   OperationSnapshot,
   OperationSubmission,
@@ -40,6 +42,7 @@ const eventName = "volume/changed";
 describe("client subscriptions across renderer IPC", () => {
   let eden: TestEden;
   const pendingWork = new Set<() => void>();
+  const restoreRuntimes: Array<() => void> = [];
   let transport: ShellTransport;
   let listeners: Map<string, Set<EventSubscriptionCallback>>;
   let owner: {
@@ -95,8 +98,28 @@ describe("client subscriptions across renderer IPC", () => {
   afterEach(async () => {
     for (const finish of pendingWork) finish();
     pendingWork.clear();
-    await eden?.dispose();
+    try {
+      await eden?.dispose();
+    } finally {
+      for (const restore of restoreRuntimes.splice(0)) restore();
+    }
   });
+
+  const useClient = (api: EdenAPI, runtime: "window" | "worker" = "window") => {
+    for (const key of ["window", "worker"]) {
+      const original = Object.getOwnPropertyDescriptor(globalThis, key);
+      Object.defineProperty(globalThis, key, {
+        configurable: true,
+        writable: true,
+        value: key === runtime ? { edenAPI: api } : undefined,
+      });
+      restoreRuntimes.push(() => {
+        if (original) Object.defineProperty(globalThis, key, original);
+        else Reflect.deleteProperty(globalThis, key);
+      });
+    }
+    return volumeClient;
+  };
   const change = async (id: string) => {
     const rootPath = path.join(eden.paths.root, id);
     await fs.mkdir(rootPath);
@@ -171,50 +194,98 @@ describe("client subscriptions across renderer IPC", () => {
         listeners,
       );
       const updates: string[] = [];
+      const client = useClient(api);
       const replacement = () => {
         updates.push("delivered");
       };
       const original = sameCallback ? replacement : () => undefined;
-      const initial = api.subscribe(eventName, original);
+      const initial = client.subscribe("changed", original);
       const failure = expect(initial).rejects.toThrow(
         "First registration failed",
       );
       await started.promise;
-      api.unsubscribe(eventName, original);
-      const accepted = api.subscribe(eventName, replacement);
+      client.unsubscribe("changed", original);
+      const accepted = client.subscribe("changed", replacement);
       finish.release();
       await failure;
       await accepted;
       await change("replacement");
       expect(updates).toEqual(["delivered"]);
-      api.unsubscribe(eventName, replacement);
+      client.unsubscribe("changed", replacement);
       await tick();
     },
   );
 
-  it("keeps the remaining listener active when another stops", async () => {
-    const api = createEdenAPI(transport, listeners);
-    const first: string[] = [];
-    const second: string[] = [];
-    const one = () => {
-      first.push("changed");
+  it.each(["window", "worker"] as const)(
+    "keeps the remaining %s client listener active when another stops",
+    async (runtime) => {
+      const api = createEdenAPI(transport, listeners);
+      const client = useClient(api, runtime);
+      const first: string[] = [];
+      const second: string[] = [];
+      const one = () => {
+        first.push("changed");
+      };
+      const two = () => {
+        second.push("changed");
+      };
+      await Promise.all([
+        client.subscribe("changed", one),
+        client.subscribe("changed", two),
+      ]);
+      client.unsubscribe("changed", one);
+      await tick();
+      await change("still-observed");
+      expect(first).toEqual([]);
+      expect(second).toEqual(["changed"]);
+      client.unsubscribe("changed", two);
+      await tick();
+      await change("unobserved");
+      expect(second).toEqual(["changed"]);
+    },
+  );
+
+  it("stops a client listener immediately while remote setup is pending", async () => {
+    const started = gate();
+    const finish = gate();
+    pendingWork.add(finish.release);
+    let first = true;
+    const client = useClient(
+      createEdenAPI(
+        {
+          exec: async (command, args, submission) => {
+            const response = await transport.exec(command, args, submission);
+            if (command === "event/subscribe" && first) {
+              first = false;
+              started.release();
+              await finish.promise;
+            }
+            return response;
+          },
+        },
+        listeners,
+      ),
+    );
+    const updates: string[][] = [];
+    const callback = (event: { volumes: Array<{ id: string }> }) => {
+      updates.push(event.volumes.map((volume) => volume.id));
     };
-    const two = () => {
-      second.push("changed");
-    };
-    await Promise.all([
-      api.subscribe(eventName, one),
-      api.subscribe(eventName, two),
-    ]);
-    api.unsubscribe(eventName, one);
+    const ready = client.subscribe("changed", callback);
+    await started.promise;
+    client.unsubscribe("changed", callback);
+    await change("during-setup");
+    expect(updates).toEqual([]);
+    finish.release();
+    await ready;
     await tick();
-    await change("still-observed");
-    expect(first).toEqual([]);
-    expect(second).toEqual(["changed"]);
-    api.unsubscribe(eventName, two);
+    await change("after-setup");
+    expect(updates).toEqual([]);
+    await client.subscribe("changed", callback);
+    await change("resubscribed");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toContain("resubscribed");
+    client.unsubscribe("changed", callback);
     await tick();
-    await change("unobserved");
-    expect(second).toEqual(["changed"]);
   });
 
   it("isolates async listener failures and failed remote cleanup", async () => {
@@ -231,23 +302,24 @@ describe("client subscriptions across renderer IPC", () => {
       throw new Error("Listener failed asynchronously");
     };
     let delivered = 0;
+    const client = useClient(api);
     const healthy = () => {
       delivered++;
     };
-    await api.subscribe(eventName, broken);
-    await api.subscribe(eventName, healthy);
+    await client.subscribe("changed", broken);
+    await client.subscribe("changed", healthy);
     await change("listeners");
     await tick();
     expect(delivered).toBe(1);
-    api.unsubscribe(eventName, broken);
-    api.unsubscribe(eventName, healthy);
+    client.unsubscribe("changed", broken);
+    client.unsubscribe("changed", healthy);
     await tick();
     await change("stopped");
     expect(delivered).toBe(1);
-    await api.subscribe(eventName, healthy);
+    await client.subscribe("changed", healthy);
     await change("reopened");
     expect(delivered).toBe(2);
-    api.unsubscribe(eventName, healthy);
+    client.unsubscribe("changed", healthy);
     await tick();
   });
 

@@ -41,7 +41,7 @@ const App = () => {
       setError("No package file specified.");
     }
 
-    window.edenAPI.subscribe("file/opened", (data) => {
+    eden.file.subscribe("opened", (data) => {
       if (data.location.path) {
         loadPackage(data.location);
       }

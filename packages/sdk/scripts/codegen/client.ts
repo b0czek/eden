@@ -1,4 +1,5 @@
 import type { NamespaceCommands } from "./commands";
+import type { NamespaceEvents } from "./events";
 import { generateHeader } from "./utils";
 
 function clientName(name: string, command: string): string {
@@ -18,16 +19,41 @@ const reserved = new Set(
   ),
 );
 
-export function generateClientCode(namespaces: NamespaceCommands[]): string {
+export function generateClientCode(
+  commandNamespaces: NamespaceCommands[],
+  eventNamespaces: NamespaceEvents[] = [],
+): string {
   const lines = generateHeader(
-    "Typed app client generated from @EdenHandler decorators",
+    "Typed app client generated from command and event declarations",
   );
   lines.push(
-    'import type { CommandArgs, CommandResult, OperationSubmission } from "@edenapp/types";',
+    'import type { CommandArgs, CommandResult, EventData, OperationSubmission } from "@edenapp/types";',
   );
   lines.push('import { invoke } from "./invoke.js";', "");
+  if (eventNamespaces.some((namespace) => namespace.events.length)) {
+    lines.push(
+      'import { subscribe, unsubscribe } from "./subscriptions.js";',
+      "",
+    );
+  }
+  const namespaces = new Map<
+    string,
+    {
+      namespace: string;
+      commands: NamespaceCommands["commands"];
+      events: NamespaceEvents["events"];
+    }
+  >();
+  for (const namespace of commandNamespaces) {
+    namespaces.set(namespace.namespace, { ...namespace, events: [] });
+  }
+  for (const namespace of eventNamespaces) {
+    const existing = namespaces.get(namespace.namespace);
+    if (existing) existing.events = namespace.events;
+    else namespaces.set(namespace.namespace, { ...namespace, commands: [] });
+  }
   const exports = new Set<string>();
-  for (const namespace of namespaces) {
+  for (const namespace of namespaces.values()) {
     const name = clientName(namespace.namespace, namespace.namespace);
     if (exports.has(name))
       throw new Error(
@@ -40,6 +66,14 @@ export function generateClientCode(namespaces: NamespaceCommands[]): string {
     for (const command of namespace.commands) {
       const id = `${namespace.namespace}/${command.command}`;
       const method = clientName(command.command, id);
+      if (
+        namespace.events.length &&
+        (method === "subscribe" || method === "unsubscribe")
+      ) {
+        throw new Error(
+          `${id}: client method ${name}.${method} is reserved for event subscriptions`,
+        );
+      }
       if (methods.has(method))
         throw new Error(`${id}: duplicate client method ${name}.${method}`);
       methods.add(method);
@@ -106,6 +140,18 @@ export function generateClientCode(namespaces: NamespaceCommands[]): string {
       lines.push(
         `    invoke(${JSON.stringify(id)}, { ${properties.join(", ")} }${command.mode === "operation" ? `, ${options}?.submission` : ""}),`,
       );
+    }
+    if (namespace.events.length) {
+      const eventNames = namespace.events
+        .map((event) => JSON.stringify(event.eventName))
+        .join(" | ");
+      const eventType = `EventData<\`${namespace.namespace}/\${E}\`>`;
+      for (const method of ["subscribe", "unsubscribe"]) {
+        lines.push(
+          `  [${JSON.stringify(method)}]: <E extends ${eventNames}>(event: E, callback: (data: ${eventType}) => void): ${method === "subscribe" ? "Promise<void>" : "void"} =>`,
+          `    ${method}(\`${namespace.namespace}/\${event}\`, callback),`,
+        );
+      }
     }
     lines.push("};", `export { ${localName} as ${name} };`, "");
   }

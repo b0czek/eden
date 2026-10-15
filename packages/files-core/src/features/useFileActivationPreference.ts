@@ -26,7 +26,7 @@ export const useFileActivationPreference = (ownerAppId?: string) => {
 
   onMount(async () => {
     try {
-      await window.edenAPI.subscribe("settings/changed", handleChanged);
+      await eden.settings.subscribe("changed", handleChanged);
       const result = await eden.settings.get(SINGLE_CLICK_SETTING_KEY, {
         ...(ownerAppId ? { appId: ownerAppId } : {}),
       });
@@ -37,7 +37,7 @@ export const useFileActivationPreference = (ownerAppId?: string) => {
   });
 
   onCleanup(() => {
-    void window.edenAPI.unsubscribe("settings/changed", handleChanged);
+    void eden.settings.unsubscribe("changed", handleChanged);
   });
 
   return openWithSingleClick;

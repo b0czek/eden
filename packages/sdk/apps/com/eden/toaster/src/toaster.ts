@@ -509,11 +509,11 @@ async function init(): Promise<void> {
   await eden.notification.registerDisplay();
 
   // Subscribe to notification events
-  window.edenAPI.subscribe("notification/added", handleToastAdded);
+  eden.notification.subscribe("added", handleToastAdded);
 
   // Subscribe to window size changes
-  window.edenAPI.subscribe(
-    "view/global-bounds-changed",
+  eden.view.subscribe(
+    "global-bounds-changed",
     (data: { windowSize: WindowSize }) => {
       windowSize = data.windowSize;
       updateOverlayBounds();
@@ -521,14 +521,11 @@ async function init(): Promise<void> {
   );
 
   // Keep the overlay's physical bounds in sync with renderer zoom.
-  window.edenAPI.subscribe(
-    "view/interface-scale-changed",
-    (data: { scale: number }) => {
-      if (!Number.isFinite(data.scale)) return;
-      interfaceScale = data.scale;
-      updateOverlayBounds();
-    },
-  );
+  eden.view.subscribe("interface-scale-changed", (data: { scale: number }) => {
+    if (!Number.isFinite(data.scale)) return;
+    interfaceScale = data.scale;
+    updateOverlayBounds();
+  });
 
   // Initial bounds (0x0)
   await updateOverlayBounds();

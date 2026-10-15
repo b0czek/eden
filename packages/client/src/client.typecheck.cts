@@ -7,8 +7,14 @@ function commonJsSignatures() {
     path: "/notes.txt",
   });
   packages.list();
+  const subscribed: Promise<void> = fs.subscribe("changed", (event) => {
+    const watchId: string = event.watchId;
+    return watchId;
+  });
+  // @ts-expect-error CommonJS imports use domain-local event names too
+  fs.unsubscribe("fs/changed", () => {});
   // @ts-expect-error required arguments remain required for CommonJS imports
   fs.stat();
-  return stat;
+  return { stat, subscribed };
 }
 void commonJsSignatures;

@@ -86,8 +86,10 @@ updated inventories and returns an unsubscribe function. Apps receive metadata
 without host mount paths:
 
 ```typescript
-const volumes = await window.edenAPI.shellCommand("volume/list", {});
-await window.edenAPI.subscribe("volume/changed", ({ volumes }) => {
+import { volume } from "@edenapp/client";
+
+const volumes = await volume.list();
+await volume.subscribe("changed", ({ volumes }) => {
   updateVolumeSelector(volumes);
 });
 ```
@@ -275,9 +277,11 @@ Handlers retrieve the initial address with `getLaunchFile()` and receive further
 addresses in `file/opened` events:
 
 ```typescript
+import { file } from "@edenapp/client";
+
 const initial = window.edenAPI.getLaunchFile();
 if (initial) await openDocument(initial);
-await window.edenAPI.subscribe("file/opened", ({ location, isDirectory }) => {
+await file.subscribe("opened", ({ location, isDirectory }) => {
   if (!isDirectory) void openDocument(location);
 });
 ```
@@ -337,8 +341,11 @@ Apps with `fs/read` can watch non-recursive directories on volumes advertising
 snapshot after watch creation:
 
 ```typescript
+import { fs } from "@edenapp/client";
+import type { EventData } from "@edenapp/types";
+
 let watchId: string | undefined;
-const handleChanged = (event) => {
+const handleChanged = (event: EventData<"fs/changed">) => {
   if (event.watchId !== watchId) return;
   if (event.kind === "change") void refreshDirectory();
   else if (event.kind === "volume-removed") {
@@ -347,15 +354,14 @@ const handleChanged = (event) => {
   } else reportLiveUpdateFailure();
 };
 
-await window.edenAPI.subscribe("fs/changed", handleChanged);
-({ watchId } = await window.edenAPI.shellCommand("fs/watch", {
-  location: { volume: "home", path: "/Documents" },
-}));
+await fs.subscribe("changed", handleChanged);
+const watch = await fs.watch({ volume: "home", path: "/Documents" });
+watchId = watch.watchId;
 await refreshDirectory();
 
 // On cleanup:
-if (watchId) await window.edenAPI.shellCommand("fs/unwatch", { watchId });
-window.edenAPI.unsubscribe("fs/changed", handleChanged);
+if (watchId) await fs.unwatch(watchId);
+fs.unsubscribe("changed", handleChanged);
 ```
 
 Each watch belongs to the creating view. Eden releases watches when the owning

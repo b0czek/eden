@@ -23,7 +23,7 @@ The **EdenAPI** provides apps with access to system-level operations managed by 
 - **Frontend**: `window.edenAPI`
 - **Backend**: `worker.edenAPI` (exposed via `backend-preload.ts`)
 
-Apps can import generated command methods from `@edenapp/client` in either
+Apps can import generated command and subscription methods from `@edenapp/client` in either
 runtime:
 
 ```typescript
@@ -41,6 +41,10 @@ const { value } = await eden.db.get("theme");
 Required top-level arguments are positional and optional fields go in a final
 options object. Methods preserve the command's typed result or operation
 controls, permissions, and errors. See the [client guide](../packages/client/README.md).
+
+Client subscriptions use domain-local event names and preserve callback identity.
+`subscribe` awaits setup; `unsubscribe` immediately stops local delivery, including
+while setup is pending. See [subscription lifetimes](../packages/client/README.md#event-subscriptions).
 
 ### Core Methods
 
@@ -75,15 +79,15 @@ interface EdenAPI {
 ### Usage Example
 
 ```typescript
-// Execute a shell command
-const launch = await window.edenAPI.shellCommand("process/launch", {
-  appId: "com.example.myapp",
+import { process } from "@edenapp/client";
+
+const launch = await process.launch("com.example.myapp", {
   bounds: { x: 0, y: 0, width: 800, height: 600 },
 });
 await launch.result();
 
 // Subscribe to system events
-await window.edenAPI.subscribe("process/launched", (data) => {
+await process.subscribe("launched", (data) => {
   console.log("Process launched:", data);
 });
 

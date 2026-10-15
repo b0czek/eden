@@ -204,18 +204,18 @@ async function init(): Promise<void> {
     }
   });
 
-  await window.edenAPI.subscribe("context-menu/opened", ({ menu: data }) => {
+  await eden.contextMenu.subscribe("opened", ({ menu: data }) => {
     void openMenu(data);
   });
 
-  await window.edenAPI.subscribe("context-menu/closed", (data) => {
+  await eden.contextMenu.subscribe("closed", (data) => {
     if (!activeMenu || activeMenu.requestId !== data.requestId) return;
     if (data.reason === "select" || data.reason === "dismiss") return;
     closeMenu(data.reason, data.itemId, false);
   });
 
-  await window.edenAPI.subscribe(
-    "view/global-bounds-changed",
+  await eden.view.subscribe(
+    "global-bounds-changed",
     ({ windowSize: nextSize }) => {
       windowSize = nextSize;
       if (activeMenu) {

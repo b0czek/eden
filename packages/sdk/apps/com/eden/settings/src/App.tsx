@@ -115,10 +115,10 @@ const App: Component = () => {
   onMount(async () => {
     await initLocale();
     await Promise.all([loadBranding(), loadCatalog()]);
-    await window.edenAPI.subscribe("settings/panels-changed", refresh);
+    await eden.settings.subscribe("panels-changed", refresh);
   });
   onCleanup(() => {
-    void window.edenAPI.unsubscribe("settings/panels-changed", refresh);
+    void eden.settings.unsubscribe("panels-changed", refresh);
   });
 
   createEffect(() => {

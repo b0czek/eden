@@ -274,8 +274,8 @@ export default function ShellOverlay() {
 
     // Register cleanup synchronously (must happen before any async work)
     onCleanup(() => {
-      window.edenAPI.unsubscribe("process/launched", handleAppLifecycle);
-      window.edenAPI.unsubscribe("process/stopped", handleAppLifecycle);
+      eden.process.unsubscribe("launched", handleAppLifecycle);
+      eden.process.unsubscribe("stopped", handleAppLifecycle);
     });
 
     // Async initialization
@@ -291,8 +291,8 @@ export default function ShellOverlay() {
 
       try {
         // Subscribe to events
-        await window.edenAPI.subscribe("process/launched", handleAppLifecycle);
-        await window.edenAPI.subscribe("process/stopped", handleAppLifecycle);
+        await eden.process.subscribe("launched", handleAppLifecycle);
+        await eden.process.subscribe("stopped", handleAppLifecycle);
       } catch (error) {
         console.error("Failed to subscribe to events:", error);
       }

@@ -44,7 +44,7 @@ void (async () => {
 
 void (async () => {
   let started = false;
-  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
+  await client.volume.subscribe("changed", async ({ volumes }) => {
     if (started || !volumes.some((volume) => volume.id === "operation-delay"))
       return;
     started = true;
@@ -97,7 +97,7 @@ void (async () => {
 })();
 
 void (async () => {
-  await worker.edenAPI.subscribe("volume/changed", async ({ volumes }) => {
+  await client.volume.subscribe("changed", async ({ volumes }) => {
     if (
       !volumes.some(
         (volume) => volume.id === "slow-eject" && volume.state === "ready",

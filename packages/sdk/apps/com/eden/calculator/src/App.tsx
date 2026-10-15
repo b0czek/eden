@@ -68,7 +68,7 @@ const App: Component = () => {
 
     // Subscribe to settings changes
     try {
-      await window.edenAPI.subscribe("settings/changed", handleSettingsChanged);
+      await settings.subscribe("changed", handleSettingsChanged);
 
       // Load initial settings
       await loadSettings();

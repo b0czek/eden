@@ -161,17 +161,14 @@ import { setupWindowResizing } from "./window-resizing.js";
         setTitle(appName);
 
         // Subscribe to locale changes for live updates
-        window.edenAPI.subscribe(
-          "i18n/locale-changed",
-          (data: { locale: string }) => {
-            const newLocale = data.locale;
-            currentLocale = newLocale;
-            const currentName = getAppName(rawName, newLocale);
-            setTitle(currentName);
-            appName = currentName;
-            refreshLayoutCompassLocale?.();
-          },
-        );
+        eden.i18n.subscribe("locale-changed", (data) => {
+          const newLocale = data.locale;
+          currentLocale = newLocale;
+          const currentName = getAppName(rawName, newLocale);
+          setTitle(currentName);
+          appName = currentName;
+          refreshLayoutCompassLocale?.();
+        });
       }
     }
 
@@ -194,28 +191,25 @@ import { setupWindowResizing } from "./window-resizing.js";
     // Setup floating window controls
     setupFloatingWindowControls();
 
-    window.edenAPI.subscribe(
-      "view/mode-changed",
-      (data: { mode: "tiled" | "floating"; bounds: ViewBounds }) => {
-        const edenFrame = window.edenFrame;
-        if (!edenFrame) {
-          return;
-        }
+    eden.view.subscribe("mode-changed", (data) => {
+      const edenFrame = window.edenFrame;
+      if (!edenFrame) {
+        return;
+      }
 
-        const { mode, bounds } = data;
+      const { mode, bounds } = data;
 
-        // Update window mode and bounds
-        edenFrame._internal.currentMode = mode;
-        if (bounds && bounds.x !== undefined) {
-          edenFrame._internal.bounds = bounds;
-          currentBoundsRef.current = { ...bounds };
-        }
+      // Update window mode and bounds
+      edenFrame._internal.currentMode = mode;
+      if (bounds && bounds.x !== undefined) {
+        edenFrame._internal.bounds = bounds;
+        currentBoundsRef.current = { ...bounds };
+      }
 
-        // Re-setup controls for new mode
-        syncOverlayMode();
-        setupFloatingWindowControls();
-      },
-    );
+      // Re-setup controls for new mode
+      syncOverlayMode();
+      setupFloatingWindowControls();
+    });
   };
 
   const setupFloatingWindowControls = (): void => {
@@ -286,7 +280,7 @@ import { setupWindowResizing } from "./window-resizing.js";
 
   // Listen for bounds updates from main process (during mouse drag/resize)
   // This keeps currentBounds in sync even when main process is controlling movement
-  window.edenAPI.subscribe("view/bounds-updated", (newBounds) => {
+  eden.view.subscribe("bounds-updated", (newBounds) => {
     currentBoundsRef.current = { ...newBounds };
     syncEdenFrameBounds(newBounds);
   });
