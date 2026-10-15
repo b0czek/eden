@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { addAbortListener } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -24,11 +25,13 @@ interface PreparedTransfer {
   assertDestinationActive?: () => Promise<void>;
 }
 
+interface PathReservation {
+  paths: string[];
+  completed: Promise<void>;
+}
+
 export class FilesystemTransfer {
-  private readonly reservations = new Set<{
-    paths: string[];
-    completed: Promise<void>;
-  }>();
+  private readonly reservations = new Set<PathReservation>();
 
   async copy(request: TransferRequest): Promise<void> {
     await this.withReservedPaths(request, () => this.copyReserved(request));
@@ -70,12 +73,27 @@ export class FilesystemTransfer {
     // reservation, including source removal after a cross-device move.
     this.reservations.add(reservation);
     try {
-      await Promise.all(predecessors.map((entry) => entry.completed));
+      await this.waitForPredecessors(predecessors, request.reporter?.signal);
       await operation();
     } finally {
       this.reservations.delete(reservation);
       release();
     }
+  }
+
+  private waitForPredecessors(
+    predecessors: PathReservation[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      signal?.throwIfAborted();
+      const abortListener = signal
+        ? addAbortListener(signal, () => reject(signal.reason))
+        : undefined;
+      Promise.all(predecessors.map((entry) => entry.completed))
+        .finally(() => abortListener?.[Symbol.dispose]())
+        .then(() => resolve(), reject);
+    });
   }
 
   private async copyReserved(request: TransferRequest): Promise<void> {

@@ -101,6 +101,76 @@ describe("safe volume removal", () => {
     expect(hostContent).toBe("queued work");
   });
 
+  it("releases a cancelled copy's destination while a conflicting copy is still blocked", async () => {
+    const source = path.join(eden.paths.userDirectory, "source.txt");
+    await fs.writeFile(source, "source contents");
+    let ejected = false;
+    await register({
+      eject: async () => {
+        ejected = true;
+      },
+    });
+    const copying = deferred();
+    const resumeCopy = deferred();
+    const stat = fs.stat.bind(fs);
+    let pause = true;
+    jest.spyOn(fs, "stat").mockImplementation(async (...args) => {
+      if (args[0] === source && pause) {
+        pause = false;
+        copying.resolve();
+        await resumeCopy.promise;
+      }
+      return stat(...args);
+    });
+    const caller = {
+      appId,
+      principal: { kind: "user" as const, profile: user },
+    };
+    const manager = eden.runtime.resolve(OperationManager);
+    const first = await eden.execute<OperationHandle>(
+      "fs/cp",
+      {
+        from: { volume: "home", path: "/source.txt" },
+        to: { volume: "home", path: "/first.txt" },
+      },
+      caller,
+    );
+    let firstFinished = false;
+    const firstResult = manager.wait(first, caller).then(() => {
+      firstFinished = true;
+    });
+    // Release stalled I/O even if cancellation is broken, so failure can clean up.
+    const watchdog = setTimeout(() => resumeCopy.resolve(), 2000);
+    try {
+      await copying.promise;
+      const second = await eden.execute<OperationHandle>(
+        "fs/cp",
+        {
+          from: { volume: "home", path: "/source.txt" },
+          to: { volume: "usb", path: "/second.txt" },
+        },
+        caller,
+      );
+      await eden.execute("operation/cancel", { handle: second }, caller);
+      const eject = await eden.execute<OperationHandle>(
+        "volume/eject",
+        { volume: "usb" },
+        caller,
+      );
+      await expect(manager.wait(second, caller)).rejects.toMatchObject({
+        name: "AbortError",
+      });
+      await manager.wait(eject, caller);
+      expect(firstFinished).toBe(false);
+      expect(ejected).toBe(true);
+      expect(await fs.readdir(usbRoot)).toEqual([]);
+    } finally {
+      clearTimeout(watchdog);
+      resumeCopy.resolve();
+      await firstResult;
+    }
+  });
+
   it("keeps queued file-opening work admitted until its read handle closes", async () => {
     const closing = deferred();
     const finishClose = deferred();
