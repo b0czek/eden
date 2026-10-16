@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { defineController } from "../../../src/controllers/controller";
 import {
   targetedEvent,
+  routedEvent,
+  type RoutedNotification,
   type TargetedNotification,
 } from "../../../src/controllers/events";
 import { createEvent } from "../../../src/events/event";
@@ -16,6 +18,7 @@ import { createTestEden } from "../../support/createTestEden";
 it("delivers a controller notification only to selected subscribed views and releases forwarding on shutdown", async () => {
   const eden = await createTestEden();
   const source = createEvent<TargetedNotification<{ value: string }>>();
+  const mixed = createEvent<RoutedNotification<{ value: string }>>();
   try {
     const registry = eden.runtime.resolve(PackageRegistry);
     const ids = ["com.example.first", "com.example.second"];
@@ -27,7 +30,7 @@ it("delivers a controller notification only to selected subscribed views and rel
     bridge.registerController(
       defineController("routing", {
         commands: {},
-        events: { changed: targetedEvent(source) },
+        events: { changed: targetedEvent(source), notice: routedEvent(mixed) },
       }),
     );
     const recipients: Array<{ viewId: number; contentsId: number }> = [];
@@ -43,8 +46,11 @@ it("delivers a controller notification only to selected subscribed views and rel
       expect(bridge.eventSubscribers.subscribe(viewId, "routing/changed")).toBe(
         true,
       );
+      expect(bridge.eventSubscribers.subscribe(viewId, "routing/notice")).toBe(
+        true,
+      );
     }
-    const received = () =>
+    const received = (eventName = "routing/changed") =>
       eden.platform.effects.flatMap((effect) => {
         if (
           effect.type !== "message-sent" ||
@@ -52,7 +58,7 @@ it("delivers a controller notification only to selected subscribed views and rel
         )
           return [];
         const message = effect.args[0] as { type: string; payload: unknown };
-        return message.type === "routing/changed"
+        return message.type === eventName
           ? [{ contentsId: effect.webContentsId, payload: message.payload }]
           : [];
       });
@@ -64,7 +70,20 @@ it("delivers a controller notification only to selected subscribed views and rel
     expect(received()).toEqual([
       { contentsId: recipients[0].contentsId, payload: { value: "private" } },
     ]);
+    mixed.emit({ payload: { value: "broadcast" } });
+    mixed.emit({
+      payload: { value: "selected" },
+      viewIds: [recipients[1].viewId],
+    });
+    mixed.emit({ payload: { value: "empty" }, viewIds: [] });
+    expect(received("routing/notice")).toEqual([
+      { contentsId: recipients[0].contentsId, payload: { value: "broadcast" } },
+      { contentsId: recipients[1].contentsId, payload: { value: "broadcast" } },
+      { contentsId: recipients[1].contentsId, payload: { value: "selected" } },
+    ]);
     await eden.dispose();
+    mixed.emit({ payload: { value: "after shutdown" } });
+    expect(received("routing/notice")).toHaveLength(3);
     source.emit({
       payload: { value: "after shutdown" },
       viewIds: [recipients[1].viewId],
@@ -72,6 +91,7 @@ it("delivers a controller notification only to selected subscribed views and rel
     expect(received()).toHaveLength(1);
   } finally {
     source.dispose();
+    mixed.dispose();
     await eden.dispose();
   }
 });

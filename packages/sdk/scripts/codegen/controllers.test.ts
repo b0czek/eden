@@ -16,7 +16,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     import * as v from "valibot";
     import { command, defineController } from "./controller";
     import { createEvent } from "../events/event";
-    import { targetedEvent, type TargetedNotification } from "./events";
+    import { targetedEvent, routedEvent, type TargetedNotification, type RoutedNotification } from "./events";
     import { operationTask } from "../operations/OperationTask";
     export const example = defineController("example", {
       commands: {
@@ -38,6 +38,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
       events: {
         changed: createEvent<{ value: number }>(),
         selected: targetedEvent(createEvent<TargetedNotification<{ selected: string }>>()),
+        notice: routedEvent(createEvent<RoutedNotification<{ message: string }>>()),
       },
     });
     // @ts-expect-error the validated argument is inferred as a number
@@ -85,6 +86,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
   ).toEqual([
     { namespace: "example", eventName: "changed" },
     { namespace: "example", eventName: "selected" },
+    { namespace: "example", eventName: "notice" },
   ]);
   project.createSourceFile(
     path.join(__dirname, "../../src/controllers/events.fixture.ts"),
@@ -96,6 +98,9 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     import type { ExampleEvents } from "./events.fixture";
     const change: ExampleEvents["example/changed"] = { value: 2 };
     const selected: ExampleEvents["example/selected"] = { selected: "item" };
+    const notice: ExampleEvents["example/notice"] = { message: "public" };
+    // @ts-expect-error broadcast audiences remain private too
+    const privateNotice: ExampleEvents["example/notice"] = { message: "public", viewIds: [] };
     // @ts-expect-error routing metadata is private to the controller
     const routed: ExampleEvents["example/selected"] = { selected: "item", viewIds: [1] };
     // @ts-expect-error generated event payloads retain their numeric field

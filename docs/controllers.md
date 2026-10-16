@@ -172,6 +172,11 @@ views; an empty audience delivers nothing. Routing metadata stays internal and
 does not enter the generated event payload. The service scope owns the local
 source, and runtime disposal releases its IPC forwarding.
 
+Use `routedEvent(source)` with `RoutedNotification<Payload>` when a source also
+supports broadcast delivery. Omit `viewIds` for a broadcast through the normal
+subscriber routing; supply an array for selected views. An empty array still
+delivers nothing. `targetedEvent` requires an explicit view audience.
+
 ## Composition and generation
 
 One [Effect runtime](../packages/sdk/src/effects/runtime.ts) belongs to each Eden
