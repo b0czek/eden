@@ -138,22 +138,18 @@ export interface AppbusCommands {
 export interface AppearanceCommands {
   "appearance/set-wallpaper": {
     mode: "result";
-    args: {
-    wallpaper: import("./index").WallpaperConfig };
+    args: { wallpaper: import("./index").WallpaperConfig; };
     response: void;
   };
   "appearance/get-wallpaper": {
     mode: "result";
     args: Record<string, never>;
-    response: { wallpaper: import("./index").WallpaperPreset };
+    response: { wallpaper: import("./index").WallpaperPreset; };
   };
   "appearance/get-presets": {
     mode: "result";
     args: Record<string, never>;
-    response: {
-    solid: import("./index").WallpaperPreset[];
-    gradients: import("./index").WallpaperPreset[];
-  };
+    response: { solid: import("./index").WallpaperPreset[]; gradients: import("./index").WallpaperPreset[]; };
   };
 }
 

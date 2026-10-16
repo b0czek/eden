@@ -40,6 +40,9 @@ function signatures() {
   eden.db.getSu("app.id", "theme");
   packages.list();
   eden.package.list();
+  eden.appearance.setWallpaper({ type: "preset", id: "eden-default" });
+  // @ts-expect-error wallpaper settings retain their discriminated public input type
+  eden.appearance.setWallpaper({ type: "invalid" });
   const changed = (event: EventData<"settings/panels-changed">) => {
     const panelId: string | undefined = event.panelId;
     return panelId;

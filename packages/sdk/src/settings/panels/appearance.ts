@@ -38,20 +38,20 @@ export const appearancePanel: BuiltinPanelModule = {
         properties: { wallpaper: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: async ({ appearanceManager }, invocation) => {
+      handler: async ({ appearance, effects }, invocation) => {
         const { wallpaper } = invocation.value as unknown as {
           wallpaper: WallpaperConfig;
         };
-        await appearanceManager.setWallpaper(wallpaper);
+        await effects.run(appearance.setWallpaper(wallpaper));
       },
     },
   },
   createLoader:
-    ({ appearanceManager }) =>
+    ({ appearance, effects }) =>
     async () => ({
       data: cloneRendererValue({
-        presets: appearanceManager.getPresets(),
-        wallpaper: await appearanceManager.getWallpaper(),
+        presets: appearance.getPresets(),
+        wallpaper: await effects.run(appearance.getWallpaper()),
       }) as unknown as SettingsPanelValue,
     }),
 };

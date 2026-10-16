@@ -26,7 +26,9 @@ import {
 import { createSettingsApi } from "../api/createSettingsApi";
 import { AppAssociationManager } from "../app-associations";
 import { AppChannelManager } from "../appbus";
-import { AppearanceManager } from "../appearance/AppearanceManager";
+import { createAppearanceController } from "../appearance/controller";
+import { createAppearance, type Appearance } from "../appearance/service";
+import { createAppearanceSettings } from "../appearance/settings-adapter";
 import { BrandingManager } from "../branding";
 import { ContextMenuManager } from "../context-menu";
 import { DaemonManager } from "../daemon";
@@ -130,6 +132,7 @@ export class EdenRuntime {
   private packageManager!: PackageManager;
   private processManager!: ProcessManager;
   private fileOpenManager!: FileOpenManager;
+  private appearanceService!: Appearance;
   private appAssociationManager!: AppAssociationManager;
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
@@ -346,7 +349,7 @@ export class EdenRuntime {
       this.settingsPanelManager.synchronizeManifestPanels();
       await this.daemonManager.initialize();
       await this.sessionManager.initialize();
-      await this.resolveOwned(AppearanceManager).initialize();
+      await this.effects.run(this.appearanceService.initialize());
       await this.appAssociationManager.initialize();
       await this.fileOpenManager.initialize();
       this.assertStartupActive();
@@ -428,21 +431,29 @@ export class EdenRuntime {
     this.resolveOwned(ContextMenuManager);
     this.resolveOwned(FilePickerManager);
     this.resolveOwned(DbManager);
-    const appearanceManager = this.resolveOwned(AppearanceManager);
+    const appearance = await this.effects.acquire(
+      createAppearance({
+        settings: createAppearanceSettings(settings),
+      }),
+    );
+    this.appearanceService = appearance;
+    this.ipcBridge.registerController(createAppearanceController(appearance));
     this.controlPlaneApis = createControlPlaneApis({
       packageManager: this.packageManager,
       daemonManager: this.daemonManager,
       userManager: this.userManager,
       sessionManager: this.sessionManager,
-      appearanceManager,
+      appearance,
+      effects: this.effects,
       associationManager: this.appAssociationManager,
       volumeManager: this.resolveOwned(VolumeManager),
       operationManager: this.resolveOwned(OperationManager),
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,
-      settings: this.resolveOwned(SettingsManager),
-      appearanceManager,
+      settings,
+      appearance,
+      effects: this.effects,
       packageManager: this.packageManager,
       daemonManager: this.daemonManager,
       userManager: this.userManager,

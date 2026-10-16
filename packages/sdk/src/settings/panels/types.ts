@@ -7,7 +7,8 @@ import type {
   SettingsPanelProviderContext,
   SettingsPanelValue,
 } from "@edenapp/types";
-import type { AppearanceManager } from "../../appearance/AppearanceManager";
+import type { EffectRuntime } from "../../effects/runtime";
+import type { Appearance } from "../../appearance/service";
 import type { DaemonManager } from "../../daemon";
 import type { PackageManager } from "../../package-manager";
 import type { UserManager } from "../../user";
@@ -17,7 +18,8 @@ import type { SettingsPanelManager } from "../SettingsPanelManager";
 export interface BuiltinSettingsDependencies {
   panels: SettingsPanelManager;
   settings: SettingsManager;
-  appearanceManager: AppearanceManager;
+  appearance: Appearance;
+  effects: EffectRuntime;
   packageManager: PackageManager;
   daemonManager: DaemonManager;
   userManager: UserManager;

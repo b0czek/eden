@@ -80,6 +80,21 @@ describe("EdenRuntime integration", () => {
     expect(await first.execute("i18n/get-locale")).toEqual({ locale: "pl" });
     expect(await second.execute("i18n/get-locale")).toEqual({ locale: "en" });
 
+    await first.runtime.appearance.setWallpaper({
+      type: "custom",
+      value: "#112233",
+    });
+    await second.runtime.appearance.setWallpaper({
+      type: "custom",
+      value: "#445566",
+    });
+    expect(await first.runtime.appearance.getWallpaper()).toMatchObject({
+      value: "#112233",
+    });
+    expect(await second.runtime.appearance.getWallpaper()).toMatchObject({
+      value: "#445566",
+    });
+
     await first.execute(
       "fs/write",
       {
@@ -160,7 +175,7 @@ describe("EdenRuntime integration", () => {
     ).toBe(false);
   });
 
-  it("preserves changed credentials, default account, and settings when restarting the same seeded profile", async () => {
+  it("preserves changed credentials, default account, settings, and wallpaper when restarting the same seeded profile", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-restart-"));
     try {
       const seedPath = path.join(root, "eden-seed.json");
@@ -201,6 +216,10 @@ describe("EdenRuntime integration", () => {
       await first.runtime
         .resolve(SettingsManager)
         .set("restart-app", "theme", "changed-theme");
+      await first.runtime.appearance.setWallpaper({
+        type: "custom",
+        value: "#abcdef",
+      });
       await first.dispose();
 
       const second = await createTestEden({ root, config: { seedPath } });
@@ -224,6 +243,10 @@ describe("EdenRuntime integration", () => {
           .resolve(SettingsManager)
           .get("restart-app", "theme"),
       ).toBe("changed-theme");
+      expect(await second.runtime.appearance.getWallpaper()).toMatchObject({
+        type: "custom",
+        value: "#abcdef",
+      });
     } finally {
       await Promise.all(active.splice(0).map((eden) => eden.dispose()));
       await fs.rm(root, { recursive: true, force: true });

@@ -134,7 +134,7 @@
     if (!container) return;
     const layer = document.createElement("div");
     layer.className = "wallpaper-layer";
-    // Matches AppearanceManager default
+    // Matches the appearance service default
     layer.style.background =
       "linear-gradient(135deg, #1e1e2e 0%, #1a1b26 100%)";
     layer.style.zIndex = zIndexCounter++;

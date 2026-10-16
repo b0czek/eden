@@ -24,6 +24,7 @@ import {
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
 import { SettingsManager } from "../../../src/settings/SettingsManager";
+import type { WallpaperPreset } from "@edenapp/types";
 import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
 import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
 import { IPCBridge } from "../../../src/ipc/IPCBridge";
@@ -191,6 +192,48 @@ describe("client subscriptions across renderer IPC", () => {
     const common = await api.shellCommand("i18n/get-common", { locale: "pl" });
     expect(common.translations).toMatchObject({ common: { cancel: "Anuluj" } });
     api.unsubscribe("i18n/locale-changed", onLocale);
+  });
+
+  it("validates and authorizes plain appearance commands and publishes their resolved events", async () => {
+    const api = createEdenAPI(transport, listeners);
+    const wallpaper = { type: "custom" as const, value: "#123456" };
+    await expect(
+      api.shellCommand("appearance/set-wallpaper", { wallpaper }),
+    ).rejects.toThrow("Permission denied");
+    eden.runtime
+      .resolve(PermissionRegistry)
+      .registerApp(owner.appId, ["appearance/manage"]);
+    const external: WallpaperPreset[] = [];
+    const local: WallpaperPreset[] = [];
+    const stop = eden.runtime.appearance.onChanged((value) => {
+      local.push(value);
+    });
+    const listener = (value: WallpaperPreset) => {
+      external.push(value);
+    };
+    await api.subscribe("appearance/wallpaper-changed", listener);
+    await api.shellCommand("appearance/set-wallpaper", { wallpaper });
+    const expected = {
+      id: "custom",
+      name: "Custom",
+      type: "custom",
+      value: "#123456",
+    };
+    expect(external).toEqual([expected]);
+    expect(local).toEqual([expected]);
+    await expect(
+      api.shellCommand("appearance/get-wallpaper", {}),
+    ).resolves.toEqual({ wallpaper: expected });
+    await expect(
+      eden.execute(
+        "appearance/set-wallpaper",
+        { wallpaper: { type: "invalid" } },
+        owner,
+      ),
+    ).rejects.toThrow();
+    expect(await eden.runtime.appearance.getWallpaper()).toEqual(expected);
+    api.unsubscribe("appearance/wallpaper-changed", listener);
+    stop();
   });
 
   it.each([false, true])(

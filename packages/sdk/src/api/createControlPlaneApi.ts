@@ -1,5 +1,6 @@
 import type { AppAssociationManager } from "../app-associations";
-import type { AppearanceManager } from "../appearance/AppearanceManager";
+import type { EffectRuntime } from "../effects/runtime";
+import type { Appearance } from "../appearance/service";
 import type { DaemonManager } from "../daemon";
 import type { VolumeManager } from "../filesystem/VolumeManager";
 import type { OperationManager } from "../operations/OperationManager";
@@ -32,7 +33,8 @@ interface Dependencies {
   daemonManager: DaemonManager;
   userManager: UserManager;
   sessionManager: SessionManager;
-  appearanceManager: AppearanceManager;
+  appearance: Appearance;
+  effects: EffectRuntime;
   associationManager: AppAssociationManager;
   volumeManager: VolumeManager;
   operationManager: OperationManager;
@@ -45,7 +47,8 @@ export function createControlPlaneApis({
   daemonManager,
   userManager,
   sessionManager,
-  appearanceManager,
+  appearance: appearanceService,
+  effects,
   associationManager,
   volumeManager,
   operationManager,
@@ -197,11 +200,13 @@ export function createControlPlaneApis({
   };
 
   const appearance: EdenAppearanceApi = {
-    getWallpaper: async () => clone(await appearanceManager.getWallpaper()),
-    getPresets: () => clone(appearanceManager.getPresets()),
-    setWallpaper: (config) => appearanceManager.setWallpaper(clone(config)),
+    getWallpaper: async () =>
+      clone(await effects.run(appearanceService.getWallpaper())),
+    getPresets: () => clone(appearanceService.getPresets()),
+    setWallpaper: (config) =>
+      effects.run(appearanceService.setWallpaper(clone(config))),
     onChanged: (listener) =>
-      appearanceManager.on("wallpaper-changed", (wallpaper) =>
+      appearanceService.wallpaperChanged.on((wallpaper) =>
         listener(clone(wallpaper)),
       ),
   };
