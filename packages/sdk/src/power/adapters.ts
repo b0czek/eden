@@ -1,6 +1,6 @@
 import type { EdenPowerProvider } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { PowerHost, PowerShutdown } from "./ports";
+import type { PowerHost, PowerShutdown } from "./service";
 
 const asError = (error: unknown) =>
   error instanceof Error ? error : new Error(String(error));

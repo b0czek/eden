@@ -2,12 +2,12 @@
 
 Eden can expose restart and power-off controls in eveshell and on the login
 screen. The controls are available only when the consumer supplies a typed
-host-side provider to `new Eden(...)`:
+host-side provider to `createEden(...)`:
 
 ```ts
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Eden, type EdenPowerProvider } from "@edenapp/sdk";
+import { createEden, type EdenPowerProvider } from "@edenapp/sdk";
 
 const execFileAsync = promisify(execFile);
 
@@ -20,7 +20,7 @@ const powerProvider: EdenPowerProvider = {
   },
 };
 
-new Eden({ powerProvider });
+createEden({ powerProvider });
 ```
 
 The example uses fixed executable and argument values. Do not pass user input

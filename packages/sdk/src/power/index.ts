@@ -1,10 +1,4 @@
-export { createPower, type Power } from "./service";
 export { createPowerHost, createPowerShutdown } from "./adapters";
-export { createPowerOperations, type PowerOperations } from "./operations";
-export { createPowerController } from "./controller";
-export type {
-  PowerAction,
-  PowerHost,
-  PowerShutdown,
-  PowerOperationBoundary,
-} from "./ports";
+export { createPowerController } from "./controller-edenapi";
+export type { PowerAction, PowerHost, PowerShutdown } from "./service";
+export { createPower, type Power } from "./service";

@@ -1,6 +1,4 @@
-import "reflect-metadata";
 import type { OperationHandle } from "@edenapp/types";
-import { OperationManager } from "../../../src/operations/OperationManager";
 import { operationTask } from "../../../src/operations/OperationTask";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -23,7 +21,7 @@ describe("power operation lifecycle", () => {
         },
       },
     });
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => {
       release = resolve;
@@ -68,12 +66,12 @@ describe("power operation lifecycle", () => {
         },
       },
     });
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>("system/power", {
       action: "poweroff",
     });
     let admissionDuringFailure: Promise<unknown> | undefined;
-    const stop = manager.on("changed", ({ snapshot }) => {
+    const stop = manager.changed.on(({ payload: { snapshot } }) => {
       if (snapshot.id !== handle.id || snapshot.status !== "failed") return;
       admissionDuringFailure = eden
         .execute("system/power", { action: "poweroff" })

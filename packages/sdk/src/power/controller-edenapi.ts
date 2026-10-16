@@ -1,28 +1,31 @@
 import * as v from "valibot";
-import { command, defineController } from "../controllers/controller";
-import type { PowerOperations } from "./operations";
+import {
+  command,
+  defineController,
+  operation,
+} from "../controllers/controller";
 import type { Power } from "./service";
 
-export function createPowerController(
-  power: Power,
-  operations: PowerOperations,
-) {
+export function createPowerController(power: Power) {
   return defineController("system", {
     commands: {
       "power-capabilities": command({
         permission: "power",
         handle: () => power.getCapabilities(),
       }),
-      power: command({
+      power: operation({
         permission: "power",
-        mode: "operation",
+        transition: "runtime",
         input: v.object({
           action: v.picklist(
             ["poweroff", "reboot"],
             "Unsupported system power action",
           ),
         }),
-        handle: (args) => operations.preparePower(args),
+        prepare: (args) => {
+          power.assertAvailable(args);
+          return (reporter) => power.power(args, reporter);
+        },
       }),
     },
   });

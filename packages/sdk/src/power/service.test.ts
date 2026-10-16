@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import { createEffectRuntime } from "../effects/runtime";
 import { createPowerHost } from "./adapters";
-import { createPowerOperations } from "./operations";
+import { createPowerController } from "./controller-edenapi";
 import { createPower } from "./service";
 
 it("rejects unavailable operations synchronously before a retained task is created", async () => {
@@ -13,11 +13,11 @@ it("rejects unavailable operations synchronously before a retained task is creat
         processes: { shutdown: () => Effect.void },
       }),
     );
-    const operations = createPowerOperations(power, { run: runtime.run });
+    const controller = createPowerController(power);
     expect(power.getCapabilities()).toEqual({ poweroff: false, reboot: false });
-    expect(() => operations.preparePower({ action: "poweroff" })).toThrow(
-      "System power management is unavailable",
-    );
+    expect(() =>
+      controller.commands.power.execute({ action: "poweroff" }, {}),
+    ).toThrow("System power management is unavailable");
   } finally {
     await runtime.dispose();
   }
@@ -65,12 +65,12 @@ it("drains an accepted host handoff before scope teardown and preserves provider
       }),
     );
     expect(power.getCapabilities()).toEqual({ poweroff: true, reboot: false });
-    expect(() => power.validatePower({ action: "reboot" })).toThrow(
+    expect(() => power.assertAvailable({ action: "reboot" })).toThrow(
       "System reboot is unavailable",
     );
     const action = runtime.run(power.power({ action: "poweroff" }));
     await started;
-    expect(() => power.validatePower({ action: "poweroff" })).toThrow(
+    expect(() => power.assertAvailable({ action: "poweroff" })).toThrow(
       "already pending",
     );
     const disposal = runtime.dispose();
@@ -85,7 +85,7 @@ it("drains an accepted host handoff before scope teardown and preserves provider
     const settled = await Promise.allSettled([action, disposal]);
     expect(settled[1].status).toBe("fulfilled");
     expect(provider.completed).toBe(true);
-    expect(() => power.validatePower({ action: "poweroff" })).toThrow(
+    expect(() => power.assertAvailable({ action: "poweroff" })).toThrow(
       "disposed",
     );
   } finally {
