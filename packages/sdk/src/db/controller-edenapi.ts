@@ -1,6 +1,11 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
+import {
+  keyArgsSchema,
+  namespaceArgsSchema,
+  namespacedKeyArgsSchema,
+} from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/ExecutionContext";
 import type { Db } from "./service";
 
@@ -15,7 +20,7 @@ export function createDbController(db: Db) {
     commands: {
       /** Get a value from database (scoped to caller's app) */
       get: command({
-        input: v.object({ key: v.string() }),
+        input: keyArgsSchema,
         permission: "rw",
         handle: ({ key }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -24,7 +29,7 @@ export function createDbController(db: Db) {
       }),
       /** Set a value in database (scoped to caller's app) */
       set: command({
-        input: v.object({ key: v.string(), value: v.string() }),
+        input: v.object({ key: keyArgsSchema.entries.key, value: v.string() }),
         permission: "rw",
         handle: ({ key, value }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -35,7 +40,7 @@ export function createDbController(db: Db) {
       }),
       /** Delete a key from database (scoped to caller's app) */
       delete: command({
-        input: v.object({ key: v.string() }),
+        input: keyArgsSchema,
         permission: "rw",
         handle: ({ key }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -44,7 +49,7 @@ export function createDbController(db: Db) {
       }),
       /** Check if a key exists (scoped to caller's app) */
       has: command({
-        input: v.object({ key: v.string() }),
+        input: keyArgsSchema,
         permission: "rw",
         handle: ({ key }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -71,7 +76,7 @@ export function createDbController(db: Db) {
       }),
       /** Get a value from any app's namespace (superuser only) */
       "get/su": command({
-        input: v.object({ appId: v.string(), key: v.string() }),
+        input: namespacedKeyArgsSchema,
         permission: "superuser",
         handle: ({ appId, key }) =>
           Effect.map(db.get(appId, key), (value) => ({ value })),
@@ -79,8 +84,8 @@ export function createDbController(db: Db) {
       /** Set a value in any app's namespace (superuser only) */
       "set/su": command({
         input: v.object({
-          appId: v.string(),
-          key: v.string(),
+          appId: namespaceArgsSchema.entries.appId,
+          key: keyArgsSchema.entries.key,
           value: v.string(),
         }),
         permission: "superuser",
@@ -91,21 +96,21 @@ export function createDbController(db: Db) {
       }),
       /** Delete a key from any app's namespace (superuser only) */
       "delete/su": command({
-        input: v.object({ appId: v.string(), key: v.string() }),
+        input: namespacedKeyArgsSchema,
         permission: "superuser",
         handle: ({ appId, key }) =>
           Effect.map(db.delete(appId, key), (success) => ({ success })),
       }),
       /** Check if a key exists in any app's namespace (superuser only) */
       "has/su": command({
-        input: v.object({ appId: v.string(), key: v.string() }),
+        input: namespacedKeyArgsSchema,
         permission: "superuser",
         handle: ({ appId, key }) =>
           Effect.map(db.has(appId, key), (exists) => ({ exists })),
       }),
       /** Clear all keys in any app's namespace (superuser only) */
       "clear/su": command({
-        input: v.object({ appId: v.string() }),
+        input: namespaceArgsSchema,
         permission: "superuser",
         handle: ({ appId }) =>
           Effect.map(db.clear(appId), (): { success: boolean } => ({
@@ -114,7 +119,7 @@ export function createDbController(db: Db) {
       }),
       /** List all keys in any app's namespace (superuser only) */
       "list/su": command({
-        input: v.object({ appId: v.string() }),
+        input: namespaceArgsSchema,
         permission: "superuser",
         handle: ({ appId }) => Effect.map(db.list(appId), (keys) => ({ keys })),
       }),

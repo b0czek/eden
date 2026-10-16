@@ -14,7 +14,7 @@ it("isolates app namespaces using trusted callers and gates cross-app commands",
   const eden = await createTestEden();
   try {
     const { caller } = await createTestCaller(eden, "app.first", ["db/rw"]);
-    const permissions = eden.runtime.resolve(PermissionRegistry);
+    const permissions = eden.runtime.services.permissions;
     permissions.registerApp("app.second", ["db/rw"]);
     permissions.registerApp("app.admin", ["db/superuser"]);
     permissions.registerApp("app.denied", []);
