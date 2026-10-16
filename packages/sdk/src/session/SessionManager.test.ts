@@ -1,15 +1,15 @@
-import { gate } from "../../tests/support/async";
-import "reflect-metadata";
-
 import type { UserProfile } from "@edenapp/types";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import type { FilesystemManager } from "../filesystem/FilesystemManager";
-import type { CommandRegistry, IPCBridge } from "../ipc";
-import { OperationManager } from "../operations/OperationManager";
-import type { ProcessManager } from "../process-manager/ProcessManager";
-import type { UserManager } from "../user/UserManager";
-import { SessionContext } from "./SessionContext";
-import { SessionManager } from "./SessionManager";
+import * as Effect from "effect/Effect";
+import { gate } from "../../tests/support/async";
+import { fromPromise } from "../effects/io";
+import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
+import { createExecutionContext } from "../execution/ExecutionContext";
+import {
+  createOperationManager,
+  type OperationManager,
+} from "../operations/OperationManager";
+import { createSessionContext, type SessionContext } from "./SessionContext";
+import { createSessionManager, type SessionManager } from "./SessionManager";
 
 const createUser = (username: string): UserProfile => ({
   username,
@@ -32,45 +32,48 @@ describe("SessionManager", () => {
   let notify: jest.Mock;
   let manager: SessionManager;
   let operations: OperationManager;
+  let effects: EffectRuntime;
 
-  beforeEach(() => {
-    context = new SessionContext();
+  beforeEach(async () => {
+    context = createSessionContext();
     userManager = {
       authenticate: jest.fn(),
-      getDefaultUser: jest.fn().mockResolvedValue(null),
+      getDefaultUser: jest.fn().mockReturnValue(Effect.succeed(null)),
     };
     processManager = {
-      stopSessionApps: jest.fn().mockResolvedValue(undefined),
+      stopSessionApps: jest.fn().mockReturnValue(Effect.void),
     };
     notify = jest.fn();
-    const bridge = { eventSubscribers: { notify } } as unknown as IPCBridge;
-    operations = new OperationManager(
-      bridge,
-      new ExecutionContext({}),
-      context,
-      {
-        releaseHandles: jest.fn().mockResolvedValue(undefined),
-      } as unknown as FilesystemManager,
+    effects = createEffectRuntime();
+    operations = createOperationManager({
+      effects,
+      execution: createExecutionContext({ config: {} }),
+      session: context,
+      filesystem: { releaseHandles: () => Effect.void },
+    });
+    manager = await effects.acquire(
+      createSessionManager({
+        users: userManager,
+        processes: processManager,
+        context,
+        operations,
+      }),
     );
-    manager = new SessionManager(
-      { eventSubscribers: { notify } } as unknown as IPCBridge,
-      { registerManager: jest.fn() } as unknown as CommandRegistry,
-      userManager as unknown as UserManager,
-      processManager as unknown as ProcessManager,
-      context,
-      operations,
-    );
+    manager.changed.on(notify);
   });
 
-  afterEach(() => operations.dispose());
+  afterEach(async () => {
+    operations.dispose();
+    await effects.dispose();
+  });
 
   it("does not stop apps or change identity when authentication fails", async () => {
     context.setCurrentUser(alice);
-    userManager.authenticate.mockRejectedValue(
-      new Error("Invalid credentials"),
+    userManager.authenticate.mockReturnValue(
+      Effect.fail(new Error("Invalid credentials")),
     );
 
-    await expect(manager.login("bob", "wrong")).rejects.toThrow(
+    await expect(effects.run(manager.login("bob", "wrong"))).rejects.toThrow(
       "Invalid credentials",
     );
     expect(processManager.stopSessionApps).not.toHaveBeenCalled();
@@ -80,12 +83,12 @@ describe("SessionManager", () => {
 
   it("keeps the old identity when app shutdown fails", async () => {
     context.setCurrentUser(alice);
-    userManager.authenticate.mockResolvedValue(bob);
-    processManager.stopSessionApps.mockRejectedValue(
-      new Error("shutdown failed"),
+    userManager.authenticate.mockReturnValue(Effect.succeed(bob));
+    processManager.stopSessionApps.mockReturnValue(
+      Effect.fail(new Error("shutdown failed")),
     );
 
-    await expect(manager.login("bob", "password")).rejects.toThrow(
+    await expect(effects.run(manager.login("bob", "password"))).rejects.toThrow(
       "shutdown failed",
     );
     expect(manager.getCurrentUser()?.username).toBe("alice");
@@ -94,10 +97,12 @@ describe("SessionManager", () => {
 
   it("rejects concurrent transitions", async () => {
     const authentication = gate<UserProfile>();
-    userManager.authenticate.mockReturnValue(authentication.promise);
+    userManager.authenticate.mockReturnValue(
+      fromPromise(() => authentication.promise),
+    );
 
-    const login = manager.login("alice", "password");
-    await expect(manager.logout()).rejects.toThrow(
+    const login = effects.run(manager.login("alice", "password"));
+    await expect(effects.run(manager.logout())).rejects.toThrow(
       "A session transition is already in progress",
     );
     authentication.release(alice);
@@ -107,22 +112,22 @@ describe("SessionManager", () => {
   it("refreshes the same identity without stopping apps", async () => {
     context.setCurrentUser(alice);
     const refreshed = { ...alice, name: "Alice Updated", updatedAt: 2 };
-    userManager.authenticate.mockResolvedValue(refreshed);
+    userManager.authenticate.mockReturnValue(Effect.succeed(refreshed));
 
-    await manager.login("alice", "password");
+    await effects.run(manager.login("alice", "password"));
 
     expect(processManager.stopSessionApps).not.toHaveBeenCalled();
     expect(manager.getCurrentUser()).toEqual(refreshed);
   });
 
   it("activates the configured default user during initialization", async () => {
-    userManager.getDefaultUser.mockResolvedValue(alice);
+    userManager.getDefaultUser.mockReturnValue(Effect.succeed(alice));
 
-    await manager.initialize();
+    await effects.run(manager.initialize());
 
     expect(processManager.stopSessionApps).toHaveBeenCalledTimes(1);
     expect(manager.getCurrentUser()).toEqual(alice);
-    expect(notify).toHaveBeenCalledWith("session/changed", {
+    expect(notify).toHaveBeenCalledWith({
       currentUser: alice,
       previousUsername: null,
       reason: "system",

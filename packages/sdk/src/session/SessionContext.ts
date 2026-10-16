@@ -1,34 +1,35 @@
 import { randomUUID } from "node:crypto";
 import type { UserProfile } from "@edenapp/types";
-import { Lifecycle, scoped } from "tsyringe";
 
-@scoped(Lifecycle.ContainerScoped)
-export class SessionContext {
-  private currentUser: UserProfile | null = null;
-  private sessionId = randomUUID();
+export function createSessionContext() {
+  let currentUser: UserProfile | null = null;
+  let sessionId = randomUUID();
 
-  getCurrentUser(): UserProfile | null {
-    return this.currentUser ? this.cloneUser(this.currentUser) : null;
+  function getCurrentUser(): UserProfile | null {
+    return currentUser ? cloneUser(currentUser) : null;
   }
-
-  setCurrentUser(user: UserProfile | null): void {
-    this.currentUser = user ? this.cloneUser(user) : null;
+  function setCurrentUser(user: UserProfile | null): void {
+    currentUser = user ? cloneUser(user) : null;
   }
-
-  getSessionId(): string {
-    return this.sessionId;
+  function getSessionId(): string {
+    return sessionId;
   }
-
-  beginSession(user: UserProfile | null): void {
-    this.sessionId = randomUUID();
-    this.setCurrentUser(user);
+  function beginSession(user: UserProfile | null): void {
+    sessionId = randomUUID();
+    setCurrentUser(user);
   }
-
-  private cloneUser(user: UserProfile): UserProfile {
+  function cloneUser(user: UserProfile): UserProfile {
     return { ...user, grants: [...user.grants] };
   }
-
-  dispose(): void {
-    this.currentUser = null;
+  function dispose(): void {
+    currentUser = null;
   }
+  return {
+    getCurrentUser,
+    setCurrentUser,
+    getSessionId,
+    beginSession,
+    dispose,
+  };
 }
+export type SessionContext = ReturnType<typeof createSessionContext>;

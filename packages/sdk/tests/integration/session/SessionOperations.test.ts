@@ -1,6 +1,3 @@
-import { gate, tick } from "../../support/async";
-import { createTestCaller } from "../../support/callers";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle } from "@edenapp/types";
@@ -8,6 +5,8 @@ import { PermissionRegistry } from "../../../src/ipc";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { operationTask } from "../../../src/operations/OperationTask";
 import { SessionContext } from "../../../src/session/SessionContext";
+import { gate, tick } from "../../support/async";
+import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("session operation transactions", () => {
@@ -24,10 +23,10 @@ describe("session operation transactions", () => {
       ["session/manage"],
     );
     await eden.runtime.sessions.login(profile.username, "password");
-    const session = eden.runtime.resolve(SessionContext);
+    const session = eden.runtime.services.sessionContext;
     const sessionId = session.getSessionId();
     const caller = { ...owner, sessionId };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const blocked = gate();
     const file = path.join(eden.paths.root, "session-work");
     const work = manager.submit("integration/session-work", {}, caller, () =>
@@ -70,9 +69,8 @@ describe("session operation transactions", () => {
       config: {
         powerProvider: {
           poweroff: async () => {
-            userAtHandoff = eden.runtime
-              .resolve(SessionContext)
-              .getCurrentUser()?.username;
+            userAtHandoff =
+              eden.runtime.services.sessionContext.getCurrentUser()?.username;
             throw new Error("Host refused poweroff");
           },
         },
@@ -89,10 +87,11 @@ describe("session operation transactions", () => {
       // Daemon operations outlive interactive login sessions.
       sessionId: "daemon:session-controller",
     };
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(caller.appId, ["session/manage", "system/power"]);
-    const manager = eden.runtime.resolve(OperationManager);
+    eden.runtime.services.permissions.registerApp(caller.appId, [
+      "session/manage",
+      "system/power",
+    ]);
+    const manager = eden.runtime.services.operations;
     const login = await eden.execute<OperationHandle>(
       "session/login",
       { username: "operator", password: "password" },
@@ -121,7 +120,7 @@ describe("session operation transactions", () => {
     await refused;
     expect(userAtHandoff).toBe("operator");
     expect(
-      eden.runtime.resolve(SessionContext).getCurrentUser()?.username,
+      eden.runtime.services.sessionContext.getCurrentUser()?.username,
     ).toBe("operator");
     await expect(eden.complete("session/logout", {}, caller)).resolves.toEqual({
       success: true,
@@ -135,7 +134,7 @@ describe("session operation transactions", () => {
       name: "Operator",
       password: "password",
     });
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>("session/login", {
       username: "operator",
       password: "wrong",

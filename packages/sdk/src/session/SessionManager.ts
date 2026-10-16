@@ -1,110 +1,95 @@
 import type { UserProfile } from "@edenapp/types";
-import { inject, Lifecycle, scoped } from "tsyringe";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
-import { OperationManager } from "../operations/OperationManager";
-import { ProcessManager } from "../process-manager/ProcessManager";
-import { UserManager } from "../user/UserManager";
-import { SessionContext } from "./SessionContext";
-import { SessionHandler } from "./SessionHandler";
+import * as Effect from "effect/Effect";
+import { scopedEvent } from "../events/scoped";
+import type { OperationManager } from "../operations/OperationManager";
+import type { UserManager } from "../user/UserManager";
+import type { SessionContext } from "./SessionContext";
 
-interface SessionNamespaceEvents {
-  changed: {
-    currentUser: UserProfile | null;
-    previousUsername: string | null;
-    reason: "login" | "logout" | "system";
-  };
+export interface SessionChange {
+  currentUser: UserProfile | null;
+  previousUsername: string | null;
+  reason: "login" | "logout" | "system";
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@EdenNamespace("session")
-export class SessionManager extends EdenEmitter<SessionNamespaceEvents> {
-  private initialized = false;
-  private transitionInProgress = false;
-
-  constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(UserManager) private userManager: UserManager,
-    @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(SessionContext) private context: SessionContext,
-    @inject(OperationManager) private operations: OperationManager,
+export const createSessionManager = Effect.fn(function* ({
+  users,
+  context,
+  operations,
+  processes,
+}: {
+  users: Pick<UserManager, "getDefaultUser" | "authenticate">;
+  context: SessionContext;
+  operations: Pick<OperationManager, "withSessionTransition">;
+  processes: { stopSessionApps(sessionId: string): Effect.Effect<void, Error> };
+}) {
+  const changed = yield* scopedEvent<SessionChange>();
+  let initialized = false;
+  let transitionInProgress = false;
+  const transitionTo = Effect.fn(function* (
+    user: UserProfile | null,
+    reason: SessionChange["reason"],
   ) {
-    super(ipcBridge);
-    commandRegistry.registerManager(new SessionHandler(this));
-  }
-
-  async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    const defaultUser = await this.userManager.getDefaultUser();
-    if (defaultUser) {
-      await this.runTransition(() => this.transitionTo(defaultUser, "system"));
-    }
-    this.initialized = true;
-  }
-
-  getCurrentUser(): UserProfile | null {
-    return this.context.getCurrentUser();
-  }
-
-  async login(username: string, password: string): Promise<UserProfile> {
-    return await this.runTransition(async () => {
-      const user = await this.userManager.authenticate(username, password);
-      await this.transitionTo(user, "login");
-      return user;
+    const previousUsername = context.getCurrentUser()?.username ?? null;
+    const nextUsername = user?.username ?? null;
+    if (previousUsername !== nextUsername) {
+      yield* processes.stopSessionApps(context.getSessionId());
+      context.beginSession(user);
+    } else context.setCurrentUser(user);
+    changed.emit({
+      currentUser: context.getCurrentUser(),
+      previousUsername,
+      reason,
+    });
+  });
+  function runTransition<A>(work: Effect.Effect<A, Error>) {
+    return Effect.suspend(() => {
+      if (transitionInProgress)
+        return Effect.fail(
+          new Error("A session transition is already in progress"),
+        );
+      transitionInProgress = true;
+      return operations.withSessionTransition(work).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            transitionInProgress = false;
+          }),
+        ),
+      );
     });
   }
-
-  async logout(): Promise<void> {
-    await this.runTransition(() => this.transitionTo(null, "logout"));
-  }
-
-  synchronizeUser(user: UserProfile): void {
-    const currentUser = this.context.getCurrentUser();
-    if (currentUser?.username !== user.username) return;
-
-    this.context.setCurrentUser(user);
-    this.notify("changed", {
-      currentUser: this.context.getCurrentUser(),
+  const initialize = Effect.fn(function* () {
+    if (initialized) return;
+    const defaultUser = yield* users.getDefaultUser();
+    if (defaultUser) yield* runTransition(transitionTo(defaultUser, "system"));
+    initialized = true;
+  });
+  const login = (username: string, password: string) =>
+    runTransition(
+      Effect.gen(function* () {
+        const user = yield* users.authenticate(username, password);
+        yield* transitionTo(user, "login");
+        return user;
+      }),
+    );
+  const logout = () => runTransition(transitionTo(null, "logout"));
+  function synchronizeUser(user: UserProfile) {
+    if (context.getCurrentUser()?.username !== user.username) return;
+    context.setCurrentUser(user);
+    changed.emit({
+      currentUser: context.getCurrentUser(),
       previousUsername: user.username,
       reason: "system",
     });
   }
-
-  private async transitionTo(
-    user: UserProfile | null,
-    reason: SessionNamespaceEvents["changed"]["reason"],
-  ): Promise<void> {
-    const previousUser = this.context.getCurrentUser();
-    const previousUsername = previousUser?.username ?? null;
-    const nextUsername = user?.username ?? null;
-
-    if (previousUsername !== nextUsername) {
-      await this.processManager.stopSessionApps(this.context.getSessionId());
-    }
-
-    if (previousUsername !== nextUsername) {
-      this.context.beginSession(user);
-    } else {
-      this.context.setCurrentUser(user);
-    }
-    this.notify("changed", {
-      currentUser: this.context.getCurrentUser(),
-      previousUsername,
-      reason,
-    });
-  }
-
-  private async runTransition<T>(task: () => Promise<T>): Promise<T> {
-    if (this.transitionInProgress) {
-      throw new Error("A session transition is already in progress");
-    }
-
-    this.transitionInProgress = true;
-    try {
-      return await this.operations.withSessionTransition(task);
-    } finally {
-      this.transitionInProgress = false;
-    }
-  }
-}
+  return {
+    initialize,
+    login,
+    logout,
+    synchronizeUser,
+    getCurrentUser: context.getCurrentUser,
+    changed,
+  };
+});
+export type SessionManager = Effect.Success<
+  ReturnType<typeof createSessionManager>
+>;
