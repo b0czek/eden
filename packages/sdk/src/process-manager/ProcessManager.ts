@@ -12,7 +12,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { AppChannelManager } from "../appbus/AppChannelManager";
+import { APP_CHANNELS, type AppChannelLifecycle } from "../appbus/ports";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import {
@@ -70,7 +70,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(PackageManager) private packageManager: PackageManager,
-    @inject(AppChannelManager) private appChannelManager: AppChannelManager,
+    @inject(APP_CHANNELS) private appChannelManager: AppChannelLifecycle,
     @inject(SessionContext) private sessionContext: SessionContext,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject("EdenConfig") private config: EdenConfig,

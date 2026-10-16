@@ -75,11 +75,8 @@ export interface AppbusCommands {
    */
   "appbus/register": {
     mode: "result";
-    args: {
-    serviceName: string;
-    description?: string;
-    allowedClients?: string[] };
-    response: { success: boolean; error?: string };
+    args: { serviceName: string; description?: string | undefined; allowedClients?: string[] | undefined; };
+    response: { success: boolean; error?: string; };
   };
   /**
    * Unregister a service
@@ -87,9 +84,8 @@ export interface AppbusCommands {
    */
   "appbus/unregister": {
     mode: "result";
-    args: {
-    serviceName: string };
-    response: { success: boolean };
+    args: { serviceName: string; };
+    response: { success: boolean; };
   };
   /**
    * List all available services
@@ -98,7 +94,7 @@ export interface AppbusCommands {
   "appbus/list": {
     mode: "result";
     args: Record<string, never>;
-    response: { services: import("./index").ServiceInfo[] };
+    response: { services: import("./index").ServiceInfo[]; };
   };
   /**
    * List services by app ID
@@ -106,9 +102,8 @@ export interface AppbusCommands {
    */
   "appbus/list-by-app": {
     mode: "result";
-    args: {
-    appId: string };
-    response: { services: import("./index").ServiceInfo[] };
+    args: { appId: string; };
+    response: { services: import("./index").ServiceInfo[]; };
   };
   /**
    * Connect to another app's service
@@ -117,9 +112,7 @@ export interface AppbusCommands {
    */
   "appbus/connect": {
     mode: "result";
-    args: {
-    targetAppId: string;
-    serviceName: string };
+    args: { targetAppId: string; serviceName: string; };
     response: import("./index").ConnectResult;
   };
 }

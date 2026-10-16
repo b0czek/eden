@@ -30,7 +30,12 @@ import {
   createJsonFileAssociationStorage,
   type AppAssociations,
 } from "../app-associations";
-import { AppChannelManager } from "../appbus";
+import {
+  APP_CHANNELS,
+  createAppChannels,
+  createAppChannelsController,
+  type AppChannels,
+} from "../appbus";
 import { createAppearanceController } from "../appearance/controller";
 import { createAppearance, type Appearance } from "../appearance/service";
 import { createAppearanceSettings } from "../appearance/settings-adapter";
@@ -189,6 +194,7 @@ export class EdenRuntime {
   private sessionManager!: SessionManager;
   private daemonManager!: DaemonManager;
   private keyboardService!: Keyboard;
+  private appChannels?: AppChannels;
 
   public readonly settings: EdenSettingsApi;
 
@@ -219,6 +225,10 @@ export class EdenRuntime {
       this.own(this.legacySettings).access,
     );
     this.container.registerInstance("EdenConfig", this.config);
+    this.container.registerInstance(APP_CHANNELS, {
+      unregisterAllServices: (appId: string) =>
+        this.appChannels?.unregisterAllServices(appId) ?? 0,
+    });
     this.container.registerInstance("appsDirectory", this.paths.appsDirectory);
     this.container.registerInstance("distPath", this.paths.distPath);
     this.container.registerInstance("userDirectory", this.paths.userDirectory);
@@ -463,7 +473,21 @@ export class EdenRuntime {
     this.legacySettings.connect(settings);
     this.ipcBridge.registerController(createSettingsController(settings));
     this.viewManager = this.resolveOwned(ViewManager);
-    this.resolveOwned(AppChannelManager);
+    const backends = this.resolveOwned(BackendManager);
+    this.appChannels = await this.effects.acquire(
+      createAppChannels({
+        channels: this.platform.appChannels,
+        backends: {
+          hasBackend: (appId) => backends.hasBackend(appId),
+          sendPortToBackend: (appId, message, ports) =>
+            backends.sendPortToBackend(appId, message, ports),
+          sendMessage: (appId, message) => backends.sendMessage(appId, message),
+        },
+      }),
+    );
+    this.ipcBridge.registerController(
+      createAppChannelsController(this.appChannels),
+    );
     this.resolveOwned(FilesystemManager);
     this.userManager = this.resolveOwned(UserManager);
     this.own(this.effects);
