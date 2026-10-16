@@ -1,9 +1,10 @@
 # Controllers and domain events
 
-Controllers declare the public command and event contract for one domain. Keep
-its factory beside the domain implementation, such as `i18n/controller.ts` or
-`appearance/controller.ts`. Factories receive their dependencies explicitly;
-services own domain behavior and state. The runtime composes and registers them.
+Each domain keeps its public boundaries beside its implementation:
+`controller-edenapi.ts` exposes sandboxed app commands and events, while
+`controller-sdk.ts` exposes trusted main-process SDK methods. Factories receive
+their dependencies explicitly; services own domain behavior and state. The
+runtime composes the controllers and registers the EdenAPI command contracts.
 
 ## Services
 
@@ -19,13 +20,15 @@ import * as Effect from "effect/Effect";
 export type I18n = Effect.Success<ReturnType<typeof createI18n>>;
 ```
 
-Keep each service in its domain's `service.ts`, beside `controller.ts`. Stateless
+Keep single-service domains in `service.ts`, beside their controllers. Larger
+domains keep cohesive services in focused adjacent modules. Stateless
 domain rules and data use ordinary functions, such as wallpaper resolution in
 [appearance/presets.ts](../packages/sdk/src/appearance/presets.ts). Service
 closures own instance state and resource lifetimes.
 
-Dependencies describe domain capabilities in `ports.ts`, using fully provided
-Effects for I/O:
+Dependencies describe domain capabilities using fully provided Effects for I/O.
+Keep small contracts beside the factory; use `ports.ts` when the set of contracts
+benefits from its own module:
 
 ```ts
 import type { WallpaperConfig } from "@edenapp/types";
@@ -47,37 +50,45 @@ service's Effects directly. Adapters for legacy Promise APIs defer work with
 Promise or interpreter. Services receive neither a dependency container nor a
 concrete settings manager.
 
+Controllers validate external inputs before passing domain values to services.
+Share input schemas between EdenAPI and SDK controllers where their contracts
+match. Host-only inputs, such as filesystem paths and callback providers, have
+SDK-specific validation. Services enforce runtime invariants and validate data
+arriving from other boundaries, such as persistence; they do not repeat the
+controller's input parsing.
+
+Reuse the small argument shapes in `controllers/schemas.ts` for plain string
+keys and app namespaces. Keep domain constraints in the owning domain's schemas.
+Persistence readers use those same domain schemas before passing stored data to
+services; runtime checks depend on current state rather than repeating shape checks.
+
 Register cleanup when acquiring a resource. For example, i18n acquires its local
 event source and upstream subscription within the factory's scope:
 
 ```ts
 import * as Effect from "effect/Effect";
-import { createEvent } from "../events/event";
-import type { I18nSettings } from "./ports";
+import { listen, scopedEvent } from "../events/scoped";
 
 interface I18nDependencies {
   settings: I18nSettings;
 }
 
-export function createI18n({ settings }: I18nDependencies) {
-  return Effect.gen(function* () {
-    const localeChanged = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<{ locale: string }>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() => settings.localeChanged.on(localeChanged.emit)),
-      (stop) => Effect.sync(stop),
-    );
+export const createI18n = Effect.fn(function* ({ settings }: I18nDependencies) {
+  const localeChanged = yield* scopedEvent<{ locale: string }>();
+  yield* listen(settings.localeChanged, localeChanged.emit);
 
-    function getLocale() {
-      return Effect.map(settings.readLocale(), (locale) => locale || "en");
-    }
-
-    return { getLocale, localeChanged };
+  const getLocale = Effect.fn(function* () {
+    return (yield* settings.readLocale()) || "en";
   });
-}
+
+  return { getLocale, localeChanged };
+});
 ```
+
+`Effect.fn` keeps workflow construction lazy and infers its result, failures and
+requirements. `scopedEvent` acquires a local event source and clears its listeners
+when the scope closes. `listen` registers a listener and removes it on scope close.
+Both helpers use the shared event primitives and standard Effect resource ownership.
 
 The complete [i18n service](../packages/sdk/src/i18n/service.ts) also exposes
 ordinary synchronous translation lookup. The
@@ -126,16 +137,56 @@ return work rather than calling `runPromise` themselves.
 `permission: "manage"` on an appearance command requires `appearance/manage`.
 Commands run through the existing registry's permission and grant checks.
 Trusted caller context is supplied as the second handler argument, separately
-from schema-validated public input. Operation commands declare
-`mode: "operation"` and synchronously prepare an `OperationTask`, using the
-existing operation lifecycle and client controls. Preparing that task is distinct
-from executing its retained work.
+from schema-validated public input.
+
+Use `operation` for commands that synchronously validate and prepare retained work:
+
+```ts
+power: operation({
+  permission: "power",
+  input: powerActionSchema,
+  transition: "runtime",
+  prepare: (args) => {
+    power.assertAvailable(args);
+    return (reporter) => power.power(args, reporter);
+  },
+}),
+```
+
+`prepare` receives validated arguments and trusted caller context. It returns a
+function that accepts the operation reporter and produces a fully provided Effect
+or Promise. Preparation finishes before acceptance; execution starts afterward.
+The operation runtime interprets Effects and retains their completion or failure
+through the existing operation lifecycle. The reporter supplies progress updates
+and a cancellation signal for work that declares `cancellable: true`.
+
+Commands may also declare `mode: "operation"` and return an `OperationTask`
+directly, for example when a filesystem capability prepares resource admission.
 
 Codegen extracts the successful result from value, Promise, and Effect handlers,
 and the completion value from an operation task. Effect failure types and service
 requirements do not enter generated client declarations. Apps keep the existing
 Promise-based client API, including operation controls and subscriptions, without
 an Effect dependency.
+
+## SDK controllers
+
+SDK controllers return the existing typed method objects, preserving synchronous
+reads, Promise-based work, detached data and idempotent unsubscribe functions.
+They validate inputs before mutating state or submitting retained work. See
+[appearance](../packages/sdk/src/appearance/controller-sdk.ts) for native Effect
+composition and [sessions](../packages/sdk/src/session/controller-sdk.ts) for
+retained host transitions.
+
+The runtime supplies one `SdkContext`. Its `run` method establishes host authority
+with a system principal and no inherited app, renderer or operation identity.
+`effect` interprets fully provided service Effects in that context. `operation`
+submits through the existing operation ledger and awaits completion. SDK event
+callbacks also enter host context and receive detached payloads.
+
+`createControlPlaneApis` composes these domain controllers; it contains no input
+validation or domain workflow. The
+[main-process API](main-process-api.md) owns the public host trust contract.
 
 ## Events
 
@@ -176,6 +227,8 @@ Use `routedEvent(source)` with `RoutedNotification<Payload>` when a source also
 supports broadcast delivery. Omit `viewIds` for a broadcast through the normal
 subscriber routing; supply an array for selected views. An empty array still
 delivers nothing. `targetedEvent` requires an explicit view audience.
+Operation notifications also carry an internal owner/session `scope`; forwarding
+preserves that scope so only authorized subscribers receive them.
 
 ## Composition and generation
 
@@ -204,12 +257,12 @@ preserves startup ordering: appearance initializes after settings and sessions
 are ready. Host and IPC boundaries execute service Effects while preserving
 their existing Promise APIs.
 
-Plain controller commands and decorated handlers use the same execution registry.
-An explicit controller cannot replace an existing command, and decorated handlers
-cannot replace explicit controller commands. Codegen extracts explicit
-controller contracts through their inferred TypeScript types, alongside existing
-decorated domains. It does not instantiate domain services. Test files are excluded
-from production contract discovery.
+Controllers register their commands and selected event sources with one execution
+registry. A command name has one owner; registering a duplicate is an error.
+Codegen extracts command inputs, successful results, operation completions and
+event payloads from the controllers' inferred TypeScript types. It never
+constructs services or runs their workflows. Test files are excluded from
+production contract discovery.
 
 Regenerate declarations and the client after changing a public controller:
 

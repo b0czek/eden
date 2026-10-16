@@ -1,32 +1,49 @@
+const path = require("node:path");
+const Effect = require("effect/Effect");
+const v = require("valibot");
+const { createEdenHost } = require("../../dist/Eden.js");
 const {
-  OperationManager,
-} = require("../../dist/operations/OperationManager.js");
-const { SessionContext } = require("../../dist/session/SessionContext.js");
-const { Eden } = require("../../dist/index.js");
+  createElectronPlatform,
+} = require("../../dist/platform/electron/index.js");
+const { createEdenRuntime } = require("../../dist/runtime/EdenRuntime.js");
+const {
+  defineController,
+  operation,
+} = require("../../dist/controllers/controller.js");
 
-const eden = new Eden({
+const platform = createElectronPlatform();
+platform.resources.registerSchemes(["eden-dlc"]);
+platform.application.appendCommandLineSwitch("enable-features", "V8CodeCache");
+const config = {
   appsDirectory: process.env.EDEN_TEST_APPS_DIRECTORY,
   userDirectory: process.env.EDEN_TEST_USER_DIRECTORY,
   seedPath: process.env.EDEN_TEST_SEED_PATH,
   loginAppId: "",
-  window: {
-    title: "Eden Electron Integration",
+  window: { title: "Eden Electron Integration" },
+};
+const runtime = createEdenRuntime({
+  config,
+  platform,
+  paths: {
+    appsDirectory: config.appsDirectory,
+    userDirectory: config.userDirectory,
+    distPath: path.join(process.cwd(), "dist"),
+    appPath: platform.application.getAppPath(),
   },
 });
-
+const eden = createEdenHost({ runtime, application: platform.application });
 const operationReleases = new Map();
 
 globalThis.__edenIntegration = {
   releaseOperation: (name) => operationReleases.get(name)?.(),
   eden,
+  runtime,
   execute: async (command, args) => {
-    const registry = eden.runtime.ipcBridge.commandRegistry;
-    const caller = {
-      sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
-    };
-    const result = await registry.execute(command, args, caller);
-    return registry.getMode(command) === "operation"
-      ? eden.runtime.resolve(OperationManager).wait(result, caller)
+    const { commands, sessionContext, operations } = runtime.services;
+    const caller = { sessionId: sessionContext.getSessionId() };
+    const result = await commands.execute(command, args, caller);
+    return commands.getMode(command) === "operation"
+      ? operations.wait(result, caller)
       : result;
   },
 };
@@ -39,49 +56,33 @@ eden.whenReady().then(
   },
 );
 
-// A fixture command performs real I/O after a long task phase, exercising both
+// A fixture operation performs real I/O after a long phase, exercising both
 // transports independently of subsystem-specific elapsed time.
-const {
-  EdenHandler,
-  EdenNamespace,
-} = require("../../dist/ipc/CommandDecorators.js");
-const {
-  FilesystemManager,
-} = require("../../dist/filesystem/FilesystemManager.js");
-class IntegrationOperations {
-  prepare(args) {
-    if (
-      typeof args.name !== "string" ||
-      !["renderer", "backend"].includes(args.name)
-    )
-      throw new Error("Invalid integration operation name");
-    return {
-      run: async (reporter) => {
-        const released = new Promise((resolve) =>
-          operationReleases.set(args.name, resolve),
-        );
-        reporter.update("waiting-for-fixture");
-        await new Promise((resolve) => setTimeout(resolve, 31_000));
-        await released;
-        operationReleases.delete(args.name);
-        reporter.update("writing-fixture");
-        await eden.runtime
-          .resolve(FilesystemManager)
-          .writeFile(
-            { volume: "home", path: `/operation-${args.name}.txt` },
-            args.name,
-          );
-        return { name: args.name };
-      },
-    };
-  }
-}
-EdenNamespace("integration")(IntegrationOperations);
-EdenHandler("delayed", { mode: "operation", permission: "operation" })(
-  IntegrationOperations.prototype,
-  "prepare",
-  Object.getOwnPropertyDescriptor(IntegrationOperations.prototype, "prepare"),
-);
-eden.runtime.ipcBridge.commandRegistry.registerManager(
-  new IntegrationOperations(),
+runtime.services.commands.registerController(
+  defineController("integration", {
+    commands: {
+      delayed: operation({
+        permission: "operation",
+        input: v.object({ name: v.picklist(["renderer", "backend"]) }),
+        prepare:
+          ({ name }) =>
+          (reporter) =>
+            Effect.gen(function* () {
+              const released = new Promise((resolve) =>
+                operationReleases.set(name, resolve),
+              );
+              reporter.update("waiting-for-fixture");
+              yield* Effect.sleep("31 seconds");
+              yield* Effect.promise(() => released);
+              operationReleases.delete(name);
+              reporter.update("writing-fixture");
+              yield* runtime.services.filesystem.writeFile(
+                { volume: "home", path: `/operation-${name}.txt` },
+                name,
+              );
+              return { name };
+            }),
+      }),
+    },
+  }),
 );

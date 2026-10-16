@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import * as Effect from "effect/Effect";
 
-import { CachedFileReader } from "./cachedFileReader";
+import { createCachedFileReader } from "./cachedFileReader";
 
 describe("CachedFileReader", () => {
   const tempDirs: string[] = [];
@@ -22,7 +23,7 @@ describe("CachedFileReader", () => {
   });
 
   it("caches sync reads until the cache is flushed", () => {
-    const reader = new CachedFileReader();
+    const reader = createCachedFileReader();
     const filePath = createTempFile("first");
 
     expect(reader.read(filePath)).toBe("first");
@@ -38,10 +39,12 @@ describe("CachedFileReader", () => {
   });
 
   it("caches async reads and supports flushing the entire cache", async () => {
-    const reader = new CachedFileReader();
+    const reader = createCachedFileReader();
     const filePath = createTempFile("alpha");
 
-    await expect(reader.readAsync(filePath)).resolves.toBe("alpha");
+    await expect(Effect.runPromise(reader.readAsync(filePath))).resolves.toBe(
+      "alpha",
+    );
     expect(reader.isCached(filePath)).toBe(true);
 
     reader.flushCache();
@@ -49,6 +52,8 @@ describe("CachedFileReader", () => {
     expect(reader.isCached(filePath)).toBe(false);
 
     fs.writeFileSync(filePath, "beta", "utf-8");
-    await expect(reader.readAsync(filePath)).resolves.toBe("beta");
+    await expect(Effect.runPromise(reader.readAsync(filePath))).resolves.toBe(
+      "beta",
+    );
   });
 });

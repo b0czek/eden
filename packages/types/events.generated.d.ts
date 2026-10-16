@@ -25,7 +25,7 @@ export interface ContextMenuEvents {
  * DaemonEvents - Events for the "daemon" namespace
  */
 export interface DaemonEvents {
-  "daemon/changed": { status: import("./index").DaemonStatus };
+  "daemon/changed": { status: import("./index").DaemonStatus; };
 }
 
 /**
@@ -47,14 +47,14 @@ export interface FilePickerEvents {
  * FsEvents - Events for the "fs" namespace
  */
 export interface FsEvents {
-  "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind };
+  "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind; };
 }
 
 /**
  * VolumeEvents - Events for the "volume" namespace
  */
 export interface VolumeEvents {
-  "volume/changed": { volumes: import("./index").FilesystemVolume[] };
+  "volume/changed": { volumes: import("./index").FilesystemVolume[]; };
 }
 
 /**
@@ -77,78 +77,61 @@ export interface NotificationEvents {
  * OperationEvents - Events for the "operation" namespace
  */
 export interface OperationEvents {
-  "operation/changed": { snapshot: import("./index").OperationSnapshot };
+  "operation/changed": { snapshot: import("./index").OperationSnapshot; };
 }
 
 /**
  * PackageEvents - Events for the "package" namespace
  */
 export interface PackageEvents {
-  "package/installed": { manifest: import("./index").InstalledPackageManifest };
-  "package/uninstalled": | { kind: "app"; packageId: string }
-    | { kind: "dlc"; packageId: string; hostAppId: string };
+  "package/installed": { manifest: import("./index").InstalledPackageManifest; };
+  "package/uninstalled": { kind: "app"; packageId: string; } | { kind: "dlc"; packageId: string; hostAppId: string; };
 }
 
 /**
  * ProcessEvents - Events for the "process" namespace
  */
 export interface ProcessEvents {
-  "process/launched": { instance: import("./index").AppInstance };
-  "process/stopped": { appId: string };
-  "process/reloading": { appId: string };
-  "process/error": { appId: string; error: unknown };
-  "process/exited": { appId: string; code: number };
+  "process/launched": { instance: import("./index").AppInstance; };
+  "process/stopped": { appId: string; };
+  "process/reloading": { appId: string; };
+  "process/error": { appId: string; error: unknown; };
+  "process/exited": { appId: string; code: number; };
 }
 
 /**
  * SessionEvents - Events for the "session" namespace
  */
 export interface SessionEvents {
-  "session/changed": {
-    currentUser: import("./index").UserProfile | null;
-    previousUsername: string | null;
-    reason: "login" | "logout" | "system";
-  };
+  "session/changed": SessionChange;
 }
 
 /**
  * SettingsEvents - Events for the "settings" namespace
  */
 export interface SettingsEvents {
+  "settings/panels-changed": { reason: "catalog" | "grants" | "session" | "state" | "visibility"; panelId?: string; };
   "settings/changed": { appId: string; key: string; value: string; };
-  "settings/panels-changed": {
-    reason: "catalog" | "grants" | "session" | "state" | "visibility";
-    /** Limits a state refresh to one panel when supplied. */
-    panelId?: string;
-  };
 }
 
 /**
  * UserEvents - Events for the "user" namespace
  */
 export interface UserEvents {
-  "user/grant-options-changed": { revision: number };
+  "user/grant-options-changed": { revision: number; };
 }
 
 /**
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
-  "view/view-removed": { viewId: number; appId: string; webContentsId: number };
+  "view/view-removed": { viewId: number; appId: string; webContentsId: number; };
+  "view/view-loaded": { viewId: number; appId: string; overlay: boolean; };
+  "view/view-load-failed": { viewId: number; appId: string; errorCode: number; errorDescription: string; };
+  "view/interface-scale-changed": { scale: number; };
+  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize; };
   "view/bounds-updated": import("./index").ViewBounds;
-  "view/interface-scale-changed": { scale: number };
-  "view/view-loaded": { viewId: number; appId: string; overlay: boolean };
-  "view/view-load-failed": {
-    viewId: number;
-    appId: string;
-    errorCode: number;
-    errorDescription: string;
-  };
-  "view/mode-changed": { mode: "floating" | "tiled"; bounds: import("./index").ViewBounds };
-  "view/global-bounds-changed": {
-    workspaceBounds: import("./index").ViewBounds;
-    windowSize: import("./index").WindowSize;
-  };
+  "view/mode-changed": { mode: "floating" | "tiled"; bounds: import("./index").ViewBounds; };
 }
 
 /**

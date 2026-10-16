@@ -1,8 +1,8 @@
-import * as v from "valibot";
 import type { Effect } from "effect";
-import type { ControllerEvent } from "./events";
+import * as v from "valibot";
 import type { CommandCallerContext } from "../execution/ExecutionContext";
-import type { OperationTask } from "../operations/OperationTask";
+import { type OperationTask, operationTask } from "../operations/OperationTask";
+import type { ControllerEvent } from "./events";
 
 type CommandMode = "result" | "operation";
 
@@ -73,6 +73,43 @@ export function command(
     execute: (input, caller) =>
       options.handle(v.parse(schema, input) as never, caller),
   };
+}
+
+interface OperationOptions<Args, Result> {
+  permission?: string;
+  transition?: OperationTask<Result>["transition"];
+  cancellable?: boolean;
+  prepare: (
+    args: Args,
+    caller: CommandCallerContext,
+  ) => OperationTask<Result>["run"];
+}
+
+/** Validate and prepare synchronously; the operation runtime executes retained work. */
+export function operation<Schema extends v.GenericSchema, Result>(
+  options: OperationOptions<v.InferOutput<Schema>, Result> & { input: Schema },
+): Command<
+  v.InferInput<Schema>,
+  OperationTask<Result>,
+  "operation",
+  v.InferOutput<Schema>
+>;
+export function operation<Result>(
+  options: OperationOptions<Record<string, never>, Result> & { input?: never },
+): Command<Record<string, never>, OperationTask<Result>, "operation">;
+export function operation(
+  options: OperationOptions<never, unknown> & { input?: v.GenericSchema },
+): ControllerCommand {
+  return command({
+    permission: options.permission,
+    input: options.input ?? v.object({}),
+    mode: "operation",
+    handle: (args, caller) =>
+      operationTask(options.prepare(args as never, caller), {
+        transition: options.transition,
+        cancellable: options.cancellable,
+      }),
+  });
 }
 
 export interface Controller {

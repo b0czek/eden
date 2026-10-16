@@ -1,40 +1,45 @@
 import { randomUUID } from "node:crypto";
-import { EventEmitter } from "node:events";
 import type { EventData, EventName, OperationSubmission } from "@edenapp/types";
 import type { Controller } from "../controllers/controller";
-import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import { log } from "../logging";
 import { OperationManager } from "../operations/OperationManager";
-import {
-  PLATFORM_RENDERER_IPC,
-  type PlatformWindow,
-  type RendererIpcPort,
-} from "../platform/ports";
+import { type PlatformWindow, type RendererIpcPort } from "../platform/ports";
 import { BackendManager } from "../process-manager/BackendManager";
 import { ViewManager } from "../view-manager/ViewManager";
 import { CommandRegistry } from "./CommandRegistry";
-import { EventHandler } from "./EventHandler";
-import { EventSubscriberManager } from "./EventSubscriberManager";
+import { createEventController } from "./controller-edenapi";
+import {
+  createEventSubscriberManager,
+  type EventSubscriberManager,
+} from "./EventSubscriberManager";
 import { PermissionRegistry } from "./PermissionRegistry";
-/**
- * IPCBridge
- *
- * Central communication hub for IPC messages between:
- * - Main process
- * - Utility processes (app backends)
- * - WebContentsViews (app frontends)
- */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-export class IPCBridge extends EventEmitter {
-  public eventSubscribers: EventSubscriberManager;
-  private eventHandler: EventHandler;
-  private mainWindow: PlatformWindow | null = null;
-  private readonly controllerEvents = new Map<string, () => void>();
-  private runningAppIds: Set<string> = new Set();
-  private pendingCommands: Map<
+
+export function createIPCBridge({
+  backendManager,
+  commandRegistry,
+  permissionRegistry,
+  viewManager,
+  runtimeContexts,
+  execution,
+  rendererIpc,
+  operations,
+}: {
+  backendManager: BackendManager;
+  commandRegistry: CommandRegistry;
+  permissionRegistry: PermissionRegistry;
+  viewManager: ViewManager;
+  runtimeContexts: RuntimeContextRegistry;
+  execution: ExecutionContext;
+  rendererIpc: RendererIpcPort;
+  operations: OperationManager;
+}) {
+  let eventSubscribers: EventSubscriberManager;
+  let mainWindow: PlatformWindow | null = null;
+  let controllerEvents = new Map<string, () => void>();
+  let runningAppIds: Set<string> = new Set();
+  let pendingCommands: Map<
     string,
     {
       resolve: (value: unknown) => void;
@@ -42,95 +47,62 @@ export class IPCBridge extends EventEmitter {
       timeout: NodeJS.Timeout;
     }
   > = new Map();
-  private backendMessageListener?: (payload: {
-    appId: string;
-    message: unknown;
-  }) => void;
+  let stopBackendMessages: (() => void) | undefined;
+  let backendMessageListener:
+    | ((payload: { appId: string; message: unknown }) => void)
+    | undefined;
 
-  constructor(
-    @inject(delay(() => BackendManager)) private backendManager: BackendManager,
-    @inject(CommandRegistry) private commandRegistry: CommandRegistry,
-    @inject(PermissionRegistry) permissionRegistry: PermissionRegistry,
-    @inject(delay(() => ViewManager)) private viewManager: ViewManager,
-    @inject(delay(() => RuntimeContextRegistry))
-    private runtimeContexts: RuntimeContextRegistry,
-    @inject(ExecutionContext) execution: ExecutionContext,
-    @inject(PLATFORM_RENDERER_IPC) private rendererIpc: RendererIpcPort,
-    @inject(delay(() => OperationManager)) operations: OperationManager,
-  ) {
-    super();
-
-    // Initialize event subscriber manager
-    this.eventSubscribers = new EventSubscriberManager(
-      viewManager,
-      execution,
-      runtimeContexts,
-    );
-    this.eventSubscribers.setBackendManager(this.backendManager);
-    this.eventSubscribers.setPermissionRegistry(permissionRegistry);
-
-    // Initialize and register EventHandler
-    this.eventHandler = new EventHandler(
-      this.eventSubscribers,
-      viewManager,
-      operations,
-    );
-    this.commandRegistry.registerManager(this.eventHandler);
-
-    this.setupIPCHandlers();
-    this.setupBackendMessageHandlers();
-  }
-
-  registerController(controller: Controller): void {
+  eventSubscribers = createEventSubscriberManager({
+    viewManager,
+    execution,
+    contexts: runtimeContexts,
+    backendManager,
+    permissionRegistry,
+  });
+  commandRegistry.registerController(
+    createEventController(eventSubscribers, viewManager, operations),
+  );
+  setupIPCHandlers();
+  setupBackendMessageHandlers();
+  function registerController(controller: Controller): void {
     for (const event of Object.keys(controller.events)) {
       const name = `${controller.namespace}/${event}`;
-      if (this.controllerEvents.has(name))
+      if (controllerEvents.has(name))
         throw new Error(`Event already registered: ${name}`);
     }
-    this.commandRegistry.registerController(controller);
+    commandRegistry.registerController(controller);
     for (const [event, source] of Object.entries(controller.events)) {
       const name = `${controller.namespace}/${event}` as EventName;
-      this.controllerEvents.set(
+      controllerEvents.set(
         name,
-        source.on((payload, viewIds) => {
+        source.on((payload, viewIds, scope) => {
           if (viewIds !== undefined) {
             for (const viewId of new Set(viewIds))
-              this.eventSubscribers.notifyView(
+              eventSubscribers.notifyView(
                 viewId,
                 name,
                 payload as EventData<typeof name>,
               );
           } else {
-            this.eventSubscribers.notify(
+            eventSubscribers.notify(
               name,
               payload as EventData<typeof name>,
+              scope,
             );
           }
         }),
       );
     }
   }
-
-  /**
-   * Set the main window for shell communication
-   */
-  setMainWindow(window: PlatformWindow): void {
-    this.mainWindow = window;
+  function setMainWindow(window: PlatformWindow): void {
+    mainWindow = window;
   }
-
-  /**
-   * Get the main window instance
-   */
-  getMainWindow(): PlatformWindow | null {
-    return this.mainWindow;
+  function getMainWindow(): PlatformWindow | null {
+    return mainWindow;
   }
-
-  /**
-   * Setup IPC handlers for renderer processes
-   */
-  private setupIPCHandlers(): void {
+  function setupIPCHandlers(): void {
     // Handle shell commands
-    this.rendererIpc.handle<[string, unknown, OperationSubmission?], unknown>(
+    rendererIpc.handle<[string, unknown, OperationSubmission?], unknown>(
       "shell-command",
       async (
         event,
@@ -139,23 +111,22 @@ export class IPCBridge extends EventEmitter {
         submission?: OperationSubmission,
       ) => {
         // Build caller context for commands that need it
-        const appId = this.viewManager.getAppIdByWebContentsId(event.sender.id);
-        const isFoundation =
-          this.mainWindow?.webContents.id === event.sender.id;
+        const appId = viewManager.getAppIdByWebContentsId(event.sender.id);
+        const isFoundation = mainWindow?.webContents.id === event.sender.id;
 
         if (!appId && !isFoundation) {
           throw new Error("Shell command caller is not a registered Eden view");
         }
 
-        return this.handleShellCommand(
+        return handleShellCommand(
           command,
           args,
           {
-            sessionId: appId ? this.callerSession(appId) : undefined,
+            sessionId: appId ? callerSession(appId) : undefined,
             appId,
             webContentsId: event.sender.id,
             principal: appId
-              ? this.runtimeContexts.resolvePrincipal(appId)
+              ? runtimeContexts.resolvePrincipal(appId)
               : undefined,
             foundation: isFoundation,
           },
@@ -164,12 +135,8 @@ export class IPCBridge extends EventEmitter {
       },
     );
   }
-
-  /**
-   * Setup handlers for backend utility process messages
-   */
-  private setupBackendMessageHandlers(): void {
-    this.backendMessageListener = async ({ appId, message }) => {
+  function setupBackendMessageHandlers(): void {
+    backendMessageListener = async ({ appId, message }) => {
       if (!message || typeof message !== "object" || !("type" in message)) {
         log.warn(`Unknown backend message from ${appId}:`, message);
         return;
@@ -192,20 +159,20 @@ export class IPCBridge extends EventEmitter {
 
         // Backend requesting a shell command execution
         try {
-          const result = await this.handleShellCommand(
+          const result = await handleShellCommand(
             backendMessage.command,
             backendMessage.args,
             {
               appId,
-              sessionId: this.callerSession(appId),
-              principal: this.runtimeContexts.resolvePrincipal(appId),
+              sessionId: callerSession(appId),
+              principal: runtimeContexts.resolvePrincipal(appId),
             },
             backendMessage.submission,
           );
           // Send response back to backend
-          this.sendBackendResponse(appId, backendMessage.commandId, result);
+          sendBackendResponse(appId, backendMessage.commandId, result);
         } catch (error) {
-          this.backendManager.sendMessage(appId, {
+          backendManager.sendMessage(appId, {
             type: "shell-command-response",
             commandId: backendMessage.commandId,
             error: error instanceof Error ? error.message : String(error),
@@ -218,37 +185,30 @@ export class IPCBridge extends EventEmitter {
         );
       }
     };
-    this.backendManager.on("backend-message", this.backendMessageListener);
+    stopBackendMessages = backendManager.backendMessage.on(
+      backendMessageListener,
+    );
   }
-
-  /**
-   * Helper to send response to backend
-   */
-  private sendBackendResponse(
+  function sendBackendResponse(
     appId: string,
     commandId: string,
     result: unknown,
   ): void {
-    this.backendManager.sendMessage(appId, {
+    backendManager.sendMessage(appId, {
       type: "shell-command-response",
       commandId,
       result,
     });
   }
-
-  /**
-   * Handle shell commands (app management, etc.)
-   */
-  private callerSession(appId: string): string | undefined {
-    const owner = this.runtimeContexts.get(appId)?.owner;
+  function callerSession(appId: string): string | undefined {
+    const owner = runtimeContexts.get(appId)?.owner;
     return owner?.kind === "session"
       ? owner.sessionId
       : owner?.kind === "system"
         ? "runtime"
         : undefined;
   }
-
-  private async handleShellCommand(
+  async function handleShellCommand(
     command: string,
     args: unknown,
     callerContext: import("../execution").CommandCallerContext = {},
@@ -262,19 +222,19 @@ export class IPCBridge extends EventEmitter {
         log.error(
           `Command '${command}' (ID: ${commandId}) timed out after 10s`,
         );
-        this.pendingCommands.delete(commandId);
+        pendingCommands.delete(commandId);
         reject(new Error(`Command '${command}' timed out`));
       }, 10000);
 
-      this.pendingCommands.set(commandId, { resolve, reject, timeout });
+      pendingCommands.set(commandId, { resolve, reject, timeout });
 
       // Execute via CommandRegistry with trusted caller context
-      const mode = this.commandRegistry.getMode(command);
-      this.commandRegistry
+      const mode = commandRegistry.getMode(command);
+      commandRegistry
         .execute(command, args, callerContext, submission)
         .then((result) => {
           clearTimeout(timeout);
-          this.pendingCommands.delete(commandId);
+          pendingCommands.delete(commandId);
           resolve(
             mode === "operation"
               ? { mode: "operation", handle: result }
@@ -290,7 +250,7 @@ export class IPCBridge extends EventEmitter {
             `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`,
           );
           clearTimeout(timeout);
-          this.pendingCommands.delete(commandId);
+          pendingCommands.delete(commandId);
           const sanitized = new Error(err.message);
           sanitized.name = err.name;
           sanitized.stack = "";
@@ -298,44 +258,42 @@ export class IPCBridge extends EventEmitter {
         });
     });
   }
-
-  /**
-   * Provide running-app updates from the AppManager
-   */
-  updateRunningApps(appIds: Iterable<string>): void {
-    this.runningAppIds = new Set(appIds);
+  function updateRunningApps(appIds: Iterable<string>): void {
+    runningAppIds = new Set(appIds);
   }
-
-  getRunningAppIds(): string[] {
-    return Array.from(this.runningAppIds);
+  function getRunningAppIds(): string[] {
+    return Array.from(runningAppIds);
   }
-
-  /**
-   * Cleanup
-   */
-  destroy(): void {
+  function destroy(): void {
     // Remove global IPC handlers
-    this.rendererIpc.removeHandler("shell-command");
-    if (this.backendMessageListener) {
-      this.backendManager.removeListener(
-        "backend-message",
-        this.backendMessageListener,
-      );
-      this.backendMessageListener = undefined;
+    rendererIpc.removeHandler("shell-command");
+    if (backendMessageListener) {
+      stopBackendMessages?.();
+      backendMessageListener = undefined;
     }
-    for (const pending of this.pendingCommands.values()) {
+    for (const pending of pendingCommands.values()) {
       clearTimeout(pending.timeout);
       pending.reject(new Error("Eden runtime disposed"));
     }
-    this.pendingCommands.clear();
-    for (const stop of this.controllerEvents.values()) stop();
-    this.controllerEvents.clear();
-    this.eventSubscribers.dispose();
-    this.removeAllListeners();
-    this.mainWindow = null;
-  }
+    pendingCommands.clear();
+    for (const stop of controllerEvents.values()) stop();
+    controllerEvents.clear();
+    eventSubscribers.dispose();
 
-  dispose(): void {
-    this.destroy();
+    mainWindow = null;
   }
+  function dispose(): void {
+    destroy();
+  }
+  return {
+    eventSubscribers,
+    registerController,
+    setMainWindow,
+    getMainWindow,
+    updateRunningApps,
+    getRunningAppIds,
+    destroy,
+    dispose,
+  };
 }
+export type IPCBridge = ReturnType<typeof createIPCBridge>;

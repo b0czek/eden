@@ -15,7 +15,7 @@ export async function createTestCaller(
     grants: ["*"],
     ...userInput,
   });
-  eden.runtime.resolve(PermissionRegistry).registerApp(appId, permissions);
+  eden.runtime.services.permissions.registerApp(appId, permissions);
   return {
     user,
     caller: { appId, principal: { kind: "user" as const, profile: user } },

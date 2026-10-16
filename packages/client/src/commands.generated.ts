@@ -11,24 +11,6 @@ import { invoke } from "./invoke.js";
 
 import { subscribe, unsubscribe } from "./subscriptions.js";
 
-const systemCommands = {
-  /**
-   * Get system information including platform, versions, and running apps.
-   */
-  ["info"]: (): Promise<CommandResult<"system/info">> =>
-    invoke("system/info", {  }),
-  /**
-   * Get consumer-controlled product branding for SDK-owned interfaces.
-   */
-  ["branding"]: (): Promise<CommandResult<"system/branding">> =>
-    invoke("system/branding", {  }),
-  ["powerCapabilities"]: (): Promise<CommandResult<"system/power-capabilities">> =>
-    invoke("system/power-capabilities", {  }),
-  ["power"]: (action: CommandArgs<"system/power">["action"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"system/power">> =>
-    invoke("system/power", { ["action"]: action }, options?.submission),
-};
-export { systemCommands as system };
-
 const associationsCommands = {
   ["get"]: (key: CommandArgs<"associations/get">["key"]): Promise<CommandResult<"associations/get">> =>
     invoke("associations/get", { ["key"]: key }),
@@ -89,6 +71,21 @@ const appearanceCommands = {
     unsubscribe(`appearance/${event}`, callback),
 };
 export { appearanceCommands as appearance };
+
+const systemCommands = {
+  /**
+   * Get consumer-controlled product branding for SDK-owned interfaces.
+   */
+  ["branding"]: (): Promise<CommandResult<"system/branding">> =>
+    invoke("system/branding", {  }),
+  ["powerCapabilities"]: (): Promise<CommandResult<"system/power-capabilities">> =>
+    invoke("system/power-capabilities", {  }),
+  ["power"]: (action: CommandArgs<"system/power">["action"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"system/power">> =>
+    invoke("system/power", { ["action"]: action }, options?.submission),
+  ["info"]: (): Promise<CommandResult<"system/info">> =>
+    invoke("system/info", {  }),
+};
+export { systemCommands as system };
 
 const contextMenuCommands = {
   ["registerDisplay"]: (): Promise<CommandResult<"context-menu/register-display">> =>
@@ -252,92 +249,40 @@ const filePickerCommands = {
 export { filePickerCommands as filePicker };
 
 const fsCommands = {
-  /**
-   * Return the caller's accessible starting folder within a volume.
-   */
   ["accessScope"]: (volume: CommandArgs<"fs/access-scope">["volume"]): Promise<CommandResult<"fs/access-scope">> =>
     invoke("fs/access-scope", { ["volume"]: volume }),
-  /**
-   * Open a file and hold volume access until close or owner teardown.
-   */
   ["open"]: (location: CommandArgs<"fs/open">["location"], options?: Pick<CommandArgs<"fs/open">, "mode">): Promise<CommandResult<"fs/open">> =>
     invoke("fs/open", { ["location"]: location, ["mode"]: options?.["mode"] }),
-  /**
-   * Close an owned file handle after its accepted operations finish.
-   */
   ["close"]: (handle: CommandArgs<"fs/close">["handle"]): Promise<CommandResult<"fs/close">> =>
     invoke("fs/close", { ["handle"]: handle }),
-  /**
-   * Read the contents of a file.
-   */
   ["read"]: (location: CommandArgs<"fs/read">["location"], options?: Pick<CommandArgs<"fs/read">, "encoding">): Promise<CommandResult<"fs/read">> =>
     invoke("fs/read", { ["location"]: location, ["encoding"]: options?.["encoding"] }),
-  /**
-   * Read the raw contents of a file.
-   */
   ["readBinary"]: (location: CommandArgs<"fs/read-binary">["location"]): Promise<CommandResult<"fs/read-binary">> =>
     invoke("fs/read-binary", { ["location"]: location }),
-  /**
-   * Write content to a file, creating directories if needed.
-   */
   ["write"]: (location: CommandArgs<"fs/write">["location"], content: CommandArgs<"fs/write">["content"], options?: Pick<CommandArgs<"fs/write">, "encoding">): Promise<CommandResult<"fs/write">> =>
     invoke("fs/write", { ["location"]: location, ["content"]: content, ["encoding"]: options?.["encoding"] }),
-  /**
-   * Write raw bytes to a file, creating directories if needed.
-   */
   ["writeBinary"]: (location: CommandArgs<"fs/write-binary">["location"], content: CommandArgs<"fs/write-binary">["content"]): Promise<CommandResult<"fs/write-binary">> =>
     invoke("fs/write-binary", { ["location"]: location, ["content"]: content }),
-  /**
-   * Check if a file or directory exists.
-   */
   ["exists"]: (location: CommandArgs<"fs/exists">["location"]): Promise<CommandResult<"fs/exists">> =>
     invoke("fs/exists", { ["location"]: location }),
-  /**
-   * Create a directory and any necessary parent directories.
-   */
   ["mkdir"]: (location: CommandArgs<"fs/mkdir">["location"]): Promise<CommandResult<"fs/mkdir">> =>
     invoke("fs/mkdir", { ["location"]: location }),
-  /**
-   * List contents of a directory.
-   */
   ["readdir"]: (location: CommandArgs<"fs/readdir">["location"]): Promise<CommandResult<"fs/readdir">> =>
     invoke("fs/readdir", { ["location"]: location }),
-  /**
-   * Get file or directory statistics.
-   */
   ["stat"]: (location: CommandArgs<"fs/stat">["location"]): Promise<CommandResult<"fs/stat">> =>
     invoke("fs/stat", { ["location"]: location }),
   ["watch"]: (location: CommandArgs<"fs/watch">["location"]): Promise<CommandResult<"fs/watch">> =>
     invoke("fs/watch", { ["location"]: location }),
   ["unwatch"]: (watchId: CommandArgs<"fs/unwatch">["watchId"]): Promise<CommandResult<"fs/unwatch">> =>
     invoke("fs/unwatch", { ["watchId"]: watchId }),
-  /**
-   * Resolve an Eden path to the underlying OS path.
-   */
   ["resolve"]: (location: CommandArgs<"fs/resolve">["location"]): Promise<CommandResult<"fs/resolve">> =>
     invoke("fs/resolve", { ["location"]: location }),
-  /**
-   * Search for files and directories using glob patterns.
-   */
   ["search"]: (location: CommandArgs<"fs/search">["location"], pattern: CommandArgs<"fs/search">["pattern"], options?: Pick<CommandArgs<"fs/search">, "limit">): Promise<CommandResult<"fs/search">> =>
     invoke("fs/search", { ["location"]: location, ["pattern"]: pattern, ["limit"]: options?.["limit"] }),
-  /**
-   * Delete a file or directory.
-   * For directories, removes recursively.
-   */
   ["delete"]: (location: CommandArgs<"fs/delete">["location"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/delete">> =>
     invoke("fs/delete", { ["location"]: location }, options?.submission),
-  /**
-   * Copy a file or directory.
-   * Directories are copied recursively.
-   * Existing destinations are replaced only when overwrite is true.
-   */
   ["cp"]: (from: CommandArgs<"fs/cp">["from"], to: CommandArgs<"fs/cp">["to"], options?: Pick<CommandArgs<"fs/cp">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/cp">> =>
     invoke("fs/cp", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
-  /**
-   * Move or rename a file or directory.
-   * Existing destinations are replaced only when overwrite is true.
-   */
   ["mv"]: (from: CommandArgs<"fs/mv">["from"], to: CommandArgs<"fs/mv">["to"], options?: Pick<CommandArgs<"fs/mv">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/mv">> =>
     invoke("fs/mv", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
   ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): Promise<void> =>
@@ -350,9 +295,6 @@ export { fsCommands as fs };
 const volumeCommands = {
   ["list"]: (): Promise<CommandResult<"volume/list">> =>
     invoke("volume/list", {  }),
-  /**
-   * Safely eject a device after draining admitted volume I/O.
-   */
   ["eject"]: (volume: CommandArgs<"volume/eject">["volume"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"volume/eject">> =>
     invoke("volume/eject", { ["volume"]: volume }, options?.submission),
   ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`volume/${E}`>) => void): Promise<void> =>
@@ -427,56 +369,24 @@ const operationCommands = {
 export { operationCommands as operation };
 
 const packageCommands = {
-  /**
-   * Install an application or DLC from a local path.
-   */
   ["install"]: (source: CommandArgs<"package/install">["source"], options?: Pick<CommandArgs<"package/install">, "replace"> & { submission?: OperationSubmission }): Promise<CommandResult<"package/install">> =>
     invoke("package/install", { ["source"]: source, ["replace"]: options?.["replace"] }, options?.submission),
-  /**
-   * Uninstall an application or DLC by its package ID.
-   */
   ["uninstall"]: (packageId: CommandArgs<"package/uninstall">["packageId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"package/uninstall">> =>
     invoke("package/uninstall", { ["packageId"]: packageId }, options?.submission),
-  /**
-   * List all installed applications.
-   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
-   * @param showRestricted - If true, includes apps the current user cannot launch (hidden by default)
-   */
   ["list"]: (options?: Pick<CommandArgs<"package/list">, "showHidden" | "showRestricted">): Promise<CommandResult<"package/list">> =>
     invoke("package/list", { ["showHidden"]: options?.["showHidden"], ["showRestricted"]: options?.["showRestricted"] }),
-  /**
-   * Identify the authenticated app and return its extension resources.
-   */
   ["self"]: (): Promise<CommandResult<"package/self">> =>
     invoke("package/self", {  }),
-  /**
-   * Get an installed package and any extension resources it owns.
-   */
   ["get"]: (packageId: CommandArgs<"package/get">["packageId"]): Promise<CommandResult<"package/get">> =>
     invoke("package/get", { ["packageId"]: packageId }),
-  /**
-   * Toggle hot reload for an app
-   */
   ["toggleHotReload"]: (packageId: CommandArgs<"package/toggle-hot-reload">["packageId"]): Promise<CommandResult<"package/toggle-hot-reload">> =>
     invoke("package/toggle-hot-reload", { ["packageId"]: packageId }),
-  /**
-   * Check if hot reload is enabled for an app
-   */
   ["isHotReloadEnabled"]: (packageId: CommandArgs<"package/is-hot-reload-enabled">["packageId"]): Promise<CommandResult<"package/is-hot-reload-enabled">> =>
     invoke("package/is-hot-reload-enabled", { ["packageId"]: packageId }),
-  /**
-   * Get the icon for an installed package as a data URL.
-   */
   ["getIcon"]: (packageId: CommandArgs<"package/get-icon">["packageId"]): Promise<CommandResult<"package/get-icon">> =>
     invoke("package/get-icon", { ["packageId"]: packageId }),
-  /**
-   * Get info about a package file without installing it
-   */
   ["getInfo"]: (location: CommandArgs<"package/get-info">["location"]): Promise<CommandResult<"package/get-info">> =>
     invoke("package/get-info", { ["location"]: location }),
-  /**
-   * Get the installed size of a package in bytes.
-   */
   ["getSize"]: (packageId: CommandArgs<"package/get-size">["packageId"]): Promise<CommandResult<"package/get-size">> =>
     invoke("package/get-size", { ["packageId"]: packageId }),
   ["subscribe"]: <E extends "installed" | "uninstalled">(event: E, callback: (data: EventData<`package/${E}`>) => void): Promise<void> =>
@@ -487,39 +397,14 @@ const packageCommands = {
 export { packageCommands as package };
 
 const processCommands = {
-  /**
-   * Launch an application instance.
-   * Requires "process/manage" permission.
-   */
   ["launch"]: (appId: CommandArgs<"process/launch">["appId"], options?: Pick<CommandArgs<"process/launch">, "bounds"> & { submission?: OperationSubmission }): Promise<CommandResult<"process/launch">> =>
     invoke("process/launch", { ["appId"]: appId, ["bounds"]: options?.["bounds"] }, options?.submission),
-  /**
-   * Stop a running application instance.
-   * Requires "process/manage" permission.
-   */
   ["stop"]: (appId: CommandArgs<"process/stop">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"process/stop">> =>
     invoke("process/stop", { ["appId"]: appId }, options?.submission),
-  /**
-   * Stop the caller app instance.
-   * No explicit permission required - this endpoint only allows self-exit.
-   */
   ["exit"]: (options?: { submission?: OperationSubmission }): Promise<CommandResult<"process/exit">> =>
     invoke("process/exit", {  }, options?.submission),
-  /**
-   * List all running application processes.
-   * Requires "process/read" permission.
-   * @param showHidden - If true, includes overlay apps (hidden by default)
-   */
   ["list"]: (options?: Pick<CommandArgs<"process/list">, "showHidden">): Promise<CommandResult<"process/list">> =>
     invoke("process/list", { ["showHidden"]: options?.["showHidden"] }),
-  /**
-   * Return CPU and memory metrics for running Eden apps.
-   * Requires "process/read" permission.
-   * @param showHidden - If true, includes overlay apps and backend-only apps
-   * @param pollingTimeoutMs - How long main should keep the shared sampler alive
-   * @param waitForAccurateCpu - If false, returns the current sample immediately,
-   * even before Electron has a full CPU interval
-   */
   ["metrics"]: (options?: Pick<CommandArgs<"process/metrics">, "showHidden" | "pollingTimeoutMs" | "waitForAccurateCpu">): Promise<CommandResult<"process/metrics">> =>
     invoke("process/metrics", { ["showHidden"]: options?.["showHidden"], ["pollingTimeoutMs"]: options?.["pollingTimeoutMs"], ["waitForAccurateCpu"]: options?.["waitForAccurateCpu"] }),
   ["subscribe"]: <E extends "launched" | "stopped" | "reloading" | "error" | "exited">(event: E, callback: (data: EventData<`process/${E}`>) => void): Promise<void> =>
@@ -544,6 +429,12 @@ const sessionCommands = {
 export { sessionCommands as session };
 
 const settingsCommands = {
+  ["panels"]: (): Promise<CommandResult<"settings/panels">> =>
+    invoke("settings/panels", {  }),
+  ["panel"]: (panelId: CommandArgs<"settings/panel">["panelId"]): Promise<CommandResult<"settings/panel">> =>
+    invoke("settings/panel", { ["panelId"]: panelId }),
+  ["action"]: (panelId: CommandArgs<"settings/action">["panelId"], actionId: CommandArgs<"settings/action">["actionId"], options?: Pick<CommandArgs<"settings/action">, "invocation">): Promise<CommandResult<"settings/action">> =>
+    invoke("settings/action", { ["panelId"]: panelId, ["actionId"]: actionId, ["invocation"]: options?.["invocation"] }),
   /**
    * Get a setting value (scoped to caller's app)
    */
@@ -596,24 +487,9 @@ const settingsCommands = {
    */
   ["resetSu"]: (appId: CommandArgs<"settings/reset/su">["appId"], key: CommandArgs<"settings/reset/su">["key"], options?: Pick<CommandArgs<"settings/reset/su">, "schema">): Promise<CommandResult<"settings/reset/su">> =>
     invoke("settings/reset/su", { ["appId"]: appId, ["key"]: key, ["schema"]: options?.["schema"] }),
-  /**
-   * List the settings panels visible to the active user.
-   */
-  ["panels"]: (): Promise<CommandResult<"settings/panels">> =>
-    invoke("settings/panels", {  }),
-  /**
-   * Load one complete authorized panel snapshot.
-   */
-  ["panel"]: (panelId: CommandArgs<"settings/panel">["panelId"]): Promise<CommandResult<"settings/panel">> =>
-    invoke("settings/panel", { ["panelId"]: panelId }),
-  /**
-   * Invoke one declared panel-private action.
-   */
-  ["action"]: (panelId: CommandArgs<"settings/action">["panelId"], actionId: CommandArgs<"settings/action">["actionId"], options?: Pick<CommandArgs<"settings/action">, "invocation">): Promise<CommandResult<"settings/action">> =>
-    invoke("settings/action", { ["panelId"]: panelId, ["actionId"]: actionId, ["invocation"]: options?.["invocation"] }),
-  ["subscribe"]: <E extends "changed" | "panels-changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): Promise<void> =>
+  ["subscribe"]: <E extends "panels-changed" | "changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): Promise<void> =>
     subscribe(`settings/${event}`, callback),
-  ["unsubscribe"]: <E extends "changed" | "panels-changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "panels-changed" | "changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): void =>
     unsubscribe(`settings/${event}`, callback),
 };
 export { settingsCommands as settings };
@@ -621,49 +497,22 @@ export { settingsCommands as settings };
 const userCommands = {
   ["grantOptions"]: (): Promise<CommandResult<"user/grant-options">> =>
     invoke("user/grant-options", {  }),
-  /**
-   * List all users.
-   */
   ["list"]: (): Promise<CommandResult<"user/list">> =>
     invoke("user/list", {  }),
-  /**
-   * Create a new user.
-   */
   ["create"]: (name: CommandArgs<"user/create">["name"], password: CommandArgs<"user/create">["password"], options?: Pick<CommandArgs<"user/create">, "username" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/create">> =>
     invoke("user/create", { ["name"]: name, ["password"]: password, ["username"]: options?.["username"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
-  /**
-   * Update user profile details or grants.
-   */
   ["update"]: (username: CommandArgs<"user/update">["username"], options?: Pick<CommandArgs<"user/update">, "name" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/update">> =>
     invoke("user/update", { ["username"]: username, ["name"]: options?.["name"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
-  /**
-   * Delete a user.
-   */
   ["delete"]: (username: CommandArgs<"user/delete">["username"]): Promise<CommandResult<"user/delete">> =>
     invoke("user/delete", { ["username"]: username }),
-  /**
-   * Set a user's password.
-   */
   ["setPassword"]: (username: CommandArgs<"user/set-password">["username"], password: CommandArgs<"user/set-password">["password"]): Promise<CommandResult<"user/set-password">> =>
     invoke("user/set-password", { ["username"]: username, ["password"]: password }),
-  /**
-   * Change the current user's password.
-   */
   ["changePassword"]: (currentPassword: CommandArgs<"user/change-password">["currentPassword"], newPassword: CommandArgs<"user/change-password">["newPassword"]): Promise<CommandResult<"user/change-password">> =>
     invoke("user/change-password", { ["currentPassword"]: currentPassword, ["newPassword"]: newPassword }),
-  /**
-   * Check whether the current user has a specific grant.
-   */
   ["hasGrant"]: (grant: CommandArgs<"user/has-grant">["grant"]): Promise<CommandResult<"user/has-grant">> =>
     invoke("user/has-grant", { ["grant"]: grant }),
-  /**
-   * Return the configured default username.
-   */
   ["getDefault"]: (): Promise<CommandResult<"user/get-default">> =>
     invoke("user/get-default", {  }),
-  /**
-   * Update the configured default username.
-   */
   ["setDefault"]: (username: CommandArgs<"user/set-default">["username"]): Promise<CommandResult<"user/set-default">> =>
     invoke("user/set-default", { ["username"]: username }),
   ["subscribe"]: <E extends "grant-options-changed">(event: E, callback: (data: EventData<`user/${E}`>) => void): Promise<void> =>
@@ -674,116 +523,49 @@ const userCommands = {
 export { userCommands as user };
 
 const viewCommands = {
-  /**
-   * Update bounds for the caller's own view.
-   */
   ["updateBounds"]: (bounds: CommandArgs<"view/update-bounds">["bounds"]): Promise<CommandResult<"view/update-bounds">> =>
     invoke("view/update-bounds", { ["bounds"]: bounds }),
-  /**
-   * Update bounds for any app view.
-   * Requires "view/manage" permission.
-   */
   ["updateViewBounds"]: (appId: CommandArgs<"view/update-view-bounds">["appId"], bounds: CommandArgs<"view/update-view-bounds">["bounds"]): Promise<CommandResult<"view/update-view-bounds">> =>
     invoke("view/update-view-bounds", { ["appId"]: appId, ["bounds"]: bounds }),
-  /**
-   * Show or hide the caller's own view.
-   */
   ["setVisibility"]: (visible: CommandArgs<"view/set-visibility">["visible"]): Promise<CommandResult<"view/set-visibility">> =>
     invoke("view/set-visibility", { ["visible"]: visible }),
-  /**
-   * Show or hide any app view.
-   * Requires "view/manage" permission.
-   */
   ["setViewVisibility"]: (appId: CommandArgs<"view/set-view-visibility">["appId"], visible: CommandArgs<"view/set-view-visibility">["visible"]): Promise<CommandResult<"view/set-view-visibility">> =>
     invoke("view/set-view-visibility", { ["appId"]: appId, ["visible"]: visible }),
-  /**
-   * Bring caller's own view to the front and focus it.
-   */
   ["focus"]: (): Promise<CommandResult<"view/focus">> =>
     invoke("view/focus", {  }),
-  /**
-   * Bring any app view to the front and focus it.
-   * Requires "view/manage" permission.
-   */
   ["focusView"]: (appId: CommandArgs<"view/focus-view">["appId"]): Promise<CommandResult<"view/focus-view">> =>
     invoke("view/focus-view", { ["appId"]: appId }),
-  /**
-   * Update the available workspace bounds (e.g. after taskbar resize).
-   * Requires "view/manage" permission for app callers.
-   */
   ["updateGlobalBounds"]: (bounds: CommandArgs<"view/update-global-bounds">["bounds"], windowSize: CommandArgs<"view/update-global-bounds">["windowSize"]): Promise<CommandResult<"view/update-global-bounds">> =>
     invoke("view/update-global-bounds", { ["bounds"]: bounds, ["windowSize"]: windowSize }),
-  /**
-   * Toggle caller's own view between floating and tiled window modes.
-   */
   ["toggleMode"]: (options?: Pick<CommandArgs<"view/toggle-mode">, "mode">): Promise<CommandResult<"view/toggle-mode">> =>
     invoke("view/toggle-mode", { ["mode"]: options?.["mode"] }),
-  /**
-   * Toggle any app view between floating and tiled window modes.
-   * Requires "view/manage" permission.
-   */
   ["toggleViewMode"]: (appId: CommandArgs<"view/toggle-view-mode">["appId"], options?: Pick<CommandArgs<"view/toggle-view-mode">, "mode">): Promise<CommandResult<"view/toggle-view-mode">> =>
     invoke("view/toggle-view-mode", { ["appId"]: appId, ["mode"]: options?.["mode"] }),
-  /**
-   * Get adjacent tiled windows for the caller's app-frame layout controls.
-   */
   ["tileLayoutState"]: (): Promise<CommandResult<"view/tile-layout-state">> =>
     invoke("view/tile-layout-state", {  }),
-  /**
-   * Swap the caller with the tiled window on one edge.
-   */
   ["swapTile"]: (direction: CommandArgs<"view/swap-tile">["direction"]): Promise<CommandResult<"view/swap-tile">> =>
     invoke("view/swap-tile", { ["direction"]: direction }),
-  /**
-   * Temporarily cover the tiled window on one edge with the caller.
-   */
   ["expandTile"]: (direction: CommandArgs<"view/expand-tile">["direction"]): Promise<CommandResult<"view/expand-tile">> =>
     invoke("view/expand-tile", { ["direction"]: direction }),
-  /**
-   * Start dragging caller's own view.
-   */
   ["startDrag"]: (startX: CommandArgs<"view/start-drag">["startX"], startY: CommandArgs<"view/start-drag">["startY"]): Promise<CommandResult<"view/start-drag">> =>
     invoke("view/start-drag", { ["startX"]: startX, ["startY"]: startY }),
-  /**
-   * End drag operation for caller's own view.
-   */
   ["endDrag"]: (): Promise<CommandResult<"view/end-drag">> =>
     invoke("view/end-drag", {  }),
-  /**
-   * Handle global mouse up event to stop any active drag/resize operations.
-   * Requires "view/manage" permission for app callers.
-   */
   ["globalMouseup"]: (): Promise<CommandResult<"view/global-mouseup">> =>
     invoke("view/global-mouseup", {  }),
-  /**
-   * Start resizing caller's own view.
-   */
   ["startResize"]: (startX: CommandArgs<"view/start-resize">["startX"], startY: CommandArgs<"view/start-resize">["startY"], options?: Pick<CommandArgs<"view/start-resize">, "direction">): Promise<CommandResult<"view/start-resize">> =>
     invoke("view/start-resize", { ["startX"]: startX, ["startY"]: startY, ["direction"]: options?.["direction"] }),
-  /**
-   * End resize operation for caller's own view.
-   */
   ["endResize"]: (): Promise<CommandResult<"view/end-resize">> =>
     invoke("view/end-resize", {  }),
-  /**
-   * Get the current dimensions of the main window.
-   */
   ["windowSize"]: (): Promise<CommandResult<"view/window-size">> =>
     invoke("view/window-size", {  }),
-  /**
-   * Set the interface scale (zoom factor) for all views.
-   * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
-   */
   ["setInterfaceScale"]: (scale: CommandArgs<"view/set-interface-scale">["scale"]): Promise<CommandResult<"view/set-interface-scale">> =>
     invoke("view/set-interface-scale", { ["scale"]: scale }),
-  /**
-   * Get the current interface scale.
-   */
   ["getInterfaceScale"]: (): Promise<CommandResult<"view/get-interface-scale">> =>
     invoke("view/get-interface-scale", {  }),
-  ["subscribe"]: <E extends "view-removed" | "bounds-updated" | "interface-scale-changed" | "view-loaded" | "view-load-failed" | "mode-changed" | "global-bounds-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): Promise<void> =>
+  ["subscribe"]: <E extends "view-removed" | "view-loaded" | "view-load-failed" | "interface-scale-changed" | "global-bounds-changed" | "bounds-updated" | "mode-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): Promise<void> =>
     subscribe(`view/${event}`, callback),
-  ["unsubscribe"]: <E extends "view-removed" | "bounds-updated" | "interface-scale-changed" | "view-loaded" | "view-load-failed" | "mode-changed" | "global-bounds-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "view-removed" | "view-loaded" | "view-load-failed" | "interface-scale-changed" | "global-bounds-changed" | "bounds-updated" | "mode-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): void =>
     unsubscribe(`view/${event}`, callback),
 };
 export { viewCommands as view };

@@ -35,15 +35,13 @@ function subscriptionKey(
 }
 
 /** Own local listeners and serialize changes to each remote subscription. */
-export class EventSubscriptions {
-  private readonly subscriptions = new Map<string, Subscription>();
+export function createEventSubscriptions(
+  transport: ShellTransport,
+  listeners: Map<string, Set<EventSubscriptionCallback>>,
+) {
+  const subscriptions = new Map<string, Subscription>();
 
-  constructor(
-    private transport: ShellTransport,
-    private listeners: Map<string, Set<EventSubscriptionCallback>>,
-  ) {}
-
-  async subscribe<T extends EventName>(
+  async function subscribe<T extends EventName>(
     eventName: T,
     callback: (data: EventData<T>) => void,
     operation?: OperationObservation,
@@ -51,14 +49,14 @@ export class EventSubscriptions {
     if (typeof callback !== "function")
       throw new Error("Callback must be a function");
     const key = subscriptionKey(eventName, operation);
-    let subscription = this.subscriptions.get(key);
+    let subscription = subscriptions.get(key);
     if (!subscription) {
       subscription = {
         callbacks: new Map(),
         pending: Promise.resolve(),
         registered: false,
       };
-      this.subscriptions.set(key, subscription);
+      subscriptions.set(key, subscription);
     }
     const listener = callback as EventSubscriptionCallback;
     const existing = subscription.callbacks.get(listener);
@@ -66,54 +64,54 @@ export class EventSubscriptions {
     const entry = subscription;
     const registration: Registration = { ready: Promise.resolve() };
     entry.callbacks.set(listener, registration);
-    if (!this.listeners.has(key)) this.listeners.set(key, new Set());
-    this.listeners.get(key)!.add(listener);
-    registration.ready = this.enqueue(key, entry, async () => {
+    if (!listeners.has(key)) listeners.set(key, new Set());
+    listeners.get(key)!.add(listener);
+    registration.ready = enqueue(key, entry, async () => {
       if (entry.callbacks.get(listener) !== registration) return;
       if (!entry.registered) {
-        await this.transport.exec("event/subscribe", { eventName, operation });
+        await transport.exec("event/subscribe", { eventName, operation });
         entry.registered = true;
       }
     }).catch((error) => {
       // A failed older request must not remove a replacement registration.
       if (entry.callbacks.get(listener) === registration)
-        this.remove(key, entry, listener);
+        remove(key, entry, listener);
       throw error;
     });
     return registration.ready;
   }
 
-  unsubscribe<T extends EventName>(
+  function unsubscribe<T extends EventName>(
     eventName: T,
     callback: (data: EventData<T>) => void,
     operation?: OperationObservation,
   ): void {
     const key = subscriptionKey(eventName, operation);
-    const entry = this.subscriptions.get(key);
+    const entry = subscriptions.get(key);
     const listener = callback as EventSubscriptionCallback;
     if (!entry?.callbacks.has(listener)) return;
-    this.remove(key, entry, listener);
-    void this.enqueue(key, entry, async () => {
+    remove(key, entry, listener);
+    void enqueue(key, entry, async () => {
       if (entry.callbacks.size || !entry.registered) return;
       entry.registered = false;
-      await this.transport.exec("event/unsubscribe", { eventName, operation });
+      await transport.exec("event/unsubscribe", { eventName, operation });
     }).catch((error) =>
       log.error(`Failed to unsubscribe from ${eventName}:`, error),
     );
   }
 
-  private remove(
+  function remove(
     eventName: string,
     entry: Subscription,
     listener: EventSubscriptionCallback,
   ): void {
     entry.callbacks.delete(listener);
-    const callbacks = this.listeners.get(eventName);
+    const callbacks = listeners.get(eventName);
     callbacks?.delete(listener);
-    if (!callbacks?.size) this.listeners.delete(eventName);
+    if (!callbacks?.size) listeners.delete(eventName);
   }
 
-  private enqueue(
+  function enqueue(
     eventName: string,
     entry: Subscription,
     task: () => Promise<void>,
@@ -126,12 +124,13 @@ export class EventSubscriptions {
         entry.pending === pending &&
         !entry.registered &&
         !entry.callbacks.size &&
-        this.subscriptions.get(eventName) === entry
+        subscriptions.get(eventName) === entry
       )
-        this.subscriptions.delete(eventName);
+        subscriptions.delete(eventName);
     });
     return request;
   }
+  return { subscribe, unsubscribe };
 }
 
 /** Isolate synchronous and asynchronous listener failures in both app runtimes. */

@@ -1,94 +1,65 @@
 import * as fs from "node:fs";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
 
-/**
- * Cached file reader for non-changing files.
- * Reads from filesystem on first access, then serves from cache.
- */
-class CachedFileReader {
-  private cache: Map<string, string> = new Map();
+export function createCachedFileReader() {
+  let cache: Map<string, string> = new Map();
 
-  /**
-   * Reads a file from cache if available, otherwise reads from filesystem and caches the result.
-   * @param filePath - Absolute path to the file to read
-   * @param encoding - File encoding (default: 'utf-8')
-   * @returns The file contents as a string
-   */
-  read(filePath: string, encoding: BufferEncoding = "utf-8"): string {
+  function read(filePath: string, encoding: BufferEncoding = "utf-8"): string {
     const cacheKey = `${filePath}:${encoding}`;
 
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
+    if (cache.has(cacheKey)) {
+      const cached = cache.get(cacheKey);
       if (cached !== undefined) {
         return cached;
       }
     }
 
     const content = fs.readFileSync(filePath, encoding);
-    this.cache.set(cacheKey, content);
+    cache.set(cacheKey, content);
 
     return content;
   }
-
-  /**
-   * Asynchronously reads a file from cache if available, otherwise reads from filesystem and caches the result.
-   * @param filePath - Absolute path to the file to read
-   * @param encoding - File encoding (default: 'utf-8')
-   * @returns Promise resolving to the file contents as a string
-   */
-  async readAsync(
+  const readAsync = Effect.fn(function* readAsync(
     filePath: string,
     encoding: BufferEncoding = "utf-8",
-  ): Promise<string> {
+  ): Effect.fn.Return<string, Error> {
     const cacheKey = `${filePath}:${encoding}`;
 
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
+    if (cache.has(cacheKey)) {
+      const cached = cache.get(cacheKey);
       if (cached !== undefined) {
         return cached;
       }
     }
 
-    const content = await fs.promises.readFile(filePath, encoding);
-    this.cache.set(cacheKey, content);
+    const content = yield* fromPromise(() =>
+      fs.promises.readFile(filePath, encoding),
+    );
+    cache.set(cacheKey, content);
 
     return content;
+  });
+  function flushCache(): void {
+    cache.clear();
   }
-
-  /**
-   * Flushes the entire cache.
-   */
-  flushCache(): void {
-    this.cache.clear();
-  }
-
-  /**
-   * Flushes a specific file from the cache.
-   * @param filePath - Absolute path to the file to flush
-   * @param encoding - File encoding (default: 'utf-8')
-   */
-  flushFile(filePath: string, encoding: BufferEncoding = "utf-8"): void {
+  function flushFile(
+    filePath: string,
+    encoding: BufferEncoding = "utf-8",
+  ): void {
     const cacheKey = `${filePath}:${encoding}`;
-    this.cache.delete(cacheKey);
+    cache.delete(cacheKey);
   }
-
-  /**
-   * Checks if a file is cached.
-   * @param filePath - Absolute path to the file
-   * @param encoding - File encoding (default: 'utf-8')
-   * @returns true if the file is cached, false otherwise
-   */
-  isCached(filePath: string, encoding: BufferEncoding = "utf-8"): boolean {
+  function isCached(
+    filePath: string,
+    encoding: BufferEncoding = "utf-8",
+  ): boolean {
     const cacheKey = `${filePath}:${encoding}`;
-    return this.cache.has(cacheKey);
+    return cache.has(cacheKey);
   }
-
-  /**
-   * Gets the number of cached files.
-   * @returns The number of files currently in cache
-   */
-  getCacheSize(): number {
-    return this.cache.size;
+  function getCacheSize(): number {
+    return cache.size;
   }
+  return { read, readAsync, flushCache, flushFile, isCached, getCacheSize };
 }
-
-export { CachedFileReader };
+export type CachedFileReader = ReturnType<typeof createCachedFileReader>;

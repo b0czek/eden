@@ -1,5 +1,3 @@
-import "reflect-metadata";
-
 export type {
   CommandCompletion,
   CommunicationMode,
@@ -23,7 +21,7 @@ export type {
   ResultCommand,
 } from "@edenapp/types";
 export * from "./api";
-export { Eden } from "./Eden";
+export { createEden, type Eden } from "./Eden";
 export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";
 export {
   configureLogger,

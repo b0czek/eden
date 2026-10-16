@@ -1,105 +1,103 @@
-import "reflect-metadata";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
-import type {
-  EdenAppearanceApi,
-  EdenAssociationsApi,
-  EdenDaemonsApi,
-  EdenLifecycleState,
-  EdenPackagesApi,
-  EdenSessionsApi,
-  EdenSettingsApi,
-  EdenUsersApi,
-  EdenVolumesApi,
-} from "./api";
+import { log } from "./logging";
 import { createElectronPlatform } from "./platform/electron";
-import { EdenRuntime } from "./runtime/EdenRuntime";
+import type { ApplicationLifecyclePort } from "./platform/ports";
+import { createEdenRuntime, type EdenRuntime } from "./runtime/EdenRuntime";
 
-/** Public Electron host for one isolated Eden runtime. */
-export class Eden {
-  private readonly runtime: EdenRuntime;
-  public readonly settings: EdenSettingsApi;
+/** Create and start an isolated Eden desktop in the Electron main process. */
+export function createEden(config: EdenConfig = {}) {
+  const platform = createElectronPlatform();
+  // Electron requires privileged schemes before application readiness.
+  platform.resources.registerSchemes(["eden-dlc"]);
+  const application = platform.application;
+  application.appendCommandLineSwitch("enable-features", "V8CodeCache");
 
-  constructor(config: EdenConfig = {}) {
-    const platform = createElectronPlatform();
-    // Electron requires privileged schemes to be declared before app readiness;
-    // DlcResourceManager attaches the authorized file handler during startup.
-    platform.resources.registerSchemes(["eden-dlc"]);
-    const application = platform.application;
-    application.appendCommandLineSwitch("enable-features", "V8CodeCache");
-
-    const appsDirectory =
-      config.appsDirectory ??
-      path.join(application.getPath("userData"), "eden-apps");
-    const userDirectory =
-      config.userDirectory ??
-      path.join(application.getPath("userData"), "eden-user");
-
-    this.runtime = new EdenRuntime({
-      config,
-      platform,
-      paths: {
-        appsDirectory,
-        userDirectory,
-        distPath: path.join(process.cwd(), "dist"),
-        appPath: application.getAppPath(),
-      },
-    });
-    this.settings = this.runtime.settings;
-    this.setupAppEventHandlers(application);
-  }
-
-  public whenReady(): Promise<void> {
-    return this.runtime.whenReady();
-  }
-
-  public get state(): EdenLifecycleState {
-    return this.runtime.state;
-  }
-
-  public get operations(): import("./api").EdenOperationsObserver {
-    return this.runtime.operations;
-  }
-
-  public get volumes(): EdenVolumesApi {
-    return this.runtime.volumes;
-  }
-
-  public get packages(): EdenPackagesApi {
-    return this.runtime.packages;
-  }
-
-  public get daemons(): EdenDaemonsApi {
-    return this.runtime.daemons;
-  }
-
-  public get users(): EdenUsersApi {
-    return this.runtime.users;
-  }
-
-  public get sessions(): EdenSessionsApi {
-    return this.runtime.sessions;
-  }
-
-  public get appearance(): EdenAppearanceApi {
-    return this.runtime.appearance;
-  }
-
-  public get associations(): EdenAssociationsApi {
-    return this.runtime.associations;
-  }
-
-  private setupAppEventHandlers(
-    application: ReturnType<typeof createElectronPlatform>["application"],
-  ): void {
-    void application
-      .whenReady()
-      .then(() => this.runtime.start())
-      .catch(() => undefined);
-    application.on("window-all-closed", () => application.quit());
-    application.on("activate", () => this.runtime.activate());
-    application.on("quit-requested", () => {
-      void this.runtime.dispose().finally(() => application.completeQuit());
-    });
-  }
+  const runtime = createEdenRuntime({
+    config,
+    platform,
+    paths: {
+      appsDirectory:
+        config.appsDirectory ??
+        path.join(application.getPath("userData"), "eden-apps"),
+      userDirectory:
+        config.userDirectory ??
+        path.join(application.getPath("userData"), "eden-user"),
+      distPath: path.join(process.cwd(), "dist"),
+      appPath: application.getAppPath(),
+    },
+  });
+  return createEdenHost({ runtime, application });
 }
+
+/** Compose an already-owned runtime with the application's lifecycle. */
+export function createEdenHost({
+  runtime,
+  application,
+}: {
+  runtime: EdenRuntime;
+  application: ApplicationLifecyclePort;
+}) {
+  let disposal: Promise<void> | undefined;
+  const unsubscribe = [
+    application.on("window-all-closed", () => application.quit()),
+    application.on("activate", () => runtime.activate()),
+    application.on("quit-requested", () => {
+      void dispose()
+        .finally(() => application.completeQuit())
+        .catch((error) => {
+          log.error("Failed to dispose Eden before quitting:", error);
+        });
+    }),
+  ];
+
+  function dispose(): Promise<void> {
+    disposal ??= (async () => {
+      for (const stop of unsubscribe) stop();
+      await runtime.dispose();
+    })();
+    return disposal;
+  }
+
+  void application
+    .whenReady()
+    .then(() => {
+      if (!disposal) return runtime.start();
+    })
+    .catch(() => undefined);
+
+  return {
+    settings: runtime.settings,
+    whenReady: () => runtime.whenReady(),
+    dispose,
+    get state() {
+      return runtime.state;
+    },
+    get operations() {
+      return runtime.operations;
+    },
+    get volumes() {
+      return runtime.volumes;
+    },
+    get packages() {
+      return runtime.packages;
+    },
+    get daemons() {
+      return runtime.daemons;
+    },
+    get users() {
+      return runtime.users;
+    },
+    get sessions() {
+      return runtime.sessions;
+    },
+    get appearance() {
+      return runtime.appearance;
+    },
+    get associations() {
+      return runtime.associations;
+    },
+  };
+}
+
+export type Eden = ReturnType<typeof createEden>;

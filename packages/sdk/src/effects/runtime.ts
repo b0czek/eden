@@ -56,6 +56,3 @@ export function createEffectRuntime() {
 }
 
 export type EffectRuntime = ReturnType<typeof createEffectRuntime>;
-
-/** Temporary DI boundary while the remaining runtime services are converted. */
-export const EFFECT_RUNTIME = Symbol("Eden Effect runtime");

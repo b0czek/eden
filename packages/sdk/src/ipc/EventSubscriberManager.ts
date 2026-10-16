@@ -70,57 +70,40 @@ function removeEndpoint<T>(
     if (!endpoints.size) subscriptions.delete(key);
   }
 }
-export class EventSubscriberManager {
-  private viewManager: ViewManager;
-  private backendManager?: BackendManager;
-  private subscriptions: Map<string, Set<number>> = new Map();
-  private backendSubscriptions: Map<string, Set<string>> = new Map();
-  private foundationSubscriptions: Map<string, boolean> = new Map();
-  private permissionRegistry?: PermissionRegistry;
-  private readonly operationViews: OperationSubscriptions<number> = new Map();
-  private readonly operationBackends: OperationSubscriptions<string> =
-    new Map();
 
-  private viewScopes = new Map<
-    number,
-    { appId?: string; sessionId?: string }
-  >();
-  private backendScopes = new Map<
-    string,
-    { appId?: string; sessionId?: string }
-  >();
+export function createEventSubscriberManager({
+  viewManager,
+  execution,
+  contexts,
+  backendManager,
+  permissionRegistry,
+}: {
+  viewManager: Pick<
+    ViewManager,
+    "getViewInfo" | "sendToView" | "sendToMainWindow"
+  >;
+  execution: Pick<ExecutionContext, "get">;
+  contexts: Pick<RuntimeContextRegistry, "resolvePrincipal">;
+  backendManager: Pick<BackendManager, "sendMessage">;
+  permissionRegistry: Pick<
+    PermissionRegistry,
+    "getEventPermission" | "hasPermission"
+  >;
+}) {
+  let subscriptions: Map<string, Set<number>> = new Map();
+  let backendSubscriptions: Map<string, Set<string>> = new Map();
+  let foundationSubscriptions: Map<string, boolean> = new Map();
+  let operationViews: OperationSubscriptions<number> = new Map();
+  let operationBackends: OperationSubscriptions<string> = new Map();
+  let viewScopes = new Map<number, { appId?: string; sessionId?: string }>();
+  let backendScopes = new Map<string, { appId?: string; sessionId?: string }>();
 
-  constructor(
-    viewManager: ViewManager,
-    private execution?: ExecutionContext,
-    private contexts?: RuntimeContextRegistry,
-  ) {
-    this.viewManager = viewManager;
-  }
-
-  /**
-   * Set the backend manager for backend notifications
-   */
-  setBackendManager(backendManager: BackendManager): void {
-    this.backendManager = backendManager;
-  }
-
-  /**
-   * Set the permission registry for permission checking
-   */
-  setPermissionRegistry(registry: PermissionRegistry): void {
-    this.permissionRegistry = registry;
-  }
-
-  /**
-   * Subscribe a view to an event
-   */
-  public subscribe(
+  function subscribe(
     viewId: number,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
-    const viewInfo = this.viewManager.getViewInfo(viewId);
+    const viewInfo = viewManager.getViewInfo(viewId);
     if (!viewInfo) {
       log.warn(`Cannot subscribe: view ${viewId} not found`);
       return false;
@@ -128,13 +111,10 @@ export class EventSubscriberManager {
 
     // Check event permission if required
     const requiredPermission =
-      this.permissionRegistry?.getEventPermission(eventName);
-    if (requiredPermission && this.permissionRegistry) {
+      permissionRegistry?.getEventPermission(eventName);
+    if (requiredPermission && permissionRegistry) {
       if (
-        !this.permissionRegistry.hasPermission(
-          viewInfo.appId,
-          requiredPermission,
-        )
+        !permissionRegistry.hasPermission(viewInfo.appId, requiredPermission)
       ) {
         throw new Error(
           `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
@@ -142,84 +122,71 @@ export class EventSubscriberManager {
       }
     }
 
-    if (operation) addOperation(this.operationViews, viewId, operation);
+    if (operation) addOperation(operationViews, viewId, operation);
     else {
-      if (!this.subscriptions.has(eventName))
-        this.subscriptions.set(eventName, new Set());
-      this.subscriptions.get(eventName)!.add(viewId);
+      if (!subscriptions.has(eventName))
+        subscriptions.set(eventName, new Set());
+      subscriptions.get(eventName)!.add(viewId);
     }
-    this.viewScopes.set(viewId, {
+    viewScopes.set(viewId, {
       appId: viewInfo.appId,
-      sessionId: this.execution?.get()?.sessionId,
+      sessionId: execution?.get()?.sessionId,
     });
     log.info(
       `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
     );
     return true;
   }
-
-  /**
-   * Subscribe foundation to an event
-   */
-  public subscribeFoundation(eventName: string): boolean {
-    if (!this.foundationSubscriptions.has(eventName)) {
-      this.foundationSubscriptions.set(eventName, true);
+  function subscribeFoundation(eventName: string): boolean {
+    if (!foundationSubscriptions.has(eventName)) {
+      foundationSubscriptions.set(eventName, true);
       log.info(`Foundation subscribed to event: ${eventName}`);
     }
     return true;
   }
-
-  /**
-   * Subscribe a backend to an event
-   */
-  public subscribeBackend(
+  function subscribeBackend(
     appId: string,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
     // Check event permission if required
     const requiredPermission =
-      this.permissionRegistry?.getEventPermission(eventName);
-    if (requiredPermission && this.permissionRegistry) {
-      if (!this.permissionRegistry.hasPermission(appId, requiredPermission)) {
+      permissionRegistry?.getEventPermission(eventName);
+    if (requiredPermission && permissionRegistry) {
+      if (!permissionRegistry.hasPermission(appId, requiredPermission)) {
         throw new Error(
           `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
         );
       }
     }
 
-    if (operation) addOperation(this.operationBackends, appId, operation);
+    if (operation) addOperation(operationBackends, appId, operation);
     else {
-      if (!this.backendSubscriptions.has(eventName))
-        this.backendSubscriptions.set(eventName, new Set());
-      this.backendSubscriptions.get(eventName)!.add(appId);
+      if (!backendSubscriptions.has(eventName))
+        backendSubscriptions.set(eventName, new Set());
+      backendSubscriptions.get(eventName)!.add(appId);
     }
-    this.backendScopes.set(appId, {
+    backendScopes.set(appId, {
       appId,
-      sessionId: this.execution?.get()?.sessionId,
+      sessionId: execution?.get()?.sessionId,
     });
     log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
     return true;
   }
-
-  /**
-   * Unsubscribe a view from an event
-   */
-  public unsubscribe(
+  function unsubscribe(
     viewId: number,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
-    if (operation)
-      return removeOperation(this.operationViews, viewId, operation);
-    const subscriptions = this.subscriptions.get(eventName);
-    if (!subscriptions) {
+    if (operation) return removeOperation(operationViews, viewId, operation);
+    const recipients = subscriptions.get(eventName);
+    if (!recipients) {
       return false;
     }
 
-    const result = subscriptions.delete(viewId);
-    if (subscriptions.size === 0) {
-      this.subscriptions.delete(eventName);
+    const result = recipients.delete(viewId);
+    if (recipients.size === 0) {
+      subscriptions.delete(eventName);
     }
 
     if (result) {
@@ -227,37 +194,28 @@ export class EventSubscriberManager {
     }
     return result;
   }
-
-  /**
-   * Unsubscribe foundation from an event
-   */
-  public unsubscribeFoundation(eventName: string): boolean {
-    if (this.foundationSubscriptions.has(eventName)) {
-      this.foundationSubscriptions.delete(eventName);
+  function unsubscribeFoundation(eventName: string): boolean {
+    if (foundationSubscriptions.has(eventName)) {
+      foundationSubscriptions.delete(eventName);
       log.info(`Foundation unsubscribed from event: ${eventName}`);
       return true;
     }
     return false;
   }
-
-  /**
-   * Unsubscribe a backend from an event
-   */
-  public unsubscribeBackend(
+  function unsubscribeBackend(
     appId: string,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
-    if (operation)
-      return removeOperation(this.operationBackends, appId, operation);
-    const subscriptions = this.backendSubscriptions.get(eventName);
-    if (!subscriptions) {
+    if (operation) return removeOperation(operationBackends, appId, operation);
+    const recipients = backendSubscriptions.get(eventName);
+    if (!recipients) {
       return false;
     }
 
-    const result = subscriptions.delete(appId);
-    if (subscriptions.size === 0) {
-      this.backendSubscriptions.delete(eventName);
+    const result = recipients.delete(appId);
+    if (recipients.size === 0) {
+      backendSubscriptions.delete(eventName);
     }
 
     if (result) {
@@ -265,107 +223,88 @@ export class EventSubscriberManager {
     }
     return result;
   }
-
-  /**
-   * Get all views subscribed to an event
-   */
-  public getSubscribedViews(eventName: string): number[] {
-    const subscriptions = this.subscriptions.get(eventName);
-    return subscriptions ? Array.from(subscriptions) : [];
+  function getSubscribedViews(eventName: string): number[] {
+    const recipients = subscriptions.get(eventName);
+    return recipients ? Array.from(recipients) : [];
   }
-
-  /**
-   * Get all backends subscribed to an event
-   */
-  public getSubscribedBackends(eventName: string): string[] {
-    const subscriptions = this.backendSubscriptions.get(eventName);
-    return subscriptions ? Array.from(subscriptions) : [];
+  function getSubscribedBackends(eventName: string): string[] {
+    const recipients = backendSubscriptions.get(eventName);
+    return recipients ? Array.from(recipients) : [];
   }
-
-  private *viewRecipients(
+  function* viewRecipients(
     eventName: string,
     scope?: EventScope,
   ): Iterable<number> {
-    const general = this.subscriptions.get(eventName);
+    const general = subscriptions.get(eventName);
     if (general) for (const endpoint of general) yield endpoint;
     if (eventName === "operation/changed")
-      for (const endpoint of interested(this.operationViews, scope?.operation))
+      for (const endpoint of interested(operationViews, scope?.operation))
         if (!general?.has(endpoint)) yield endpoint;
   }
-
-  private *backendRecipients(
+  function* backendRecipients(
     eventName: string,
     scope?: EventScope,
   ): Iterable<string> {
-    const general = this.backendSubscriptions.get(eventName);
+    const general = backendSubscriptions.get(eventName);
     if (general) for (const endpoint of general) yield endpoint;
     if (eventName === "operation/changed")
-      for (const endpoint of interested(
-        this.operationBackends,
-        scope?.operation,
-      ))
+      for (const endpoint of interested(operationBackends, scope?.operation))
         if (!general?.has(endpoint)) yield endpoint;
   }
-
-  private viewAuthorized(viewId: number, scope?: EventScope): boolean {
+  function viewAuthorized(viewId: number, scope?: EventScope): boolean {
     if (!scope) return true;
-    const subscriber = this.viewScopes.get(viewId);
+    const subscriber = viewScopes.get(viewId);
     return (
       subscriber?.appId === scope.appId &&
       subscriber?.sessionId === scope.sessionId &&
-      !!this.contexts?.resolvePrincipal(subscriber.appId!)
+      !!contexts?.resolvePrincipal(subscriber.appId!)
     );
   }
-
-  private backendAuthorized(appId: string, scope?: EventScope): boolean {
+  function backendAuthorized(appId: string, scope?: EventScope): boolean {
     if (!scope) return true;
-    const subscriber = this.backendScopes.get(appId);
+    const subscriber = backendScopes.get(appId);
     return (
       subscriber?.appId === scope.appId &&
       subscriber?.sessionId === scope.sessionId &&
-      !!this.contexts?.resolvePrincipal(appId)
+      !!contexts?.resolvePrincipal(appId)
     );
   }
-
-  /** Check interest before a producer allocates a notification payload. */
-  public hasSubscribers(eventName: string, scope?: EventScope): boolean {
-    if (!scope && this.foundationSubscriptions.has(eventName)) return true;
-    for (const viewId of this.viewRecipients(eventName, scope))
-      if (this.viewAuthorized(viewId, scope)) return true;
-    if (this.backendManager)
-      for (const appId of this.backendRecipients(eventName, scope))
-        if (this.backendAuthorized(appId, scope)) return true;
+  function hasSubscribers(eventName: string, scope?: EventScope): boolean {
+    if (!scope && foundationSubscriptions.has(eventName)) return true;
+    for (const viewId of viewRecipients(eventName, scope))
+      if (viewAuthorized(viewId, scope)) return true;
+    if (backendManager)
+      for (const appId of backendRecipients(eventName, scope))
+        if (backendAuthorized(appId, scope)) return true;
     return false;
   }
-
-  /** Send an event once to each authorized, interested external consumer. */
-  public notify<T extends EventName>(
+  function notify<T extends EventName>(
     eventName: T,
     payload: EventData<T>,
     scope?: EventScope,
   ): void {
     // Notify foundation if subscribed
-    if (!scope && this.foundationSubscriptions.has(eventName)) {
-      this.viewManager.sendToMainWindow("shell-message", {
+    if (!scope && foundationSubscriptions.has(eventName)) {
+      viewManager.sendToMainWindow("shell-message", {
         type: eventName,
         payload,
       });
     }
 
     // Notify view subscribers
-    for (const viewId of this.viewRecipients(eventName, scope)) {
-      if (!this.viewAuthorized(viewId, scope)) continue;
-      this.viewManager.sendToView(viewId, "shell-message", {
+    for (const viewId of viewRecipients(eventName, scope)) {
+      if (!viewAuthorized(viewId, scope)) continue;
+      viewManager.sendToView(viewId, "shell-message", {
         type: eventName,
         payload,
       });
     }
 
     // Notify backend subscribers
-    if (this.backendManager) {
-      for (const appId of this.backendRecipients(eventName, scope)) {
-        if (!this.backendAuthorized(appId, scope)) continue;
-        this.backendManager.sendMessage(appId, {
+    if (backendManager) {
+      for (const appId of backendRecipients(eventName, scope)) {
+        if (!backendAuthorized(appId, scope)) continue;
+        backendManager.sendMessage(appId, {
           type: "shell-event",
           eventName,
           payload,
@@ -373,68 +312,69 @@ export class EventSubscriberManager {
       }
     }
   }
-
-  /**
-   * Send event to a specific subscribed view
-   */
-  public notifyView<T extends EventName>(
+  function notifyView<T extends EventName>(
     viewId: number,
     eventName: T,
     payload: EventData<T>,
   ): boolean {
-    const subscriptions = this.subscriptions.get(eventName);
-    if (!subscriptions?.has(viewId)) {
+    const recipients = subscriptions.get(eventName);
+    if (!recipients?.has(viewId)) {
       return false;
     }
 
-    return this.viewManager.sendToView(viewId, "shell-message", {
+    return viewManager.sendToView(viewId, "shell-message", {
       type: eventName,
       payload,
     });
   }
-
-  /**
-   * Remove all subscriptions for a view
-   */
-  public removeViewSubscriptions(viewId: number): void {
-    removeEndpoint(this.operationViews, viewId);
-    this.viewScopes.delete(viewId);
-    for (const [eventName, subscribers] of this.subscriptions.entries()) {
+  function removeViewSubscriptions(viewId: number): void {
+    removeEndpoint(operationViews, viewId);
+    viewScopes.delete(viewId);
+    for (const [eventName, subscribers] of subscriptions.entries()) {
       if (subscribers.delete(viewId)) {
         if (subscribers.size === 0) {
-          this.subscriptions.delete(eventName);
+          subscriptions.delete(eventName);
         }
       }
     }
   }
-
-  /**
-   * Remove all subscriptions for a backend
-   */
-  public removeBackendSubscriptions(appId: string): void {
-    removeEndpoint(this.operationBackends, appId);
-    this.backendScopes.delete(appId);
-    for (const [
-      eventName,
-      subscribers,
-    ] of this.backendSubscriptions.entries()) {
+  function removeBackendSubscriptions(appId: string): void {
+    removeEndpoint(operationBackends, appId);
+    backendScopes.delete(appId);
+    for (const [eventName, subscribers] of backendSubscriptions.entries()) {
       if (subscribers.delete(appId)) {
         if (subscribers.size === 0) {
-          this.backendSubscriptions.delete(eventName);
+          backendSubscriptions.delete(eventName);
         }
       }
     }
   }
-
-  dispose(): void {
-    this.operationViews.clear();
-    this.operationBackends.clear();
-    this.viewScopes.clear();
-    this.backendScopes.clear();
-    this.subscriptions.clear();
-    this.backendSubscriptions.clear();
-    this.foundationSubscriptions.clear();
-    this.backendManager = undefined;
-    this.permissionRegistry = undefined;
+  function dispose(): void {
+    operationViews.clear();
+    operationBackends.clear();
+    viewScopes.clear();
+    backendScopes.clear();
+    subscriptions.clear();
+    backendSubscriptions.clear();
+    foundationSubscriptions.clear();
   }
+  return {
+    subscribe,
+    subscribeFoundation,
+    subscribeBackend,
+    unsubscribe,
+    unsubscribeFoundation,
+    unsubscribeBackend,
+    getSubscribedViews,
+    getSubscribedBackends,
+    hasSubscribers,
+    notify,
+    notifyView,
+    removeViewSubscriptions,
+    removeBackendSubscriptions,
+    dispose,
+  };
 }
+export type EventSubscriberManager = ReturnType<
+  typeof createEventSubscriberManager
+>;

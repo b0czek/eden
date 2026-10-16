@@ -1,8 +1,12 @@
-import "reflect-metadata";
-
+import { createExecutionContext } from "../execution/ExecutionContext";
+import { createRuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import type { BackendManager } from "../process-manager/BackendManager";
+import { createSessionContext } from "../session/SessionContext";
 import type { ViewManager } from "../view-manager/ViewManager";
-import { EventSubscriberManager } from "./EventSubscriberManager";
+import {
+  createEventSubscriberManager,
+  type EventSubscriberManager,
+} from "./EventSubscriberManager";
 import type { PermissionRegistry } from "./PermissionRegistry";
 
 type ViewManagerMock = jest.Mocked<
@@ -32,8 +36,20 @@ const createPermissionRegistryMock = (): PermissionRegistryMock => ({
 const createViewInfo = (appId: string = "app.one"): ViewInfo =>
   ({ appId }) as ViewInfo;
 
-const createManager = (viewManager: ViewManagerMock): EventSubscriberManager =>
-  new EventSubscriberManager(viewManager as unknown as ViewManager);
+const createManager = (
+  viewManager: ViewManagerMock,
+  backendManager: BackendManagerMock,
+  permissionRegistry: PermissionRegistryMock,
+): EventSubscriberManager =>
+  createEventSubscriberManager({
+    viewManager,
+    backendManager,
+    permissionRegistry,
+    execution: createExecutionContext({ config: {} }),
+    contexts: createRuntimeContextRegistry({
+      sessionContext: createSessionContext(),
+    }),
+  });
 
 describe("EventSubscriberManager", () => {
   let viewManager: ViewManagerMock;
@@ -60,17 +76,22 @@ describe("EventSubscriberManager", () => {
   });
 
   it("returns false when subscribing an unknown view", () => {
-    const manager = createManager(viewManager);
+    const manager = createManager(
+      viewManager,
+      backendManager,
+      permissionRegistry,
+    );
 
     viewManager.getViewInfo.mockReturnValue(undefined);
 
     expect(manager.subscribe(1, "event/missing")).toBe(false);
   });
 
-  it("enforces event permissions when a registry is set", () => {
-    const manager = createManager(viewManager);
-    manager.setPermissionRegistry(
-      permissionRegistry as unknown as PermissionRegistry,
+  it("enforces the event permission configured for a subscription", () => {
+    const manager = createManager(
+      viewManager,
+      backendManager,
+      permissionRegistry,
     );
 
     viewManager.getViewInfo.mockReturnValue(createViewInfo());
@@ -83,8 +104,11 @@ describe("EventSubscriberManager", () => {
   });
 
   it("subscribes/unsubscribes views and sends notifications", () => {
-    const manager = createManager(viewManager);
-    manager.setBackendManager(backendManager as unknown as BackendManager);
+    const manager = createManager(
+      viewManager,
+      backendManager,
+      permissionRegistry,
+    );
 
     viewManager.getViewInfo.mockReturnValue(createViewInfo());
 
@@ -119,7 +143,11 @@ describe("EventSubscriberManager", () => {
   });
 
   it("sends to a specific view only when subscribed", () => {
-    const manager = createManager(viewManager);
+    const manager = createManager(
+      viewManager,
+      backendManager,
+      permissionRegistry,
+    );
     viewManager.getViewInfo.mockReturnValue(createViewInfo());
 
     expect(
@@ -146,8 +174,11 @@ describe("EventSubscriberManager", () => {
   });
 
   it("cleans up subscriptions for views and backends", () => {
-    const manager = createManager(viewManager);
-    manager.setBackendManager(backendManager as unknown as BackendManager);
+    const manager = createManager(
+      viewManager,
+      backendManager,
+      permissionRegistry,
+    );
 
     viewManager.getViewInfo.mockReturnValue(createViewInfo());
 

@@ -1,27 +1,16 @@
-import "reflect-metadata";
 import type { OperationSubmission } from "@edenapp/types";
-import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import type { Controller } from "../controllers/controller";
 import * as Effect from "effect/Effect";
-import { EFFECT_RUNTIME, type EffectRuntime } from "../effects/runtime";
+import type { Controller } from "../controllers/controller";
+import { type EffectRuntime } from "../effects/runtime";
 import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/ExecutionContext";
-import { log } from "../logging";
 import { OperationManager } from "../operations/OperationManager";
 import type { OperationTask } from "../operations/OperationTask";
 import type { SessionContext } from "../session";
-import { getManagerMetadata } from "./CommandMetadata";
 import { assertFoundationCommandAllowed } from "./FoundationPolicy";
 import { PermissionRegistry } from "./PermissionRegistry";
-
-export {
-  addCommandHandler,
-  getManagerMetadata,
-  setManagerNamespace,
-} from "./CommandMetadata";
-
 /**
  * CommandRegistry
  *
@@ -34,188 +23,82 @@ export type CommandHandler<TArgs = unknown, TResult = unknown> = (
   args: TArgs,
 ) => Promise<TResult> | TResult;
 
-export interface CommandMetadata {
-  source: "decorator" | "controller";
+export interface RegisteredCommand {
   namespace: string;
   command: string;
   handler: CommandHandler;
-  target: object; // The instance that owns the handler
   mode: "result" | "operation";
   permission?: string; // Full permission: "namespace/action"
-  methodName: string; // Original method name for metadata lookup
 }
 
-interface CommandManager {
-  constructor: object;
-}
+export function createCommandRegistry({
+  permissionRegistry,
+  sessionContext,
+  executionContext,
+  operations,
+  effects,
+}: {
+  permissionRegistry: PermissionRegistry;
+  sessionContext: SessionContext;
+  executionContext: ExecutionContext;
+  operations: OperationManager;
+  effects: EffectRuntime;
+}) {
+  let handlers = new Map<string, RegisteredCommand>();
 
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-export class CommandRegistry {
-  private handlers = new Map<string, CommandMetadata>();
-
-  constructor(
-    @inject(PermissionRegistry) private permissionRegistry: PermissionRegistry,
-    @inject(delay(() => require("../session/SessionContext").SessionContext))
-    private sessionContext: SessionContext,
-    @inject(ExecutionContext) private executionContext: ExecutionContext,
-    @inject(delay(() => OperationManager)) private operations: OperationManager,
-    @inject(EFFECT_RUNTIME) private effects: EffectRuntime,
-  ) {}
-
-  /**
-   * Register a command handler under a namespace
-   * @param namespace - The namespace (e.g., "app", "view")
-   * @param command - The command name (e.g., "launch", "update-bounds")
-   * @param handler - The handler function
-   * @param target - The instance that owns the handler (for proper `this` binding)
-   * @param methodName - The original method name for metadata lookup
-   */
-  register(
-    namespace: string,
-    command: string,
-    handler: CommandHandler,
-    target: object,
-    methodName?: string,
-  ): void {
-    const fullCommand = `${namespace}/${command}`;
-
-    if (this.handlers.get(fullCommand)?.source === "controller") {
-      throw new Error(`Command already registered: ${fullCommand}`);
-    }
-    if (this.handlers.has(fullCommand))
-      log.warn(`Command handler for "${fullCommand}" is being overwritten`);
-
-    // Look up permission from decorator metadata
-    let permission: string | undefined;
-    if (methodName && target) {
-      const handlerPermission = Reflect.getMetadata(
-        "eden:handler:permission",
-        target.constructor.prototype,
-        methodName,
-      );
-      if (handlerPermission) {
-        permission = `${namespace}/${handlerPermission}`;
-      }
-    }
-
-    const mode = methodName
-      ? (Reflect.getMetadata(
-          "eden:handler:mode",
-          target.constructor.prototype,
-          methodName,
-        ) ?? "result")
-      : "result";
-
-    this.handlers.set(fullCommand, {
-      source: "decorator",
-      mode,
-      namespace,
-      command,
-      handler,
-      target,
-      permission,
-      methodName: methodName || "",
-    });
-  }
-
-  /** Register explicit definitions through the same execution and permission path. */
-  registerController(controller: Controller): void {
+  function registerController(controller: Controller): void {
     for (const name of Object.keys(controller.commands)) {
       const fullCommand = `${controller.namespace}/${name}`;
-      if (this.handlers.has(fullCommand))
+      if (handlers.has(fullCommand))
         throw new Error(`Command already registered: ${fullCommand}`);
     }
     for (const [name, command] of Object.entries(controller.commands)) {
-      this.handlers.set(`${controller.namespace}/${name}`, {
-        source: "controller",
+      handlers.set(`${controller.namespace}/${name}`, {
         namespace: controller.namespace,
         command: name,
         mode: command.mode,
         permission: command.permission
           ? `${controller.namespace}/${command.permission}`
           : undefined,
-        handler: (args) =>
-          command.execute(args, this.executionContext.get() ?? {}),
-        target: controller,
-        methodName: name,
+        handler: (args) => command.execute(args, executionContext.get() ?? {}),
       });
     }
   }
 
-  /**
-   * Register multiple handlers from a manager instance
-   * @param manager - The manager instance to register handlers from
-   */
-  registerManager(manager: CommandManager): void {
-    const metadata = getManagerMetadata(manager);
-    if (!metadata) {
-      log.warn("Manager has no command handlers to register");
-      return;
-    }
-
-    const { namespace, handlers } = metadata;
-    const managerMethods = manager as Record<string, unknown>;
-
-    for (const [command, methodName] of handlers.entries()) {
-      const handler = managerMethods[methodName];
-      if (typeof handler === "function") {
-        this.register(
-          namespace,
-          command,
-          handler.bind(manager),
-          manager,
-          methodName,
-        );
-      }
-    }
-    log.info(
-      `Registered ${handlers.size} command handlers for namespace "${namespace}"`,
-    );
-  }
-
-  /**
-   * Execute a command by its full name
-   * @param fullCommand - The full command name (e.g., "process/launch")
-   * @param args - The command arguments
-   * @param callerContext - Trusted caller metadata resolved by the transport
-   * @returns The command result
-   */
-  async execute<TResult = unknown>(
+  async function execute<TResult = unknown>(
     fullCommand: string,
     args: unknown,
     callerContext: CommandCallerContext = {},
     submission: OperationSubmission = {},
   ): Promise<TResult> {
-    const metadata = this.handlers.get(fullCommand);
+    const metadata = handlers.get(fullCommand);
 
     if (!metadata) {
       throw new Error(`Unknown command: ${fullCommand}`);
     }
 
-    const context = this.resolveCallerContext(callerContext);
+    const context = resolveCallerContext(callerContext);
     const appId = context.appId;
 
     if (context.foundation) {
       assertFoundationCommandAllowed(fullCommand);
     }
 
-    return this.executionContext.run(context, async () => {
+    return executionContext.run(context, async () => {
       // Check app permission if required
       if (metadata.permission && appId) {
         // First check if app has this as a base permission
-        const hasBasePermission = this.permissionRegistry.hasPermission(
+        const hasBasePermission = permissionRegistry.hasPermission(
           appId,
           metadata.permission,
         );
 
         if (!hasBasePermission) {
           // Check if app declares a grant that would unlock this permission
-          const requiredGrantKeys =
-            this.permissionRegistry.getRequiredGrantKeys(
-              appId,
-              metadata.permission,
-            );
+          const requiredGrantKeys = permissionRegistry.getRequiredGrantKeys(
+            appId,
+            metadata.permission,
+          );
 
           if (requiredGrantKeys.length === 0) {
             // App neither has base permission nor declares any grant for it
@@ -226,7 +109,7 @@ export class CommandRegistry {
 
           // Check if user has any of the grants that would unlock this permission
           const hasGrant = requiredGrantKeys.some((grantKey) =>
-            this.executionContext.hasGrant(grantKey),
+            executionContext.hasGrant(grantKey),
           );
 
           if (!hasGrant) {
@@ -238,44 +121,33 @@ export class CommandRegistry {
       }
 
       if (metadata.mode === "operation") {
-        const preparedArgs = structuredClone(
-          this.withCallerContext(args, context),
-        );
+        const preparedArgs = structuredClone(sanitizeArgs(args));
         const fingerprintArgs = { ...preparedArgs };
         for (const key of Object.keys(fingerprintArgs))
           if (key.startsWith("_")) delete fingerprintArgs[key];
-        return this.operations.submit(
+        return operations.submit(
           fullCommand,
           fingerprintArgs,
           context,
-          () =>
-            metadata.handler.call(
-              metadata.target,
-              preparedArgs,
-            ) as OperationTask<unknown>,
+          () => metadata.handler(preparedArgs) as OperationTask<unknown>,
           submission,
         ) as TResult;
       }
-      const result = await metadata.handler.call(
-        metadata.target,
-        this.withCallerContext(args, context),
-      );
+      const result = await metadata.handler(sanitizeArgs(args));
       return (
         Effect.isEffect(result)
-          ? await this.effects.run(result as Effect.Effect<unknown, unknown>)
+          ? await effects.run(result as Effect.Effect<unknown, unknown>)
           : await result
       ) as TResult;
     });
   }
-
-  private resolveCallerContext(
+  function resolveCallerContext(
     callerContext: CommandCallerContext,
   ): CommandCallerContext {
     if (callerContext.principal)
       return {
         ...callerContext,
-        sessionId:
-          callerContext.sessionId ?? this.sessionContext.getSessionId(),
+        sessionId: callerContext.sessionId ?? sessionContext.getSessionId(),
       };
     if (callerContext.appId) {
       throw new Error(
@@ -283,75 +155,55 @@ export class CommandRegistry {
       );
     }
 
-    const profile = this.sessionContext.getCurrentUser();
+    const profile = sessionContext.getCurrentUser();
     return profile
       ? {
           ...callerContext,
-          sessionId: this.sessionContext.getSessionId(),
+          sessionId: sessionContext.getSessionId(),
           principal: { kind: "user", profile },
         }
-      : { ...callerContext, sessionId: this.sessionContext.getSessionId() };
+      : { ...callerContext, sessionId: sessionContext.getSessionId() };
   }
-
-  private withCallerContext(
-    args: unknown,
-    context: CommandCallerContext,
-  ): Record<string, unknown> {
+  function sanitizeArgs(args: unknown): Record<string, unknown> {
     const commandArgs =
       args && typeof args === "object" && !Array.isArray(args)
         ? (args as Record<string, unknown>)
         : {};
 
-    const callerArgs: Record<string, unknown> = {};
-    if (context.appId !== undefined) callerArgs._callerAppId = context.appId;
-    if (context.webContentsId !== undefined) {
-      callerArgs._callerWebContentsId = context.webContentsId;
-    }
-    if (context.foundation !== undefined) {
-      callerArgs._isFoundation = context.foundation;
-    }
-
     const cleanArgs = { ...commandArgs };
     for (const key of Object.keys(cleanArgs))
       if (key.startsWith("_")) delete cleanArgs[key];
-    return { ...cleanArgs, ...callerArgs };
+    return cleanArgs;
   }
-
-  /**
-   * Check if a command is registered
-   */
-  getMode(fullCommand: string): CommandMetadata["mode"] | undefined {
-    return this.handlers.get(fullCommand)?.mode;
+  function getMode(fullCommand: string): RegisteredCommand["mode"] | undefined {
+    return handlers.get(fullCommand)?.mode;
   }
-
-  has(fullCommand: string): boolean {
-    return this.handlers.has(fullCommand);
+  function has(fullCommand: string): boolean {
+    return handlers.has(fullCommand);
   }
-
-  /**
-   * Get all registered command names
-   */
-  getCommands(): string[] {
-    return Array.from(this.handlers.keys());
+  function getCommands(): string[] {
+    return Array.from(handlers.keys());
   }
-
-  /**
-   * Get commands for a specific namespace
-   */
-  getNamespaceCommands(namespace: string): string[] {
-    return Array.from(this.handlers.values())
+  function getNamespaceCommands(namespace: string): string[] {
+    return Array.from(handlers.values())
       .filter((meta) => meta.namespace === namespace)
       .map((meta) => `${meta.namespace}/${meta.command}`);
   }
-
-  /**
-   * Clear all handlers (useful for testing)
-   */
-  clear(): void {
-    this.handlers.clear();
+  function clear(): void {
+    handlers.clear();
   }
-
-  dispose(): void {
-    this.clear();
+  function dispose(): void {
+    clear();
   }
+  return {
+    registerController,
+    execute,
+    getMode,
+    has,
+    getCommands,
+    getNamespaceCommands,
+    clear,
+    dispose,
+  };
 }
+export type CommandRegistry = ReturnType<typeof createCommandRegistry>;

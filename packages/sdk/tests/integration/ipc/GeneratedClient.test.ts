@@ -1,6 +1,3 @@
-import { testApp } from "../../support/apps";
-import { createTestCaller } from "../../support/callers";
-import "reflect-metadata";
 import * as nodeFs from "node:fs/promises";
 import * as path from "node:path";
 import * as client from "@edenapp/client";
@@ -20,6 +17,8 @@ import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
+import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe.each(["window", "worker"])(
@@ -32,7 +31,7 @@ describe.each(["window", "worker"])(
     beforeEach(async () => {
       original = Object.getOwnPropertyDescriptor(globalThis, globalName);
       eden = await createTestEden();
-      eden.runtime.resolve(PackageRegistry).register(
+      eden.runtime.services.packageRegistry.register(
         testApp(appId, {
           name: "Generated Client",
           window: {
@@ -47,14 +46,10 @@ describe.each(["window", "worker"])(
       });
       await eden.runtime.sessions.login("client", "password");
       await eden.complete("process/launch", { appId });
-      const instance = eden.runtime
-        .resolve(ProcessManager)
-        .getAppInstance(appId);
+      const instance = eden.runtime.services.processes.getAppInstance(appId);
       if (!instance)
         throw new Error("Generated client test app was not launched");
-      const view = eden.runtime
-        .resolve(ViewManager)
-        .getViewInfo(instance.viewId);
+      const view = eden.runtime.services.views.getViewInfo(instance.viewId);
       if (!view) throw new Error("Generated client test view was not created");
       const contents = view.view.webContents;
       const listeners = new Map<string, Set<EventSubscriptionCallback>>();
@@ -133,6 +128,22 @@ describe.each(["window", "worker"])(
       expect(await client.db.list()).toEqual({ keys: ["theme"] });
     });
 
+    it("sets an association using key, app ID, kind and optional label arguments", async () => {
+      await client.associations.set(
+        "provider:generated",
+        "com.example.provider",
+        "provider",
+        { label: "Generated provider" },
+      );
+      expect(await client.associations.get("provider:generated")).toEqual({
+        association: {
+          appId: "com.example.provider",
+          kind: "provider",
+          label: "Generated provider",
+        },
+      });
+    });
+
     it("preserves operation completion, observation, overwrite options, and submission deduplication", async () => {
       const from = { volume: "home", path: "/source.txt" };
       const to = { volume: "home", path: "/destination.txt" };
@@ -152,7 +163,7 @@ describe.each(["window", "worker"])(
     });
 
     it("propagates permission and validation failures", async () => {
-      eden.runtime.resolve(PermissionRegistry).registerApp(appId, ["fs/read"]);
+      eden.runtime.services.permissions.registerApp(appId, ["fs/read"]);
       await expect(
         client.fs.write({ volume: "home", path: "/forbidden.txt" }, "denied"),
       ).rejects.toThrow(/permission/i);

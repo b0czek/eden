@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { Eden } from "./Eden";
+import { createEden } from "./Eden";
 
 const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
 const userDirectory =
@@ -8,7 +8,7 @@ const stateDirectory =
   process.env.EDEN_DEV_HOT_RELOAD_DIRECTORY ?? ".eden-hot-reload";
 const seedPath = process.env.EDEN_DEV_SEED_PATH;
 
-new Eden({
+createEden({
   development: true,
   tiling: {
     mode: "smart",

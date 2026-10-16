@@ -1,10 +1,9 @@
-import "reflect-metadata";
 import { defineController } from "../../../src/controllers/controller";
 import {
-  targetedEvent,
-  routedEvent,
   type RoutedNotification,
+  routedEvent,
   type TargetedNotification,
+  targetedEvent,
 } from "../../../src/controllers/events";
 import { createEvent } from "../../../src/events/event";
 import { IPCBridge } from "../../../src/ipc/IPCBridge";
@@ -20,13 +19,13 @@ it("delivers a controller notification only to selected subscribed views and rel
   const source = createEvent<TargetedNotification<{ value: string }>>();
   const mixed = createEvent<RoutedNotification<{ value: string }>>();
   try {
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     const ids = ["com.example.first", "com.example.second"];
     for (const id of ids) registry.register(testApp(id));
     const { user } = await createTestCaller(eden, ids[0], []);
     await eden.runtime.sessions.login(user.username, "password");
-    const views = eden.runtime.resolve(ViewManager);
-    const bridge = eden.runtime.resolve(IPCBridge);
+    const views = eden.runtime.services.views;
+    const bridge = eden.runtime.services.ipc;
     bridge.registerController(
       defineController("routing", {
         commands: {},
@@ -36,9 +35,8 @@ it("delivers a controller notification only to selected subscribed views and rel
     const recipients: Array<{ viewId: number; contentsId: number }> = [];
     for (const appId of ids) {
       await eden.complete("process/launch", { appId });
-      const viewId = eden.runtime
-        .resolve(ProcessManager)
-        .getAppInstance(appId)!.viewId;
+      const viewId =
+        eden.runtime.services.processes.getAppInstance(appId)!.viewId;
       recipients.push({
         viewId,
         contentsId: views.getViewInfo(viewId)!.view.webContents.id,

@@ -1,7 +1,5 @@
-import "reflect-metadata";
-
 import type { ResolvedGrant } from "@edenapp/types";
-import { PermissionRegistry } from "./PermissionRegistry";
+import { createPermissionRegistry } from "./PermissionRegistry";
 
 describe("PermissionRegistry", () => {
   let logSpy: jest.SpyInstance;
@@ -15,7 +13,7 @@ describe("PermissionRegistry", () => {
   });
 
   it("registers base permissions and evaluates matches", () => {
-    const registry = new PermissionRegistry();
+    const registry = createPermissionRegistry();
 
     registry.registerApp("app.one", ["fs/read", "fs/*"], []);
 
@@ -26,7 +24,7 @@ describe("PermissionRegistry", () => {
   });
 
   it("returns required grant keys when permission is not base", () => {
-    const registry = new PermissionRegistry();
+    const registry = createPermissionRegistry();
 
     const grants: ResolvedGrant[] = [
       {
@@ -62,7 +60,7 @@ describe("PermissionRegistry", () => {
   });
 
   it("unregisters apps when no permissions or grants are provided", () => {
-    const registry = new PermissionRegistry();
+    const registry = createPermissionRegistry();
 
     registry.registerApp("app.three", [], []);
     expect(registry.hasApp("app.three")).toBe(false);
@@ -77,7 +75,7 @@ describe("PermissionRegistry", () => {
 
 describe("Event Permission Registry", () => {
   it("tracks required permissions for events", () => {
-    const registry = new PermissionRegistry();
+    const registry = createPermissionRegistry();
     registry.registerEventPermission("app/ready", "app/observe");
 
     expect(registry.getEventPermission("app/ready")).toBe("app/observe");
@@ -87,8 +85,8 @@ describe("Event Permission Registry", () => {
   });
 
   it("keeps event permissions isolated between registries", () => {
-    const first = new PermissionRegistry();
-    const second = new PermissionRegistry();
+    const first = createPermissionRegistry();
+    const second = createPermissionRegistry();
     first.registerEventPermission("app/ready", "app/observe");
 
     expect(second.getEventPermission("app/ready")).toBeUndefined();

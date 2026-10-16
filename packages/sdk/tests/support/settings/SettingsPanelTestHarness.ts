@@ -1,12 +1,9 @@
-import { panelUser } from "./panels";
-import "reflect-metadata";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import type { ExecutionContext } from "../../../src/execution";
-import type { CommandRegistry, IPCBridge } from "../../../src/ipc";
-import type { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import type { SessionContext } from "../../../src/session";
-import { type LegacySettingsAccess } from "../../../src/settings/legacy-access";
-import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
+import * as Effect from "effect/Effect";
+import { createExecutionContext } from "../../../src/execution/ExecutionContext";
+import type { SessionContext } from "../../../src/session/SessionContext";
+import { createSettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
+import { panelUser } from "./panels";
 
 export function createSettingsPanelHarness(
   initialUser = panelUser(["panels/network"]),
@@ -15,43 +12,33 @@ export function createSettingsPanelHarness(
   let sessionId = "session-1";
   const notify = jest.fn();
   const settings = {
-    get: jest.fn<Promise<string | undefined>, [string, string]>(
-      async () => undefined,
+    get: jest.fn<Effect.Effect<string | undefined, Error>, [string, string]>(
+      () => Effect.succeed(undefined),
     ),
-    set: jest.fn<Promise<void>, [string, string, string]>(
-      async () => undefined,
+    set: jest.fn<Effect.Effect<void, Error>, [string, string, string]>(
+      () => Effect.void,
     ),
-    listApps: jest.fn<Promise<string[]>, [string, boolean?]>(async () => []),
   };
   const catalog = {
     allApps: jest.fn<RuntimeAppManifest[], []>(() => []),
-    listApps: jest.fn<RuntimeAppManifest[], [{ showHidden?: boolean }]>(
-      () => [],
-    ),
-    getIcon: jest.fn<Promise<string | undefined>, [string]>(
-      async () => undefined,
-    ),
-    getSize: jest.fn<Promise<number | undefined>, [string]>(
-      async () => undefined,
+    getIcon: jest.fn<Effect.Effect<string | undefined>, [string]>(() =>
+      Effect.succeed(undefined),
     ),
   };
-  const execution = {
-    run: jest.fn((_context, task: () => unknown) => task()),
-  };
-  const manager = new SettingsPanelManager(
-    { eventSubscribers: { notify } } as unknown as IPCBridge,
-    { registerManager: jest.fn() } as unknown as CommandRegistry,
-    settings as unknown as LegacySettingsAccess,
-    catalog as unknown as PackageCatalog,
-    {
+  const execution = createExecutionContext({ config: {} });
+  const manager = createSettingsPanelManager({
+    settingsManager: settings,
+    packageCatalog: catalog,
+    sessionContext: {
       getCurrentUser: () =>
         currentUser
           ? { ...currentUser, grants: [...currentUser.grants] }
           : null,
       getSessionId: () => sessionId,
-    } as unknown as SessionContext,
-    execution as unknown as ExecutionContext,
-  );
+    } as SessionContext,
+    executionContext: execution,
+  });
+  manager.changed.on(notify);
   return {
     manager,
     settings,

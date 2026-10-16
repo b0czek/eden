@@ -1,66 +1,63 @@
-import "reflect-metadata";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
-import {
-  type DependencyContainer,
-  type InjectionToken,
-  container as rootContainer,
-} from "tsyringe";
-import type {
-  EdenAppearanceApi,
-  EdenAssociationsApi,
-  EdenDaemonsApi,
-  EdenLifecycleState,
-  EdenPackagesApi,
-  EdenSessionsApi,
-  EdenSettingsApi,
-  EdenUsersApi,
-  EdenVolumesApi,
-} from "../api";
-import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
+import * as Effect from "effect/Effect";
+import type { EdenLifecycleState } from "../api";
 import {
   createControlPlaneApis,
   type EdenControlPlaneApis,
 } from "../api/createControlPlaneApi";
-import { createSettingsApi } from "../api/createSettingsApi";
+import { createSdkContext } from "../api/sdk-context";
 import {
+  type AppAssociations,
   createAppAssociations,
   createAppAssociationsController,
   createJsonFileAssociationStorage,
-  type AppAssociations,
 } from "../app-associations";
 import {
-  APP_CHANNELS,
+  type AppChannels,
   createAppChannels,
   createAppChannelsController,
-  type AppChannels,
 } from "../appbus";
-import { createAppearanceController } from "../appearance/controller";
-import { createAppearance, type Appearance } from "../appearance/service";
+import { createAppearanceController } from "../appearance/controller-edenapi";
+import { type Appearance, createAppearance } from "../appearance/service";
 import { createAppearanceSettings } from "../appearance/settings-adapter";
 import {
+  type Autostart,
   createAutostart,
   createAutostartProcesses,
   createDevelopmentAutostart,
-  type Autostart,
 } from "../autostart";
 import {
+  type Branding,
   createBranding,
   createBrandingController,
   createFilesystemBrandingAssets,
   resolveBrandingName,
-  type Branding,
 } from "../branding";
 import {
   createContextMenu,
   createContextMenuController,
   createContextMenuViews,
 } from "../context-menu";
-import { DaemonManager } from "../daemon";
+import type { Controller } from "../controllers/controller";
+import { createDaemonController } from "../daemon/controller-edenapi";
+import {
+  createDaemonManager,
+  type DaemonManager,
+} from "../daemon/DaemonManager";
+import { connectDaemonLifecycle } from "../daemon/lifecycle";
 import { createDb, createDbController, createSqliteDbStorage } from "../db";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import { createEffectRuntime, EFFECT_RUNTIME } from "../effects/runtime";
+import { createEffectRuntime } from "../effects/runtime";
+import { listen } from "../events/scoped";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+} from "../execution/ExecutionContext";
+import {
+  createRuntimeContextRegistry,
+  type RuntimeContextRegistry,
+} from "../execution/RuntimeContextRegistry";
 import {
   createFileOpen,
   createFileOpenController,
@@ -71,18 +68,33 @@ import {
 import {
   createFilePicker,
   createFilePickerController,
-  createFilePickerViews,
-  createFilePickerProcesses,
   createFilePickerFiles,
   createFilePickerNotifications,
+  createFilePickerProcesses,
+  createFilePickerViews,
 } from "../file-picker";
-import { FilesystemManager } from "../filesystem";
-import { VolumeHandler } from "../filesystem/VolumeHandler";
-import { VolumeManager } from "../filesystem/VolumeManager";
-import { createI18nController } from "../i18n/controller";
+import { createVolumeController } from "../filesystem/controller-edenapi";
+import { createFilesystemController } from "../filesystem/controller-edenapi-files";
+import {
+  createFilesystemManager,
+  type FilesystemManager,
+} from "../filesystem/FilesystemManager";
+import {
+  createVolumeManager,
+  type VolumeManager,
+} from "../filesystem/VolumeManager";
+import { createI18nController } from "../i18n/controller-edenapi";
 import { createI18n } from "../i18n/service";
 import { createI18nSettings } from "../i18n/settings";
-import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
+import {
+  type CommandRegistry,
+  createCommandRegistry,
+} from "../ipc/CommandRegistry";
+import { createIPCBridge, type IPCBridge } from "../ipc/IPCBridge";
+import {
+  createPermissionRegistry,
+  type PermissionRegistry,
+} from "../ipc/PermissionRegistry";
 import {
   createKeyboard,
   createKeyboardAssets,
@@ -91,53 +103,85 @@ import {
 } from "../keyboard";
 import { log } from "../logging";
 import {
-  createNotifications,
   createNotificationController,
+  createNotifications,
   createNotificationViews,
 } from "../notification";
-import { OperationHandler } from "../operations/OperationHandler";
-import { OperationManager } from "../operations/OperationManager";
-import { PackageManager } from "../package-manager";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
+import { createOperationController } from "../operations/controller-edenapi";
+import { createOperationsSdkController } from "../operations/controller-sdk";
 import {
-  type EdenPlatform,
-  PLATFORM_APP_CHANNELS,
-  PLATFORM_DISPLAY,
-  PLATFORM_PROCESS_METRICS,
-  PLATFORM_RENDERER_IPC,
-  PLATFORM_RESOURCES,
-  PLATFORM_SHORTCUTS,
-  PLATFORM_THEME,
-  PLATFORM_UTILITY_PROCESSES,
-  PLATFORM_WINDOWS,
-  type PlatformWindow,
-} from "../platform/ports";
+  createOperationManager,
+  type OperationManager,
+} from "../operations/OperationManager";
+import { createPackageController } from "../package-manager/controller-edenapi";
 import {
-  createPower,
-  createPowerController,
-  createPowerHost,
-  createPowerOperations,
-  createPowerShutdown,
-} from "../power";
-import { BackendManager, ProcessManager } from "../process-manager";
-import { SystemHandler } from "../SystemHandler";
+  createDlcResourceManager,
+  type DlcResourceManager,
+} from "../package-manager/DlcResourceManager";
+import {
+  createPackageCatalog,
+  type PackageCatalog,
+} from "../package-manager/PackageCatalog";
+import {
+  createPackageManager,
+  type PackageManager,
+} from "../package-manager/PackageManager";
+import {
+  createPackageOperationCoordinator,
+  type PackageOperationCoordinator,
+} from "../package-manager/PackageOperationCoordinator";
+import {
+  createPackageRegistry,
+  type PackageRegistry,
+} from "../package-manager/PackageRegistry";
+import { createDlcResourceProtocols } from "../package-manager/resource-adapter";
+import type { EdenPlatform, PlatformWindow } from "../platform/ports";
+import { createPower, createPowerController, createPowerHost } from "../power";
+import {
+  type BackendManager,
+  createBackendManager,
+} from "../process-manager/BackendManager";
+import { createProcessController } from "../process-manager/controller-edenapi";
+import {
+  createProcessManager,
+  type ProcessManager,
+} from "../process-manager/ProcessManager";
 import { seedDatabase } from "../seed";
-import { SessionContext, SessionManager } from "../session";
+import { createSessionController } from "../session/controller-edenapi";
 import {
-  registerBuiltinSettingsPanels,
-  createSettings,
-  createSettingsController,
-  createSqliteSettingsStorage,
-  SettingsPanelManager,
-} from "../settings";
+  createSessionContext,
+  type SessionContext,
+} from "../session/SessionContext";
 import {
-  createLegacySettingsAccess,
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../settings/legacy-access";
-import { GrantCatalogManager, UserManager } from "../user";
-import { UserHandler } from "../user/UserHandler";
-import { ViewManager } from "../view-manager";
+  createSessionManager,
+  type SessionManager,
+} from "../session/SessionManager";
+import { createSettingsController } from "../settings/controller-edenapi";
+import { createSettingsPanelsController } from "../settings/controller-edenapi-panels";
+import { createSettingsSdkController } from "../settings/controller-sdk";
+import { connectSettingsLifecycle } from "../settings/lifecycle";
+import { registerBuiltinSettingsPanels } from "../settings/panels";
+import {
+  createSettingsPanelManager,
+  type SettingsPanelManager,
+} from "../settings/SettingsPanelManager";
+import { createSettings, type Settings } from "../settings/service";
+import { createSqliteSettingsStorage } from "../settings/sqlite-storage";
+import { createSystemController } from "../system/controller-edenapi";
+import { createUserController } from "../user/controller-edenapi";
+import {
+  createGrantCatalogManager,
+  type GrantCatalogManager,
+} from "../user/GrantCatalogManager";
+import { createUserManager, type UserManager } from "../user/UserManager";
+import { createUserStore } from "../user/UserStore";
+import { normalizeAppIds } from "../utils/normalize";
+import { createViewController } from "../view-manager/controller-edenapi";
+import { createViewInteractions } from "../view-manager/interactions";
+import {
+  createViewManager,
+  type ViewManager,
+} from "../view-manager/ViewManager";
 
 export interface EdenRuntimePaths {
   appsDirectory: string;
@@ -145,542 +189,436 @@ export interface EdenRuntimePaths {
   distPath: string;
   appPath: string;
 }
-
 export interface EdenRuntimeOptions {
   config?: EdenConfig;
   paths: EdenRuntimePaths;
   platform: EdenPlatform;
-  parentContainer?: DependencyContainer;
+}
+export interface RuntimeServices {
+  execution: ExecutionContext;
+  runtimeContexts: RuntimeContextRegistry;
+  sessionContext: SessionContext;
+  permissions: PermissionRegistry;
+  operations: OperationManager;
+  commands: CommandRegistry;
+  ipc: IPCBridge;
+  packageRegistry: PackageRegistry;
+  catalog: PackageCatalog;
+  packageOperations: PackageOperationCoordinator;
+  dlcResources: DlcResourceManager;
+  settings: Settings;
+  settingsPanels: SettingsPanelManager;
+  grants: GrantCatalogManager;
+  views: ViewManager;
+  backends: BackendManager;
+  filesystem: FilesystemManager;
+  volumes: VolumeManager;
+  packages: PackageManager;
+  processes: ProcessManager;
+  users: UserManager;
+  sessions: SessionManager;
+  daemons: DaemonManager;
 }
 
-/**
- * Internal composition root for one Eden instance.
- *
- * Every mutable service is resolved from this runtime's child container. The
- * Electron-specific presentation code remains here only until the platform
- * adapter migration; consumers continue to interact with the public Eden host.
- */
-export class EdenRuntime {
-  private readonly container: DependencyContainer;
-  private readonly effects = createEffectRuntime();
-  private readonly ownedServices: Array<{
-    dispose: () => void | Promise<void>;
-  }> = [];
-  private readonly ownedServiceSet = new Set<object>();
-  private readonly config: EdenConfig;
-  private readonly paths: EdenRuntimePaths;
-  private mainWindow: PlatformWindow | null = null;
-  private readonly platform: EdenPlatform;
-  private viewManager!: ViewManager;
-  private readonly ipcBridge: IPCBridge;
-  private brandingService!: Branding;
-  private readonly settingsPanelManager: SettingsPanelManager;
-  private managersInitialized = false;
-  private resourcesDisposed = false;
-  private lifecycleState: EdenLifecycleState = "created";
-  private controlPlaneApis?: EdenControlPlaneApis;
-  private startPromise?: Promise<void>;
-  private disposePromise?: Promise<void>;
-  private readonly readyPromise: Promise<void>;
-  private resolveReady!: () => void;
-  private rejectReady!: (error: unknown) => void;
-  private readySettled = false;
-
-  private packageManager!: PackageManager;
-  private processManager!: ProcessManager;
-  private readonly legacySettings = createLegacySettingsAccess(this.effects);
-  private appearanceService!: Appearance;
-  private appAssociationManager!: AppAssociations;
-  private autostart!: Autostart;
-  private userManager!: UserManager;
-  private sessionManager!: SessionManager;
-  private daemonManager!: DaemonManager;
-  private keyboardService!: Keyboard;
-  private appChannels?: AppChannels;
-
-  public readonly settings: EdenSettingsApi;
-
-  constructor(options: EdenRuntimeOptions) {
-    this.readyPromise = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve;
-      this.rejectReady = reject;
-    });
-    // A host may choose not to await readiness. Keep the owned rejection from
-    // becoming an unhandled rejection while preserving the returned promise.
-    void this.readyPromise.catch(() => undefined);
-
-    this.config = {
-      ...options.config,
-      loginAppId: options.config?.loginAppId ?? "com.eden.login",
-    };
-    this.paths = { ...options.paths };
-    this.platform = options.platform;
-    this.ensureDirectory(this.paths.appsDirectory, "appsDirectory");
-    this.ensureDirectory(this.paths.userDirectory, "userDirectory");
-
-    this.container = (
-      options.parentContainer ?? rootContainer
-    ).createChildContainer();
-    this.container.registerInstance(EFFECT_RUNTIME, this.effects);
-    this.container.registerInstance(
-      LEGACY_SETTINGS,
-      this.own(this.legacySettings).access,
-    );
-    this.container.registerInstance("EdenConfig", this.config);
-    this.container.registerInstance(APP_CHANNELS, {
-      unregisterAllServices: (appId: string) =>
-        this.appChannels?.unregisterAllServices(appId) ?? 0,
-    });
-    this.container.registerInstance("appsDirectory", this.paths.appsDirectory);
-    this.container.registerInstance("distPath", this.paths.distPath);
-    this.container.registerInstance("userDirectory", this.paths.userDirectory);
-    this.container.registerInstance("appPath", this.paths.appPath);
-    this.container.registerInstance(PLATFORM_WINDOWS, this.platform.windows);
-    this.container.registerInstance(
-      PLATFORM_RENDERER_IPC,
-      this.platform.rendererIpc,
-    );
-    this.container.registerInstance(
-      PLATFORM_UTILITY_PROCESSES,
-      this.platform.utilityProcesses,
-    );
-    this.container.registerInstance(
-      PLATFORM_APP_CHANNELS,
-      this.platform.appChannels,
-    );
-    this.container.registerInstance(PLATFORM_DISPLAY, this.platform.display);
-    this.container.registerInstance(
-      PLATFORM_PROCESS_METRICS,
-      this.platform.processMetrics,
-    );
-    this.container.registerInstance(
-      PLATFORM_SHORTCUTS,
-      this.platform.shortcuts,
-    );
-    this.container.registerInstance(PLATFORM_THEME, this.platform.theme);
-    this.container.registerInstance(
-      PLATFORM_RESOURCES,
-      this.platform.resources,
-    );
-
-    resolveBrandingName(this.config.branding);
-    this.resolveOwned(CommandRegistry);
-    this.resolveOwned(BackendManager);
-    this.ipcBridge = this.resolveOwned(IPCBridge);
-    const operations = this.resolveOwned(OperationManager);
-    this.resolveOwned(CommandRegistry).registerManager(
-      new OperationHandler(operations),
-    );
-    this.resolveOwned(CommandRegistry).registerManager(
-      new VolumeHandler(
-        this.resolveOwned(VolumeManager),
-        this.resolveOwned(ExecutionContext),
-      ),
-    );
-    this.settingsPanelManager = this.resolveOwned(SettingsPanelManager);
-    this.settings = createSettingsApi(this.settingsPanelManager);
-
-    const permissions = this.resolveOwned(PermissionRegistry);
-    permissions.registerEventPermission(
-      "settings/panels-changed",
-      "settings/panels",
-    );
-    permissions.registerEventPermission(
-      "user/grant-options-changed",
-      "user/manage",
-    );
-    permissions.registerEventPermission("fs/changed", "fs/read");
-    permissions.registerEventPermission("volume/changed", "volume/read");
-  }
-
-  public whenReady(): Promise<void> {
-    return this.readyPromise;
-  }
-
-  public get state(): EdenLifecycleState {
-    return this.lifecycleState;
-  }
-
-  public get operations(): EdenOperationsObserver {
-    const manager = this.resolveOwned(OperationManager);
-    return {
-      get: (handle) => manager.inspect(handle),
-      list: () => manager.inspectAll(),
-      onChanged: (listener) =>
-        manager.on("changed", ({ snapshot }) =>
-          listener(structuredClone(snapshot)),
-        ),
-    };
-  }
-
-  public get volumes(): EdenVolumesApi {
-    return this.requireControlPlaneApis().volumes;
-  }
-
-  public get packages(): EdenPackagesApi {
-    return this.requireControlPlaneApis().packages;
-  }
-
-  public get daemons(): EdenDaemonsApi {
-    return this.requireControlPlaneApis().daemons;
-  }
-
-  public get users(): EdenUsersApi {
-    return this.requireControlPlaneApis().users;
-  }
-
-  public get sessions(): EdenSessionsApi {
-    return this.requireControlPlaneApis().sessions;
-  }
-
-  public get appearance(): EdenAppearanceApi {
-    return this.requireControlPlaneApis().appearance;
-  }
-
-  public get associations(): EdenAssociationsApi {
-    return this.requireControlPlaneApis().associations;
-  }
-
-  /** Resolve an internal runtime-owned service for SDK infrastructure. */
-  public resolve<T>(token: InjectionToken<T>): T {
-    return this.resolveOwned(token);
-  }
-
-  private resolveOwned<T>(token: InjectionToken<T>): T {
-    return this.own(this.container.resolve(token));
-  }
-
-  private own<T>(instance: T): T {
-    if (
-      instance &&
-      typeof instance === "object" &&
-      "dispose" in instance &&
-      typeof instance.dispose === "function" &&
-      !this.ownedServiceSet.has(instance)
-    ) {
-      this.ownedServiceSet.add(instance);
-      this.ownedServices.push(
-        instance as { dispose: () => void | Promise<void> },
+/** Explicit composition and lifecycle ownership for one isolated Eden instance. */
+export function createEdenRuntime(options: EdenRuntimeOptions) {
+  const config: EdenConfig = {
+    ...options.config,
+    loginAppId: options.config?.loginAppId ?? "com.eden.login",
+  };
+  const paths = { ...options.paths };
+  const platform = options.platform;
+  const effects = createEffectRuntime();
+  fs.mkdirSync(paths.appsDirectory, { recursive: true });
+  fs.mkdirSync(paths.userDirectory, { recursive: true });
+  resolveBrandingName(config.branding);
+  const execution = createExecutionContext({ config });
+  const sessionContext = createSessionContext();
+  const runtimeContexts = createRuntimeContextRegistry({ sessionContext });
+  const permissions = createPermissionRegistry();
+  const packageRegistry = createPackageRegistry();
+  const catalog = createPackageCatalog({
+    registry: packageRegistry,
+    executionContext: execution,
+    appsDirectory: paths.appsDirectory,
+    distPath: paths.distPath,
+  });
+  const packageOperations = createPackageOperationCoordinator({
+    appsDirectory: paths.appsDirectory,
+  });
+  const services = {
+    execution,
+    sessionContext,
+    runtimeContexts,
+    permissions,
+    packageRegistry,
+    catalog,
+    packageOperations,
+  } as RuntimeServices;
+  const operations = createOperationManager({
+    effects,
+    execution,
+    session: sessionContext,
+    filesystem: {
+      releaseHandles: (sessionId) =>
+        services.filesystem?.releaseHandles(sessionId) ?? Effect.void,
+    },
+  });
+  const commands = createCommandRegistry({
+    permissionRegistry: permissions,
+    sessionContext,
+    executionContext: execution,
+    operations,
+    effects,
+  });
+  const sdk = createSdkContext({ execution, effects, operations });
+  const operationsApi = createOperationsSdkController({ operations, sdk });
+  const settingsPanels = createSettingsPanelManager({
+    settingsManager: {
+      get: (...args) => Effect.suspend(() => services.settings.get(...args)),
+      set: (...args) => Effect.suspend(() => services.settings.set(...args)),
+    },
+    packageCatalog: catalog,
+    sessionContext,
+    executionContext: execution,
+  });
+  const settings = createSettingsSdkController({ panels: settingsPanels, sdk });
+  const grants = createGrantCatalogManager({
+    packageCatalog: catalog,
+    settingsPanels,
+  });
+  Object.assign(services, { operations, commands, settingsPanels, grants });
+  const eventPermissions = {
+    "settings/panels-changed": "settings/panels",
+    "user/grant-options-changed": "user/manage",
+    "fs/changed": "fs/read",
+    "volume/changed": "volume/read",
+  };
+  for (const [event, permission] of Object.entries(eventPermissions))
+    permissions.registerEventPermission(event, permission);
+  let state: EdenLifecycleState = "created";
+  let controlPlane: EdenControlPlaneApis | undefined;
+  let mainWindow: PlatformWindow | null = null;
+  let branding: Branding;
+  let appearance: Appearance;
+  let associations: AppAssociations;
+  let keyboard: Keyboard;
+  let autostart: Autostart;
+  let channels: AppChannels;
+  let startPromise: Promise<void> | undefined;
+  let disposePromise: Promise<void> | undefined;
+  let resourcesDisposed = false;
+  let readySettled = false;
+  let resolveReady!: () => void;
+  let rejectReady!: (error: unknown) => void;
+  const readyPromise = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
+  void readyPromise.catch(() => undefined);
+  const register = (controller: Controller) =>
+    services.ipc.registerController(controller);
+  function operational() {
+    if (!controlPlane || state !== "ready")
+      throw new Error(
+        "Eden is not ready. Await eden.whenReady() before using operational APIs.",
       );
-    }
-    return instance;
+    return controlPlane;
   }
-
-  public start(): Promise<void> {
-    if (this.lifecycleState === "starting" && this.startPromise) {
-      return this.startPromise;
-    }
-    if (this.lifecycleState === "ready") {
-      return this.startPromise ?? Promise.resolve();
-    }
-    if (this.lifecycleState !== "created") {
-      return Promise.reject(
-        new Error(
-          `Cannot start Eden runtime from ${this.lifecycleState} state`,
-        ),
-      );
-    }
-
-    this.lifecycleState = "starting";
-    this.startPromise = this.startInternal();
-    return this.startPromise;
-  }
-
-  public dispose(): Promise<void> {
-    if (this.disposePromise) return this.disposePromise;
-    this.disposePromise = this.disposeInternal();
-    return this.disposePromise;
-  }
-
-  /** Recreate the foundation window when the host application is activated. */
-  public activate(): void {
-    if (this.lifecycleState === "ready" && this.mainWindow === null) {
-      void this.createMainWindow().catch((error) =>
-        log.error("Failed to activate foundation window:", error),
-      );
-    }
-  }
-
-  private async startInternal(): Promise<void> {
-    try {
-      log.info("Eden starting...");
-      await seedDatabase(
-        this.paths.appsDirectory,
-        this.config.seedPath ??
-          path.join(this.paths.distPath, "eden-seed.json"),
-        this.paths.userDirectory,
-      );
-
-      await this.initializeManagers();
-      await this.userManager.initialize();
-      await this.packageManager.initialize();
-      this.settingsPanelManager.synchronizeManifestPanels();
-      await this.daemonManager.initialize();
-      await this.sessionManager.initialize();
-      await this.effects.run(this.appearanceService.initialize());
-      await this.effects.run(this.appAssociationManager.initialize());
-      this.assertStartupActive();
-      await this.createMainWindow();
-      this.assertStartupActive();
-
-      this.lifecycleState = "ready";
-      this.readySettled = true;
-      this.resolveReady();
-      log.info("Eden ready!");
-    } catch (error) {
-      await this.disposeResources();
-      if (this.lifecycleState !== "stopping") {
-        this.lifecycleState = "failed";
-      }
-      this.readySettled = true;
-      this.rejectReady(error);
-      if (this.lifecycleState === "failed") {
-        log.error("Eden failed to start", error);
-      }
-      throw error;
-    }
-  }
-
-  private assertStartupActive(): void {
-    if (this.lifecycleState !== "starting") {
-      throw new Error("Eden runtime startup aborted by shutdown");
-    }
-  }
-
-  private async initializeManagers(): Promise<void> {
-    if (this.managersInitialized) return;
-    this.managersInitialized = true;
-
-    this.brandingService = await this.effects.acquire(
+  async function initializeServices() {
+    branding = await effects.acquire(
       createBranding({
-        branding: this.config.branding,
-        assets: createFilesystemBrandingAssets(this.paths.appPath),
+        branding: config.branding,
+        assets: createFilesystemBrandingAssets(paths.appPath),
       }),
     );
-    this.ipcBridge.registerController(
-      createBrandingController(this.brandingService),
-    );
-    const settings = await this.effects.acquire(
+    services.settings = await effects.acquire(
       createSettings({
         storage: createSqliteSettingsStorage({
-          appsDirectory: this.paths.appsDirectory,
+          appsDirectory: paths.appsDirectory,
         }),
-        catalog: {
-          getAppSettings: (appId) =>
-            this.resolveOwned(PackageCatalog).getApp(appId)?.settings,
-        },
-        authorization: this.resolveOwned(ExecutionContext),
+        catalog: { getAppSettings: (appId) => catalog.getApp(appId)?.settings },
+        authorization: execution,
       }),
     );
-    this.legacySettings.connect(settings);
-    this.ipcBridge.registerController(createSettingsController(settings));
-    this.viewManager = this.resolveOwned(ViewManager);
-    const backends = this.resolveOwned(BackendManager);
-    this.appChannels = await this.effects.acquire(
+    services.views = await effects.acquire(
+      createViewManager({
+        config,
+        distPath: paths.distPath,
+        settings: services.settings,
+        windows: platform.windows,
+      }),
+    );
+    await effects.run(services.views.initialize());
+    services.volumes = await effects.acquire(createVolumeManager());
+    services.filesystem = await effects.acquire(
+      createFilesystemManager({
+        baseDir: paths.userDirectory,
+        executionContext: execution,
+        volumes: services.volumes,
+        views: {
+          resolveViewId: services.views.getViewIdByWebContentsId,
+          removed: services.views.viewRemoved,
+        },
+      }),
+    );
+    services.dlcResources = await effects.acquire(
+      createDlcResourceManager({
+        catalog,
+        views: services.views,
+        protocols: createDlcResourceProtocols(platform.resources, effects.run),
+      }),
+    );
+    services.backends = await effects.acquire(
+      createBackendManager({
+        distPath: paths.distPath,
+        utilityProcesses: platform.utilityProcesses,
+        dlcResources: services.dlcResources,
+      }),
+    );
+    services.ipc = createIPCBridge({
+      backendManager: services.backends,
+      commandRegistry: commands,
+      permissionRegistry: permissions,
+      viewManager: services.views,
+      runtimeContexts,
+      execution,
+      rendererIpc: platform.rendererIpc,
+      operations,
+    });
+    services.packages = await effects.acquire(
+      createPackageManager({
+        appsDirectory: paths.appsDirectory,
+        distPath: paths.distPath,
+        config,
+        permissionRegistry: permissions,
+        filesystemManager: services.filesystem,
+        registry: packageRegistry,
+        catalog,
+        dlcResources: services.dlcResources,
+        operations: packageOperations,
+        runtimeContexts,
+      }),
+    );
+    channels = await effects.acquire(
       createAppChannels({
-        channels: this.platform.appChannels,
-        backends: {
-          hasBackend: (appId) => backends.hasBackend(appId),
-          sendPortToBackend: (appId, message, ports) =>
-            backends.sendPortToBackend(appId, message, ports),
-          sendMessage: (appId, message) => backends.sendMessage(appId, message),
+        channels: platform.appChannels,
+        backends: services.backends,
+      }),
+    );
+    services.processes = await effects.acquire(
+      createProcessManager({
+        backendManager: services.backends,
+        viewManager: services.views,
+        packageCatalog: catalog,
+        packageManager: services.packages,
+        appChannelManager: channels,
+        sessionContext,
+        executionContext: execution,
+        config,
+        runtimeContexts,
+        processMetrics: platform.processMetrics,
+        routing: {
+          updateRunningApps: services.ipc.updateRunningApps,
+          removeBackendSubscriptions:
+            services.ipc.eventSubscribers.removeBackendSubscriptions,
         },
       }),
     );
-    this.ipcBridge.registerController(
-      createAppChannelsController(this.appChannels),
+    const store = await effects.acquire(
+      createUserStore({ appsDirectory: paths.appsDirectory }),
     );
-    this.resolveOwned(FilesystemManager);
-    this.userManager = this.resolveOwned(UserManager);
-    this.own(this.effects);
-    const i18n = await this.effects.acquire(
-      createI18n({
-        settings: createI18nSettings(settings),
+    services.users = await effects.acquire(
+      createUserManager({
+        store,
+        userDirectory: paths.userDirectory,
+        restrictedApps: normalizeAppIds(config.restrictedApps),
       }),
     );
-    this.ipcBridge.registerController(createI18nController(i18n));
-    this.packageManager = this.resolveOwned(PackageManager);
-    this.processManager = this.resolveOwned(ProcessManager);
-    this.resolveOwned(FilesystemManager).connectLifecycle(this.processManager);
-    this.sessionManager = this.resolveOwned(SessionManager);
-    this.daemonManager = this.resolveOwned(DaemonManager);
-    this.resolveOwned(CommandRegistry).registerManager(
-      new UserHandler(
-        this.userManager,
-        this.sessionManager,
-        this.resolveOwned(ExecutionContext),
-        this.resolveOwned(GrantCatalogManager),
+    services.sessions = await effects.acquire(
+      createSessionManager({
+        users: services.users,
+        context: sessionContext,
+        operations,
+        processes: services.processes,
+      }),
+    );
+    services.daemons = await effects.acquire(
+      createDaemonManager({
+        catalog,
+        processes: services.processes,
+        settings: services.settings,
+        users: services.users,
+      }),
+    );
+    await effects.acquire(
+      connectDaemonLifecycle(
+        services.daemons,
+        services.processes,
+        services.packages,
       ),
     );
-    const associations = await this.effects.acquire(
-      createAppAssociations({
-        catalog: this.resolveOwned(PackageCatalog),
-        storage: createJsonFileAssociationStorage(this.paths.userDirectory),
+    await effects.acquire(
+      connectSettingsLifecycle(
+        settingsPanels,
+        services.sessions,
+        services.packages,
+        services.daemons,
+        grants,
+      ),
+    );
+    await effects.acquire(
+      Effect.gen(function* () {
+        yield* listen(services.views.viewRemoved, ({ viewId }) =>
+          services.ipc.eventSubscribers.removeViewSubscriptions(viewId),
+        );
+        yield* listen(services.processes.stopped, ({ appId }) =>
+          effects.run(services.filesystem.closeOwner({ appId })),
+        );
+        yield* listen(services.processes.exited, ({ appId }) =>
+          effects.run(services.filesystem.closeOwner({ appId })),
+        );
       }),
     );
-    this.appAssociationManager = associations;
-    this.ipcBridge.registerController(
-      createAppAssociationsController(associations),
+    const i18n = await effects.acquire(
+      createI18n({ settings: createI18nSettings(services.settings) }),
     );
-    const filesystem = this.resolveOwned(FilesystemManager);
-    const fileOpen = await this.effects.acquire(
+    associations = await effects.acquire(
+      createAppAssociations({
+        catalog,
+        storage: createJsonFileAssociationStorage(paths.userDirectory),
+      }),
+    );
+    const fileOpen = await effects.acquire(
       createFileOpen({
         associations,
-        catalog: this.resolveOwned(PackageCatalog),
-        processes: createFileOpenProcesses(this.processManager),
-        views: this.viewManager,
-        filesystem: createFileOpenFilesystem(filesystem),
+        catalog,
+        processes: createFileOpenProcesses(services.processes),
+        views: services.views,
+        filesystem: createFileOpenFilesystem(services.filesystem),
         i18n,
       }),
     );
     const fileOpenOperations = createFileOpenOperations(fileOpen, {
-      prepareVolumeOperation:
-        filesystem.prepareVolumeOperation.bind(filesystem),
-      run: this.effects.run,
+      prepareVolumeOperation: services.filesystem.prepareVolumeOperation,
     });
-    this.ipcBridge.registerController(
-      createFileOpenController(fileOpen, fileOpenOperations),
-    );
-    const sessionContext = this.resolveOwned(SessionContext);
-    this.autostart = await this.effects.acquire(
+    autostart = await effects.acquire(
       createAutostart({
-        development: !!this.config.development,
-        loginAppId: this.config.loginAppId,
-        settings,
+        development: !!config.development,
+        loginAppId: config.loginAppId,
+        settings: services.settings,
         sessions: {
-          currentUser: () => sessionContext.getCurrentUser(),
-          changed: {
-            on: (listener) => this.sessionManager.on("changed", listener),
-          },
+          currentUser: sessionContext.getCurrentUser,
+          changed: services.sessions.changed,
         },
-        processes: createAutostartProcesses(
-          this.processManager,
-          this.resolveOwned(ExecutionContext),
-        ),
-        developmentApps: createDevelopmentAutostart(this.config),
+        processes: createAutostartProcesses(services.processes, execution),
+        developmentApps: createDevelopmentAutostart(config),
       }),
     );
-    this.keyboardService = await this.effects.acquire(
+    keyboard = await effects.acquire(
       createKeyboard({
         assets: createKeyboardAssets(),
-        settings,
-        views: createKeyboardViews(this.viewManager),
-        processes: {
-          stopped: {
-            on: (listener) => this.processManager.on("stopped", listener),
-          },
-        },
-        windows: this.platform.windows,
-        rendererIpc: this.platform.rendererIpc,
-        display: this.platform.display,
-        run: this.effects.run,
+        settings: services.settings,
+        views: createKeyboardViews(services.views),
+        processes: { stopped: services.processes.stopped },
+        windows: platform.windows,
+        rendererIpc: platform.rendererIpc,
+        display: platform.display,
+        run: effects.run,
       }),
     );
-    await this.effects.run(this.keyboardService.initialize());
-
-    this.resolveOwned(SystemHandler);
-    const power = await this.effects.acquire(
+    await effects.run(keyboard.initialize());
+    const power = await effects.acquire(
       createPower({
-        host: createPowerHost(this.config.powerProvider),
-        daemons: createPowerShutdown(this.daemonManager),
-        processes: createPowerShutdown(this.processManager),
+        host: createPowerHost(config.powerProvider),
+        daemons: services.daemons,
+        processes: services.processes,
       }),
     );
-    this.ipcBridge.registerController(
-      createPowerController(
-        power,
-        createPowerOperations(power, { run: this.effects.run }),
-      ),
+    const notifications = await effects.acquire(
+      createNotifications({ views: createNotificationViews(services.views) }),
     );
-    const notifications = await this.effects.acquire(
-      createNotifications({ views: createNotificationViews(this.viewManager) }),
+    const contextMenu = await effects.acquire(
+      createContextMenu({ views: createContextMenuViews(services.views) }),
     );
-    this.ipcBridge.registerController(
-      createNotificationController(notifications),
-    );
-    const contextMenu = await this.effects.acquire(
-      createContextMenu({ views: createContextMenuViews(this.viewManager) }),
-    );
-    this.ipcBridge.registerController(createContextMenuController(contextMenu));
-    const filePicker = await this.effects.acquire(
+    const filePicker = await effects.acquire(
       createFilePicker({
         associations,
-        views: createFilePickerViews(this.viewManager),
-        processes: createFilePickerProcesses(this.processManager),
-        files: createFilePickerFiles(filesystem),
-        volumes: this.resolveOwned(VolumeManager),
-        permissions: this.resolveOwned(PermissionRegistry),
+        views: createFilePickerViews(services.views),
+        processes: createFilePickerProcesses(services.processes),
+        files: createFilePickerFiles(services.filesystem),
+        volumes: services.volumes,
+        permissions,
         notifications: createFilePickerNotifications(notifications),
       }),
     );
-    this.ipcBridge.registerController(createFilePickerController(filePicker));
-    const db = await this.effects.acquire(
-      createDb(
-        createSqliteDbStorage({
-          appsDirectory: this.paths.appsDirectory,
-        }),
-      ),
+    const db = await effects.acquire(
+      createDb(createSqliteDbStorage({ appsDirectory: paths.appsDirectory })),
     );
-    this.ipcBridge.registerController(createDbController(db));
-    const appearance = await this.effects.acquire(
+    appearance = await effects.acquire(
       createAppearance({
-        settings: createAppearanceSettings(settings),
+        settings: createAppearanceSettings(services.settings),
       }),
     );
-    this.appearanceService = appearance;
-    this.ipcBridge.registerController(createAppearanceController(appearance));
-    this.controlPlaneApis = createControlPlaneApis({
-      packageManager: this.packageManager,
-      daemonManager: this.daemonManager,
-      userManager: this.userManager,
-      sessionManager: this.sessionManager,
+    const viewInteractions = await effects.acquire(
+      createViewInteractions(services.views, platform.display),
+    );
+    for (const controller of [
+      createOperationController(operations),
+      createSettingsPanelsController(settingsPanels),
+      createBrandingController(branding),
+      createSettingsController(services.settings),
+      createViewController(services.views, viewInteractions),
+      createVolumeController(services.volumes, execution),
+      createFilesystemController(services.filesystem),
+      createPackageController(services.packages),
+      createAppChannelsController(channels),
+      createProcessController(services.processes, execution),
+      createUserController({
+        users: services.users,
+        sessions: services.sessions,
+        execution,
+        grants,
+      }),
+      createSessionController(services.sessions),
+      createDaemonController(services.daemons, execution, services.users),
+      createI18nController(i18n),
+      createAppAssociationsController(associations),
+      createFileOpenController(fileOpen, fileOpenOperations),
+      createPowerController(power),
+      createNotificationController(notifications),
+      createContextMenuController(contextMenu),
+      createFilePickerController(filePicker),
+      createDbController(db),
+      createAppearanceController(appearance),
+      createSystemController(config, services.ipc.getRunningAppIds),
+    ])
+      register(controller);
+    controlPlane = createControlPlaneApis({
+      packageManager: services.packages,
+      daemonManager: services.daemons,
+      userManager: services.users,
+      sessionManager: services.sessions,
       appearance,
-      effects: this.effects,
-      associationManager: this.appAssociationManager,
-      volumeManager: this.resolveOwned(VolumeManager),
-      operationManager: this.resolveOwned(OperationManager),
+      associationManager: associations,
+      volumeManager: services.volumes,
+      sdk,
     });
     registerBuiltinSettingsPanels({
-      panels: this.settingsPanelManager,
-      settings: this.resolveOwned<LegacySettingsAccess>(LEGACY_SETTINGS),
+      panels: settingsPanels,
+      settings: services.settings,
       appearance,
-      effects: this.effects,
-      packageManager: this.packageManager,
-      daemonManager: this.daemonManager,
-      userManager: this.userManager,
-      config: this.config,
+      packageManager: services.packages,
+      daemonManager: services.daemons,
+      userManager: services.users,
+      config,
     });
-    this.settingsPanelManager.connectLifecycle(
-      this.sessionManager,
-      this.packageManager,
-      this.daemonManager,
-    );
   }
-
-  private requireControlPlaneApis(): EdenControlPlaneApis {
-    if (!this.controlPlaneApis || this.lifecycleState !== "ready") {
-      throw new Error(
-        "Eden is not ready. Await eden.whenReady() before using operational APIs.",
-      );
-    }
-    return this.controlPlaneApis;
-  }
-
-  private ensureDirectory(directory: string, label: string): void {
-    try {
-      fs.mkdirSync(directory, { recursive: true });
-    } catch (error) {
-      log.error(`Failed to create ${label} at ${directory}:`, error);
-      throw error;
-    }
-  }
-
-  private async createMainWindow(): Promise<void> {
-    const windowConfig = this.config.window || {};
-    const title = this.brandingService.getWindowTitle(windowConfig.title);
-    const icon = this.brandingService.getWindowIconPath();
-
-    this.mainWindow = this.platform.windows.createWindow({
+  async function createMainWindow() {
+    const windowConfig = config.window || {};
+    const title = branding.getWindowTitle(windowConfig.title);
+    const icon = branding.getWindowIconPath();
+    mainWindow = platform.windows.createWindow({
       width: windowConfig.width || 1280,
       height: windowConfig.height || 800,
       minWidth: Math.max(windowConfig.minWidth || 800, 800),
@@ -691,107 +629,181 @@ export class EdenRuntime {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        preload: path.join(
-          this.paths.distPath,
-          "foundation/foundation-preload.js",
-        ),
+        preload: path.join(paths.distPath, "foundation/foundation-preload.js"),
         additionalArguments: [`--window-title=${title}`],
       },
       backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
       autoHideMenuBar: true,
       show: false,
     });
-
-    this.platform.windows.attachWebContentsLogger(this.mainWindow.webContents, {
+    platform.windows.attachWebContentsLogger(mainWindow.webContents, {
       source: "foundation",
     });
-    this.viewManager.setMainWindow(this.mainWindow);
-    this.ipcBridge.setMainWindow(this.mainWindow);
-    await this.effects.run(this.keyboardService.setMainWindow(this.mainWindow));
-    this.mainWindow.loadFile(
-      path.join(this.paths.distPath, "foundation/foundation.html"),
+    services.views.setMainWindow(mainWindow);
+    services.ipc.setMainWindow(mainWindow);
+    await effects.run(keyboard.setMainWindow(mainWindow));
+    mainWindow.loadFile(
+      path.join(paths.distPath, "foundation/foundation.html"),
     );
-    this.mainWindow.webContents.once("did-finish-load", () => {
-      this.autostart.onFoundationReady();
-    });
-    this.mainWindow.once("ready-to-show", () => {
-      this.mainWindow?.show();
-    });
-    this.mainWindow.on("closed", () => {
-      this.mainWindow = null;
+    mainWindow.webContents.once("did-finish-load", () =>
+      autostart.onFoundationReady(),
+    );
+    mainWindow.once("ready-to-show", () => mainWindow?.show());
+    mainWindow.on("closed", () => {
+      mainWindow = null;
     });
   }
-
-  private async disposeInternal(): Promise<void> {
-    if (this.lifecycleState === "stopped") return;
-    const disposedBeforeStart = this.lifecycleState === "created";
-    this.lifecycleState = "stopping";
-    if (disposedBeforeStart && !this.readySettled) {
-      this.readySettled = true;
-      this.rejectReady(new Error("Eden runtime disposed before startup"));
-    }
-    log.info("Eden shutting down...");
-
+  function assertStartupActive() {
+    if (state !== "starting")
+      throw new Error("Eden runtime startup aborted by shutdown");
+  }
+  async function startInternal() {
     try {
-      if (this.startPromise) {
-        await this.startPromise.catch(() => undefined);
-      }
-      await this.disposeResources();
-      log.info("Eden shutdown complete");
+      log.info("Eden starting...");
+      await seedDatabase(
+        paths.appsDirectory,
+        config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
+        paths.userDirectory,
+      );
+      await initializeServices();
+      await effects.run(services.users.initialize());
+      await effects.run(services.packages.initialize());
+      settingsPanels.synchronizeManifestPanels();
+      await effects.run(services.daemons.initialize());
+      await effects.run(services.sessions.initialize());
+      await effects.run(appearance.initialize());
+      await effects.run(associations.initialize());
+      assertStartupActive();
+      await createMainWindow();
+      assertStartupActive();
+      state = "ready";
+      readySettled = true;
+      resolveReady();
+      log.info("Eden ready!");
     } catch (error) {
-      log.error("Error during shutdown:", error);
-    } finally {
-      this.lifecycleState = "stopped";
-    }
-  }
-
-  private async disposeResources(): Promise<void> {
-    if (this.resourcesDisposed) return;
-    this.resourcesDisposed = true;
-
-    if (this.managersInitialized)
-      await this.resolveOwned(FilesystemManager).closeHandles();
-    await this.resolveOwned(OperationManager).shutdown();
-    if (this.managersInitialized) {
-      if (this.autostart) await this.effects.run(this.autostart.shutdown());
-      await this.daemonManager?.shutdown();
-      await this.processManager?.shutdown();
-    }
-
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.destroy();
-      this.mainWindow = null;
-    }
-    for (let index = this.ownedServices.length - 1; index >= 0; index--) {
-      const service = this.ownedServices[index];
       try {
-        await service.dispose();
-      } catch (error) {
-        log.error("Error disposing Eden runtime resource:", error);
+        await disposeResources();
+      } catch (cleanupError) {
+        log.error("Error disposing failed Eden startup:", cleanupError);
       } finally {
-        // tsyringe also records every constructed disposable. Remove services
-        // whose ordered disposal is owned here so the final container pass is
-        // limited to indirectly-created resources.
-        this.removeContainerDisposable(service);
+        if (state !== "stopping") state = "failed";
+        readySettled = true;
+        rejectReady(error);
+      }
+      if (state === "failed") log.error("Eden failed to start", error);
+      throw error;
+    }
+  }
+  function start() {
+    if (state === "starting" && startPromise) return startPromise;
+    if (state === "ready") return startPromise ?? Promise.resolve();
+    if (state !== "created")
+      return Promise.reject(
+        new Error(`Cannot start Eden runtime from ${state} state`),
+      );
+    state = "starting";
+    startPromise = startInternal();
+    return startPromise;
+  }
+  async function disposeResources() {
+    if (resourcesDisposed) return;
+    resourcesDisposed = true;
+    async function release(name: string, cleanup: () => void | Promise<void>) {
+      try {
+        await cleanup();
+      } catch (error) {
+        log.error(`Failed to dispose Eden ${name}:`, error);
       }
     }
-    this.ownedServices.length = 0;
-    this.ownedServiceSet.clear();
-    await this.effects.dispose();
 
-    try {
-      await this.container.dispose();
-    } catch (error) {
-      // Services are deliberately disposed above in reverse ownership order.
-      // The container pass releases any indirectly-created disposables.
-      log.error("Error disposing Eden runtime container:", error);
+    if (services.filesystem)
+      await release("filesystem handles", () =>
+        effects.run(services.filesystem.closeHandles()),
+      );
+    await release("operation drain", operations.shutdown);
+    if (autostart)
+      await release("autostart", () => effects.run(autostart.shutdown()));
+    if (services.daemons)
+      await release("daemons", () => effects.run(services.daemons.shutdown()));
+    if (services.processes)
+      await release("processes", () =>
+        effects.run(services.processes.shutdown()),
+      );
+    await release("foundation window", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+      mainWindow = null;
+    });
+    await release("IPC", () => services.ipc?.dispose());
+    await release("service scopes", effects.dispose);
+    await release("grant catalog", grants.dispose);
+    await release("settings panels", settingsPanels.dispose);
+    await release("command registry", commands.dispose);
+    await release("operations", operations.dispose);
+    await release("permissions", permissions.dispose);
+    await release("runtime contexts", runtimeContexts.dispose);
+    await release("session context", sessionContext.dispose);
+  }
+  function dispose() {
+    if (disposePromise) return disposePromise;
+    const beforeStart = state === "created";
+    state = "stopping";
+    if (beforeStart && !readySettled) {
+      readySettled = true;
+      rejectReady(new Error("Eden runtime disposed before startup"));
     }
+    disposePromise = (async () => {
+      try {
+        if (startPromise) await startPromise.catch(() => undefined);
+        await disposeResources();
+      } catch (error) {
+        log.error("Error during shutdown:", error);
+      } finally {
+        state = "stopped";
+      }
+    })();
+    return disposePromise;
   }
-
-  private removeContainerDisposable(service: object): void {
-    const disposableContainer = this.container as DependencyContainer & {
-      disposables?: Set<object>;
-    };
-    disposableContainer.disposables?.delete(service);
+  function activate() {
+    if (state === "ready" && mainWindow === null)
+      void createMainWindow().catch((error) =>
+        log.error("Failed to activate foundation window:", error),
+      );
   }
+  return {
+    effects,
+    services,
+    settings,
+    start,
+    dispose,
+    activate,
+    whenReady: () => readyPromise,
+    get state() {
+      return state;
+    },
+    get operations() {
+      return operationsApi;
+    },
+    get volumes() {
+      return operational().volumes;
+    },
+    get packages() {
+      return operational().packages;
+    },
+    get daemons() {
+      return operational().daemons;
+    },
+    get users() {
+      return operational().users;
+    },
+    get sessions() {
+      return operational().sessions;
+    },
+    get appearance() {
+      return operational().appearance;
+    },
+    get associations() {
+      return operational().associations;
+    },
+  };
 }
+export type EdenRuntime = ReturnType<typeof createEdenRuntime>;

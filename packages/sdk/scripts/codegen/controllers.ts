@@ -1,9 +1,9 @@
 import {
-  Node,
   type CallExpression,
+  Node,
+  type Signature,
   type SourceFile,
   type Type,
-  type Signature,
   TypeFormatFlags,
 } from "ts-morph";
 import type { CommandInfo } from "./commands";
@@ -54,7 +54,7 @@ export function extractControllers(source: SourceFile): {
         ?.getTypeAtLocation(node);
       if (
         !args ||
-        !args.isObject() ||
+        (!args.isObject() && !args.isIntersection()) ||
         args.isUnion() ||
         args.isArray() ||
         args.getNumberIndexType() ||

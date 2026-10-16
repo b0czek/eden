@@ -1,8 +1,6 @@
-import "reflect-metadata";
-
 import type { UserProfile } from "@edenapp/types";
-import { RuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
-import { SessionContext } from "../../../src/session";
+import { createRuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
+import { createSessionContext } from "../../../src/session";
 
 const user: UserProfile = {
   username: "operator",
@@ -15,8 +13,8 @@ const user: UserProfile = {
 
 describe("RuntimeContextRegistry", () => {
   it("resolves a pre-login session app's system principal", () => {
-    const session = new SessionContext();
-    const registry = new RuntimeContextRegistry(session);
+    const session = createSessionContext();
+    const registry = createRuntimeContextRegistry({ sessionContext: session });
     registry.register("com.eden.login", {
       owner: {
         kind: "session",
@@ -32,8 +30,8 @@ describe("RuntimeContextRegistry", () => {
   });
 
   it("rejects a system principal owned by a stale session", () => {
-    const session = new SessionContext();
-    const registry = new RuntimeContextRegistry(session);
+    const session = createSessionContext();
+    const registry = createRuntimeContextRegistry({ sessionContext: session });
     registry.register("com.eden.login", {
       owner: { kind: "session", sessionId: "stale", username: null },
       principal: { kind: "system" },
@@ -43,9 +41,9 @@ describe("RuntimeContextRegistry", () => {
   });
 
   it("resolves a session user's current profile", () => {
-    const session = new SessionContext();
+    const session = createSessionContext();
     session.setCurrentUser(user);
-    const registry = new RuntimeContextRegistry(session);
+    const registry = createRuntimeContextRegistry({ sessionContext: session });
     registry.register("com.example.app", {
       owner: {
         kind: "session",

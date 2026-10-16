@@ -1,8 +1,8 @@
 import * as path from "node:path";
 import { Project } from "ts-morph";
 import { generateClientCode } from "./client";
-import { extractControllers } from "./controllers";
 import { generateCommandsCode, groupCommandsByNamespace } from "./commands";
+import { extractControllers } from "./controllers";
 import { generateEventsCode, groupEventsByNamespace } from "./events";
 
 it("extracts schema inputs, inferred results, operations, and event payloads from controller values", () => {
@@ -123,9 +123,9 @@ it("generates public success values without Effect failures or service requireme
   const fixture = project.createSourceFile(
     path.join(directory, "effect-contract.fixture.ts"),
     `
-    import type { Effect } from "effect";
+    import { Effect } from "effect";
     import * as v from "valibot";
-    import { command, defineController } from "./controller";
+    import { command, defineController, operation } from "./controller";
     import { operationTask } from "../operations/OperationTask";
     declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }, { storage: true }>;
     declare const empty: Effect.Effect<undefined, { _tag: "EmptyFailed" }, { storage: true }>;
@@ -149,8 +149,16 @@ it("generates public success values without Effect failures or service requireme
           mode: "operation",
           handle: () => operationTask(async () => ({ saved: true })),
         }),
+        saveEffect: operation({
+          input: v.object({ value: v.optional(v.number(), 4) }),
+          prepare: ({ value }) => () => Effect.succeed({ saved: value }),
+        }),
       },
     });
+    // @ts-expect-error operation work must have its dependencies provided
+    operation({ prepare: () => () => load });
+    // @ts-expect-error preparation must finish before operation acceptance
+    operation({ prepare: async () => () => Effect.succeed(1) });
   `,
   );
   const contracts = extractControllers(fixture);
@@ -183,7 +191,9 @@ it("generates public success values without Effect failures or service requireme
       Assert<Equal<ExampleCommands["example/null"]["response"], null>>,
       Assert<Equal<ExampleCommands["example/undefined"]["response"], undefined>>,
       Assert<Equal<ExampleCommands["example/save"]["completion"], { saved: boolean }>>,
+      Assert<Equal<ExampleCommands["example/saveEffect"]["completion"], { saved: number }>>,
     ];
+    const operationInput: ExampleCommands["example/saveEffect"]["args"] = {};
     const defaulted: ExampleCommands["example/load"]["args"] = {};
     // @ts-expect-error schema inputs preserve their numeric type
     const invalidInput: ExampleCommands["example/load"]["args"] = { count: "four" };

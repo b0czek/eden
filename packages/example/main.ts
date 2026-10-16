@@ -1,7 +1,7 @@
-import { Eden } from "@edenapp/sdk";
+import { createEden } from "@edenapp/sdk";
 
 // Create and start the Eden desktop environment
-new Eden({
+createEden({
   development: process.env.NODE_ENV === "development",
   tiling: {
     mode: "smart", // Options: "none", "horizontal", "vertical", "grid", "smart"

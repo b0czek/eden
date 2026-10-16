@@ -3,7 +3,6 @@ import type {
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import { inject, Lifecycle, scoped } from "tsyringe";
 import { SessionContext } from "../session/SessionContext";
 import type { EffectivePrincipal } from "./ExecutionContext";
 
@@ -13,33 +12,31 @@ type RuntimeContext = {
   profile?: UserProfile;
 };
 
-@scoped(Lifecycle.ContainerScoped)
-export class RuntimeContextRegistry {
-  private readonly contexts = new Map<string, RuntimeContext>();
+export function createRuntimeContextRegistry({
+  sessionContext,
+}: {
+  sessionContext: SessionContext;
+}) {
+  let contexts = new Map<string, RuntimeContext>();
 
-  constructor(@inject(SessionContext) private sessionContext: SessionContext) {}
-
-  register(appId: string, context: RuntimeContext): void {
-    this.contexts.set(appId, context);
+  function register(appId: string, context: RuntimeContext): void {
+    contexts.set(appId, context);
   }
-
-  unregister(appId: string): void {
-    this.contexts.delete(appId);
+  function unregister(appId: string): void {
+    contexts.delete(appId);
   }
-
-  get(appId: string): RuntimeContext | undefined {
-    return this.contexts.get(appId);
+  function get(appId: string): RuntimeContext | undefined {
+    return contexts.get(appId);
   }
-
-  resolvePrincipal(appId: string): EffectivePrincipal | undefined {
-    const context = this.contexts.get(appId);
+  function resolvePrincipal(appId: string): EffectivePrincipal | undefined {
+    const context = contexts.get(appId);
     if (!context) return undefined;
     if (context.owner.kind === "session") {
-      if (context.owner.sessionId !== this.sessionContext.getSessionId()) {
+      if (context.owner.sessionId !== sessionContext.getSessionId()) {
         return undefined;
       }
       if (context.principal.kind === "system") return { kind: "system" };
-      const profile = this.sessionContext.getCurrentUser();
+      const profile = sessionContext.getCurrentUser();
       return profile ? { kind: "user", profile } : undefined;
     }
     if (context.principal.kind === "system") return { kind: "system" };
@@ -47,8 +44,11 @@ export class RuntimeContextRegistry {
       ? { kind: "user", profile: context.profile }
       : undefined;
   }
-
-  dispose(): void {
-    this.contexts.clear();
+  function dispose(): void {
+    contexts.clear();
   }
+  return { register, unregister, get, resolvePrincipal, dispose };
 }
+export type RuntimeContextRegistry = ReturnType<
+  typeof createRuntimeContextRegistry
+>;

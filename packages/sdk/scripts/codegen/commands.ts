@@ -1,12 +1,10 @@
 /**
  * Command Type Generator
  *
- * Extracts @EdenHandler decorators and generates command type interfaces.
+ * Generates command type interfaces from controller contracts.
  */
 
-import { type ClassDeclaration, Node } from "ts-morph";
 import {
-  extractDocs,
   generateHeader,
   namespaceToInterfaceName,
   replaceTypesWithInlineImports,
@@ -38,132 +36,6 @@ export interface NamespaceCommands {
     docs: string[];
     fields: CommandField[];
   }>;
-}
-
-/**
- * Extract command handlers from a class
- */
-export function extractCommandHandlers(
-  classDec: ClassDeclaration,
-  namespace: string,
-): CommandInfo[] {
-  const commands: CommandInfo[] = [];
-
-  classDec.getMethods().forEach((method) => {
-    const commandDecorator = method.getDecorator("EdenHandler");
-    if (commandDecorator) {
-      const args = commandDecorator.getArguments();
-      if (args.length > 0 && Node.isStringLiteral(args[0])) {
-        const commandName = args[0].getLiteralText();
-
-        // Extract argument type from first parameter
-        let argsType = "Record<string, never>";
-        const params = method.getParameters();
-        const argumentType = params[0]?.getType();
-        const stringIndex = argumentType?.getStringIndexType();
-        const commandId = `${namespace}/${commandName}`;
-        if (
-          argumentType &&
-          (argumentType.isUnion() ||
-            argumentType.isArray() ||
-            argumentType.isTuple() ||
-            (!argumentType.isObject() && !argumentType.isIntersection()) ||
-            argumentType.getCallSignatures().length > 0 ||
-            (stringIndex && !stringIndex.isNever()) ||
-            argumentType.getNumberIndexType())
-        ) {
-          throw new Error(
-            `${commandId}: client arguments require an object with declared fields`,
-          );
-        }
-        const fields = (argumentType?.getProperties() ?? [])
-          .filter((field) => !field.getName().startsWith("_"))
-          .map((field) => ({
-            name: field.getName(),
-            optional: field.isOptional(),
-          }));
-        if (params.length > 0) {
-          const param = params[0];
-          const typeNode = param.getTypeNode();
-          if (typeNode) {
-            const rawType = typeNode.getText();
-
-            // Filter out properties starting with underscore (like _callerAppId)
-            argsType = rawType
-              .replace(/[;,]\s*_\w+\??\s*:\s*[^;,}]+/g, "")
-              .replace(/{\s*_\w+\??\s*:\s*[^;,}]+\s*[;,]?\s*/g, "{ ")
-              .replace(/[;,]\s*}/g, " }")
-              .trim();
-          }
-        }
-
-        // Extract return type
-        let returnType = "unknown";
-        const returnTypeNode = method.getReturnTypeNode();
-        if (returnTypeNode) {
-          const type = returnTypeNode.getType();
-          const symbol = type.getSymbol();
-          if (symbol && symbol.getName() === "Promise") {
-            const typeArgs = type.getTypeArguments();
-            if (typeArgs.length > 0) {
-              if (Node.isTypeReference(returnTypeNode)) {
-                const typeArgsNodes = returnTypeNode.getTypeArguments();
-                if (typeArgsNodes.length > 0) {
-                  returnType = typeArgsNodes[0].getText();
-                } else {
-                  returnType = "void";
-                }
-              } else {
-                const typeText = returnTypeNode.getText();
-                const match = typeText.match(/Promise<(.+)>/);
-                if (match) {
-                  returnType = match[1];
-                } else {
-                  returnType = typeText;
-                }
-              }
-            }
-          } else {
-            returnType = returnTypeNode.getText();
-          }
-        }
-
-        const options = args[1];
-        let mode: "result" | "operation" = "result";
-        if (options && Node.isObjectLiteralExpression(options)) {
-          const property = options.getProperty("mode");
-          if (property && Node.isPropertyAssignment(property)) {
-            const value = property.getInitializer();
-            if (value && Node.isStringLiteral(value)) {
-              const name = value.getLiteralText();
-              if (name === "operation") mode = name;
-            }
-          }
-        }
-        if (mode !== "result") {
-          if (!returnTypeNode || !Node.isTypeReference(returnTypeNode)) {
-            throw new Error(
-              `${namespace}/${commandName} requires an explicit task type`,
-            );
-          }
-          const types = returnTypeNode.getTypeArguments();
-          returnType = types[0]?.getText() ?? "void";
-        }
-
-        commands.push({
-          mode,
-          namespace,
-          command: commandName,
-          argsType,
-          returnType,
-          docs: extractDocs(method),
-          fields,
-        });
-      }
-    }
-  });
-
-  return commands;
 }
 
 /**

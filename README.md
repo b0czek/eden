@@ -118,7 +118,7 @@ permissions, backends, standalone development, and packaging.
 
 ```text
 Your Electron product
-└── new Eden({ branding, apps, users, windowing, ... })
+└── createEden({ branding, apps, users, windowing, ... })
     │
     ├── Foundation
     │   └── the host window and workspace behind every app

@@ -1,12 +1,10 @@
 /**
  * Event Type Generator
  *
- * Extracts event declarations and generates event type interfaces.
+ * Generates event type interfaces from controller contracts.
  */
 
-import { type ClassDeclaration, Node, SyntaxKind } from "ts-morph";
 import {
-  extractDocs,
   generateHeader,
   namespaceToInterfaceName,
   replaceTypesWithInlineImports,
@@ -23,96 +21,6 @@ export interface NamespaceEvents {
   namespace: string;
   interfaceName: string;
   events: Array<{ eventName: string; payloadType: string; docs: string[] }>;
-}
-
-/**
- * Extract event declarations from a class
- */
-export function extractEventDeclarations(
-  classDec: ClassDeclaration,
-  namespace: string,
-): EventInfo[] {
-  const events: EventInfo[] = [];
-  let eventsInterfaceName: string | null = null;
-
-  // Check decorator arguments for events interface
-  const namespaceDecorator = classDec.getDecorator("EdenNamespace");
-  if (namespaceDecorator) {
-    const args = namespaceDecorator.getArguments();
-    if (args.length > 1 && Node.isObjectLiteralExpression(args[1])) {
-      const eventsProperty = args[1].getProperty("events");
-      if (eventsProperty && Node.isPropertyAssignment(eventsProperty)) {
-        const initializer = eventsProperty.getInitializer();
-        if (initializer && Node.isStringLiteral(initializer)) {
-          eventsInterfaceName = initializer.getLiteralText();
-        }
-      }
-    }
-  }
-
-  // Extract events interface from extends EdenEmitter<InterfaceName>
-  if (!eventsInterfaceName) {
-    const heritageClauses = classDec.getHeritageClauses();
-    for (const clause of heritageClauses) {
-      if (clause.getToken() === SyntaxKind.ExtendsKeyword) {
-        for (const type of clause.getTypeNodes()) {
-          const expression = type.getExpression();
-          if (
-            Node.isIdentifier(expression) &&
-            expression.getText() === "EdenEmitter"
-          ) {
-            const typeArgs = type.getTypeArguments();
-            if (typeArgs.length > 0) {
-              const typeArg = typeArgs[0];
-              if (Node.isTypeReference(typeArg)) {
-                eventsInterfaceName = typeArg.getTypeName().getText();
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // If we found an events interface name, find the interface definition
-  if (eventsInterfaceName) {
-    const sourceFile = classDec.getSourceFile();
-    const interfaceDec = sourceFile.getInterface(eventsInterfaceName);
-
-    if (interfaceDec) {
-      interfaceDec.getProperties().forEach((prop) => {
-        const nameNode = prop.getNameNode();
-        if (Node.isStringLiteral(nameNode) || Node.isIdentifier(nameNode)) {
-          const eventName = prop.getName();
-
-          let cleanEventName = eventName;
-          if (cleanEventName.startsWith('"') && cleanEventName.endsWith('"')) {
-            cleanEventName = cleanEventName.slice(1, -1);
-          } else if (
-            cleanEventName.startsWith("'") &&
-            cleanEventName.endsWith("'")
-          ) {
-            cleanEventName = cleanEventName.slice(1, -1);
-          }
-
-          let payloadType = "unknown";
-          const typeNode = prop.getTypeNode();
-          if (typeNode) {
-            payloadType = typeNode.getText();
-          }
-
-          events.push({
-            namespace,
-            eventName: cleanEventName,
-            payloadType,
-            docs: extractDocs(prop),
-          });
-        }
-      });
-    }
-  }
-
-  return events;
 }
 
 /**

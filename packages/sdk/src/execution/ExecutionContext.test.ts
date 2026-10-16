@@ -1,7 +1,5 @@
-import "reflect-metadata";
-
 import type { EdenConfig, UserProfile } from "@edenapp/types";
-import { ExecutionContext } from "./ExecutionContext";
+import { createExecutionContext } from "./ExecutionContext";
 
 const createUser = (overrides: Partial<UserProfile> = {}): UserProfile => ({
   username: "operator",
@@ -15,17 +13,19 @@ const createUser = (overrides: Partial<UserProfile> = {}): UserProfile => ({
 
 describe("ExecutionContext authorization", () => {
   it("denies authorization without a user principal", () => {
-    const context = new ExecutionContext({} as EdenConfig);
+    const context = createExecutionContext({ config: {} as EdenConfig });
 
     expect(context.hasGrant("preset/files/read")).toBe(false);
     expect(context.canLaunchApp("app.one")).toBe(false);
   });
 
   it("applies grants and app launch policy to the effective principal", () => {
-    const context = new ExecutionContext({
-      coreApps: ["app.core"],
-      restrictedApps: ["app.restricted"],
-    } as EdenConfig);
+    const context = createExecutionContext({
+      config: {
+        coreApps: ["app.core"],
+        restrictedApps: ["app.restricted"],
+      } as EdenConfig,
+    });
     const profile = createUser({
       grants: ["apps/launch/app.allowed", "settings/com.eden/*"],
     });
@@ -40,9 +40,11 @@ describe("ExecutionContext authorization", () => {
   });
 
   it("gives vendor principals unrestricted authorization", () => {
-    const context = new ExecutionContext({
-      restrictedApps: ["app.restricted"],
-    } as EdenConfig);
+    const context = createExecutionContext({
+      config: {
+        restrictedApps: ["app.restricted"],
+      } as EdenConfig,
+    });
     const profile = createUser({ role: "vendor" });
 
     context.run({ principal: { kind: "user", profile } }, () => {

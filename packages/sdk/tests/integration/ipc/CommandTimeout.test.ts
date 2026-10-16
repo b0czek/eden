@@ -1,7 +1,5 @@
-import { testApp } from "../../support/apps";
-import "reflect-metadata";
 import type { OperationHandle } from "@edenapp/types";
-import { EdenHandler, EdenNamespace } from "../../../src/ipc/CommandDecorators";
+import { command, defineController } from "../../../src/controllers/controller";
 import { CommandRegistry } from "../../../src/ipc/CommandRegistry";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import {
@@ -11,28 +9,9 @@ import {
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
-class DeadlineFixture {
-  constructor(private completion: Promise<string>) {}
-  result(): Promise<string> {
-    return this.completion;
-  }
-  operation(): OperationTask<string> {
-    return operationTask(async () => this.completion);
-  }
-}
-EdenNamespace("deadline-test")(DeadlineFixture);
-for (const [method, mode] of [
-  ["result", "result"],
-  ["operation", "operation"],
-] as const) {
-  EdenHandler(method, { mode })(
-    DeadlineFixture.prototype,
-    method,
-    Object.getOwnPropertyDescriptor(DeadlineFixture.prototype, method)!,
-  );
-}
 const appId = "com.example.command-deadlines";
 
 describe("one bounded IPC deadline", () => {
@@ -48,22 +27,27 @@ describe("one bounded IPC deadline", () => {
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register(testApp(appId, { name: "Deadlines" }));
+    eden.runtime.services.packageRegistry.register(
+      testApp(appId, { name: "Deadlines" }),
+    );
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime
-      .resolve(ProcessManager)
-      .getAppInstance(appId)!;
-    webContentsId = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(instance.viewId)!.view.webContents.id;
+    const instance = eden.runtime.services.processes.getAppInstance(appId)!;
+    webContentsId = eden.runtime.services.views.getViewInfo(instance.viewId)!
+      .view.webContents.id;
     const completion = new Promise<string>((resolve) => {
       complete = resolve;
     });
-    eden.runtime
-      .resolve(CommandRegistry)
-      .registerManager(new DeadlineFixture(completion));
+    eden.runtime.services.commands.registerController(
+      defineController("deadline-test", {
+        commands: {
+          result: command({ handle: () => completion }),
+          operation: command({
+            mode: "operation",
+            handle: () => operationTask(async () => completion),
+          }),
+        },
+      }),
+    );
     jest.useFakeTimers();
   });
   afterEach(async () => {
@@ -99,7 +83,7 @@ describe("one bounded IPC deadline", () => {
       handle: OperationHandle;
     };
     const handle = response.handle;
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const caller = { appId };
     expect(manager.get(handle, caller).status).toBe("queued");
     await jest.advanceTimersByTimeAsync(120_000);

@@ -1,13 +1,13 @@
 # Main-process API
 
-`@edenapp/sdk` exposes a stable, typed API from the `Eden` instance for trusted
-Electron main-process integrations. These APIs are not available to sandboxed
+`@edenapp/sdk` exposes a typed API from the host returned by `createEden()` for
+trusted Electron main-process integrations. These APIs are not available to sandboxed
 apps or renderers.
 
 ```ts
-import { Eden } from "@edenapp/sdk";
+import { createEden } from "@edenapp/sdk";
 
-const eden = new Eden(config);
+const eden = createEden(config);
 
 // Registration APIs are also available before operational startup completes.
 const registration = eden.settings.registerPanel(definition, provider);
@@ -27,6 +27,11 @@ const daemons = await eden.daemons.list();
 `stopped`. Await `eden.whenReady()` before accessing operational facades. The
 promise rejects with the startup failure and never resolves while Eden is only
 partially initialized.
+
+`createEden(config)` starts the runtime when Electron is ready. Application quit
+requests await runtime disposal. Hosts can also call `await eden.dispose()` for
+explicit teardown; repeated calls await the same cleanup and release application
+lifecycle subscriptions. Disposing before Electron is ready prevents startup.
 
 Registration APIs, such as `eden.settings.registerPanel()`, are available both
 during startup and later when a host integration is loaded dynamically.
@@ -67,6 +72,14 @@ The instance facades are a trusted host API. Calling them is equivalent to
 letting the host control its Eden runtime, so they must never be copied onto a
 preload bridge or exposed through a renderer-selected method name.
 
+SDK methods and change callbacks execute with host authority independently of
+any app caller active in the surrounding main-process code. Inputs are validated
+at the SDK controller boundary before mutation or operation admission. Malformed
+arguments reject Promise-based methods or throw from synchronous methods;
+runtime failures retain the method's existing error and operation behavior.
+See [Controllers and domain events](controllers.md#sdk-controllers) for boundary
+ownership and schema sharing.
+
 Sandboxed apps use the shell-command transport instead. Its handlers enforce
 the caller app's manifest permission and, when applicable, the active user's
 grant through `CommandRegistry` and `ExecutionContext`. The built-in Control
@@ -83,10 +96,10 @@ Hosts can configure Eden's shared logger before constructing the runtime and
 can use the same logger for host messages:
 
 ```ts
-import { configureLogger, Eden, log } from "@edenapp/sdk";
+import { configureLogger, createEden, log } from "@edenapp/sdk";
 
 configureLogger({ minLevel: "info", format: "pretty" });
 log.info("Starting host");
 
-const eden = new Eden(config);
+const eden = createEden(config);
 ```

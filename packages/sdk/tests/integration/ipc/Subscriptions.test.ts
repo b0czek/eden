@@ -1,11 +1,3 @@
-import type {
-  ShellCommandResponse,
-  ShellTransport,
-} from "../../../src/app-runtime/common/shell-transport";
-import { testApp } from "../../support/apps";
-import { gate, tick } from "../../support/async";
-import { createTestCaller } from "../../support/callers";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { volume as volumeClient } from "@edenapp/client";
@@ -17,19 +9,17 @@ import type {
   OperationSnapshot,
   OperationSubmission,
   UserProfile,
+  WallpaperPreset,
 } from "@edenapp/types";
 import { createEdenAPI } from "../../../src/app-runtime/common/eden-api";
 import {
   dispatchEvent,
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
-import {
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../../../src/settings/legacy-access";
-import type { WallpaperPreset } from "@edenapp/types";
-import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
-import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
+import type {
+  ShellCommandResponse,
+  ShellTransport,
+} from "../../../src/app-runtime/common/shell-transport";
 import { IPCBridge } from "../../../src/ipc/IPCBridge";
 import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { OperationManager } from "../../../src/operations/OperationManager";
@@ -40,6 +30,9 @@ import {
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
+import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const eventName = "volume/changed";
@@ -58,9 +51,9 @@ describe("client subscriptions across renderer IPC", () => {
   beforeEach(async () => {
     eden = await createTestEden();
     const appId = "com.example.subscription-observer";
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register(testApp(appId, { name: "Observer" }));
+    eden.runtime.services.packageRegistry.register(
+      testApp(appId, { name: "Observer" }),
+    );
     const { user: profile, caller } = await createTestCaller(
       eden,
       appId,
@@ -70,12 +63,9 @@ describe("client subscriptions across renderer IPC", () => {
     owner = caller;
     await eden.runtime.sessions.login(profile.username, "password");
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime
-      .resolve(ProcessManager)
-      .getAppInstance(appId)!;
-    const contents = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(instance.viewId)!.view.webContents;
+    const instance = eden.runtime.services.processes.getAppInstance(appId)!;
+    const contents = eden.runtime.services.views.getViewInfo(instance.viewId)!
+      .view.webContents;
     webContentsId = contents.id;
     listeners = new Map();
     contents.on(
@@ -141,9 +131,11 @@ describe("client subscriptions across renderer IPC", () => {
     pendingWork.add(finish.release);
     const started = gate();
     let report!: OperationReporter;
-    const handle = eden.runtime
-      .resolve(OperationManager)
-      .submit("integration/observed-work", { name }, owner, () =>
+    const handle = eden.runtime.services.operations.submit(
+      "integration/observed-work",
+      { name },
+      owner,
+      () =>
         operationTask(async (reporter) => {
           report = reporter;
           started.release();
@@ -151,7 +143,7 @@ describe("client subscriptions across renderer IPC", () => {
           await fs.writeFile(path.join(eden.paths.root, name), name);
           return name;
         }),
-      );
+    );
     return {
       handle,
       started: started.promise,
@@ -185,9 +177,9 @@ describe("client subscriptions across renderer IPC", () => {
       locales.push(locale);
     };
     await api.subscribe("i18n/locale-changed", onLocale);
-    await eden.runtime
-      .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
-      .set("com.eden", "general.locale", "pl");
+    await eden.runtime.effects.run(
+      eden.runtime.services.settings.set("com.eden", "general.locale", "pl"),
+    );
     expect(locales).toEqual(["pl"]);
     await expect(api.shellCommand("i18n/get-locale", {})).resolves.toEqual({
       locale: "pl",
@@ -203,9 +195,9 @@ describe("client subscriptions across renderer IPC", () => {
     await expect(
       api.shellCommand("appearance/set-wallpaper", { wallpaper }),
     ).rejects.toThrow("Permission denied");
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(owner.appId, ["appearance/manage"]);
+    eden.runtime.services.permissions.registerApp(owner.appId, [
+      "appearance/manage",
+    ]);
     const external: WallpaperPreset[] = [];
     const local: WallpaperPreset[] = [];
     const stop = eden.runtime.appearance.onChanged((value) => {
@@ -433,7 +425,7 @@ describe("client subscriptions across renderer IPC", () => {
 
   it("routes by operation and delivers only completion to waiters", async () => {
     const api = createEdenAPI(transport, listeners);
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const watched = work("watched");
     const waited = work("waited");
     const ignored = work("ignored");
@@ -505,9 +497,10 @@ describe("client subscriptions across renderer IPC", () => {
   });
 
   it("returns bound operation controls and restores them from a retained handle", async () => {
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(owner.appId, ["fs/read", "fs/write"]);
+    eden.runtime.services.permissions.registerApp(owner.appId, [
+      "fs/read",
+      "fs/write",
+    ]);
     await fs.writeFile(
       path.join(eden.paths.userDirectory, "source.txt"),
       "copied",
@@ -524,7 +517,7 @@ describe("client subscriptions across renderer IPC", () => {
       requestKey: "copy",
     });
     expect(repeated.handle).toEqual(copy.handle);
-    await eden.runtime.resolve(OperationManager).drain();
+    await eden.runtime.services.operations.drain();
     await expect(copy.result()).resolves.toBeUndefined();
     expect(
       await fs.readFile(
@@ -545,9 +538,10 @@ describe("client subscriptions across renderer IPC", () => {
   });
 
   it("cancels a recursive copy through the client API and delivers its terminal cleanup status", async () => {
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(owner.appId, ["fs/read", "fs/write"]);
+    eden.runtime.services.permissions.registerApp(owner.appId, [
+      "fs/read",
+      "fs/write",
+    ]);
     const source = path.join(eden.paths.userDirectory, "cancel-tree");
     const destination = path.join(eden.paths.userDirectory, "cancel-tree-copy");
     await fs.mkdir(path.join(source, "nested"), { recursive: true });
@@ -595,7 +589,7 @@ describe("client subscriptions across renderer IPC", () => {
       expect(
         (await fs.stat(path.join(source, "nested", "large.bin"))).size,
       ).toBe(8 * 1024 * 1024);
-      await eden.runtime.resolve(OperationManager).drain();
+      await eden.runtime.services.operations.drain();
     } finally {
       stop();
     }
@@ -635,7 +629,7 @@ describe("client subscriptions across renderer IPC", () => {
     expect(targeted.some((snapshot) => snapshot.phase === "finishing")).toBe(
       true,
     );
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const foreign = manager.submit(
       "integration/foreign",
       {},
@@ -655,43 +649,5 @@ describe("client subscriptions across renderer IPC", () => {
     await manager.wait(watched.handle, owner);
     stop();
     await tick();
-  });
-
-  it("builds lazy notification payloads only when local or external observers exist", async () => {
-    class Producer extends EdenEmitter<{ changed: { volumes: [] } }> {
-      publish(payload: () => { volumes: [] }) {
-        this.notify("changed", payload);
-      }
-    }
-    EdenNamespace("volume")(Producer);
-    const producer = new Producer(eden.runtime.resolve(IPCBridge));
-    expect(() =>
-      producer.publish(() => {
-        throw new Error("Payload should not be built");
-      }),
-    ).not.toThrow();
-    const local: unknown[] = [];
-    const off = producer.on("changed", (payload) => {
-      local.push(payload);
-    });
-    producer.publish(() => ({ volumes: [] }));
-    expect(local).toEqual([{ volumes: [] }]);
-    off();
-    const api = createEdenAPI(transport, listeners);
-    const external: unknown[] = [];
-    const callback = (payload: unknown) => {
-      external.push(payload);
-    };
-    await api.subscribe(eventName, callback);
-    producer.publish(() => ({ volumes: [] }));
-    expect(external).toEqual([{ volumes: [] }]);
-    api.unsubscribe(eventName, callback);
-    await tick();
-    expect(() =>
-      producer.publish(() => {
-        throw new Error("Payload should no longer be built");
-      }),
-    ).not.toThrow();
-    producer.dispose();
   });
 });

@@ -1,6 +1,5 @@
-import "reflect-metadata";
 import * as Effect from "effect/Effect";
-import { ExecutionContext } from "../execution/ExecutionContext";
+import { createExecutionContext } from "../execution/ExecutionContext";
 import { createEffectRuntime } from "./runtime";
 
 describe("Effect runtime ownership", () => {
@@ -72,12 +71,12 @@ describe("Effect runtime ownership", () => {
     expect(released).toEqual(["work", "service"]);
   });
 
-  it("keeps legacy caller identity isolated across yielding concurrent work", async () => {
+  it("keeps caller identity isolated across yielding concurrent work", async () => {
     const runtime = createEffectRuntime();
-    const execution = new ExecutionContext({});
+    const execution = createExecutionContext({ config: {} });
     function whoami(appId: string) {
-      return execution.run({ appId }, () =>
-        runtime.run(
+      return runtime.run(
+        execution.provide(
           Effect.gen(function* () {
             const identities: Array<string | undefined> = [];
             for (let index = 0; index < 20; index++) {
@@ -87,6 +86,7 @@ describe("Effect runtime ownership", () => {
             }
             return identities;
           }),
+          { appId },
         ),
       );
     }

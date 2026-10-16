@@ -22,8 +22,10 @@ When building an app you should strive to minimize the custom css - use [edencss
 
 Main-process code must not hardcode app IDs or assume a specific app implements a system capability. Resolve configured providers through the app-associations service, using declared capability permissions such as `file-picker/display` to discover defaults when no valid association exists.
 
-Managers must use the shared event primitives (`createEvent(...).on(...)`, or
-`EdenEmitter.on(...)` in domains awaiting conversion) for lifecycle notifications. Never introduce a one-off listener registration method, callback array, or `onBefore...` API for a single event emission. Add a typed manager event and subscribe to it instead. If an operation requires awaited, transactional coordination rather than a notification, model that as an explicit manager operation rather than disguising it as an event listener.
+Services must use the shared event primitives (`createEvent(...)`,
+`scopedEvent(...)`, `listen(...)`, and each source's `.on(...)`) for lifecycle
+notifications. Scoped factories own event cleanup through their Effect scope;
+synchronous owners release their sources during disposal. Never introduce a one-off listener registration method, callback array, or `onBefore...` API for a single event emission. Add a typed domain event and subscribe to it instead. If an operation requires awaited, transactional coordination rather than a notification, model that as an explicit service operation rather than disguising it as an event listener.
 
 Read [Controllers and domain events](docs/controllers.md) before adding or converting
 domain services, plain controller definitions, or their domain event sources.

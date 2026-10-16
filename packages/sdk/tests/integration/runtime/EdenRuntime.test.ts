@@ -1,15 +1,9 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
-import { CommandRegistry, PermissionRegistry } from "../../../src/ipc";
-import { SessionManager } from "../../../src/session";
-import {
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../../../src/settings/legacy-access";
-import { UserManager } from "../../../src/user";
+import * as Effect from "effect/Effect";
+import { command, defineController } from "../../../src/controllers/controller";
 import { hashPassword } from "../../../src/user/UserAuth";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -30,14 +24,18 @@ describe("EdenRuntime integration", () => {
     const second = await createTestEden();
     active.push(first, second);
 
-    const firstCommands = first.runtime.resolve(CommandRegistry);
-    const secondCommands = second.runtime.resolve(CommandRegistry);
-    firstCommands.register("test", "only-first", () => "first", {});
+    const firstCommands = first.runtime.services.commands;
+    const secondCommands = second.runtime.services.commands;
+    firstCommands.registerController(
+      defineController("test", {
+        commands: { "only-first": command({ handle: () => "first" }) },
+      }),
+    );
     expect(await first.execute("test/only-first")).toBe("first");
     expect(secondCommands.has("test/only-first")).toBe(false);
 
-    const firstPermissions = first.runtime.resolve(PermissionRegistry);
-    const secondPermissions = second.runtime.resolve(PermissionRegistry);
+    const firstPermissions = first.runtime.services.permissions;
+    const secondPermissions = second.runtime.services.permissions;
     firstPermissions.registerApp("isolated-app", ["fs/write"]);
     expect(firstPermissions.hasPermission("isolated-app", "fs/write")).toBe(
       true,
@@ -48,40 +46,64 @@ describe("EdenRuntime integration", () => {
       secondPermissions.getEventPermission("test/changed"),
     ).toBeUndefined();
 
-    const firstUser = await first.runtime.resolve(UserManager).createUser({
-      username: "first-user",
-      name: "First User",
-      password: "first-password",
-    });
-    const secondUser = await second.runtime.resolve(UserManager).createUser({
-      username: "second-user",
-      name: "Second User",
-      password: "second-password",
-    });
-    await first.runtime
-      .resolve(SessionManager)
-      .login(firstUser.username, "first-password");
-    await second.runtime
-      .resolve(SessionManager)
-      .login(secondUser.username, "second-password");
-    expect(
-      first.runtime.resolve(SessionManager).getCurrentUser()?.username,
-    ).toBe("first-user");
-    expect(
-      second.runtime.resolve(SessionManager).getCurrentUser()?.username,
-    ).toBe("second-user");
+    const firstUser = await first.runtime.effects.run(
+      first.runtime.services.users.createUser({
+        username: "first-user",
+        name: "First User",
+        password: "first-password",
+      }),
+    );
+    const secondUser = await second.runtime.effects.run(
+      second.runtime.services.users.createUser({
+        username: "second-user",
+        name: "Second User",
+        password: "second-password",
+      }),
+    );
+    await first.runtime.effects.run(
+      first.runtime.services.sessions.login(
+        firstUser.username,
+        "first-password",
+      ),
+    );
+    await second.runtime.effects.run(
+      second.runtime.services.sessions.login(
+        secondUser.username,
+        "second-password",
+      ),
+    );
+    expect(first.runtime.services.sessions.getCurrentUser()?.username).toBe(
+      "first-user",
+    );
+    expect(second.runtime.services.sessions.getCurrentUser()?.username).toBe(
+      "second-user",
+    );
 
-    const firstSettings =
-      first.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
-    const secondSettings =
-      second.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
-    await firstSettings.set("isolated-app", "value", "first");
-    await secondSettings.set("isolated-app", "value", "second");
-    expect(await firstSettings.get("isolated-app", "value")).toBe("first");
-    expect(await secondSettings.get("isolated-app", "value")).toBe("second");
+    const firstSettings = first.runtime.services.settings;
+    const secondSettings = second.runtime.services.settings;
+    await first.runtime.effects.run(
+      firstSettings.set("isolated-app", "value", "first"),
+    );
+    await second.runtime.effects.run(
+      secondSettings.set("isolated-app", "value", "second"),
+    );
+    expect(
+      await first.runtime.effects.run(
+        firstSettings.get("isolated-app", "value"),
+      ),
+    ).toBe("first");
+    expect(
+      await second.runtime.effects.run(
+        secondSettings.get("isolated-app", "value"),
+      ),
+    ).toBe("second");
 
-    await firstSettings.set("com.eden", "general.locale", "pl");
-    await secondSettings.set("com.eden", "general.locale", "en");
+    await first.runtime.effects.run(
+      firstSettings.set("com.eden", "general.locale", "pl"),
+    );
+    await second.runtime.effects.run(
+      secondSettings.set("com.eden", "general.locale", "en"),
+    );
     expect(await first.execute("i18n/get-locale")).toEqual({ locale: "pl" });
     expect(await second.execute("i18n/get-locale")).toEqual({ locale: "en" });
 
@@ -139,6 +161,37 @@ describe("EdenRuntime integration", () => {
     });
   });
 
+  it("preserves the startup failure and finishes disposal when a scoped finalizer fails", async () => {
+    const startupFailure = new Error("foundation window unavailable");
+    const eden = await createTestEden({
+      autoStart: false,
+      platform: { failWindowCreation: startupFailure },
+    });
+    active.push(eden);
+    await eden.runtime.effects.acquire(
+      Effect.addFinalizer(() => Effect.die(new Error("resource close failed"))),
+    );
+    const { commands, permissions } = eden.runtime.services;
+    commands.registerController(
+      defineController("cleanup", {
+        commands: { transient: command({ handle: () => "active" }) },
+      }),
+    );
+    permissions.registerApp("cleanup-owner", ["package/read"]);
+
+    const readiness = eden.runtime.whenReady();
+    await expect(eden.start()).rejects.toBe(startupFailure);
+    await expect(readiness).rejects.toBe(startupFailure);
+
+    expect(eden.runtime.state).toBe("failed");
+    expect(eden.platform.activeResourceCount).toBe(0);
+    expect(commands.has("cleanup/transient")).toBe(false);
+    expect(permissions.hasApp("cleanup-owner")).toBe(false);
+    await expect(eden.runtime.effects.run(Effect.void)).rejects.toThrow(
+      "disposed",
+    );
+  });
+
   it("supports disposal before startup, after success, and repeatedly", async () => {
     const beforeStart = await createTestEden({ autoStart: false });
     active.push(beforeStart);
@@ -179,28 +232,6 @@ describe("EdenRuntime integration", () => {
       eden.platform.effects.some((effect) => effect.type === "window-created"),
     ).toBe(false);
   });
-
-  it("connects legacy settings reads and subscriptions registered before startup", async () => {
-    const eden = await createTestEden({ autoStart: false });
-    active.push(eden);
-    const settings =
-      eden.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
-    const locales: string[] = [];
-    const stop = settings.changed.on(({ key, value }) => {
-      if (key === "general.locale") locales.push(value);
-    });
-    try {
-      const locale = settings.get("com.eden", "general.locale");
-      await eden.start();
-      expect(await locale).toBe("en");
-      await settings.set("com.eden", "general.locale", "pl");
-      expect(locales).toEqual(["pl"]);
-      expect(await eden.execute("i18n/get-locale")).toEqual({ locale: "pl" });
-    } finally {
-      stop();
-    }
-  });
-
   it("aborts readiness when shutdown starts while attaching the keyboard to the foundation window", async () => {
     const eden = await createTestEden({ autoStart: false });
     active.push(eden);
@@ -242,26 +273,38 @@ describe("EdenRuntime integration", () => {
       );
       const first = await createTestEden({ root, config: { seedPath } });
       active.push(first);
-      const users = first.runtime.resolve(UserManager);
+      const users = first.runtime.services.users;
       expect(users.getDefaultUsername()).toBe("vendor");
       await expect(
-        users.authenticate("vendor", "seed-password"),
+        first.runtime.effects.run(
+          users.authenticate("vendor", "seed-password"),
+        ),
       ).resolves.toMatchObject({ username: "vendor" });
       expect(
-        await first.runtime
-          .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
-          .get("restart-app", "theme"),
+        await first.runtime.effects.run(
+          first.runtime.services.settings.get("restart-app", "theme"),
+        ),
       ).toBe("seed-theme");
-      await users.setPassword("vendor", "changed-password");
-      const operator = await users.createUser({
-        username: "operator",
-        name: "Operator",
-        password: "operator-password",
-      });
-      await users.setDefaultUsername(operator.username);
-      await first.runtime
-        .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
-        .set("restart-app", "theme", "changed-theme");
+      await first.runtime.effects.run(
+        users.setPassword("vendor", "changed-password"),
+      );
+      const operator = await first.runtime.effects.run(
+        users.createUser({
+          username: "operator",
+          name: "Operator",
+          password: "operator-password",
+        }),
+      );
+      await first.runtime.effects.run(
+        users.setDefaultUsername(operator.username),
+      );
+      await first.runtime.effects.run(
+        first.runtime.services.settings.set(
+          "restart-app",
+          "theme",
+          "changed-theme",
+        ),
+      );
       await first.runtime.appearance.setWallpaper({
         type: "custom",
         value: "#abcdef",
@@ -270,24 +313,30 @@ describe("EdenRuntime integration", () => {
 
       const second = await createTestEden({ root, config: { seedPath } });
       active.push(second);
-      const restored = second.runtime.resolve(UserManager);
+      const restored = second.runtime.services.users;
       await expect(
-        restored.authenticate("vendor", "changed-password"),
+        second.runtime.effects.run(
+          restored.authenticate("vendor", "changed-password"),
+        ),
       ).resolves.toMatchObject({ username: "vendor" });
       await expect(
-        restored.authenticate("vendor", "seed-password"),
+        second.runtime.effects.run(
+          restored.authenticate("vendor", "seed-password"),
+        ),
       ).rejects.toThrow("Invalid credentials");
       await expect(
-        restored.authenticate("operator", "operator-password"),
+        second.runtime.effects.run(
+          restored.authenticate("operator", "operator-password"),
+        ),
       ).resolves.toEqual(operator);
       expect(restored.getDefaultUsername()).toBe("operator");
+      expect(second.runtime.services.sessions.getCurrentUser()?.username).toBe(
+        "operator",
+      );
       expect(
-        second.runtime.resolve(SessionManager).getCurrentUser()?.username,
-      ).toBe("operator");
-      expect(
-        await second.runtime
-          .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
-          .get("restart-app", "theme"),
+        await second.runtime.effects.run(
+          second.runtime.services.settings.get("restart-app", "theme"),
+        ),
       ).toBe("changed-theme");
       expect(await second.runtime.appearance.getWallpaper()).toMatchObject({
         type: "custom",

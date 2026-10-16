@@ -25,17 +25,15 @@ export async function pauseCommand<C extends CommandName>(
       const { isDeepStrictEqual } = process.getBuiltinModule("node:util");
       const integration = globalThis as PauseGlobal & {
         __edenIntegration: {
-          eden: {
-            runtime: {
-              ipcBridge: {
-                commandRegistry: {
-                  execute(
-                    command: string,
-                    args: Record<string, unknown>,
-                    caller?: { appId?: string },
-                    submission?: unknown,
-                  ): Promise<unknown>;
-                };
+          runtime: {
+            services: {
+              commands: {
+                execute(
+                  command: string,
+                  args: Record<string, unknown>,
+                  caller?: { appId?: string },
+                  submission?: unknown,
+                ): Promise<unknown>;
               };
             };
           };
@@ -43,8 +41,7 @@ export async function pauseCommand<C extends CommandName>(
       };
       if (integration.__edenCommandPause)
         throw new Error("A command pause is already installed");
-      const registry =
-        integration.__edenIntegration.eden.runtime.ipcBridge.commandRegistry;
+      const registry = integration.__edenIntegration.runtime.services.commands;
       const execute = registry.execute;
       let resume!: () => void;
       const resumed = new Promise<void>((resolve) => {

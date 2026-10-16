@@ -7,39 +7,6 @@
  */
 
 /**
- * SystemCommands - Commands for the "system" namespace
- */
-export interface SystemCommands {
-  /**
-   * Get system information including platform, versions, and running apps.
-   */
-  "system/info": {
-    mode: "result";
-    args: Record<string, never>;
-    response: import("./index").SystemInfo;
-  };
-  /**
-   * Get consumer-controlled product branding for SDK-owned interfaces.
-   */
-  "system/branding": {
-    mode: "result";
-    args: Record<string, never>;
-    response: import("./index").EdenBrandingInfo;
-  };
-  "system/power-capabilities": {
-    mode: "result";
-    args: Record<string, never>;
-    response: import("./index").EdenPowerCapabilities;
-  };
-  "system/power": {
-    mode: "operation";
-    args: { action: "poweroff" | "reboot"; };
-    response: import("./index").OperationHandle<"system/power">;
-    completion: void;
-  };
-}
-
-/**
  * AssociationsCommands - Commands for the "associations" namespace
  */
 export interface AssociationsCommands {
@@ -139,6 +106,36 @@ export interface AppearanceCommands {
 }
 
 /**
+ * SystemCommands - Commands for the "system" namespace
+ */
+export interface SystemCommands {
+  /**
+   * Get consumer-controlled product branding for SDK-owned interfaces.
+   */
+  "system/branding": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").EdenBrandingInfo;
+  };
+  "system/power-capabilities": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").EdenPowerCapabilities;
+  };
+  "system/power": {
+    mode: "operation";
+    args: { action: "poweroff" | "reboot"; };
+    response: import("./index").OperationHandle<"system/power">;
+    completion: void;
+  };
+  "system/info": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").SystemInfo;
+  };
+}
+
+/**
  * ContextMenuCommands - Commands for the "context-menu" namespace
  */
 export interface ContextMenuCommands {
@@ -175,37 +172,36 @@ export interface DaemonCommands {
   };
   "daemon/update-definition": {
     mode: "result";
-    args: {
-    definition: import("./index").DaemonDefinition };
-    response: { success: true };
+    args: { definition: import("./index").DaemonDefinition; };
+    response: { readonly success: true; };
   };
   "daemon/enable": {
     mode: "result";
-    args: { appId: string };
-    response: { success: true };
+    args: { appId: string; };
+    response: { readonly success: true; };
   };
   "daemon/disable": {
     mode: "result";
-    args: { appId: string };
-    response: { success: true };
+    args: { appId: string; };
+    response: { readonly success: true; };
   };
   "daemon/start": {
     mode: "operation";
-    args: { appId: string };
+    args: { appId: string; };
     response: import("./index").OperationHandle<"daemon/start">;
-    completion: { success: true };
+    completion: { readonly success: true; };
   };
   "daemon/stop": {
     mode: "operation";
-    args: { appId: string };
+    args: { appId: string; };
     response: import("./index").OperationHandle<"daemon/stop">;
-    completion: { success: true };
+    completion: { readonly success: true; };
   };
   "daemon/restart": {
     mode: "operation";
-    args: { appId: string };
+    args: { appId: string; };
     response: import("./index").OperationHandle<"daemon/restart">;
-    completion: { success: true };
+    completion: { readonly success: true; };
   };
 }
 
@@ -405,165 +401,96 @@ export interface FilePickerCommands {
  * FsCommands - Commands for the "fs" namespace
  */
 export interface FsCommands {
-  /**
-   * Return the caller's accessible starting folder within a volume.
-   */
   "fs/access-scope": {
     mode: "result";
-    args: { volume: string };
+    args: { volume: string; };
     response: import("./index").FilesystemLocation;
   };
-  /**
-   * Open a file and hold volume access until close or owner teardown.
-   */
   "fs/open": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation;
-    mode?: import("./index").FilesystemOpenMode };
+    args: { location: { volume: string; path: string; }; mode?: "read" | undefined; };
     response: import("./index").FilesystemHandle;
   };
-  /**
-   * Close an owned file handle after its accepted operations finish.
-   */
   "fs/close": {
     mode: "result";
-    args: { handle: import("./index").FilesystemHandle };
+    args: { handle: { handleId: string; }; };
     response: void;
   };
-  /**
-   * Read the contents of a file.
-   */
   "fs/read": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemSource;
-    encoding?: string };
+    args: { location: unknown; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
     response: string;
   };
-  /**
-   * Read the raw contents of a file.
-   */
   "fs/read-binary": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemSource };
-    response: Uint8Array;
+    args: { location: unknown; };
+    response: Uint8Array<ArrayBuffer>;
   };
-  /**
-   * Write content to a file, creating directories if needed.
-   */
   "fs/write": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation;
-    content: string;
-    encoding?: string };
+    args: { location: { volume: string; path: string; }; content: string; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
     response: void;
   };
-  /**
-   * Write raw bytes to a file, creating directories if needed.
-   */
   "fs/write-binary": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation;
-    content: Uint8Array };
+    args: { location: { volume: string; path: string; }; content: Uint8Array<ArrayBufferLike>; };
     response: void;
   };
-  /**
-   * Check if a file or directory exists.
-   */
   "fs/exists": {
     mode: "result";
-    args: { location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: boolean;
   };
-  /**
-   * Create a directory and any necessary parent directories.
-   */
   "fs/mkdir": {
     mode: "result";
-    args: { location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: void;
   };
-  /**
-   * List contents of a directory.
-   */
   "fs/readdir": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: string[];
   };
-  /**
-   * Get file or directory statistics.
-   */
   "fs/stat": {
     mode: "result";
-    args: { location: import("./index").FilesystemSource };
+    args: { location: unknown; };
     response: import("./index").FileStats;
   };
   "fs/watch": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
-    response: { watchId: string };
+    args: { location: { volume: string; path: string; }; };
+    response: { watchId: string; };
   };
   "fs/unwatch": {
     mode: "result";
-    args: {
-    watchId: string };
+    args: { watchId: string; };
     response: void;
   };
-  /**
-   * Resolve an Eden path to the underlying OS path.
-   */
   "fs/resolve": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
-    response: { realPath: string };
+    args: { location: { volume: string; path: string; }; };
+    response: { realPath: string; };
   };
-  /**
-   * Search for files and directories using glob patterns.
-   */
   "fs/search": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation;
-    pattern: string;
-    limit?: number };
+    args: { location: { volume: string; path: string; }; pattern: string; limit?: number | undefined; };
     response: import("./index").SearchResult[];
   };
-  /**
-   * Delete a file or directory.
-   * For directories, removes recursively.
-   */
   "fs/delete": {
     mode: "operation";
-    args: { location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: import("./index").OperationHandle<"fs/delete">;
     completion: void;
   };
-  /**
-   * Copy a file or directory.
-   * Directories are copied recursively.
-   * Existing destinations are replaced only when overwrite is true.
-   */
   "fs/cp": {
     mode: "operation";
-    args: import("./index").FilesystemTransferArgs;
+    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
     response: import("./index").OperationHandle<"fs/cp">;
     completion: void;
   };
-  /**
-   * Move or rename a file or directory.
-   * Existing destinations are replaced only when overwrite is true.
-   */
   "fs/mv": {
     mode: "operation";
-    args: import("./index").FilesystemTransferArgs;
+    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
     response: import("./index").OperationHandle<"fs/mv">;
     completion: void;
   };
@@ -578,12 +505,9 @@ export interface VolumeCommands {
     args: Record<string, never>;
     response: import("./index").FilesystemVolume[];
   };
-  /**
-   * Safely eject a device after draining admitted volume I/O.
-   */
   "volume/eject": {
     mode: "operation";
-    args: { volume: string };
+    args: { volume: string; };
     response: import("./index").OperationHandle<"volume/eject">;
     completion: void;
   };
@@ -611,21 +535,17 @@ export interface I18nCommands {
 export interface EventCommands {
   "event/subscribe": {
     mode: "result";
-    args: {
-    eventName: string;
-    operation?: import("./index").OperationObservation };
+    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
     response: void;
   };
   "event/unsubscribe": {
     mode: "result";
-    args: {
-    eventName: string;
-    operation?: import("./index").OperationObservation };
+    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
     response: void;
   };
   "event/exists": {
     mode: "result";
-    args: { eventName: string };
+    args: { eventName: string; };
     response: boolean;
   };
 }
@@ -674,12 +594,12 @@ export interface NotificationCommands {
 export interface OperationCommands {
   "operation/get": {
     mode: "result";
-    args: { handle: import("./index").OperationHandle };
-    response: import("./index").OperationSnapshot;
+    args: { handle: { command: string; id: string; }; };
+    response: (import("./index").OperationSnapshotBase<string> & { status: "queued" | "running"; }) | (import("./index").OperationSnapshotBase<string> & { status: "cancelled"; completedAt: number; }) | (import("./index").OperationSnapshotBase<string> & { status: "succeeded"; completedAt: number; result: unknown; }) | (import("./index").OperationSnapshotBase<string> & { status: "failed"; completedAt: number; error: import("./index").OperationError; response?: unknown; });
   };
   "operation/cancel": {
     mode: "result";
-    args: { handle: import("./index").OperationHandle };
+    args: { handle: { command: string; id: string; }; };
     response: void;
   };
   "operation/list": {
@@ -693,103 +613,57 @@ export interface OperationCommands {
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
-  /**
-   * Install an application or DLC from a local path.
-   */
   "package/install": {
     mode: "operation";
-    args: {
-    source: import("./index").FilesystemLocation;
-    replace?: boolean };
+    args: { source: { volume: string; path: string; }; replace?: boolean | undefined; };
     response: import("./index").OperationHandle<"package/install">;
-    completion: import("./index").InstalledPackageManifest;
+    completion: import("./index").RuntimeAppManifest | import("./index").RuntimeDlcManifest;
   };
-  /**
-   * Uninstall an application or DLC by its package ID.
-   */
   "package/uninstall": {
     mode: "operation";
-    args: { packageId: string };
+    args: { packageId: string; };
     response: import("./index").OperationHandle<"package/uninstall">;
     completion: boolean;
   };
-  /**
-   * List all installed applications.
-   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
-   * @param showRestricted - If true, includes apps the current user cannot launch (hidden by default)
-   */
   "package/list": {
     mode: "result";
-    args: {
-    showHidden?: boolean;
-    showRestricted?: boolean };
+    args: { showHidden?: boolean | undefined; showRestricted?: boolean | undefined; };
     response: import("./index").RuntimeAppManifest[];
   };
-  /**
-   * Identify the authenticated app and return its extension resources.
-   */
   "package/self": {
     mode: "result";
-    args: { };
+    args: Record<string, never>;
     response: import("./index").InstalledPackageInfo;
   };
-  /**
-   * Get an installed package and any extension resources it owns.
-   */
   "package/get": {
     mode: "result";
-    args: {
-    packageId: string };
+    args: { packageId: string; };
     response: import("./index").InstalledPackageInfo;
   };
-  /**
-   * Toggle hot reload for an app
-   */
   "package/toggle-hot-reload": {
     mode: "result";
-    args: {
-    packageId: string };
-    response: { enabled: boolean };
+    args: { packageId: string; };
+    response: { enabled: boolean; };
   };
-  /**
-   * Check if hot reload is enabled for an app
-   */
   "package/is-hot-reload-enabled": {
     mode: "result";
-    args: {
-    packageId: string };
-    response: { enabled: boolean };
+    args: { packageId: string; };
+    response: { enabled: boolean; };
   };
-  /**
-   * Get the icon for an installed package as a data URL.
-   */
   "package/get-icon": {
     mode: "result";
-    args: {
-    packageId: string };
-    response: { icon: string | undefined };
+    args: { packageId: string; };
+    response: { icon: string | undefined; };
   };
-  /**
-   * Get info about a package file without installing it
-   */
   "package/get-info": {
     mode: "result";
-    args: { location: import("./index").FilesystemLocation };
-    response: {
-    success: boolean;
-    manifest?: import("./index").PackageManifest;
-    preview?: import("./index").PackageOperationPreview;
-    error?: string;
+    args: { location: { volume: string; path: string; }; };
+    response: EdenPackageInfo;
   };
-  };
-  /**
-   * Get the installed size of a package in bytes.
-   */
   "package/get-size": {
     mode: "result";
-    args: {
-    packageId: string };
-    response: { size: number | undefined };
+    args: { packageId: string; };
+    response: { size: number | undefined; };
   };
 }
 
@@ -797,62 +671,32 @@ export interface PackageCommands {
  * ProcessCommands - Commands for the "process" namespace
  */
 export interface ProcessCommands {
-  /**
-   * Launch an application instance.
-   * Requires "process/manage" permission.
-   */
   "process/launch": {
     mode: "operation";
-    args: {
-    appId: string;
-    bounds?: import("./index").ViewBounds };
+    args: { appId: string; bounds?: { x: number; y: number; width: number; height: number; } | undefined; };
     response: import("./index").OperationHandle<"process/launch">;
     completion: import("./index").LaunchResult;
   };
-  /**
-   * Stop a running application instance.
-   * Requires "process/manage" permission.
-   */
   "process/stop": {
     mode: "operation";
-    args: { appId: string };
+    args: { appId: string; };
     response: import("./index").OperationHandle<"process/stop">;
-    completion: { success: boolean };
+    completion: { success: boolean; };
   };
-  /**
-   * Stop the caller app instance.
-   * No explicit permission required - this endpoint only allows self-exit.
-   */
   "process/exit": {
     mode: "operation";
-    args: { };
+    args: Record<string, never>;
     response: import("./index").OperationHandle<"process/exit">;
-    completion: { success: boolean };
+    completion: { success: boolean; };
   };
-  /**
-   * List all running application processes.
-   * Requires "process/read" permission.
-   * @param showHidden - If true, includes overlay apps (hidden by default)
-   */
   "process/list": {
     mode: "result";
-    args: { showHidden?: boolean };
+    args: { showHidden?: boolean | undefined; };
     response: import("./index").AppInstance[];
   };
-  /**
-   * Return CPU and memory metrics for running Eden apps.
-   * Requires "process/read" permission.
-   * @param showHidden - If true, includes overlay apps and backend-only apps
-   * @param pollingTimeoutMs - How long main should keep the shared sampler alive
-   * @param waitForAccurateCpu - If false, returns the current sample immediately,
-   * even before Electron has a full CPU interval
-   */
   "process/metrics": {
     mode: "result";
-    args: {
-    showHidden?: boolean;
-    pollingTimeoutMs?: number;
-    waitForAccurateCpu?: boolean };
+    args: { showHidden?: boolean | undefined; pollingTimeoutMs?: number | undefined; waitForAccurateCpu?: boolean | undefined; };
     response: import("./index").ProcessMetricsSnapshot;
   };
 }
@@ -864,21 +708,19 @@ export interface SessionCommands {
   "session/get-current": {
     mode: "result";
     args: Record<string, never>;
-    response: { user: import("./index").UserProfile | null };
+    response: { user: import("./index").UserProfile | null; };
   };
   "session/login": {
     mode: "operation";
-    args: {
-    username: string;
-    password: string };
+    args: { username: string; password: string; };
     response: import("./index").OperationHandle<"session/login">;
-    completion: { success: boolean; user?: import("./index").UserProfile; error?: string };
+    completion: { success: boolean; user?: import("./index").UserProfile; error?: string; } | { success: boolean; error: string; };
   };
   "session/logout": {
     mode: "operation";
     args: Record<string, never>;
     response: import("./index").OperationHandle<"session/logout">;
-    completion: { success: boolean };
+    completion: { success: boolean; };
   };
 }
 
@@ -886,6 +728,21 @@ export interface SessionCommands {
  * SettingsCommands - Commands for the "settings" namespace
  */
 export interface SettingsCommands {
+  "settings/panels": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { panels: import("./index").SettingsPanelSummary[]; };
+  };
+  "settings/panel": {
+    mode: "result";
+    args: { panelId: string; };
+    response: import("./index").SettingsPanelResponse;
+  };
+  "settings/action": {
+    mode: "result";
+    args: { panelId: string; actionId: string; invocation?: import("./index").SettingsPanelActionInvocation | undefined; };
+    response: import("./index").SettingsPanelActionResponse;
+  };
   /**
    * Get a setting value (scoped to caller's app)
    */
@@ -968,33 +825,6 @@ export interface SettingsCommands {
     args: { appId: string; key: string; schema?: import("./index").SettingsCategory[] | undefined; };
     response: { success: boolean; };
   };
-  /**
-   * List the settings panels visible to the active user.
-   */
-  "settings/panels": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { panels: import("./index").SettingsPanelSummary[] };
-  };
-  /**
-   * Load one complete authorized panel snapshot.
-   */
-  "settings/panel": {
-    mode: "result";
-    args: { panelId: string };
-    response: import("./index").SettingsPanelResponse;
-  };
-  /**
-   * Invoke one declared panel-private action.
-   */
-  "settings/action": {
-    mode: "result";
-    args: {
-    panelId: string;
-    actionId: string;
-    invocation?: import("./index").SettingsPanelActionInvocation };
-    response: import("./index").SettingsPanelActionResponse;
-  };
 }
 
 /**
@@ -1006,94 +836,50 @@ export interface UserCommands {
     args: Record<string, never>;
     response: import("./index").UserGrantOptionsResponse;
   };
-  /**
-   * List all users.
-   */
   "user/list": {
     mode: "result";
     args: Record<string, never>;
-    response: { users: import("./index").UserProfile[] };
+    response: { users: import("./index").UserProfile[]; };
   };
-  /**
-   * Create a new user.
-   */
   "user/create": {
     mode: "result";
-    args: {
-    username?: string;
-    name: string;
-    role?: import("./index").UserRole;
-    password: string;
-    grants?: string[];
-    directoryRestriction?: string };
-    response: { user: import("./index").UserProfile };
+    args: { username?: string | undefined; name: string; role?: "standard" | "vendor" | undefined; password: string; grants?: string[] | undefined; directoryRestriction?: string | undefined; };
+    response: { user: import("./index").UserProfile; };
   };
-  /**
-   * Update user profile details or grants.
-   */
   "user/update": {
     mode: "result";
-    args: {
-    username: string;
-    name?: string;
-    role?: import("./index").UserRole;
-    grants?: string[];
-    directoryRestriction?: string | null };
-    response: { user: import("./index").UserProfile };
+    args: { username: string; name?: string | undefined; role?: "standard" | "vendor" | undefined; grants?: string[] | undefined; directoryRestriction?: string | null | undefined; };
+    response: { user: import("./index").UserProfile; };
   };
-  /**
-   * Delete a user.
-   */
   "user/delete": {
     mode: "result";
-    args: {
-    username: string };
-    response: { success: boolean };
+    args: { username: string; };
+    response: { success: boolean; };
   };
-  /**
-   * Set a user's password.
-   */
   "user/set-password": {
     mode: "result";
-    args: {
-    username: string;
-    password: string };
-    response: { success: boolean };
+    args: { username: string; password: string; };
+    response: { success: boolean; };
   };
-  /**
-   * Change the current user's password.
-   */
   "user/change-password": {
     mode: "result";
-    args: {
-    currentPassword: string;
-    newPassword: string };
-    response: { success: boolean; error?: string };
+    args: { currentPassword: string; newPassword: string; };
+    response: { success: boolean; error?: string; } | { success: boolean; error: string; };
   };
-  /**
-   * Check whether the current user has a specific grant.
-   */
   "user/has-grant": {
     mode: "result";
-    args: { grant: string };
-    response: { allowed: boolean };
+    args: { grant: string; };
+    response: { allowed: boolean; };
   };
-  /**
-   * Return the configured default username.
-   */
   "user/get-default": {
     mode: "result";
     args: Record<string, never>;
-    response: { username: string | null };
+    response: { username: string | null; };
   };
-  /**
-   * Update the configured default username.
-   */
   "user/set-default": {
     mode: "result";
-    args: {
-    username: string | null };
-    response: { success: boolean };
+    args: { username: string | null; };
+    response: { success: boolean; };
   };
 }
 
@@ -1101,196 +887,109 @@ export interface UserCommands {
  * ViewCommands - Commands for the "view" namespace
  */
 export interface ViewCommands {
-  /**
-   * Update bounds for the caller's own view.
-   */
   "view/update-bounds": {
     mode: "result";
-    args: {
-    bounds: import("./index").ViewBounds };
-    response: { success: boolean };
+    args: { bounds: { x: number; y: number; width: number; height: number; }; };
+    response: { success: boolean; };
   };
-  /**
-   * Update bounds for any app view.
-   * Requires "view/manage" permission.
-   */
   "view/update-view-bounds": {
     mode: "result";
-    args: {
-    appId: string;
-    bounds: import("./index").ViewBounds };
-    response: { success: boolean };
+    args: { appId: string; bounds: { x: number; y: number; width: number; height: number; }; };
+    response: { success: boolean; };
   };
-  /**
-   * Show or hide the caller's own view.
-   */
   "view/set-visibility": {
     mode: "result";
-    args: {
-    visible: boolean };
-    response: { success: boolean };
+    args: { visible: boolean; };
+    response: { success: boolean; };
   };
-  /**
-   * Show or hide any app view.
-   * Requires "view/manage" permission.
-   */
   "view/set-view-visibility": {
     mode: "result";
-    args: {
-    appId: string;
-    visible: boolean };
-    response: { success: boolean };
+    args: { appId: string; visible: boolean; };
+    response: { success: boolean; };
   };
-  /**
-   * Bring caller's own view to the front and focus it.
-   */
   "view/focus": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
-  /**
-   * Bring any app view to the front and focus it.
-   * Requires "view/manage" permission.
-   */
   "view/focus-view": {
     mode: "result";
-    args: {
-    appId: string };
-    response: { success: boolean };
+    args: { appId: string; };
+    response: { success: boolean; };
   };
-  /**
-   * Update the available workspace bounds (e.g. after taskbar resize).
-   * Requires "view/manage" permission for app callers.
-   */
   "view/update-global-bounds": {
     mode: "result";
-    args: {
-    bounds: import("./index").ViewBounds;
-    windowSize: import("./index").WindowSize };
-    response: { success: boolean };
+    args: { bounds: { x: number; y: number; width: number; height: number; }; windowSize: { width: number; height: number; }; };
+    response: { success: boolean; };
   };
-  /**
-   * Toggle caller's own view between floating and tiled window modes.
-   */
   "view/toggle-mode": {
     mode: "result";
-    args: {
-    mode?: "floating" | "tiled" };
-    response: { success: boolean };
+    args: { mode?: "floating" | "tiled" | undefined; };
+    response: { success: boolean; };
   };
-  /**
-   * Toggle any app view between floating and tiled window modes.
-   * Requires "view/manage" permission.
-   */
   "view/toggle-view-mode": {
     mode: "result";
-    args: {
-    appId: string;
-    mode?: "floating" | "tiled" };
-    response: { success: boolean };
+    args: { appId: string; mode?: "floating" | "tiled" | undefined; };
+    response: { success: boolean; };
   };
-  /**
-   * Get adjacent tiled windows for the caller's app-frame layout controls.
-   */
   "view/tile-layout-state": {
     mode: "result";
-    args: { };
+    args: Record<string, never>;
     response: import("./index").TileLayoutState;
   };
-  /**
-   * Swap the caller with the tiled window on one edge.
-   */
   "view/swap-tile": {
     mode: "result";
-    args: {
-    direction: import("./index").TileLayoutDirection };
+    args: { direction: "left" | "right" | "top" | "bottom"; };
     response: import("./index").TileLayoutState;
   };
-  /**
-   * Temporarily cover the tiled window on one edge with the caller.
-   */
   "view/expand-tile": {
     mode: "result";
-    args: {
-    direction: import("./index").TileLayoutDirection };
+    args: { direction: "left" | "right" | "top" | "bottom"; };
     response: import("./index").TileLayoutState;
   };
-  /**
-   * Start dragging caller's own view.
-   */
   "view/start-drag": {
     mode: "result";
-    args: {
-    startX: number;
-    startY: number };
-    response: { success: boolean };
+    args: { startX: number; startY: number; };
+    response: { success: boolean; };
   };
-  /**
-   * End drag operation for caller's own view.
-   */
   "view/end-drag": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
-  /**
-   * Handle global mouse up event to stop any active drag/resize operations.
-   * Requires "view/manage" permission for app callers.
-   */
   "view/global-mouseup": {
     mode: "result";
     args: Record<string, never>;
-    response: { success: boolean };
+    response: { success: boolean; };
   };
-  /**
-   * Start resizing caller's own view.
-   */
   "view/start-resize": {
     mode: "result";
-    args: {
-    startX: number;
-    startY: number;
-    direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" };
-    response: { success: boolean };
+    args: { direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" | undefined; startX: number; startY: number; };
+    response: { success: boolean; };
   };
-  /**
-   * End resize operation for caller's own view.
-   */
   "view/end-resize": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
-  /**
-   * Get the current dimensions of the main window.
-   */
   "view/window-size": {
     mode: "result";
     args: Record<string, never>;
     response: import("./index").WindowSize;
   };
-  /**
-   * Set the interface scale (zoom factor) for all views.
-   * @param scale - Scale factor as a string (e.g., "1.0" for 100%, "1.5" for 150%)
-   */
   "view/set-interface-scale": {
     mode: "result";
-    args: {
-    scale: string };
-    response: { success: boolean };
+    args: { scale: string; };
+    response: { success: boolean; };
   };
-  /**
-   * Get the current interface scale.
-   */
   "view/get-interface-scale": {
     mode: "result";
     args: Record<string, never>;
-    response: { scale: number };
+    response: { scale: number; };
   };
 }
 
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends SystemCommands, AssociationsCommands, AppbusCommands, AppearanceCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, VolumeCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends AssociationsCommands, AppbusCommands, AppearanceCommands, SystemCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, VolumeCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}

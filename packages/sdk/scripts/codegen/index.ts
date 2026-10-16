@@ -2,9 +2,9 @@
  * Codegen Orchestrator
  *
  * Main entry point that coordinates all code generation:
- * - Commands: @EdenHandler decorators → commands.generated.d.ts
+ * - Commands: Controller contracts → commands.generated.d.ts
  * - Client: Commands/events → @edenapp/client methods
- * - Events: EdenEmitter interfaces → events.generated.d.ts
+ * - Events: Controller event sources → events.generated.d.ts
  * - Runtime: Command/event name arrays → runtime.ts
  * - I18n: SDK locale files → i18n.ts types
  *
@@ -13,18 +13,16 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Node, Project } from "ts-morph";
+import { Project } from "ts-morph";
 import { generateClientCode } from "./client";
-import { extractControllers } from "./controllers";
 import {
   type CommandInfo,
-  extractCommandHandlers,
   generateCommandsCode,
   groupCommandsByNamespace,
 } from "./commands";
+import { extractControllers } from "./controllers";
 import {
   type EventInfo,
-  extractEventDeclarations,
   generateEventsCode,
   groupEventsByNamespace,
 } from "./events";
@@ -35,7 +33,7 @@ import { generateRuntimeCode } from "./runtime";
  * Main code generation function
  */
 export function generateAll(): void {
-  console.log("Scanning controller definitions and decorated handlers...");
+  console.log("Scanning controller definitions...");
 
   const projectRoot = path.resolve(__dirname, "../..");
   const srcDir = path.join(projectRoot, "src");
@@ -67,7 +65,7 @@ export function generateAll(): void {
     console.log(`Found ${exportedTypes.size} exported types from index.d.ts`);
   }
 
-  // Extract commands and events from decorated classes
+  // Extract contracts without constructing domain services.
   const allCommands: CommandInfo[] = [];
   const allEvents: EventInfo[] = [];
 
@@ -78,32 +76,11 @@ export function generateAll(): void {
     allCommands.push(...controllers.commands);
     allEvents.push(...controllers.events);
 
-    sourceFile.getClasses().forEach((classDec) => {
-      const namespaceDecorator = classDec.getDecorator("EdenNamespace");
-      if (namespaceDecorator) {
-        const args = namespaceDecorator.getArguments();
-        if (args.length > 0 && Node.isStringLiteral(args[0])) {
-          const namespace = args[0].getLiteralText();
-
-          const commands = extractCommandHandlers(classDec, namespace);
-          const events = extractEventDeclarations(classDec, namespace);
-
-          allCommands.push(...commands);
-          allEvents.push(...events);
-
-          if (commands.length > 0) {
-            console.log(
-              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${commands.length} commands`,
-            );
-          }
-          if (events.length > 0) {
-            console.log(
-              `  ✓ ${path.relative(projectRoot, sourceFile.getFilePath())}: ${events.length} events`,
-            );
-          }
-        }
-      }
-    });
+    if (controllers.commands.length || controllers.events.length) {
+      console.log(
+        `  ${path.relative(projectRoot, sourceFile.getFilePath())}: ${controllers.commands.length} commands, ${controllers.events.length} events`,
+      );
+    }
   });
 
   console.log(`\n📦 Found ${allCommands.length} total command handlers`);

@@ -6,7 +6,8 @@ import type { CommandCallerContext } from "../../src/execution";
 import { CommandRegistry, PermissionRegistry } from "../../src/ipc";
 import { OperationManager } from "../../src/operations/OperationManager";
 import {
-  EdenRuntime,
+  createEdenRuntime,
+  type EdenRuntime,
   type EdenRuntimePaths,
 } from "../../src/runtime/EdenRuntime";
 import { SessionContext } from "../../src/session/SessionContext";
@@ -66,7 +67,7 @@ export async function createTestEden(
   ]);
 
   const platform = new InMemoryPlatform(root, options.platform);
-  const runtime = new EdenRuntime({
+  const runtime = createEdenRuntime({
     config: { loginAppId: "", ...options.config },
     paths,
     platform,
@@ -82,8 +83,7 @@ export async function createTestEden(
       command: string,
       args: unknown = {},
       caller: CommandCallerContext = {},
-    ) =>
-      runtime.resolve(CommandRegistry).execute<TResult>(command, args, caller),
+    ) => runtime.services.commands.execute<TResult>(command, args, caller),
     complete: async <TResult>(
       command: string,
       args: unknown = {},
@@ -92,15 +92,16 @@ export async function createTestEden(
       const context = {
         ...caller,
         sessionId:
-          caller.sessionId ?? runtime.resolve(SessionContext).getSessionId(),
+          caller.sessionId ?? runtime.services.sessionContext.getSessionId(),
       };
-      const registry = runtime.resolve(CommandRegistry);
+      const registry = runtime.services.commands;
       const result = await registry.execute(command, args, context);
       return (
         registry.getMode(command) === "operation"
-          ? await runtime
-              .resolve(OperationManager)
-              .wait(result as OperationHandle, context)
+          ? await runtime.services.operations.wait(
+              result as OperationHandle,
+              context,
+            )
           : result
       ) as TResult;
     },
@@ -117,7 +118,7 @@ export async function createTestEden(
 
   // Resolve it here so tests can register callers before or after startup and
   // so the registry's lifetime is always owned by the runtime.
-  runtime.resolve(PermissionRegistry);
+  runtime.services.permissions;
 
   try {
     if (options.autoStart !== false) await harness.start();

@@ -7,8 +7,8 @@ import type {
   OperationSubmission,
 } from "@edenapp/types";
 import {
+  createEventSubscriptions,
   type EventSubscriptionCallback,
-  EventSubscriptions,
 } from "./event-subscriptions";
 import { createOperationsAPI } from "./operations-api";
 import type { ShellTransport } from "./shell-transport";
@@ -24,7 +24,7 @@ export function createEdenAPI(
     getLaunchFile?: () => FilesystemLocation | undefined;
   },
 ): EdenAPI {
-  const subscriptions = new EventSubscriptions(transport, eventSubscriptions);
+  const subscriptions = createEventSubscriptions(transport, eventSubscriptions);
   const api = {
     shellCommand: async <C extends CommandName>(
       command: C,
@@ -37,8 +37,8 @@ export function createEdenAPI(
       return response.result as CommandResult<C>;
     },
 
-    subscribe: subscriptions.subscribe.bind(subscriptions),
-    unsubscribe: subscriptions.unsubscribe.bind(subscriptions),
+    subscribe: subscriptions.subscribe,
+    unsubscribe: subscriptions.unsubscribe,
 
     isEventSupported: async (eventName: string) => {
       return (await transport.exec("event/exists", { eventName })).result;

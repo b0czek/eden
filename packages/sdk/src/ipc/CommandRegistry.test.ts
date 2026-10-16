@@ -1,79 +1,65 @@
-import "reflect-metadata";
 import * as Effect from "effect/Effect";
-
+import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
-import { ExecutionContext } from "../execution";
-import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../effects/runtime";
+import { createExecutionContext } from "../execution/ExecutionContext";
 import type { OperationManager } from "../operations/OperationManager";
-import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
-import { CommandRegistry } from "./CommandRegistry";
+import { createSessionContext } from "../session/SessionContext";
+import { createCommandRegistry } from "./CommandRegistry";
+import { createPermissionRegistry } from "./PermissionRegistry";
 
-type PermissionRegistryLike = {
-  hasPermission: jest.Mock<boolean, [string, string]>;
-  getRequiredGrantKeys: jest.Mock<string[], [string, string]>;
+function harness() {
+  const execution = createExecutionContext({ config: {} });
+  const session = createSessionContext();
+  const effects = createEffectRuntime();
+  const permissions = createPermissionRegistry();
+  const registry = createCommandRegistry({
+    permissionRegistry: permissions,
+    sessionContext: session,
+    executionContext: execution,
+    operations: {} as OperationManager,
+    effects,
+  });
+  return { registry, execution, session, effects, permissions };
+}
+const profile = {
+  username: "operator",
+  name: "Operator",
+  role: "standard" as const,
+  grants: [] as string[],
+  createdAt: 1,
+  updatedAt: 1,
 };
 
-type SessionContextLike = {
-  getCurrentUser: jest.Mock;
-  getSessionId: jest.Mock;
-};
-
-describe("CommandRegistry", () => {
-  let permissionRegistry: PermissionRegistryLike;
-  let sessionContext: SessionContextLike;
-  let executionContext: ExecutionContext;
-  let registry: CommandRegistry;
-  let effects: EffectRuntime;
-  let warnSpy: jest.SpyInstance;
-  let logSpy: jest.SpyInstance;
-
+describe("command dispatch", () => {
+  let h: ReturnType<typeof harness>;
   beforeEach(() => {
-    permissionRegistry = {
-      hasPermission: jest.fn(),
-      getRequiredGrantKeys: jest.fn(),
-    };
-    sessionContext = {
-      getCurrentUser: jest.fn().mockReturnValue(null),
-      getSessionId: jest.fn().mockReturnValue("session"),
-    };
-    executionContext = new ExecutionContext({});
-    effects = createEffectRuntime();
-    registry = new CommandRegistry(
-      permissionRegistry as unknown as ConstructorParameters<
-        typeof CommandRegistry
-      >[0],
-      sessionContext as unknown as ConstructorParameters<
-        typeof CommandRegistry
-      >[1],
-      executionContext,
-      {} as OperationManager,
-      effects,
-    );
-
-    warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    h = harness();
   });
-
   afterEach(async () => {
-    await effects.dispose();
-    warnSpy.mockRestore();
-    logSpy.mockRestore();
+    await h.effects.dispose();
   });
-
-  it("registers and executes a command", async () => {
-    const handler = jest.fn().mockResolvedValue("ok");
-
-    registry.register("system", "ping", handler, { name: "target" });
-
-    expect(registry.has("system/ping")).toBe(true);
-    await expect(registry.execute("system/ping", { value: 1 })).resolves.toBe(
-      "ok",
+  it("executes registered commands and rejects unknown commands", async () => {
+    h.registry.registerController(
+      defineController("system", {
+        commands: {
+          ping: command({
+            input: v.object({ value: v.number() }),
+            handle: ({ value }) => value + 1,
+          }),
+        },
+      }),
     );
-    expect(handler).toHaveBeenCalledWith({ value: 1 });
+    expect(h.registry.getNamespaceCommands("system")).toEqual(["system/ping"]);
+    await expect(h.registry.execute("system/ping", { value: 1 })).resolves.toBe(
+      2,
+    );
+    await expect(h.registry.execute("missing/command", {})).rejects.toThrow(
+      "Unknown command: missing/command",
+    );
   });
-
-  it("executes Effect commands under each trusted caller after asynchronous yields", async () => {
-    registry.registerController(
+  it("executes Effect commands under each trusted caller across asynchronous yields", async () => {
+    h.registry.registerController(
       defineController("example", {
         commands: {
           caller: command({
@@ -83,7 +69,7 @@ describe("CommandRegistry", () => {
                 yield* Effect.promise(() => Promise.resolve());
                 return {
                   trusted: caller.appId,
-                  current: executionContext.get()?.appId,
+                  current: h.execution.get()?.appId,
                 };
               }),
           }),
@@ -95,13 +81,10 @@ describe("CommandRegistry", () => {
       }),
     );
     const invoke = (appId: string) =>
-      registry.execute(
+      h.registry.execute(
         "example/caller",
         {},
-        {
-          appId,
-          principal: { kind: "system" },
-        },
+        { appId, principal: { kind: "system" } },
       );
     await expect(
       Promise.all([invoke("first"), invoke("second")]),
@@ -109,242 +92,130 @@ describe("CommandRegistry", () => {
       { trusted: "first", current: "first" },
       { trusted: "second", current: "second" },
     ]);
-    await expect(registry.execute("example/promised", {})).resolves.toBe(
+    await expect(h.registry.execute("example/promised", {})).resolves.toBe(
       "resolved",
     );
-    await expect(registry.execute("example/fail", {})).rejects.toThrow(
+    await expect(h.registry.execute("example/fail", {})).rejects.toThrow(
       "service failed",
     );
   });
-
-  it.each([true, false])(
-    "rejects mixed controller registrations with the same command (plain first: %s)",
-    (plainFirst) => {
-      class Legacy {
-        handle() {
-          return "legacy";
-        }
-      }
-      setManagerNamespace(Legacy, "example");
-      addCommandHandler(Legacy, "read", "handle");
-      const plain = defineController("example", {
-        commands: { read: command({ handle: () => "plain" }) },
-      });
-      const registerPlain = () => registry.registerController(plain);
-      const registerLegacy = () => registry.registerManager(new Legacy());
-      const first = plainFirst ? registerPlain : registerLegacy;
-      const second = plainFirst ? registerLegacy : registerPlain;
-      first();
-      expect(second).toThrow("Command already registered: example/read");
-    },
-  );
-
-  it("establishes the session user as the principal for interactive commands", async () => {
-    const profile = {
-      username: "operator",
-      name: "Operator",
-      role: "standard" as const,
-      grants: ["preset/settings/read"],
-      createdAt: 1,
-      updatedAt: 1,
-    };
-    sessionContext.getCurrentUser.mockReturnValue(profile);
-    const handler = jest.fn(() => executionContext.getPrincipal());
-    registry.register("system", "whoami", handler, {});
-
-    await expect(registry.execute("system/whoami", {})).resolves.toEqual({
-      kind: "user",
-      profile,
+  it("rejects duplicate commands without replacing the existing controller", async () => {
+    const first = defineController("example", {
+      commands: { read: command({ handle: () => "first" }) },
     });
+    h.registry.registerController(first);
+    expect(() =>
+      h.registry.registerController(
+        defineController("example", {
+          commands: { read: command({ handle: () => "second" }) },
+        }),
+      ),
+    ).toThrow("Command already registered: example/read");
+    await expect(h.registry.execute("example/read", {})).resolves.toBe("first");
   });
-
-  it("synthesizes trusted caller arguments at handler invocation", async () => {
-    const handler = jest.fn((args) => args);
-    registry.register("system", "caller", handler, {});
-
-    const result = await registry.execute(
-      "system/caller",
-      {
+  it("uses the session principal for interactive calls and keeps trusted caller metadata separate from input", async () => {
+    h.session.setCurrentUser(profile);
+    h.registry.registerController(
+      defineController("system", {
+        commands: {
+          whoami: command({
+            input: v.object({ value: v.number() }),
+            handle: (args, caller) => ({
+              args,
+              caller,
+              principal: h.execution.getPrincipal(),
+            }),
+          }),
+        },
+      }),
+    );
+    await expect(
+      h.registry.execute("system/whoami", {
         value: 1,
         _callerAppId: "spoofed",
-        _callerWebContentsId: 999,
         _isFoundation: true,
-      },
-      {
-        appId: "app.one",
-        webContentsId: 42,
-        foundation: false,
-        principal: {
-          kind: "user",
-          profile: {
-            username: "user",
-            name: "User",
-            role: "standard",
-            grants: [],
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        },
-      },
-    );
-
-    expect(result).toEqual({
-      value: 1,
-      _callerAppId: "app.one",
-      _callerWebContentsId: 42,
-      _isFoundation: false,
+      }),
+    ).resolves.toMatchObject({
+      args: { value: 1 },
+      principal: { kind: "user", profile },
     });
-  });
-
-  it("registers handlers from manager metadata", async () => {
-    class TestManager {
-      value = 10;
-
-      handle(): number {
-        return this.value + 5;
-      }
-    }
-
-    setManagerNamespace(TestManager, "manager");
-    addCommandHandler(TestManager, "add", "handle");
-
-    const instance = new TestManager();
-    registry.registerManager(instance);
-
-    expect(registry.getNamespaceCommands("manager")).toEqual(["manager/add"]);
-    await expect(registry.execute("manager/add", {})).resolves.toBe(15);
-  });
-
-  it("enforces permission checks and grant requirements", async () => {
-    class SecureManager {
-      handle(): string {
-        return "secured";
-      }
-    }
-
-    Reflect.defineMetadata(
-      "eden:handler:permission",
-      "read",
-      SecureManager.prototype,
-      "handle",
-    );
-
-    const instance = new SecureManager();
-    registry.register("files", "read", instance.handle, instance, "handle");
-
-    permissionRegistry.hasPermission.mockReturnValue(false);
-    permissionRegistry.getRequiredGrantKeys.mockReturnValue([]);
-
+    const caller = {
+      appId: "app.one",
+      webContentsId: 42,
+      foundation: false,
+      principal: { kind: "user" as const, profile },
+    };
     await expect(
-      registry.execute("files/read", {}, { appId: "app.one" }),
-    ).rejects.toThrow("Caller principal could not be resolved for app app.one");
-
+      h.registry.execute(
+        "system/whoami",
+        { value: 1, _callerAppId: "spoofed" },
+        caller,
+      ),
+    ).resolves.toMatchObject({ args: { value: 1 }, caller });
+  });
+  it("enforces permissions and declared grants while accepting base permissions", async () => {
+    h.registry.registerController(
+      defineController("files", {
+        commands: {
+          read: command({ permission: "read", handle: () => "secured" }),
+        },
+      }),
+    );
+    await expect(
+      h.registry.execute("files/read", {}, { appId: "app.one" }),
+    ).rejects.toThrow("Caller principal could not be resolved");
     const caller = {
       appId: "app.one",
       principal: {
         kind: "user" as const,
-        profile: {
-          username: "user",
-          name: "User",
-          role: "standard" as const,
-          grants: [] as string[],
-          createdAt: 1,
-          updatedAt: 1,
-        },
+        profile: { ...profile, grants: [] as string[] },
       },
     };
-
-    await expect(registry.execute("files/read", {}, caller)).rejects.toThrow(
-      "Permission denied: files/read required for files/read",
+    await expect(h.registry.execute("files/read", {}, caller)).rejects.toThrow(
+      "Permission denied",
     );
-
-    permissionRegistry.getRequiredGrantKeys.mockReturnValue([
-      "preset/files/read",
-    ]);
-    await expect(registry.execute("files/read", {}, caller)).rejects.toThrow(
-      "Grant denied: preset/files/read required for files/read",
+    h.permissions.registerApp(
+      "app.one",
+      [],
+      [
+        {
+          scope: "preset",
+          id: "files/read",
+          label: "Read files",
+          preset: "files/read",
+          permissions: ["files/read"],
+        },
+      ],
     );
-
+    await expect(h.registry.execute("files/read", {}, caller)).rejects.toThrow(
+      "Grant denied",
+    );
     caller.principal.profile.grants.push("preset/files/read");
-
-    await expect(registry.execute("files/read", {}, caller)).resolves.toBe(
+    await expect(h.registry.execute("files/read", {}, caller)).resolves.toBe(
       "secured",
     );
-
-    await expect(
-      registry.execute(
-        "files/read",
-        {},
-        {
-          ...caller,
-          principal: {
-            ...caller.principal,
-            profile: { ...caller.principal.profile, grants: [] },
-          },
-        },
-      ),
-    ).rejects.toThrow("Grant denied");
-  });
-
-  it("skips grant checks when base permission is present", async () => {
-    class ManageManager {
-      handle(): string {
-        return "ok";
-      }
-    }
-
-    Reflect.defineMetadata(
-      "eden:handler:permission",
-      "manage",
-      ManageManager.prototype,
-      "handle",
+    h.permissions.registerApp("app.one", ["files/read"]);
+    caller.principal.profile.grants = [];
+    await expect(h.registry.execute("files/read", {}, caller)).resolves.toBe(
+      "secured",
     );
-
-    const instance = new ManageManager();
-    registry.register("apps", "manage", instance.handle, instance, "handle");
-
-    permissionRegistry.hasPermission.mockReturnValue(true);
-
-    await expect(
-      registry.execute(
-        "apps/manage",
-        {},
-        {
-          appId: "app.two",
-          principal: {
-            kind: "user",
-            profile: {
-              username: "user",
-              name: "User",
-              role: "standard",
-              grants: [],
-              createdAt: 1,
-              updatedAt: 1,
-            },
-          },
-        },
-      ),
-    ).resolves.toBe("ok");
   });
-
   it("limits foundation to its explicit command capabilities", async () => {
-    const allowedHandler = jest.fn().mockReturnValue("allowed");
-    const deniedHandler = jest.fn().mockReturnValue("denied");
-    registry.register("appearance", "get-wallpaper", allowedHandler, {});
-    registry.register("process", "launch", deniedHandler, {});
-
+    h.registry.registerController(
+      defineController("appearance", {
+        commands: { "get-wallpaper": command({ handle: () => "allowed" }) },
+      }),
+    );
+    h.registry.registerController(
+      defineController("process", {
+        commands: { launch: command({ handle: () => "denied" }) },
+      }),
+    );
     await expect(
-      registry.execute("appearance/get-wallpaper", {}, { foundation: true }),
+      h.registry.execute("appearance/get-wallpaper", {}, { foundation: true }),
     ).resolves.toBe("allowed");
     await expect(
-      registry.execute("process/launch", {}, { foundation: true }),
-    ).rejects.toThrow("Foundation is not allowed to execute process/launch");
-    expect(deniedHandler).not.toHaveBeenCalled();
-  });
-
-  it("throws on unknown commands", async () => {
-    await expect(registry.execute("missing/command", {})).rejects.toThrow(
-      "Unknown command: missing/command",
-    );
+      h.registry.execute("process/launch", {}, { foundation: true }),
+    ).rejects.toThrow("Foundation is not allowed");
   });
 });

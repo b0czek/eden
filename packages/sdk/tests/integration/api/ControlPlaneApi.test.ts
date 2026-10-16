@@ -1,13 +1,16 @@
-import { testApp } from "../../support/apps";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
+  AppAssociation,
   RuntimeAppManifest,
   RuntimeDlcManifest,
   UserProfile,
+  WallpaperConfig,
 } from "@edenapp/types";
+import { ExecutionContext } from "../../../src/execution/ExecutionContext";
+import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("control-plane API integration", () => {
@@ -93,7 +96,7 @@ describe("control-plane API integration", () => {
       contributions: [],
       isPrebuilt: false,
     };
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     registry.register(app);
     registry.register(dlc);
 
@@ -108,7 +111,7 @@ describe("control-plane API integration", () => {
     const app = testApp("com.example.control-plane", {
       name: "Control Plane App",
     });
-    eden.runtime.resolve(PackageRegistry).register(app);
+    eden.runtime.services.packageRegistry.register(app);
 
     const user = await eden.runtime.users.create({
       username: "operator",
@@ -144,5 +147,94 @@ describe("control-plane API integration", () => {
       expect.objectContaining({ username: user.username, name: "Renamed" }),
       null,
     ]);
+  });
+
+  it("rejects malformed SDK wallpaper input before persistence or notifications", async () => {
+    eden = await createTestEden();
+    const settings = eden.runtime.services.settings;
+    const before = await eden.runtime.effects.run(
+      settings.get("com.eden", "appearance.wallpaper"),
+    );
+    const wallpaper = await eden.runtime.appearance.getWallpaper();
+    const changes: unknown[] = [];
+    const stop = eden.runtime.appearance.onChanged((value) =>
+      changes.push(value),
+    );
+    try {
+      await expect(
+        eden.runtime.appearance.setWallpaper({
+          type: "custom",
+          value: 42,
+        } as unknown as WallpaperConfig),
+      ).rejects.toMatchObject({ name: "ValiError" });
+      expect(
+        await eden.runtime.effects.run(
+          settings.get("com.eden", "appearance.wallpaper"),
+        ),
+      ).toBe(before);
+      expect(await eden.runtime.appearance.getWallpaper()).toEqual(wallpaper);
+      expect(changes).toEqual([]);
+    } finally {
+      stop();
+    }
+  });
+
+  it("applies the same association input contract at SDK and EdenAPI boundaries", async () => {
+    eden = await createTestEden();
+    const selected = { appId: "com.example.selected", kind: "provider" };
+    await eden.runtime.associations.set("provider:test", selected);
+    const invalid = { appId: 42, kind: "provider" };
+    await expect(
+      eden.runtime.associations.set(
+        "provider:test",
+        invalid as unknown as AppAssociation,
+      ),
+    ).rejects.toMatchObject({ name: "ValiError" });
+    await expect(
+      eden.execute("associations/set", { key: "provider:test", ...invalid }),
+    ).rejects.toMatchObject({ name: "ValiError" });
+    expect(eden.runtime.associations.get("provider:test")).toEqual(selected);
+    await expect(eden.runtime.associations.remove(" ")).rejects.toMatchObject({
+      name: "ValiError",
+    });
+    expect(() => eden.runtime.associations.list(null as never)).toThrow();
+  });
+
+  it("delivers detached native Effect events under SDK authority without inheriting the app caller", async () => {
+    eden = await createTestEden();
+    const execution = eden.runtime.services.execution;
+    eden.runtime.services.permissions.registerApp("app.sdk-origin", [
+      "appearance/manage",
+    ]);
+    const contexts: unknown[] = [];
+    const stop = eden.runtime.appearance.onChanged((wallpaper) => {
+      contexts.push(structuredClone(execution.get()));
+      wallpaper.value = "changed by observer";
+    });
+    try {
+      await eden.execute(
+        "appearance/set-wallpaper",
+        { wallpaper: { type: "custom", value: "#123456" } },
+        {
+          appId: "app.sdk-origin",
+          webContentsId: 42,
+          operationId: "foreign-operation",
+          principal: { kind: "system" },
+        },
+      );
+      expect(contexts).toEqual([{ principal: { kind: "system" } }]);
+      expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
+        value: "#123456",
+      });
+      const input: WallpaperConfig = { type: "custom", value: "#abcdef" };
+      const update = eden.runtime.appearance.setWallpaper(input);
+      input.value = "mutated after submission";
+      await update;
+      expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
+        value: "#abcdef",
+      });
+    } finally {
+      stop();
+    }
   });
 });
