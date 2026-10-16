@@ -12,12 +12,12 @@ import type { Appearance } from "../../appearance/service";
 import type { DaemonManager } from "../../daemon";
 import type { PackageManager } from "../../package-manager";
 import type { UserManager } from "../../user";
-import type { SettingsManager } from "../SettingsManager";
+import { type LegacySettingsAccess } from "../legacy-access";
 import type { SettingsPanelManager } from "../SettingsPanelManager";
 
 export interface BuiltinSettingsDependencies {
   panels: SettingsPanelManager;
-  settings: SettingsManager;
+  settings: LegacySettingsAccess;
   appearance: Appearance;
   effects: EffectRuntime;
   packageManager: PackageManager;

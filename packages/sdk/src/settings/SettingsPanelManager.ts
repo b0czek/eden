@@ -28,7 +28,7 @@ import {
   createGeneratedSettingsPanel,
   type GeneratedPanelOwner,
 } from "./GeneratedSettingsPanel";
-import { SettingsManager } from "./SettingsManager";
+import { LEGACY_SETTINGS, type LegacySettingsAccess } from "./legacy-access";
 import {
   actionAuthorization,
   applyActionAuthorization,
@@ -70,8 +70,8 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => SettingsManager))
-    private readonly settingsManager: SettingsManager,
+    @inject(LEGACY_SETTINGS)
+    private readonly settingsManager: LegacySettingsAccess,
     @inject(PackageCatalog) private readonly packageCatalog: PackageCatalog,
     @inject(SessionContext) private readonly sessionContext: SessionContext,
     @inject(ExecutionContext)

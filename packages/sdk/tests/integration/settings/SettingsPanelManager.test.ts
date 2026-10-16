@@ -1,6 +1,9 @@
 import "reflect-metadata";
 import type { SettingsPanelResponse } from "@edenapp/types";
-import { SettingsManager } from "../../../src/settings/SettingsManager";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../../../src/settings/legacy-access";
 import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -34,7 +37,8 @@ describe("SettingsPanelManager integration", () => {
       id: "midnight",
       value: "#1a1b26",
     });
-    const settings = eden.runtime.resolve(SettingsManager);
+    const settings =
+      eden.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
     expect(await settings.get("com.eden", "appearance.wallpaper")).toBe(
       JSON.stringify({ type: "preset", id: "midnight" }),
     );

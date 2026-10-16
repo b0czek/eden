@@ -13,8 +13,11 @@ import { log } from "../logging";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { PackageManager } from "../package-manager/PackageManager";
 import { ProcessManager } from "../process-manager/ProcessManager";
-import { SettingsManager } from "../settings";
-import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../settings/legacy-access";
+import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { UserManager } from "../user/UserManager";
 import { DaemonHandler } from "./DaemonHandler";
 
@@ -40,13 +43,14 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
   private readonly supervised = new Set<string>();
   private readonly intentionalStops = new Set<string>();
   private shuttingDown = false;
+  private readonly statusUpdates = new Set<Promise<void>>();
 
   constructor(
     @inject(IPCBridge) ipcBridge: IPCBridge,
     @inject(CommandRegistry) commandRegistry: CommandRegistry,
     @inject(PackageCatalog) private packageCatalog: PackageCatalog,
     @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(SettingsManager) private settingsManager: SettingsManager,
+    @inject(LEGACY_SETTINGS) private settingsManager: LegacySettingsAccess,
     @inject(UserManager) private userManager: UserManager,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject(PackageManager) packageManager: PackageManager,
@@ -231,15 +235,12 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
-    for (const app of this.daemonApps()) this.clearTimers(app.id);
+    for (const appId of this.runtime.keys()) this.clearTimers(appId);
+    await this.drainStatusUpdates();
   }
 
-  override dispose(): void {
-    this.shuttingDown = true;
-    for (const runtime of this.runtime.values()) {
-      if (runtime.timer) clearTimeout(runtime.timer);
-      if (runtime.stableTimer) clearTimeout(runtime.stableTimer);
-    }
+  override async dispose(): Promise<void> {
+    await this.shutdown();
     this.runtime.clear();
     this.loaded.clear();
     this.supervised.clear();
@@ -392,8 +393,18 @@ export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
 
   private setRuntime(appId: string, state: RuntimeState): RuntimeState {
     this.runtime.set(appId, state);
-    void this.emitStatus(appId);
+    const update = this.emitStatus(appId).catch((error) => {
+      log.error(`Failed to publish daemon status for ${appId}:`, error);
+    });
+    this.statusUpdates.add(update);
+    void update.then(() => this.statusUpdates.delete(update));
     return state;
+  }
+
+  private async drainStatusUpdates(): Promise<void> {
+    while (this.statusUpdates.size > 0) {
+      await Promise.all(this.statusUpdates);
+    }
   }
 
   private markFailed(appId: string, error: unknown): void {

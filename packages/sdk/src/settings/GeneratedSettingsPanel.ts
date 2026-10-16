@@ -9,7 +9,7 @@ import type {
   SettingsPanelValue,
   UserProfile,
 } from "@edenapp/types";
-import type { SettingsManager } from "./SettingsManager";
+import { type LegacySettingsAccess } from "./legacy-access";
 import {
   cloneAndValidatePanelView,
   cloneRendererValue,
@@ -126,7 +126,7 @@ export function createGeneratedSettingsPanel(
   panelId: string,
   owner: GeneratedPanelOwner,
   source: "eden" | "application",
-  settingsManager: SettingsManager,
+  settingsManager: LegacySettingsAccess,
   hasGrant: (user: UserProfile, grant: string) => boolean,
 ): GeneratedSettingsPanel {
   const settings = cloneRendererValue(owner.settings ?? []);

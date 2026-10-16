@@ -5,7 +5,10 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import { CommandRegistry, PermissionRegistry } from "../../../src/ipc";
 import { SessionManager } from "../../../src/session";
-import { SettingsManager } from "../../../src/settings";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../../../src/settings/legacy-access";
 import { UserManager } from "../../../src/user";
 import { hashPassword } from "../../../src/user/UserAuth";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -68,8 +71,10 @@ describe("EdenRuntime integration", () => {
       second.runtime.resolve(SessionManager).getCurrentUser()?.username,
     ).toBe("second-user");
 
-    const firstSettings = first.runtime.resolve(SettingsManager);
-    const secondSettings = second.runtime.resolve(SettingsManager);
+    const firstSettings =
+      first.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
+    const secondSettings =
+      second.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
     await firstSettings.set("isolated-app", "value", "first");
     await secondSettings.set("isolated-app", "value", "second");
     expect(await firstSettings.get("isolated-app", "value")).toBe("first");
@@ -175,6 +180,27 @@ describe("EdenRuntime integration", () => {
     ).toBe(false);
   });
 
+  it("connects legacy settings reads and subscriptions registered before startup", async () => {
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+    const settings =
+      eden.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
+    const locales: string[] = [];
+    const stop = settings.changed.on(({ key, value }) => {
+      if (key === "general.locale") locales.push(value);
+    });
+    try {
+      const locale = settings.get("com.eden", "general.locale");
+      await eden.start();
+      expect(await locale).toBe("en");
+      await settings.set("com.eden", "general.locale", "pl");
+      expect(locales).toEqual(["pl"]);
+      expect(await eden.execute("i18n/get-locale")).toEqual({ locale: "pl" });
+    } finally {
+      stop();
+    }
+  });
+
   it("preserves changed credentials, default account, settings, and wallpaper when restarting the same seeded profile", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-restart-"));
     try {
@@ -203,7 +229,7 @@ describe("EdenRuntime integration", () => {
       ).resolves.toMatchObject({ username: "vendor" });
       expect(
         await first.runtime
-          .resolve(SettingsManager)
+          .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
           .get("restart-app", "theme"),
       ).toBe("seed-theme");
       await users.setPassword("vendor", "changed-password");
@@ -214,7 +240,7 @@ describe("EdenRuntime integration", () => {
       });
       await users.setDefaultUsername(operator.username);
       await first.runtime
-        .resolve(SettingsManager)
+        .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
         .set("restart-app", "theme", "changed-theme");
       await first.runtime.appearance.setWallpaper({
         type: "custom",
@@ -240,7 +266,7 @@ describe("EdenRuntime integration", () => {
       ).toBe("operator");
       expect(
         await second.runtime
-          .resolve(SettingsManager)
+          .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
           .get("restart-app", "theme"),
       ).toBe("changed-theme");
       expect(await second.runtime.appearance.getWallpaper()).toMatchObject({

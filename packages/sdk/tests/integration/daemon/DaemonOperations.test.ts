@@ -1,6 +1,7 @@
 import { tick } from "../../support/async";
 import "reflect-metadata";
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
+import { DaemonManager } from "../../../src/daemon/DaemonManager";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
@@ -37,6 +38,10 @@ describe("daemon operation lifecycle", () => {
       enabled: false,
       runAs: { kind: "user", username: profile.username },
       restart: "never",
+    });
+    const states: string[] = [];
+    eden.runtime.resolve(DaemonManager).on("changed", ({ status }) => {
+      if (status.appId === appId) states.push(status.state);
     });
     const manager = eden.runtime.resolve(OperationManager);
     const ready = async (previousPid = 0) => {
@@ -79,5 +84,8 @@ describe("daemon operation lifecycle", () => {
       status: "succeeded",
       phase: "stopping-daemon",
     });
+    await eden.dispose();
+    expect(states).toContain("active");
+    expect(states.at(-1)).toBe("inactive");
   });
 });

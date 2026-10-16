@@ -7,10 +7,8 @@
 
 import type { AppManifest } from "@edenapp/types";
 import { log } from "../logging";
-import {
-  EDEN_SETTINGS_APP_ID,
-  type SettingsManager,
-} from "../settings/SettingsManager";
+import { type LegacySettingsAccess } from "../settings/legacy-access";
+import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import type { ViewInfo, ViewType } from "./types";
 
 const INTERFACE_SCALE_KEY = "general.interfaceScale";
@@ -19,14 +17,14 @@ export class ScaleController {
   private readonly stopListening: () => void;
   private currentScale: number = 1.0;
   private readonly getViews: () => Iterable<ViewInfo>;
-  private readonly settingsManager: SettingsManager;
+  private readonly settingsManager: LegacySettingsAccess;
   private readonly notifyScaleChanged: (
     scale: number,
     previousScale: number,
   ) => void;
 
   constructor(
-    settingsManager: SettingsManager,
+    settingsManager: LegacySettingsAccess,
     getViews: () => Iterable<ViewInfo>,
     notifyScaleChanged: (
       scale: number,
@@ -38,7 +36,7 @@ export class ScaleController {
     this.notifyScaleChanged = notifyScaleChanged;
 
     // Listen for interface scale setting changes
-    this.stopListening = settingsManager.on("changed", (data) => {
+    this.stopListening = settingsManager.changed.on((data) => {
       if (data.key === INTERFACE_SCALE_KEY) {
         const scale = parseFloat(data.value);
         if (!Number.isNaN(scale)) {

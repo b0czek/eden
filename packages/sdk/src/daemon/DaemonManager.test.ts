@@ -7,7 +7,7 @@ import type { CommandRegistry, IPCBridge } from "../ipc";
 import type { PackageCatalog } from "../package-manager/PackageCatalog";
 import type { PackageManager } from "../package-manager/PackageManager";
 import type { ProcessManager } from "../process-manager/ProcessManager";
-import type { SettingsManager } from "../settings";
+import { type LegacySettingsAccess } from "../settings/legacy-access";
 import type { UserManager } from "../user/UserManager";
 import { DaemonManager } from "./DaemonManager";
 
@@ -72,7 +72,7 @@ describe("DaemonManager", () => {
             },
           ),
         delete: jest.fn(),
-      } as unknown as SettingsManager,
+      } as unknown as LegacySettingsAccess,
       { getUser } as unknown as UserManager,
       executionContext,
       { on: jest.fn() } as unknown as PackageManager,

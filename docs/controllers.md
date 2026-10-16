@@ -40,10 +40,12 @@ export interface AppearanceSettings {
 The domain owns this contract. Translate existing managers into it at the
 composition boundary, as in
 [appearance/settings-adapter.ts](../packages/sdk/src/appearance/settings-adapter.ts)
-and [i18n/settings.ts](../packages/sdk/src/i18n/settings.ts). Adapters defer
-Promise-returning work with `Effect.tryPromise` and translate persistence keys
-and notifications into domain operations. Services receive neither a dependency
-container nor a concrete settings manager.
+and [i18n/settings.ts](../packages/sdk/src/i18n/settings.ts). Those adapters
+translate persistence keys and notifications while composing the settings
+service's Effects directly. Adapters for legacy Promise APIs defer work with
+`Effect.tryPromise`; converted services compose Effects without an intermediate
+Promise or interpreter. Services receive neither a dependency container nor a
+concrete settings manager.
 
 Register cleanup when acquiring a resource. For example, i18n acquires its local
 event source and upstream subscription within the factory's scope:

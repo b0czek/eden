@@ -15,7 +15,7 @@ import Keyv from "keyv";
 import { ensureDirectoryRestriction } from "../user/UserDirectoryRestriction";
 import { defaultGrantsForRole } from "../user/UserGrants";
 
-// Key constants matching UserManager and SettingsManager schemas
+// Key constants matching user and settings storage schemas
 const USERS_SEED_VERSION_KEY = "_seed:users:version";
 const SETTINGS_SEED_VERSION_KEY = "_seed:settings:version";
 const USERS_INDEX_KEY = "users:index";

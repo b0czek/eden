@@ -13,9 +13,8 @@ describe("i18n service ownership", () => {
       value: string;
     }>();
     const settings = {
-      get: async () => undefined,
-      on: (_event: "changed", listener: Parameters<typeof changed.on>[0]) =>
-        changed.on(listener),
+      get: () => Effect.succeed(undefined),
+      changed,
     };
     const firstScope = Scope.makeUnsafe();
     const secondScope = Scope.makeUnsafe();
@@ -86,12 +85,14 @@ describe("i18n persisted settings", () => {
     let readFailure: Error | undefined;
     const reads: string[][] = [];
     const settings = createI18nSettings({
-      get: async (appId, key) => {
-        reads.push([appId, key]);
-        if (readFailure) throw readFailure;
-        return locale;
-      },
-      on: () => () => {},
+      get: (appId, key) =>
+        Effect.suspend(() => {
+          reads.push([appId, key]);
+          return readFailure
+            ? Effect.fail(readFailure)
+            : Effect.succeed(locale);
+        }),
+      changed: createEvent<{ appId: string; key: string; value: string }>(),
     });
 
     await Effect.runPromise(
@@ -132,8 +133,8 @@ describe("i18n persisted settings", () => {
         Effect.gen(function* () {
           const i18n = yield* createI18n({
             settings: createI18nSettings({
-              get: async () => undefined,
-              on: (_event, listener) => changed.on(listener),
+              get: () => Effect.succeed(undefined),
+              changed,
             }),
           });
           i18n.localeChanged.on(({ locale }) => {

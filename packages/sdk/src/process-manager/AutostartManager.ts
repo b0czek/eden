@@ -5,8 +5,11 @@ import { loadHotReloadAppsState } from "../hotreload-config";
 import { log } from "../logging";
 import { SessionContext } from "../session/SessionContext";
 import { SessionManager } from "../session/SessionManager";
-import { SettingsManager } from "../settings";
-import { EDEN_SETTINGS_APP_ID } from "../settings/SettingsManager";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../settings/legacy-access";
+import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { ProcessManager } from "./ProcessManager";
 /**
  * AutostartManager handles launching applications when Eden starts
@@ -23,7 +26,7 @@ export class AutostartManager {
   constructor(
     @inject("EdenConfig") private config: EdenConfig,
     @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(SettingsManager) private settingsManager: SettingsManager,
+    @inject(LEGACY_SETTINGS) private settingsManager: LegacySettingsAccess,
     @inject(SessionContext) private sessionContext: SessionContext,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject(delay(() => SessionManager)) sessionManager: SessionManager,

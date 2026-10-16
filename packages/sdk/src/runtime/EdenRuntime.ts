@@ -86,9 +86,16 @@ import { seedDatabase } from "../seed";
 import { SessionManager } from "../session";
 import {
   registerBuiltinSettingsPanels,
-  SettingsManager,
+  createSettings,
+  createSettingsController,
+  createSqliteSettingsStorage,
   SettingsPanelManager,
 } from "../settings";
+import {
+  createLegacySettingsAccess,
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../settings/legacy-access";
 import { GrantCatalogManager, UserManager } from "../user";
 import { UserHandler } from "../user/UserHandler";
 import { ViewManager } from "../view-manager";
@@ -143,6 +150,7 @@ export class EdenRuntime {
   private packageManager!: PackageManager;
   private processManager!: ProcessManager;
   private fileOpenManager!: FileOpenManager;
+  private readonly legacySettings = createLegacySettingsAccess(this.effects);
   private appearanceService!: Appearance;
   private appAssociationManager!: AppAssociations;
   private autostartManager!: AutostartManager;
@@ -175,6 +183,10 @@ export class EdenRuntime {
       options.parentContainer ?? rootContainer
     ).createChildContainer();
     this.container.registerInstance(EFFECT_RUNTIME, this.effects);
+    this.container.registerInstance(
+      LEGACY_SETTINGS,
+      this.own(this.legacySettings).access,
+    );
     this.container.registerInstance("EdenConfig", this.config);
     this.container.registerInstance("appsDirectory", this.paths.appsDirectory);
     this.container.registerInstance("distPath", this.paths.distPath);
@@ -403,11 +415,24 @@ export class EdenRuntime {
     this.ipcBridge.registerController(
       createBrandingController(this.brandingService),
     );
+    const settings = await this.effects.acquire(
+      createSettings({
+        storage: createSqliteSettingsStorage({
+          appsDirectory: this.paths.appsDirectory,
+        }),
+        catalog: {
+          getAppSettings: (appId) =>
+            this.resolveOwned(PackageCatalog).getApp(appId)?.settings,
+        },
+        authorization: this.resolveOwned(ExecutionContext),
+      }),
+    );
+    this.legacySettings.connect(settings);
+    this.ipcBridge.registerController(createSettingsController(settings));
     this.viewManager = this.resolveOwned(ViewManager);
     this.resolveOwned(AppChannelManager);
     this.resolveOwned(FilesystemManager);
     this.userManager = this.resolveOwned(UserManager);
-    const settings = this.resolveOwned(SettingsManager);
     this.own(this.effects);
     const i18n = await this.effects.acquire(
       createI18n({
@@ -506,7 +531,7 @@ export class EdenRuntime {
     });
     registerBuiltinSettingsPanels({
       panels: this.settingsPanelManager,
-      settings,
+      settings: this.resolveOwned<LegacySettingsAccess>(LEGACY_SETTINGS),
       appearance,
       effects: this.effects,
       packageManager: this.packageManager,

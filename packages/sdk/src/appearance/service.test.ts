@@ -12,8 +12,8 @@ describe("appearance effects", () => {
         Effect.gen(function* () {
           const appearance = yield* createAppearance({
             settings: createAppearanceSettings({
-              get: async () => "not JSON",
-              set: async () => undefined,
+              get: () => Effect.succeed("not JSON"),
+              set: () => Effect.void,
             }),
           });
 
@@ -36,10 +36,11 @@ describe("appearance effects", () => {
         Effect.gen(function* () {
           const appearance = yield* createAppearance({
             settings: createAppearanceSettings({
-              get: async () => undefined,
-              set: async (appId, key, value) => {
-                writes.push({ appId, key, value });
-              },
+              get: () => Effect.succeed(undefined),
+              set: (appId, key, value) =>
+                Effect.sync(() => {
+                  writes.push({ appId, key, value });
+                }),
             }),
           });
           appearance.wallpaperChanged.on((wallpaper) => {
@@ -86,10 +87,8 @@ describe("appearance effects", () => {
         Effect.gen(function* () {
           const appearance = yield* createAppearance({
             settings: createAppearanceSettings({
-              get: async () => undefined,
-              set: async () => {
-                throw failure;
-              },
+              get: () => Effect.succeed(undefined),
+              set: () => Effect.fail(failure),
             }),
           });
           appearance.wallpaperChanged.on((wallpaper) => {
@@ -134,12 +133,13 @@ describe("appearance effects", () => {
         Effect.gen(function* () {
           const appearance = yield* createAppearance({
             settings: createAppearanceSettings({
-              get: async () => persisted,
-              set: async (_appId, _key, value) => {
-                signalSaveStarted();
-                await saveReleased;
-                persisted = value;
-              },
+              get: () => Effect.sync(() => persisted),
+              set: (_appId, _key, value) =>
+                Effect.promise(async () => {
+                  signalSaveStarted();
+                  await saveReleased;
+                  persisted = value;
+                }),
             }),
           });
           appearance.wallpaperChanged.on((wallpaper) => {

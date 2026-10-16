@@ -1,27 +1,25 @@
 import "reflect-metadata";
 
 import type { AppManifest } from "@edenapp/types";
+import { createEvent } from "../events/event";
 import { ScaleController } from "./ScaleController";
 import type { ViewInfo, ViewType } from "./types";
 
-type SettingsChangedCallback = (data: {
+type SettingsChanged = {
   appId: string;
   key: string;
   value: string;
-}) => void;
+};
 
 const createController = (
   views: ViewInfo[] = [],
   notifyScaleChanged = jest.fn(),
   initialScale: string | null = null,
 ) => {
-  let settingsChangedCallback: SettingsChangedCallback | undefined;
+  const changed = createEvent<SettingsChanged>();
   const settingsManager = {
     get: jest.fn().mockResolvedValue(initialScale),
-    on: jest.fn((_event: string, callback: SettingsChangedCallback) => {
-      settingsChangedCallback = callback;
-      return jest.fn();
-    }),
+    changed,
   };
 
   const controller = new ScaleController(
@@ -34,7 +32,7 @@ const createController = (
     controller,
     notifyScaleChanged,
     emitSettingsChanged: (value: string) =>
-      settingsChangedCallback?.({
+      changed.emit({
         appId: "com.eden",
         key: "general.interfaceScale",
         value,

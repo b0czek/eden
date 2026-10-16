@@ -5,7 +5,7 @@ import type { ExecutionContext } from "../../../src/execution";
 import type { CommandRegistry, IPCBridge } from "../../../src/ipc";
 import type { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
 import type { SessionContext } from "../../../src/session";
-import type { SettingsManager } from "../../../src/settings/SettingsManager";
+import { type LegacySettingsAccess } from "../../../src/settings/legacy-access";
 import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
 
 export function createSettingsPanelHarness(
@@ -41,7 +41,7 @@ export function createSettingsPanelHarness(
   const manager = new SettingsPanelManager(
     { eventSubscribers: { notify } } as unknown as IPCBridge,
     { registerManager: jest.fn() } as unknown as CommandRegistry,
-    settings as unknown as SettingsManager,
+    settings as unknown as LegacySettingsAccess,
     catalog as unknown as PackageCatalog,
     {
       getCurrentUser: () =>

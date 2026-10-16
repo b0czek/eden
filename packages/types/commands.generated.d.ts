@@ -919,67 +919,56 @@ export interface SettingsCommands {
    */
   "settings/get": {
     mode: "result";
-    args: {
-    key: string;
-    appId?: string };
-    response: { value: string | undefined };
+    args: { key: string; appId?: string | undefined; };
+    response: { value: string | undefined; };
   };
   /**
    * Set a setting value (scoped to caller's app)
    */
   "settings/set": {
     mode: "result";
-    args: {
-    key: string;
-    value: string };
-    response: { success: boolean };
+    args: { key: string; value: string; };
+    response: { success: boolean; };
   };
   /**
    * List all settings keys (scoped to caller's app)
    */
   "settings/list": {
     mode: "result";
-    args: { };
-    response: { keys: string[] };
+    args: Record<string, never>;
+    response: { keys: string[]; };
   };
   /**
    * Get all settings with values (scoped to caller's app)
    */
   "settings/get-all": {
     mode: "result";
-    args: { };
-    response: { settings: Record<string, string> };
+    args: Record<string, never>;
+    response: { settings: Record<string, string>; };
   };
   /**
    * Reset a setting to default (scoped to caller's app)
    */
   "settings/reset": {
     mode: "result";
-    args: {
-    key: string;
-    schema?: import("./index").SettingsCategory[] };
-    response: { success: boolean };
+    args: { key: string; schema?: import("./index").SettingsCategory[] | undefined; };
+    response: { success: boolean; };
   };
   /**
    * Get a setting from any app's namespace (superuser only)
    */
   "settings/get/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string };
-    response: { value: string | undefined };
+    args: { appId: string; key: string; };
+    response: { value: string | undefined; };
   };
   /**
    * Set a setting in any app's namespace (superuser only)
    */
   "settings/set/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string;
-    value: string };
-    response: { success: boolean };
+    args: { appId: string; key: string; value: string; };
+    response: { success: boolean; };
   };
   /**
    * List all settings in any app's namespace (superuser only)
@@ -987,10 +976,8 @@ export interface SettingsCommands {
    */
   "settings/list/su": {
     mode: "result";
-    args: {
-    appId: string;
-    showRestricted?: boolean };
-    response: { keys: string[] };
+    args: { appId: string; showRestricted?: boolean | undefined; };
+    response: { keys: string[]; };
   };
   /**
    * Get all settings with values for any app (superuser only)
@@ -998,21 +985,16 @@ export interface SettingsCommands {
    */
   "settings/get-all/su": {
     mode: "result";
-    args: {
-    appId: string;
-    showRestricted?: boolean };
-    response: { settings: Record<string, string> };
+    args: { appId: string; showRestricted?: boolean | undefined; };
+    response: { settings: Record<string, string>; };
   };
   /**
    * Reset a setting for any app (superuser only)
    */
   "settings/reset/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string;
-    schema?: import("./index").SettingsCategory[] };
-    response: { success: boolean };
+    args: { appId: string; key: string; schema?: import("./index").SettingsCategory[] | undefined; };
+    response: { success: boolean; };
   };
   /**
    * List the settings panels visible to the active user.

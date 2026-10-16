@@ -19,7 +19,10 @@ import {
   type PlatformWindow,
   type WindowingPort,
 } from "../platform/ports";
-import { SettingsManager } from "../settings/SettingsManager";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../settings/legacy-access";
 import { DevToolsController } from "./DevToolsController";
 import { FloatingWindowController } from "./FloatingWindowController";
 import { PresentationController } from "./PresentationController";
@@ -85,7 +88,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
     @inject("EdenConfig") config: EdenConfig,
     @inject("distPath") distPath: string,
-    @inject(delay(() => SettingsManager)) settingsManager: SettingsManager,
+    @inject(LEGACY_SETTINGS) settingsManager: LegacySettingsAccess,
     @inject(PLATFORM_WINDOWS) private windows: WindowingPort,
     @inject(PLATFORM_DISPLAY) display: DisplayPort,
   ) {

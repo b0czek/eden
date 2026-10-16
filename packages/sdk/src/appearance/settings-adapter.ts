@@ -1,29 +1,12 @@
-import * as Effect from "effect/Effect";
-import type { SettingsManager } from "../settings/SettingsManager";
+import type { Settings } from "../settings/service";
 import type { AppearanceSettings } from "./ports";
 
-function settingsError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
 export function createAppearanceSettings(
-  settings: Pick<SettingsManager, "get" | "set">,
+  settings: Pick<Settings, "get" | "set">,
 ): AppearanceSettings {
   return {
-    readWallpaper: () =>
-      Effect.tryPromise({
-        try: () => settings.get("com.eden", "appearance.wallpaper"),
-        catch: settingsError,
-      }),
+    readWallpaper: () => settings.get("com.eden", "appearance.wallpaper"),
     saveWallpaper: (config) =>
-      Effect.tryPromise({
-        try: () =>
-          settings.set(
-            "com.eden",
-            "appearance.wallpaper",
-            JSON.stringify(config),
-          ),
-        catch: settingsError,
-      }),
+      settings.set("com.eden", "appearance.wallpaper", JSON.stringify(config)),
   };
 }

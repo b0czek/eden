@@ -23,7 +23,10 @@ import {
   dispatchEvent,
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
-import { SettingsManager } from "../../../src/settings/SettingsManager";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../../../src/settings/legacy-access";
 import type { WallpaperPreset } from "@edenapp/types";
 import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
 import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
@@ -183,7 +186,7 @@ describe("client subscriptions across renderer IPC", () => {
     };
     await api.subscribe("i18n/locale-changed", onLocale);
     await eden.runtime
-      .resolve(SettingsManager)
+      .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
       .set("com.eden", "general.locale", "pl");
     expect(locales).toEqual(["pl"]);
     await expect(api.shellCommand("i18n/get-locale", {})).resolves.toEqual({

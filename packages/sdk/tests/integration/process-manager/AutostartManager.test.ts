@@ -4,7 +4,10 @@ import "reflect-metadata";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { AutostartManager } from "../../../src/process-manager/AutostartManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { SettingsManager } from "../../../src/settings";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../../../src/settings/legacy-access";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("AutostartManager integration", () => {
@@ -19,7 +22,7 @@ describe("AutostartManager integration", () => {
     const app = testApp("com.example.autostart", { name: "Autostart App" });
     eden.runtime.resolve(PackageRegistry).register(app);
     await eden.runtime
-      .resolve(SettingsManager)
+      .resolve<LegacySettingsAccess>(LEGACY_SETTINGS)
       .set("com.eden", `autostart.${app.id}`, "true");
     const user = await eden.runtime.users.create({
       username: "autostart-user",
@@ -49,7 +52,8 @@ describe("AutostartManager integration", () => {
       name: "Delayed Autostart App",
     });
     eden.runtime.resolve(PackageRegistry).register(app);
-    const settings = eden.runtime.resolve(SettingsManager);
+    const settings =
+      eden.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
     await settings.set("com.eden", `autostart.${app.id}`, "true");
     const user = await eden.runtime.users.create({
       username: "delayed-autostart-user",

@@ -26,7 +26,11 @@ import {
   type WindowingPort,
 } from "../platform/ports";
 import { ProcessManager } from "../process-manager";
-import { EDEN_SETTINGS_APP_ID, SettingsManager } from "../settings";
+import {
+  LEGACY_SETTINGS,
+  type LegacySettingsAccess,
+} from "../settings/legacy-access";
+import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { ViewManager } from "../view-manager";
 import { MouseTracker } from "../view-manager/MouseTracker";
 import {
@@ -111,8 +115,8 @@ export class KeyboardManager {
     @inject(ViewManager) private readonly viewManager: ViewManager,
     @inject(delay(() => ProcessManager))
     private readonly processManager: ProcessManager,
-    @inject(delay(() => SettingsManager))
-    private readonly settingsManager: SettingsManager,
+    @inject(LEGACY_SETTINGS)
+    private readonly settingsManager: LegacySettingsAccess,
     @inject(PLATFORM_WINDOWS) private readonly windows: WindowingPort,
     @inject(PLATFORM_RENDERER_IPC)
     private readonly rendererIpc: RendererIpcPort,
@@ -156,7 +160,7 @@ export class KeyboardManager {
       }
     });
 
-    this.settingsManager.on("changed", (data) => {
+    this.settingsManager.changed.on((data) => {
       if (data.appId !== EDEN_SETTINGS_APP_ID) {
         return;
       }

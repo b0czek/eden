@@ -8,7 +8,7 @@ import type {
   PlatformWindow,
   WindowingPort,
 } from "../platform/ports";
-import type { SettingsManager } from "../settings/SettingsManager";
+import { type LegacySettingsAccess } from "../settings/legacy-access";
 import type { ViewInfo, ViewMode } from "./types";
 import { ViewManager } from "./ViewManager";
 
@@ -29,9 +29,9 @@ function createManager(tiling: TilingConfig): ViewManager {
     },
   } as unknown as IPCBridge;
   const settingsManager = {
-    on: jest.fn(() => jest.fn()),
+    changed: { on: jest.fn(() => jest.fn()) },
     get: jest.fn().mockResolvedValue(undefined),
-  } as unknown as SettingsManager;
+  } as unknown as LegacySettingsAccess;
 
   const manager = new ViewManager(
     commandRegistry,
