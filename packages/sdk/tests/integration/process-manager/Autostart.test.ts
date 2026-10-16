@@ -1,18 +1,17 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createAutostart } from "../../../src/autostart/service";
-import { createAutostartProcesses } from "../../../src/autostart/processes";
 import { createDevelopmentAutostart } from "../../../src/autostart/development";
+import { createAutostartProcesses } from "../../../src/autostart/processes";
+import { createAutostart } from "../../../src/autostart/service";
 import { createEffectRuntime } from "../../../src/effects/runtime";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { SessionContext } from "../../../src/session/SessionContext";
-import { SessionManager } from "../../../src/session/SessionManager";
+import type { ExecutionContext } from "../../../src/execution/ExecutionContext";
+import type { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import type { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import type { SessionContext } from "../../../src/session/SessionContext";
+import type { SessionManager } from "../../../src/session/SessionManager";
 import { createSettings } from "../../../src/settings/service";
 import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
 import { testApp } from "../../support/apps";
@@ -44,9 +43,9 @@ async function setAutostart(eden: TestEden, appId: string, enabled = true) {
 }
 
 function launched(eden: TestEden, appId: string) {
-  const processes = eden.runtime.resolve(ProcessManager);
+  const processes = eden.runtime.services.processes;
   const result = gate();
-  const stop = processes.on("launched", ({ instance }) => {
+  const stop = processes.launched.on(({ instance }) => {
     if (instance.manifest.id === appId) {
       stop();
       result.release();
@@ -94,21 +93,32 @@ async function scopedAutostart(
       authorization: { hasGrant: () => false },
     }),
   );
-  const processManager = eden.runtime.resolve(ProcessManager);
+  const processManager = eden.runtime.services.processes;
   const processes = createAutostartProcesses(
     {
       getAppInstance: (appId) => processManager.getAppInstance(appId),
       getInstalledManifest: (appId) =>
         processManager.getInstalledManifest(appId),
-      launchApp: async (appId, bounds, launchArgs, location) => {
-        if (options.beforeLaunch) await options.beforeLaunch(appId);
-        return processManager.launchApp(appId, bounds, launchArgs, location);
-      },
+      launchApp: (appId, bounds, launchArgs, location) =>
+        Effect.gen(function* () {
+          if (options.beforeLaunch)
+            yield* Effect.tryPromise({
+              try: () => options.beforeLaunch!(appId),
+              catch: (error) =>
+                error instanceof Error ? error : new Error(String(error)),
+            });
+          return yield* processManager.launchApp(
+            appId,
+            bounds,
+            launchArgs,
+            location,
+          );
+        }),
     },
-    eden.runtime.resolve(ExecutionContext),
+    eden.runtime.services.execution,
   );
-  const sessionContext = eden.runtime.resolve(SessionContext);
-  const sessionManager = eden.runtime.resolve(SessionManager);
+  const sessionContext = eden.runtime.services.sessionContext;
+  const sessionManager = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
     createAutostart({
       development: options.development ?? false,
@@ -117,7 +127,7 @@ async function scopedAutostart(
       processes,
       sessions: {
         currentUser: () => sessionContext.getCurrentUser(),
-        changed: { on: (listener) => sessionManager.on("changed", listener) },
+        changed: { on: (listener) => sessionManager.changed.on(listener) },
       },
       developmentApps: createDevelopmentAutostart({
         hotReload: { stateDirectory: options.stateDirectory },
@@ -139,7 +149,7 @@ describe("autostart session, settings and process composition", () => {
   it("launches an enabled app under the user principal after a real session transition", async () => {
     const eden = await environment();
     const app = testApp("com.example.autostart");
-    eden.runtime.resolve(PackageRegistry).register(app);
+    eden.runtime.services.packageRegistry.register(app);
     await setAutostart(eden, app.id);
     const user = await eden.runtime.users.create({
       username: "autostart-user",
@@ -151,14 +161,14 @@ describe("autostart session, settings and process composition", () => {
     await eden.runtime.sessions.login(user.username, "password");
     await started;
     expect(
-      eden.runtime.resolve(ProcessManager).getAppInstance(app.id),
+      eden.runtime.services.processes.getAppInstance(app.id),
     ).toMatchObject({ principal: { kind: "user", username: user.username } });
   });
 
   it("drains a pending Settings read and prevents its app launch before shutdown", async () => {
     const eden = await environment();
     const app = testApp("com.example.delayed-autostart");
-    eden.runtime.resolve(PackageRegistry).register(app);
+    eden.runtime.services.packageRegistry.register(app);
     const listStarted = gate();
     const settingsPending = gate();
     const s = await scopedAutostart(eden, {
@@ -197,7 +207,7 @@ describe("autostart session, settings and process composition", () => {
   it("waits for a launch already admitted by the process adapter before shutdown completes", async () => {
     const eden = await environment();
     const app = testApp("com.example.starting-autostart");
-    eden.runtime.resolve(PackageRegistry).register(app);
+    eden.runtime.services.packageRegistry.register(app);
     const started = gate();
     const finish = gate();
     const s = await scopedAutostart(eden, {
@@ -248,7 +258,7 @@ describe("autostart session, settings and process composition", () => {
         },
       },
     });
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     const dev = testApp("com.example.development-autostart", {
       isDevelopment: true,
     });
@@ -270,7 +280,9 @@ describe("autostart session, settings and process composition", () => {
       );
       registry.register(app, { sourcePath });
     }
-    await eden.runtime.resolve(ProcessManager).launchApp(existing.id);
+    await eden.runtime.effects.run(
+      eden.runtime.services.processes.launchApp(existing.id),
+    );
     await fs.writeFile(
       path.join(stateDirectory, "apps.json"),
       JSON.stringify({
@@ -328,7 +340,7 @@ describe("autostart session, settings and process composition", () => {
 
   it("skips disabled and headless entries and continues after an unauthorized launch", async () => {
     const eden = await environment();
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     const allowed = testApp("com.example.allowed-autostart");
     const denied = testApp("com.example.denied-autostart");
     const headless = testApp("com.example.headless-autostart", {
