@@ -6,7 +6,7 @@ import type {
   RuntimeAppManifest,
   ViewBounds,
 } from "@edenapp/types";
-import type { AppAssociationManager } from "../app-associations";
+import type { FilePickerAssociations } from "./ports";
 import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import { VolumeManager } from "../filesystem/VolumeManager";
 import type { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
@@ -34,8 +34,8 @@ type NotificationManagerMock = jest.Mocked<
 type ProcessManagerMock = jest.Mocked<
   Pick<ProcessManager, "ensureAppRunning" | "getAppInstance" | "on" | "stopApp">
 >;
-type AppAssociationManagerMock = jest.Mocked<
-  Pick<AppAssociationManager, "resolve">
+type FilePickerAssociationsMock = jest.Mocked<
+  Pick<FilePickerAssociations, "resolve">
 >;
 type PermissionRegistryMock = jest.Mocked<
   Pick<PermissionRegistry, "hasPermission">
@@ -105,7 +105,7 @@ const createManager = () => {
     on: jest.fn(),
     stopApp: jest.fn(async (_appId: string) => undefined),
   };
-  const appAssociationManager: AppAssociationManagerMock = {
+  const appAssociationManager: FilePickerAssociationsMock = {
     resolve: jest.fn((_key, _matches) => [
       { appId: "com.eden.file-picker", kind: "provider" },
     ]),
@@ -123,7 +123,7 @@ const createManager = () => {
     viewManager as unknown as ViewManager,
     notificationManager as unknown as NotificationManager,
     processManager as unknown as ProcessManager,
-    appAssociationManager as unknown as AppAssociationManager,
+    appAssociationManager as unknown as FilePickerAssociations,
     permissionRegistry as unknown as PermissionRegistry,
     new VolumeManager(ipcBridge),
     {

@@ -24,7 +24,12 @@ import {
   type EdenControlPlaneApis,
 } from "../api/createControlPlaneApi";
 import { createSettingsApi } from "../api/createSettingsApi";
-import { AppAssociationManager } from "../app-associations";
+import {
+  createAppAssociations,
+  createAppAssociationsController,
+  createJsonFileAssociationStorage,
+  type AppAssociations,
+} from "../app-associations";
 import { AppChannelManager } from "../appbus";
 import { createAppearanceController } from "../appearance/controller";
 import { createAppearance, type Appearance } from "../appearance/service";
@@ -139,7 +144,7 @@ export class EdenRuntime {
   private processManager!: ProcessManager;
   private fileOpenManager!: FileOpenManager;
   private appearanceService!: Appearance;
-  private appAssociationManager!: AppAssociationManager;
+  private appAssociationManager!: AppAssociations;
   private autostartManager!: AutostartManager;
   private userManager!: UserManager;
   private sessionManager!: SessionManager;
@@ -356,7 +361,7 @@ export class EdenRuntime {
       await this.daemonManager.initialize();
       await this.sessionManager.initialize();
       await this.effects.run(this.appearanceService.initialize());
-      await this.appAssociationManager.initialize();
+      await this.effects.run(this.appAssociationManager.initialize());
       await this.fileOpenManager.initialize();
       this.assertStartupActive();
       this.createMainWindow();
@@ -423,10 +428,25 @@ export class EdenRuntime {
         this.resolveOwned(GrantCatalogManager),
       ),
     );
-    this.appAssociationManager = this.resolveOwned(AppAssociationManager);
+    const associations = await this.effects.acquire(
+      createAppAssociations({
+        catalog: this.resolveOwned(PackageCatalog),
+        storage: createJsonFileAssociationStorage(this.paths.userDirectory),
+      }),
+    );
+    this.appAssociationManager = associations;
+    this.ipcBridge.registerController(
+      createAppAssociationsController(associations),
+    );
     this.fileOpenManager = this.own(
       new FileOpenManager(
-        this.appAssociationManager,
+        {
+          get: associations.get,
+          list: associations.list,
+          set: (key, association) =>
+            this.effects.run(associations.set(key, association)),
+          remove: (key) => this.effects.run(associations.remove(key)),
+        },
         this.resolveOwned(PackageCatalog),
         this.processManager,
         this.viewManager,
@@ -444,7 +464,20 @@ export class EdenRuntime {
     this.resolveOwned(PowerHandler);
     this.resolveOwned(NotificationManager);
     this.resolveOwned(ContextMenuManager);
-    this.resolveOwned(FilePickerManager);
+    const filePicker = this.own(
+      new FilePickerManager(
+        this.ipcBridge,
+        this.resolveOwned(CommandRegistry),
+        this.viewManager,
+        this.resolveOwned(NotificationManager),
+        this.processManager,
+        associations,
+        this.resolveOwned(PermissionRegistry),
+        this.resolveOwned(VolumeManager),
+        this.resolveOwned(FilesystemManager),
+      ),
+    );
+    this.container.registerInstance(FilePickerManager, filePicker);
     const db = await this.effects.acquire(
       createDb(
         createSqliteDbStorage({

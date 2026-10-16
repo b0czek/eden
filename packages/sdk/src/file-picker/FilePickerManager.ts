@@ -4,9 +4,7 @@ import type {
   FilePickerResult,
   ViewBounds,
 } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import * as v from "valibot";
-import { AppAssociationManager } from "../app-associations";
 import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
 import { FilesystemManager } from "../filesystem/FilesystemManager";
 import { VolumeManager } from "../filesystem/VolumeManager";
@@ -23,6 +21,7 @@ import { IdleProcessStopper, ProcessManager } from "../process-manager";
 import { DisplayProviderRegistry, ViewManager } from "../view-manager";
 import { isViewAlive } from "../view-manager/viewLifecycle";
 import { FilePickerHandler } from "./FilePickerHandler";
+import type { FilePickerAssociations } from "./ports";
 
 interface FilePickerNamespaceEvents {
   opened: { picker: FilePickerOpenEvent };
@@ -50,8 +49,6 @@ const FILE_PICKER_PROVIDER_ASSOCIATION = "provider:file-picker";
 const FILE_PICKER_DISPLAY_PERMISSION = "file-picker/display";
 const PROVIDER_REGISTRATION_TIMEOUT_MS = 5_000;
 
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
 @EdenNamespace("file-picker")
 export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
   private handler: FilePickerHandler;
@@ -61,18 +58,15 @@ export class FilePickerManager extends EdenEmitter<FilePickerNamespaceEvents> {
   private idleProviderStopper: IdleProcessStopper;
 
   constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(ViewManager) private viewManager: ViewManager,
-    @inject(NotificationManager)
+    ipcBridge: IPCBridge,
+    commandRegistry: CommandRegistry,
+    private viewManager: ViewManager,
     private notificationManager: NotificationManager,
-    @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(AppAssociationManager)
-    private appAssociationManager: AppAssociationManager,
-    @inject(PermissionRegistry)
+    private processManager: ProcessManager,
+    private appAssociationManager: FilePickerAssociations,
     private permissionRegistry: PermissionRegistry,
-    @inject(VolumeManager) private volumes: VolumeManager,
-    @inject(FilesystemManager) private files: FilesystemManager,
+    private volumes: VolumeManager,
+    private files: FilesystemManager,
   ) {
     super(ipcBridge);
 

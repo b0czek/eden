@@ -45,31 +45,23 @@ export interface SystemCommands {
 export interface AssociationsCommands {
   "associations/get": {
     mode: "result";
-    args: { key: string };
-    response: {
-    association: import("./index").AppAssociation | undefined;
-  };
+    args: { key: string; };
+    response: { association: import("./index").AppAssociation | undefined; };
   };
   "associations/set": {
     mode: "result";
-    args: {
-    key: string;
-    appId: string;
-    kind: string;
-    label?: string };
-    response: { success: boolean };
+    args: { key: string; appId: string; kind: string; label?: string | undefined; };
+    response: { success: boolean; };
   };
   "associations/remove": {
     mode: "result";
-    args: { key: string };
-    response: { success: boolean };
+    args: { key: string; };
+    response: { success: boolean; };
   };
   "associations/list": {
     mode: "result";
-    args: { kindPrefix?: string };
-    response: {
-    associations: Record<string, import("./index").AppAssociation>;
-  };
+    args: { kindPrefix?: string | undefined; };
+    response: { associations: Record<string, import("./index").AppAssociation>; };
   };
 }
 

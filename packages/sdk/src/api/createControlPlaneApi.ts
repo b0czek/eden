@@ -1,4 +1,4 @@
-import type { AppAssociationManager } from "../app-associations";
+import type { AppAssociations } from "../app-associations";
 import type { EffectRuntime } from "../effects/runtime";
 import type { Appearance } from "../appearance/service";
 import type { DaemonManager } from "../daemon";
@@ -35,7 +35,7 @@ interface Dependencies {
   sessionManager: SessionManager;
   appearance: Appearance;
   effects: EffectRuntime;
-  associationManager: AppAssociationManager;
+  associationManager: AppAssociations;
   volumeManager: VolumeManager;
   operationManager: OperationManager;
 }
@@ -217,8 +217,9 @@ export function createControlPlaneApis({
       return association ? clone(association) : undefined;
     },
     list: (options) => clone(associationManager.list(options)),
-    set: (key, association) => associationManager.set(key, clone(association)),
-    remove: (key) => associationManager.remove(key),
+    set: (key, association) =>
+      effects.run(associationManager.set(key, clone(association))),
+    remove: (key) => effects.run(associationManager.remove(key)),
   };
 
   const volumes: EdenVolumesApi = {

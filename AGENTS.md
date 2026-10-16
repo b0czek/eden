@@ -20,7 +20,7 @@ When building an app you should strive to minimize the custom css - use [edencss
 
 # Architecture
 
-Main-process code must not hardcode app IDs or assume a specific app implements a system capability. Resolve configured providers through `AppAssociationManager`, using declared capability permissions such as `file-picker/display` to discover defaults when no valid association exists.
+Main-process code must not hardcode app IDs or assume a specific app implements a system capability. Resolve configured providers through the app-associations service, using declared capability permissions such as `file-picker/display` to discover defaults when no valid association exists.
 
 Managers must use the shared event primitives (`createEvent(...).on(...)`, or
 `EdenEmitter.on(...)` in domains awaiting conversion) for lifecycle notifications. Never introduce a one-off listener registration method, callback array, or `onBefore...` API for a single event emission. Add a typed manager event and subscribe to it instead. If an operation requires awaited, transactional coordination rather than a notification, model that as an explicit manager operation rather than disguising it as an event listener.

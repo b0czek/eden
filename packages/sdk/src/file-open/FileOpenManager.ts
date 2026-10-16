@@ -9,7 +9,6 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import { WASMagic } from "wasmagic";
-import { AppAssociationManager } from "../app-associations";
 import { FilesystemManager } from "../filesystem";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
@@ -18,6 +17,7 @@ import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { ProcessManager } from "../process-manager";
 import { ViewManager } from "../view-manager";
 import { FileOpenHandler } from "./FileOpenHandler";
+import type { FileOpenAssociations } from "./ports";
 
 /**
  * Events emitted by the FileOpenManager
@@ -41,7 +41,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   private static readonly MIME_DETECTION_BYTES = 8192;
 
   constructor(
-    private appAssociationManager: AppAssociationManager,
+    private appAssociationManager: FileOpenAssociations,
     private packageCatalog: PackageCatalog,
     private processManager: ProcessManager,
     private viewManager: ViewManager,
