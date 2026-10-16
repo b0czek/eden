@@ -1,13 +1,8 @@
-import "reflect-metadata";
 import type {
   FilePickerOpenEvent,
   FilePickerResult,
   Notification,
 } from "@edenapp/types";
-import { IPCBridge } from "../../../src/ipc/IPCBridge";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
@@ -18,7 +13,7 @@ it("executes a native notification action to replace the busy file picker across
     const providerId = "com.example.displays";
     const firstId = "com.example.first-opener";
     const secondId = "com.example.second-opener";
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     for (const id of [providerId, firstId, secondId])
       registry.register(
         testApp(id, {
@@ -33,9 +28,8 @@ it("executes a native notification action to replace the busy file picker across
       "file-picker/display",
     ]);
     await eden.runtime.sessions.login(user.username, "password");
-    const processes = eden.runtime.resolve(ProcessManager);
-    const views = eden.runtime.resolve(ViewManager);
-    const subscribers = eden.runtime.resolve(IPCBridge).eventSubscribers;
+    const processes = eden.runtime.services.processes;
+    const views = eden.runtime.services.views;
     async function launch(appId: string) {
       await eden.complete("process/launch", { appId });
       const viewId = processes.getAppInstance(appId)!.viewId;
@@ -45,9 +39,21 @@ it("executes a native notification action to replace the busy file picker across
     const provider = await launch(providerId);
     const first = await launch(firstId);
     const second = await launch(secondId);
-    subscribers.subscribe(provider.viewId, "notification/added");
-    subscribers.subscribe(first.viewId, "file-picker/closed");
-    subscribers.subscribe(second.viewId, "file-picker/opened");
+    await eden.execute(
+      "event/subscribe",
+      { eventName: "notification/added" },
+      provider.caller,
+    );
+    await eden.execute(
+      "event/subscribe",
+      { eventName: "file-picker/closed" },
+      first.caller,
+    );
+    await eden.execute(
+      "event/subscribe",
+      { eventName: "file-picker/opened" },
+      second.caller,
+    );
     const events = <T>(type: string, contentsId: number): T[] =>
       eden.platform.effects.flatMap((effect) => {
         if (

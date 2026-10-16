@@ -1,8 +1,8 @@
+export { createNotificationController } from "./controller-edenapi";
+export type { NotificationCaller, NotificationViews } from "./ports";
 export {
   createNotifications,
-  type Notifications,
   type NotificationActionCallbacks,
+  type Notifications,
 } from "./service";
-export { createNotificationController } from "./controller";
 export { createNotificationViews } from "./views";
-export type { NotificationCaller, NotificationViews } from "./ports";

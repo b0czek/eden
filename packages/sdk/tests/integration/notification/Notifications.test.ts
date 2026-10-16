@@ -1,8 +1,4 @@
 import type { Notification } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
@@ -17,10 +13,10 @@ it("delivers through real notification controllers only to the display and origi
       "notification/display",
     ]);
     await eden.runtime.sessions.login(user.username, "password");
-    const packages = eden.runtime.resolve(PackageRegistry);
-    const permissions = eden.runtime.resolve(PermissionRegistry);
-    const processes = eden.runtime.resolve(ProcessManager);
-    const views = eden.runtime.resolve(ViewManager);
+    const packages = eden.runtime.services.packageRegistry;
+    const permissions = eden.runtime.services.permissions;
+    const processes = eden.runtime.services.processes;
+    const views = eden.runtime.services.views;
     const messages = new Map<
       number,
       Array<{ type: string; payload: unknown }>
