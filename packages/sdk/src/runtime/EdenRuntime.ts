@@ -41,7 +41,11 @@ import {
   resolveBrandingName,
   type Branding,
 } from "../branding";
-import { ContextMenuManager } from "../context-menu";
+import {
+  createContextMenu,
+  createContextMenuController,
+  createContextMenuViews,
+} from "../context-menu";
 import { DaemonManager } from "../daemon";
 import { createDb, createDbController, createSqliteDbStorage } from "../db";
 import { ExecutionContext } from "../execution/ExecutionContext";
@@ -499,7 +503,10 @@ export class EdenRuntime {
     this.resolveOwned(SystemHandler);
     this.resolveOwned(PowerHandler);
     this.resolveOwned(NotificationManager);
-    this.resolveOwned(ContextMenuManager);
+    const contextMenu = await this.effects.acquire(
+      createContextMenu({ views: createContextMenuViews(this.viewManager) }),
+    );
+    this.ipcBridge.registerController(createContextMenuController(contextMenu));
     const filePicker = await this.effects.acquire(
       createFilePicker({
         associations,

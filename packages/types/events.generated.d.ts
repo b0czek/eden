@@ -17,7 +17,7 @@ export interface AppearanceEvents {
  * ContextMenuEvents - Events for the "context-menu" namespace
  */
 export interface ContextMenuEvents {
-  "context-menu/opened": { menu: import("./index").ContextMenuOpenEvent };
+  "context-menu/opened": { menu: import("./index").ContextMenuOpenEvent; };
   "context-menu/closed": import("./index").ContextMenuResult;
 }
 

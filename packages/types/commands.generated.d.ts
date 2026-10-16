@@ -151,24 +151,23 @@ export interface AppearanceCommands {
 export interface ContextMenuCommands {
   "context-menu/register-display": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
   "context-menu/open": {
     mode: "result";
-    args: import("./index").ContextMenuOpenArgs & { };
-    response: { requestId: string };
+    args: import("./index").ContextMenuOpenArgs;
+    response: { requestId: string; };
   };
   "context-menu/resolve": {
     mode: "result";
-    args: import("./index").ContextMenuResult & { };
-    response: { success: boolean };
+    args: import("./index").ContextMenuResult;
+    response: { success: boolean; };
   };
   "context-menu/close": {
     mode: "result";
-    args: {
-    requestId?: string };
-    response: { success: boolean };
+    args: { requestId?: string | undefined; };
+    response: { success: boolean; };
   };
 }
 
