@@ -7,32 +7,37 @@ import type {
   EdenConfig,
   ExecutionPrincipal,
   FilesystemLocation,
+  LaunchResult,
   ProcessMetricsSnapshot,
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { APP_CHANNELS, type AppChannelLifecycle } from "../appbus/ports";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Queue from "effect/Queue";
+import { type AppChannelLifecycle } from "../appbus/ports";
+import { asError, fromPromise } from "../effects/io";
+import { listen, scopedEvent } from "../events/scoped";
+import type { ExecutionContext } from "../execution/ExecutionContext";
+import type { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
 import {
   getHotReloadServersPath,
   isHotReloadConfigured,
   loadHotReloadServerState,
 } from "../hotreload-config";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+
 import { log } from "../logging";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
-import { PackageManager } from "../package-manager/PackageManager";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
+import type { PackageManager } from "../package-manager/PackageManager";
+import { type ProcessMetricsPort } from "../platform/ports";
+import type { SessionContext } from "../session/SessionContext";
+import type { ViewManager } from "../view-manager/ViewManager";
+import type { BackendManager } from "./BackendManager";
+
 import {
-  PLATFORM_PROCESS_METRICS,
-  type ProcessMetricsPort,
-} from "../platform/ports";
-import { SessionContext } from "../session/SessionContext";
-import { ViewManager } from "../view-manager/ViewManager";
-import { BackendManager } from "./BackendManager";
-import { ProcessHandler } from "./ProcessHandler";
-import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
+  createProcessMetricsCollector,
+  type ProcessMetricsCollector,
+} from "./ProcessMetricsCollector";
 
 /**
  * Events emitted by the ProcessManager
@@ -44,151 +49,107 @@ interface ProcessNamespaceEvents {
   error: { appId: string; error: unknown };
   exited: { appId: string; code: number };
 }
+export interface ProcessManagerDependencies {
+  backendManager: BackendManager;
+  viewManager: ViewManager;
+  packageCatalog: PackageCatalog;
+  packageManager: PackageManager;
+  appChannelManager: AppChannelLifecycle;
+  sessionContext: SessionContext;
+  executionContext: ExecutionContext;
+  config: EdenConfig;
+  runtimeContexts: RuntimeContextRegistry;
+  processMetrics: ProcessMetricsPort;
+  routing: {
+    updateRunningApps(appIds: Iterable<string>): void;
+    removeBackendSubscriptions(appId: string): void;
+  };
+}
+export const createProcessManager = Effect.fn(function* ({
+  backendManager,
+  viewManager,
+  packageCatalog,
+  packageManager,
+  appChannelManager,
+  sessionContext,
+  executionContext,
+  config,
+  runtimeContexts,
+  processMetrics,
+  routing,
+}: ProcessManagerDependencies) {
+  const launched = yield* scopedEvent<ProcessNamespaceEvents["launched"]>();
+  const stopped = yield* scopedEvent<ProcessNamespaceEvents["stopped"]>();
+  const reloading = yield* scopedEvent<ProcessNamespaceEvents["reloading"]>();
+  const processError = yield* scopedEvent<ProcessNamespaceEvents["error"]>();
+  const exited = yield* scopedEvent<ProcessNamespaceEvents["exited"]>();
+  const pending =
+    yield* Queue.unbounded<() => Effect.Effect<unknown, unknown>>();
+  let _runningApps: Map<string, AppInstance> = new Map();
 
-/**
- * ProcessManager
- *
- * Handles app lifecycle (launch, stop) and coordination between workers and views.
- */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-@EdenNamespace("process")
-export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
-  private runningApps: Map<string, AppInstance> = new Map();
-  private processHandler: ProcessHandler;
-  private processMetrics: ProcessMetricsCollector;
-  private loginAppId?: string;
-  private hotReloadStates = new Map<string, string>();
-  private hotReloadWatcher?: fs.FSWatcher;
-  private hotReloadSetupPromise?: Promise<void>;
-  private hotReloadDebounceTimer?: NodeJS.Timeout;
-  private shuttingDown = false;
+  let _processMetrics: ProcessMetricsCollector;
+  let _loginAppId: string | undefined;
+  let _hotReloadStates = new Map<string, string>();
+  let _hotReloadWatcher: fs.FSWatcher | undefined;
 
-  constructor(
-    @inject(BackendManager) private backendManager: BackendManager,
-    @inject(ViewManager) private viewManager: ViewManager,
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
-    @inject(PackageManager) private packageManager: PackageManager,
-    @inject(APP_CHANNELS) private appChannelManager: AppChannelLifecycle,
-    @inject(SessionContext) private sessionContext: SessionContext,
-    @inject(ExecutionContext) private executionContext: ExecutionContext,
-    @inject("EdenConfig") private config: EdenConfig,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(RuntimeContextRegistry)
-    private runtimeContexts: RuntimeContextRegistry,
-    @inject(PLATFORM_PROCESS_METRICS) processMetrics: ProcessMetricsPort,
-  ) {
-    super(ipcBridge);
-    this.loginAppId = this.config.loginAppId;
-    this.processMetrics = new ProcessMetricsCollector({
-      backendManager: this.backendManager,
-      viewManager: this.viewManager,
-      getRunningApps: (showHidden) => this.getRunningApps(showHidden),
-      processMetrics,
-    });
+  let _hotReloadDebounceTimer: NodeJS.Timeout | undefined;
+  let _shuttingDown = false;
+  const _backendManager = backendManager;
+  const _viewManager = viewManager;
+  const _packageCatalog = packageCatalog;
+  const _packageManager = packageManager;
+  const _appChannelManager = appChannelManager;
+  const _sessionContext = sessionContext;
+  const _executionContext = executionContext;
+  const _config = config;
+  const _runtimeContexts = runtimeContexts;
 
-    this.setupEventHandlers();
-    this.packageManager.on("uninstalled", async (change) => {
-      if (change.kind !== "app") return;
-      const appId = change.packageId;
-      if (this.runningApps.has(appId)) await this.stopApp(appId);
-    });
-    this.setupHotReloadWatcher();
+  _loginAppId = _config.loginAppId;
+  _processMetrics = createProcessMetricsCollector({
+    backendManager: _backendManager,
+    viewManager: _viewManager,
+    getRunningApps: (showHidden) => getRunningApps(showHidden),
+    processMetrics,
+  });
 
-    // Create and register handler
-    this.processHandler = new ProcessHandler(this, this.executionContext);
-    commandRegistry.registerManager(this.processHandler);
-  }
-
-  /**
-   * Setup event handlers
-   */
-  private setupEventHandlers(): void {
-    // Handle backend errors
-    this.backendManager.on("backend-error", ({ appId, error }) => {
-      log.error(`Backend error for app ${appId}:`, error);
-      this.handleAppError(appId, error);
-    });
-
-    // Handle backend exits
-    this.backendManager.on("backend-exit", ({ appId, code }) => {
-      log.info(`Backend exited for app ${appId} with code ${code}`);
-      this.handleAppExit(appId, code);
-    });
-
-    // Transfer backend port to frontend when view loads
-    this.viewManager.on("view-loaded", ({ viewId, appId }) => {
-      log.info(`View loaded for app ${appId}`);
-
-      // If app has a backend, transfer the port to the frontend
-      const backendPort = this.backendManager.getFrontendPort(appId);
-      if (backendPort) {
-        const viewInfo = this.viewManager.getViewInfo(viewId);
-        if (viewInfo) {
-          log.info(
-            `Transferring backend port to view ${viewId} for app ${appId}`,
-          );
-          viewInfo.view.webContents.postMessage("backend-port", {}, [
-            backendPort,
-          ]);
-          // Port has been transferred
-        }
-      } else {
-        log.info(`No backend port for app ${appId} (may be frontend-only)`);
-      }
-    });
-  }
-
-  private setupHotReloadWatcher(): void {
-    if (!isHotReloadConfigured(this.config)) {
-      return;
-    }
-
-    const serversPath = getHotReloadServersPath(this.config);
+  yield* listen(backendManager.backendError, ({ appId, error }) =>
+    handleAppError(appId, error),
+  );
+  yield* listen(backendManager.backendExit, ({ appId, code }) =>
+    handleAppExit(appId, code),
+  );
+  yield* listen(viewManager.viewLoaded, ({ viewId, appId }) => {
+    const port = backendManager.getFrontendPort(appId);
+    const info = viewManager.getViewInfo(viewId);
+    if (port && info)
+      info.view.webContents.postMessage("backend-port", {}, [port]);
+  });
+  yield* listen(packageManager.uninstalled, (change) => {
+    if (change.kind === "app" && _runningApps.has(change.packageId))
+      Queue.offerUnsafe(pending, () => stopApp(change.packageId));
+  });
+  const setupHotReloadWatcher = Effect.fn(function* () {
+    if (!isHotReloadConfigured(config)) return;
+    const serversPath = getHotReloadServersPath(config);
     const stateDirectory = path.dirname(serversPath);
-    const debounceMs = Math.max(this.config.hotReload?.debounce ?? 300, 50);
-
-    this.hotReloadSetupPromise = fsp
-      .mkdir(stateDirectory, { recursive: true })
-      .then(() => {
-        if (this.shuttingDown) return;
-        this.hotReloadWatcher = fs.watch(
-          stateDirectory,
-          (eventType, filename) => {
-            if (eventType !== "rename" && eventType !== "change") {
-              return;
-            }
-            if (
-              filename &&
-              filename.toString() !== path.basename(serversPath)
-            ) {
-              return;
-            }
-
-            if (this.hotReloadDebounceTimer) {
-              clearTimeout(this.hotReloadDebounceTimer);
-            }
-            this.hotReloadDebounceTimer = setTimeout(() => {
-              void this.handleHotReloadStateChanged();
-            }, debounceMs);
-          },
-        );
-
-        void this.handleHotReloadStateChanged();
-        log.info(`Watching hot reload state: ${serversPath}`);
-      })
-      .catch((error) => {
-        if (!this.shuttingDown) {
-          log.error(`Failed to watch hot reload state: ${serversPath}`, error);
-        }
-      });
-  }
-
-  private async handleHotReloadStateChanged(): Promise<void> {
-    const state = await loadHotReloadServerState(this.config);
+    yield* fromPromise(() => fsp.mkdir(stateDirectory, { recursive: true }));
+    _hotReloadWatcher = fs.watch(stateDirectory, (eventType, filename) => {
+      if (_shuttingDown || (eventType !== "rename" && eventType !== "change"))
+        return;
+      if (filename && filename.toString() !== path.basename(serversPath))
+        return;
+      if (_hotReloadDebounceTimer) clearTimeout(_hotReloadDebounceTimer);
+      _hotReloadDebounceTimer = setTimeout(
+        () => Queue.offerUnsafe(pending, handleHotReloadStateChanged),
+        Math.max(config.hotReload?.debounce ?? 300, 50),
+      );
+    });
+    Queue.offerUnsafe(pending, handleHotReloadStateChanged);
+  });
+  const handleHotReloadStateChanged = Effect.fn(function* () {
+    const state = yield* fromPromise(() => loadHotReloadServerState(_config));
     const appIds = new Set([
-      ...this.hotReloadStates.keys(),
+      ..._hotReloadStates.keys(),
       ...Object.keys(state.apps),
     ]);
     const nextStates = new Map<string, string>();
@@ -202,68 +163,73 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     const changedAppIds = Array.from(appIds).filter(
-      (appId) => this.hotReloadStates.get(appId) !== nextStates.get(appId),
+      (appId) => _hotReloadStates.get(appId) !== nextStates.get(appId),
     );
 
-    this.hotReloadStates = nextStates;
+    _hotReloadStates = nextStates;
 
     for (const appId of changedAppIds) {
-      await this.refreshHotReloadApp(appId);
+      yield* refreshHotReloadApp(appId);
     }
-  }
+  });
 
-  private async refreshHotReloadApp(appId: string): Promise<void> {
-    try {
-      await this.packageManager.reloadPackage(appId);
-    } catch (error) {
-      log.warn(`Failed to refresh hot reload manifest for ${appId}:`, error);
-      return;
-    }
+  const refreshHotReloadApp = Effect.fn(function* (appId: string) {
+    const refreshed = yield* _packageManager.reloadPackage(appId).pipe(
+      Effect.match({
+        onSuccess: () => true,
+        onFailure: (error) => {
+          log.warn(
+            `Failed to refresh hot reload manifest for ${appId}:`,
+            error,
+          );
+          return false;
+        },
+      }),
+    );
+    if (!refreshed || !_runningApps.has(appId)) return;
+    yield* reloadApp(appId).pipe(
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.sync(() =>
+              log.error(
+                `Failed to reload hot reload app ${appId}:`,
+                Cause.squash(cause),
+              ),
+            ),
+      ),
+    );
+  });
 
-    if (!this.runningApps.has(appId)) {
-      return;
-    }
-
-    try {
-      await this.reloadApp(appId);
-    } catch (error) {
-      log.error(`Failed to reload hot reload app ${appId}:`, error);
-    }
-  }
-
-  /**
-   * Launch an app
-   */
-  assertCanLaunch(appId: string): void {
+  function assertCanLaunch(appId: string): void {
     const developmentApp =
-      this.config.development &&
-      this.packageCatalog.getApp(appId)?.isDevelopment;
+      _config.development && _packageCatalog.getApp(appId)?.isDevelopment;
     if (
       !developmentApp &&
-      !this.isLoginApp(appId) &&
-      !this.executionContext.canLaunchApp(appId)
+      !isLoginApp(appId) &&
+      !_executionContext.canLaunchApp(appId)
     ) {
       throw new Error(`User cannot launch app ${appId}`);
     }
   }
 
-  async launchApp(
+  const launchApp = Effect.fn(function* (
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    this.assertCanLaunch(appId);
+  ): Effect.fn.Return<LaunchResult, Error> {
+    yield* Effect.try({ try: () => assertCanLaunch(appId), catch: asError });
 
-    const currentUser = this.sessionContext.getCurrentUser();
-    return await this.launchAppInternal(
+    const currentUser = _sessionContext.getCurrentUser();
+    return yield* launchAppInternal(
       appId,
       bounds,
       launchArgs,
       {
         owner: {
           kind: "session",
-          sessionId: this.sessionContext.getSessionId(),
+          sessionId: _sessionContext.getSessionId(),
           username: currentUser?.username ?? null,
         },
         principal: currentUser
@@ -274,25 +240,27 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         ? { volume: launchFile.volume, path: launchFile.path }
         : undefined,
     );
-  }
+  });
 
-  async launchDaemon(
+  const launchDaemon = Effect.fn(function* (
     appId: string,
     principal: ExecutionPrincipal,
     profile?: UserProfile,
-  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.packageManager.getAppForLaunch(appId);
+  ): Effect.fn.Return<LaunchResult, Error> {
+    const manifest = _packageManager.getAppForLaunch(appId);
     if (!manifest?.backend?.entry || manifest.frontend?.entry) {
-      throw new Error(`App ${appId} is not a backend-only daemon`);
+      return yield* Effect.fail(
+        asError(new Error(`App ${appId} is not a backend-only daemon`)),
+      );
     }
-    return await this.launchAppInternal(appId, undefined, undefined, {
+    return yield* launchAppInternal(appId, undefined, undefined, {
       owner: { kind: "system" },
       principal,
       profile,
     });
-  }
+  });
 
-  private async launchAppInternal(
+  const launchAppInternal = Effect.fn(function* (
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
@@ -302,32 +270,42 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       profile?: UserProfile;
     },
     launchFile?: FilesystemLocation,
-  ): Promise<{ success: boolean; instanceId: string; appId: string }> {
-    const manifest = this.packageManager.getAppForLaunch(appId);
+  ): Effect.fn.Return<LaunchResult, Error> {
+    const manifest = _packageManager.getAppForLaunch(appId);
     if (!manifest) {
-      throw new Error(`App ${appId} is not installed`);
+      return yield* Effect.fail(
+        asError(new Error(`App ${appId} is not installed`)),
+      );
     }
 
     // Validate manifest has at least frontend or backend
     if (!manifest.frontend?.entry && !manifest.backend?.entry) {
-      throw new Error(
-        `App ${appId} must have at least a frontend or backend entry`,
+      return yield* Effect.fail(
+        asError(
+          new Error(
+            `App ${appId} must have at least a frontend or backend entry`,
+          ),
+        ),
       );
     }
 
     // Check if already running
-    if (this.runningApps.has(appId)) {
-      throw new Error(`App ${appId} is already running`);
+    if (_runningApps.has(appId)) {
+      return yield* Effect.fail(
+        asError(new Error(`App ${appId} is already running`)),
+      );
     }
 
     // Get the correct install path
-    const installPath = this.packageCatalog.getPath(appId);
+    const installPath = _packageCatalog.getPath(appId);
     if (!installPath) {
-      throw new Error(`App path not found for ${appId}`);
+      return yield* Effect.fail(
+        asError(new Error(`App path not found for ${appId}`)),
+      );
     }
 
     const instanceId = randomUUID();
-    const currentUser = this.sessionContext.getCurrentUser();
+    const currentUser = _sessionContext.getCurrentUser();
     const resolvedRuntime: {
       owner: ProcessOwner;
       principal: ExecutionPrincipal;
@@ -335,7 +313,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     } = runtime ?? {
       owner: {
         kind: "session" as const,
-        sessionId: this.sessionContext.getSessionId(),
+        sessionId: _sessionContext.getSessionId(),
         username: currentUser?.username ?? null,
       },
       principal: currentUser
@@ -343,16 +321,16 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         : ({ kind: "system" } as const),
     };
 
-    this.runtimeContexts.register(appId, {
+    _runtimeContexts.register(appId, {
       owner: resolvedRuntime.owner,
       principal: resolvedRuntime.principal,
       profile: resolvedRuntime.profile,
     });
 
-    try {
+    return yield* Effect.gen(function* () {
       // Create backend utility process if one is defined
       if (manifest.backend?.entry) {
-        await this.backendManager.createBackend(
+        yield* _backendManager.createBackend(
           appId,
           manifest,
           installPath,
@@ -364,7 +342,7 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       // Create view for frontend only if frontend is defined
       let viewId: number | undefined;
       if (manifest.frontend?.entry) {
-        viewId = this.viewManager.createView(
+        viewId = _viewManager.createView(
           appId,
           manifest,
           installPath,
@@ -387,10 +365,10 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         lastLaunched: new Date(),
       };
 
-      this.runningApps.set(appId, instance);
-      this.syncRunningAppsState();
+      _runningApps.set(appId, instance);
+      syncRunningAppsState();
 
-      this.notify("launched", { instance });
+      launched.emit({ instance });
 
       // Return serializable data only
       return {
@@ -398,75 +376,90 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         instanceId,
         appId,
       };
-    } catch (error) {
-      this.runtimeContexts.unregister(appId);
-      log.error(`Failed to launch app ${appId}:`, error);
-      throw error;
-    }
-  }
+    }).pipe(
+      Effect.onError(() =>
+        Effect.sync(() => _runtimeContexts.unregister(appId)),
+      ),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.gen(function* () {
+              const error = Cause.squash(cause);
+              log.error(`Failed to launch app ${appId}:`, error);
+              return yield* Effect.fail(asError(error));
+            }),
+      ),
+    );
+  });
 
-  async ensureAppRunning(
+  const ensureAppRunning = Effect.fn(function* (
     appId: string,
     options: {
       bounds?: { x: number; y: number; width: number; height: number };
       launchArgs?: string[];
     } = {},
-  ): Promise<AppInstance> {
-    const existing = this.runningApps.get(appId);
+  ): Effect.fn.Return<AppInstance, Error> {
+    const existing = _runningApps.get(appId);
     if (existing) {
       return existing;
     }
 
-    await this.launchApp(appId, options.bounds, options.launchArgs);
+    yield* launchApp(appId, options.bounds, options.launchArgs);
 
-    const launched = this.runningApps.get(appId);
+    const launched = _runningApps.get(appId);
     if (!launched) {
-      throw new Error(`App ${appId} failed to start`);
+      return yield* Effect.fail(
+        asError(new Error(`App ${appId} failed to start`)),
+      );
     }
     return launched;
-  }
+  });
 
-  /**
-   * Stop a running app
-   */
-  async stopApp(appId: string): Promise<void> {
-    const instance = this.runningApps.get(appId);
+  const stopApp = Effect.fn(function* (
+    appId: string,
+  ): Effect.fn.Return<void, Error> {
+    const instance = _runningApps.get(appId);
     if (!instance) {
-      throw new Error(`App ${appId} is not running`);
+      return yield* Effect.fail(
+        asError(new Error(`App ${appId} is not running`)),
+      );
     }
 
-    try {
+    yield* Effect.gen(function* () {
       // Unregister all services exposed by this app
-      this.appChannelManager.unregisterAllServices(appId);
+      _appChannelManager.unregisterAllServices(appId);
 
       // Remove view first (before backend termination to avoid race)
       if (instance.viewId !== -1) {
-        this.viewManager.removeView(instance.viewId);
+        _viewManager.removeView(instance.viewId);
       }
 
       // Terminate backend after view is removed
-      if (this.backendManager.hasBackend(appId)) {
-        await this.backendManager.terminateBackend(appId);
+      if (_backendManager.hasBackend(appId)) {
+        yield* _backendManager.terminateBackend(appId);
       }
 
       // Remove from running apps
-      this.runningApps.delete(appId);
-      this.runtimeContexts.unregister(appId);
-      this.syncRunningAppsState();
+      _runningApps.delete(appId);
+      _runtimeContexts.unregister(appId);
+      syncRunningAppsState();
 
-      this.notify("stopped", { appId });
-    } catch (error) {
-      log.error(`Failed to stop app ${appId}:`, error);
-      throw error;
-    }
-  }
+      stopped.emit({ appId });
+    }).pipe(
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.gen(function* () {
+              const error = Cause.squash(cause);
+              log.error(`Failed to stop app ${appId}:`, error);
+              return yield* Effect.fail(asError(error));
+            }),
+      ),
+    );
+  });
 
-  /**
-   * Get list of running apps
-   * @param showHidden - If true, includes overlay apps and daemons (hidden by default)
-   */
-  getRunningApps(showHidden: boolean = false): AppInstance[] {
-    const apps = Array.from(this.runningApps.values());
+  function getRunningApps(showHidden: boolean = false): AppInstance[] {
+    const apps = Array.from(_runningApps.values());
     return showHidden
       ? apps
       : apps.filter(
@@ -477,139 +470,120 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
         );
   }
 
-  /**
-   * Get app instance
-   */
-  getAppInstance(appId: string): AppInstance | undefined {
-    return this.runningApps.get(appId);
+  function getAppInstance(appId: string): AppInstance | undefined {
+    return _runningApps.get(appId);
   }
 
-  getInstalledManifest(appId: string) {
-    return this.packageCatalog.getApp(appId);
+  function getInstalledManifest(appId: string) {
+    return _packageCatalog.getApp(appId);
   }
 
-  /**
-   * Return a process metrics snapshot for running Eden apps.
-   *
-   * CPU percentages are interval-based values supplied by Electron. To avoid
-   * concurrent callers resetting each other's sampling window, the main process
-   * owns a shared sampler with a fixed cadence and can keep it alive for slower
-   * polling clients.
-   */
-  async getMetrics(
+  const getMetrics = Effect.fn(function* (
     showHidden: boolean = false,
     pollingTimeoutMs?: number,
     waitForAccurateCpu: boolean = true,
-  ): Promise<ProcessMetricsSnapshot> {
-    return await this.processMetrics.getMetrics(
+  ): Effect.fn.Return<ProcessMetricsSnapshot, Error> {
+    return yield* _processMetrics.getMetrics(
       showHidden,
       pollingTimeoutMs,
       waitForAccurateCpu,
     );
+  });
+
+  function syncRunningAppsState(): void {
+    routing.updateRunningApps(_runningApps.keys());
   }
 
-  /**
-   * Sync running app IDs with the IPC bridge
-   */
-  private syncRunningAppsState(): void {
-    this.ipcBridge.updateRunningApps(this.runningApps.keys());
-  }
-
-  /**
-   * Handle app error
-   */
-  private handleAppError(appId: string, error: unknown): void {
-    const instance = this.runningApps.get(appId);
+  function handleAppError(appId: string, error: unknown): void {
+    const instance = _runningApps.get(appId);
     if (instance) {
       instance.state = "error";
-      this.notify("error", { appId, error });
+      processError.emit({ appId, error });
     }
   }
 
-  /**
-   * Handle app exit (called when backend crashes or exits unexpectedly)
-   * Note: If stopApp() was called, the instance is already removed so this is a no-op
-   */
-  private handleAppExit(appId: string, code: number): void {
-    this.ipcBridge.eventSubscribers.removeBackendSubscriptions(appId);
-    const instance = this.runningApps.get(appId);
+  function handleAppExit(appId: string, code: number): void {
+    routing.removeBackendSubscriptions(appId);
+    const instance = _runningApps.get(appId);
     if (!instance) {
       // App was already cleaned up by stopApp(), nothing to do
       return;
     }
 
     // Unregister all services exposed by this app
-    this.appChannelManager.unregisterAllServices(appId);
+    _appChannelManager.unregisterAllServices(appId);
 
     // Clean up view (only if frontend exists, viewId !== -1)
     if (instance.viewId !== -1) {
       try {
-        this.viewManager.removeView(instance.viewId);
+        _viewManager.removeView(instance.viewId);
       } catch (_e) {
         // View may already be removed
       }
     }
 
-    this.runningApps.delete(appId);
-    this.runtimeContexts.unregister(appId);
-    this.syncRunningAppsState();
+    _runningApps.delete(appId);
+    _runtimeContexts.unregister(appId);
+    syncRunningAppsState();
 
-    this.notify("exited", { appId, code });
+    exited.emit({ appId, code });
   }
 
-  /**
-   * Shutdown all apps
-   */
-  async shutdown(): Promise<void> {
-    this.shuttingDown = true;
-    await this.hotReloadSetupPromise;
-    this.hotReloadWatcher?.close();
-    if (this.hotReloadDebounceTimer) {
-      clearTimeout(this.hotReloadDebounceTimer);
+  const shutdown = Effect.fn(function* () {
+    _shuttingDown = true;
+
+    _hotReloadWatcher?.close();
+    if (_hotReloadDebounceTimer) {
+      clearTimeout(_hotReloadDebounceTimer);
     }
 
-    const runningAppIds = Array.from(this.runningApps.keys());
+    const runningAppIds = Array.from(_runningApps.keys());
 
     log.info(`Stopping ${runningAppIds.length} running app(s)...`);
 
     // Stop all apps sequentially and wait for each to complete
     for (const appId of runningAppIds) {
-      try {
+      yield* Effect.gen(function* () {
         log.info(`Stopping app: ${appId}`);
-        await this.stopApp(appId);
+        yield* stopApp(appId);
         log.info(`✓ Stopped app: ${appId}`);
-      } catch (error) {
-        log.error(`Failed to stop app ${appId}:`, error);
-      }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause)
+            : Effect.sync(() => {
+                const error = Cause.squash(cause);
+                log.error(`Failed to stop app ${appId}:`, error);
+              }),
+        ),
+      );
     }
+  });
+
+  function dispose(): void {
+    _shuttingDown = true;
+    _hotReloadWatcher?.close();
+    _hotReloadWatcher = undefined;
+    if (_hotReloadDebounceTimer) {
+      clearTimeout(_hotReloadDebounceTimer);
+      _hotReloadDebounceTimer = undefined;
+    }
+    _processMetrics.dispose();
+    _runningApps.clear();
+    _hotReloadStates.clear();
   }
 
-  override dispose(): void {
-    this.shuttingDown = true;
-    this.hotReloadWatcher?.close();
-    this.hotReloadWatcher = undefined;
-    if (this.hotReloadDebounceTimer) {
-      clearTimeout(this.hotReloadDebounceTimer);
-      this.hotReloadDebounceTimer = undefined;
-    }
-    this.processMetrics.dispose();
-    this.runningApps.clear();
-    this.hotReloadStates.clear();
-    super.dispose();
-  }
-
-  /**
-   * Reload a running app
-   */
-  async reloadApp(appId: string): Promise<void> {
-    const instance = this.runningApps.get(appId);
+  const reloadApp = Effect.fn(function* (
+    appId: string,
+  ): Effect.fn.Return<void, Error> {
+    const instance = _runningApps.get(appId);
     if (!instance) {
       log.info(`App ${appId} is not running, skipping reload`);
       return;
     }
 
     // Save the current view bounds
-    const viewInfo = this.viewManager.getViewInfo(instance.viewId);
+    const viewInfo = _viewManager.getViewInfo(instance.viewId);
     const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
 
     log.info(`Reloading app ${appId}...`);
@@ -617,22 +591,22 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     // A hot-reload watcher runs outside the request's AsyncLocalStorage
     // context. Preserve the running process identity before stopApp removes it
     // so relaunch does not depend on ambient user authorization state.
-    const runtime = this.runtimeContexts.get(appId);
+    const runtime = _runtimeContexts.get(appId);
 
     // Stop the app
     if (instance.owner.kind === "system") {
-      this.notify("reloading", { appId });
-      await this.stopApp(appId);
-      await this.launchDaemon(appId, instance.principal, runtime?.profile);
+      reloading.emit({ appId });
+      yield* stopApp(appId);
+      yield* launchDaemon(appId, instance.principal, runtime?.profile);
     } else {
-      await this.stopApp(appId);
+      yield* stopApp(appId);
 
       // Small delay to ensure cleanup
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      yield* Effect.sleep(100);
 
       // Relaunch with the same bounds and the identity of the process that was
       // already authorized to run.
-      await this.launchAppInternal(appId, bounds, undefined, {
+      yield* launchAppInternal(appId, bounds, undefined, {
         owner: instance.owner,
         principal: instance.principal,
         profile: runtime?.profile,
@@ -640,12 +614,12 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
     }
 
     log.info(`App ${appId} reloaded successfully`);
-  }
+  });
 
-  async stopSessionApps(
-    sessionId = this.sessionContext.getSessionId(),
-  ): Promise<void> {
-    const running = Array.from(this.runningApps.values())
+  const stopSessionApps = Effect.fn(function* (
+    sessionId = _sessionContext.getSessionId(),
+  ): Effect.fn.Return<void, Error> {
+    const running = Array.from(_runningApps.values())
       .filter(
         (instance) =>
           instance.owner.kind === "session" &&
@@ -654,22 +628,91 @@ export class ProcessManager extends EdenEmitter<ProcessNamespaceEvents> {
       .map((instance) => instance.manifest.id);
     const errors: unknown[] = [];
     for (const appId of running) {
-      try {
-        await this.stopApp(appId);
-      } catch (error) {
-        // A process may exit on its own after the snapshot was taken.
-        if (this.runningApps.has(appId)) {
-          errors.push(error);
-        }
-      }
+      yield* Effect.gen(function* () {
+        yield* stopApp(appId);
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause)
+            : Effect.sync(() => {
+                const error = Cause.squash(cause);
+                // A process may exit on its own after the snapshot was taken.
+                if (_runningApps.has(appId)) {
+                  errors.push(error);
+                }
+              }),
+        ),
+      );
     }
 
     if (errors.length > 0) {
-      throw new AggregateError(errors, "Failed to stop all session apps");
+      return yield* Effect.fail(
+        asError(new AggregateError(errors, "Failed to stop all session apps")),
+      );
     }
-  }
+  });
 
-  private isLoginApp(appId: string): boolean {
-    return !!this.loginAppId && appId === this.loginAppId;
+  function isLoginApp(appId: string): boolean {
+    return !!_loginAppId && appId === _loginAppId;
   }
-}
+  yield* Effect.forkScoped(
+    Effect.forever(
+      Effect.flatMap(Queue.take(pending), (work) =>
+        work().pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.failCause(cause)
+              : Effect.sync(() =>
+                  log.error(
+                    "Process lifecycle task failed:",
+                    Cause.squash(cause),
+                  ),
+                ),
+          ),
+        ),
+      ),
+    ),
+  );
+  yield* Effect.addFinalizer(() =>
+    shutdown().pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() =>
+          log.error("Failed to stop process lifecycle:", Cause.squash(cause)),
+        ),
+      ),
+      Effect.ensuring(Effect.sync(dispose)),
+    ),
+  );
+  yield* setupHotReloadWatcher().pipe(
+    Effect.catchCause((cause) =>
+      Cause.hasInterruptsOnly(cause)
+        ? Effect.failCause(cause)
+        : Effect.sync(() =>
+            log.error("Failed to watch hot reload state:", Cause.squash(cause)),
+          ),
+    ),
+  );
+  return {
+    launched,
+    stopped,
+    reloading,
+    error: processError,
+    exited,
+    assertCanLaunch,
+    launchApp,
+    launchDaemon,
+    ensureAppRunning,
+    stopApp,
+    getRunningApps,
+    getAppInstance,
+    getInstalledManifest,
+    getMetrics,
+    shutdown,
+    reloadApp,
+    stopSessionApps,
+  };
+});
+
+export type ProcessManager = Effect.Success<
+  ReturnType<typeof createProcessManager>
+>;

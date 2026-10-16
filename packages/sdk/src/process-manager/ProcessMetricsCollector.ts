@@ -4,6 +4,7 @@ import type {
   EdenProcessMetric,
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import type {
   PlatformProcessMetric,
   ProcessMetricsPort,
@@ -27,111 +28,111 @@ const DEFAULT_METRICS_POLLING_TIMEOUT_MS = 1000;
 const MAX_METRICS_POLLING_TIMEOUT_MS = 10000;
 
 interface ProcessMetricsCollectorDeps {
-  backendManager: BackendManager;
-  viewManager: ViewManager;
+  backendManager: Pick<BackendManager, "getBackend">;
+  viewManager: Pick<ViewManager, "getView">;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   processMetrics: ProcessMetricsPort;
 }
+export function createProcessMetricsCollector(
+  deps: ProcessMetricsCollectorDeps,
+) {
+  let _backendManager: Pick<BackendManager, "getBackend">;
+  let _viewManager: Pick<ViewManager, "getView">;
+  let _getRunningApps: (showHidden?: boolean) => AppInstance[];
+  let _processMetrics: ProcessMetricsPort;
+  let _metricsSampler: NodeJS.Timeout | null = null;
+  let _nextMetricsRequestId = 0;
+  let _pendingMetricsRequests: Map<number, MetricsRequest> = new Map();
+  let _metricsSamplerKeepAliveUntil = 0;
+  let _latestMetricsSample: CachedMetricsSample | null = null;
 
-export class ProcessMetricsCollector {
-  private readonly backendManager: BackendManager;
-  private readonly viewManager: ViewManager;
-  private readonly getRunningApps: (showHidden?: boolean) => AppInstance[];
-  private readonly processMetrics: ProcessMetricsPort;
-  private metricsSampler: NodeJS.Timeout | null = null;
-  private nextMetricsRequestId = 0;
-  private pendingMetricsRequests: Map<number, MetricsRequest> = new Map();
-  private metricsSamplerKeepAliveUntil = 0;
-  private latestMetricsSample: CachedMetricsSample | null = null;
+  _backendManager = deps.backendManager;
+  _viewManager = deps.viewManager;
+  _getRunningApps = deps.getRunningApps;
+  _processMetrics = deps.processMetrics;
 
-  constructor(deps: ProcessMetricsCollectorDeps) {
-    this.backendManager = deps.backendManager;
-    this.viewManager = deps.viewManager;
-    this.getRunningApps = deps.getRunningApps;
-    this.processMetrics = deps.processMetrics;
-  }
-
-  async getMetrics(
+  const getMetrics = Effect.fn(function* (
     showHidden: boolean = false,
     pollingTimeoutMs: number = DEFAULT_METRICS_POLLING_TIMEOUT_MS,
     waitForAccurateCpu: boolean = true,
-  ): Promise<ProcessMetricsSnapshot> {
+  ) {
     const normalizedTimeout = Math.max(
       METRICS_SAMPLE_INTERVAL_MS,
       Math.min(MAX_METRICS_POLLING_TIMEOUT_MS, pollingTimeoutMs),
     );
-    this.extendMetricsSamplerKeepAlive(normalizedTimeout);
-    this.ensureMetricsSampler(waitForAccurateCpu);
+    extendMetricsSamplerKeepAlive(normalizedTimeout);
+    ensureMetricsSampler(waitForAccurateCpu);
 
-    if (this.latestMetricsSample) {
-      return this.buildMetricsSnapshot(
-        this.latestMetricsSample.appMetrics,
-        this.latestMetricsSample.sampledAt,
+    if (_latestMetricsSample) {
+      return buildMetricsSnapshot(
+        _latestMetricsSample.appMetrics,
+        _latestMetricsSample.sampledAt,
         showHidden,
       );
     }
 
     if (!waitForAccurateCpu) {
-      const immediateSample = this.captureMetricsSample();
-      return this.buildMetricsSnapshot(
+      const immediateSample = captureMetricsSample();
+      return buildMetricsSnapshot(
         immediateSample.appMetrics,
         immediateSample.sampledAt,
         showHidden,
       );
     }
 
-    return await new Promise<ProcessMetricsSnapshot>((resolve, reject) => {
-      this.pendingMetricsRequests.set(this.nextMetricsRequestId++, {
+    return yield* Effect.callback<ProcessMetricsSnapshot, Error>((resume) => {
+      const id = _nextMetricsRequestId++;
+      _pendingMetricsRequests.set(id, {
         showHidden,
-        resolve,
-        reject,
+        resolve: (value) => resume(Effect.succeed(value)),
+        reject: (error) => resume(Effect.fail(error)),
+      });
+      return Effect.sync(() => {
+        _pendingMetricsRequests.delete(id);
       });
     });
-  }
+  });
 
-  private ensureMetricsSampler(waitForAccurateCpu: boolean): void {
-    if (this.metricsSampler) return;
+  function ensureMetricsSampler(waitForAccurateCpu: boolean): void {
+    if (_metricsSampler) return;
 
     if (waitForAccurateCpu) {
       // Prime Electron's CPU sampler so the next interval-based sample is useful.
-      this.processMetrics.getAppMetrics();
-      this.latestMetricsSample = null;
+      _processMetrics.getAppMetrics();
+      _latestMetricsSample = null;
     } else {
-      this.captureMetricsSample();
+      captureMetricsSample();
     }
 
-    this.metricsSampler = setInterval(() => {
-      this.collectMetricsSample();
+    _metricsSampler = setInterval(() => {
+      collectMetricsSample();
     }, METRICS_SAMPLE_INTERVAL_MS);
   }
 
-  private extendMetricsSamplerKeepAlive(timeoutMs: number): void {
-    this.metricsSamplerKeepAliveUntil = Math.max(
-      this.metricsSamplerKeepAliveUntil,
+  function extendMetricsSamplerKeepAlive(timeoutMs: number): void {
+    _metricsSamplerKeepAliveUntil = Math.max(
+      _metricsSamplerKeepAliveUntil,
       Date.now() + timeoutMs,
     );
   }
 
-  private collectMetricsSample(): void {
+  function collectMetricsSample(): void {
     if (
-      this.pendingMetricsRequests.size === 0 &&
-      Date.now() >= this.metricsSamplerKeepAliveUntil
+      _pendingMetricsRequests.size === 0 &&
+      Date.now() >= _metricsSamplerKeepAliveUntil
     ) {
-      this.stopMetricsSampler();
+      stopMetricsSampler();
       return;
     }
 
     try {
-      const { appMetrics, sampledAt } = this.captureMetricsSample();
+      const { appMetrics, sampledAt } = captureMetricsSample();
 
-      for (const [
-        requestId,
-        request,
-      ] of this.pendingMetricsRequests.entries()) {
+      for (const [requestId, request] of _pendingMetricsRequests.entries()) {
         request.resolve(
-          this.buildMetricsSnapshot(appMetrics, sampledAt, request.showHidden),
+          buildMetricsSnapshot(appMetrics, sampledAt, request.showHidden),
         );
-        this.pendingMetricsRequests.delete(requestId);
+        _pendingMetricsRequests.delete(requestId);
       }
     } catch (error) {
       const failure =
@@ -139,31 +140,31 @@ export class ProcessMetricsCollector {
           ? error
           : new Error(`Failed to collect process metrics: ${String(error)}`);
 
-      for (const [, request] of this.pendingMetricsRequests.entries()) {
+      for (const [, request] of _pendingMetricsRequests.entries()) {
         request.reject(failure);
       }
-      this.pendingMetricsRequests.clear();
-      this.stopMetricsSampler();
+      _pendingMetricsRequests.clear();
+      stopMetricsSampler();
     }
   }
 
-  private captureMetricsSample(): CachedMetricsSample {
-    const appMetrics = this.processMetrics.getAppMetrics();
+  function captureMetricsSample(): CachedMetricsSample {
+    const appMetrics = _processMetrics.getAppMetrics();
     const sampledAt = new Date().toISOString();
     const sample = { sampledAt, appMetrics };
-    this.latestMetricsSample = sample;
+    _latestMetricsSample = sample;
     return sample;
   }
 
-  private stopMetricsSampler(): void {
-    if (!this.metricsSampler) return;
-    clearInterval(this.metricsSampler);
-    this.metricsSampler = null;
-    this.metricsSamplerKeepAliveUntil = 0;
-    this.latestMetricsSample = null;
+  function stopMetricsSampler(): void {
+    if (!_metricsSampler) return;
+    clearInterval(_metricsSampler);
+    _metricsSampler = null;
+    _metricsSamplerKeepAliveUntil = 0;
+    _latestMetricsSample = null;
   }
 
-  private buildMetricsSnapshot(
+  function buildMetricsSnapshot(
     appMetrics: PlatformProcessMetric[],
     sampledAt: string,
     showHidden: boolean,
@@ -173,16 +174,13 @@ export class ProcessMetricsCollector {
     );
     const matchedPids = new Set<number>();
     const visibleAppIds = new Set(
-      this.getRunningApps(showHidden).map((instance) => instance.manifest.id),
+      _getRunningApps(showHidden).map((instance) => instance.manifest.id),
     );
 
-    const apps = this.getRunningApps(true)
+    const apps = _getRunningApps(true)
       .map((instance) => {
-        const rendererMetric = this.resolveRendererMetric(
-          instance,
-          metricsByPid,
-        );
-        const backendMetric = this.resolveBackendMetric(instance, metricsByPid);
+        const rendererMetric = resolveRendererMetric(instance, metricsByPid);
+        const backendMetric = resolveBackendMetric(instance, metricsByPid);
 
         if (rendererMetric) matchedPids.add(rendererMetric.pid);
         if (backendMetric) matchedPids.add(backendMetric.pid);
@@ -222,7 +220,7 @@ export class ProcessMetricsCollector {
 
     const sharedProcesses = appMetrics
       .filter((metric) => !matchedPids.has(metric.pid))
-      .map((metric) => this.toProcessMetric(metric, "shared"))
+      .map((metric) => toProcessMetric(metric, "shared"))
       .sort((left, right) => {
         const leftName = String(
           left.name || left.serviceName || left.processType || left.pid,
@@ -266,13 +264,13 @@ export class ProcessMetricsCollector {
     };
   }
 
-  private resolveRendererMetric(
+  function resolveRendererMetric(
     instance: AppInstance,
     metricsByPid: Map<number, PlatformProcessMetric>,
   ): EdenProcessMetric | undefined {
     if (instance.viewId === -1) return undefined;
 
-    const view = this.viewManager.getView(instance.viewId);
+    const view = _viewManager.getView(instance.viewId);
     if (!view || view.webContents.isDestroyed()) return undefined;
 
     const rendererPid = view.webContents.getOSProcessId();
@@ -281,30 +279,28 @@ export class ProcessMetricsCollector {
     const metric = metricsByPid.get(rendererPid);
     if (!metric) return undefined;
 
-    return this.toProcessMetric(metric, "renderer", {
+    return toProcessMetric(metric, "renderer", {
       appId: instance.manifest.id,
       viewId: instance.viewId,
     });
   }
 
-  private resolveBackendMetric(
+  function resolveBackendMetric(
     instance: AppInstance,
     metricsByPid: Map<number, PlatformProcessMetric>,
   ): EdenProcessMetric | undefined {
-    const backendPid = this.backendManager.getBackend(
-      instance.manifest.id,
-    )?.pid;
+    const backendPid = _backendManager.getBackend(instance.manifest.id)?.pid;
     if (!backendPid || backendPid <= 0) return undefined;
 
     const metric = metricsByPid.get(backendPid);
     if (!metric) return undefined;
 
-    return this.toProcessMetric(metric, "backend", {
+    return toProcessMetric(metric, "backend", {
       appId: instance.manifest.id,
     });
   }
 
-  private toProcessMetric(
+  function toProcessMetric(
     metric: PlatformProcessMetric,
     category: EdenProcessMetric["category"],
     options: { appId?: string; viewId?: number } = {},
@@ -334,15 +330,20 @@ export class ProcessMetricsCollector {
     return snapshot;
   }
 
-  dispose(): void {
-    if (this.metricsSampler) {
-      clearInterval(this.metricsSampler);
-      this.metricsSampler = null;
+  function dispose(): void {
+    if (_metricsSampler) {
+      clearInterval(_metricsSampler);
+      _metricsSampler = null;
     }
-    for (const request of this.pendingMetricsRequests.values()) {
+    for (const request of _pendingMetricsRequests.values()) {
       request.reject(new Error("Eden runtime disposed"));
     }
-    this.pendingMetricsRequests.clear();
-    this.latestMetricsSample = null;
+    _pendingMetricsRequests.clear();
+    _latestMetricsSample = null;
   }
+  return { getMetrics, dispose };
 }
+
+export type ProcessMetricsCollector = ReturnType<
+  typeof createProcessMetricsCollector
+>;

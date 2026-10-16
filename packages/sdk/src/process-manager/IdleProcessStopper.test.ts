@@ -1,10 +1,7 @@
-import "reflect-metadata";
-
-import { IdleProcessStopper } from "./IdleProcessStopper";
-import type { ProcessManager } from "./ProcessManager";
+import { createIdleProcessStopper } from "./IdleProcessStopper";
 
 type ProcessManagerMock = jest.Mocked<
-  Pick<ProcessManager, "getAppInstance" | "stopApp">
+  Parameters<typeof createIdleProcessStopper>[0]
 >;
 
 const createProcessManager = (): ProcessManagerMock => ({
@@ -23,7 +20,7 @@ describe("IdleProcessStopper", () => {
 
   it("schedules the current target after delay", async () => {
     const processManager = createProcessManager();
-    const stopper = new IdleProcessStopper(processManager, 1000, "test app");
+    const stopper = createIdleProcessStopper(processManager, 1000, "test app");
 
     stopper.setTarget("com.example.app");
     stopper.schedule();
@@ -38,7 +35,7 @@ describe("IdleProcessStopper", () => {
 
   it("schedule with no target does nothing", () => {
     const processManager = createProcessManager();
-    const stopper = new IdleProcessStopper(processManager, 1000);
+    const stopper = createIdleProcessStopper(processManager, 1000);
 
     stopper.schedule();
     jest.advanceTimersByTime(1000);
@@ -48,7 +45,7 @@ describe("IdleProcessStopper", () => {
 
   it("cancel prevents the scheduled stop", () => {
     const processManager = createProcessManager();
-    const stopper = new IdleProcessStopper(processManager, 1000);
+    const stopper = createIdleProcessStopper(processManager, 1000);
 
     stopper.setTarget("com.example.app");
     stopper.schedule();
@@ -60,7 +57,7 @@ describe("IdleProcessStopper", () => {
 
   it("changing target before the timer fires stops only the latest target", async () => {
     const processManager = createProcessManager();
-    const stopper = new IdleProcessStopper(processManager, 1000);
+    const stopper = createIdleProcessStopper(processManager, 1000);
 
     stopper.setTarget("com.example.first");
     stopper.schedule();
@@ -76,7 +73,7 @@ describe("IdleProcessStopper", () => {
 
   it("clearTarget only clears the matching target", async () => {
     const processManager = createProcessManager();
-    const stopper = new IdleProcessStopper(processManager, 1000);
+    const stopper = createIdleProcessStopper(processManager, 1000);
 
     stopper.setTarget("com.example.app");
     stopper.clearTarget("com.example.other");
@@ -98,7 +95,7 @@ describe("IdleProcessStopper", () => {
   it("does not stop apps that are no longer running", async () => {
     const processManager = createProcessManager();
     processManager.getAppInstance.mockReturnValue(undefined);
-    const stopper = new IdleProcessStopper(processManager, 1000);
+    const stopper = createIdleProcessStopper(processManager, 1000);
 
     stopper.setTarget("com.example.app");
     stopper.schedule();
@@ -114,7 +111,7 @@ describe("IdleProcessStopper", () => {
       .mockImplementation(() => undefined);
     const processManager = createProcessManager();
     processManager.stopApp.mockRejectedValueOnce(new Error("stop failed"));
-    const stopper = new IdleProcessStopper(processManager, 1000, "test app");
+    const stopper = createIdleProcessStopper(processManager, 1000, "test app");
 
     try {
       stopper.setTarget("com.example.app");

@@ -1,16 +1,18 @@
-import { testApp } from "../../support/apps";
-import "reflect-metadata";
+import nativeFs from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { bundle } from "@edenapp/genesis";
+import * as packageBundler from "@edenapp/genesis/dist/bundler";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { PackageManager } from "../../../src/package-manager/PackageManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import type { OperationManager } from "../../../src/operations/OperationManager";
+import type { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
+import type { PackageManager } from "../../../src/package-manager/PackageManager";
+import type { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import type { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import type { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
+import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -28,9 +30,9 @@ describe("ProcessManager integration", () => {
   it("queues renderer self-exit acceptance before destroying the caller", async () => {
     eden = await createTestEden();
     const appId = "com.example.self-exit";
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register(testApp(appId, { name: "Self exit" }));
+    eden.runtime.services.packageRegistry.register(
+      testApp(appId, { name: "Self exit" }),
+    );
     const profile = await eden.runtime.users.create({
       username: "exiting",
       name: "Exiting",
@@ -39,11 +41,9 @@ describe("ProcessManager integration", () => {
     });
     await eden.runtime.sessions.login(profile.username, "password");
     await eden.complete("process/launch", { appId });
-    const processes = eden.runtime.resolve(ProcessManager);
+    const processes = eden.runtime.services.processes;
     const instance = processes.getAppInstance(appId)!;
-    const view = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(instance.viewId)!.view;
+    const view = eden.runtime.services.views.getViewInfo(instance.viewId)!.view;
     const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
       view.webContents.id,
@@ -56,9 +56,7 @@ describe("ProcessManager integration", () => {
       id: expect.any(String),
     });
     expect(processes.getAppInstance(appId)).toBeDefined();
-    await eden.runtime
-      .resolve(OperationManager)
-      .wait(handle, caller(appId, profile));
+    await eden.runtime.services.operations.wait(handle, caller(appId, profile));
     expect(processes.getAppInstance(appId)).toBeUndefined();
     expect(view.webContents.isDestroyed()).toBe(true);
     expect(eden.runtime.operations.get(handle)).toMatchObject({
@@ -70,10 +68,10 @@ describe("ProcessManager integration", () => {
   it("enforces process ownership through the real command path", async () => {
     eden = await createTestEden();
     const target = testApp("com.example.target", { name: "Target App" });
-    eden.runtime.resolve(PackageRegistry).register(target);
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("com.example.controller", ["process/manage"]);
+    eden.runtime.services.packageRegistry.register(target);
+    eden.runtime.services.permissions.registerApp("com.example.controller", [
+      "process/manage",
+    ]);
     const alice = await eden.runtime.users.create({
       username: "alice",
       name: "Alice",
@@ -100,7 +98,7 @@ describe("ProcessManager integration", () => {
       ),
     ).rejects.toThrow(`User cannot stop process ${target.id}`);
     expect(
-      eden.runtime.resolve(ProcessManager).getAppInstance(target.id),
+      eden.runtime.services.processes.getAppInstance(target.id),
     ).toBeDefined();
 
     await expect(
@@ -111,17 +109,16 @@ describe("ProcessManager integration", () => {
       ),
     ).resolves.toEqual({ success: true });
     expect(
-      eden.runtime.resolve(ProcessManager).getAppInstance(target.id),
+      eden.runtime.services.processes.getAppInstance(target.id),
     ).toBeUndefined();
   });
 
   it("rejects launches while the package manager marks a host as changing", async () => {
     eden = await createTestEden();
     const target = testApp("com.example.guarded", { name: "Guarded App" });
-    eden.runtime.resolve(PackageRegistry).register(target);
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("com.example.controller", ["process/manage"]);
+    eden.runtime.services.permissions.registerApp("com.example.controller", [
+      "process/manage",
+    ]);
     const user = await eden.runtime.users.create({
       username: "operator",
       name: "Operator",
@@ -130,17 +127,58 @@ describe("ProcessManager integration", () => {
     });
     await eden.runtime.sessions.login(user.username, "password");
 
-    const processes = eden.runtime.resolve(ProcessManager);
-    const packages = eden.runtime.resolve(PackageManager) as unknown as {
-      runWithHostsChanging<T>(
-        appIds: Iterable<string>,
-        operation: () => Promise<T>,
-      ): Promise<T>;
+    const processes = eden.runtime.services.processes;
+    const source = path.join(eden.paths.root, "replacement-source");
+    const archive = path.join(eden.paths.root, "replacement.edenite");
+    await fs.mkdir(source);
+    const manifest = {
+      id: target.id,
+      name: target.name,
+      version: target.version,
+      frontend: { entry: "index.html" },
     };
-    await packages.runWithHostsChanging([target.id], async () => {
-      expect(
-        eden.runtime.resolve(PackageCatalog).getApp(target.id),
-      ).toBeDefined();
+    await fs.writeFile(
+      path.join(source, "manifest.json"),
+      JSON.stringify(manifest),
+    );
+    await fs.writeFile(
+      path.join(source, "index.html"),
+      "<html>Replacement</html>",
+    );
+    const initial = await bundle({ appDirectory: source, outputPath: archive });
+    if (!initial.success) throw new Error(initial.error);
+    await eden.runtime.packages.install(archive);
+    await fs.writeFile(
+      path.join(source, "manifest.json"),
+      JSON.stringify({ ...manifest, version: "2.0.0" }),
+    );
+    const bundled = await bundle({ appDirectory: source, outputPath: archive });
+    if (!bundled.success) throw new Error(bundled.error);
+
+    let releaseExtraction!: () => void;
+    const extractionGate = new Promise<void>((resolve) => {
+      releaseExtraction = resolve;
+    });
+    let extractionStarted!: () => void;
+    const extracting = new Promise<void>((resolve) => {
+      extractionStarted = resolve;
+    });
+    const extract = packageBundler.extract;
+    const gatedExtraction = jest
+      .spyOn(packageBundler, "extract")
+      .mockImplementation(async (options) => {
+        extractionStarted();
+        await extractionGate;
+        return extract(options);
+      });
+    const replacement = eden.runtime.packages.install(archive, {
+      replace: true,
+    });
+    try {
+      await extracting;
+      expect(eden.runtime.services.catalog.getApp(target.id)?.version).toBe(
+        target.version,
+      );
       await expect(
         eden.complete(
           "process/launch",
@@ -149,7 +187,13 @@ describe("ProcessManager integration", () => {
         ),
       ).rejects.toThrow(`App ${target.id} is not installed`);
       expect(processes.getAppInstance(target.id)).toBeUndefined();
-    });
+    } finally {
+      releaseExtraction();
+      await replacement.finally(() => gatedExtraction.mockRestore());
+    }
+    expect(eden.runtime.packages.get(target.id)?.manifest.version).toBe(
+      "2.0.0",
+    );
 
     await eden.complete(
       "process/launch",
@@ -159,28 +203,30 @@ describe("ProcessManager integration", () => {
     expect(processes.getAppInstance(target.id)).toBeDefined();
   });
 
-  it("drains hot-reload watcher setup during shutdown", async () => {
+  it("closes the acquired hot-reload watcher during shutdown", async () => {
     const stateRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "eden-hot-reload-test-"),
     );
     const stateDirectory = path.join(stateRoot, "state");
+    const closed = gate();
+    const watch = nativeFs.watch;
+    const observing = jest.spyOn(nativeFs, "watch").mockImplementation(((
+      ...args: Parameters<typeof nativeFs.watch>
+    ) => {
+      const watcher = watch(...args);
+      if (String(args[0]) === stateDirectory)
+        watcher.once("close", closed.release);
+      return watcher;
+    }) as typeof nativeFs.watch);
     try {
       eden = await createTestEden({
-        autoStart: false,
         config: { hotReload: { enabled: true, stateDirectory } },
       });
-      const processes = eden.runtime.resolve(ProcessManager) as unknown as {
-        hotReloadSetupPromise?: Promise<void>;
-        hotReloadWatcher?: unknown;
-      };
-      const setup = processes.hotReloadSetupPromise;
-
       await eden.runtime.dispose();
-      await setup;
-
-      expect(processes.hotReloadWatcher).toBeUndefined();
+      await closed.promise;
       await expect(fs.access(stateDirectory)).resolves.toBeUndefined();
     } finally {
+      observing.mockRestore();
       await fs.rm(stateRoot, { recursive: true, force: true });
     }
   });

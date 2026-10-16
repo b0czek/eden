@@ -1,12 +1,11 @@
-import "reflect-metadata";
-
 import type { AppInstance, AppManifest } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
-import { ProcessMetricsCollector } from "./ProcessMetricsCollector";
+import { createProcessMetricsCollector } from "./ProcessMetricsCollector";
 
 const getAppMetrics = jest.fn();
 
-type CollectorDeps = ConstructorParameters<typeof ProcessMetricsCollector>[0];
+type CollectorDeps = Parameters<typeof createProcessMetricsCollector>[0];
 type BackendManagerLike = Pick<CollectorDeps["backendManager"], "getBackend">;
 type ViewManagerLike = Pick<CollectorDeps["viewManager"], "getView">;
 
@@ -69,13 +68,19 @@ const createCollector = (deps: {
   backendManager: BackendManagerLike;
   viewManager: ViewManagerLike;
   getRunningApps: CollectorDeps["getRunningApps"];
-}) =>
-  new ProcessMetricsCollector({
+}) => {
+  const collector = createProcessMetricsCollector({
     backendManager: deps.backendManager as CollectorDeps["backendManager"],
     viewManager: deps.viewManager as CollectorDeps["viewManager"],
     getRunningApps: deps.getRunningApps,
     processMetrics: { getAppMetrics },
   });
+  return {
+    ...collector,
+    getMetrics: (...args: Parameters<typeof collector.getMetrics>) =>
+      Effect.runPromise(collector.getMetrics(...args)),
+  };
+};
 
 describe("ProcessMetricsCollector", () => {
   beforeEach(() => {

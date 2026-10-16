@@ -1,53 +1,49 @@
-import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import type { AppManifest, FilesystemLocation } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
+import * as Effect from "effect/Effect";
+import { asError } from "../effects/io";
+import { scopedEvent } from "../events/scoped";
 
 import { log } from "../logging";
-import { DlcResourceManager } from "../package-manager/DlcResourceManager";
+import type { DlcResourceManager } from "../package-manager/DlcResourceManager";
 import {
-  PLATFORM_UTILITY_PROCESSES,
   type PlatformMessagePort,
   type PlatformUtilityProcess,
   type UtilityProcessPort,
 } from "../platform/ports";
 import { encodeLaunchContext } from "../utils/appLaunchContext";
-/**
- * BackendManager
- *
- * Manages utility processes for app backends.
- * Each app's backend code runs in an isolated utility process.
- * Uses Electron's utilityProcess for better main process integration
- * and MessageChannelMain for direct frontend<->backend communication.
- */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-export class BackendManager extends EventEmitter {
-  private backends: Map<string, PlatformUtilityProcess> = new Map();
-  private backendData: Map<
+export interface BackendManagerDependencies {
+  distPath: string;
+  utilityProcesses: UtilityProcessPort;
+  dlcResources: Pick<
+    DlcResourceManager,
+    "createBackendBinding" | "revokeBackend"
+  >;
+}
+export const createBackendManager = Effect.fn(function* ({
+  distPath,
+  utilityProcesses,
+  dlcResources,
+}: BackendManagerDependencies) {
+  const backendExit = yield* scopedEvent<{ appId: string; code: number }>();
+  const backendError = yield* scopedEvent<{ appId: string; error: unknown }>();
+  const backendMessage = yield* scopedEvent<{
+    appId: string;
+    message: unknown;
+  }>();
+  let _backends: Map<string, PlatformUtilityProcess> = new Map();
+  let _backendData: Map<
     string,
     { manifest: AppManifest; installPath: string }
   > = new Map();
-  private distPath: string;
+  let _distPath: string;
+  let _backendPorts: Map<string, PlatformMessagePort> = new Map();
+  const _utilityProcesses = utilityProcesses;
+  const _dlcResources = dlcResources;
 
-  /**
-   * MessagePort pairs for frontend<->backend communication
-   * The BackendManager holds references to the main-process side of ports
-   */
-  private backendPorts: Map<string, PlatformMessagePort> = new Map();
+  _distPath = distPath;
 
-  constructor(
-    @inject("distPath") distPath: string,
-    @inject(PLATFORM_UTILITY_PROCESSES)
-    private utilityProcesses: UtilityProcessPort,
-    @inject(DlcResourceManager)
-    private readonly dlcResources: DlcResourceManager,
-  ) {
-    super();
-    this.distPath = distPath;
-  }
-
-  private getMessageType(message: unknown): string | undefined {
+  function getMessageType(message: unknown): string | undefined {
     if (message && typeof message === "object" && "type" in message) {
       const type = (message as { type?: unknown }).type;
       return typeof type === "string" ? type : undefined;
@@ -56,145 +52,122 @@ export class BackendManager extends EventEmitter {
     return undefined;
   }
 
-  /**
-   * Create and start a utility process for an app backend
-   */
-  async createBackend(
+  const createBackend = Effect.fn(function* (
     appId: string,
     manifest: AppManifest,
     installPath: string,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): Promise<{ backend: PlatformUtilityProcess }> {
-    // Check if backend already exists
-    if (this.backends.has(appId)) {
-      throw new Error(`Backend for app ${appId} already exists`);
-    }
-
-    // Check if app has a backend
-    const backendConfig = manifest.backend;
-    if (!backendConfig?.entry) {
-      throw new Error(`App ${appId} does not have a backend`);
-    }
-
-    const backendEntryPath = path.join(installPath, backendConfig.entry);
-
-    // Path to the backend runtime that wraps the actual backend
-    const runtimePath = path.join(
-      this.distPath,
-      "app-runtime/backend-preload.js",
-    );
-    const dlcBinding = this.dlcResources.createBackendBinding(appId);
-
-    // Create utility process with the runtime as entry point
-    const backend = this.utilityProcesses.fork(
-      runtimePath,
-      encodeLaunchContext({ appId, args: launchArgs ?? [], file: launchFile }),
-      {
-        serviceName: `eden-backend-${appId}`,
-        stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          EDEN_BACKEND_ENTRY: backendEntryPath,
-          EDEN_INSTALL_PATH: installPath,
-          EDEN_MANIFEST: JSON.stringify(manifest),
-          EDEN_DLC_BINDING: JSON.stringify(dlcBinding),
-        },
+  ) {
+    const backend = yield* Effect.try({
+      try: () => {
+        if (_backends.has(appId))
+          throw new Error(`Backend for app ${appId} already exists`);
+        const entry = manifest.backend?.entry;
+        if (!entry) throw new Error(`App ${appId} does not have a backend`);
+        const binding = _dlcResources.createBackendBinding(appId);
+        const backend = _utilityProcesses.fork(
+          path.join(distPath, "app-runtime/backend-preload.js"),
+          encodeLaunchContext({
+            appId,
+            args: launchArgs ?? [],
+            file: launchFile,
+          }),
+          {
+            serviceName: `eden-backend-${appId}`,
+            stdio: ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              EDEN_BACKEND_ENTRY: path.join(installPath, entry),
+              EDEN_INSTALL_PATH: installPath,
+              EDEN_MANIFEST: JSON.stringify(manifest),
+              EDEN_DLC_BINDING: JSON.stringify(binding),
+            },
+          },
+        );
+        pipeBackendOutput(backend);
+        if (manifest.frontend?.entry) {
+          const { port1, port2 } = _utilityProcesses.createMessageChannel();
+          backend.postMessage({ type: "init-port" }, [port1]);
+          _backendPorts.set(appId, port2);
+        }
+        backend.on("message", (message: unknown) =>
+          handleBackendMessage(appId, message),
+        );
+        backend.on("exit", (code) => {
+          _backends.delete(appId);
+          _backendData.delete(appId);
+          _backendPorts.get(appId)?.close();
+          _backendPorts.delete(appId);
+          _dlcResources.revokeBackend(appId);
+          backendExit.emit({ appId, code });
+        });
+        _backends.set(appId, backend);
+        _backendData.set(appId, { manifest, installPath });
+        return backend;
       },
-    );
-
-    this.pipeBackendOutput(backend);
-
-    // Only create frontend<->backend MessageChannel if app has a frontend
-    const hasFrontend = !!manifest.frontend?.entry;
-
-    if (hasFrontend) {
-      // Create MessageChannel for frontend<->backend communication
-      const { port1, port2 } = this.utilityProcesses.createMessageChannel();
-
-      // port1 goes to the backend (utility process)
-      // port2 goes to the frontend (will be transferred via IPCBridge)
-      backend.postMessage({ type: "init-port" }, [port1]);
-
-      // Store port2 for later transfer to frontend
-      this.backendPorts.set(appId, port2);
-    }
-
-    // Set up backend event handlers
-    backend.on("message", (message: unknown) => {
-      this.handleBackendMessage(appId, message);
+      catch: asError,
     });
-
-    backend.on("exit", (code) => {
-      log.info(`Backend for app ${appId} exited with code ${code}`);
-      this.backends.delete(appId);
-      this.backendData.delete(appId);
-      this.backendPorts.delete(appId);
-      this.dlcResources.revokeBackend(appId);
-      this.emit("backend-exit", { appId, code });
-    });
-
-    // Register backend early so it can receive responses to shell commands
-    // during initialization (before backend-ready is sent)
-    this.backends.set(appId, backend);
-    this.backendData.set(appId, { manifest, installPath });
-
-    // Wait for the backend to signal it's ready
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(
-            new Error(`Backend ${appId} startup timed out after 10 seconds`),
+    yield* Effect.callback<void, Error>((resume) => {
+      let completed = false;
+      function finish(error?: Error) {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        resume(error ? Effect.fail(error) : Effect.void);
+      }
+      const onMessage = (message: unknown) => {
+        const type = getMessageType(message);
+        if (type === "backend-ready") finish();
+        else if (type === "backend-error")
+          finish(
+            new Error(
+              message &&
+                typeof message === "object" &&
+                "error" in message &&
+                typeof message.error === "string"
+                ? message.error
+                : "Unknown backend startup error",
+            ),
           );
-        }, 10000);
-
-        const onMessage = (msg: unknown) => {
-          const messageType = this.getMessageType(msg);
-          if (messageType === "backend-ready") {
-            clearTimeout(timeout);
-            backend.removeListener("message", onMessage);
-            resolve();
-          } else if (messageType === "backend-error") {
-            clearTimeout(timeout);
-            backend.removeListener("message", onMessage);
-            reject(
-              new Error(
-                msg &&
-                  typeof msg === "object" &&
-                  "error" in msg &&
-                  typeof msg.error === "string"
-                  ? msg.error
-                  : "Unknown backend startup error",
-              ),
-            );
-          }
-        };
-
-        backend.on("message", onMessage);
-      });
-    } catch (error) {
-      // Clean up on failure
-      this.backends.delete(appId);
-      this.backendData.delete(appId);
-      this.backendPorts.delete(appId);
-      this.dlcResources.revokeBackend(appId);
-      throw error;
-    }
-
-    log.info(
-      `Backend started for app ${appId}${
-        hasFrontend ? " (with frontend port)" : " (backend-only)"
-      }`,
+      };
+      const onExit = (code: number) =>
+        finish(
+          new Error(`Backend ${appId} exited before becoming ready (${code})`),
+        );
+      const timer = setTimeout(
+        () =>
+          finish(
+            new Error(`Backend ${appId} startup timed out after 10 seconds`),
+          ),
+        10000,
+      );
+      backend.on("message", onMessage);
+      backend.once("exit", onExit);
+      function cleanup() {
+        clearTimeout(timer);
+        backend.removeListener("message", onMessage);
+        backend.removeListener("exit", onExit);
+      }
+      return Effect.sync(cleanup);
+    }).pipe(
+      Effect.onError(() =>
+        Effect.sync(() => {
+          _backends.delete(appId);
+          _backendData.delete(appId);
+          _backendPorts.get(appId)?.close();
+          _backendPorts.delete(appId);
+          _dlcResources.revokeBackend(appId);
+          backend.kill();
+        }),
+      ),
     );
-
+    log.info(`Backend started for app ${appId}`);
     return { backend };
-  }
+  });
 
-  /**
-   * Send a message to a backend's utility process (for IPC from main)
-   */
-  sendMessage(appId: string, message: unknown): boolean {
-    const backend = this.backends.get(appId);
+  function sendMessage(appId: string, message: unknown): boolean {
+    const backend = _backends.get(appId);
     if (!backend) {
       log.warn(`No backend found for app ${appId}`);
       return false;
@@ -203,7 +176,7 @@ export class BackendManager extends EventEmitter {
     try {
       log.debug(
         `Sending message to backend ${appId}:`,
-        this.getMessageType(message) ?? "unknown",
+        getMessageType(message) ?? "unknown",
       );
       backend.postMessage(message);
       return true;
@@ -213,17 +186,14 @@ export class BackendManager extends EventEmitter {
     }
   }
 
-  /**
-   * Send a message with ports to a backend's utility process
-   */
-  sendPortToBackend(
+  function sendPortToBackend(
     appId: string,
     message: unknown,
     ports: PlatformMessagePort[],
   ): boolean {
-    const backend = this.backends.get(appId);
+    const backend = _backends.get(appId);
     if (!backend) {
-      this.dlcResources.revokeBackend(appId);
+      _dlcResources.revokeBackend(appId);
       log.warn(`No backend found for app ${appId}`);
       return false;
     }
@@ -231,7 +201,7 @@ export class BackendManager extends EventEmitter {
     try {
       log.info(
         `Sending message with ${ports.length} ports to backend ${appId}:`,
-        this.getMessageType(message) ?? "unknown",
+        getMessageType(message) ?? "unknown",
       );
       backend.postMessage(message, ports);
       return true;
@@ -244,113 +214,79 @@ export class BackendManager extends EventEmitter {
     }
   }
 
-  /**
-   * Get the frontend port for an app (to transfer to renderer)
-   */
-  getFrontendPort(appId: string): PlatformMessagePort | undefined {
-    return this.backendPorts.get(appId);
+  function getFrontendPort(appId: string): PlatformMessagePort | undefined {
+    return _backendPorts.get(appId);
   }
 
-  /**
-   * Terminate a backend utility process
-   */
-  async terminateBackend(appId: string): Promise<void> {
-    const backend = this.backends.get(appId);
-    if (!backend) {
-      log.warn(`No backend found for app ${appId}`);
-      return;
-    }
-
-    try {
-      // Create a promise that resolves when backend exits
-      const exitPromise = new Promise<void>((resolve) => {
-        backend.once("exit", () => {
-          resolve();
-        });
-      });
-
-      // Create a timeout promise (5 seconds)
-      let terminationTimeout: NodeJS.Timeout | undefined;
-      const timeoutPromise = new Promise<void>((_, reject) => {
-        terminationTimeout = setTimeout(() => {
-          reject(
+  const terminateBackend = Effect.fn(function* (appId: string) {
+    const candidate = _backends.get(appId);
+    if (!candidate) return;
+    const backend = candidate;
+    yield* Effect.callback<void, Error>((resume) => {
+      let completed = false;
+      function finish(error?: Error) {
+        if (completed) return;
+        completed = true;
+        cleanup();
+        resume(error ? Effect.fail(error) : Effect.void);
+      }
+      const onExit = () => finish();
+      backend.once("exit", onExit);
+      const killTimer = setTimeout(() => {
+        if (_backends.has(appId)) backend.kill();
+      }, 500);
+      const timeout = setTimeout(
+        () =>
+          finish(
             new Error(`Backend ${appId} termination timed out after 5 seconds`),
-          );
-        }, 5000);
-      });
-
-      // Send graceful shutdown message first
-      backend.postMessage({ type: "shutdown" });
-
-      // Wait a bit for graceful shutdown
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Kill if still running
-      if (this.backends.has(appId)) {
-        backend.kill();
-      }
-
-      // Wait for either exit or timeout
+          ),
+        5000,
+      );
       try {
-        await Promise.race([exitPromise, timeoutPromise]);
-      } finally {
-        if (terminationTimeout) clearTimeout(terminationTimeout);
+        backend.postMessage({ type: "shutdown" });
+      } catch (error) {
+        finish(asError(error));
       }
-
-      this.backends.delete(appId);
-      this.backendData.delete(appId);
-      this.dlcResources.revokeBackend(appId);
-
-      // Close the port
-      const port = this.backendPorts.get(appId);
-      if (port) {
-        port.close();
-        this.backendPorts.delete(appId);
+      function cleanup() {
+        clearTimeout(killTimer);
+        clearTimeout(timeout);
+        backend.removeListener("exit", onExit);
       }
-    } catch (error) {
-      log.error(`Failed to terminate backend ${appId}:`, error);
-      // Force cleanup even on error
-      this.backends.delete(appId);
-      this.backendData.delete(appId);
-      this.backendPorts.delete(appId);
-      this.dlcResources.revokeBackend(appId);
-      throw error;
-    }
+      return Effect.sync(cleanup);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          _backends.delete(appId);
+          _backendData.delete(appId);
+          _backendPorts.get(appId)?.close();
+          _backendPorts.delete(appId);
+          _dlcResources.revokeBackend(appId);
+        }),
+      ),
+    );
+  });
+
+  function getBackend(appId: string): PlatformUtilityProcess | undefined {
+    return _backends.get(appId);
   }
 
-  /**
-   * Get backend by app ID
-   */
-  getBackend(appId: string): PlatformUtilityProcess | undefined {
-    return this.backends.get(appId);
+  function hasBackend(appId: string): boolean {
+    return _backends.has(appId);
   }
 
-  /**
-   * Check if backend exists for app
-   */
-  hasBackend(appId: string): boolean {
-    return this.backends.has(appId);
+  function getRunningBackends(): string[] {
+    return Array.from(_backends.keys());
   }
 
-  /**
-   * Get all running backend IDs
-   */
-  getRunningBackends(): string[] {
-    return Array.from(this.backends.keys());
-  }
-
-  /**
-   * Handle messages from backends (for system-level IPC)
-   */
-  private handleBackendMessage(appId: string, message: unknown): void {
+  function handleBackendMessage(appId: string, message: unknown): void {
     // Emit event for IPC bridge to handle
-    this.emit("backend-message", {
+    backendMessage.emit({
       appId,
       message,
     });
   }
 
-  private pipeBackendOutput(backend: PlatformUtilityProcess): void {
+  function pipeBackendOutput(backend: PlatformUtilityProcess): void {
     backend.stdout?.on("data", (chunk: Buffer | string) => {
       process.stdout.write(chunk);
     });
@@ -360,25 +296,44 @@ export class BackendManager extends EventEmitter {
     });
   }
 
-  /**
-   * Terminate all backends
-   */
-  async terminateAll(): Promise<void> {
-    const terminationPromises = Array.from(this.backends.keys()).map((appId) =>
-      this.terminateBackend(appId),
+  const terminateAll = () =>
+    Effect.forEach([..._backends.keys()], terminateBackend, {
+      concurrency: "unbounded",
+      discard: true,
+    });
+  const dispose = () =>
+    terminateAll().pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          for (const port of _backendPorts.values()) port.close();
+          _backendPorts.clear();
+          _backendData.clear();
+          _backends.clear();
+        }),
+      ),
     );
-    await Promise.all(terminationPromises);
-  }
-
-  async dispose(): Promise<void> {
-    try {
-      await this.terminateAll();
-    } finally {
-      for (const port of this.backendPorts.values()) port.close();
-      this.backendPorts.clear();
-      this.backendData.clear();
-      this.backends.clear();
-      this.removeAllListeners();
-    }
-  }
-}
+  yield* Effect.addFinalizer(() =>
+    dispose().pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => log.error("Failed to terminate backends:", error)),
+      ),
+    ),
+  );
+  return {
+    backendExit,
+    backendError,
+    backendMessage,
+    createBackend,
+    sendMessage,
+    sendPortToBackend,
+    getFrontendPort,
+    terminateBackend,
+    getBackend,
+    hasBackend,
+    getRunningBackends,
+    terminateAll,
+  };
+});
+export type BackendManager = Effect.Success<
+  ReturnType<typeof createBackendManager>
+>;
