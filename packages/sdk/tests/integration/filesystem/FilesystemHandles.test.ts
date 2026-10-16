@@ -1,11 +1,15 @@
-import * as fs from "node:fs/promises";
+import fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   FilesystemHandle,
   OperationHandle,
   RuntimeAppManifest,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import type { CommandCallerContext } from "../../../src/execution/context";
+import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { registerTestVolume } from "../../support/filesystem";
@@ -62,6 +66,7 @@ describe("file handle access and lifetime", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+    jest.restoreAllMocks();
   });
 
   it("accepts enriched locations for one-shot reads and file or directory metadata", async () => {
@@ -120,6 +125,67 @@ describe("file handle access and lifetime", () => {
     expect(await acceptedRead).toEqual(new Uint8Array(contents));
     await closing;
   });
+
+  it.each(["location", "handle"] as const)(
+    "keeps a %s descriptor and volume admitted until interrupted native reads settle",
+    async (kind) => {
+      const reading = gate();
+      const finishRead = gate();
+      const nativeOpen = fs.open;
+      let descriptor: fs.FileHandle | undefined;
+      jest.spyOn(fs, "open").mockImplementation(async (...args) => {
+        const file = await nativeOpen(...args);
+        descriptor = file;
+        const nativeRead = file.read.bind(file);
+        jest.spyOn(file, "read").mockImplementation((async (
+          ...args: unknown[]
+        ) => {
+          reading.release();
+          await finishRead.promise;
+          return Reflect.apply(nativeRead, undefined, args);
+        }) as typeof file.read);
+        return file;
+      });
+      const source =
+        kind === "handle"
+          ? await execute<FilesystemHandle>("fs/open", { location })
+          : location;
+      const runtime = eden.runtime;
+      const fiber = runtime.effects.fork(
+        runtime.services.execution.provide(
+          runtime.services.filesystem.readBinaryFile(source),
+          caller,
+        ),
+      );
+      let closing = Promise.resolve();
+      let removing = Promise.resolve();
+      try {
+        await reading.promise;
+        fiber.interruptUnsafe();
+        if ("handleId" in source)
+          closing = execute<void>("fs/close", { handle: source });
+        removing = eden.runtime.volumes.eject("usb");
+        await tick();
+        expect(ejected).toBe(false);
+        expect(fiber.pollUnsafe()).toBeUndefined();
+        expect(await descriptor?.stat()).toMatchObject({ size: 8 });
+        finishRead.release();
+        const exit = await runtime.effects.run(Fiber.await(fiber));
+        expect(
+          Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause),
+        ).toBe(true);
+        await Promise.all([closing, removing]);
+        expect(ejected).toBe(true);
+        await expect(descriptor?.stat()).rejects.toMatchObject({
+          code: "EBADF",
+        });
+      } finally {
+        finishRead.release();
+        await runtime.effects.run(Fiber.await(fiber));
+        await Promise.allSettled([closing, removing]);
+      }
+    },
+  );
 
   it("binds handle access and close to the opening app, account, and session", async () => {
     const handle = await execute<FilesystemHandle>("fs/open", { location });

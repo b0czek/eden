@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { addAbortListener } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/task";
@@ -30,7 +30,7 @@ interface PreparedTransfer {
 
 interface PathReservation {
   paths: string[];
-  completed: Promise<void>;
+  completed: Deferred.Deferred<void>;
 }
 
 export function createFileTransfers() {
@@ -65,13 +65,7 @@ export function createFileTransfers() {
             ),
           ),
         );
-        let release!: () => void;
-        const reservation = {
-          paths,
-          completed: new Promise<void>((resolve) => {
-            release = resolve;
-          }),
-        };
+        const reservation = { paths, completed: yield* Deferred.make<void>() };
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {
             reservations.add(reservation);
@@ -80,35 +74,22 @@ export function createFileTransfers() {
           () =>
             restore(
               Effect.andThen(
-                fromPromise((signal) =>
-                  waitForPredecessors(predecessors, signal),
+                Effect.forEach(
+                  predecessors,
+                  (entry) => Deferred.await(entry.completed),
+                  { discard: true },
                 ),
                 work,
               ),
             ),
           () =>
-            Effect.sync(() => {
-              reservations.delete(reservation);
-              release();
-            }),
+            Effect.andThen(
+              Effect.sync(() => reservations.delete(reservation)),
+              Deferred.succeed(reservation.completed, undefined),
+            ),
         );
       }),
     );
-  }
-
-  function waitForPredecessors(
-    predecessors: PathReservation[],
-    signal?: AbortSignal,
-  ): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      signal?.throwIfAborted();
-      const abortListener = signal
-        ? addAbortListener(signal, () => reject(signal.reason))
-        : undefined;
-      Promise.all(predecessors.map((entry) => entry.completed))
-        .finally(() => abortListener?.[Symbol.dispose]())
-        .then(() => resolve(), reject);
-    });
   }
 
   const copyReserved = Effect.fn(function* (request: TransferRequest) {

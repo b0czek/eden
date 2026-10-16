@@ -411,7 +411,9 @@ describe("consumer-managed filesystem volumes", () => {
       await fs.writeFile(source, "replacement");
       await fs.writeFile(destination, "original");
       const sourceLease = requireValue(
-        eden.runtime.services.volumes.getRoot("usb"),
+        await eden.runtime.effects.run(
+          eden.runtime.services.volumes.root("usb"),
+        ),
       );
       const transfer = createFileTransfers();
       await expect(
@@ -898,7 +900,9 @@ describe("consumer-managed filesystem volumes", () => {
   );
 
   it("revokes old registrations and never recreates an absent mount", async () => {
-    const lease = requireValue(eden.runtime.services.volumes.getRoot("usb"));
+    const lease = requireValue(
+      await eden.runtime.effects.run(eden.runtime.services.volumes.root("usb")),
+    );
     expect(eden.runtime.volumes.unregister("usb")).toBe(true);
     await expect(
       execute("fs/exists", {

@@ -5,6 +5,7 @@ import type {
   OperationHandle,
   UserProfile,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import type { EdenVolumeOptions } from "../../../src/api/control-plane";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -95,6 +96,54 @@ describe("safe volume removal", () => {
     await eden.runtime.effects.run(filesystem.wait(copy, caller));
     await eden.runtime.effects.run(filesystem.wait(eject, caller));
     expect(hostContent).toBe("queued work");
+  });
+
+  it("retains queued child admission after the parent volume scope ends", async () => {
+    let hostContent: string | undefined;
+    await register({
+      eject: async () => {
+        hostContent = await fs.readFile(
+          path.join(usbRoot, "child.txt"),
+          "utf8",
+        );
+      },
+    });
+    const runtime = eden.runtime;
+    const { filesystem, volumes, execution, operations } = runtime.services;
+    const caller = {
+      appId,
+      principal: { kind: "user" as const, profile: user },
+    };
+    const location = { volume: "usb", path: "/child.txt" };
+    const prepared = await runtime.effects.run(
+      execution.provide(
+        volumes.withVolumes(
+          ["usb"],
+          Effect.sync(() =>
+            filesystem.prepareVolumeOperation(["usb"], () =>
+              filesystem.writeFile(location, "child work"),
+            ),
+          ),
+        ),
+        caller,
+      ),
+    );
+    const child = operations.submit(
+      "fs/write",
+      { location, content: "child work" },
+      caller,
+      () => prepared,
+    );
+    const eject = await eden.execute<OperationHandle>(
+      "volume/eject",
+      { volume: "usb" },
+      caller,
+    );
+    expect(operations.get(child, caller).status).toBe("queued");
+    expect(hostContent).toBeUndefined();
+    await runtime.effects.run(operations.wait(child, caller));
+    await runtime.effects.run(operations.wait(eject, caller));
+    expect(hostContent).toBe("child work");
   });
 
   it("releases a cancelled copy's destination while a conflicting copy is still blocked", async () => {
@@ -421,23 +470,24 @@ describe("safe volume removal", () => {
         "complete report",
       );
       const filesystem = eden.runtime.services.volumes;
-      const getRoot = filesystem.getRoot.bind(filesystem);
+      const getRoot = filesystem.root.bind(filesystem);
       let paused = false;
       // Pause one real operation at its mount check to make the race deterministic.
       // The remaining permissions, path checks, transfer, and IO are production code.
-      jest.spyOn(filesystem, "getRoot").mockImplementation((id, inherited) => {
-        const root = getRoot(id, inherited);
-        if (id !== "usb" || !root || paused) return root;
-        paused = true;
-        return {
-          rootPath: root.rootPath,
-          assertActive: async () => {
-            admitted.resolve();
-            await resume.promise;
-            await root.assertActive();
-          },
-        };
-      });
+      jest.spyOn(filesystem, "root").mockImplementation((id) =>
+        Effect.map(getRoot(id), (root) => {
+          if (id !== "usb" || !root || paused) return root;
+          paused = true;
+          return {
+            rootPath: root.rootPath,
+            assertActive: async () => {
+              admitted.resolve();
+              await resume.promise;
+              await root.assertActive();
+            },
+          };
+        }),
+      );
       const write = execute(
         `fs/${command}`,
         command === "write"

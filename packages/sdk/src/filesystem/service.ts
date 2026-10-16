@@ -4,7 +4,6 @@ import * as path from "node:path";
 import type {
   FileStats,
   FilesystemChangeKind,
-  FilesystemHandle,
   FilesystemLocation,
   FilesystemOpenMode,
   FilesystemSource,
@@ -63,30 +62,6 @@ export const createFilesystem = Effect.fn(function* ({
       TargetedNotification<{ watchId: string; kind: FilesystemChangeKind }>
     >();
   const transfer = createFileTransfers();
-  const handles = createFileHandles(executionContext, openFile);
-  const watcher = createFilesystemWatches({
-    resolveViewId: views.resolveViewId,
-    viewRemoved: views.removed,
-    notify: (viewId, payload) => changed.emit({ payload, viewIds: [viewId] }),
-  });
-  yield* Effect.addFinalizer(() =>
-    io(async () => {
-      watcher.dispose();
-      await handles.dispose();
-    }).pipe(Effect.orDie),
-  );
-  yield* listen(views.removed, ({ webContentsId }) =>
-    handles.closeOwner({ webContentsId }),
-  );
-  yield* listen(volumes.changed, ({ volumes: inventory }) =>
-    watcher.removeUnavailableVolumes(
-      new Set(
-        inventory
-          .filter((volume) => volume.state === "ready")
-          .map((volume) => volume.id),
-      ),
-    ),
-  );
 
   function requirePrincipal(): void {
     const principal = executionContext.getPrincipal();
@@ -110,8 +85,8 @@ export const createFilesystem = Effect.fn(function* ({
   // Node descriptor callbacks retain their admission across native I/O.
   async function resolveTargetNode(
     address: FilesystemLocation,
-    write = false,
-    mounted = volumes.getRoot(address.volume),
+    write: boolean,
+    mounted: VolumeRoot | undefined,
   ) {
     requirePrincipal();
     const info = volumes.get(address.volume);
@@ -153,48 +128,62 @@ export const createFilesystem = Effect.fn(function* ({
     if (target.hostPath === target.accessPath)
       throw new Error("Cannot delete, move, or replace an access root");
   }
-  async function openFile(
+  const openFile = Effect.fn(function* (
     location: FilesystemLocation,
     mode: FilesystemOpenMode,
     retained: boolean,
-  ): Promise<OpenedFilesystemFile> {
-    requirePrincipal();
-    const access = volumes.acquire([location.volume], !retained);
-    let file: fs.FileHandle | undefined;
-    try {
-      return await access.run(async () => {
-        const target = await resolveTargetNode(location);
-        file = await fs.open(target.hostPath, openFlags[mode]);
-        if (!(await file.stat()).isFile())
-          throw new Error("Filesystem source is not a regular file");
-        await target.assertActive();
-        const descriptor = file;
+  ) {
+    yield* Effect.try({ try: requirePrincipal, catch: asError });
+    const access = yield* volumes.lease([location.volume], !retained);
+    return yield* access.effect(
+      Effect.gen(function* () {
+        const target = yield* resolveTarget(location);
+        const file = yield* Effect.acquireRelease(
+          io(() => fs.open(target.hostPath, openFlags[mode])),
+          (descriptor) => io(() => descriptor.close()).pipe(Effect.orDie),
+        );
+        if (!(yield* io(() => file.stat())).isFile())
+          return yield* Effect.fail(
+            new Error("Filesystem source is not a regular file"),
+          );
+        yield* io(target.assertActive);
         return {
-          use: (operation) =>
-            access.run(async () => {
-              await target.assertActive();
-              const result = await operation(descriptor);
-              await target.assertActive();
-              return result;
-            }),
-          close: async () => {
-            try {
-              await descriptor.close();
-            } finally {
-              access.release();
-            }
-          },
-        };
-      });
-    } catch (error) {
-      try {
-        await file?.close();
-      } finally {
-        access.release();
-      }
-      throw error;
-    }
-  }
+          use: <A, E>(
+            operation: (file: fs.FileHandle) => Effect.Effect<A, E>,
+          ) =>
+            access.effect(
+              Effect.gen(function* () {
+                yield* io(target.assertActive);
+                const result = yield* operation(file);
+                yield* io(target.assertActive);
+                return result;
+              }),
+            ),
+        } satisfies OpenedFilesystemFile;
+      }),
+    );
+  });
+  const handles = yield* createFileHandles(executionContext, openFile);
+  const watcher = createFilesystemWatches({
+    resolveViewId: views.resolveViewId,
+    viewRemoved: views.removed,
+    notify: (viewId, payload) => changed.emit({ payload, viewIds: [viewId] }),
+  });
+  yield* Effect.addFinalizer(() => Effect.sync(watcher.dispose));
+  const runListener = Effect.runPromiseWith(yield* Effect.context<never>());
+  yield* listen(views.removed, ({ webContentsId }) =>
+    runListener(handles.closeOwner({ webContentsId })),
+  );
+  yield* listen(volumes.changed, ({ volumes: inventory }) =>
+    watcher.removeUnavailableVolumes(
+      new Set(
+        inventory
+          .filter((volume) => volume.state === "ready")
+          .map((volume) => volume.id),
+      ),
+    ),
+  );
+
   const resolvePath = (location: FilesystemLocation) =>
     volumes.withVolumes(
       [location.volume],
@@ -258,17 +247,12 @@ export const createFilesystem = Effect.fn(function* ({
     source: FilesystemSource,
     encoding: BufferEncoding = "utf-8",
   ) =>
-    io(() =>
-      handles.use(source, async (file) =>
-        (await readOpenedFile(file)).toString(encoding),
-      ),
+    handles.use(source, (file) =>
+      io(async () => (await readOpenedFile(file)).toString(encoding)),
     );
   const readBinaryFile = (source: FilesystemSource) =>
-    io(() =>
-      handles.use(
-        source,
-        async (file) => new Uint8Array(await readOpenedFile(file)),
-      ),
+    handles.use(source, (file) =>
+      io(async () => new Uint8Array(await readOpenedFile(file))),
     );
   const writeContent = (
     location: FilesystemLocation,
@@ -340,7 +324,7 @@ export const createFilesystem = Effect.fn(function* ({
     source: FilesystemSource,
   ): Effect.fn.Return<FileStats, Error> {
     const stats = yield* "handleId" in source
-      ? io(() => handles.use(source, (file) => file.stat()))
+      ? handles.use(source, (file) => io(() => file.stat()))
       : withVolume(source, (hostPath) => io(() => fs.stat(hostPath)));
     return {
       isFile: stats.isFile(),
@@ -517,17 +501,11 @@ export const createFilesystem = Effect.fn(function* ({
     move,
     watchDirectory,
     unwatch: watcher.unwatch,
-    open: (location: FilesystemLocation, mode: FilesystemOpenMode = "read") =>
-      io(() => handles.open(location, mode)),
-    close: (handle: FilesystemHandle) => io(() => handles.close(handle)),
-    closeOwner: (owner: {
-      appId?: string;
-      webContentsId?: number;
-      sessionId?: string;
-    }) => io(() => handles.closeOwner(owner)),
-    releaseHandles: (sessionId?: string) =>
-      io(() => handles.closeOwner({ sessionId })),
-    closeHandles: () => io(handles.dispose),
+    open: handles.open,
+    close: handles.close,
+    closeOwner: handles.closeOwner,
+    releaseHandles: (sessionId?: string) => handles.closeOwner({ sessionId }),
+    closeHandles: handles.dispose,
   };
 });
 export type Filesystem = Effect.Success<ReturnType<typeof createFilesystem>>;

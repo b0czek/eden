@@ -234,6 +234,10 @@ handles before waiting; runtime shutdown also closes remaining handles. Each
 runtime permits at most 1,024 open handles. Reading, querying, or closing an
 unknown or closed handle fails explicitly.
 
+Closing a handle blocks new uses immediately and waits for accepted native I/O
+before releasing its descriptor and volume access. Interrupted location-based
+reads likewise retain access until their native I/O has settled.
+
 An open handle retains its volume's access until it closes. Safe eject blocks
 new opens and location-based reads, waits for existing handles, and lets those
 handles continue reading during removal. Close handles promptly when work

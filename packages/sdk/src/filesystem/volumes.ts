@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import type {
@@ -6,8 +5,10 @@ import type {
   FilesystemVolumeRegistration,
 } from "@edenapp/types";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Latch from "effect/Latch";
 import type { EdenVolumeOptions } from "../api/control-plane";
 import { asError, fromPromise } from "../effects/io";
 import { scopedEvent } from "../events/scoped";
@@ -25,8 +26,9 @@ interface MountedVolume {
   inode: number;
   eject?: () => Promise<void>;
   ejectGroup?: string;
-  activeOperations: Set<Promise<void>>;
-  removal?: Promise<void>;
+  activeLeases: number;
+  idle: Latch.Latch;
+  removal?: Deferred.Deferred<void, Error>;
 }
 
 interface VolumeLease {
@@ -41,21 +43,18 @@ export interface VolumeRoot {
 
 /** Explicit admission for resources whose lifetime spans several commands. */
 export interface VolumeAccess {
-  run<T>(operation: () => Promise<T>): Promise<T>;
-  effect<A, E>(work: Effect.Effect<A, E>): Effect.Effect<A, E | Error>;
+  effect<A, E, R>(work: Effect.Effect<A, E, R>): Effect.Effect<A, E | Error, R>;
   release(): void;
 }
 
 export const createVolumes = Effect.fn(function* () {
   const changed = yield* scopedEvent<{ volumes: FilesystemVolume[] }>();
   const mounted = new Map<string, MountedVolume>();
-  const operationContext = new AsyncLocalStorage<Map<string, VolumeLease>>();
   const effectContext = Context.Reference<Map<string, VolumeLease>>(
     `eden/filesystem/volume-leases/${randomUUID()}`,
     { defaultValue: () => new Map() },
   );
-  const currentLeases = () =>
-    operationContext.getStore() ?? Fiber.getCurrent()?.getRef(effectContext);
+  const currentLeases = () => Fiber.getCurrent()?.getRef(effectContext);
   let disposed = false;
   const home: FilesystemVolume = {
     id: "home",
@@ -124,7 +123,8 @@ export const createVolumes = Effect.fn(function* () {
       inode: stats.ino,
       eject,
       ejectGroup: options.ejectGroup,
-      activeOperations: new Set(),
+      activeLeases: 0,
+      idle: Latch.makeUnsafe(true),
     });
     changed.emit({ volumes: list() });
     return { ...info };
@@ -164,60 +164,60 @@ export const createVolumes = Effect.fn(function* () {
     if (entry.removal) {
       const removal = entry.removal;
       return operationTask((reporter) =>
-        io(async () => {
+        Effect.suspend(() => {
           reporter.update("waiting-for-eject");
-          await removal;
+          return Deferred.await(removal);
         }),
       );
     }
-    let resolve!: () => void;
-    let reject!: (error: unknown) => void;
-    const removal = new Promise<void>((complete, fail) => {
-      resolve = complete;
-      reject = fail;
-    });
-    // Reservation may precede execution; attach an owned rejection observer.
-    void removal.catch(() => undefined);
+    const removal = Deferred.makeUnsafe<void, Error>();
     for (const [, sibling] of group) {
       sibling.removal = removal;
       sibling.info.state = "ejecting";
     }
     changed.emit({ volumes: list() });
     let started = false;
-    return operationTask((reporter) =>
-      Effect.gen(function* () {
-        if (started) return yield* io(() => removal);
-        started = true;
-        yield* Effect.gen(function* () {
-          reporter.update("draining-volume-io");
-          yield* io(() =>
-            Promise.all(
-              group.flatMap(([, sibling]) => [...sibling.activeOperations]),
-            ),
+    function restoreReady() {
+      for (const [volumeId, sibling] of group) {
+        if (!disposed && mounted.get(volumeId) === sibling) {
+          sibling.removal = undefined;
+          sibling.info.state = "ready";
+        }
+      }
+      if (!disposed) changed.emit({ volumes: list() });
+    }
+    return operationTask(
+      (reporter) =>
+        Effect.suspend(() => {
+          if (started) return Deferred.await(removal);
+          started = true;
+          return Effect.gen(function* () {
+            reporter.update("draining-volume-io");
+            yield* Effect.forEach(group, ([, sibling]) => sibling.idle.await, {
+              discard: true,
+            });
+            for (const [volumeId, sibling] of group)
+              yield* io(() => assertMounted(volumeId, sibling));
+            reporter.update("host-eject");
+            yield* io(operation);
+            for (const [volumeId, sibling] of group)
+              if (mounted.get(volumeId) === sibling) unregister(volumeId);
+          }).pipe(
+            Effect.onError(() => Effect.sync(restoreReady)),
+            Deferred.into(removal),
+            Effect.andThen(Deferred.await(removal)),
           );
-          for (const [volumeId, sibling] of group)
-            yield* io(() => assertMounted(volumeId, sibling));
-          reporter.update("host-eject");
-          yield* io(operation);
-          for (const [volumeId, sibling] of group)
-            if (mounted.get(volumeId) === sibling) unregister(volumeId);
-          resolve();
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.sync(() => {
-              for (const [volumeId, sibling] of group) {
-                if (!disposed && mounted.get(volumeId) === sibling) {
-                  sibling.removal = undefined;
-                  sibling.info.state = "ready";
-                }
-              }
-              if (!disposed) changed.emit({ volumes: list() });
-              reject(error);
-            }),
-          ),
-        );
-        yield* io(() => removal);
-      }).pipe(Effect.uninterruptible),
+        }).pipe(Effect.uninterruptible),
+      {
+        release: () => {
+          if (started || Deferred.isDoneUnsafe(removal)) return;
+          restoreReady();
+          Deferred.doneUnsafe(
+            removal,
+            Effect.fail(new Error("Volume eject was not executed")),
+          );
+        },
+      },
     );
   }
 
@@ -237,8 +237,8 @@ export const createVolumes = Effect.fn(function* () {
       const entry = mounted.get(id);
       if (!entry) throw new Error(`Filesystem volume '${id}' is unavailable`);
       const inherited = context.get(id);
-      if (inherited?.entry === entry && !inherited.released) continue;
-      if (entry.info.state !== "ready")
+      const alreadyAdmitted = inherited?.entry === entry && !inherited.released;
+      if (!alreadyAdmitted && entry.info.state !== "ready")
         throw new Error(`Filesystem volume '${id}' is ${entry.info.state}`);
       entries.set(id, entry);
     }
@@ -246,15 +246,11 @@ export const createVolumes = Effect.fn(function* () {
     for (const [id, entry] of entries) {
       const lease: VolumeLease = { entry, released: false };
       context.set(id, lease);
-      let resolve!: () => void;
-      const done = new Promise<void>((complete) => {
-        resolve = complete;
-      });
-      entry.activeOperations.add(done);
+      entry.activeLeases++;
+      entry.idle.closeUnsafe();
       releases.push(() => {
         lease.released = true;
-        entry.activeOperations.delete(done);
-        resolve();
+        if (--entry.activeLeases === 0) entry.idle.openUnsafe();
       });
     }
     return {
@@ -288,22 +284,21 @@ export const createVolumes = Effect.fn(function* () {
     );
   }
 
-  /** Hold an admission until a native Effect finishes, including failure/interruption. */
+  /** Scope a volume lease, independently for retained descriptors. */
+  function lease(ids: string[], inherit = true) {
+    return Effect.acquireRelease(
+      Effect.try({ try: () => acquire(ids, inherit), catch: asError }),
+      (access) => Effect.sync(access.release),
+    );
+  }
+
   function withVolumes<A, E>(
     ids: string[],
     work: Effect.Effect<A, E>,
   ): Effect.Effect<A, E | Error> {
-    return Effect.gen(function* () {
-      const inherited = yield* effectContext;
-      return yield* Effect.acquireUseRelease(
-        Effect.try({
-          try: () => acquire(ids, true, inherited),
-          catch: asError,
-        }),
-        (access) => access.effect(work),
-        (access) => Effect.sync(access.release),
-      );
-    });
+    return Effect.scoped(
+      Effect.flatMap(lease(ids), (access) => access.effect(work)),
+    );
   }
 
   function acquire(
@@ -314,12 +309,10 @@ export const createVolumes = Effect.fn(function* () {
     const admitted = admit(ids, inherit, inherited);
     let released = false;
     return {
-      run: (operation) => {
-        if (released) throw new Error("Filesystem volume access is closed");
-        return operationContext.run(admitted.context, operation);
-      },
-      effect: <A, E>(work: Effect.Effect<A, E>): Effect.Effect<A, E | Error> =>
-        Effect.suspend<A, E | Error, never>(() =>
+      effect: <A, E, R>(
+        work: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E | Error, R> =>
+        Effect.suspend<A, E | Error, R>(() =>
           released
             ? Effect.fail(new Error("Filesystem volume access is closed"))
             : Effect.provideService(work, effectContext, admitted.context),
@@ -353,7 +346,7 @@ export const createVolumes = Effect.fn(function* () {
 
   function getRoot(
     id: string,
-    inherited = currentLeases(),
+    inherited: Map<string, VolumeLease>,
   ): VolumeRoot | undefined {
     get(id);
     if (id === "home") return undefined;
@@ -382,17 +375,16 @@ export const createVolumes = Effect.fn(function* () {
     Effect.sync(() => {
       disposed = true;
       mounted.clear();
-      operationContext.disable();
     }),
   );
   const root = (id: string) =>
     Effect.flatMap(effectContext, (inherited) =>
       Effect.try({
-        try: () => service.getRoot(id, inherited),
+        try: () => getRoot(id, inherited),
         catch: asError,
       }),
     );
-  const service = {
+  return {
     list,
     get,
     register,
@@ -400,12 +392,10 @@ export const createVolumes = Effect.fn(function* () {
     prepareEject,
     prepareOperation,
     withVolumes,
-    acquire,
-    getRoot,
+    lease,
     root,
     changed,
   };
-  return service;
 });
 
 export type Volumes = Effect.Success<ReturnType<typeof createVolumes>>;
