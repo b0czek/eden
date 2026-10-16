@@ -1,5 +1,3 @@
-import { PermissionRegistry } from "../../../src/ipc";
-import "reflect-metadata";
 import fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -8,8 +6,6 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../../../src/api/ControlPlaneApi";
-import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { OperationManager } from "../../../src/operations/OperationManager";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -77,7 +73,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const copy = await eden.execute<OperationHandle>(
       "fs/cp",
       {
@@ -126,7 +122,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const first = await eden.execute<OperationHandle>(
       "fs/cp",
       {
@@ -203,7 +199,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     try {
       const opening = await eden.execute<OperationHandle>(
         "file/open",
@@ -294,7 +290,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>(
       "volume/eject",
       { volume: "usb" },
@@ -416,13 +412,13 @@ describe("safe volume removal", () => {
         path.join(eden.paths.userDirectory, "report.txt"),
         "complete report",
       );
-      const manager = eden.runtime.resolve(VolumeManager);
+      const manager = eden.runtime.services.volumes;
       const getRoot = manager.getRoot.bind(manager);
       let paused = false;
       // Pause one real operation at its mount check to make the race deterministic.
       // The remaining permissions, path checks, transfer, and IO are production code.
-      jest.spyOn(manager, "getRoot").mockImplementation((id) => {
-        const root = getRoot(id);
+      jest.spyOn(manager, "getRoot").mockImplementation((id, inherited) => {
+        const root = getRoot(id, inherited);
         if (id !== "usb" || !root || paused) return root;
         paused = true;
         return {
@@ -536,13 +532,14 @@ describe("safe volume removal", () => {
       });
     eden.runtime.volumes.unregister("usb");
     await register({ eject: async () => {} });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/read", "fs/write"]);
+    eden.runtime.services.permissions.registerApp(appId, [
+      "fs/read",
+      "fs/write",
+    ]);
     await expect(execute("volume/eject", { volume: "usb" })).rejects.toThrow(
       "Permission denied",
     );
-    eden.runtime.resolve(PermissionRegistry).registerApp(
+    eden.runtime.services.permissions.registerApp(
       appId,
       ["fs/read", "fs/write"],
       [

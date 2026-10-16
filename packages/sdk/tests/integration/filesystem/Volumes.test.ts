@@ -1,5 +1,3 @@
-import { testApp } from "../../support/apps";
-import "reflect-metadata";
 import { statSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -9,14 +7,10 @@ import type {
   OperationHandle,
   UserProfile,
 } from "@edenapp/types";
-import { FilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
-import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import * as Effect from "effect/Effect";
+import { createFilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
 import { decodeLaunchContext } from "../../../src/utils/appLaunchContext";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -59,10 +53,10 @@ describe("consumer-managed filesystem volumes", () => {
 
   const invoke = async (id: string, command: string, args: unknown) => {
     const instance = requireValue(
-      eden.runtime.resolve(ProcessManager).getAppInstance(id),
+      eden.runtime.services.processes.getAppInstance(id),
     );
     const view = requireValue(
-      eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
+      eden.runtime.services.views.getViewInfo(instance.viewId),
     );
     const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
@@ -112,7 +106,7 @@ describe("consumer-managed filesystem volumes", () => {
   });
 
   it("authorizes volume discovery independently of file access", async () => {
-    const permissions = eden.runtime.resolve(PermissionRegistry);
+    const permissions = eden.runtime.services.permissions;
     permissions.registerApp(appId, ["fs/*"]);
     await expect(execute("volume/list")).rejects.toThrow("volume/read");
     await expect(
@@ -368,7 +362,7 @@ describe("consumer-managed filesystem volumes", () => {
         location: { volume: "readonly", path: "/folder" },
       }),
     ).rejects.toThrow("read-only");
-    eden.runtime.resolve(PermissionRegistry).registerApp("reader", ["fs/read"]);
+    eden.runtime.services.permissions.registerApp("reader", ["fs/read"]);
     await expect(
       eden.complete(
         "fs/write",
@@ -417,30 +411,32 @@ describe("consumer-managed filesystem volumes", () => {
       await fs.writeFile(source, "replacement");
       await fs.writeFile(destination, "original");
       const sourceLease = requireValue(
-        eden.runtime.resolve(VolumeManager).getRoot("usb"),
+        eden.runtime.services.volumes.getRoot("usb"),
       );
-      const transfer = new FilesystemTransfer();
+      const transfer = createFilesystemTransfer();
       await expect(
-        transfer[operation]({
-          source,
-          destination,
-          destinationLabel: "home:/operators/one/original.txt",
-          overwrite: true,
-          assertSourceActive: async () => {
-            // Disconnect after the original has been staged, before copying starts.
-            if (
-              (await fs.readdir(destinationRoot)).some((name) =>
-                name.startsWith(".original.txt.eden-transfer-"),
-              )
-            ) {
-              eden.runtime.volumes.unregister("usb");
-            }
-            await sourceLease.assertActive();
-          },
-          assertDestinationActive: async () => {
-            await fs.stat(destinationRoot);
-          },
-        }),
+        Effect.runPromise(
+          transfer[operation]({
+            source,
+            destination,
+            destinationLabel: "home:/operators/one/original.txt",
+            overwrite: true,
+            assertSourceActive: async () => {
+              // Disconnect after the original has been staged, before copying starts.
+              if (
+                (await fs.readdir(destinationRoot)).some((name) =>
+                  name.startsWith(".original.txt.eden-transfer-"),
+                )
+              ) {
+                eden.runtime.volumes.unregister("usb");
+              }
+              await sourceLease.assertActive();
+            },
+            assertDestinationActive: async () => {
+              await fs.stat(destinationRoot);
+            },
+          }),
+        ),
       ).rejects.toThrow("unavailable");
       await expect(fs.readFile(destination, "utf8")).resolves.toBe("original");
       await expect(fs.readdir(destinationRoot)).resolves.toEqual([
@@ -550,7 +546,7 @@ describe("consumer-managed filesystem volumes", () => {
       name: "Handler",
       fileHandlers: [{ name: "Folders", directories: true }],
     });
-    eden.runtime.resolve(PackageRegistry).register(handler);
+    eden.runtime.services.packageRegistry.register(handler);
     await execute("fs/mkdir", {
       location: { volume: "usb", path: "/same-path" },
     });
@@ -573,10 +569,10 @@ describe("consumer-managed filesystem volumes", () => {
       ),
     ).toEqual({ appId: handlerId, args: [], file: usb });
     const instance = requireValue(
-      eden.runtime.resolve(ProcessManager).getAppInstance(handlerId),
+      eden.runtime.services.processes.getAppInstance(handlerId),
     );
     const view = requireValue(
-      eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
+      eden.runtime.services.views.getViewInfo(instance.viewId),
     );
     await eden.platform.rendererIpc.invoke(
       "shell-command",
@@ -607,20 +603,18 @@ describe("consumer-managed filesystem volumes", () => {
 
   it("allows another picker after a drive disconnects during provider startup", async () => {
     const providerId = "com.example.volume-picker";
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     registry.register(testApp(appId));
     registry.register(testApp(providerId));
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(providerId, ["file-picker/display"]);
+    eden.runtime.services.permissions.registerApp(providerId, [
+      "file-picker/display",
+    ]);
     await eden.complete("process/launch", { appId });
 
     const launched = gate();
-    const stop = eden.runtime
-      .resolve(ProcessManager)
-      .on("launched", ({ instance }) => {
-        if (instance.manifest.id === providerId) launched.release();
-      });
+    const stop = eden.runtime.services.processes.launched.on(({ instance }) => {
+      if (instance.manifest.id === providerId) launched.release();
+    });
     try {
       const opening = invoke(appId, "file-picker/open", {
         mode: "open",
@@ -668,14 +662,15 @@ describe("consumer-managed filesystem volumes", () => {
 
   it("keeps picker selections within allowed, available volumes", async () => {
     const providerId = "com.example.volume-picker";
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const registry = eden.runtime.services.packageRegistry;
     for (const id of [appId, providerId]) {
       registry.register(testApp(id, { name: "Picker test" }));
       await eden.complete("process/launch", { appId: id });
     }
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(providerId, ["file-picker/display", "fs/read"]);
+    eden.runtime.services.permissions.registerApp(providerId, [
+      "file-picker/display",
+      "fs/read",
+    ]);
     await invoke(providerId, "file-picker/register-display", {});
     await expect(
       invoke(appId, "file-picker/open", {
@@ -715,9 +710,10 @@ describe("consumer-managed filesystem volumes", () => {
     await expect(resolve(opened.requestId, [home, usb])).rejects.toThrow(
       "not allowed",
     );
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/*", "file-picker/display"]);
+    eden.runtime.services.permissions.registerApp(appId, [
+      "fs/*",
+      "file-picker/display",
+    ]);
     await expect(
       invoke(appId, "file-picker/resolve", {
         requestId: opened.requestId,
@@ -902,9 +898,7 @@ describe("consumer-managed filesystem volumes", () => {
   );
 
   it("revokes old registrations and never recreates an absent mount", async () => {
-    const lease = requireValue(
-      eden.runtime.resolve(VolumeManager).getRoot("usb"),
-    );
+    const lease = requireValue(eden.runtime.services.volumes.getRoot("usb"));
     expect(eden.runtime.volumes.unregister("usb")).toBe(true);
     await expect(
       execute("fs/exists", {
@@ -945,13 +939,13 @@ describe("consumer-managed filesystem volumes", () => {
     "invalidates owned watches and sends live volume inventory on %s",
     async (removal) => {
       const app = testApp(appId, { name: "Volumes" });
-      eden.runtime.resolve(PackageRegistry).register(app);
+      eden.runtime.services.packageRegistry.register(app);
       await eden.complete("process/launch", { appId });
       const instance = requireValue(
-        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+        eden.runtime.services.processes.getAppInstance(appId),
       );
       const view = requireValue(
-        eden.runtime.resolve(ViewManager).getViewInfo(instance.viewId),
+        eden.runtime.services.views.getViewInfo(instance.viewId),
       );
       const webContentsId = view.view.webContents.id;
       const invoke = async (command: string, args: unknown) => {
@@ -966,12 +960,10 @@ describe("consumer-managed filesystem volumes", () => {
         const result =
           response.mode === "operation" ? response.handle : response.result;
         return command === "volume/eject"
-          ? eden.runtime
-              .resolve(OperationManager)
-              .wait(result as OperationHandle, {
-                appId,
-                principal: { kind: "user", profile: user },
-              })
+          ? eden.runtime.services.operations.wait(result as OperationHandle, {
+              appId,
+              principal: { kind: "user", profile: user },
+            })
           : result;
       };
       await invoke("event/subscribe", { eventName: "fs/changed" });

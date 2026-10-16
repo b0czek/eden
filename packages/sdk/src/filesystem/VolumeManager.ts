@@ -1,22 +1,22 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import type {
   FilesystemVolume,
   FilesystemVolumeRegistration,
 } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import type { EdenVolumeOptions } from "../api/ControlPlaneApi";
-import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import { asError, fromPromise } from "../effects/io";
+import { scopedEvent } from "../events/scoped";
+
 import {
   type OperationReporter,
   type OperationTask,
   operationTask,
 } from "../operations/OperationTask";
-
-interface VolumeEvents {
-  changed: { volumes: FilesystemVolume[] };
-}
 
 interface MountedVolume {
   info: FilesystemVolume;
@@ -42,19 +42,22 @@ export interface VolumeRoot {
 /** Explicit admission for resources whose lifetime spans several commands. */
 export interface VolumeAccess {
   run<T>(operation: () => Promise<T>): Promise<T>;
+  effect<A, E>(work: Effect.Effect<A, E>): Effect.Effect<A, E | Error>;
   release(): void;
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-@EdenNamespace("volume")
-export class VolumeManager extends EdenEmitter<VolumeEvents> {
-  private readonly mounted = new Map<string, MountedVolume>();
-  private readonly operationContext = new AsyncLocalStorage<
-    Map<string, VolumeLease>
-  >();
-  private disposed = false;
-  private readonly home: FilesystemVolume = {
+export const createVolumeManager = Effect.fn(function* () {
+  const changed = yield* scopedEvent<{ volumes: FilesystemVolume[] }>();
+  const mounted = new Map<string, MountedVolume>();
+  const operationContext = new AsyncLocalStorage<Map<string, VolumeLease>>();
+  const effectContext = Context.Reference<Map<string, VolumeLease>>(
+    `eden/filesystem/volume-leases/${randomUUID()}`,
+    { defaultValue: () => new Map() },
+  );
+  const currentLeases = () =>
+    operationContext.getStore() ?? Fiber.getCurrent()?.getRef(effectContext);
+  let disposed = false;
+  const home: FilesystemVolume = {
     id: "home",
     label: "Home",
     kind: "local",
@@ -63,81 +66,48 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     supportsEject: false,
     state: "ready",
   };
-
-  constructor(@inject(IPCBridge) ipcBridge: IPCBridge) {
-    super(ipcBridge);
-  }
-
-  list(): FilesystemVolume[] {
+  const io = <A>(run: () => Promise<A>) =>
+    fromPromise(run).pipe(Effect.uninterruptible);
+  function list(): FilesystemVolume[] {
     return structuredClone([
-      this.home,
-      ...Array.from(this.mounted.values(), (entry) => entry.info),
+      home,
+      ...Array.from(mounted.values(), (entry) => entry.info),
     ]);
   }
 
-  get(id: string): FilesystemVolume {
-    if (this.disposed) throw new Error("Filesystem volumes are disposed");
-    const info = id === "home" ? this.home : this.mounted.get(id)?.info;
+  function get(id: string): FilesystemVolume {
+    if (disposed) throw new Error("Filesystem volumes are disposed");
+    const info = id === "home" ? home : mounted.get(id)?.info;
     if (!info) throw new Error(`Filesystem volume '${id}' is unavailable`);
     return { ...info };
   }
 
-  async register(
+  const register = Effect.fn(function* (
     input: FilesystemVolumeRegistration,
     options: EdenVolumeOptions = {},
-  ): Promise<FilesystemVolume> {
-    if (
-      !input ||
-      typeof input.id !== "string" ||
-      !input.id.trim() ||
-      input.id === "home"
-    ) {
-      throw new Error("Volume ID must be nonempty and cannot be 'home'");
-    }
-    if (typeof input.label !== "string" || !input.label.trim())
-      throw new Error("Volume label is required");
-    if (!["local", "removable", "network"].includes(input.kind))
-      throw new Error("Invalid volume kind");
-    if (
-      typeof input.rootPath !== "string" ||
-      !path.isAbsolute(input.rootPath)
-    ) {
-      throw new Error(
-        "Volume root must be an absolute path to an existing directory",
-      );
-    }
-    for (const value of [input.readOnly, input.supportsWatch]) {
-      if (value !== undefined && typeof value !== "boolean")
-        throw new TypeError("Volume capabilities must be booleans");
-    }
-    if (options.eject !== undefined && typeof options.eject !== "function")
-      throw new TypeError("Volume eject operation must be a function");
-    if (
-      options.ejectGroup !== undefined &&
-      (typeof options.ejectGroup !== "string" ||
-        !options.ejectGroup.trim() ||
-        !options.eject)
-    )
-      throw new TypeError(
-        "An eject group requires a nonempty key and an eject operation",
-      );
+  ) {
     const eject = options.eject?.bind(options);
-    const rootPath = await fs.realpath(input.rootPath);
-    const stats = await fs.stat(rootPath);
-    if (!stats.isDirectory())
-      throw new Error("Volume root must be a directory");
-    if (this.disposed) throw new Error("Filesystem volumes are disposed");
-    if (this.mounted.has(input.id))
-      throw new Error(`Volume '${input.id}' is already registered`);
-    if (
-      options.ejectGroup &&
-      [...this.mounted.values()].some(
-        (entry) => entry.ejectGroup === options.ejectGroup && entry.removal,
-      )
-    )
-      throw new Error(
-        "Cannot register a volume while its eject group is being removed",
-      );
+    const rootPath = yield* io(() => fs.realpath(input.rootPath));
+    const stats = yield* io(() => fs.stat(rootPath));
+    yield* Effect.try({
+      try: () => {
+        if (!stats.isDirectory())
+          throw new Error("Volume root must be a directory");
+        if (disposed) throw new Error("Filesystem volumes are disposed");
+        if (mounted.has(input.id))
+          throw new Error(`Volume '${input.id}' is already registered`);
+        if (
+          options.ejectGroup &&
+          [...mounted.values()].some(
+            (entry) => entry.ejectGroup === options.ejectGroup && entry.removal,
+          )
+        )
+          throw new Error(
+            "Cannot register a volume while its eject group is being removed",
+          );
+      },
+      catch: asError,
+    });
     const info: FilesystemVolume = {
       id: input.id,
       label: input.label,
@@ -147,7 +117,7 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       supportsEject: eject !== undefined,
       state: "ready",
     };
-    this.mounted.set(input.id, {
+    mounted.set(input.id, {
       info,
       rootPath,
       device: stats.dev,
@@ -156,35 +126,35 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       ejectGroup: options.ejectGroup,
       activeOperations: new Set(),
     });
-    this.notify("changed", { volumes: this.list() });
+    changed.emit({ volumes: list() });
     return { ...info };
-  }
+  });
 
-  unregister(id: string): boolean {
+  function unregister(id: string): boolean {
     if (id === "home")
       throw new Error("The home volume cannot be unregistered");
-    if (!this.mounted.delete(id)) return false;
-    this.notify("changed", { volumes: this.list() });
+    if (!mounted.delete(id)) return false;
+    changed.emit({ volumes: list() });
     return true;
   }
 
   /** Reserve removal synchronously so newly submitted I/O is rejected. */
-  prepareEject(id: string): OperationTask<void> {
-    this.get(id);
+  function prepareEject(id: string): OperationTask<void> {
+    get(id);
     if (id === "home") throw new Error("The home volume cannot be ejected");
-    const entry = this.mounted.get(id);
+    const entry = mounted.get(id);
     if (!entry) throw new Error(`Filesystem volume '${id}' is unavailable`);
     const operation = entry.eject;
     if (!operation)
       throw new Error(`Filesystem volume '${id}' does not support eject`);
     const group = entry.ejectGroup
-      ? [...this.mounted.entries()].filter(
+      ? [...mounted.entries()].filter(
           ([, sibling]) => sibling.ejectGroup === entry.ejectGroup,
         )
       : [[id, entry] as const];
     if (
       group.some(([volumeId, sibling]) => {
-        const lease = this.operationContext.getStore()?.get(volumeId);
+        const lease = currentLeases()?.get(volumeId);
         return lease?.entry === sibling && !lease.released;
       })
     )
@@ -193,10 +163,12 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       );
     if (entry.removal) {
       const removal = entry.removal;
-      return operationTask(async (reporter) => {
-        reporter.update("waiting-for-eject");
-        await removal;
-      });
+      return operationTask((reporter) =>
+        io(async () => {
+          reporter.update("waiting-for-eject");
+          await removal;
+        }),
+      );
     }
     let resolve!: () => void;
     let reject!: (error: unknown) => void;
@@ -210,55 +182,59 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       sibling.removal = removal;
       sibling.info.state = "ejecting";
     }
-    this.notify("changed", { volumes: this.list() });
+    changed.emit({ volumes: list() });
     let started = false;
-    return operationTask(async (reporter) => {
-      if (started) {
-        await removal;
-        return;
-      }
-      started = true;
-      try {
-        reporter.update("draining-volume-io");
-        await Promise.all(
-          group.flatMap(([, sibling]) => [...sibling.activeOperations]),
+    return operationTask((reporter) =>
+      Effect.gen(function* () {
+        if (started) return yield* io(() => removal);
+        started = true;
+        yield* Effect.gen(function* () {
+          reporter.update("draining-volume-io");
+          yield* io(() =>
+            Promise.all(
+              group.flatMap(([, sibling]) => [...sibling.activeOperations]),
+            ),
+          );
+          for (const [volumeId, sibling] of group)
+            yield* io(() => assertMounted(volumeId, sibling));
+          reporter.update("host-eject");
+          yield* io(operation);
+          for (const [volumeId, sibling] of group)
+            if (mounted.get(volumeId) === sibling) unregister(volumeId);
+          resolve();
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              for (const [volumeId, sibling] of group) {
+                if (!disposed && mounted.get(volumeId) === sibling) {
+                  sibling.removal = undefined;
+                  sibling.info.state = "ready";
+                }
+              }
+              if (!disposed) changed.emit({ volumes: list() });
+              reject(error);
+            }),
+          ),
         );
-        for (const [volumeId, sibling] of group)
-          await this.assertMounted(volumeId, sibling);
-        reporter.update("host-eject");
-        await operation();
-        for (const [volumeId, sibling] of group)
-          if (this.mounted.get(volumeId) === sibling) this.unregister(volumeId);
-        resolve();
-      } catch (error) {
-        for (const [volumeId, sibling] of group) {
-          if (!this.disposed && this.mounted.get(volumeId) === sibling) {
-            sibling.removal = undefined;
-            sibling.info.state = "ready";
-          }
-        }
-        if (!this.disposed) this.notify("changed", { volumes: this.list() });
-        reject(error);
-      }
-      await removal;
-    });
+        yield* io(() => removal);
+      }).pipe(Effect.uninterruptible),
+    );
   }
 
-  private admit(
+  function admit(
     ids: string[],
     inherit: boolean,
+    inherited = currentLeases(),
   ): {
     context: Map<string, VolumeLease>;
     release: () => void;
   } {
-    const context = new Map(
-      inherit ? this.operationContext.getStore() : undefined,
-    );
+    const context = new Map(inherit ? inherited : undefined);
     const entries = new Map<string, MountedVolume>();
     for (const id of new Set(ids)) {
-      this.get(id);
+      get(id);
       if (id === "home") continue;
-      const entry = this.mounted.get(id);
+      const entry = mounted.get(id);
       if (!entry) throw new Error(`Filesystem volume '${id}' is unavailable`);
       const inherited = context.get(id);
       if (inherited?.entry === entry && !inherited.released) continue;
@@ -290,41 +266,63 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
   }
 
   /** Admission belongs to acceptance even when execution is still queued. */
-  prepareOperation<R>(
+  function prepareOperation<R>(
     ids: string[],
-    run: (reporter: OperationReporter) => Promise<R>,
+    run: (reporter: OperationReporter) => Effect.Effect<R, unknown>,
   ): OperationTask<R> {
-    const access = this.acquire(ids, true);
+    const access = acquire(ids, true);
     let started = false;
-    return operationTask(async (reporter) => {
-      if (started) throw new Error("Volume operation has already started");
-      started = true;
-      try {
-        return await access.run(() => run(reporter));
-      } finally {
-        access.release();
-      }
+    return operationTask((reporter) =>
+      Effect.suspend(() => {
+        if (started)
+          return Effect.fail(new Error("Volume operation has already started"));
+        started = true;
+        return access
+          .effect(Effect.suspend(() => run(reporter)))
+          .pipe(
+            Effect.ensuring(Effect.sync(access.release)),
+            Effect.uninterruptible,
+          );
+      }),
+    );
+  }
+
+  /** Hold an admission until a native Effect finishes, including failure/interruption. */
+  function withVolumes<A, E>(
+    ids: string[],
+    work: Effect.Effect<A, E>,
+  ): Effect.Effect<A, E | Error> {
+    return Effect.gen(function* () {
+      const inherited = yield* effectContext;
+      return yield* Effect.acquireUseRelease(
+        Effect.try({
+          try: () => acquire(ids, true, inherited),
+          catch: asError,
+        }),
+        (access) => access.effect(work).pipe(Effect.uninterruptible),
+        (access) => Effect.sync(access.release),
+      );
     });
   }
 
-  /** Admit awaited filesystem I/O and let removal wait for it to finish. */
-  async withVolumes<T>(ids: string[], operation: () => Promise<T>): Promise<T> {
-    const access = this.acquire(ids, true);
-    try {
-      return await access.run(operation);
-    } finally {
-      access.release();
-    }
-  }
-
-  acquire(ids: string[], inherit = false): VolumeAccess {
-    const admitted = this.admit(ids, inherit);
+  function acquire(
+    ids: string[],
+    inherit = false,
+    inherited?: Map<string, VolumeLease>,
+  ): VolumeAccess {
+    const admitted = admit(ids, inherit, inherited);
     let released = false;
     return {
       run: (operation) => {
         if (released) throw new Error("Filesystem volume access is closed");
-        return this.operationContext.run(admitted.context, operation);
+        return operationContext.run(admitted.context, operation);
       },
+      effect: <A, E>(work: Effect.Effect<A, E>): Effect.Effect<A, E | Error> =>
+        Effect.suspend<A, E | Error, never>(() =>
+          released
+            ? Effect.fail(new Error("Filesystem volume access is closed"))
+            : Effect.provideService(work, effectContext, admitted.context),
+        ),
       release: () => {
         if (released) return;
         released = true;
@@ -333,9 +331,12 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
     };
   }
 
-  private async assertMounted(id: string, entry: MountedVolume): Promise<void> {
+  async function assertMounted(
+    id: string,
+    entry: MountedVolume,
+  ): Promise<void> {
     const assertRegistered = () => {
-      if (this.disposed || this.mounted.get(id) !== entry)
+      if (disposed || mounted.get(id) !== entry)
         throw new Error(`Filesystem volume '${id}' is unavailable`);
     };
     assertRegistered();
@@ -349,12 +350,15 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       throw new Error(`Filesystem volume '${id}' mount has changed`);
   }
 
-  getRoot(id: string): VolumeRoot | undefined {
-    this.get(id);
+  function getRoot(
+    id: string,
+    inherited = currentLeases(),
+  ): VolumeRoot | undefined {
+    get(id);
     if (id === "home") return undefined;
-    const entry = this.mounted.get(id);
+    const entry = mounted.get(id);
     if (!entry) throw new Error(`Filesystem volume '${id}' is unavailable`);
-    const lease = this.operationContext.getStore()?.get(id);
+    const lease = inherited?.get(id);
     const assertAccessible = () => {
       if (
         entry.info.state !== "ready" &&
@@ -367,15 +371,42 @@ export class VolumeManager extends EdenEmitter<VolumeEvents> {
       rootPath: entry.rootPath,
       assertActive: async () => {
         assertAccessible();
-        await this.assertMounted(id, entry);
+        await assertMounted(id, entry);
         assertAccessible();
       },
     };
   }
 
-  override dispose(): void {
-    this.disposed = true;
-    this.mounted.clear();
-    super.dispose();
-  }
-}
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      disposed = true;
+      mounted.clear();
+      operationContext.disable();
+    }),
+  );
+  const root = (id: string) =>
+    Effect.flatMap(effectContext, (inherited) =>
+      Effect.try({
+        try: () => service.getRoot(id, inherited),
+        catch: asError,
+      }),
+    );
+  const service = {
+    list,
+    get,
+    register,
+    unregister,
+    prepareEject,
+    prepareOperation,
+    withVolumes,
+    acquire,
+    getRoot,
+    root,
+    changed,
+  };
+  return service;
+});
+
+export type VolumeManager = Effect.Success<
+  ReturnType<typeof createVolumeManager>
+>;

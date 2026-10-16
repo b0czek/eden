@@ -1,9 +1,7 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
-import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { OperationManager } from "../../../src/operations/OperationManager";
+import { fromPromise } from "../../../src/effects/io";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { registerTestVolume } from "../../support/filesystem";
@@ -62,14 +60,17 @@ describe("grouped volume removal", () => {
       await fs.writeFile(path.join(root, "notes.txt"), id);
     }
     const file = path.join(eden.paths.root, "second", "notes.txt");
-    const reading = eden.runtime
-      .resolve(VolumeManager)
-      .withVolumes(["second"], async () => {
-        started.resolve();
-        await finish.promise;
-        content = await fs.readFile(file, "utf8");
-      });
-    const operations = eden.runtime.resolve(OperationManager);
+    const reading = eden.runtime.effects.run(
+      eden.runtime.services.volumes.withVolumes(
+        ["second"],
+        fromPromise(async () => {
+          started.resolve();
+          await finish.promise;
+          content = await fs.readFile(file, "utf8");
+        }),
+      ),
+    );
+    const operations = eden.runtime.services.operations;
     await started.promise;
     const eject = await eden.execute<OperationHandle>(
       "volume/eject",
