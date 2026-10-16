@@ -29,7 +29,13 @@ import { AppChannelManager } from "../appbus";
 import { createAppearanceController } from "../appearance/controller";
 import { createAppearance, type Appearance } from "../appearance/service";
 import { createAppearanceSettings } from "../appearance/settings-adapter";
-import { BrandingManager } from "../branding";
+import {
+  createBranding,
+  createBrandingController,
+  createFilesystemBrandingAssets,
+  resolveBrandingName,
+  type Branding,
+} from "../branding";
 import { ContextMenuManager } from "../context-menu";
 import { DaemonManager } from "../daemon";
 import { createDb, createDbController, createSqliteDbStorage } from "../db";
@@ -116,7 +122,7 @@ export class EdenRuntime {
   private readonly platform: EdenPlatform;
   private viewManager!: ViewManager;
   private readonly ipcBridge: IPCBridge;
-  private readonly brandingManager: BrandingManager;
+  private brandingService!: Branding;
   private readonly settingsPanelManager: SettingsPanelManager;
   private managersInitialized = false;
   private resourcesDisposed = false;
@@ -197,7 +203,7 @@ export class EdenRuntime {
       this.platform.resources,
     );
 
-    this.brandingManager = this.resolveOwned(BrandingManager);
+    resolveBrandingName(this.config.branding);
     this.resolveOwned(CommandRegistry);
     this.resolveOwned(BackendManager);
     this.ipcBridge = this.resolveOwned(IPCBridge);
@@ -383,6 +389,15 @@ export class EdenRuntime {
     if (this.managersInitialized) return;
     this.managersInitialized = true;
 
+    this.brandingService = await this.effects.acquire(
+      createBranding({
+        branding: this.config.branding,
+        assets: createFilesystemBrandingAssets(this.paths.appPath),
+      }),
+    );
+    this.ipcBridge.registerController(
+      createBrandingController(this.brandingService),
+    );
     this.viewManager = this.resolveOwned(ViewManager);
     this.resolveOwned(AppChannelManager);
     this.resolveOwned(FilesystemManager);
@@ -493,8 +508,8 @@ export class EdenRuntime {
 
   private createMainWindow(): void {
     const windowConfig = this.config.window || {};
-    const title = this.brandingManager.getWindowTitle(windowConfig.title);
-    const icon = this.brandingManager.getWindowIconPath();
+    const title = this.brandingService.getWindowTitle(windowConfig.title);
+    const icon = this.brandingService.getWindowIconPath();
 
     this.mainWindow = this.platform.windows.createWindow({
       width: windowConfig.width || 1280,
