@@ -46,7 +46,13 @@ import { DaemonManager } from "../daemon";
 import { createDb, createDbController, createSqliteDbStorage } from "../db";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { createEffectRuntime, EFFECT_RUNTIME } from "../effects/runtime";
-import { FileOpenManager } from "../file-open";
+import {
+  createFileOpen,
+  createFileOpenController,
+  createFileOpenFilesystem,
+  createFileOpenOperations,
+  createFileOpenProcesses,
+} from "../file-open";
 import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
 import { VolumeHandler } from "../filesystem/VolumeHandler";
@@ -149,7 +155,6 @@ export class EdenRuntime {
 
   private packageManager!: PackageManager;
   private processManager!: ProcessManager;
-  private fileOpenManager!: FileOpenManager;
   private readonly legacySettings = createLegacySettingsAccess(this.effects);
   private appearanceService!: Appearance;
   private appAssociationManager!: AppAssociations;
@@ -374,7 +379,6 @@ export class EdenRuntime {
       await this.sessionManager.initialize();
       await this.effects.run(this.appearanceService.initialize());
       await this.effects.run(this.appAssociationManager.initialize());
-      await this.fileOpenManager.initialize();
       this.assertStartupActive();
       this.createMainWindow();
 
@@ -463,25 +467,25 @@ export class EdenRuntime {
     this.ipcBridge.registerController(
       createAppAssociationsController(associations),
     );
-    this.fileOpenManager = this.own(
-      new FileOpenManager(
-        {
-          get: associations.get,
-          list: associations.list,
-          set: (key, association) =>
-            this.effects.run(associations.set(key, association)),
-          remove: (key) => this.effects.run(associations.remove(key)),
-        },
-        this.resolveOwned(PackageCatalog),
-        this.processManager,
-        this.viewManager,
-        this.resolveOwned(FilesystemManager),
-        { getLocale: () => this.effects.run(i18n.getLocale()) },
-        this.ipcBridge,
-        this.resolveOwned(CommandRegistry),
-      ),
+    const filesystem = this.resolveOwned(FilesystemManager);
+    const fileOpen = await this.effects.acquire(
+      createFileOpen({
+        associations,
+        catalog: this.resolveOwned(PackageCatalog),
+        processes: createFileOpenProcesses(this.processManager),
+        views: this.viewManager,
+        filesystem: createFileOpenFilesystem(filesystem),
+        i18n,
+      }),
     );
-    this.container.registerInstance(FileOpenManager, this.fileOpenManager);
+    const fileOpenOperations = createFileOpenOperations(fileOpen, {
+      prepareVolumeOperation:
+        filesystem.prepareVolumeOperation.bind(filesystem),
+      run: this.effects.run,
+    });
+    this.ipcBridge.registerController(
+      createFileOpenController(fileOpen, fileOpenOperations),
+    );
     this.autostartManager = this.resolveOwned(AutostartManager);
     this.keyboardManager = this.resolveOwned(KeyboardManager);
 

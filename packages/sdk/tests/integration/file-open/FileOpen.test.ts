@@ -4,7 +4,7 @@ import type { RuntimeDlcManifest } from "@edenapp/types";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
-describe("FileOpenManager integration", () => {
+describe("file opening integration", () => {
   let eden: TestEden;
 
   afterEach(async () => {
@@ -118,5 +118,82 @@ describe("FileOpenManager integration", () => {
         location: { path: "/request.http", volume: "home" },
       }),
     ).resolves.toEqual({ appId: undefined });
+  });
+
+  it("uses current locale and persisted associations when completing file opening", async () => {
+    eden = await createTestEden();
+    const registry = eden.runtime.resolve(PackageRegistry);
+    const first = testApp("com.example.first", {
+      name: { en: "First editor", pl: "Pierwszy edytor" },
+      fileHandlers: [{ name: "Text", extensions: ["txt"] }],
+    });
+    const preferred = testApp("com.example.preferred", {
+      name: { en: "Preferred editor", pl: "Wybrany edytor" },
+      fileHandlers: [{ name: "Text", extensions: ["txt"] }],
+    });
+    registry.register(first);
+    registry.register(preferred);
+    const user = await eden.runtime.users.create({
+      username: "localized-editor",
+      name: "Localized Editor",
+      password: "password",
+    });
+    await eden.runtime.sessions.login(user.username, "password");
+    const location = { volume: "home", path: "/notes.txt" };
+    await eden.execute("fs/write", { location, content: "Document contents" });
+    await eden.execute("settings/set/su", {
+      appId: "com.eden",
+      key: "general.locale",
+      value: "pl",
+    });
+    await expect(
+      eden.execute("file/get-supported-handlers", { location }),
+    ).resolves.toEqual([
+      {
+        appId: first.id,
+        appName: "Pierwszy edytor",
+        handlerName: "Text",
+        icon: undefined,
+      },
+      {
+        appId: preferred.id,
+        appName: "Wybrany edytor",
+        handlerName: "Text",
+        icon: undefined,
+      },
+    ]);
+    await eden.execute("file/set-default-handler", {
+      location,
+      appId: preferred.id,
+    });
+    await expect(eden.complete("file/open", { location })).resolves.toEqual({
+      success: true,
+      appId: preferred.id,
+    });
+    await eden.execute("file/remove-default-handler", { location });
+    await expect(
+      eden.execute("file/get-handler", { location }),
+    ).resolves.toEqual({ appId: first.id });
+    await eden.execute("settings/set/su", {
+      appId: "com.eden",
+      key: "general.locale",
+      value: "en",
+    });
+    await expect(
+      eden.execute("file/get-supported-handlers", { location }),
+    ).resolves.toEqual([
+      {
+        appId: first.id,
+        appName: "First editor",
+        handlerName: "Text",
+        icon: undefined,
+      },
+      {
+        appId: preferred.id,
+        appName: "Preferred editor",
+        handlerName: "Text",
+        icon: undefined,
+      },
+    ]);
   });
 });

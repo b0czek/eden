@@ -328,8 +328,7 @@ export interface FileCommands {
    */
   "file/open": {
     mode: "operation";
-    args: {
-    location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: import("./index").OperationHandle<"file/open">;
     completion: import("./index").FileOpenResult;
   };
@@ -338,9 +337,7 @@ export interface FileCommands {
    */
   "file/open-with": {
     mode: "operation";
-    args: {
-    location: import("./index").FilesystemLocation;
-    appId: string };
+    args: { location: { volume: string; path: string; }; appId: string; };
     response: import("./index").OperationHandle<"file/open-with">;
     completion: import("./index").FileOpenResult;
   };
@@ -349,18 +346,15 @@ export interface FileCommands {
    */
   "file/get-handler": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
-    response: { appId: string | undefined };
+    args: { location: { volume: string; path: string; }; };
+    response: { appId: string | undefined; };
   };
   /**
    * Set user preference for a file path's default handler
    */
   "file/set-default-handler": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation;
-    appId: string };
+    args: { location: { volume: string; path: string; }; appId: string; };
     response: void;
   };
   /**
@@ -368,8 +362,7 @@ export interface FileCommands {
    */
   "file/remove-default-handler": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: void;
   };
   /**
@@ -377,8 +370,7 @@ export interface FileCommands {
    */
   "file/get-supported-handlers": {
     mode: "result";
-    args: {
-    location: import("./index").FilesystemLocation };
+    args: { location: { volume: string; path: string; }; };
     response: import("./index").FileHandlerInfo[];
   };
   /**
@@ -387,10 +379,7 @@ export interface FileCommands {
   "file/get-associations": {
     mode: "result";
     args: Record<string, never>;
-    response: Record<
-      string,
-      { default: string | undefined; userOverride: string | undefined }
-    >;
+    response: { [x: string]: { default: string | undefined; userOverride: string | undefined; }; };
   };
 }
 
