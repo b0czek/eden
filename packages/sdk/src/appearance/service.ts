@@ -1,5 +1,6 @@
 import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as v from "valibot";
 import { createEvent } from "../events/event";
 import { log } from "../logging";
 import type { AppearanceSettings } from "./ports";
@@ -8,6 +9,7 @@ import {
   resolveWallpaper,
   WALLPAPER_PRESETS,
 } from "./presets";
+import { wallpaperConfigSchema } from "./schemas";
 
 interface AppearanceDependencies {
   settings: AppearanceSettings;
@@ -26,7 +28,7 @@ export function createAppearance({ settings }: AppearanceDependencies) {
         if (savedWallpaper) {
           try {
             currentWallpaper = resolveWallpaper(
-              JSON.parse(savedWallpaper) as WallpaperConfig,
+              v.parse(wallpaperConfigSchema, JSON.parse(savedWallpaper)),
             );
           } catch (error) {
             log.error("Failed to parse saved wallpaper config", error);
@@ -36,7 +38,7 @@ export function createAppearance({ settings }: AppearanceDependencies) {
     }
 
     function setWallpaper(config: WallpaperConfig) {
-      // The legacy store cannot cancel a write already in progress. Finish
+      // The store cannot cancel a write already in progress. Finish
       // publishing that commit before honoring interruption.
       return Effect.gen(function* () {
         yield* settings.saveWallpaper(config);
