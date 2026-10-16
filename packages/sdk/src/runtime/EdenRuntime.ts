@@ -32,7 +32,7 @@ import { createAppearanceSettings } from "../appearance/settings-adapter";
 import { BrandingManager } from "../branding";
 import { ContextMenuManager } from "../context-menu";
 import { DaemonManager } from "../daemon";
-import { DbManager } from "../db";
+import { createDb, createDbController, createSqliteDbStorage } from "../db";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { createEffectRuntime, EFFECT_RUNTIME } from "../effects/runtime";
 import { FileOpenManager } from "../file-open";
@@ -430,7 +430,14 @@ export class EdenRuntime {
     this.resolveOwned(NotificationManager);
     this.resolveOwned(ContextMenuManager);
     this.resolveOwned(FilePickerManager);
-    this.resolveOwned(DbManager);
+    const db = await this.effects.acquire(
+      createDb(
+        createSqliteDbStorage({
+          appsDirectory: this.paths.appsDirectory,
+        }),
+      ),
+    );
+    this.ipcBridge.registerController(createDbController(db));
     const appearance = await this.effects.acquire(
       createAppearance({
         settings: createAppearanceSettings(settings),

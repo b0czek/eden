@@ -234,112 +234,96 @@ export interface DbCommands {
    */
   "db/get": {
     mode: "result";
-    args: {
-    key: string };
-    response: { value: string | undefined };
+    args: { key: string; };
+    response: { value: string | undefined; };
   };
   /**
    * Set a value in database (scoped to caller's app)
    */
   "db/set": {
     mode: "result";
-    args: {
-    key: string;
-    value: string };
-    response: { success: boolean };
+    args: { key: string; value: string; };
+    response: { success: boolean; };
   };
   /**
    * Delete a key from database (scoped to caller's app)
    */
   "db/delete": {
     mode: "result";
-    args: {
-    key: string };
-    response: { success: boolean };
+    args: { key: string; };
+    response: { success: boolean; };
   };
   /**
    * Check if a key exists (scoped to caller's app)
    */
   "db/has": {
     mode: "result";
-    args: {
-    key: string };
-    response: { exists: boolean };
+    args: { key: string; };
+    response: { exists: boolean; };
   };
   /**
    * Clear all keys (scoped to caller's app)
    */
   "db/clear": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
   /**
    * List all keys (scoped to caller's app)
    */
   "db/list": {
     mode: "result";
-    args: { };
-    response: { keys: string[] };
+    args: Record<string, never>;
+    response: { keys: string[]; };
   };
   /**
    * Get a value from any app's namespace (superuser only)
    */
   "db/get/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string };
-    response: { value: string | undefined };
+    args: { appId: string; key: string; };
+    response: { value: string | undefined; };
   };
   /**
    * Set a value in any app's namespace (superuser only)
    */
   "db/set/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string;
-    value: string };
-    response: { success: boolean };
+    args: { appId: string; key: string; value: string; };
+    response: { success: boolean; };
   };
   /**
    * Delete a key from any app's namespace (superuser only)
    */
   "db/delete/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string };
-    response: { success: boolean };
+    args: { appId: string; key: string; };
+    response: { success: boolean; };
   };
   /**
    * Check if a key exists in any app's namespace (superuser only)
    */
   "db/has/su": {
     mode: "result";
-    args: {
-    appId: string;
-    key: string };
-    response: { exists: boolean };
+    args: { appId: string; key: string; };
+    response: { exists: boolean; };
   };
   /**
    * Clear all keys in any app's namespace (superuser only)
    */
   "db/clear/su": {
     mode: "result";
-    args: {
-    appId: string };
-    response: { success: boolean };
+    args: { appId: string; };
+    response: { success: boolean; };
   };
   /**
    * List all keys in any app's namespace (superuser only)
    */
   "db/list/su": {
     mode: "result";
-    args: {
-    appId: string };
-    response: { keys: string[] };
+    args: { appId: string; };
+    response: { keys: string[]; };
   };
 }
 
