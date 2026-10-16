@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { Project } from "ts-morph";
+import { generateClientCode } from "./client";
 import { extractControllers } from "./controllers";
 import { generateCommandsCode, groupCommandsByNamespace } from "./commands";
 import { generateEventsCode, groupEventsByNamespace } from "./events";
@@ -18,6 +19,10 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     import { operationTask } from "../operations/OperationTask";
     export const example = defineController("example", {
       commands: {
+        /**
+         * Read the requested count.
+         * @returns The resolved numeric value.
+         */
         read: command({
           input: v.object({ count: v.optional(v.number(), 4) }),
           handle: ({ count }) => {
@@ -25,6 +30,8 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
             return { value: resolved + 1 };
           },
         }),
+        // Internal implementation comment is not public documentation.
+        /** Save the current value. */
         save: command({ mode: "operation", handle: () => operationTask(async () => "saved") }),
       },
       events: { changed: createEvent<{ value: number }>() },
@@ -39,6 +46,16 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
       .map((diagnostic) => diagnostic.getMessageText()),
   ).toEqual([]);
   const contracts = extractControllers(fixture);
+  const commandNamespaces = groupCommandsByNamespace(contracts.commands);
+  for (const output of [
+    generateCommandsCode(commandNamespaces, new Set()),
+    generateClientCode(commandNamespaces),
+  ]) {
+    expect(output).toContain("* Read the requested count.");
+    expect(output).toContain("* @returns The resolved numeric value.");
+    expect(output).toContain("* Save the current value.");
+    expect(output).not.toContain("Internal implementation comment");
+  }
   expect(
     contracts.commands.map(({ namespace, command, fields, mode }) => ({
       namespace,

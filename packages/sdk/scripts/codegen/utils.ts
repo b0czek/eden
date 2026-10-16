@@ -28,6 +28,23 @@ export function extractDocs(node: Node): string[] {
   if (Node.isJSDocable(node)) {
     return node.getJsDocs().map((doc) => doc.getInnerText());
   }
+  if (
+    Node.isPropertyAssignment(node) ||
+    Node.isShorthandPropertyAssignment(node)
+  ) {
+    return node
+      .getLeadingCommentRanges()
+      .map((comment) => comment.getText())
+      .filter((comment) => comment.startsWith("/**"))
+      .map((comment) =>
+        comment
+          .slice(3, -2)
+          .split(/\r?\n/)
+          .map((line) => line.replace(/^\s*\* ?/, ""))
+          .join("\n")
+          .trim(),
+      );
+  }
   return [];
 }
 
