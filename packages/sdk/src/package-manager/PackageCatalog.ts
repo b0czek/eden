@@ -5,186 +5,173 @@ import type {
   RuntimeAppManifest,
   RuntimeDlcManifest,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import fg from "fast-glob";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { ExecutionContext } from "../execution";
+import { fromPromise } from "../effects/io";
+import type { ExecutionContext } from "../execution";
 import { log } from "../logging";
 import { DEFAULT_PACKAGE_ICON_DATA_URL } from "./defaultPackageIcon";
-import { PackageRegistry } from "./PackageRegistry";
-
+import type { PackageRegistry } from "./PackageRegistry";
 export interface AppPackageListOptions {
   showHidden?: boolean;
   showRestricted?: boolean;
 }
 
-/** Unified inventory and filesystem metadata for every installed package. */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-export class PackageCatalog {
-  readonly dlcDirectory: string;
-
-  constructor(
-    @inject(PackageRegistry) private readonly registry: PackageRegistry,
-    @inject(ExecutionContext)
-    private readonly executionContext: ExecutionContext,
-    @inject("appsDirectory") private readonly appsDirectory: string,
-    @inject("distPath") private readonly distPath: string,
-  ) {
-    this.dlcDirectory = path.join(appsDirectory, ".dlcs");
+export const createPackageCatalog = ({
+  registry,
+  executionContext,
+  appsDirectory,
+  distPath,
+}: {
+  registry: PackageRegistry;
+  executionContext: Pick<ExecutionContext, "canLaunchApp">;
+  appsDirectory: string;
+  distPath: string;
+}) => {
+  const dlcDirectory = path.join(appsDirectory, ".dlcs");
+  function get(packageId: string): InstalledPackageManifest | undefined {
+    return registry.get(packageId);
   }
-
-  get(packageId: string): InstalledPackageManifest | undefined {
-    return this.registry.get(packageId);
+  function has(packageId: string): boolean {
+    return get(packageId) !== undefined;
   }
-
-  has(packageId: string): boolean {
-    return this.get(packageId) !== undefined;
+  function all(): InstalledPackageManifest[] {
+    return registry.all();
   }
-
-  all(): InstalledPackageManifest[] {
-    return this.registry.all();
+  function getApp(appId: string): RuntimeAppManifest | undefined {
+    return registry.getApp(appId);
   }
-
-  getApp(appId: string): RuntimeAppManifest | undefined {
-    return this.registry.getApp(appId);
+  function hasApp(appId: string): boolean {
+    return getApp(appId) !== undefined;
   }
-
-  hasApp(appId: string): boolean {
-    return this.getApp(appId) !== undefined;
-  }
-
-  allApps(): RuntimeAppManifest[] {
-    return this.all().filter(
+  function allApps(): RuntimeAppManifest[] {
+    return all().filter(
       (manifest): manifest is RuntimeAppManifest => manifest.kind === "app",
     );
   }
-
-  prebuiltApps(): RuntimeAppManifest[] {
-    return this.allApps().filter((app) => app.isPrebuilt);
+  function prebuiltApps(): RuntimeAppManifest[] {
+    return allApps().filter((app) => app.isPrebuilt);
   }
-
-  installedApps(): RuntimeAppManifest[] {
-    return this.allApps().filter(
-      (app) => !app.isPrebuilt && !app.isDevelopment,
-    );
+  function installedApps(): RuntimeAppManifest[] {
+    return allApps().filter((app) => !app.isPrebuilt && !app.isDevelopment);
   }
-
-  developmentApps(): RuntimeAppManifest[] {
-    return this.allApps().filter((app) => app.isDevelopment);
+  function developmentApps(): RuntimeAppManifest[] {
+    return allApps().filter((app) => app.isDevelopment);
   }
-
-  listApps(options: AppPackageListOptions = {}): RuntimeAppManifest[] {
+  function listApps(options: AppPackageListOptions = {}): RuntimeAppManifest[] {
     const { showHidden = false, showRestricted = false } = options;
-    return this.allApps().filter((app) => {
+    return allApps().filter((app) => {
       if (!showHidden) {
         const isHidden = app.hidden !== undefined ? app.hidden : app.overlay;
         if (isHidden || !app.frontend?.entry) return false;
       }
-      return showRestricted || this.executionContext.canLaunchApp(app.id);
+      return showRestricted || executionContext.canLaunchApp(app.id);
     });
   }
-
-  getLaunchableApp(appId: string): RuntimeAppManifest | undefined {
-    const app = this.getApp(appId);
-    return app && this.executionContext.canLaunchApp(appId) ? app : undefined;
+  function getLaunchableApp(appId: string): RuntimeAppManifest | undefined {
+    const app = getApp(appId);
+    return app && executionContext.canLaunchApp(appId) ? app : undefined;
   }
-
-  getDlc(dlcId: string): RuntimeDlcManifest | undefined {
-    return this.registry.getDlc(dlcId);
+  function getDlc(dlcId: string): RuntimeDlcManifest | undefined {
+    return registry.getDlc(dlcId);
   }
-
-  hasDlc(dlcId: string): boolean {
-    return this.getDlc(dlcId) !== undefined;
+  function hasDlc(dlcId: string): boolean {
+    return getDlc(dlcId) !== undefined;
   }
-
-  allDlcs(): RuntimeDlcManifest[] {
-    return this.all().filter(
+  function allDlcs(): RuntimeDlcManifest[] {
+    return all().filter(
       (manifest): manifest is RuntimeDlcManifest => manifest.kind === "dlc",
     );
   }
-
-  dlcsForHost(hostAppId: string): RuntimeDlcManifest[] {
-    return this.allDlcs().filter(
-      (manifest) => manifest.hostAppId === hostAppId,
-    );
+  function dlcsForHost(hostAppId: string): RuntimeDlcManifest[] {
+    return allDlcs().filter((manifest) => manifest.hostAppId === hostAppId);
   }
-
-  getPath(packageId: string): string | undefined {
-    const manifest = this.get(packageId);
+  function getPath(packageId: string): string | undefined {
+    const manifest = get(packageId);
     if (!manifest) return undefined;
     if (manifest.kind === "dlc") {
       return manifest.isPrebuilt
-        ? path.join(this.distPath, "apps", "prebuilt", packageId)
-        : path.join(this.dlcDirectory, packageId);
+        ? path.join(distPath, "apps", "prebuilt", packageId)
+        : path.join(dlcDirectory, packageId);
     }
-    if (manifest.isDevelopment) return this.registry.getSourcePath(packageId);
+    if (manifest.isDevelopment) return registry.getSourcePath(packageId);
     return manifest.isPrebuilt
-      ? path.join(this.distPath, "apps", "prebuilt", packageId)
-      : path.join(this.appsDirectory, packageId);
+      ? path.join(distPath, "apps", "prebuilt", packageId)
+      : path.join(appsDirectory, packageId);
   }
-
-  async getIcon(packageId: string): Promise<string | undefined> {
-    const manifest = this.get(packageId);
-    const packagePath = this.getPath(packageId);
-    if (manifest?.icon && packagePath) {
-      try {
-        const iconPath =
-          manifest.kind === "dlc"
-            ? await this.resolveContainedDlcPath(packageId, manifest.icon)
-            : path.join(packagePath, manifest.icon);
-        const content = await fs.readFile(iconPath);
-        return `data:${this.imageMimeType(iconPath)};base64,${content.toString("base64")}`;
-      } catch (error) {
-        log.warn(`Failed to read icon for ${packageId}:`, error);
-      }
-    }
-    return manifest?.kind === "app" ? DEFAULT_PACKAGE_ICON_DATA_URL : undefined;
-  }
-
-  async getSize(packageId: string): Promise<number | undefined> {
-    const packagePath = this.getPath(packageId);
+  const getIcon = Effect.fn(function* (packageId: string) {
+    const manifest = get(packageId);
+    const packagePath = getPath(packageId);
+    const fallback =
+      manifest?.kind === "app" ? DEFAULT_PACKAGE_ICON_DATA_URL : undefined;
+    const icon = manifest?.icon;
+    if (!icon || !packagePath) return fallback;
+    return yield* Effect.gen(function* () {
+      const iconPath =
+        manifest.kind === "dlc"
+          ? yield* resolveContainedDlcPath(packageId, icon)
+          : path.join(packagePath, icon);
+      const content = yield* fromPromise(() => fs.readFile(iconPath));
+      return `data:${imageMimeType(iconPath)};base64,${content.toString("base64")}`;
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          log.warn(`Failed to read icon for ${packageId}:`, error);
+          return fallback;
+        }),
+      ),
+    );
+  });
+  const getSize = Effect.fn(function* (packageId: string) {
+    const packagePath = getPath(packageId);
     if (!packagePath) return undefined;
-    try {
-      const files = await fg("**/*", {
-        cwd: packagePath,
-        stats: true,
-        followSymbolicLinks: false,
-        onlyFiles: true,
-      });
-      return files.reduce((sum, file) => sum + (file.stats?.size ?? 0), 0);
-    } catch (error) {
-      log.warn(`Failed to calculate size for ${packageId}:`, error);
-      return undefined;
-    }
-  }
-
-  async resolveContainedDlcPath(
+    return yield* Effect.catch(
+      Effect.gen(function* () {
+        const files = yield* fromPromise(() =>
+          fg("**/*", {
+            cwd: packagePath,
+            stats: true,
+            followSymbolicLinks: false,
+            onlyFiles: true,
+          }),
+        );
+        return files.reduce((sum, file) => sum + (file.stats?.size ?? 0), 0);
+      }),
+      (error) =>
+        Effect.sync(() => {
+          log.warn(`Failed to calculate size for ${packageId}:`, error);
+          return undefined;
+        }),
+    );
+  });
+  const resolveContainedDlcPath = Effect.fn(function* (
     dlcId: string,
     relativePath: string,
-  ): Promise<string> {
-    const manifest = this.getDlc(dlcId);
-    const root = this.getPath(dlcId);
-    if (!manifest || !root) throw new Error(`DLC ${dlcId} is not installed`);
+  ) {
+    const manifest = getDlc(dlcId);
+    const root = getPath(dlcId);
+    if (!manifest || !root)
+      return yield* Effect.fail(new Error(`DLC ${dlcId} is not installed`));
     if (!relativePath || path.isAbsolute(relativePath)) {
-      throw new Error("DLC path must be relative");
+      return yield* Effect.fail(new Error("DLC path must be relative"));
     }
     const target = path.resolve(root, relativePath);
     const relative = path.relative(root, target);
     if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error("DLC path escapes the package root");
+      return yield* Effect.fail(new Error("DLC path escapes the package root"));
     }
-    const [realRoot, realTarget] = await Promise.all([
-      fs.realpath(root),
-      fs.realpath(target),
-    ]);
+    const [realRoot, realTarget] = yield* fromPromise(() =>
+      Promise.all([fs.realpath(root), fs.realpath(target)]),
+    );
     const realRelative = path.relative(realRoot, realTarget);
     if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
-      throw new Error("DLC path resolves outside the package root");
+      return yield* Effect.fail(
+        new Error("DLC path resolves outside the package root"),
+      );
     }
     return realTarget;
-  }
-
-  private imageMimeType(filePath: string): string {
+  });
+  function imageMimeType(filePath: string): string {
     const types: Record<string, string> = {
       ".png": "image/png",
       ".jpg": "image/jpeg",
@@ -198,4 +185,27 @@ export class PackageCatalog {
       types[path.extname(filePath).toLowerCase()] ?? "application/octet-stream"
     );
   }
-}
+  return {
+    dlcDirectory,
+    get,
+    has,
+    all,
+    getApp,
+    hasApp,
+    allApps,
+    prebuiltApps,
+    installedApps,
+    developmentApps,
+    listApps,
+    getLaunchableApp,
+    getDlc,
+    hasDlc,
+    allDlcs,
+    dlcsForHost,
+    getPath,
+    getIcon,
+    getSize,
+    resolveContainedDlcPath,
+  };
+};
+export type PackageCatalog = ReturnType<typeof createPackageCatalog>;

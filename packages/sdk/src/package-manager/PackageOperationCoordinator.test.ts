@@ -1,8 +1,12 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PackageOperationCoordinator } from "./PackageOperationCoordinator";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
+import {
+  createPackageOperationCoordinator,
+  type PackageOperationCoordinator,
+} from "./PackageOperationCoordinator";
 
 describe("PackageOperationCoordinator", () => {
   let root: string;
@@ -15,8 +19,8 @@ describe("PackageOperationCoordinator", () => {
     );
     apps = path.join(root, "apps");
     await fs.mkdir(apps, { recursive: true });
-    coordinator = new PackageOperationCoordinator(apps);
-    await coordinator.initialize();
+    coordinator = createPackageOperationCoordinator({ appsDirectory: apps });
+    await Effect.runPromise(coordinator.initialize());
   });
 
   afterEach(async () => {
@@ -30,20 +34,22 @@ describe("PackageOperationCoordinator", () => {
     await fs.writeFile(path.join(apps, "blocker"), "not a directory");
 
     await expect(
-      coordinator.execute([
-        {
-          target,
-          prepare: async (stage) => {
-            await fs.writeFile(path.join(stage, "version"), "new");
+      Effect.runPromise(
+        coordinator.execute([
+          {
+            target,
+            prepare: (stage) =>
+              fromPromise(() =>
+                fs.writeFile(path.join(stage, "version"), "new"),
+              ),
           },
-        },
-        {
-          target: path.join(apps, "blocker", "child"),
-          prepare: async (stage) => {
-            await fs.writeFile(path.join(stage, "value"), "new");
+          {
+            target: path.join(apps, "blocker", "child"),
+            prepare: (stage) =>
+              fromPromise(() => fs.writeFile(path.join(stage, "value"), "new")),
           },
-        },
-      ]),
+        ]),
+      ),
     ).rejects.toThrow();
 
     await expect(
@@ -77,7 +83,7 @@ describe("PackageOperationCoordinator", () => {
       }),
     );
 
-    await coordinator.initialize();
+    await Effect.runPromise(coordinator.initialize());
 
     await expect(
       fs.readFile(path.join(target, "version"), "utf-8"),
@@ -96,16 +102,24 @@ describe("PackageOperationCoordinator", () => {
     });
     const order: string[] = [];
 
-    const first = coordinator.runExclusive(async () => {
-      order.push("first filesystem swap");
-      firstStarted();
-      await firstBlocked;
-      order.push("first registry update");
-    });
+    const first = Effect.runPromise(
+      coordinator.runExclusive(() =>
+        Effect.gen(function* () {
+          order.push("first filesystem swap");
+          firstStarted();
+          yield* fromPromise(() => firstBlocked);
+          order.push("first registry update");
+        }),
+      ),
+    );
     await started;
-    const second = coordinator.runExclusive(async () => {
-      order.push("second filesystem swap");
-    });
+    const second = Effect.runPromise(
+      coordinator.runExclusive(() =>
+        Effect.sync(() => {
+          order.push("second filesystem swap");
+        }),
+      ),
+    );
 
     await Promise.resolve();
     expect(order).toEqual(["first filesystem swap"]);

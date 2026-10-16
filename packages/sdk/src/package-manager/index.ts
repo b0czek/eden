@@ -1,6 +1,17 @@
-export { DlcResourceManager } from "./DlcResourceManager";
-export { type AppPackageListOptions, PackageCatalog } from "./PackageCatalog";
-export { PackageHandler } from "./PackageHandler";
-export { PackageManager } from "./PackageManager";
-export { PackageOperationCoordinator } from "./PackageOperationCoordinator";
-export { PackageRegistry } from "./PackageRegistry";
+export { createPackageController } from "./controller-edenapi";
+export {
+  createDlcResourceManager,
+  type DlcResourceManager,
+} from "./DlcResourceManager";
+export {
+  type AppPackageListOptions,
+  createPackageCatalog,
+  type PackageCatalog,
+} from "./PackageCatalog";
+export { createPackageManager, type PackageManager } from "./PackageManager";
+export {
+  createPackageOperationCoordinator,
+  type PackageOperationCoordinator,
+} from "./PackageOperationCoordinator";
+export { createPackageRegistry, type PackageRegistry } from "./PackageRegistry";
+export { createDlcResourceProtocols } from "./resource-adapter";

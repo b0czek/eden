@@ -1,8 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { PackageManager } from "../../../src/package-manager/PackageManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("PackageManager development packages", () => {
@@ -45,13 +43,13 @@ describe("PackageManager development packages", () => {
         hotReload: { enabled: true, stateDirectory },
       },
     });
-    const packages = eden.runtime.resolve(PackageManager);
-    const catalog = eden.runtime.resolve(PackageCatalog);
+    const packages = eden.runtime.services.packages;
+    const catalog = eden.runtime.services.catalog;
 
     expect(catalog.getPath(manifest.id)).toBe(sourcePath);
-    await packages.reloadPackage(manifest.id);
+    await eden.runtime.effects.run(packages.reloadPackage(manifest.id));
     expect(catalog.getPath(manifest.id)).toBe(sourcePath);
-    await packages.reloadPackage(manifest.id);
+    await eden.runtime.effects.run(packages.reloadPackage(manifest.id));
     expect(catalog.getPath(manifest.id)).toBe(sourcePath);
   });
 });

@@ -1,9 +1,7 @@
-import { testApp } from "../../tests/support/apps";
-import "reflect-metadata";
-
 import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
-import { PackageCatalog } from "./PackageCatalog";
-import { PackageRegistry } from "./PackageRegistry";
+import { testApp } from "../../tests/support/apps";
+import { createPackageCatalog } from "./PackageCatalog";
+import { createPackageRegistry } from "./PackageRegistry";
 
 const manifest = (
   id: string,
@@ -15,15 +13,15 @@ const manifest = (
   }) as RuntimeAppManifest;
 
 const createInventory = () => {
-  const registry = new PackageRegistry();
-  const catalog = new PackageCatalog(
+  const registry = createPackageRegistry();
+  const catalog = createPackageCatalog({
     registry,
-    {
+    executionContext: {
       canLaunchApp: (appId: string) => appId !== "app.restricted",
-    } as never,
-    "/installed",
-    "/dist",
-  );
+    },
+    appsDirectory: "/installed",
+    distPath: "/dist",
+  });
   return { catalog, registry };
 };
 

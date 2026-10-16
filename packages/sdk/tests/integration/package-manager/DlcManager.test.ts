@@ -10,11 +10,6 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type { EdenPackageChange } from "../../../src/api";
-import { PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const vendor: UserProfile = {
@@ -99,12 +94,12 @@ describe("DLC package lifecycle", () => {
         },
       },
     );
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     let archiveReadStarted!: () => void;
     const reading = new Promise<void>((resolve) => {
       archiveReadStarted = resolve;
     });
-    const off = manager.on("changed", ({ snapshot }) => {
+    const off = manager.changed.on(({ payload: { snapshot } }) => {
       if (
         snapshot.command === "package/install" &&
         snapshot.phase === "extracting-archive"
@@ -150,10 +145,10 @@ describe("DLC package lifecycle", () => {
       { "index.html": "<html>operation</html>" },
     );
     const caller = { principal: { kind: "user" as const, profile: vendor } };
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const phases: string[] = [];
     const progress: unknown[] = [];
-    const off = manager.on("changed", ({ snapshot }) => {
+    const off = manager.changed.on(({ payload: { snapshot } }) => {
       if (snapshot.phase) phases.push(snapshot.phase);
       if (snapshot.progress) progress.push(snapshot.progress);
     });
@@ -373,9 +368,8 @@ describe("DLC package lifecycle", () => {
       { principal: { kind: "user", profile: vendor } },
     );
     const settingsChanges: string[] = [];
-    const stopTrackingSettings = eden.runtime
-      .resolve(SettingsPanelManager)
-      .on("panels-changed", ({ reason }) => {
+    const stopTrackingSettings =
+      eden.runtime.services.settingsPanels.changed.on(({ reason }) => {
         settingsChanges.push(reason);
       });
     await eden.complete(
@@ -423,8 +417,8 @@ describe("DLC package lifecycle", () => {
     );
 
     const inspectorAppId = "com.example.inspector";
-    const permissions = eden.runtime.resolve(PermissionRegistry);
-    const views = eden.runtime.resolve(ViewManager);
+    const permissions = eden.runtime.services.permissions;
+    const views = eden.runtime.services.views;
     const inspectorViewId = views.createView(
       inspectorAppId,
       {
@@ -580,9 +574,8 @@ describe("DLC package lifecycle", () => {
     ]);
     const changes: EdenPackageChange[] = [];
     const uninstallSettingsChanges: string[] = [];
-    const stopTrackingUninstallSettings = eden.runtime
-      .resolve(SettingsPanelManager)
-      .on("panels-changed", ({ reason }) => {
+    const stopTrackingUninstallSettings =
+      eden.runtime.services.settingsPanels.changed.on(({ reason }) => {
         uninstallSettingsChanges.push(reason);
       });
     const unsubscribe = eden.runtime.packages.onChanged((change) =>
@@ -902,7 +895,7 @@ describe("DLC package lifecycle", () => {
       manifest: { ...dlc, isPrebuilt: true },
       dlcs: [],
     });
-    expect(eden.runtime.resolve(PackageCatalog).getPath(dlc.id)).toBe(dlcRoot);
+    expect(eden.runtime.services.catalog.getPath(dlc.id)).toBe(dlcRoot);
     await expect(
       eden.runtime.packages.getSize(dlc.id),
     ).resolves.toBeGreaterThan(0);

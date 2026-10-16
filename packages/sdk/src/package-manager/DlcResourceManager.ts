@@ -2,14 +2,16 @@ import { randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { DlcResource } from "@edenapp/types";
-import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import {
-  PLATFORM_RESOURCES,
-  type PlatformProtocolRequest,
-  type ResourceProtocolPort,
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
+import { fromPromise } from "../effects/io";
+import { listen } from "../events/scoped";
+import type {
+  PlatformProtocolRequest,
+  PlatformProtocolResponse,
 } from "../platform/ports";
-import { ViewManager } from "../view-manager/ViewManager";
-import { PackageCatalog } from "./PackageCatalog";
+import type { ViewManager } from "../view-manager/ViewManager";
+import type { PackageCatalog } from "./PackageCatalog";
 
 const SCHEME = "eden-dlc";
 const AUTHORITY = "resource";
@@ -24,58 +26,49 @@ export interface BackendDlcBinding {
   roots: Record<string, string>;
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-export class DlcResourceManager {
-  private readonly capabilities = new Map<string, Capability>();
-  private readonly capabilityByView = new Map<number, Map<string, string>>();
-  private readonly backendBindings = new Map<string, BackendDlcBinding>();
-  private initialized = false;
-  private offViewRemoved?: () => void;
-
-  constructor(
-    @inject(PackageCatalog) private readonly catalog: PackageCatalog,
-    @inject(delay(() => ViewManager)) private readonly views: ViewManager,
-    @inject(PLATFORM_RESOURCES)
-    private readonly protocols: ResourceProtocolPort,
-  ) {}
-
-  initialize(): void {
-    if (this.initialized) return;
-    this.initialized = true;
-    this.protocols.handle(
-      SCHEME,
-      (request) => this.authorize(request),
-      (request) => this.serve(request),
-    );
-    this.offViewRemoved = this.views.on("view-removed", ({ webContentsId }) =>
-      this.revokeView(webContentsId),
-    );
-  }
-
-  list(hostAppId: string, webContentsId?: number): DlcResource[] {
-    const manifests = this.catalog.dlcsForHost(hostAppId);
+export interface DlcResourceProtocols {
+  serve(
+    scheme: string,
+    authorize: (request: PlatformProtocolRequest) => boolean,
+    handler: (
+      request: PlatformProtocolRequest,
+    ) => Effect.Effect<PlatformProtocolResponse, Error>,
+  ): Effect.Effect<void, Error, Scope.Scope>;
+}
+export const createDlcResourceManager = Effect.fn(function* ({
+  catalog,
+  views,
+  protocols,
+}: {
+  catalog: PackageCatalog;
+  views: Pick<ViewManager, "viewRemoved">;
+  protocols: DlcResourceProtocols;
+}) {
+  const capabilities = new Map<string, Capability>();
+  const capabilityByView = new Map<number, Map<string, string>>();
+  const backendBindings = new Map<string, BackendDlcBinding>();
+  function list(hostAppId: string, webContentsId?: number): DlcResource[] {
+    const manifests = catalog.dlcsForHost(hostAppId);
     if (webContentsId === undefined) {
       const binding =
-        this.backendBindings.get(hostAppId) ??
-        this.createBackendBinding(hostAppId);
+        backendBindings.get(hostAppId) ?? createBackendBinding(hostAppId);
       return manifests.map((manifest) => ({
         manifest,
-        rootUrl: this.rootUrl(binding.capability, manifest.id),
+        rootUrl: rootUrl(binding.capability, manifest.id),
       }));
     }
 
-    const capability = this.getOrCreateCapability(hostAppId, webContentsId);
+    const capability = getOrCreateCapability(hostAppId, webContentsId);
     return manifests.map((manifest) => ({
       manifest,
-      rootUrl: this.rootUrl(capability, manifest.id),
+      rootUrl: rootUrl(capability, manifest.id),
     }));
   }
 
-  createBackendBinding(appId: string): BackendDlcBinding {
+  function createBackendBinding(appId: string): BackendDlcBinding {
     const roots = Object.fromEntries(
-      this.catalog.dlcsForHost(appId).map((manifest) => {
-        const root = this.catalog.getPath(manifest.id);
+      catalog.dlcsForHost(appId).map((manifest) => {
+        const root = catalog.getPath(manifest.id);
         if (!root) throw new Error(`DLC ${manifest.id} is not installed`);
         return [manifest.id, root];
       }),
@@ -84,89 +77,76 @@ export class DlcResourceManager {
       capability: randomBytes(32).toString("base64url"),
       roots,
     };
-    this.backendBindings.set(appId, binding);
+    backendBindings.set(appId, binding);
     return structuredClone(binding);
   }
 
-  revokeBackend(appId: string): void {
-    this.backendBindings.delete(appId);
+  function revokeBackend(appId: string): void {
+    backendBindings.delete(appId);
   }
 
-  dispose(): void {
-    if (!this.initialized) return;
-    this.initialized = false;
-    this.offViewRemoved?.();
-    this.offViewRemoved = undefined;
-    this.capabilities.clear();
-    this.capabilityByView.clear();
-    this.backendBindings.clear();
-    this.protocols.unhandle(SCHEME);
-  }
-
-  private getOrCreateCapability(appId: string, webContentsId: number): string {
-    let capabilityByHost = this.capabilityByView.get(webContentsId);
+  function getOrCreateCapability(appId: string, webContentsId: number): string {
+    let capabilityByHost = capabilityByView.get(webContentsId);
     if (!capabilityByHost) {
       capabilityByHost = new Map();
-      this.capabilityByView.set(webContentsId, capabilityByHost);
+      capabilityByView.set(webContentsId, capabilityByHost);
     }
     const existing = capabilityByHost.get(appId);
     if (existing) return existing;
 
     const capability = randomBytes(32).toString("base64url");
-    this.capabilities.set(capability, { appId, webContentsId });
+    capabilities.set(capability, { appId, webContentsId });
     capabilityByHost.set(appId, capability);
     return capability;
   }
 
-  private revokeView(webContentsId: number): void {
-    const capabilityByHost = this.capabilityByView.get(webContentsId);
+  function revokeView(webContentsId: number): void {
+    const capabilityByHost = capabilityByView.get(webContentsId);
     if (!capabilityByHost) return;
     for (const capability of capabilityByHost.values()) {
-      this.capabilities.delete(capability);
+      capabilities.delete(capability);
     }
-    this.capabilityByView.delete(webContentsId);
+    capabilityByView.delete(webContentsId);
   }
 
-  private authorize(request: PlatformProtocolRequest): boolean {
+  function authorize(request: PlatformProtocolRequest): boolean {
     if (request.method !== "GET" && request.method !== "HEAD") return false;
     if (request.webContentsId === undefined) return false;
-    const route = this.parseRoute(request.url);
+    const route = parseRoute(request.url);
     if (!route) return false;
-    const binding = this.capabilities.get(route.capability);
+    const binding = capabilities.get(route.capability);
     if (!binding || binding.webContentsId !== request.webContentsId) {
       return false;
     }
-    const manifest = this.catalog.getDlc(route.dlcId);
+    const manifest = catalog.getDlc(route.dlcId);
     return manifest?.hostAppId === binding.appId;
   }
 
-  private async serve(request: PlatformProtocolRequest) {
-    try {
-      const route = this.parseRoute(request.url);
-      if (!route?.relativePath) return { status: 404 };
-      const filePath = await this.catalog.resolveContainedDlcPath(
+  const serve = Effect.fn(function* (request: PlatformProtocolRequest) {
+    const route = parseRoute(request.url);
+    if (!route?.relativePath) return { status: 404 };
+    return yield* Effect.gen(function* () {
+      const filePath = yield* catalog.resolveContainedDlcPath(
         route.dlcId,
         route.relativePath,
       );
-      const stat = await fs.stat(filePath);
+      const stat = yield* fromPromise(() => fs.stat(filePath));
       if (!stat.isFile()) return { status: 404 };
       return {
         status: 200,
         filePath,
         headers: {
-          "Content-Type": this.mimeType(filePath),
+          "Content-Type": mimeType(filePath),
           "X-Content-Type-Options": "nosniff",
           "Cross-Origin-Resource-Policy": "cross-origin",
           "Access-Control-Allow-Origin": "*",
           "Cache-Control": "private, max-age=31536000, immutable",
         },
       };
-    } catch {
-      return { status: 404 };
-    }
-  }
+    }).pipe(Effect.catch(() => Effect.succeed({ status: 404 })));
+  });
 
-  private parseRoute(urlValue: string): {
+  function parseRoute(urlValue: string): {
     capability: string;
     dlcId: string;
     relativePath: string;
@@ -202,11 +182,11 @@ export class DlcResourceManager {
     }
   }
 
-  private rootUrl(capability: string, dlcId: string): string {
+  function rootUrl(capability: string, dlcId: string): string {
     return `${SCHEME}://${AUTHORITY}/${capability}/${encodeURIComponent(dlcId)}/`;
   }
 
-  private mimeType(filePath: string): string {
+  function mimeType(filePath: string): string {
     const types: Record<string, string> = {
       ".js": "text/javascript; charset=utf-8",
       ".mjs": "text/javascript; charset=utf-8",
@@ -232,4 +212,19 @@ export class DlcResourceManager {
       types[path.extname(filePath).toLowerCase()] ?? "application/octet-stream"
     );
   }
-}
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      capabilities.clear();
+      capabilityByView.clear();
+      backendBindings.clear();
+    }),
+  );
+  yield* protocols.serve(SCHEME, authorize, serve);
+  yield* listen(views.viewRemoved, ({ webContentsId }) =>
+    revokeView(webContentsId),
+  );
+  return { list, createBackendBinding, revokeBackend };
+});
+export type DlcResourceManager = Effect.Success<
+  ReturnType<typeof createDlcResourceManager>
+>;

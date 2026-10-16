@@ -1,7 +1,5 @@
-import "reflect-metadata";
-
 import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
-import { PackageRegistry } from "./PackageRegistry";
+import { createPackageRegistry } from "./PackageRegistry";
 
 const app: RuntimeAppManifest = {
   kind: "app",
@@ -27,7 +25,7 @@ const dlc: RuntimeDlcManifest = {
 
 describe("PackageRegistry", () => {
   it("registers and narrows both package kinds", () => {
-    const registry = new PackageRegistry();
+    const registry = createPackageRegistry();
     registry.register(app);
     registry.register(dlc);
 
@@ -37,7 +35,7 @@ describe("PackageRegistry", () => {
   });
 
   it("returns copies and unregisters by package ID", () => {
-    const registry = new PackageRegistry();
+    const registry = createPackageRegistry();
     registry.register(app, { sourcePath: "/source/app.example" });
     const returned = registry.getApp(app.id);
     if (!returned) throw new Error("Expected registered app");
