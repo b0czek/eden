@@ -16,6 +16,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     import * as v from "valibot";
     import { command, defineController } from "./controller";
     import { createEvent } from "../events/event";
+    import { targetedEvent, type TargetedNotification } from "./events";
     import { operationTask } from "../operations/OperationTask";
     export const example = defineController("example", {
       commands: {
@@ -34,7 +35,10 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
         /** Save the current value. */
         save: command({ mode: "operation", handle: () => operationTask(async () => "saved") }),
       },
-      events: { changed: createEvent<{ value: number }>() },
+      events: {
+        changed: createEvent<{ value: number }>(),
+        selected: targetedEvent(createEvent<TargetedNotification<{ selected: string }>>()),
+      },
     });
     // @ts-expect-error the validated argument is inferred as a number
     command({ input: v.object({ count: v.number() }), handle: ({ count }: { count: string }) => count });
@@ -78,7 +82,10 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
       namespace,
       eventName,
     })),
-  ).toEqual([{ namespace: "example", eventName: "changed" }]);
+  ).toEqual([
+    { namespace: "example", eventName: "changed" },
+    { namespace: "example", eventName: "selected" },
+  ]);
   project.createSourceFile(
     path.join(__dirname, "../../src/controllers/events.fixture.ts"),
     generateEventsCode(groupEventsByNamespace(contracts.events), new Set()),
@@ -88,6 +95,9 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     `
     import type { ExampleEvents } from "./events.fixture";
     const change: ExampleEvents["example/changed"] = { value: 2 };
+    const selected: ExampleEvents["example/selected"] = { selected: "item" };
+    // @ts-expect-error routing metadata is private to the controller
+    const routed: ExampleEvents["example/selected"] = { selected: "item", viewIds: [1] };
     // @ts-expect-error generated event payloads retain their numeric field
     const invalid: ExampleEvents["example/changed"] = { value: "two" };
   `,

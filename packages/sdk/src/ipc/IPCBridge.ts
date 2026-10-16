@@ -92,8 +92,20 @@ export class IPCBridge extends EventEmitter {
       const name = `${controller.namespace}/${event}` as EventName;
       this.controllerEvents.set(
         name,
-        source.on((payload) => {
-          this.eventSubscribers.notify(name, payload as EventData<typeof name>);
+        source.on((payload, viewIds) => {
+          if (viewIds !== undefined) {
+            for (const viewId of new Set(viewIds))
+              this.eventSubscribers.notifyView(
+                viewId,
+                name,
+                payload as EventData<typeof name>,
+              );
+          } else {
+            this.eventSubscribers.notify(
+              name,
+              payload as EventData<typeof name>,
+            );
+          }
         }),
       );
     }

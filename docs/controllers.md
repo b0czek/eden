@@ -162,6 +162,14 @@ app subscription routing. Apps retain the generated `domain.subscribe` and
 `domain.unsubscribe` methods. Controller registration creates no source-specific
 subscription handlers. IPC forwarding is released during runtime disposal.
 
+For notifications intended for specific views, publish a
+`TargetedNotification<Payload>` containing `payload` and `viewIds`, and expose
+the source through `targetedEvent(source)` from `controllers/events.ts` in the
+controller's event map. Forwarding delivers the payload only to those subscribed
+views; an empty audience delivers nothing. Routing metadata stays internal and
+does not enter the generated event payload. The service scope owns the local
+source, and runtime disposal releases its IPC forwarding.
+
 ## Composition and generation
 
 One [Effect runtime](../packages/sdk/src/effects/runtime.ts) belongs to each Eden

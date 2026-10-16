@@ -96,9 +96,14 @@ export function extractControllers(source: SourceFile): {
         .getProperty("emit")
         ?.getTypeAtLocation(node)
         .getCallSignatures()[0];
-      const payload: Type | undefined = emit
-        ?.getParameters()[0]
-        ?.getTypeAtLocation(node);
+      const payload: Type | undefined =
+        sourceType
+          .getProperty("contract")
+          ?.getTypeAtLocation(node)
+          .getNonNullableType()
+          .getProperty("payload")
+          ?.getTypeAtLocation(node) ??
+        emit?.getParameters()[0]?.getTypeAtLocation(node);
       if (!payload)
         throw new Error(
           `${namespace}/${property.getName()}: event requires a typed source`,

@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { Effect } from "effect";
-import type { Event } from "../events/event";
+import type { ControllerEvent } from "./events";
 import type { CommandCallerContext } from "../execution/ExecutionContext";
 import type { OperationTask } from "../operations/OperationTask";
 
@@ -78,14 +78,17 @@ export function command(
 export interface Controller {
   readonly namespace: string;
   readonly commands: Record<string, ControllerCommand>;
-  readonly events: Record<string, Event<unknown>>;
+  readonly events: Record<string, ControllerEvent<unknown>>;
 }
 
 /** Keep the inferred command and event types available to the client generator. */
 export function defineController<
   const Namespace extends string,
   Commands extends Record<string, ControllerCommand>,
-  Events extends Record<string, Event<unknown>> = Record<string, never>,
+  Events extends Record<string, ControllerEvent<unknown>> = Record<
+    string,
+    never
+  >,
 >(namespace: Namespace, definition: { commands: Commands; events?: Events }) {
   return {
     namespace,
