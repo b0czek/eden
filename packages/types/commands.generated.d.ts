@@ -33,7 +33,7 @@ export interface SystemCommands {
   };
   "system/power": {
     mode: "operation";
-    args: { action: "poweroff" | "reboot" };
+    args: { action: "poweroff" | "reboot"; };
     response: import("./index").OperationHandle<"system/power">;
     completion: void;
   };

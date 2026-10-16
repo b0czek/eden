@@ -2,10 +2,9 @@ import "reflect-metadata";
 import type { OperationHandle } from "@edenapp/types";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { operationTask } from "../../../src/operations/OperationTask";
-import { PowerManager } from "../../../src/power/PowerManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
-describe("PowerManager integration", () => {
+describe("power operation lifecycle", () => {
   let eden: TestEden;
 
   afterEach(async () => {
@@ -70,39 +69,31 @@ describe("PowerManager integration", () => {
       },
     });
     const manager = eden.runtime.resolve(OperationManager);
-    const power = eden.runtime.resolve(PowerManager);
-    let handoffFailed!: () => void;
-    const failed = new Promise<void>((resolve) => {
-      handoffFailed = resolve;
+    const handle = await eden.execute<OperationHandle>("system/power", {
+      action: "poweroff",
     });
-    let release!: () => void;
-    const blocked = new Promise<void>((resolve) => {
-      release = resolve;
+    let admissionDuringFailure: Promise<unknown> | undefined;
+    const stop = manager.on("changed", ({ snapshot }) => {
+      if (snapshot.id !== handle.id || snapshot.status !== "failed") return;
+      admissionDuringFailure = eden
+        .execute("system/power", { action: "poweroff" })
+        .then(
+          () => undefined,
+          (error) => error,
+        );
     });
-    const handle = manager.submit("integration/power-handoff", {}, {}, () =>
-      operationTask(
-        async () => {
-          try {
-            await power.power({ action: "poweroff" });
-          } catch (error) {
-            handoffFailed();
-            await blocked;
-            throw error;
-          }
-        },
-        { transition: "runtime" },
-      ),
-    );
     try {
-      await failed;
-      expect(manager.get(handle).status).toBe("running");
-      await expect(
-        eden.execute("system/power", { action: "poweroff" }),
-      ).rejects.toThrow("draining");
+      await expect(manager.wait(handle)).rejects.toThrow(
+        "Host refused poweroff",
+      );
+      expect(admissionDuringFailure).toBeDefined();
+      expect(await admissionDuringFailure).toBeInstanceOf(Error);
+      expect(((await admissionDuringFailure) as Error).message).toContain(
+        "draining",
+      );
     } finally {
-      release();
+      stop();
     }
-    await expect(manager.wait(handle)).rejects.toThrow("Host refused poweroff");
     await expect(eden.complete("session/logout")).resolves.toEqual({
       success: true,
     });

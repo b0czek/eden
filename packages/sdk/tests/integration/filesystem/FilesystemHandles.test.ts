@@ -10,7 +10,6 @@ import type {
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
 import { OperationManager } from "../../../src/operations/OperationManager";
 import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { PowerManager } from "../../../src/power/PowerManager";
 import { BackendManager } from "../../../src/process-manager/BackendManager";
 import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { SessionContext } from "../../../src/session/SessionContext";
@@ -354,14 +353,9 @@ describe("file handle access and lifetime", () => {
     },
   );
 
-  it.each([
-    ["operation", "poweroff"],
-    ["operation", "reboot"],
-    ["host", "poweroff"],
-    ["host", "reboot"],
-  ] as const)(
-    "releases retained handles before %s %s drains an eject",
-    async (entry, action) => {
+  it.each(["poweroff", "reboot"] as const)(
+    "releases retained handles before %s drains an eject",
+    async (action) => {
       await launchOwner(true);
       await execute("fs/open", { location });
       const eject = await eden.execute<OperationHandle>(
@@ -369,9 +363,7 @@ describe("file handle access and lifetime", () => {
         { volume: "usb" },
         caller,
       );
-      if (entry === "operation")
-        await eden.complete("system/power", { action });
-      else await eden.runtime.resolve(PowerManager).power({ action });
+      await eden.complete("system/power", { action });
       await eden.runtime.resolve(OperationManager).wait(eject, caller);
       expect(ejected).toBe(true);
       expect(powerHandoffs).toBe(1);
@@ -409,21 +401,15 @@ describe("file handle access and lifetime", () => {
     expect(await execute("fs/read", { location: nextHandle })).toBe("original");
   });
 
-  it.each(["operation", "host"] as const)(
-    "allows new handles after a failed power handoff via %s",
-    async (entry) => {
-      const handle = await execute<FilesystemHandle>("fs/open", { location });
-      powerFailure = new Error("Host refused poweroff");
-      const transition =
-        entry === "operation"
-          ? eden.complete("system/power", { action: "poweroff" })
-          : eden.runtime.resolve(PowerManager).power({ action: "poweroff" });
-      await expect(transition).rejects.toThrow("Host refused poweroff");
-      await expect(execute("fs/read", { location: handle })).rejects.toThrow(
-        /unavailable/,
-      );
-      const reopened = await execute<FilesystemHandle>("fs/open", { location });
-      expect(await execute("fs/read", { location: reopened })).toBe("original");
-    },
-  );
+  it("allows new handles after a failed power handoff", async () => {
+    const handle = await execute<FilesystemHandle>("fs/open", { location });
+    powerFailure = new Error("Host refused poweroff");
+    const transition = eden.complete("system/power", { action: "poweroff" });
+    await expect(transition).rejects.toThrow("Host refused poweroff");
+    await expect(execute("fs/read", { location: handle })).rejects.toThrow(
+      /unavailable/,
+    );
+    const reopened = await execute<FilesystemHandle>("fs/open", { location });
+    expect(await execute("fs/read", { location: reopened })).toBe("original");
+  });
 });

@@ -101,7 +101,13 @@ import {
   PLATFORM_WINDOWS,
   type PlatformWindow,
 } from "../platform/ports";
-import { PowerHandler } from "../power";
+import {
+  createPower,
+  createPowerController,
+  createPowerHost,
+  createPowerOperations,
+  createPowerShutdown,
+} from "../power";
 import {
   AutostartManager,
   BackendManager,
@@ -529,7 +535,19 @@ export class EdenRuntime {
     await this.effects.run(this.keyboardService.initialize());
 
     this.resolveOwned(SystemHandler);
-    this.resolveOwned(PowerHandler);
+    const power = await this.effects.acquire(
+      createPower({
+        host: createPowerHost(this.config.powerProvider),
+        daemons: createPowerShutdown(this.daemonManager),
+        processes: createPowerShutdown(this.processManager),
+      }),
+    );
+    this.ipcBridge.registerController(
+      createPowerController(
+        power,
+        createPowerOperations(power, { run: this.effects.run }),
+      ),
+    );
     const notifications = await this.effects.acquire(
       createNotifications({ views: createNotificationViews(this.viewManager) }),
     );
