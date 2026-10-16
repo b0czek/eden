@@ -4,6 +4,7 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as Semaphore from "effect/Semaphore";
 import * as v from "valibot";
 import { log } from "../logging";
 import type { AppAssociationCatalog, AppAssociationStorage } from "./ports";
@@ -34,6 +35,7 @@ export function createAppAssociations({
   return Effect.gen(function* () {
     let associations = new Map<string, AppAssociation>();
     let initialized = false;
+    const mutations = yield* Semaphore.make(1);
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
@@ -92,33 +94,39 @@ export function createAppAssociations({
         .map((app) => ({ appId: app.id, kind: "provider" }));
     }
 
-    function persistMutation(mutate: () => void) {
-      return Effect.gen(function* () {
-        const content = yield* Effect.try({
-          try: () => {
-            mutate();
-            const store: AppAssociationStore = {
-              version: 1,
-              associations: Object.fromEntries(associations),
-            };
-            return `${JSON.stringify(store, null, 2)}\n`;
-          },
-          catch: (error) =>
-            error instanceof Error ? error : new Error(String(error)),
-        });
-        yield* storage.write(content);
-      }).pipe(Effect.uninterruptible);
+    function persistMutation(
+      mutate: (next: Map<string, AppAssociation>) => void,
+    ) {
+      return mutations.withPermit(
+        Effect.gen(function* () {
+          const next = new Map(associations);
+          const content = yield* Effect.try({
+            try: () => {
+              mutate(next);
+              const store: AppAssociationStore = {
+                version: 1,
+                associations: Object.fromEntries(next),
+              };
+              return `${JSON.stringify(store, null, 2)}\n`;
+            },
+            catch: (error) =>
+              error instanceof Error ? error : new Error(String(error)),
+          });
+          yield* storage.write(content);
+          associations = next;
+        }).pipe(Effect.uninterruptible),
+      );
     }
 
     function set(key: string, association: AppAssociation) {
-      return persistMutation(() => {
-        associations.set(key, { ...association });
+      return persistMutation((next) => {
+        next.set(key, { ...association });
       });
     }
 
     function remove(key: string) {
-      return persistMutation(() => {
-        associations.delete(key);
+      return persistMutation((next) => {
+        next.delete(key);
       });
     }
 

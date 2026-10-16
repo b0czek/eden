@@ -226,8 +226,11 @@ describe("app associations persistence and catalog integration", () => {
     },
   );
 
-  it("preserves in-memory mutations when persistence fails", async () => {
+  it("keeps the committed association when its file cannot be written", async () => {
     const { associations, runtime, storePath } = await createAssociations();
+    const committed = { appId: "com.example.committed", kind: "provider" };
+    await runtime.run(associations.set("selected", committed));
+    await fs.rm(storePath);
     await fs.mkdir(storePath);
     await expect(
       runtime.run(
@@ -237,15 +240,7 @@ describe("app associations persistence and catalog integration", () => {
         }),
       ),
     ).rejects.toThrow();
-    expect(associations.get("selected")).toEqual({
-      appId: "com.example.selected",
-      kind: "provider",
-    });
-
-    await expect(
-      runtime.run(associations.remove("selected")),
-    ).rejects.toThrow();
-    expect(associations.get("selected")).toBeUndefined();
+    expect(associations.get("selected")).toEqual(committed);
   });
 
   it("clears instance state with its owning scope without clearing another service", async () => {
