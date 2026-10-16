@@ -389,24 +389,23 @@ export interface FileCommands {
 export interface FilePickerCommands {
   "file-picker/register-display": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
   "file-picker/open": {
     mode: "result";
-    args: import("./index").FilePickerOpenArgs & { };
-    response: { requestId: string };
+    args: import("./index").FilePickerOpenArgs;
+    response: { requestId: string; };
   };
   "file-picker/resolve": {
     mode: "result";
-    args: import("./index").FilePickerResult & { };
-    response: { success: boolean };
+    args: import("./index").FilePickerResult;
+    response: { success: boolean; };
   };
   "file-picker/close": {
     mode: "result";
-    args: {
-    requestId?: string };
-    response: { success: boolean };
+    args: { requestId?: string | undefined; };
+    response: { success: boolean; };
   };
 }
 

@@ -53,7 +53,14 @@ import {
   createFileOpenOperations,
   createFileOpenProcesses,
 } from "../file-open";
-import { FilePickerManager } from "../file-picker";
+import {
+  createFilePicker,
+  createFilePickerController,
+  createFilePickerViews,
+  createFilePickerProcesses,
+  createFilePickerFiles,
+  createFilePickerNotifications,
+} from "../file-picker";
 import { FilesystemManager } from "../filesystem";
 import { VolumeHandler } from "../filesystem/VolumeHandler";
 import { VolumeManager } from "../filesystem/VolumeManager";
@@ -493,20 +500,21 @@ export class EdenRuntime {
     this.resolveOwned(PowerHandler);
     this.resolveOwned(NotificationManager);
     this.resolveOwned(ContextMenuManager);
-    const filePicker = this.own(
-      new FilePickerManager(
-        this.ipcBridge,
-        this.resolveOwned(CommandRegistry),
-        this.viewManager,
-        this.resolveOwned(NotificationManager),
-        this.processManager,
+    const filePicker = await this.effects.acquire(
+      createFilePicker({
         associations,
-        this.resolveOwned(PermissionRegistry),
-        this.resolveOwned(VolumeManager),
-        this.resolveOwned(FilesystemManager),
-      ),
+        views: createFilePickerViews(this.viewManager),
+        processes: createFilePickerProcesses(this.processManager),
+        files: createFilePickerFiles(filesystem),
+        volumes: this.resolveOwned(VolumeManager),
+        permissions: this.resolveOwned(PermissionRegistry),
+        notifications: createFilePickerNotifications(
+          this.resolveOwned(NotificationManager),
+          this.effects.run,
+        ),
+      }),
     );
-    this.container.registerInstance(FilePickerManager, filePicker);
+    this.ipcBridge.registerController(createFilePickerController(filePicker));
     const db = await this.effects.acquire(
       createDb(
         createSqliteDbStorage({

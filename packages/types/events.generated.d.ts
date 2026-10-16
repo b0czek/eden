@@ -39,7 +39,7 @@ export interface FileEvents {
  * FilePickerEvents - Events for the "file-picker" namespace
  */
 export interface FilePickerEvents {
-  "file-picker/opened": { picker: import("./index").FilePickerOpenEvent };
+  "file-picker/opened": { picker: import("./index").FilePickerOpenEvent; };
   "file-picker/closed": import("./index").FilePickerResult;
 }
 
