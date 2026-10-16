@@ -1,12 +1,12 @@
 # Branding an Eden Consumer
 
 SDK consumers can replace Eden's user-facing product identity through the
-runtime configuration passed to `new Eden(...)`:
+runtime configuration passed to `createEden(...)`:
 
 ```ts
-import { Eden } from "@edenapp/sdk";
+import { createEden } from "@edenapp/sdk";
 
-new Eden({
+createEden({
   branding: {
     name: "Acme Workspace",
     logoPath: "assets/acme-logo.svg",
