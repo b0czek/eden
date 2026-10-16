@@ -1,2 +1,5 @@
-export { GrantCatalogManager } from "./GrantCatalogManager";
-export { UserManager } from "./UserManager";
+export {
+  createGrantCatalogManager,
+  type GrantCatalogManager,
+} from "./GrantCatalogManager";
+export { createUserManager, type UserManager } from "./UserManager";

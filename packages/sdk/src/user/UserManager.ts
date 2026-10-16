@@ -1,86 +1,90 @@
 import { randomBytes } from "node:crypto";
-import type { EdenConfig, UserProfile, UserRole } from "@edenapp/types";
-import { inject, Lifecycle, scoped } from "tsyringe";
-import { normalizeAppIds } from "../utils/normalize";
+import type { UserProfile, UserRole } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
 import { hashPassword, verifyPassword } from "./UserAuth";
 import {
   ensureDirectoryRestriction,
   normalizeDirectoryRestriction,
 } from "./UserDirectoryRestriction";
 import { defaultGrantsForRole, normalizeGrants } from "./UserGrants";
-import { UserStore } from "./UserStore";
+import type { UserStore } from "./UserStore";
 import type { StoredUser } from "./UserTypes";
 
-@scoped(Lifecycle.ContainerScoped)
-export class UserManager {
-  private store: UserStore;
-  private initialized = false;
-  private defaultUsername: string | null = null;
-  private restrictedApps: Set<string>;
+export const createUserManager = Effect.fn(function* ({
+  store,
+  userDirectory,
+  restrictedApps,
+}: {
+  store: UserStore;
+  userDirectory: string;
+  restrictedApps: ReadonlySet<string>;
+}) {
+  let initialized = false;
+  let defaultUsername: string | null = null;
+  const initialize = Effect.fn(function* initialize(): Effect.fn.Return<
+    void,
+    Error
+  > {
+    if (initialized) return;
+    initialized = true;
 
-  constructor(
-    @inject("EdenConfig") config: EdenConfig,
-    @inject("appsDirectory") appsDirectory: string,
-    @inject("userDirectory") private userDirectory: string,
-  ) {
-    this.store = new UserStore(appsDirectory);
-    this.restrictedApps = normalizeAppIds(config.restrictedApps);
-  }
-
-  async initialize(): Promise<void> {
-    if (this.initialized) return;
-    this.initialized = true;
-
-    await this.loadDefaultUsername();
-  }
-
-  async listUsers(): Promise<UserProfile[]> {
-    const ids = await this.store.getUserIndex();
+    yield* loadDefaultUsername();
+  });
+  const listUsers = Effect.fn(function* listUsers(): Effect.fn.Return<
+    UserProfile[],
+    Error
+  > {
+    const ids = yield* store.getUserIndex();
     const users: UserProfile[] = [];
     for (const username of ids) {
-      const record = await this.store.getUserRecord(username);
+      const record = yield* store.getUserRecord(username);
       if (record) {
-        users.push(this.toPublicUser(record));
+        users.push(toPublicUser(record));
       }
     }
     users.sort((a, b) => a.name.localeCompare(b.name));
     return users;
-  }
-
-  async getUser(username: string): Promise<UserProfile | null> {
-    const record = await this.store.getUserRecord(username);
-    return record ? this.toPublicUser(record) : null;
-  }
-
-  async createUser(args: {
+  });
+  const getUser = Effect.fn(function* getUser(
+    username: string,
+  ): Effect.fn.Return<UserProfile | null, Error> {
+    const record = yield* store.getUserRecord(username);
+    return record ? toPublicUser(record) : null;
+  });
+  const createUser = Effect.fn(function* createUser(args: {
     username?: string;
     name: string;
     role?: UserRole;
     password: string;
     grants?: string[];
     directoryRestriction?: string;
-  }): Promise<UserProfile> {
-    const username = this.normalizeUsername(args.username, args.name);
-    const existing = await this.store.getUserRecord(username);
+  }): Effect.fn.Return<UserProfile, Error> {
+    const username = normalizeUsername(args.username, args.name);
+    const existing = yield* store.getUserRecord(username);
     if (existing) {
-      throw new Error(`User "${username}" already exists`);
+      return yield* Effect.fail(new Error(`User "${username}" already exists`));
     }
 
     const role = args.role ?? "standard";
     if (role === "vendor") {
-      throw new Error("Vendor account can only be seeded");
+      return yield* Effect.fail(new Error("Vendor account can only be seeded"));
     }
-    const { passwordHash, passwordSalt } = await hashPassword(args.password);
+    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
+      hashPassword(args.password),
+    );
     const now = Date.now();
 
-    const grants = this.normalizeUserGrants(
+    const grants = normalizeUserGrants(
       role,
       args.grants ?? defaultGrantsForRole(role),
     );
-    const directoryRestriction = await ensureDirectoryRestriction(
-      this.userDirectory,
-      role,
-      args.directoryRestriction,
+    const directoryRestriction = yield* fromPromise(() =>
+      ensureDirectoryRestriction(
+        userDirectory,
+        role,
+        args.directoryRestriction,
+      ),
     );
 
     const user: StoredUser = {
@@ -95,24 +99,23 @@ export class UserManager {
       passwordSalt,
     };
 
-    await this.store.saveUserRecord(user);
-    return this.toPublicUser(user);
-  }
-
-  async updateUser(args: {
+    yield* store.saveUserRecord(user);
+    return toPublicUser(user);
+  });
+  const updateUser = Effect.fn(function* updateUser(args: {
     username: string;
     name?: string;
     role?: UserRole;
     grants?: string[];
     directoryRestriction?: string | null;
-  }): Promise<UserProfile> {
-    const user = await this.requireUserRecord(args.username);
+  }): Effect.fn.Return<UserProfile, Error> {
+    const user = yield* requireUserRecord(args.username);
 
     if (user.role === "vendor" && args.role && args.role !== "vendor") {
-      throw new Error("Vendor role cannot be changed");
+      return yield* Effect.fail(new Error("Vendor role cannot be changed"));
     }
     if (args.role === "vendor" && user.role !== "vendor") {
-      throw new Error("Vendor account can only be seeded");
+      return yield* Effect.fail(new Error("Vendor account can only be seeded"));
     }
 
     if (args.name) {
@@ -121,18 +124,20 @@ export class UserManager {
 
     if (args.role) {
       user.role = args.role;
-      user.grants = this.normalizeUserGrants(user.role, user.grants);
+      user.grants = normalizeUserGrants(user.role, user.grants);
     }
 
     if (args.grants) {
-      user.grants = this.normalizeUserGrants(user.role, args.grants);
+      user.grants = normalizeUserGrants(user.role, args.grants);
     }
 
     if (args.directoryRestriction !== undefined) {
-      const directoryRestriction = await ensureDirectoryRestriction(
-        this.userDirectory,
-        user.role,
-        args.directoryRestriction,
+      const directoryRestriction = yield* fromPromise(() =>
+        ensureDirectoryRestriction(
+          userDirectory,
+          user.role,
+          args.directoryRestriction,
+        ),
       );
       if (directoryRestriction) {
         user.directoryRestriction = directoryRestriction;
@@ -147,86 +152,93 @@ export class UserManager {
 
     user.updatedAt = Date.now();
 
-    await this.store.saveUserRecord(user);
+    yield* store.saveUserRecord(user);
 
-    return this.toPublicUser(user);
-  }
-
-  async deleteUser(username: string): Promise<void> {
-    const user = await this.requireUserRecord(username);
+    return toPublicUser(user);
+  });
+  const deleteUser = Effect.fn(function* deleteUser(
+    username: string,
+  ): Effect.fn.Return<void, Error> {
+    const user = yield* requireUserRecord(username);
     if (user.role === "vendor") {
-      throw new Error("Vendor account cannot be deleted");
+      return yield* Effect.fail(new Error("Vendor account cannot be deleted"));
     }
 
-    await this.store.deleteUserRecord(username);
-  }
-
-  async setPassword(username: string, password: string): Promise<UserProfile> {
-    const user = await this.requireUserRecord(username);
-    const { passwordHash, passwordSalt } = await hashPassword(password);
+    yield* store.deleteUserRecord(username);
+  });
+  const setPassword = Effect.fn(function* setPassword(
+    username: string,
+    password: string,
+  ): Effect.fn.Return<UserProfile, Error> {
+    const user = yield* requireUserRecord(username);
+    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
+      hashPassword(password),
+    );
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
-    await this.store.saveUserRecord(user);
-    return this.toPublicUser(user);
-  }
-
-  async changePassword(
+    yield* store.saveUserRecord(user);
+    return toPublicUser(user);
+  });
+  const changePassword = Effect.fn(function* changePassword(
     username: string,
     currentPassword: string,
     newPassword: string,
-  ): Promise<UserProfile> {
-    const user = await this.requireUserRecord(username);
-    const valid = await verifyPassword(
-      currentPassword,
-      user.passwordSalt,
-      user.passwordHash,
+  ): Effect.fn.Return<UserProfile, Error> {
+    const user = yield* requireUserRecord(username);
+    const valid = yield* fromPromise(() =>
+      verifyPassword(currentPassword, user.passwordSalt, user.passwordHash),
     );
     if (!valid) {
-      throw new Error("Invalid password");
+      return yield* Effect.fail(new Error("Invalid password"));
     }
 
-    const { passwordHash, passwordSalt } = await hashPassword(newPassword);
+    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
+      hashPassword(newPassword),
+    );
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
-    await this.store.saveUserRecord(user);
-    return this.toPublicUser(user);
-  }
-
-  async authenticate(username: string, password: string): Promise<UserProfile> {
-    const user = await this.requireUserRecord(username);
+    yield* store.saveUserRecord(user);
+    return toPublicUser(user);
+  });
+  const authenticate = Effect.fn(function* authenticate(
+    username: string,
+    password: string,
+  ): Effect.fn.Return<UserProfile, Error> {
+    const user = yield* requireUserRecord(username);
 
     if (
-      !(await verifyPassword(password, user.passwordSalt, user.passwordHash))
+      !(yield* fromPromise(() =>
+        verifyPassword(password, user.passwordSalt, user.passwordHash),
+      ))
     ) {
-      throw new Error("Invalid credentials");
+      return yield* Effect.fail(new Error("Invalid credentials"));
     }
 
-    return this.toPublicUser(user);
+    return toPublicUser(user);
+  });
+  function getDefaultUsername(): string | null {
+    return defaultUsername;
   }
-
-  getDefaultUsername(): string | null {
-    return this.defaultUsername;
-  }
-
-  async setDefaultUsername(username: string | null): Promise<void> {
+  const setDefaultUsername = Effect.fn(function* setDefaultUsername(
+    username: string | null,
+  ): Effect.fn.Return<void, Error> {
     if (!username) {
-      this.defaultUsername = null;
-      await this.store.setDefaultUsername(null);
+      defaultUsername = null;
+      yield* store.setDefaultUsername(null);
       return;
     }
 
-    const user = await this.store.getUserRecord(username);
+    const user = yield* store.getUserRecord(username);
     if (!user) {
-      throw new Error(`User "${username}" not found`);
+      return yield* Effect.fail(new Error(`User "${username}" not found`));
     }
 
-    this.defaultUsername = username;
-    await this.store.setDefaultUsername(username);
-  }
-
-  private normalizeUsername(
+    defaultUsername = username;
+    yield* store.setDefaultUsername(username);
+  });
+  function normalizeUsername(
     username: string | undefined,
     name: string,
   ): string {
@@ -240,16 +252,16 @@ export class UserManager {
     const suffix = randomBytes(2).toString("hex");
     return `${slug || "user"}-${suffix}`;
   }
-
-  private async requireUserRecord(username: string): Promise<StoredUser> {
-    const record = await this.store.getUserRecord(username);
+  const requireUserRecord = Effect.fn(function* requireUserRecord(
+    username: string,
+  ): Effect.fn.Return<StoredUser, Error> {
+    const record = yield* store.getUserRecord(username);
     if (!record) {
-      throw new Error(`User "${username}" not found`);
+      return yield* Effect.fail(new Error(`User "${username}" not found`));
     }
     return record;
-  }
-
-  private toPublicUser(user: StoredUser): UserProfile {
+  });
+  function toPublicUser(user: StoredUser): UserProfile {
     return {
       username: user.username,
       name: user.name,
@@ -260,32 +272,28 @@ export class UserManager {
       updatedAt: user.updatedAt,
     };
   }
-
-  private async loadDefaultUsername(): Promise<void> {
-    this.defaultUsername = await this.store.getDefaultUsername();
-  }
-
-  async getDefaultUser(): Promise<UserProfile | null> {
-    if (!this.defaultUsername) return null;
-    const user = await this.store.getUserRecord(this.defaultUsername);
-    return user ? this.toPublicUser(user) : null;
-  }
-
-  private normalizeUserGrants(role: UserRole, grants: string[]): string[] {
+  const loadDefaultUsername = Effect.fn(
+    function* loadDefaultUsername(): Effect.fn.Return<void, Error> {
+      defaultUsername = yield* store.getDefaultUsername();
+    },
+  );
+  const getDefaultUser = Effect.fn(function* getDefaultUser(): Effect.fn.Return<
+    UserProfile | null,
+    Error
+  > {
+    if (!defaultUsername) return null;
+    const user = yield* store.getUserRecord(defaultUsername);
+    return user ? toPublicUser(user) : null;
+  });
+  function normalizeUserGrants(role: UserRole, grants: string[]): string[] {
     const normalized = normalizeGrants(role, grants);
-    return this.filterRestrictedAppGrants(role, normalized);
+    return filterRestrictedAppGrants(role, normalized);
   }
-
-  /**
-   * Removes apps/launch/* grants for restricted apps to keep grants tidy.
-   * Note: This is cosmetic only - actual restriction is enforced in canLaunchApp()
-   * which checks restrictedApps directly, bypassing grants entirely.
-   */
-  private filterRestrictedAppGrants(
+  function filterRestrictedAppGrants(
     role: UserRole,
     grants: string[],
   ): string[] {
-    if (role === "vendor" || this.restrictedApps.size === 0) {
+    if (role === "vendor" || restrictedApps.size === 0) {
       return grants;
     }
 
@@ -298,11 +306,23 @@ export class UserManager {
       if (!appId || appId === "*") {
         return true;
       }
-      return !this.restrictedApps.has(appId);
+      return !restrictedApps.has(appId);
     });
   }
 
-  async dispose(): Promise<void> {
-    await this.store.dispose();
-  }
-}
+  return {
+    initialize,
+    listUsers,
+    getUser,
+    createUser,
+    updateUser,
+    deleteUser,
+    setPassword,
+    changePassword,
+    authenticate,
+    getDefaultUsername,
+    setDefaultUsername,
+    getDefaultUser,
+  };
+});
+export type UserManager = Effect.Success<ReturnType<typeof createUserManager>>;

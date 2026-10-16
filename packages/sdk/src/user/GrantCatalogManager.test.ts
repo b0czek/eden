@@ -1,30 +1,5 @@
-import "reflect-metadata";
 import type { RuntimeAppManifest, UserGrantOption } from "@edenapp/types";
-import type { IPCBridge } from "../ipc";
-import type { PackageManager } from "../package-manager";
-import type { PackageCatalog } from "../package-manager/PackageCatalog";
-import type { SettingsPanelManager } from "../settings";
-import { GrantCatalogManager } from "./GrantCatalogManager";
-
-const emitter = () => {
-  const listeners = new Map<string, Array<(payload: never) => void>>();
-  return {
-    on: jest.fn((event: string, listener: (payload: never) => void) => {
-      const current = listeners.get(event) ?? [];
-      current.push(listener);
-      listeners.set(event, current);
-      return () =>
-        listeners.set(
-          event,
-          current.filter((item) => item !== listener),
-        );
-    }),
-    emit(event: string, payload: unknown) {
-      for (const listener of listeners.get(event) ?? [])
-        listener(payload as never);
-    },
-  };
-};
+import { createGrantCatalogManager } from "./GrantCatalogManager";
 
 const app = {
   id: "com.example.app",
@@ -54,8 +29,6 @@ const app = {
 
 describe("GrantCatalogManager", () => {
   it("combines and deduplicates app and panel grants", () => {
-    const packages = emitter();
-    const panels = emitter();
     const panelOptions: UserGrantOption[] = [
       {
         grant: "preset/network/manage",
@@ -68,15 +41,10 @@ describe("GrantCatalogManager", () => {
         label: "Runtime panel",
       },
     ];
-    const manager = new GrantCatalogManager(
-      { eventSubscribers: { notify: jest.fn() } } as unknown as IPCBridge,
-      { allApps: () => [app] } as unknown as PackageCatalog,
-      {
-        on: panels.on,
-        listGrantOptions: () => panelOptions,
-      } as unknown as SettingsPanelManager,
-      { on: packages.on } as unknown as PackageManager,
-    );
+    const manager = createGrantCatalogManager({
+      packageCatalog: { allApps: () => [app] },
+      settingsPanels: { listGrantOptions: () => panelOptions },
+    });
 
     expect(manager.getOptions().options).toEqual(
       expect.arrayContaining([
@@ -104,27 +72,20 @@ describe("GrantCatalogManager", () => {
   });
 
   it("coalesces runtime catalog invalidations", async () => {
-    const packages = emitter();
-    const panels = emitter();
     const notify = jest.fn();
-    const manager = new GrantCatalogManager(
-      { eventSubscribers: { notify } } as unknown as IPCBridge,
-      { allApps: () => [] } as unknown as PackageCatalog,
-      {
-        on: panels.on,
-        listGrantOptions: () => [],
-      } as unknown as SettingsPanelManager,
-      { on: packages.on } as unknown as PackageManager,
-    );
-
-    panels.emit("panels-changed", { reason: "catalog" });
-    packages.emit("installed", { manifest: app });
-    panels.emit("panels-changed", { reason: "visibility" });
+    const manager = createGrantCatalogManager({
+      packageCatalog: { allApps: () => [] },
+      settingsPanels: { listGrantOptions: () => [] },
+    });
+    manager.changed.on(notify);
+    manager.invalidate();
+    manager.invalidate();
+    manager.invalidate();
     await Promise.resolve();
 
     expect(manager.getOptions().revision).toBe(2);
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith("user/grant-options-changed", {
+    expect(notify).toHaveBeenCalledWith({
       revision: 2,
     });
   });

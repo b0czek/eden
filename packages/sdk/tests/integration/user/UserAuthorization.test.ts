@@ -1,12 +1,7 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { UserManager } from "../../../src/user/UserManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import type { UserManager } from "../../../src/user/UserManager";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -43,19 +38,23 @@ describe("account command authorization", () => {
       }),
     );
     await eden.start();
-    users = eden.runtime.resolve(UserManager);
-    const seededVendor = await users.getUser("vendor");
+    users = eden.runtime.services.users;
+    const seededVendor = await eden.runtime.effects.run(
+      users.getUser("vendor"),
+    );
     if (!seededVendor) throw new Error("Seeded vendor missing");
     vendor = seededVendor;
-    standard = await users.createUser({
-      username: "target",
-      name: "Target",
-      password: "password",
-      grants: [],
-    });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("account-manager", ["user/manage"]);
+    standard = await eden.runtime.effects.run(
+      users.createUser({
+        username: "target",
+        name: "Target",
+        password: "password",
+        grants: [],
+      }),
+    );
+    eden.runtime.services.permissions.registerApp("account-manager", [
+      "user/manage",
+    ]);
   });
 
   afterEach(async () => {
@@ -79,7 +78,7 @@ describe("account command authorization", () => {
     it.each(mutations)(
       "rejects %s without changing stored accounts",
       async (command, args) => {
-        const before = await users.listUsers();
+        const before = await eden.runtime.effects.run(users.listUsers());
         await expect(
           eden.execute(command, args, {
             appId,
@@ -89,11 +88,13 @@ describe("account command authorization", () => {
             },
           }),
         ).rejects.toThrow(error);
-        expect(await users.listUsers()).toEqual(before);
-        expect(users.getDefaultUsername()).toBe("vendor");
-        await expect(users.authenticate("target", "password")).resolves.toEqual(
-          standard,
+        expect(await eden.runtime.effects.run(users.listUsers())).toEqual(
+          before,
         );
+        expect(users.getDefaultUsername()).toBe("vendor");
+        await expect(
+          eden.runtime.effects.run(users.authenticate("target", "password")),
+        ).resolves.toEqual(standard);
       },
     );
   });
@@ -118,23 +119,25 @@ describe("account command authorization", () => {
       { username: "new", password: "changed" },
       caller,
     );
-    await expect(users.authenticate("new", "changed")).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(users.authenticate("new", "changed")),
+    ).resolves.toMatchObject({
       name: "Changed",
       grants: [],
     });
-    await expect(users.authenticate("new", "initial")).rejects.toThrow(
-      "Invalid credentials",
-    );
+    await expect(
+      eden.runtime.effects.run(users.authenticate("new", "initial")),
+    ).rejects.toThrow("Invalid credentials");
     await eden.execute("user/set-default", { username: "new" }, caller);
     expect(users.getDefaultUsername()).toBe("new");
     await eden.execute("user/delete", { username: "new" }, caller);
-    expect(await users.getUser("new")).toBeNull();
+    expect(await eden.runtime.effects.run(users.getUser("new"))).toBeNull();
   });
 
   it("revokes a grant for an already running app on its next renderer command", async () => {
     const appId = "com.example.granted-reader";
     const grant = `app/${appId}/read`;
-    eden.runtime.resolve(PackageRegistry).register(
+    eden.runtime.services.packageRegistry.register(
       testApp(appId, {
         resolvedGrants: [
           {
@@ -146,7 +149,7 @@ describe("account command authorization", () => {
         ],
       }),
     );
-    eden.runtime.resolve(PermissionRegistry).registerApp(
+    eden.runtime.services.permissions.registerApp(
       appId,
       [],
       [
@@ -158,18 +161,18 @@ describe("account command authorization", () => {
         },
       ],
     );
-    await users.updateUser({
-      username: standard.username,
-      grants: [grant, `apps/launch/${appId}`],
-    });
+    await eden.runtime.effects.run(
+      users.updateUser({
+        username: standard.username,
+        grants: [grant, `apps/launch/${appId}`],
+      }),
+    );
     await eden.runtime.sessions.login(standard.username, "password");
     await eden.complete("process/launch", { appId });
-    const processes = eden.runtime.resolve(ProcessManager);
+    const processes = eden.runtime.services.processes;
     const instance = processes.getAppInstance(appId);
     if (!instance) throw new Error("Reader app did not launch");
-    const viewInfo = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(instance.viewId);
+    const viewInfo = eden.runtime.services.views.getViewInfo(instance.viewId);
     if (!viewInfo) throw new Error("Reader view missing");
     const contents = viewInfo.view.webContents;
     const location = { volume: "home", path: "/grant.txt" };

@@ -3,9 +3,7 @@ import type {
   UserGrantOption,
   UserGrantOptionsResponse,
 } from "@edenapp/types";
-import { inject, Lifecycle, scoped } from "tsyringe";
-import { EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
-import { PackageManager } from "../package-manager";
+import { createEvent } from "../events/event";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
 import { SettingsPanelManager } from "../settings";
 
@@ -13,48 +11,38 @@ interface GrantCatalogEvents {
   "grant-options-changed": { revision: number };
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@EdenNamespace("user")
-export class GrantCatalogManager extends EdenEmitter<GrantCatalogEvents> {
-  private revision = 1;
-  private invalidationQueued = false;
+export function createGrantCatalogManager({
+  packageCatalog,
+  settingsPanels,
+}: {
+  packageCatalog: Pick<PackageCatalog, "allApps">;
+  settingsPanels: Pick<SettingsPanelManager, "listGrantOptions">;
+}) {
+  const changed = createEvent<GrantCatalogEvents["grant-options-changed"]>();
+  let active = true;
+  let revision = 1;
+  let invalidationQueued = false;
 
-  constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(PackageCatalog) private readonly packageCatalog: PackageCatalog,
-    @inject(SettingsPanelManager)
-    private readonly settingsPanels: SettingsPanelManager,
-    @inject(PackageManager) packageManager: PackageManager,
-  ) {
-    super(ipcBridge);
-    settingsPanels.on("panels-changed", ({ reason }) => {
-      if (reason === "catalog") this.invalidate();
-    });
-    packageManager.on("installed", () => this.invalidate());
-    packageManager.on("uninstalled", () => this.invalidate());
-  }
-
-  getOptions(): UserGrantOptionsResponse {
+  function getOptions(): UserGrantOptionsResponse {
     const options = new Map<string, UserGrantOption>();
     const add = (option: UserGrantOption) => {
       if (!option.grant || options.has(option.grant)) return;
       options.set(option.grant, structuredClone(option));
     };
 
-    for (const app of this.packageCatalog.allApps()) {
-      this.addAppOptions(app, add);
+    for (const app of packageCatalog.allApps()) {
+      addAppOptions(app, add);
     }
-    for (const option of this.settingsPanels.listGrantOptions()) add(option);
+    for (const option of settingsPanels.listGrantOptions()) add(option);
 
     return {
-      revision: this.revision,
+      revision: revision,
       options: Array.from(options.values()).sort((a, b) =>
         a.grant.localeCompare(b.grant),
       ),
     };
   }
-
-  private addAppOptions(
+  function addAppOptions(
     app: RuntimeAppManifest,
     add: (option: UserGrantOption) => void,
   ): void {
@@ -83,14 +71,24 @@ export class GrantCatalogManager extends EdenEmitter<GrantCatalogEvents> {
       });
     }
   }
-
-  private invalidate(): void {
-    if (this.invalidationQueued) return;
-    this.invalidationQueued = true;
+  function invalidate(): void {
+    if (invalidationQueued) return;
+    invalidationQueued = true;
     queueMicrotask(() => {
-      this.invalidationQueued = false;
-      this.revision += 1;
-      this.notify("grant-options-changed", { revision: this.revision });
+      invalidationQueued = false;
+      if (!active) return;
+      revision += 1;
+      changed.emit({ revision });
     });
   }
+  return {
+    getOptions,
+    invalidate,
+    changed,
+    dispose: () => {
+      active = false;
+      changed.dispose();
+    },
+  };
 }
+export type GrantCatalogManager = ReturnType<typeof createGrantCatalogManager>;
