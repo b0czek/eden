@@ -1,5 +1,3 @@
-import { PermissionRegistry } from "../../../src/ipc";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -8,12 +6,6 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { BackendManager } from "../../../src/process-manager/BackendManager";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { SessionContext } from "../../../src/session/SessionContext";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { registerTestVolume } from "../../support/filesystem";
@@ -137,9 +129,9 @@ describe("file handle access and lifetime", () => {
       password: "password",
       grants: ["*"],
     });
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp("com.example.other", ["fs/read"]);
+    eden.runtime.services.permissions.registerApp("com.example.other", [
+      "fs/read",
+    ]);
     const outsiders: CommandCallerContext[] = [
       { ...caller, appId: "com.example.other" },
       { ...caller, sessionId: "new-session" },
@@ -180,7 +172,7 @@ describe("file handle access and lifetime", () => {
     expect(await execute("fs/read", { location: handle })).toBe("original");
     expect(ejected).toBe(false);
     await execute("fs/close", { handle });
-    await eden.runtime.resolve(OperationManager).wait(eject, caller);
+    await eden.runtime.services.operations.wait(eject, caller);
     expect(ejected).toBe(true);
   });
 
@@ -215,10 +207,12 @@ describe("file handle access and lifetime", () => {
   });
 
   async function launchOwner(backend = false): Promise<void> {
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/read", "volume/*", "process/manage"]);
-    eden.runtime.resolve(PackageRegistry).register({
+    eden.runtime.services.permissions.registerApp(appId, [
+      "fs/read",
+      "volume/*",
+      "process/manage",
+    ]);
+    eden.runtime.services.packageRegistry.register({
       kind: "app",
       id: appId,
       name: "File Handles",
@@ -239,7 +233,7 @@ describe("file handle access and lifetime", () => {
     const launching = execute("process/launch", { appId });
     if (backend) {
       await new Promise<void>((resolve) => setImmediate(resolve));
-      const process = eden.runtime.resolve(BackendManager).getBackend(appId);
+      const process = eden.runtime.services.backends.getBackend(appId);
       if (!process?.pid) throw new Error("Backend did not start");
       const simulated = eden.platform.utilityProcesses.get(process.pid);
       if (!simulated) throw new Error("Backend process is unavailable");
@@ -250,9 +244,9 @@ describe("file handle access and lifetime", () => {
 
   it("closes frontend handles when their view is removed", async () => {
     await launchOwner();
-    const instance = eden.runtime.resolve(ProcessManager).getAppInstance(appId);
+    const instance = eden.runtime.services.processes.getAppInstance(appId);
     if (!instance) throw new Error("Owner app is unavailable");
-    const views = eden.runtime.resolve(ViewManager);
+    const views = eden.runtime.services.views;
     const view = views.getViewInfo(instance.viewId);
     if (!view) throw new Error("Owner view is unavailable");
     const owner = { ...caller, webContentsId: view.view.webContents.id };
@@ -283,7 +277,7 @@ describe("file handle access and lifetime", () => {
   it("closes backend handles after an unexpected process exit", async () => {
     await launchOwner(true);
     const handle = await execute<FilesystemHandle>("fs/open", { location });
-    const backend = eden.runtime.resolve(BackendManager).getBackend(appId);
+    const backend = eden.runtime.services.backends.getBackend(appId);
     if (!backend) throw new Error("Owner backend is unavailable");
     backend.kill();
     await expect(execute("fs/read", { location: handle })).rejects.toThrow(
@@ -303,7 +297,7 @@ describe("file handle access and lifetime", () => {
   it.each(["operation", "host"] as const)(
     "releases session handles before logout drains an eject via %s",
     async (entry) => {
-      caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+      caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
       await launchOwner(true);
       await execute("fs/open", { location });
       const eject = await eden.execute<OperationHandle>(
@@ -313,11 +307,11 @@ describe("file handle access and lifetime", () => {
       );
       if (entry === "operation") await eden.complete("session/logout");
       else await eden.runtime.sessions.logout();
-      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      await eden.runtime.services.operations.wait(eject, caller);
       expect(ejected).toBe(true);
       expect(eden.runtime.sessions.current()).toBeNull();
       expect(
-        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+        eden.runtime.services.processes.getAppInstance(appId),
       ).toBeUndefined();
     },
   );
@@ -325,7 +319,7 @@ describe("file handle access and lifetime", () => {
   it.each(["operation", "host"] as const)(
     "releases session handles before switching users drains an eject via %s",
     async (entry) => {
-      caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+      caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
       await eden.runtime.users.create({
         username: "other",
         name: "Other",
@@ -344,11 +338,11 @@ describe("file handle access and lifetime", () => {
           password: "password",
         });
       else await eden.runtime.sessions.login("other", "password");
-      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      await eden.runtime.services.operations.wait(eject, caller);
       expect(ejected).toBe(true);
       expect(eden.runtime.sessions.current()?.username).toBe("other");
       expect(
-        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+        eden.runtime.services.processes.getAppInstance(appId),
       ).toBeUndefined();
     },
   );
@@ -364,17 +358,17 @@ describe("file handle access and lifetime", () => {
         caller,
       );
       await eden.complete("system/power", { action });
-      await eden.runtime.resolve(OperationManager).wait(eject, caller);
+      await eden.runtime.services.operations.wait(eject, caller);
       expect(ejected).toBe(true);
       expect(powerHandoffs).toBe(1);
       expect(
-        eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+        eden.runtime.services.processes.getAppInstance(appId),
       ).toBeUndefined();
     },
   );
 
   it("preserves runtime-owned handles across logout and accepts handles in the next session", async () => {
-    caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+    caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
     const runtimeOwner = {
       ...caller,
       sessionId: "daemon:file-reader",
@@ -396,7 +390,7 @@ describe("file handle access and lifetime", () => {
       await execute("fs/read", { location: runtimeHandle }, runtimeOwner),
     ).toBe("original");
     await eden.runtime.sessions.login("operator", "password");
-    caller.sessionId = eden.runtime.resolve(SessionContext).getSessionId();
+    caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
     const nextHandle = await execute<FilesystemHandle>("fs/open", { location });
     expect(await execute("fs/read", { location: nextHandle })).toBe("original");
   });

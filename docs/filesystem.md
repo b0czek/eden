@@ -54,9 +54,9 @@ main-process API. It owns device discovery, mounting, network authentication,
 and OS removal notifications:
 
 ```typescript
-import { Eden } from "@edenapp/sdk";
+import { createEden } from "@edenapp/sdk";
 
-const eden = new Eden();
+const eden = createEden();
 await eden.whenReady();
 
 await eden.volumes.register({

@@ -31,70 +31,68 @@ interface HandleEntry {
 }
 
 /** Owns descriptors and their admission until close or owner teardown. */
-export class FilesystemHandles {
-  private readonly handles = new Map<string, HandleEntry>();
-  private readonly closing = new Set<Promise<void>>();
-  private readonly oneShots = new Set<Promise<unknown>>();
-  private disposed = false;
+export function createFilesystemHandles(
+  execution: ExecutionContext,
+  openFile: (
+    location: FilesystemLocation,
+    mode: FilesystemOpenMode,
+    retained: boolean,
+  ) => Promise<OpenedFilesystemFile>,
+) {
+  const handles = new Map<string, HandleEntry>();
+  const pendingCloses = new Set<Promise<void>>();
+  const oneShots = new Set<Promise<unknown>>();
+  let disposed = false;
 
-  constructor(
-    private readonly execution: ExecutionContext,
-    private readonly openFile: (
-      location: FilesystemLocation,
-      mode: FilesystemOpenMode,
-      retained: boolean,
-    ) => Promise<OpenedFilesystemFile>,
-  ) {}
-
-  async open(
+  async function open(
     location: FilesystemLocation,
     mode: FilesystemOpenMode = "read",
   ): Promise<FilesystemHandle> {
-    if (this.disposed) throw new Error("Filesystem handles are closed");
-    const owner = this.requireCaller();
-    if (this.handles.size + this.closing.size >= 1024)
+    if (disposed) throw new Error("Filesystem handles are closed");
+    const owner = requireCaller();
+    if (handles.size + pendingCloses.size >= 1024)
       throw new Error("Too many open filesystem handles");
     const handle = { handleId: randomUUID() };
     const entry: HandleEntry = {
       owner,
-      opened: this.openFile(location, mode, true),
+      opened: openFile(location, mode, true),
       operations: new Set(),
     };
-    this.handles.set(handle.handleId, entry);
+    handles.set(handle.handleId, entry);
     try {
       await entry.opened;
-      if (this.handles.get(handle.handleId) !== entry)
+      if (handles.get(handle.handleId) !== entry)
         throw new Error("Filesystem handle owner has closed");
       return handle;
     } catch (error) {
-      if (this.handles.get(handle.handleId) === entry)
-        await this.closeEntry(handle.handleId, entry);
+      if (handles.get(handle.handleId) === entry)
+        await closeEntry(handle.handleId, entry);
       throw error;
     }
   }
 
-  async use<T>(
+  async function use<T>(
     source: FilesystemSource,
     operation: (file: FileHandle) => Promise<T>,
   ): Promise<T> {
-    if (this.disposed) throw new Error("Filesystem handles are closed");
+    if (disposed) throw new Error("Filesystem handles are closed");
     if (!("handleId" in source)) {
       const task = (async () => {
-        const opened = await this.openFile(source, "read", false);
+        const opened = await openFile(source, "read", false);
         try {
           return await opened.use(operation);
         } finally {
           await opened.close();
         }
       })();
-      this.oneShots.add(task);
+      oneShots.add(task);
       try {
         return await task;
       } finally {
-        this.oneShots.delete(task);
+        oneShots.delete(task);
       }
     }
-    const entry = this.requireHandle(source);
+    const entry = requireHandle(source);
     const task = entry.opened.then((opened) => opened.use(operation));
     entry.operations.add(task);
     try {
@@ -104,17 +102,17 @@ export class FilesystemHandles {
     }
   }
 
-  close(handle: FilesystemHandle): Promise<void> {
-    return this.closeEntry(handle.handleId, this.requireHandle(handle));
+  function close(handle: FilesystemHandle): Promise<void> {
+    return closeEntry(handle.handleId, requireHandle(handle));
   }
 
-  async closeOwner(owner: {
+  async function closeOwner(owner: {
     appId?: string;
     webContentsId?: number;
     sessionId?: string;
   }): Promise<void> {
     await Promise.all(
-      [...this.handles]
+      [...handles]
         .filter(
           ([, entry]) =>
             (owner.appId === undefined || entry.owner.appId === owner.appId) &&
@@ -123,19 +121,19 @@ export class FilesystemHandles {
             (owner.webContentsId === undefined ||
               entry.owner.webContentsId === owner.webContentsId),
         )
-        .map(([id, entry]) => this.closeEntry(id, entry)),
+        .map(([id, entry]) => closeEntry(id, entry)),
     );
   }
 
-  async dispose(): Promise<void> {
-    this.disposed = true;
-    await this.closeOwner({});
-    await Promise.all([...this.closing]);
-    await Promise.allSettled([...this.oneShots]);
+  async function dispose(): Promise<void> {
+    disposed = true;
+    await closeOwner({});
+    await Promise.all([...pendingCloses]);
+    await Promise.allSettled([...oneShots]);
   }
 
-  private closeEntry(id: string, entry: HandleEntry): Promise<void> {
-    this.handles.delete(id);
+  function closeEntry(id: string, entry: HandleEntry): Promise<void> {
+    handles.delete(id);
     const closing = (async () => {
       // Failed opens release their own resources.
       const opened = await entry.opened.catch(() => undefined);
@@ -143,16 +141,16 @@ export class FilesystemHandles {
       await Promise.allSettled([...entry.operations]);
       await opened.close();
     })();
-    this.closing.add(closing);
+    pendingCloses.add(closing);
     void closing.then(
-      () => this.closing.delete(closing),
-      () => this.closing.delete(closing),
+      () => pendingCloses.delete(closing),
+      () => pendingCloses.delete(closing),
     );
     return closing;
   }
 
-  private requireCaller(): HandleOwner {
-    const caller = this.execution.get();
+  function requireCaller(): HandleOwner {
+    const caller = execution.get();
     if (!caller?.appId || !caller.principal)
       throw new Error("Caller has no filesystem app authority");
     return {
@@ -167,9 +165,9 @@ export class FilesystemHandles {
     };
   }
 
-  private requireHandle(handle: FilesystemHandle): HandleEntry {
-    const caller = this.requireCaller();
-    const entry = this.handles.get(handle.handleId);
+  function requireHandle(handle: FilesystemHandle): HandleEntry {
+    const caller = requireCaller();
+    const entry = handles.get(handle.handleId);
     const owner = entry?.owner;
     if (
       !owner ||
@@ -181,6 +179,7 @@ export class FilesystemHandles {
       throw new Error("Filesystem handle is unavailable to this caller");
     return entry;
   }
+  return { open, use, close, closeOwner, dispose };
 }
 
 /** Whole-file reads use explicit positions so repeated and concurrent reads start at zero. */

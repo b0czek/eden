@@ -4,6 +4,8 @@ import { createReadStream, createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/OperationTask";
 
 interface TransferRequest {
@@ -30,58 +32,66 @@ interface PathReservation {
   completed: Promise<void>;
 }
 
-export class FilesystemTransfer {
-  private readonly reservations = new Set<PathReservation>();
+export function createFilesystemTransfer() {
+  const reservations = new Set<PathReservation>();
+  const io = <A>(run: () => Promise<A>) =>
+    fromPromise(run).pipe(Effect.uninterruptible);
 
-  async copy(request: TransferRequest): Promise<void> {
-    await this.withReservedPaths(request, () => this.copyReserved(request));
-  }
+  const copy = (request: TransferRequest) =>
+    withReservedPaths(request, copyReserved(request));
+  const move = (request: TransferRequest) =>
+    withReservedPaths(request, moveReserved(request));
 
-  async move(request: TransferRequest): Promise<void> {
-    await this.withReservedPaths(request, () => this.moveReserved(request));
-  }
-
-  private async withReservedPaths(
+  function withReservedPaths(
     request: TransferRequest,
-    operation: () => Promise<void>,
-  ): Promise<void> {
-    const paths = [
-      path.resolve(request.source),
-      path.resolve(request.destination),
-      await this.resolveCanonicalPath(request.source),
-      await this.resolveCanonicalPath(request.destination),
-    ];
-    const predecessors = [...this.reservations].filter((reservation) =>
-      reservation.paths.some((reserved) =>
-        paths.some(
-          (candidate) =>
-            reserved === candidate ||
-            this.isPathWithin(reserved, candidate) ||
-            this.isPathWithin(candidate, reserved),
+    work: Effect.Effect<void, Error>,
+  ) {
+    return Effect.gen(function* () {
+      const paths = [
+        path.resolve(request.source),
+        path.resolve(request.destination),
+        yield* io(() => resolveCanonicalPath(request.source)),
+        yield* io(() => resolveCanonicalPath(request.destination)),
+      ];
+      const predecessors = [...reservations].filter((reservation) =>
+        reservation.paths.some((reserved) =>
+          paths.some(
+            (candidate) =>
+              reserved === candidate ||
+              isPathWithin(reserved, candidate) ||
+              isPathWithin(candidate, reserved),
+          ),
         ),
-      ),
-    );
-    let release!: () => void;
-    const reservation = {
-      paths,
-      completed: new Promise<void>((resolve) => {
-        release = resolve;
-      }),
-    };
-    // Reserve before waiting so later conflicting requests also wait for us.
-    // Preparation and rollback must observe the destination under the same
-    // reservation, including source removal after a cross-device move.
-    this.reservations.add(reservation);
-    try {
-      await this.waitForPredecessors(predecessors, request.reporter?.signal);
-      await operation();
-    } finally {
-      this.reservations.delete(reservation);
-      release();
-    }
+      );
+      let release!: () => void;
+      const reservation = {
+        paths,
+        completed: new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      };
+      return yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          reservations.add(reservation);
+          return reservation;
+        }),
+        () =>
+          Effect.andThen(
+            io(() =>
+              waitForPredecessors(predecessors, request.reporter?.signal),
+            ),
+            work,
+          ),
+        () =>
+          Effect.sync(() => {
+            reservations.delete(reservation);
+            release();
+          }),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 
-  private waitForPredecessors(
+  function waitForPredecessors(
     predecessors: PathReservation[],
     signal?: AbortSignal,
   ): Promise<void> {
@@ -96,79 +106,94 @@ export class FilesystemTransfer {
     });
   }
 
-  private async copyReserved(request: TransferRequest): Promise<void> {
-    request.reporter?.signal?.throwIfAborted();
+  const copyReserved = Effect.fn(function* (request: TransferRequest) {
+    yield* io(() => assertActive(request));
     request.reporter?.update("preparing-copy");
-    const transfer = await this.prepare(request, "copy");
-    await this.runWithDestinationRollback(transfer, () =>
-      this.copyEntry(transfer),
+    const transfer = yield* prepare(request, "copy");
+    yield* runWithDestinationRollback(
+      transfer,
+      io(() => copyEntry(transfer)),
     );
-  }
+  });
 
-  private async moveReserved(request: TransferRequest): Promise<void> {
+  const moveReserved = Effect.fn(function* (request: TransferRequest) {
     request.reporter?.update("preparing-move");
-    const transfer = await this.prepare(request, "move");
+    const transfer = yield* prepare(request, "move");
     let copied = false;
-    await this.runWithDestinationRollback(transfer, async () => {
-      await this.assertActive(transfer);
-      try {
+    yield* runWithDestinationRollback(
+      transfer,
+      Effect.gen(function* () {
+        yield* io(() => assertActive(transfer));
         transfer.reporter?.update("moving");
-        await fs.rename(transfer.source, transfer.destination);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-        await this.copyEntry(transfer);
-        copied = true;
-      }
-    });
-    if (copied) {
-      // The completed destination must survive an incomplete source deletion.
-      try {
-        await this.assertActive(transfer);
-        transfer.reporter?.update("removing-source");
-        await fs.rm(transfer.source, { recursive: true, force: false });
-      } catch (error) {
-        throw new Error(
-          "Move copied the destination but could not completely remove the source",
-          { cause: error },
+        yield* io(() => fs.rename(transfer.source, transfer.destination)).pipe(
+          Effect.catch((error) => {
+            if ((error as NodeJS.ErrnoException).code !== "EXDEV")
+              return Effect.fail(error);
+            return io(() => copyEntry(transfer)).pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  copied = true;
+                }),
+              ),
+            );
+          }),
         );
-      }
+      }),
+    );
+    if (copied) {
+      yield* Effect.gen(function* () {
+        yield* io(() => assertActive(transfer));
+        transfer.reporter?.update("removing-source");
+        yield* io(() =>
+          fs.rm(transfer.source, { recursive: true, force: false }),
+        );
+      }).pipe(
+        Effect.mapError(
+          (error) =>
+            new Error(
+              "Move copied the destination but could not completely remove the source",
+              { cause: error },
+            ),
+        ),
+      );
     }
-  }
+  });
 
-  private async prepare(
+  const prepare = Effect.fn(function* (
     request: TransferRequest,
     operation: "copy" | "move",
-  ): Promise<PreparedTransfer> {
-    const sourceStats = await fs.stat(request.source);
-    const canonicalSource = await fs.realpath(request.source);
-    const canonicalDestination = await this.resolveCanonicalPath(
-      request.destination,
+  ) {
+    const sourceStats = yield* io(() => fs.stat(request.source));
+    const canonicalSource = yield* io(() => fs.realpath(request.source));
+    const canonicalDestination = yield* io(() =>
+      resolveCanonicalPath(request.destination),
     );
-
-    if (canonicalSource === canonicalDestination) {
-      throw new Error("Source and destination must be different");
-    }
+    if (canonicalSource === canonicalDestination)
+      return yield* Effect.fail(
+        new Error("Source and destination must be different"),
+      );
     if (
       sourceStats.isDirectory() &&
-      this.isPathWithin(canonicalSource, canonicalDestination)
-    ) {
-      throw new Error(
-        `Cannot ${operation} a directory into itself or a descendant`,
+      isPathWithin(canonicalSource, canonicalDestination)
+    )
+      return yield* Effect.fail(
+        new Error(
+          `Cannot ${operation} a directory into itself or a descendant`,
+        ),
       );
-    }
-    if (this.isPathWithin(canonicalDestination, canonicalSource)) {
-      throw new Error("Source and destination paths overlap");
-    }
-
-    const destinationExists = await this.pathExists(request.destination);
-    if (destinationExists && !request.overwrite) {
-      throw new Error(
-        `Destination '${request.destinationLabel}' already exists`,
+    if (isPathWithin(canonicalDestination, canonicalSource))
+      return yield* Effect.fail(
+        new Error("Source and destination paths overlap"),
       );
-    }
-
-    await this.assertActive(request);
-    await fs.mkdir(path.dirname(request.destination), { recursive: true });
+    const destinationExists = yield* io(() => pathExists(request.destination));
+    if (destinationExists && !request.overwrite)
+      return yield* Effect.fail(
+        new Error(`Destination '${request.destinationLabel}' already exists`),
+      );
+    yield* io(() => assertActive(request));
+    yield* io(() =>
+      fs.mkdir(path.dirname(request.destination), { recursive: true }),
+    );
     return {
       reporter: request.reporter,
       source: request.source,
@@ -177,56 +202,57 @@ export class FilesystemTransfer {
       assertSourceActive: request.assertSourceActive,
       assertDestinationActive: request.assertDestinationActive,
     };
-  }
+  });
 
-  private async runWithDestinationRollback(
+  const runWithDestinationRollback = Effect.fn(function* (
     transfer: PreparedTransfer,
-    operation: () => Promise<void>,
-  ): Promise<void> {
-    await this.assertActive(transfer);
+    work: Effect.Effect<void, Error>,
+  ) {
+    yield* io(() => assertActive(transfer));
     const backup = transfer.destinationExists
-      ? await this.stageDestination(transfer.destination)
+      ? yield* io(() => stageDestination(transfer.destination))
       : undefined;
-
-    try {
-      await operation();
-      transfer.reporter?.signal?.throwIfAborted();
-    } catch (error) {
-      transfer.reporter?.update("rolling-back");
-      const rollbackErrors: unknown[] = [];
-      try {
-        await transfer.assertDestinationActive?.();
-        await fs.rm(transfer.destination, { recursive: true, force: true });
-      } catch (cleanupError) {
-        rollbackErrors.push(cleanupError);
-      }
-
-      if (backup) {
-        try {
-          await transfer.assertDestinationActive?.();
-          await fs.rename(backup, transfer.destination);
-        } catch (restoreError) {
-          rollbackErrors.push(restoreError);
-        }
-      }
-
-      if (rollbackErrors.length > 0) {
-        throw new AggregateError(
-          [error, ...rollbackErrors],
-          "Filesystem transfer failed and rollback was incomplete",
-        );
-      }
-      throw error;
-    }
-
+    yield* Effect.andThen(
+      work,
+      io(() => assertActive(transfer)),
+    ).pipe(
+      Effect.catch((error) =>
+        io(async () => {
+          transfer.reporter?.update("rolling-back");
+          const rollbackErrors: unknown[] = [];
+          try {
+            await transfer.assertDestinationActive?.();
+            await fs.rm(transfer.destination, { recursive: true, force: true });
+          } catch (cleanupError) {
+            rollbackErrors.push(cleanupError);
+          }
+          if (backup) {
+            try {
+              await transfer.assertDestinationActive?.();
+              await fs.rename(backup, transfer.destination);
+            } catch (restoreError) {
+              rollbackErrors.push(restoreError);
+            }
+          }
+          if (rollbackErrors.length)
+            throw new AggregateError(
+              [error, ...rollbackErrors],
+              "Filesystem transfer failed and rollback was incomplete",
+            );
+          throw error;
+        }),
+      ),
+    );
     if (backup) {
       transfer.reporter?.update("cleaning-up");
-      await transfer.assertDestinationActive?.();
-      await fs.rm(backup, { recursive: true, force: true });
+      yield* io(async () => {
+        await transfer.assertDestinationActive?.();
+        await fs.rm(backup, { recursive: true, force: true });
+      });
     }
-  }
+  });
 
-  private async stageDestination(destination: string): Promise<string> {
+  async function stageDestination(destination: string): Promise<string> {
     const backup = path.join(
       path.dirname(destination),
       `.${path.basename(destination)}.eden-transfer-${randomUUID()}`,
@@ -235,14 +261,14 @@ export class FilesystemTransfer {
     return backup;
   }
 
-  private async assertActive(transfer: TransferRequest | PreparedTransfer) {
+  async function assertActive(transfer: TransferRequest | PreparedTransfer) {
     transfer.reporter?.signal?.throwIfAborted();
     await transfer.assertSourceActive?.();
     await transfer.assertDestinationActive?.();
     transfer.reporter?.signal?.throwIfAborted();
   }
 
-  private async copyEntry(transfer: PreparedTransfer): Promise<void> {
+  async function copyEntry(transfer: PreparedTransfer): Promise<void> {
     const { source, destination } = transfer;
     const sourceStats = await fs.lstat(source);
     const total = sourceStats.isFile() ? sourceStats.size : undefined;
@@ -258,7 +284,7 @@ export class FilesystemTransfer {
       recursive: true,
       verbatimSymlinks: true,
       filter: async (entrySource, entryDestination) => {
-        await this.assertActive(transfer);
+        await assertActive(transfer);
         if (transfer.reporter) {
           const stats = await fs.lstat(entrySource);
           if (stats.isFile()) {
@@ -280,7 +306,7 @@ export class FilesystemTransfer {
               { signal: transfer.reporter.signal },
             );
             await fs.chmod(entryDestination, stats.mode);
-            await this.assertActive(transfer);
+            await assertActive(transfer);
             if (Date.now() - lastReport >= 100) report();
             return false;
           }
@@ -290,11 +316,11 @@ export class FilesystemTransfer {
       errorOnExist: true,
       force: false,
     });
-    await this.assertActive(transfer);
+    await assertActive(transfer);
     report();
   }
 
-  private async pathExists(hostPath: string): Promise<boolean> {
+  async function pathExists(hostPath: string): Promise<boolean> {
     try {
       await fs.lstat(hostPath);
       return true;
@@ -304,7 +330,7 @@ export class FilesystemTransfer {
     }
   }
 
-  private async resolveCanonicalPath(hostPath: string): Promise<string> {
+  async function resolveCanonicalPath(hostPath: string): Promise<string> {
     let existingPath = hostPath;
     const missingSegments: string[] = [];
 
@@ -324,7 +350,7 @@ export class FilesystemTransfer {
     }
   }
 
-  private isPathWithin(parentPath: string, candidatePath: string): boolean {
+  function isPathWithin(parentPath: string, candidatePath: string): boolean {
     const relative = path.relative(parentPath, candidatePath);
     return (
       relative !== "" &&
@@ -333,4 +359,5 @@ export class FilesystemTransfer {
       !path.isAbsolute(relative)
     );
   }
+  return { copy, move };
 }

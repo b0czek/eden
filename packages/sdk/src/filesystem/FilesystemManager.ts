@@ -10,151 +10,163 @@ import type {
   FilesystemSource,
   SearchResult,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import fg from "fast-glob";
-import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import type { TargetedNotification } from "../controllers/events";
+import { asError, fromPromise } from "../effects/io";
+import type { Event } from "../events/event";
+import { listen, scopedEvent } from "../events/scoped";
+import type { ExecutionContext } from "../execution/ExecutionContext";
 import { log } from "../logging";
 import type {
   OperationReporter,
   OperationTask,
 } from "../operations/OperationTask";
-import type { ProcessManager } from "../process-manager/ProcessManager";
 import {
   assertExistingPathWithin,
   assertPathWithin,
   normalizeDirectoryRestriction,
   resolveDirectoryRestriction,
 } from "../user/UserDirectoryRestriction";
-import { ViewManager } from "../view-manager/ViewManager";
-import { FilesystemHandler } from "./FilesystemHandler";
 import {
-  FilesystemHandles,
+  createFilesystemHandles,
   type OpenedFilesystemFile,
   readOpenedFile,
 } from "./FilesystemHandles";
-import { FilesystemTransfer } from "./FilesystemTransfer";
-import { FilesystemWatcher } from "./FilesystemWatcher";
-import { VolumeManager } from "./VolumeManager";
+import { createFilesystemTransfer } from "./FilesystemTransfer";
+import { createFilesystemWatcher } from "./FilesystemWatcher";
+import type { VolumeManager, VolumeRoot } from "./VolumeManager";
 
-interface FilesystemEvents {
-  changed: { watchId: string; kind: FilesystemChangeKind };
+export interface FilesystemViews {
+  resolveViewId(webContentsId: number): number | undefined;
+  removed: Pick<Event<{ viewId: number; webContentsId: number }>, "on">;
 }
-
+interface FilesystemDependencies {
+  baseDir: string;
+  executionContext: ExecutionContext;
+  views: FilesystemViews;
+  volumes: VolumeManager;
+}
 const openFlags: Record<FilesystemOpenMode, number> = {
   read: constants.O_RDONLY | constants.O_NONBLOCK,
 };
-/**
- * FilesystemManager
- *
- * Manages filesystem operations and path resolution.
- */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-@EdenNamespace("fs")
-export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
-  private baseDir: string;
-  private handler: FilesystemHandler;
-  private readonly transfer = new FilesystemTransfer();
-  private readonly watcher: FilesystemWatcher;
-  private readonly stopVolumeListener: () => void;
-  private readonly handles: FilesystemHandles;
-  private readonly stopHandleViewListener: () => void;
-  private stopHandleAppListener?: () => void;
+const io = <A>(run: () => Promise<A>) =>
+  fromPromise(run).pipe(Effect.uninterruptible);
 
-  constructor(
-    @inject("userDirectory") baseDir: string,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(ExecutionContext) private executionContext: ExecutionContext,
-    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
-    @inject(delay(() => ViewManager)) private viewManager: ViewManager,
-    @inject(VolumeManager) private volumes: VolumeManager,
+/** Filesystem state and resource ownership, independent of command transport. */
+export const createFilesystemManager = Effect.fn(function* ({
+  baseDir: inputBaseDir,
+  executionContext,
+  views,
+  volumes,
+}: FilesystemDependencies) {
+  const baseDir = path.resolve(inputBaseDir);
+  const changed =
+    yield* scopedEvent<
+      TargetedNotification<{ watchId: string; kind: FilesystemChangeKind }>
+    >();
+  const transfer = createFilesystemTransfer();
+  const handles = createFilesystemHandles(executionContext, openFile);
+  const watcher = createFilesystemWatcher({
+    resolveViewId: views.resolveViewId,
+    viewRemoved: views.removed,
+    notify: (viewId, payload) => changed.emit({ payload, viewIds: [viewId] }),
+  });
+  yield* Effect.addFinalizer(() =>
+    io(async () => {
+      watcher.dispose();
+      await handles.dispose();
+    }).pipe(Effect.orDie),
+  );
+  yield* listen(views.removed, ({ webContentsId }) =>
+    handles.closeOwner({ webContentsId }),
+  );
+  yield* listen(volumes.changed, ({ volumes: inventory }) =>
+    watcher.removeUnavailableVolumes(
+      new Set(
+        inventory
+          .filter((volume) => volume.state === "ready")
+          .map((volume) => volume.id),
+      ),
+    ),
+  );
+
+  function requirePrincipal(): void {
+    const principal = executionContext.getPrincipal();
+    if (principal?.kind !== "user" && principal?.kind !== "system")
+      throw new Error("Caller has no filesystem execution principal");
+  }
+  function getHomeAccessPath(): string {
+    const principal = executionContext.getPrincipal();
+    if (principal?.kind === "system") return baseDir;
+    if (principal?.kind !== "user")
+      throw new Error("Caller has no filesystem execution principal");
+    const user = principal.profile;
+    if (user.role === "vendor") return baseDir;
+    const restriction = normalizeDirectoryRestriction(
+      user.directoryRestriction,
+    );
+    return restriction
+      ? resolveDirectoryRestriction(baseDir, restriction)
+      : baseDir;
+  }
+  // Node descriptor callbacks retain their admission across native I/O.
+  async function resolveTargetNode(
+    address: FilesystemLocation,
+    write = false,
+    mounted = volumes.getRoot(address.volume),
   ) {
-    super(ipcBridge);
-    // Normalize baseDir to an absolute path to ensure proper path resolution
-    this.baseDir = path.resolve(baseDir);
-    this.handles = new FilesystemHandles(
-      this.executionContext,
-      (location, mode, retained) => this.openFile(location, mode, retained),
-    );
-    this.stopHandleViewListener = this.viewManager.on(
-      "view-removed",
-      ({ webContentsId }) => this.handles.closeOwner({ webContentsId }),
-    );
-
-    // Create and register handler
-    this.handler = new FilesystemHandler(this);
-    commandRegistry.registerManager(this.handler);
-    this.watcher = new FilesystemWatcher({
-      resolveViewId: (webContentsId) =>
-        this.viewManager.getViewIdByWebContentsId(webContentsId),
-      onViewRemoved: (listener) =>
-        this.viewManager.on("view-removed", ({ viewId }) => listener(viewId)),
-      notify: (viewId, event) =>
-        this.notifySubscriber(viewId, "changed", event),
-    });
-    this.stopVolumeListener = this.volumes.on("changed", ({ volumes }) => {
-      this.watcher.removeUnavailableVolumes(
-        new Set(
-          volumes
-            .filter((volume) => volume.state === "ready")
-            .map((volume) => volume.id),
-        ),
-      );
-    });
-  }
-
-  /**
-   * Get the base directory (user directory)
-   */
-  getBaseDir(): string {
-    return this.baseDir;
-  }
-
-  connectLifecycle(processes: ProcessManager): void {
-    this.stopHandleAppListener?.();
-    const closeOwner = ({ appId }: { appId: string }) =>
-      this.handles.closeOwner({ appId });
-    const stop = processes.on("stopped", closeOwner);
-    const exit = processes.on("exited", closeOwner);
-    this.stopHandleAppListener = () => {
-      stop();
-      exit();
+    requirePrincipal();
+    const info = volumes.get(address.volume);
+    if (write && info.readOnly)
+      throw new Error(`Filesystem volume '${address.volume}' is read-only`);
+    const rootPath = mounted?.rootPath ?? baseDir;
+    const accessPath = mounted?.rootPath ?? getHomeAccessPath();
+    const assertActive = async () => {
+      await mounted?.assertActive();
     };
+    await assertActive();
+    const hostPath = path.resolve(
+      rootPath,
+      address.path.replace(/^[\\/]+/, ""),
+    );
+    assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
+    assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
+    await assertExistingPathWithin(rootPath, hostPath);
+    if (accessPath !== rootPath)
+      await assertExistingPathWithin(accessPath, hostPath);
+    await assertActive();
+    return { hostPath, rootPath, accessPath, assertActive };
   }
-
-  open(
-    location: FilesystemLocation,
-    mode: FilesystemOpenMode = "read",
-  ): Promise<FilesystemHandle> {
-    return this.handles.open(location, mode);
+  const resolveTarget = Effect.fn(function* (
+    address: FilesystemLocation,
+    write = false,
+  ) {
+    yield* Effect.try({ try: requirePrincipal, catch: asError });
+    const root = yield* volumes.root(address.volume);
+    return yield* io(() => resolveTargetNode(address, write, root));
+  });
+  function assertNotRoot(target: {
+    hostPath: string;
+    rootPath: string;
+    accessPath: string;
+  }): void {
+    if (target.hostPath === target.rootPath)
+      throw new Error("Cannot delete, move, or replace a volume root");
+    if (target.hostPath === target.accessPath)
+      throw new Error("Cannot delete, move, or replace an access root");
   }
-
-  close(handle: FilesystemHandle): Promise<void> {
-    return this.handles.close(handle);
-  }
-
-  /** Release retained access for a session transition, or the whole runtime. */
-  releaseHandles(sessionId?: string): Promise<void> {
-    return this.handles.closeOwner({ sessionId });
-  }
-
-  /** Release open handles before draining operations which may be waiting to eject. */
-  closeHandles(): Promise<void> {
-    return this.handles.dispose();
-  }
-
-  private async openFile(
+  async function openFile(
     location: FilesystemLocation,
     mode: FilesystemOpenMode,
     retained: boolean,
   ): Promise<OpenedFilesystemFile> {
-    this.requirePrincipal();
-    const access = this.volumes.acquire([location.volume], !retained);
+    requirePrincipal();
+    const access = volumes.acquire([location.volume], !retained);
     let file: fs.FileHandle | undefined;
     try {
       return await access.run(async () => {
-        const target = await this.resolveTarget(location);
+        const target = await resolveTargetNode(location);
         file = await fs.open(target.hostPath, openFlags[mode]);
         if (!(await file.stat()).isFile())
           throw new Error("Filesystem source is not a regular file");
@@ -186,468 +198,341 @@ export class FilesystemManager extends EdenEmitter<FilesystemEvents> {
       throw error;
     }
   }
-
-  /**
-   * Resolve a masked path (as seen by apps) to an absolute filesystem path.
-   *
-   * @param location - The volume and masked path (e.g., "/file.json" or "/Documents/notes.txt")
-   * @returns The resolved absolute path (e.g., "/home/user/.eden/file.json")
-   * @throws Error if the path attempts to escape the base directory
-   */
-  async resolvePath(location: FilesystemLocation): Promise<string> {
-    return this.volumes.withVolumes([location.volume], async () => {
-      return (await this.resolveTarget(location)).hostPath;
-    });
-  }
-
-  prepareVolumeOperation<R>(
+  const resolvePath = (location: FilesystemLocation) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.map(resolveTarget(location), (target) => target.hostPath),
+    );
+  function prepareVolumeOperation<R>(
     ids: string[],
-    run: (reporter: OperationReporter) => Promise<R>,
+    run: (reporter: OperationReporter) => Effect.Effect<R, unknown>,
   ): OperationTask<R> {
-    this.requirePrincipal();
-    return this.volumes.prepareOperation(ids, run);
+    requirePrincipal();
+    return volumes.prepareOperation(ids, run);
   }
-
-  /** Hold access until the consumer finishes I/O at the resolved host path. */
-  async withVolume<T>(
+  function withVolume<A, E>(
     location: FilesystemLocation,
-    operation: (hostPath: string) => Promise<T>,
-  ): Promise<T> {
-    return this.volumes.withVolumes([location.volume], async () =>
-      operation(await this.resolvePath(location)),
+    operation: (hostPath: string) => Effect.Effect<A, E>,
+  ): Effect.Effect<A, E | Error> {
+    return volumes.withVolumes(
+      [location.volume],
+      Effect.flatMap(resolvePath(location), operation),
     );
   }
-
-  private requirePrincipal(): void {
-    const principal = this.executionContext.getPrincipal();
-    if (principal?.kind !== "user" && principal?.kind !== "system") {
-      throw new Error("Caller has no filesystem execution principal");
-    }
-  }
-
-  private async resolveTarget(address: FilesystemLocation, write = false) {
-    this.requirePrincipal();
-    const info = this.volumes.get(address.volume);
-    if (write && info.readOnly)
-      throw new Error(`Filesystem volume '${address.volume}' is read-only`);
-    const mounted = this.volumes.getRoot(address.volume);
-    const rootPath = mounted?.rootPath ?? this.baseDir;
-    const accessPath = mounted?.rootPath ?? this.getHomeAccessPath();
-    const assertActive = async () => {
-      await mounted?.assertActive();
-    };
-    await assertActive();
-    const relativePath = address.path.replace(/^[\\/]+/, "");
-    const hostPath = path.resolve(rootPath, relativePath);
-    assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
-    assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
-    await assertExistingPathWithin(rootPath, hostPath);
-    if (accessPath !== rootPath)
-      await assertExistingPathWithin(accessPath, hostPath);
-    await assertActive();
-    return { hostPath, rootPath, accessPath, assertActive };
-  }
-
-  private assertNotRoot(target: {
-    hostPath: string;
-    rootPath: string;
-    accessPath: string;
-  }): void {
-    if (target.hostPath === target.rootPath)
-      throw new Error("Cannot delete, move, or replace a volume root");
-    if (target.hostPath === target.accessPath)
-      throw new Error("Cannot delete, move, or replace an access root");
-  }
-
-  /**
-   * Convert an absolute filesystem path back to a masked path (as seen by apps).
-   *
-   * @param absolutePath - The absolute filesystem path
-   * @returns The masked path relative to the base directory
-   * @throws Error if the path is outside the base directory
-   */
-  async toMaskedPath(
+  const toMaskedPath = Effect.fn(function* (
     absolutePath: string,
     volume: string,
-  ): Promise<FilesystemLocation> {
-    return this.volumes.withVolumes([volume], async () => {
-      this.requirePrincipal();
-      const mounted = this.volumes.getRoot(volume);
-      await mounted?.assertActive();
-      const rootPath = mounted?.rootPath ?? this.baseDir;
-      const normalizedAbsolute = path.resolve(absolutePath);
-      assertPathWithin(rootPath, normalizedAbsolute, `Path '${absolutePath}'`);
-      const relativePath = path.relative(rootPath, normalizedAbsolute);
-      const location = {
-        volume,
-        path: `/${relativePath.split(path.sep).join("/")}`,
-      };
-      await this.resolveTarget(location);
-      return location;
-    });
-  }
-
-  /**
-   * Check if a path is within the allowed base directory
-   */
-  async isPathAllowed(targetPath: FilesystemLocation): Promise<boolean> {
-    try {
-      await this.resolvePath(targetPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /** Accessible starting directory; addresses remain relative to the volume root. */
-  accessScope(volume: string): FilesystemLocation {
-    this.requirePrincipal();
-    this.volumes.get(volume);
-    const accessPath = volume === "home" ? this.getHomeAccessPath() : undefined;
-    const relativePath = accessPath
-      ? path.relative(this.baseDir, accessPath)
-      : "";
-    return { volume, path: `/${relativePath.split(path.sep).join("/")}` };
-  }
-
-  private getHomeAccessPath(): string {
-    const principal = this.executionContext.getPrincipal();
-    if (principal?.kind === "system") {
-      return this.baseDir;
-    }
-    if (principal?.kind !== "user") {
-      throw new Error("Caller has no filesystem execution principal");
-    }
-    const user = principal.profile;
-
-    if (user.role === "vendor") {
-      return this.baseDir;
-    }
-
-    const directoryRestriction = normalizeDirectoryRestriction(
-      user.directoryRestriction,
+  ) {
+    return yield* volumes.withVolumes(
+      [volume],
+      Effect.gen(function* () {
+        yield* Effect.try({ try: requirePrincipal, catch: asError });
+        const root = yield* volumes.root(volume);
+        if (root) yield* io(root.assertActive);
+        const rootPath = root?.rootPath ?? baseDir;
+        const normalized = path.resolve(absolutePath);
+        yield* Effect.try({
+          try: () =>
+            assertPathWithin(rootPath, normalized, `Path '${absolutePath}'`),
+          catch: asError,
+        });
+        const location = {
+          volume,
+          path: `/${path.relative(rootPath, normalized).split(path.sep).join("/")}`,
+        };
+        yield* resolveTarget(location);
+        return location;
+      }),
     );
-    if (!directoryRestriction) {
-      return this.baseDir;
-    }
-
-    return resolveDirectoryRestriction(this.baseDir, directoryRestriction);
+  });
+  const isPathAllowed = (location: FilesystemLocation) =>
+    resolvePath(location).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    );
+  function accessScope(volume: string): FilesystemLocation {
+    requirePrincipal();
+    volumes.get(volume);
+    const accessPath = volume === "home" ? getHomeAccessPath() : undefined;
+    const relative = accessPath ? path.relative(baseDir, accessPath) : "";
+    return { volume, path: `/${relative.split(path.sep).join("/")}` };
   }
-
-  // =====================
-  // Filesystem Operations
-  // =====================
-
-  /**
-   * Read the contents of a file.
-   */
-  async readFile(
-    targetPath: FilesystemSource,
+  const readFile = (
+    source: FilesystemSource,
     encoding: BufferEncoding = "utf-8",
-  ): Promise<string> {
-    return this.handles.use(targetPath, async (file) =>
-      (await readOpenedFile(file)).toString(encoding),
+  ) =>
+    io(() =>
+      handles.use(source, async (file) =>
+        (await readOpenedFile(file)).toString(encoding),
+      ),
     );
-  }
-
-  /**
-   * Read the contents of a file without text encoding.
-   */
-  async readBinaryFile(targetPath: FilesystemSource): Promise<Uint8Array> {
-    return this.handles.use(
-      targetPath,
-      async (file) => new Uint8Array(await readOpenedFile(file)),
+  const readBinaryFile = (source: FilesystemSource) =>
+    io(() =>
+      handles.use(
+        source,
+        async (file) => new Uint8Array(await readOpenedFile(file)),
+      ),
     );
-  }
-
-  /**
-   * Write content to a file, creating directories if needed.
-   */
-  async writeFile(
-    targetPath: FilesystemLocation,
-    content: string,
-    encoding: BufferEncoding = "utf-8",
-  ): Promise<void> {
-    await this.writeContent(targetPath, content, encoding);
-  }
-
-  /**
-   * Write bytes to a file, creating directories if needed.
-   */
-  async writeBinaryFile(
-    targetPath: FilesystemLocation,
-    content: Uint8Array,
-  ): Promise<void> {
-    await this.writeContent(targetPath, content);
-  }
-
-  private async writeContent(
-    targetPath: FilesystemLocation,
+  const writeContent = (
+    location: FilesystemLocation,
     content: string | Uint8Array,
     encoding?: BufferEncoding,
-  ): Promise<void> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const target = await this.resolveTarget(targetPath, true);
-      const fullPath = target.hostPath;
-      await target.assertActive();
-      await fs.mkdir(path.dirname(fullPath), { recursive: true });
-      await target.assertActive();
-      await assertExistingPathWithin(target.rootPath, fullPath);
-      if (target.accessPath !== target.rootPath)
-        await assertExistingPathWithin(target.accessPath, fullPath);
-      await target.assertActive();
-      await fs.writeFile(fullPath, content, encoding);
-      this.invalidateHostDirectory(path.dirname(fullPath));
-    });
-  }
-
-  /**
-   * Check if a file or directory exists.
-   */
-  async exists(targetPath: FilesystemLocation): Promise<boolean> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      try {
-        const fullPath = await this.resolvePath(targetPath);
-        await fs.access(fullPath);
-        return true;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          await this.volumes.getRoot(targetPath.volume)?.assertActive();
-          return false;
-        }
-        throw error;
-      }
-    });
-  }
-
-  /**
-   * Create a directory and any necessary parent directories.
-   */
-  async mkdir(targetPath: FilesystemLocation): Promise<void> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const target = await this.resolveTarget(targetPath, true);
-      const fullPath = target.hostPath;
-      await target.assertActive();
-      await fs.mkdir(fullPath, { recursive: true });
-      this.invalidateHostDirectory(path.dirname(fullPath));
-    });
-  }
-
-  /**
-   * List contents of a directory.
-   */
-  async readdir(targetPath: FilesystemLocation): Promise<string[]> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const fullPath = await this.resolvePath(targetPath);
-      return await fs.readdir(fullPath);
-    });
-  }
-
-  /**
-   * Get file or directory statistics.
-   */
-  async stat(targetPath: FilesystemSource): Promise<FileStats> {
-    const stats =
-      "handleId" in targetPath
-        ? await this.handles.use(targetPath, (file) => file.stat())
-        : await this.volumes.withVolumes([targetPath.volume], async () =>
-            fs.stat(await this.resolvePath(targetPath)),
+  ) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.gen(function* () {
+        const target = yield* resolveTarget(location, true);
+        yield* io(target.assertActive);
+        yield* io(() =>
+          fs.mkdir(path.dirname(target.hostPath), { recursive: true }),
+        );
+        yield* io(target.assertActive);
+        yield* io(() =>
+          assertExistingPathWithin(target.rootPath, target.hostPath),
+        );
+        if (target.accessPath !== target.rootPath)
+          yield* io(() =>
+            assertExistingPathWithin(target.accessPath, target.hostPath),
           );
+        yield* io(target.assertActive);
+        yield* io(() => fs.writeFile(target.hostPath, content, encoding));
+        watcher.invalidate(path.dirname(target.hostPath));
+      }),
+    );
+  const writeFile = (
+    location: FilesystemLocation,
+    content: string,
+    encoding: BufferEncoding = "utf-8",
+  ) => writeContent(location, content, encoding);
+  const writeBinaryFile = (location: FilesystemLocation, content: Uint8Array) =>
+    writeContent(location, content);
+  const exists = (location: FilesystemLocation) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.gen(function* () {
+        return yield* Effect.gen(function* () {
+          const fullPath = yield* resolvePath(location);
+          yield* io(() => fs.access(fullPath));
+          return true;
+        }).pipe(
+          Effect.catch((error) => {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+              return Effect.fail(error);
+            return Effect.gen(function* () {
+              const root = yield* volumes.root(location.volume);
+              if (root) yield* io(root.assertActive);
+              return false;
+            });
+          }),
+        );
+      }),
+    );
+  const mkdir = (location: FilesystemLocation) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.gen(function* () {
+        const target = yield* resolveTarget(location, true);
+        yield* io(target.assertActive);
+        yield* io(() => fs.mkdir(target.hostPath, { recursive: true }));
+        watcher.invalidate(path.dirname(target.hostPath));
+      }),
+    );
+  const readdir = (location: FilesystemLocation) =>
+    withVolume(location, (hostPath) => io(() => fs.readdir(hostPath)));
+  const stat = Effect.fn(function* (
+    source: FilesystemSource,
+  ): Effect.fn.Return<FileStats, Error> {
+    const stats = yield* "handleId" in source
+      ? io(() => handles.use(source, (file) => file.stat()))
+      : withVolume(source, (hostPath) => io(() => fs.stat(hostPath)));
     return {
       isFile: stats.isFile(),
       isDirectory: stats.isDirectory(),
       size: stats.size,
       mtime: stats.mtime,
     };
-  }
-
-  /**
-   * Search for files and directories using glob patterns.
-   */
-  async search(
-    location: FilesystemLocation,
-    pattern: string,
-    limit: number = 10,
-  ): Promise<SearchResult[]> {
-    return this.volumes.withVolumes([location.volume], async () => {
-      const fullPath = await this.resolvePath(location);
-
-      const basePath = location.path;
-
-      // Create glob pattern
-      // If pattern is empty, match everything
-      const globPattern = pattern ? `**/*${pattern}*` : "**/*";
-
-      try {
-        const entries = await fg(globPattern, {
-          cwd: fullPath,
-          onlyFiles: false,
-          deep: 3, // Limit depth for performance
-          suppressErrors: true,
-          stats: true,
-          followSymbolicLinks: false,
-        });
-
-        const results: SearchResult[] = [];
-        for (const entry of entries) {
-          if (results.length >= limit) break;
-
-          const entryPath =
-            basePath === "/" ? `/${entry.path}` : `${basePath}/${entry.path}`;
-          const isDirectory = entry.stats?.isDirectory() ?? false;
-
-          results.push({
-            location: { volume: location.volume, path: entryPath },
-            name: path.basename(entry.path),
-            type: isDirectory ? "folder" : "file",
+  });
+  const search = (location: FilesystemLocation, pattern: string, limit = 10) =>
+    withVolume(location, (fullPath) =>
+      io(async () => {
+        try {
+          const entries = await fg(pattern ? `**/*${pattern}*` : "**/*", {
+            cwd: fullPath,
+            onlyFiles: false,
+            deep: 3,
+            suppressErrors: true,
+            stats: true,
+            followSymbolicLinks: false,
           });
+          const results: SearchResult[] = [];
+          for (const entry of entries) {
+            if (results.length >= limit) break;
+            results.push({
+              location: {
+                volume: location.volume,
+                path:
+                  location.path === "/"
+                    ? `/${entry.path}`
+                    : `${location.path}/${entry.path}`,
+              },
+              name: path.basename(entry.path),
+              type: entry.stats?.isDirectory() ? "folder" : "file",
+            });
+          }
+          return results;
+        } catch (error) {
+          log.error("Search error:", error);
+          return [];
         }
-
-        return results;
-      } catch (error) {
-        log.error("Search error:", error);
-        return [];
-      }
-    });
-  }
-
-  /**
-   * Delete a file or directory.
-   * For directories, removes recursively.
-   */
-  async delete(
-    targetPath: FilesystemLocation,
+      }),
+    );
+  const remove = (location: FilesystemLocation, reporter?: OperationReporter) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.gen(function* () {
+        reporter?.update("validating");
+        const target = yield* resolveTarget(location, true);
+        yield* Effect.try({ try: () => assertNotRoot(target), catch: asError });
+        const stats = yield* io(() => fs.stat(target.hostPath));
+        yield* io(target.assertActive);
+        reporter?.update("deleting");
+        yield* io(() =>
+          stats.isDirectory()
+            ? fs.rm(target.hostPath, { recursive: true, force: true })
+            : fs.unlink(target.hostPath),
+        );
+        watcher.invalidate(path.dirname(target.hostPath));
+      }),
+    );
+  const copy = (
+    from: FilesystemLocation,
+    to: FilesystemLocation,
+    overwrite = false,
     reporter?: OperationReporter,
-  ): Promise<void> {
-    reporter?.update("validating");
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const target = await this.resolveTarget(targetPath, true);
-      const fullPath = target.hostPath;
-
-      this.assertNotRoot(target);
-
-      // Check if it exists and get stats
-      const stats = await fs.stat(fullPath);
-
-      await target.assertActive();
-      reporter?.update("deleting");
-      if (stats.isDirectory()) {
-        // Remove directory recursively
-        await fs.rm(fullPath, { recursive: true, force: true });
-      } else {
-        // Remove file
-        await fs.unlink(fullPath);
-      }
-      this.invalidateHostDirectory(path.dirname(fullPath));
-    });
-  }
-
-  /**
-   * Copy a file or directory to another location.
-   */
-  async copy(
-    fromPath: FilesystemLocation,
-    toPath: FilesystemLocation,
-    overwrite: boolean = false,
-    reporter?: OperationReporter,
-  ): Promise<void> {
-    reporter?.update("validating");
-    return this.volumes.withVolumes(
-      [fromPath.volume, toPath.volume],
-      async () => {
-        const sourceTarget = await this.resolveTarget(fromPath);
-        const destinationTarget = await this.resolveTarget(toPath, true);
-        this.assertNotRoot(destinationTarget);
-        const source = sourceTarget.hostPath;
-        const destination = destinationTarget.hostPath;
-        await this.transfer.copy({
-          source,
-          destination,
-          destinationLabel: `${toPath.volume}:${toPath.path}`,
-          assertSourceActive: sourceTarget.assertActive,
-          assertDestinationActive: destinationTarget.assertActive,
+  ) =>
+    volumes.withVolumes(
+      [from.volume, to.volume],
+      Effect.gen(function* () {
+        reporter?.update("validating");
+        const source = yield* resolveTarget(from);
+        const destination = yield* resolveTarget(to, true);
+        yield* Effect.try({
+          try: () => assertNotRoot(destination),
+          catch: asError,
+        });
+        yield* transfer.copy({
+          source: source.hostPath,
+          destination: destination.hostPath,
+          destinationLabel: `${to.volume}:${to.path}`,
+          assertSourceActive: source.assertActive,
+          assertDestinationActive: destination.assertActive,
           overwrite,
           reporter,
         });
-        this.invalidateHostDirectory(path.dirname(destination));
-      },
+        watcher.invalidate(path.dirname(destination.hostPath));
+      }),
     );
-  }
-
-  /**
-   * Move or rename a file or directory.
-   * Falls back to copy+delete when rename crosses filesystem boundaries.
-   */
-  async move(
-    fromPath: FilesystemLocation,
-    toPath: FilesystemLocation,
-    overwrite: boolean = false,
+  const move = (
+    from: FilesystemLocation,
+    to: FilesystemLocation,
+    overwrite = false,
     reporter?: OperationReporter,
-  ): Promise<void> {
-    reporter?.update("validating");
-    return this.volumes.withVolumes(
-      [fromPath.volume, toPath.volume],
-      async () => {
-        const sourceTarget = await this.resolveTarget(fromPath, true);
-        const destinationTarget = await this.resolveTarget(toPath, true);
-        this.assertNotRoot(sourceTarget);
-        this.assertNotRoot(destinationTarget);
-        const source = sourceTarget.hostPath;
-        const destination = destinationTarget.hostPath;
-        await this.transfer.move({
-          source,
-          destination,
-          destinationLabel: `${toPath.volume}:${toPath.path}`,
-          assertSourceActive: sourceTarget.assertActive,
-          assertDestinationActive: destinationTarget.assertActive,
+  ) =>
+    volumes.withVolumes(
+      [from.volume, to.volume],
+      Effect.gen(function* () {
+        reporter?.update("validating");
+        const source = yield* resolveTarget(from, true);
+        const destination = yield* resolveTarget(to, true);
+        yield* Effect.try({
+          try: () => {
+            assertNotRoot(source);
+            assertNotRoot(destination);
+          },
+          catch: asError,
+        });
+        yield* transfer.move({
+          source: source.hostPath,
+          destination: destination.hostPath,
+          destinationLabel: `${to.volume}:${to.path}`,
+          assertSourceActive: source.assertActive,
+          assertDestinationActive: destination.assertActive,
           overwrite,
           reporter,
         });
-        this.invalidateHostDirectory(path.dirname(source));
-        this.invalidateHostDirectory(path.dirname(destination));
-      },
+        watcher.invalidate(path.dirname(source.hostPath));
+        watcher.invalidate(path.dirname(destination.hostPath));
+      }),
     );
-  }
-
-  async watchDirectory(
-    targetPath: FilesystemLocation,
-    callerWebContentsId: number | undefined,
-  ): Promise<{ watchId: string }> {
-    return this.volumes.withVolumes([targetPath.volume], async () => {
-      const target = await this.resolveTarget(targetPath);
-      if (!this.volumes.get(targetPath.volume).supportsWatch)
-        throw new Error("Filesystem volume does not support watching");
-      const hostPath = target.hostPath;
-      const stats = await fs.stat(hostPath);
-      await target.assertActive();
-      if (!stats.isDirectory()) {
-        throw new Error(`Path '${targetPath.path}' is not a directory`);
-      }
-
-      if (this.volumes.get(targetPath.volume).state !== "ready")
-        throw new Error("Filesystem volume is being removed");
-      return this.watcher.watch(
-        hostPath,
-        callerWebContentsId,
-        targetPath.volume,
-      );
-    });
-  }
-
-  unwatch(watchId: string, callerWebContentsId: number | undefined): void {
-    this.watcher.unwatch(watchId, callerWebContentsId);
-  }
-
-  private invalidateHostDirectory(hostPath: string): void {
-    this.watcher.invalidate(hostPath);
-  }
-
-  override async dispose(): Promise<void> {
-    this.stopHandleViewListener();
-    this.stopHandleAppListener?.();
-    this.stopVolumeListener();
-    this.watcher.dispose();
-    super.dispose();
-    await this.closeHandles();
-  }
-}
+  const watchDirectory = (
+    location: FilesystemLocation,
+    webContentsId: number | undefined,
+  ) =>
+    volumes.withVolumes(
+      [location.volume],
+      Effect.gen(function* () {
+        const target = yield* resolveTarget(location);
+        yield* Effect.try({
+          try: () => {
+            if (!volumes.get(location.volume).supportsWatch)
+              throw new Error("Filesystem volume does not support watching");
+          },
+          catch: asError,
+        });
+        const stats = yield* io(() => fs.stat(target.hostPath));
+        yield* io(target.assertActive);
+        return yield* Effect.try({
+          try: () => {
+            if (!stats.isDirectory())
+              throw new Error(`Path '${location.path}' is not a directory`);
+            if (volumes.get(location.volume).state !== "ready")
+              throw new Error("Filesystem volume is being removed");
+            return watcher.watch(
+              target.hostPath,
+              webContentsId,
+              location.volume,
+            );
+          },
+          catch: asError,
+        });
+      }),
+    );
+  return {
+    getBaseDir: () => baseDir,
+    changed,
+    accessScope,
+    resolvePath,
+    prepareVolumeOperation,
+    withVolume,
+    toMaskedPath,
+    isPathAllowed,
+    readFile,
+    readBinaryFile,
+    writeFile,
+    writeBinaryFile,
+    exists,
+    mkdir,
+    readdir,
+    stat,
+    search,
+    delete: remove,
+    copy,
+    move,
+    watchDirectory,
+    unwatch: watcher.unwatch,
+    open: (location: FilesystemLocation, mode: FilesystemOpenMode = "read") =>
+      io(() => handles.open(location, mode)),
+    close: (handle: FilesystemHandle) => io(() => handles.close(handle)),
+    closeOwner: (owner: {
+      appId?: string;
+      webContentsId?: number;
+      sessionId?: string;
+    }) => io(() => handles.closeOwner(owner)),
+    releaseHandles: (sessionId?: string) =>
+      io(() => handles.closeOwner({ sessionId })),
+    closeHandles: () => io(handles.dispose),
+  };
+});
+export type FilesystemManager = Effect.Success<
+  ReturnType<typeof createFilesystemManager>
+>;

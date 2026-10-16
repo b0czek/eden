@@ -3,7 +3,8 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test as nodeTest } from "node:test";
-import { FilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
+import * as Effect from "effect/Effect";
+import { createFilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
 
 const test = typeof it === "function" ? it : nodeTest;
 
@@ -19,7 +20,7 @@ async function fixture(run: (root: string) => Promise<void>) {
 for (const operation of ["copy", "move"] as const) {
   test(`concurrent ${operation} without overwrite preserves the winning destination`, async () => {
     await fixture(async (root) => {
-      const transfer = new FilesystemTransfer();
+      const transfer = createFilesystemTransfer();
       const sources = [path.join(root, "first"), path.join(root, "second")];
       const contents = [
         "first source".repeat(100000),
@@ -31,13 +32,15 @@ for (const operation of ["copy", "move"] as const) {
       const destination = path.join(root, "destination");
       const outcomes = await Promise.allSettled(
         sources.map((source) =>
-          transfer[operation]({
-            source,
-            destination,
-            destinationLabel: destination,
-            overwrite: false,
-            reporter: { update() {} },
-          }),
+          Effect.runPromise(
+            transfer[operation]({
+              source,
+              destination,
+              destinationLabel: destination,
+              overwrite: false,
+              reporter: { update() {} },
+            }),
+          ),
         ),
       );
       const winner = outcomes.findIndex(
@@ -67,7 +70,7 @@ for (const operation of ["copy", "move"] as const) {
 
   test(`failed overwrite ${operation} restores the previous destination and releases admission`, async () => {
     await fixture(async (root) => {
-      const transfer = new FilesystemTransfer();
+      const transfer = createFilesystemTransfer();
       const source = path.join(root, "source");
       const replacement = path.join(root, "replacement");
       const destination = path.join(root, "destination");
@@ -77,32 +80,36 @@ for (const operation of ["copy", "move"] as const) {
         fs.writeFile(destination, "original"),
       ]);
       await assert.rejects(
-        transfer[operation]({
-          source,
-          destination,
-          destinationLabel: destination,
-          overwrite: true,
-          assertSourceActive: async () => {
-            try {
-              await fs.stat(destination);
-            } catch (error) {
-              if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-                throw new Error("source disconnected");
+        Effect.runPromise(
+          transfer[operation]({
+            source,
+            destination,
+            destinationLabel: destination,
+            overwrite: true,
+            assertSourceActive: async () => {
+              try {
+                await fs.stat(destination);
+              } catch (error) {
+                if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+                  throw new Error("source disconnected");
+                }
+                throw error;
               }
-              throw error;
-            }
-          },
-          reporter: { update() {} },
-        }),
+            },
+            reporter: { update() {} },
+          }),
+        ),
         /source disconnected/,
       );
       assert.equal(await fs.readFile(destination, "utf8"), "original");
-      await transfer.copy({
-        source: replacement,
-        destination,
-        destinationLabel: destination,
-        overwrite: true,
-      });
+      await Effect.runPromise(
+        transfer.copy({
+          source: replacement,
+          destination,
+          destinationLabel: destination,
+          overwrite: true,
+        }),
+      );
       assert.equal(
         await fs.readFile(destination, "utf8"),
         "successful replacement",
@@ -119,7 +126,7 @@ for (const operation of ["copy", "move"] as const) {
 
 test("concurrent copies through a directory alias preserve the winning destination", async () => {
   await fixture(async (root) => {
-    const transfer = new FilesystemTransfer();
+    const transfer = createFilesystemTransfer();
     const target = path.join(root, "target");
     const alias = path.join(root, "alias");
     await fs.mkdir(target);
@@ -132,13 +139,15 @@ test("concurrent copies through a directory alias preserve the winning destinati
     const destinations = [path.join(target, "file"), path.join(alias, "file")];
     const outcomes = await Promise.allSettled(
       sources.map((source, index) =>
-        transfer.copy({
-          source,
-          destination: destinations[index],
-          destinationLabel: destinations[index],
-          overwrite: false,
-          reporter: { update() {} },
-        }),
+        Effect.runPromise(
+          transfer.copy({
+            source,
+            destination: destinations[index],
+            destinationLabel: destinations[index],
+            overwrite: false,
+            reporter: { update() {} },
+          }),
+        ),
       ),
     );
     assert.equal(
@@ -158,7 +167,7 @@ test("concurrent copies through a directory alias preserve the winning destinati
 
 test("concurrent overwrite copies publish complete content and remove their backups", async () => {
   await fixture(async (root) => {
-    const transfer = new FilesystemTransfer();
+    const transfer = createFilesystemTransfer();
     const contents = ["first".repeat(100000), "second".repeat(100000)];
     const sources = [path.join(root, "first"), path.join(root, "second")];
     const destination = path.join(root, "destination");
@@ -168,13 +177,15 @@ test("concurrent overwrite copies publish complete content and remove their back
     );
     await Promise.all(
       sources.map((source) =>
-        transfer.copy({
-          source,
-          destination,
-          destinationLabel: destination,
-          overwrite: true,
-          reporter: { update() {} },
-        }),
+        Effect.runPromise(
+          transfer.copy({
+            source,
+            destination,
+            destinationLabel: destination,
+            overwrite: true,
+            reporter: { update() {} },
+          }),
+        ),
       ),
     );
     assert.ok(contents.includes(await fs.readFile(destination, "utf8")));
@@ -189,19 +200,21 @@ test("concurrent overwrite copies publish complete content and remove their back
 for (const operation of ["copy", "move"] as const) {
   test(`${operation} preserves file and recursive directory contents`, async () => {
     await fixture(async (root) => {
-      const transfer = new FilesystemTransfer();
+      const transfer = createFilesystemTransfer();
       for (const kind of ["file", "directory"] as const) {
         const source = path.join(root, kind);
         const destination = path.join(root, "nested", kind);
         const suffix = kind === "directory" ? "/nested/data.txt" : "";
         await fs.mkdir(path.dirname(source + suffix), { recursive: true });
         await fs.writeFile(source + suffix, "preserved contents");
-        await transfer[operation]({
-          source,
-          destination,
-          destinationLabel: destination,
-          overwrite: false,
-        });
+        await Effect.runPromise(
+          transfer[operation]({
+            source,
+            destination,
+            destinationLabel: destination,
+            overwrite: false,
+          }),
+        );
         assert.equal(
           await fs.readFile(destination + suffix, "utf8"),
           "preserved contents",
@@ -224,12 +237,14 @@ for (const operation of ["copy", "move"] as const) {
       await fs.mkdir(path.join(destination, "stale"), { recursive: true });
       await fs.writeFile(path.join(source, "nested/new.txt"), "new");
       await fs.writeFile(path.join(destination, "stale/old.txt"), "old");
-      await new FilesystemTransfer()[operation]({
-        source,
-        destination,
-        destinationLabel: destination,
-        overwrite: true,
-      });
+      await Effect.runPromise(
+        createFilesystemTransfer()[operation]({
+          source,
+          destination,
+          destinationLabel: destination,
+          overwrite: true,
+        }),
+      );
       assert.equal(
         await fs.readFile(path.join(destination, "nested/new.txt"), "utf8"),
         "new",
@@ -251,18 +266,20 @@ for (const operation of ["copy", "move"] as const) {
       const source = path.join(root, "tree");
       await fs.mkdir(path.join(source, "child"), { recursive: true });
       await fs.writeFile(path.join(source, "data.txt"), "preserved");
-      const transfer = new FilesystemTransfer();
+      const transfer = createFilesystemTransfer();
       for (const [destination, error] of [
         [source, /must be different/],
         [path.join(source, "child/nested"), /descendant/],
       ] as const) {
         await assert.rejects(
-          transfer[operation]({
-            source,
-            destination,
-            destinationLabel: destination,
-            overwrite: false,
-          }),
+          Effect.runPromise(
+            transfer[operation]({
+              source,
+              destination,
+              destinationLabel: destination,
+              overwrite: false,
+            }),
+          ),
           error,
         );
       }

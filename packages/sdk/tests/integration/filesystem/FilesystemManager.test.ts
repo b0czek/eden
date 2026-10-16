@@ -1,5 +1,3 @@
-import { testApp } from "../../support/apps";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -7,11 +5,7 @@ import type {
   OperationSnapshot,
   UserProfile,
 } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -30,10 +24,11 @@ describe("FilesystemManager native watch integration", () => {
   beforeEach(async () => {
     eden = await createTestEden();
     const manifest = testApp(appId, { name: "Filesystem Watch Test" });
-    eden.runtime.resolve(PackageRegistry).register(manifest);
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(appId, ["fs/read", "fs/write"]);
+    eden.runtime.services.packageRegistry.register(manifest);
+    eden.runtime.services.permissions.registerApp(appId, [
+      "fs/read",
+      "fs/write",
+    ]);
     profile = await eden.runtime.users.create({
       username: "filesystem-watch-user",
       name: "Filesystem Watch User",
@@ -42,11 +37,9 @@ describe("FilesystemManager native watch integration", () => {
     });
     await eden.runtime.sessions.login(profile.username, "password");
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime.resolve(ProcessManager).getAppInstance(appId);
+    const instance = eden.runtime.services.processes.getAppInstance(appId);
     if (!instance) throw new Error("Filesystem test app was not launched");
-    const viewInfo = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(instance.viewId);
+    const viewInfo = eden.runtime.services.views.getViewInfo(instance.viewId);
     if (!viewInfo) throw new Error("Filesystem test app view was not created");
     webContentsId = viewInfo.view.webContents.id;
     await invokeFromView("event/subscribe", { eventName: "fs/changed" });
@@ -68,9 +61,10 @@ describe("FilesystemManager native watch integration", () => {
     const result =
       response.mode === "operation" ? response.handle : response.result;
     return command === "fs/mv"
-      ? eden.runtime
-          .resolve(OperationManager)
-          .wait(result as OperationHandle, caller(appId, profile))
+      ? eden.runtime.services.operations.wait(
+          result as OperationHandle,
+          caller(appId, profile),
+        )
       : result;
   };
 
@@ -176,21 +170,18 @@ describe("FilesystemManager native watch integration", () => {
     })) as {
       watchId: string;
     };
-    eden.runtime
-      .resolve(PackageRegistry)
-      .register(testApp(otherAppId, { name: "Other Filesystem Watch Test" }));
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(otherAppId, ["fs/read"]);
+    eden.runtime.services.packageRegistry.register(
+      testApp(otherAppId, { name: "Other Filesystem Watch Test" }),
+    );
+    eden.runtime.services.permissions.registerApp(otherAppId, ["fs/read"]);
     await eden.complete("process/launch", { appId: otherAppId });
-    const otherInstance = eden.runtime
-      .resolve(ProcessManager)
-      .getAppInstance(otherAppId);
+    const otherInstance =
+      eden.runtime.services.processes.getAppInstance(otherAppId);
     if (!otherInstance)
       throw new Error("Second filesystem test app was not launched");
-    const otherViewInfo = eden.runtime
-      .resolve(ViewManager)
-      .getViewInfo(otherInstance.viewId);
+    const otherViewInfo = eden.runtime.services.views.getViewInfo(
+      otherInstance.viewId,
+    );
     if (!otherViewInfo)
       throw new Error("Second filesystem test view was not created");
 
@@ -261,7 +252,7 @@ describe("FilesystemManager integration", () => {
       name: "Filesystem User",
       password: "password",
     });
-    const permissions = eden.runtime.resolve(PermissionRegistry);
+    const permissions = eden.runtime.services.permissions;
     permissions.registerApp("authorized-app", ["fs/write", "fs/read"]);
     permissions.registerApp("unauthorized-app", ["fs/read"]);
 
@@ -346,7 +337,7 @@ describe("FilesystemManager integration", () => {
 
   it("returns a copy handle before I/O and retains real completion phases and failures", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     await eden.execute(
       "fs/write",
       {
@@ -356,7 +347,7 @@ describe("FilesystemManager integration", () => {
       transferCaller,
     );
     const phases: string[] = [];
-    const off = manager.on("changed", ({ snapshot }) => {
+    const off = manager.changed.on(({ payload: { snapshot } }) => {
       if (snapshot.phase) phases.push(snapshot.phase);
     });
     const args = {
@@ -396,12 +387,12 @@ describe("FilesystemManager integration", () => {
 
   it("reports bytes during a large copy and preserves contents and file mode", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const content = Buffer.alloc(5 * 1024 * 1024, 0xa5);
     const source = path.join(eden.paths.userDirectory, "large.bin");
     await fs.writeFile(source, content, { mode: 0o751 });
     const updates: OperationSnapshot[] = [];
-    const off = manager.on("changed", ({ snapshot }) => {
+    const off = manager.changed.on(({ payload: { snapshot } }) => {
       if (snapshot.command === "fs/cp") updates.push(snapshot);
     });
     try {
@@ -443,7 +434,7 @@ describe("FilesystemManager integration", () => {
     "cancels an active copy and rolls back its destination (overwrite=%s)",
     async (overwrite) => {
       const transferCaller = await setUpFilesystemCaller();
-      const manager = eden.runtime.resolve(OperationManager);
+      const manager = eden.runtime.services.operations;
       const source = path.join(eden.paths.userDirectory, "cancel-source.bin");
       const destination = path.join(
         eden.paths.userDirectory,
@@ -454,7 +445,7 @@ describe("FilesystemManager integration", () => {
       if (overwrite) await fs.writeFile(destination, "previous contents");
       let cancellation: Promise<unknown> | undefined;
       const phases: string[] = [];
-      const off = manager.on("changed", ({ snapshot }) => {
+      const off = manager.changed.on(({ payload: { snapshot } }) => {
         if (snapshot.command !== "fs/cp") return;
         if (snapshot.phase) phases.push(snapshot.phase);
         if (
@@ -510,7 +501,7 @@ describe("FilesystemManager integration", () => {
 
   it("cancels a queued copy without changing either file and scopes cancellation to its owner", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const source = path.join(eden.paths.userDirectory, "queued-source");
     const destination = path.join(eden.paths.userDirectory, "queued-target");
     await fs.writeFile(source, "source");
@@ -561,7 +552,7 @@ describe("FilesystemManager integration", () => {
 
   it("reports recursive copy bytes without counting or following symbolic links", async () => {
     const transferCaller = await setUpFilesystemCaller();
-    const manager = eden.runtime.resolve(OperationManager);
+    const manager = eden.runtime.services.operations;
     const source = path.join(eden.paths.userDirectory, "tree-progress");
     await fs.mkdir(path.join(source, "nested"), { recursive: true });
     await fs.writeFile(path.join(source, "one"), "first");
