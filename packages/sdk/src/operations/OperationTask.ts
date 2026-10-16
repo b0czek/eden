@@ -1,4 +1,5 @@
 import type { OperationProgress } from "@edenapp/types";
+import type * as Effect from "effect/Effect";
 
 export interface OperationReporter {
   readonly signal?: AbortSignal;
@@ -7,7 +8,7 @@ export interface OperationReporter {
 
 /** Prepared synchronously; execution belongs to the runtime after acceptance. */
 export interface OperationTask<R> {
-  run(reporter: OperationReporter): Promise<R>;
+  run(reporter: OperationReporter): Promise<R> | Effect.Effect<R, unknown>;
   cancellable?: boolean;
   transition?: "session" | "runtime";
 }

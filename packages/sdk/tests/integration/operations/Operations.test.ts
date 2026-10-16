@@ -1,21 +1,21 @@
-import { testApp } from "../../support/apps";
-import { gate, tick } from "../../support/async";
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
+import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
+import { command, defineController } from "../../../src/controllers/controller";
 import { ExecutionContext } from "../../../src/execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
 import {
   CommandRegistry,
-  EdenHandler,
-  EdenNamespace,
   IPCBridge,
   PermissionRegistry,
 } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { OperationQuota } from "../../../src/operations/OperationQuota";
+import {
+  type OperationManager,
+  operationRetentionMs,
+} from "../../../src/operations/OperationManager";
+import { operationQuotaLimits } from "../../../src/operations/OperationQuota";
 import {
   type OperationReporter,
   type OperationTask,
@@ -27,46 +27,48 @@ import { ProcessManager } from "../../../src/process-manager/ProcessManager";
 import { SessionContext } from "../../../src/session/SessionContext";
 import { SessionManager } from "../../../src/session/SessionManager";
 import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
-
-// Register through production metadata without adding test commands to codegen.
-class Work {
-  constructor(
-    private run: (args: { value: string }) => OperationTask<unknown>,
-  ) {}
-  prepare(args: { value: string }): OperationTask<unknown> {
-    return this.run(args);
-  }
-}
-EdenNamespace("integration")(Work);
-EdenHandler("work", { mode: "operation", permission: "work" })(
-  Work.prototype,
-  "prepare",
-  Object.getOwnPropertyDescriptor(Work.prototype, "prepare")!,
-);
 
 describe("runtime-owned operations", () => {
   let eden: TestEden;
   let manager: OperationManager;
+  let prepareWork: (args: { value: string }) => OperationTask<unknown>;
   const owner = { appId: "work.app", principal: { kind: "system" as const } };
   beforeEach(async () => {
     eden = await createTestEden();
-    manager = eden.runtime.resolve(OperationManager);
-    eden.runtime
-      .resolve(PermissionRegistry)
-      .registerApp(owner.appId, ["integration/work"]);
+    manager = eden.runtime.services.operations;
+    eden.runtime.services.commands.registerController(
+      defineController("integration", {
+        commands: {
+          work: command({
+            permission: "work",
+            mode: "operation",
+            input: v.object({ value: v.string() }),
+            handle: (args) => prepareWork(args),
+          }),
+        },
+      }),
+    );
+    eden.runtime.services.permissions.registerApp(owner.appId, [
+      "integration/work",
+    ]);
   });
   afterEach(async () => {
     await eden.dispose();
   });
   const register = (run: (args: { value: string }) => OperationTask<unknown>) =>
-    eden.runtime.resolve(CommandRegistry).registerManager(new Work(run));
+    (prepareWork = run);
   const submit = (value = "value", requestKey?: string) =>
-    eden.runtime
-      .resolve(CommandRegistry)
-      .execute<OperationHandle>("integration/work", { value }, owner, {
+    eden.runtime.services.commands.execute<OperationHandle>(
+      "integration/work",
+      { value },
+      owner,
+      {
         requestKey,
-      });
+      },
+    );
 
   it("rejects cancellation for tasks that do not support it", async () => {
     register(() => operationTask(async () => "done"));
@@ -83,9 +85,7 @@ describe("runtime-owned operations", () => {
     const file = path.join(eden.paths.root, "accepted.txt");
     register(({ value }) =>
       operationTask(async (reporter) => {
-        expect(eden.runtime.resolve(ExecutionContext).get()?.appId).toBe(
-          owner.appId,
-        );
+        expect(eden.runtime.services.execution.get()?.appId).toBe(owner.appId);
         reporter.update("writing");
         await blocked.promise;
         await fs.writeFile(file, value);
@@ -122,7 +122,7 @@ describe("runtime-owned operations", () => {
     const callbacks = new Set<
       (data: { snapshot: OperationSnapshot }) => void
     >();
-    const off = manager.on("changed", (data) => {
+    const off = manager.changed.on(({ payload: data }) => {
       for (const callback of callbacks) callback(data);
     });
     const api = createOperationsAPI({
@@ -226,13 +226,13 @@ describe("runtime-owned operations", () => {
     try {
       const active = await submit("active", "active-key");
       const handles: OperationHandle[] = [];
-      for (let i = 1; i < OperationQuota.perAppLimit; i++) {
+      for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
         const handle = await submit(String(i), `key-${i}`);
         handles.push(handle);
         await manager.wait(handle, owner);
       }
       await expect(submit("rejected")).rejects.toThrow("capacity exhausted");
-      expect(preparations).toBe(OperationQuota.perAppLimit);
+      expect(preparations).toBe(operationQuotaLimits.perAppLimit);
       expect(await submit("active", "active-key")).toEqual(active);
       expect(await submit("1", "key-1")).toEqual(handles[0]);
       await expect(submit("different", "key-1")).rejects.toThrow(
@@ -240,19 +240,19 @@ describe("runtime-owned operations", () => {
       );
       // Session changes cannot multiply an app's allowance.
       await expect(
-        eden.runtime
-          .resolve(CommandRegistry)
-          .execute(
-            "integration/work",
-            { value: "other-session" },
-            { ...owner, sessionId: "other-session" },
-          ),
+        eden.runtime.services.commands.execute(
+          "integration/work",
+          { value: "other-session" },
+          { ...owner, sessionId: "other-session" },
+        ),
       ).rejects.toThrow("capacity exhausted");
-      clock.mockReturnValue(now + OperationManager.retentionMs - 1);
-      expect(manager.list(owner)).toHaveLength(OperationQuota.perAppLimit);
+      clock.mockReturnValue(now + operationRetentionMs - 1);
+      expect(manager.list(owner)).toHaveLength(
+        operationQuotaLimits.perAppLimit,
+      );
       expect(await manager.wait(handles[0], owner)).toBe("1");
       await expect(submit("still-full")).rejects.toThrow("capacity exhausted");
-      clock.mockReturnValue(now + OperationManager.retentionMs);
+      clock.mockReturnValue(now + operationRetentionMs);
       expect(manager.list(owner)).toHaveLength(1);
       expect(manager.get(active, owner).status).toBe("running");
       expect(() => manager.get(handles[0], owner)).toThrow("not found");
@@ -261,9 +261,9 @@ describe("runtime-owned operations", () => {
       await expect(manager.wait(next, owner)).resolves.toBe("new-value");
       blocked.release();
       await manager.wait(active, owner);
-      clock.mockReturnValue(now + 2 * OperationManager.retentionMs - 1);
+      clock.mockReturnValue(now + 2 * operationRetentionMs - 1);
       expect(manager.get(active, owner).status).toBe("succeeded");
-      clock.mockReturnValue(now + 2 * OperationManager.retentionMs);
+      clock.mockReturnValue(now + 2 * operationRetentionMs);
       expect(manager.list(owner)).toEqual([]);
     } finally {
       clock.mockRestore();
@@ -289,25 +289,28 @@ describe("runtime-owned operations", () => {
       })),
     ];
     for (const caller of callers)
-      eden.runtime
-        .resolve(PermissionRegistry)
-        .registerApp(caller.appId, ["integration/work"]);
+      eden.runtime.services.permissions.registerApp(caller.appId, [
+        "integration/work",
+      ]);
     const submitFor = (
       caller: typeof owner | { principal: typeof owner.principal },
       value = "active",
     ) =>
-      eden.runtime
-        .resolve(CommandRegistry)
-        .execute<OperationHandle>("integration/work", { value }, caller);
+      eden.runtime.services.commands.execute<OperationHandle>(
+        "integration/work",
+        { value },
+        caller,
+      );
     try {
-      let remainingShared = OperationQuota.sharedLimit;
+      let remainingShared = operationQuotaLimits.sharedLimit;
       for (const caller of callers.slice(0, 3)) {
         const burst = Math.min(
           remainingShared,
-          OperationQuota.perAppLimit - OperationQuota.reservedPerApp,
+          operationQuotaLimits.perAppLimit -
+            operationQuotaLimits.reservedPerApp,
         );
         remainingShared -= burst;
-        for (let i = 0; i < OperationQuota.reservedPerApp + burst; i++) {
+        for (let i = 0; i < operationQuotaLimits.reservedPerApp + burst; i++) {
           const handle = await submitFor(
             caller,
             caller === owner ? "done" : "active",
@@ -322,10 +325,10 @@ describe("runtime-owned operations", () => {
       // A new app and the host still get their entire reserved allowance.
       const host = { principal: owner.principal };
       for (const caller of [callers[3], host]) {
-        for (let i = 0; i < OperationQuota.reservedPerApp; i++)
+        for (let i = 0; i < operationQuotaLimits.reservedPerApp; i++)
           await submitFor(caller);
         expect(manager.list(caller)).toHaveLength(
-          OperationQuota.reservedPerApp,
+          operationQuotaLimits.reservedPerApp,
         );
         expect(
           manager
@@ -337,25 +340,31 @@ describe("runtime-owned operations", () => {
         );
       }
       await tick();
-      clock.mockReturnValue(now + OperationManager.retentionMs);
+      clock.mockReturnValue(now + operationRetentionMs);
       // Only the first app's completed records expire; active records stay.
       expect(manager.list(owner)).toEqual([]);
-      expect(manager.list(callers[1])).toHaveLength(OperationQuota.perAppLimit);
+      expect(manager.list(callers[1])).toHaveLength(
+        operationQuotaLimits.perAppLimit,
+      );
       for (
-        let i = OperationQuota.reservedPerApp;
-        i < OperationQuota.perAppLimit;
+        let i = operationQuotaLimits.reservedPerApp;
+        i < operationQuotaLimits.perAppLimit;
         i++
       )
         await submitFor(callers[3]);
-      expect(manager.list(callers[3])).toHaveLength(OperationQuota.perAppLimit);
+      expect(manager.list(callers[3])).toHaveLength(
+        operationQuotaLimits.perAppLimit,
+      );
       await expect(submitFor(callers[2])).rejects.toThrow(
         "Shared operation capacity exhausted",
       );
       // Reading or expiring another app's records never removes active work.
       expect(manager.list(callers[2])).toHaveLength(
-        OperationQuota.reservedPerApp +
-          OperationQuota.sharedLimit -
-          2 * (OperationQuota.perAppLimit - OperationQuota.reservedPerApp),
+        operationQuotaLimits.reservedPerApp +
+          operationQuotaLimits.sharedLimit -
+          2 *
+            (operationQuotaLimits.perAppLimit -
+              operationQuotaLimits.reservedPerApp),
       );
     } finally {
       clock.mockRestore();
@@ -373,7 +382,7 @@ describe("runtime-owned operations", () => {
     );
     expect(manager.list(owner)).toEqual([]);
     register(() => operationTask(async () => "done"));
-    for (let i = 1; i < OperationQuota.perAppLimit; i++) {
+    for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
       const handle = await submit();
       await manager.wait(handle, owner);
     }
@@ -390,7 +399,7 @@ describe("runtime-owned operations", () => {
     const handle = await submit("retry", "failed-preparation");
     await expect(manager.wait(handle, owner)).resolves.toBe("recovered");
     await expect(submit()).rejects.toThrow("capacity exhausted");
-    expect(manager.list(owner)).toHaveLength(OperationQuota.perAppLimit);
+    expect(manager.list(owner)).toHaveLength(operationQuotaLimits.perAppLimit);
   });
 
   it("reserves session transitions before acceptance and drains without waiting on itself", async () => {
@@ -402,13 +411,15 @@ describe("runtime-owned operations", () => {
       }),
     );
     const work = await submit();
-    const session = eden.runtime.resolve(SessionContext);
+    const session = eden.runtime.services.sessionContext;
     const originalId = session.getSessionId();
     // Exercise the existing awaited session method inside an operation transaction.
     register(() =>
       operationTask(
         async () => {
-          await eden.runtime.resolve(SessionManager).logout();
+          await eden.runtime.effects.run(
+            eden.runtime.services.sessions.logout(),
+          );
           return "changed";
         },
         { transition: "session" },
@@ -434,7 +445,9 @@ describe("runtime-owned operations", () => {
     register(() =>
       operationTask(
         async () => {
-          await eden.runtime.resolve(SessionManager).logout();
+          await eden.runtime.effects.run(
+            eden.runtime.services.sessions.logout(),
+          );
           transitioned.release();
           await blocked.promise;
           return "done";
@@ -448,14 +461,14 @@ describe("runtime-owned operations", () => {
       expect(manager.get(handle, owner).status).toBe("running");
       await expect(submit()).rejects.toThrow("draining");
       await expect(
-        eden.runtime.resolve(SessionManager).logout(),
+        eden.runtime.effects.run(eden.runtime.services.sessions.logout()),
       ).rejects.toThrow("already in progress");
     } finally {
       blocked.release();
     }
     await expect(manager.wait(handle, owner)).resolves.toBe("done");
     await expect(
-      eden.runtime.resolve(SessionManager).logout(),
+      eden.runtime.effects.run(eden.runtime.services.sessions.logout()),
     ).resolves.toBeUndefined();
   });
 
@@ -492,18 +505,22 @@ describe("runtime-owned operations", () => {
     );
     const processes = [];
     for (const id of [owner.appId, "other.backend"]) {
-      eden.runtime.resolve(RuntimeContextRegistry).register(id, {
+      eden.runtime.services.runtimeContexts.register(id, {
         owner: {
           kind: "session",
-          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          sessionId: eden.runtime.services.sessionContext.getSessionId(),
           username: null,
         },
         principal: { kind: "system" },
       });
       const manifest = { ...testApp(id), backend: { entry: "backend.js" } };
-      const starting = eden.runtime
-        .resolve(BackendManager)
-        .createBackend(id, manifest, eden.paths.root);
+      const starting = eden.runtime.effects.run(
+        eden.runtime.services.backends.createBackend(
+          id,
+          manifest,
+          eden.paths.root,
+        ),
+      );
       await tick();
       const effect = eden.platform.effects
         .filter((item) => item.type === "utility-process-started")
@@ -564,13 +581,13 @@ describe("runtime-owned operations", () => {
     );
     expect(JSON.stringify(processes[1].messages)).not.toContain(handle.id);
     for (const process of processes) process.kill();
-    const restarting = eden.runtime
-      .resolve(BackendManager)
-      .createBackend(
+    const restarting = eden.runtime.effects.run(
+      eden.runtime.services.backends.createBackend(
         owner.appId,
         { ...testApp(owner.appId), backend: { entry: "backend.js" } },
         eden.paths.root,
-      );
+      ),
+    );
     await tick();
     const restartedEffect = eden.platform.effects
       .filter((effect) => effect.type === "utility-process-started")
@@ -607,21 +624,21 @@ describe("runtime-owned operations", () => {
     );
     const handle = await submit();
     const start = async () => {
-      eden.runtime.resolve(RuntimeContextRegistry).register(owner.appId, {
+      eden.runtime.services.runtimeContexts.register(owner.appId, {
         owner: {
           kind: "session",
-          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          sessionId: eden.runtime.services.sessionContext.getSessionId(),
           username: null,
         },
         principal: { kind: "system" },
       });
-      const starting = eden.runtime
-        .resolve(BackendManager)
-        .createBackend(
+      const starting = eden.runtime.effects.run(
+        eden.runtime.services.backends.createBackend(
           owner.appId,
           { ...testApp(owner.appId), backend: { entry: "backend.js" } },
           eden.paths.root,
-        );
+        ),
+      );
       await tick();
       const effect = eden.platform.effects
         .filter((item) => item.type === "utility-process-started")
@@ -685,12 +702,12 @@ describe("runtime-owned operations", () => {
       process.kill();
       process = await start();
       // A restarted backend must not inherit interest in the previous operation.
-      eden.runtime.resolve(IPCBridge).eventSubscribers.notify(
+      eden.runtime.services.ipc.eventSubscribers.notify(
         "operation/changed",
         { snapshot: manager.get(handle, owner) },
         {
           appId: owner.appId,
-          sessionId: eden.runtime.resolve(SessionContext).getSessionId(),
+          sessionId: eden.runtime.services.sessionContext.getSessionId(),
           operation: { handle, terminal: true },
         },
       );
@@ -707,8 +724,8 @@ describe("runtime-owned operations", () => {
   });
 
   it("keeps work across caller closure and reopening and filters renderer/backend notifications", async () => {
-    const permissions = eden.runtime.resolve(PermissionRegistry);
-    const registry = eden.runtime.resolve(PackageRegistry);
+    const permissions = eden.runtime.services.permissions;
+    const registry = eden.runtime.services.packageRegistry;
     const profile = {
       username: "vendor",
       name: "Vendor",
@@ -717,24 +734,24 @@ describe("runtime-owned operations", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    eden.runtime.resolve(SessionContext).setCurrentUser(profile);
+    eden.runtime.services.sessionContext.setCurrentUser(profile);
     const launch = (id: string) =>
-      eden.runtime
-        .resolve(ExecutionContext)
-        .run({ principal: { kind: "user", profile } }, () =>
-          eden.runtime.resolve(ProcessManager).launchApp(id),
-        );
+      eden.runtime.services.execution.run(
+        { principal: { kind: "user", profile } },
+        () =>
+          eden.runtime.effects.run(
+            eden.runtime.services.processes.launchApp(id),
+          ),
+      );
     for (const id of [owner.appId, "other.app"]) {
       permissions.registerApp(id, ["integration/work"]);
       registry.register(testApp(id));
       await launch(id);
     }
     const view = (id: string) =>
-      eden.runtime
-        .resolve(ViewManager)
-        .getViewInfo(
-          eden.runtime.resolve(ProcessManager).getAppInstance(id)!.viewId,
-        )!.view;
+      eden.runtime.services.views.getViewInfo(
+        eden.runtime.services.processes.getAppInstance(id)!.viewId,
+      )!.view;
     const invoke = async (id: string, command: string, args: unknown) => {
       const response = (await eden.platform.rendererIpc.invoke(
         "shell-command",
@@ -748,7 +765,7 @@ describe("runtime-owned operations", () => {
     };
     for (const id of [owner.appId, "other.app"]) {
       await invoke(id, "event/subscribe", { eventName: "operation/changed" });
-      const context = eden.runtime.resolve(RuntimeContextRegistry).get(id)!;
+      const context = eden.runtime.services.runtimeContexts.get(id)!;
       await eden.execute(
         "event/subscribe",
         { eventName: "operation/changed" },
@@ -775,7 +792,9 @@ describe("runtime-owned operations", () => {
       value: "item",
     })) as { mode: "operation"; handle: OperationHandle };
     const handle = response.handle;
-    await eden.runtime.resolve(ProcessManager).stopApp(owner.appId);
+    await eden.runtime.effects.run(
+      eden.runtime.services.processes.stopApp(owner.appId),
+    );
     blocked.release();
     await manager.wait(handle, owner);
     await launch(owner.appId);

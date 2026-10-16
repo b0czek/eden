@@ -1,21 +1,21 @@
-import "reflect-metadata";
 import { createHash, randomUUID } from "node:crypto";
 import type {
   OperationHandle,
   OperationSnapshot,
   OperationSubmission,
 } from "@edenapp/types";
-import { delay, inject, Lifecycle, scoped } from "tsyringe";
+import * as Effect from "effect/Effect";
+import type { RoutedNotification } from "../controllers/events";
+import { fromPromise } from "../effects/io";
+import { type EffectRuntime } from "../effects/runtime";
+import { createEvent } from "../events/event";
 import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/ExecutionContext";
 import type { FilesystemManager } from "../filesystem/FilesystemManager";
-import { EdenNamespace } from "../ipc/CommandDecorators";
-import { EdenEmitter } from "../ipc/EdenEmitter";
-import type { IPCBridge } from "../ipc/IPCBridge";
 import { SessionContext } from "../session/SessionContext";
-import { OperationQuota } from "./OperationQuota";
+import { createOperationQuota } from "./OperationQuota";
 import type { OperationTask } from "./OperationTask";
 
 interface OperationNamespaceEvents {
@@ -48,43 +48,42 @@ function canonical(value: unknown): string {
     .join(",")}}`;
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@EdenNamespace("operation")
-export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
-  private readonly records = new Map<string, RecordEntry>();
-  private readonly requests = new Map<string, string>();
-  private readonly quota = new OperationQuota();
-  private readonly closedSessions = new Map<string, string>();
-  private accepting = true;
-  private shuttingDown = false;
-  private runtimeTransition?: string;
-  private readonly expiryTimer: NodeJS.Timeout;
-  static readonly retentionMs = 15 * 60 * 1000;
+export const operationRetentionMs = 15 * 60 * 1000;
+export function createOperationManager({
+  effects,
+  execution,
+  session,
+  filesystem,
+}: {
+  effects: EffectRuntime;
+  execution: ExecutionContext;
+  session: SessionContext;
+  filesystem: {
+    releaseHandles(sessionId?: string): Effect.Effect<void, Error>;
+  };
+}) {
+  const changed =
+    createEvent<RoutedNotification<OperationNamespaceEvents["changed"]>>();
+  let records = new Map<string, RecordEntry>();
+  let requests = new Map<string, string>();
+  let quota = createOperationQuota();
+  let closedSessions = new Map<string, string>();
+  let accepting = true;
+  let shuttingDown = false;
+  let runtimeTransition: string | undefined;
+  let expiryTimer: NodeJS.Timeout;
 
-  constructor(
-    @inject(delay(() => require("../ipc/IPCBridge").IPCBridge))
-    bridge: IPCBridge,
-    @inject(ExecutionContext) private execution: ExecutionContext,
-    @inject(SessionContext) private session: SessionContext,
-    @inject(
-      delay(() => require("../filesystem/FilesystemManager").FilesystemManager),
-    )
-    private filesystem: FilesystemManager,
-  ) {
-    super(bridge);
-    this.expiryTimer = setInterval(() => this.prune(), 60_000);
-    this.expiryTimer.unref();
-  }
-
-  submit(
+  expiryTimer = setInterval(() => prune(), 60_000);
+  expiryTimer.unref();
+  function submit(
     command: string,
     args: unknown,
     context: CommandCallerContext,
     prepare: () => OperationTask<unknown>,
     submission: OperationSubmission = {},
   ): OperationHandle {
-    this.prune();
-    const sessionId = context.sessionId ?? this.session.getSessionId();
+    prune();
+    const sessionId = context.sessionId ?? session.getSessionId();
     const owner = { appId: context.appId, sessionId };
     const requestKey = submission.requestKey;
     if (
@@ -99,8 +98,8 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
       .update(canonical([command, args]))
       .digest("hex");
     if (requestKey !== undefined) {
-      const previousId = this.requests.get(requestIdentity);
-      const previous = previousId && this.records.get(previousId);
+      const previousId = requests.get(requestIdentity);
+      const previous = previousId && records.get(previousId);
       if (previous) {
         if (previous.fingerprint !== fingerprint)
           throw new Error(
@@ -109,9 +108,9 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         return { command, id: previous.snapshot.id };
       }
     }
-    if (!this.accepting || this.closedSessions.has(sessionId))
+    if (!accepting || closedSessions.has(sessionId))
       throw new Error("Operations are draining; new submissions are closed");
-    this.quota.reserve(owner.appId);
+    quota.reserve(owner.appId);
     let retained = false;
     try {
       const task = prepare();
@@ -124,15 +123,15 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         operationId: id,
       });
       const transitionSessionId =
-        task.transition === "session" ? this.session.getSessionId() : undefined;
+        task.transition === "session" ? session.getSessionId() : undefined;
       if (transitionSessionId) {
-        if (this.closedSessions.has(transitionSessionId))
+        if (closedSessions.has(transitionSessionId))
           throw new Error("A session transition is already in progress");
-        this.closedSessions.set(transitionSessionId, id);
+        closedSessions.set(transitionSessionId, id);
       }
       if (task.transition === "runtime") {
-        this.accepting = false;
-        this.runtimeTransition = id;
+        accepting = false;
+        runtimeTransition = id;
       }
       let finish!: () => void;
       const done = new Promise<void>((resolve) => {
@@ -158,53 +157,49 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         fingerprint,
         requestKey: requestKey === undefined ? undefined : requestIdentity,
       };
-      this.records.set(id, record);
+      records.set(id, record);
       retained = true;
-      if (record.requestKey) this.requests.set(record.requestKey, id);
-      this.publish(record);
+      if (record.requestKey) requests.set(record.requestKey, id);
+      publish(record);
       // IPC response delivery is queued before tasks may tear down their caller.
       setImmediate(() => {
-        void this.execution.run(record.context, () =>
-          this.execute(record, task),
-        );
+        void execution.run(record.context, () => execute(record, task));
       });
       return { command, id };
     } finally {
-      if (!retained) this.quota.release(owner.appId);
+      if (!retained) quota.release(owner.appId);
     }
   }
-
-  /** Awaited host convenience work still belongs to the runtime's operation ledger. */
-  async runHost<R>(
+  async function runHost<R>(
     command: string,
     args: unknown,
     prepare: () => OperationTask<R>,
   ): Promise<R> {
     const context: CommandCallerContext = {
       principal: { kind: "system" },
-      sessionId: this.session.getSessionId(),
+      sessionId: session.getSessionId(),
     };
-    const handle = this.submit(command, args, context, prepare);
-    return (await this.wait(handle, context)) as R;
+    const handle = submit(command, args, context, prepare);
+    return (await wait(handle, context)) as R;
   }
-
-  private async execute(
+  async function execute(
     record: RecordEntry,
     task: OperationTask<unknown>,
   ): Promise<void> {
     try {
-      this.update(record, { status: "running", startedAt: Date.now() });
-      if (task.transition)
-        this.update(record, { phase: "waiting-for-operations" });
+      update(record, { status: "running", startedAt: Date.now() });
+      if (task.transition) update(record, { phase: "waiting-for-operations" });
       if (record.transitionSessionId) {
-        await this.filesystem.releaseHandles(record.transitionSessionId);
-        await this.drainSession(record.transitionSessionId, record.snapshot.id);
+        await effects.run(
+          filesystem.releaseHandles(record.transitionSessionId),
+        );
+        await drainSession(record.transitionSessionId, record.snapshot.id);
       }
       if (task.transition === "runtime") {
-        await this.filesystem.releaseHandles();
-        await this.drain(record.snapshot.id);
+        await effects.run(filesystem.releaseHandles());
+        await drain(record.snapshot.id);
       }
-      const result = await task.run({
+      const work = task.run({
         signal: record.cancellation?.signal,
         update: (phase, progress) => {
           const previous = record.snapshot.progress;
@@ -214,9 +209,12 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
             previous?.total === progress?.total &&
             previous?.unit === progress?.unit;
           if (record.snapshot.status === "running" && !unchanged)
-            this.update(record, { phase, progress: structuredClone(progress) });
+            update(record, { phase, progress: structuredClone(progress) });
         },
       });
+      const result = Effect.isEffect(work)
+        ? await effects.run(work)
+        : await work;
       const failed =
         result === false ||
         (result !== null &&
@@ -231,14 +229,14 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
           typeof result.error === "string"
             ? result.error
             : "Operation failed";
-        this.update(record, {
+        update(record, {
           status: "failed",
           completedAt: Date.now(),
           error: { name: "OperationError", message },
           response: structuredClone(result),
         });
       } else
-        this.update(record, {
+        update(record, {
           status: "succeeded",
           completedAt: Date.now(),
           result: structuredClone(result),
@@ -249,9 +247,9 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         record.cancellation?.signal.aborted &&
         failure?.name === "AbortError"
       ) {
-        this.update(record, { status: "cancelled", completedAt: Date.now() });
+        update(record, { status: "cancelled", completedAt: Date.now() });
       } else {
-        this.update(record, {
+        update(record, {
           status: "failed",
           completedAt: Date.now(),
           error: {
@@ -263,103 +261,95 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     } finally {
       if (
         task.transition === "session" &&
-        this.closedSessions.get(record.transitionSessionId!) ===
-          record.snapshot.id
+        closedSessions.get(record.transitionSessionId!) === record.snapshot.id
       )
-        this.closedSessions.delete(record.transitionSessionId!);
+        closedSessions.delete(record.transitionSessionId!);
       if (
         task.transition === "runtime" &&
-        this.runtimeTransition === record.snapshot.id
+        runtimeTransition === record.snapshot.id
       ) {
-        this.runtimeTransition = undefined;
-        this.accepting =
+        runtimeTransition = undefined;
+        accepting =
           (record.snapshot.status === "failed" ||
             record.snapshot.status === "cancelled") &&
-          !this.shuttingDown;
+          !shuttingDown;
       }
       record.finish();
-      this.prune();
+      prune();
     }
   }
-
-  private update(record: RecordEntry, patch: Record<string, unknown>): void {
+  function update(record: RecordEntry, patch: Record<string, unknown>): void {
     record.snapshot = {
       ...record.snapshot,
       ...patch,
       revision: record.snapshot.revision + 1,
       updatedAt: Date.now(),
     } as OperationSnapshot;
-    this.publish(record);
+    publish(record);
   }
-
-  private publish(record: RecordEntry): void {
-    this.notify(
-      "changed",
-      () => ({ snapshot: structuredClone(record.snapshot) }),
-      {
+  function publish(record: RecordEntry): void {
+    changed.emit({
+      payload: { snapshot: structuredClone(record.snapshot) },
+      scope: {
         ...record.owner,
         operation: {
           handle: record.snapshot,
-          terminal:
-            record.snapshot.status === "succeeded" ||
-            record.snapshot.status === "failed" ||
-            record.snapshot.status === "cancelled",
+          terminal: ["succeeded", "failed", "cancelled"].includes(
+            record.snapshot.status,
+          ),
         },
       },
-    );
+    });
   }
-
-  private authorized(
+  function authorized(
     record: RecordEntry,
     context: CommandCallerContext,
   ): boolean {
     return (
       record.owner.appId === context.appId &&
-      record.owner.sessionId ===
-        (context.sessionId ?? this.session.getSessionId())
+      record.owner.sessionId === (context.sessionId ?? session.getSessionId())
     );
   }
-
-  get(
+  function get(
     handle: OperationHandle,
-    context = this.execution.get() ?? {},
+    context = execution.get() ?? {},
   ): OperationSnapshot {
-    this.prune();
-    const record = this.records.get(handle.id);
+    prune();
+    const record = records.get(handle.id);
     if (
       !record ||
       record.snapshot.command !== handle.command ||
-      !this.authorized(record, context)
+      !authorized(record, context)
     )
       throw new Error("Operation not found or access denied");
     return structuredClone(record.snapshot);
   }
-
-  cancel(handle: OperationHandle, context = this.execution.get() ?? {}): void {
-    const snapshot = this.get(handle, context);
+  function cancel(
+    handle: OperationHandle,
+    context = execution.get() ?? {},
+  ): void {
+    const snapshot = get(handle, context);
     if (snapshot.status !== "queued" && snapshot.status !== "running") return;
-    const record = this.records.get(handle.id)!;
+    const record = records.get(handle.id)!;
     if (!record.cancellation) throw new Error("Operation cannot be cancelled");
     if (record.cancellation.signal.aborted) return;
     const error = new Error("Operation cancelled");
     error.name = "AbortError";
     record.cancellation.abort(error);
-    this.update(record, { phase: "cancelling" });
+    update(record, { phase: "cancelling" });
   }
-
-  list(context = this.execution.get() ?? {}): OperationSnapshot[] {
-    this.prune();
-    return [...this.records.values()]
-      .filter((record) => this.authorized(record, context))
+  function list(context = execution.get() ?? {}): OperationSnapshot[] {
+    prune();
+    return [...records.values()]
+      .filter((record) => authorized(record, context))
       .map((record) => structuredClone(record.snapshot));
   }
-
-  async wait(
+  async function wait(
     handle: OperationHandle,
-    context = this.execution.get() ?? {},
+    context = execution.get() ?? {},
   ): Promise<unknown> {
-    this.get(handle, context);
-    const record = this.records.get(handle.id)!;
+    get(handle, context);
+    const record = records.get(handle.id)!;
     await record.done;
     const snapshot = record.snapshot;
     if (snapshot.status === "succeeded")
@@ -377,26 +367,25 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
     }
     throw new Error("Operation has not completed");
   }
-
-  /** Privileged read-only host snapshots. */
-  inspect(handle: OperationHandle): OperationSnapshot | undefined {
-    this.prune();
-    const record = this.records.get(handle.id);
+  function inspect(handle: OperationHandle): OperationSnapshot | undefined {
+    prune();
+    const record = records.get(handle.id);
     return record?.snapshot.command === handle.command
       ? structuredClone(record.snapshot)
       : undefined;
   }
-
-  inspectAll(): OperationSnapshot[] {
-    this.prune();
-    return [...this.records.values()].map((record) =>
+  function inspectAll(): OperationSnapshot[] {
+    prune();
+    return [...records.values()].map((record) =>
       structuredClone(record.snapshot),
     );
   }
-
-  async drainSession(sessionId: string, excludeId?: string): Promise<void> {
+  async function drainSession(
+    sessionId: string,
+    excludeId?: string,
+  ): Promise<void> {
     await Promise.all(
-      [...this.records.values()]
+      [...records.values()]
         .filter(
           (record) =>
             record.owner.sessionId === sessionId &&
@@ -405,89 +394,123 @@ export class OperationManager extends EdenEmitter<OperationNamespaceEvents> {
         .map((record) => record.done),
     );
   }
-
-  async withSessionTransition<T>(task: () => Promise<T>): Promise<T> {
-    const sessionId = this.session.getSessionId();
-    const operationId = this.execution.get()?.operationId;
-    const reserved = this.closedSessions.get(sessionId);
-    if (reserved) {
-      // Accepted transitions are drained and released by execute().
-      if (reserved === operationId) return task();
-      throw new Error("A session transition is already in progress");
-    }
-    if (!this.accepting) throw new Error("Runtime operations are draining");
-    const reservation = operationId ?? randomUUID();
-    this.closedSessions.set(sessionId, reservation);
-    try {
-      await this.filesystem.releaseHandles(sessionId);
-      await this.drainSession(sessionId, operationId);
-      return await task();
-    } finally {
-      if (this.closedSessions.get(sessionId) === reservation)
-        this.closedSessions.delete(sessionId);
-    }
+  function withSessionTransition<A, E>(
+    work: Effect.Effect<A, E>,
+  ): Effect.Effect<A, E | Error> {
+    return Effect.suspend(() => {
+      const sessionId = session.getSessionId();
+      const operationId = execution.get()?.operationId;
+      const reserved = closedSessions.get(sessionId);
+      if (reserved)
+        return reserved === operationId
+          ? work
+          : Effect.fail(
+              new Error("A session transition is already in progress"),
+            );
+      if (!accepting)
+        return Effect.fail(new Error("Runtime operations are draining"));
+      const reservation = operationId ?? randomUUID();
+      closedSessions.set(sessionId, reservation);
+      return Effect.gen(function* () {
+        yield* filesystem.releaseHandles(sessionId);
+        yield* fromPromise(() => drainSession(sessionId, operationId));
+        return yield* work;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (closedSessions.get(sessionId) === reservation)
+              closedSessions.delete(sessionId);
+          }),
+        ),
+      );
+    });
   }
-
-  async withRuntimeTransition<T>(task: () => Promise<T>): Promise<T> {
-    const operationId = this.execution.get()?.operationId;
-    if (this.runtimeTransition) {
-      // Accepted transitions are drained and released by execute().
-      if (this.runtimeTransition === operationId) return task();
-      throw new Error("A runtime transition is already in progress");
-    }
-    if (!this.accepting) throw new Error("Runtime operations are draining");
-    const reservation = operationId ?? randomUUID();
-    this.runtimeTransition = reservation;
-    this.accepting = false;
-    try {
-      await this.filesystem.releaseHandles();
-      await this.drain(operationId);
-      return await task();
-    } catch (error) {
-      this.accepting = !this.shuttingDown;
-      throw error;
-    } finally {
-      if (this.runtimeTransition === reservation)
-        this.runtimeTransition = undefined;
-    }
+  function withRuntimeTransition<A, E>(
+    work: Effect.Effect<A, E>,
+  ): Effect.Effect<A, E | Error> {
+    return Effect.suspend(() => {
+      const operationId = execution.get()?.operationId;
+      if (runtimeTransition)
+        return runtimeTransition === operationId
+          ? work
+          : Effect.fail(
+              new Error("A runtime transition is already in progress"),
+            );
+      if (!accepting)
+        return Effect.fail(new Error("Runtime operations are draining"));
+      const reservation = operationId ?? randomUUID();
+      runtimeTransition = reservation;
+      accepting = false;
+      return Effect.gen(function* () {
+        yield* filesystem.releaseHandles();
+        yield* fromPromise(() => drain(operationId));
+        return yield* work;
+      }).pipe(
+        Effect.onError(() =>
+          Effect.sync(() => {
+            accepting = !shuttingDown;
+          }),
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (runtimeTransition === reservation)
+              runtimeTransition = undefined;
+          }),
+        ),
+      );
+    });
   }
-
-  async drain(excludeId?: string): Promise<void> {
+  async function drain(excludeId?: string): Promise<void> {
     await Promise.all(
-      [...this.records.values()]
+      [...records.values()]
         .filter((record) => record.snapshot.id !== excludeId)
         .map((record) => record.done),
     );
   }
-
-  async shutdown(): Promise<void> {
-    this.shuttingDown = true;
-    this.accepting = false;
-    await this.drain(this.execution.get()?.operationId);
+  async function shutdown(): Promise<void> {
+    shuttingDown = true;
+    accepting = false;
+    await drain(execution.get()?.operationId);
   }
-
-  private prune(): void {
+  function prune(): void {
     const now = Date.now();
-    for (const record of this.records.values()) {
+    for (const record of records.values()) {
       const snapshot = record.snapshot;
       if (
         (snapshot.status === "succeeded" ||
           snapshot.status === "failed" ||
           snapshot.status === "cancelled") &&
-        now - snapshot.completedAt >= OperationManager.retentionMs
+        now - snapshot.completedAt >= operationRetentionMs
       ) {
-        this.records.delete(record.snapshot.id);
-        if (record.requestKey) this.requests.delete(record.requestKey);
-        this.quota.release(record.owner.appId);
+        records.delete(record.snapshot.id);
+        if (record.requestKey) requests.delete(record.requestKey);
+        quota.release(record.owner.appId);
       }
     }
   }
-
-  override dispose(): void {
-    clearInterval(this.expiryTimer);
-    this.records.clear();
-    this.requests.clear();
-    this.quota.clear();
-    super.dispose();
+  function dispose(): void {
+    clearInterval(expiryTimer);
+    records.clear();
+    requests.clear();
+    quota.clear();
+    changed.dispose();
   }
+  return {
+    changed,
+    submit,
+    runHost,
+    get,
+    cancel,
+    list,
+    wait,
+    inspect,
+    inspectAll,
+    drainSession,
+    withSessionTransition,
+    withRuntimeTransition,
+    drain,
+    shutdown,
+    dispose,
+  };
 }
+export type OperationManager = ReturnType<typeof createOperationManager>;
