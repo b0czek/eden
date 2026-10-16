@@ -1,14 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as Effect from "effect/Effect";
 import { WASMagic } from "wasmagic";
+import { fromPromise } from "../effects/io";
 import type { FilesystemManager } from "../filesystem";
 import { log } from "../logging";
 import { normalizeMimeType } from "./handlers";
 import type { FileOpenFilesystem } from "./ports";
 
 const MIME_DETECTION_BYTES = 8192;
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
 
 /** Keep the volume lease through metadata/content I/O and defer the WASM load. */
 export function createFileOpenFilesystem(
@@ -36,27 +35,21 @@ export function createFileOpenFilesystem(
 
   return {
     inspect: (location) =>
-      Effect.tryPromise({
-        try: () =>
-          filesystem.withVolume(location, async (fullPath) => {
-            const stats = await fs.stat(fullPath);
-            const isDirectory = stats.isDirectory();
-            return {
-              isDirectory,
-              mimeType: isDirectory
-                ? undefined
-                : await detectMimeType(fullPath),
-            };
-          }),
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
+      filesystem.withVolume(location, (fullPath) =>
+        fromPromise(async () => {
+          const stats = await fs.stat(fullPath);
+          const isDirectory = stats.isDirectory();
+          return {
+            isDirectory,
+            mimeType: isDirectory ? undefined : await detectMimeType(fullPath),
+          };
+        }).pipe(Effect.uninterruptible),
+      ),
     isDirectory: (location) =>
-      Effect.tryPromise({
-        try: () =>
-          filesystem.withVolume(location, async (fullPath) =>
-            (await fs.stat(fullPath)).isDirectory(),
-          ),
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
+      filesystem.withVolume(location, (fullPath) =>
+        fromPromise(async () => (await fs.stat(fullPath)).isDirectory()).pipe(
+          Effect.uninterruptible,
+        ),
+      ),
   };
 }

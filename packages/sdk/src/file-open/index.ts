@@ -1,4 +1,4 @@
-export { createFileOpenController } from "./controller";
+export { createFileOpenController } from "./controller-edenapi";
 export { createFileOpenFilesystem } from "./filesystem";
 export {
   createFileOpenOperations,

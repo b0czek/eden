@@ -57,7 +57,6 @@ export interface FileOpenI18n {
 export interface FileOpenOperationBoundary {
   prepareVolumeOperation<R>(
     volumes: string[],
-    run: (reporter: OperationReporter) => Promise<R>,
+    run: (reporter: OperationReporter) => Effect.Effect<R, unknown>,
   ): OperationTask<R>;
-  run<A, E>(work: Effect.Effect<A, E>): Promise<A>;
 }
