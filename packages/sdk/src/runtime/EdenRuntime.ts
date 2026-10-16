@@ -32,6 +32,7 @@ import { ContextMenuManager } from "../context-menu";
 import { DaemonManager } from "../daemon";
 import { DbManager } from "../db";
 import { ExecutionContext } from "../execution/ExecutionContext";
+import { createEffectRuntime, EFFECT_RUNTIME } from "../effects/runtime";
 import { FileOpenManager } from "../file-open";
 import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
@@ -99,6 +100,7 @@ export interface EdenRuntimeOptions {
  */
 export class EdenRuntime {
   private readonly container: DependencyContainer;
+  private readonly effects = createEffectRuntime();
   private readonly ownedServices: Array<{
     dispose: () => void | Promise<void>;
   }> = [];
@@ -155,6 +157,7 @@ export class EdenRuntime {
     this.container = (
       options.parentContainer ?? rootContainer
     ).createChildContainer();
+    this.container.registerInstance(EFFECT_RUNTIME, this.effects);
     this.container.registerInstance("EdenConfig", this.config);
     this.container.registerInstance("appsDirectory", this.paths.appsDirectory);
     this.container.registerInstance("distPath", this.paths.distPath);
@@ -272,7 +275,10 @@ export class EdenRuntime {
   }
 
   private resolveOwned<T>(token: InjectionToken<T>): T {
-    const instance = this.container.resolve(token);
+    return this.own(this.container.resolve(token));
+  }
+
+  private own<T>(instance: T): T {
     if (
       instance &&
       typeof instance === "object" &&
@@ -331,7 +337,7 @@ export class EdenRuntime {
         this.paths.userDirectory,
       );
 
-      this.initializeManagers();
+      await this.initializeManagers();
       await this.userManager.initialize();
       await this.packageManager.initialize();
       this.settingsPanelManager.synchronizeManifestPanels();
@@ -367,7 +373,7 @@ export class EdenRuntime {
     }
   }
 
-  private initializeManagers(): void {
+  private async initializeManagers(): Promise<void> {
     if (this.managersInitialized) return;
     this.managersInitialized = true;
 
@@ -376,6 +382,7 @@ export class EdenRuntime {
     this.resolveOwned(FilesystemManager);
     this.userManager = this.resolveOwned(UserManager);
     this.resolveOwned(SettingsManager);
+    this.own(this.effects);
     this.resolveOwned(I18nManager);
     this.packageManager = this.resolveOwned(PackageManager);
     this.processManager = this.resolveOwned(ProcessManager);
@@ -524,9 +531,9 @@ export class EdenRuntime {
       await this.resolveOwned(FilesystemManager).closeHandles();
     await this.resolveOwned(OperationManager).shutdown();
     if (this.managersInitialized) {
-      await this.autostartManager.dispose();
-      await this.daemonManager.shutdown();
-      await this.processManager.shutdown();
+      await this.autostartManager?.dispose();
+      await this.daemonManager?.shutdown();
+      await this.processManager?.shutdown();
     }
 
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -548,6 +555,7 @@ export class EdenRuntime {
     }
     this.ownedServices.length = 0;
     this.ownedServiceSet.clear();
+    await this.effects.dispose();
 
     try {
       await this.container.dispose();

@@ -15,6 +15,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Node, Project } from "ts-morph";
 import { generateClientCode } from "./client";
+import { extractControllers } from "./controllers";
 import {
   type CommandInfo,
   extractCommandHandlers,
@@ -34,7 +35,7 @@ import { generateRuntimeCode } from "./runtime";
  * Main code generation function
  */
 export function generateAll(): void {
-  console.log("🔍 Scanning for @EdenHandler and @EdenNamespace decorators...");
+  console.log("Scanning controller definitions and decorated handlers...");
 
   const projectRoot = path.resolve(__dirname, "../..");
   const srcDir = path.join(projectRoot, "src");
@@ -49,6 +50,8 @@ export function generateAll(): void {
   // Add source files
   project.addSourceFilesAtPaths([
     path.join(srcDir, "**/*.ts"),
+    `!${path.join(srcDir, "**/*.test.ts")}`,
+    `!${path.join(srcDir, "**/*.spec.ts")}`,
     path.join(typesDir, "index.d.ts"),
   ]);
 
@@ -70,6 +73,10 @@ export function generateAll(): void {
 
   project.getSourceFiles().forEach((sourceFile) => {
     if (sourceFile.getFilePath() === indexFile?.getFilePath()) return;
+
+    const controllers = extractControllers(sourceFile);
+    allCommands.push(...controllers.commands);
+    allEvents.push(...controllers.events);
 
     sourceFile.getClasses().forEach((classDec) => {
       const namespaceDecorator = classDec.getDecorator("EdenNamespace");
@@ -101,6 +108,18 @@ export function generateAll(): void {
 
   console.log(`\n📦 Found ${allCommands.length} total command handlers`);
   console.log(`📦 Found ${allEvents.length} total event declarations`);
+
+  for (const entries of [
+    allCommands.map((command) => `${command.namespace}/${command.command}`),
+    allEvents.map((event) => `${event.namespace}/${event.eventName}`),
+  ]) {
+    const names = new Set<string>();
+    for (const name of entries) {
+      if (names.has(name))
+        throw new Error(`Duplicate controller contract: ${name}`);
+      names.add(name);
+    }
+  }
 
   // Group by namespace
   const namespaceCommands = groupCommandsByNamespace(allCommands);

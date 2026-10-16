@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import type { OperationSubmission } from "@edenapp/types";
+import type { EventData, EventName, OperationSubmission } from "@edenapp/types";
+import type { Controller } from "../controllers/controller";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { ExecutionContext } from "../execution/ExecutionContext";
 import { RuntimeContextRegistry } from "../execution/RuntimeContextRegistry";
@@ -31,6 +32,7 @@ export class IPCBridge extends EventEmitter {
   public eventSubscribers: EventSubscriberManager;
   private eventHandler: EventHandler;
   private mainWindow: PlatformWindow | null = null;
+  private readonly controllerEvents = new Map<string, () => void>();
   private runningAppIds: Set<string> = new Set();
   private pendingCommands: Map<
     string,
@@ -77,6 +79,24 @@ export class IPCBridge extends EventEmitter {
 
     this.setupIPCHandlers();
     this.setupBackendMessageHandlers();
+  }
+
+  registerController(controller: Controller): void {
+    for (const event of Object.keys(controller.events)) {
+      const name = `${controller.namespace}/${event}`;
+      if (this.controllerEvents.has(name))
+        throw new Error(`Event already registered: ${name}`);
+    }
+    this.commandRegistry.registerController(controller);
+    for (const [event, source] of Object.entries(controller.events)) {
+      const name = `${controller.namespace}/${event}` as EventName;
+      this.controllerEvents.set(
+        name,
+        source.on((payload) => {
+          this.eventSubscribers.notify(name, payload as EventData<typeof name>);
+        }),
+      );
+    }
   }
 
   /**
@@ -296,6 +316,8 @@ export class IPCBridge extends EventEmitter {
       pending.reject(new Error("Eden runtime disposed"));
     }
     this.pendingCommands.clear();
+    for (const stop of this.controllerEvents.values()) stop();
+    this.controllerEvents.clear();
     this.eventSubscribers.dispose();
     this.removeAllListeners();
     this.mainWindow = null;

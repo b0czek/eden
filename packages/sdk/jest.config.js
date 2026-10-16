@@ -11,7 +11,10 @@ module.exports = {
     "!src/**/*.spec.ts",
   ],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  transformIgnorePatterns: ["/node_modules/(?!\\.pnpm/|effect/)"],
   transform: {
     "^.+\\.tsx?$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.test.json" }],
+    "[/\\\\]node_modules[/\\\\]effect[/\\\\].+\\.js$":
+      "<rootDir>/scripts/jest-effect-transform.cjs",
   },
 };

@@ -95,6 +95,9 @@ await process.subscribe("launched", (data) => {
 const hasMinimize = await window.edenAPI.isEventSupported("window/minimize");
 ```
 
+Service-side declarations and event publishing are described in
+[Controllers and domain events](controllers.md).
+
 ### How It Works
 
 1. **Command Execution**: The `shellCommand` method sends a command through `ipcRenderer.invoke("shell-command", ...)` to the main process

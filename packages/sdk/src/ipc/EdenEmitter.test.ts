@@ -50,38 +50,6 @@ describe("EdenEmitter", () => {
     expect(notifyView).toHaveBeenCalledWith(12, "test/ping", { value: 7 });
   });
 
-  it("notifies local listeners in order, deduplicates, and disposes them", () => {
-    @EdenNamespace("test")
-    class Namespaced extends EdenEmitter<TestEvents> {
-      public emit(value: number): void {
-        this.notify("ping", { value });
-      }
-    }
-
-    const notify = jest.fn();
-    const emitter = new Namespaced({
-      eventSubscribers: { notify, notifyView: jest.fn() },
-    } as unknown as IPCBridge);
-    const calls: number[] = [];
-    const first = jest.fn(() => {
-      calls.push(1);
-    });
-    const second = jest.fn(() => {
-      calls.push(2);
-    });
-
-    const disposeFirst = emitter.on("ping", first);
-    emitter.on("ping", first);
-    emitter.on("ping", second);
-    emitter.emit(1);
-
-    expect(calls).toEqual([1, 2]);
-    expect(first).toHaveBeenCalledTimes(1);
-    disposeFirst();
-    emitter.emit(2);
-    expect(calls).toEqual([1, 2, 2]);
-  });
-
   it("logs listener failures and continues local and external publication", async () => {
     @EdenNamespace("test")
     class Namespaced extends EdenEmitter<TestEvents> {

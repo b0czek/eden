@@ -1,6 +1,9 @@
 import "reflect-metadata";
 import type { OperationSubmission } from "@edenapp/types";
 import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
+import type { Controller } from "../controllers/controller";
+import * as Effect from "effect/Effect";
+import { EFFECT_RUNTIME, type EffectRuntime } from "../effects/runtime";
 import {
   type CommandCallerContext,
   ExecutionContext,
@@ -32,6 +35,7 @@ export type CommandHandler<TArgs = unknown, TResult = unknown> = (
 ) => Promise<TResult> | TResult;
 
 export interface CommandMetadata {
+  source: "decorator" | "controller";
   namespace: string;
   command: string;
   handler: CommandHandler;
@@ -56,6 +60,7 @@ export class CommandRegistry {
     private sessionContext: SessionContext,
     @inject(ExecutionContext) private executionContext: ExecutionContext,
     @inject(delay(() => OperationManager)) private operations: OperationManager,
+    @inject(EFFECT_RUNTIME) private effects: EffectRuntime,
   ) {}
 
   /**
@@ -75,9 +80,11 @@ export class CommandRegistry {
   ): void {
     const fullCommand = `${namespace}/${command}`;
 
-    if (this.handlers.has(fullCommand)) {
-      log.warn(`Command handler for "${fullCommand}" is being overwritten`);
+    if (this.handlers.get(fullCommand)?.source === "controller") {
+      throw new Error(`Command already registered: ${fullCommand}`);
     }
+    if (this.handlers.has(fullCommand))
+      log.warn(`Command handler for "${fullCommand}" is being overwritten`);
 
     // Look up permission from decorator metadata
     let permission: string | undefined;
@@ -101,6 +108,7 @@ export class CommandRegistry {
       : "result";
 
     this.handlers.set(fullCommand, {
+      source: "decorator",
       mode,
       namespace,
       command,
@@ -109,6 +117,30 @@ export class CommandRegistry {
       permission,
       methodName: methodName || "",
     });
+  }
+
+  /** Register explicit definitions through the same execution and permission path. */
+  registerController(controller: Controller): void {
+    for (const name of Object.keys(controller.commands)) {
+      const fullCommand = `${controller.namespace}/${name}`;
+      if (this.handlers.has(fullCommand))
+        throw new Error(`Command already registered: ${fullCommand}`);
+    }
+    for (const [name, command] of Object.entries(controller.commands)) {
+      this.handlers.set(`${controller.namespace}/${name}`, {
+        source: "controller",
+        namespace: controller.namespace,
+        command: name,
+        mode: command.mode,
+        permission: command.permission
+          ? `${controller.namespace}/${command.permission}`
+          : undefined,
+        handler: (args) =>
+          command.execute(args, this.executionContext.get() ?? {}),
+        target: controller,
+        methodName: name,
+      });
+    }
   }
 
   /**
@@ -224,10 +256,15 @@ export class CommandRegistry {
           submission,
         ) as TResult;
       }
-      return (await metadata.handler.call(
+      const result = await metadata.handler.call(
         metadata.target,
         this.withCallerContext(args, context),
-      )) as TResult;
+      );
+      return (
+        Effect.isEffect(result)
+          ? await this.effects.run(result as Effect.Effect<unknown, unknown>)
+          : await result
+      ) as TResult;
     });
   }
 

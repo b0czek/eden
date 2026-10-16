@@ -250,6 +250,9 @@ importers:
       '@keyv/sqlite':
         specifier: ^4.0.8
         version: 4.0.8(keyv@5.6.0)
+      effect:
+        specifier: ^4.0.5
+        version: 4.0.5
       fast-glob:
         specifier: ^3.3.3
         version: 3.3.3
@@ -2933,6 +2936,9 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  effect@4.0.5:
+    resolution: {integrity: sha512-BY4/28NlpOd99yzmV741xbVGmp+1U7tks4oB7F/Png64bTa5tm5eCA6W0RiXsnuLDDoJpjfVSo4Dnq4BZb/89Q==}
 
   electron-to-chromium@1.5.266:
     resolution: {integrity: sha512-kgWEglXvkEfMH7rxP5OSZZwnaDWT7J9EoZCujhnpLbfi0bbNtRkgdX2E3gt0Uer11c61qCYktB3hwkAS325sJg==}
@@ -7211,6 +7217,8 @@ snapshots:
       gopd: 1.2.0
 
   eastasianwidth@0.2.0: {}
+
+  effect@4.0.5: {}
 
   electron-to-chromium@1.5.266: {}
 

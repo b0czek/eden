@@ -1,6 +1,9 @@
 import "reflect-metadata";
+import * as Effect from "effect/Effect";
 
+import { command, defineController } from "../controllers/controller";
 import { ExecutionContext } from "../execution";
+import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
 import type { OperationManager } from "../operations/OperationManager";
 import { addCommandHandler, setManagerNamespace } from "./CommandMetadata";
 import { CommandRegistry } from "./CommandRegistry";
@@ -20,6 +23,7 @@ describe("CommandRegistry", () => {
   let sessionContext: SessionContextLike;
   let executionContext: ExecutionContext;
   let registry: CommandRegistry;
+  let effects: EffectRuntime;
   let warnSpy: jest.SpyInstance;
   let logSpy: jest.SpyInstance;
 
@@ -33,6 +37,7 @@ describe("CommandRegistry", () => {
       getSessionId: jest.fn().mockReturnValue("session"),
     };
     executionContext = new ExecutionContext({});
+    effects = createEffectRuntime();
     registry = new CommandRegistry(
       permissionRegistry as unknown as ConstructorParameters<
         typeof CommandRegistry
@@ -42,13 +47,15 @@ describe("CommandRegistry", () => {
       >[1],
       executionContext,
       {} as OperationManager,
+      effects,
     );
 
     warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await effects.dispose();
     warnSpy.mockRestore();
     logSpy.mockRestore();
   });
@@ -64,6 +71,73 @@ describe("CommandRegistry", () => {
     );
     expect(handler).toHaveBeenCalledWith({ value: 1 });
   });
+
+  it("executes Effect commands under each trusted caller after asynchronous yields", async () => {
+    registry.registerController(
+      defineController("example", {
+        commands: {
+          caller: command({
+            handle: (_args, caller) =>
+              Effect.gen(function* () {
+                yield* Effect.yieldNow;
+                yield* Effect.promise(() => Promise.resolve());
+                return {
+                  trusted: caller.appId,
+                  current: executionContext.get()?.appId,
+                };
+              }),
+          }),
+          promised: command({ handle: async () => Effect.succeed("resolved") }),
+          fail: command({
+            handle: () => Effect.fail(new Error("service failed")),
+          }),
+        },
+      }),
+    );
+    const invoke = (appId: string) =>
+      registry.execute(
+        "example/caller",
+        {},
+        {
+          appId,
+          principal: { kind: "system" },
+        },
+      );
+    await expect(
+      Promise.all([invoke("first"), invoke("second")]),
+    ).resolves.toEqual([
+      { trusted: "first", current: "first" },
+      { trusted: "second", current: "second" },
+    ]);
+    await expect(registry.execute("example/promised", {})).resolves.toBe(
+      "resolved",
+    );
+    await expect(registry.execute("example/fail", {})).rejects.toThrow(
+      "service failed",
+    );
+  });
+
+  it.each([true, false])(
+    "rejects mixed controller registrations with the same command (plain first: %s)",
+    (plainFirst) => {
+      class Legacy {
+        handle() {
+          return "legacy";
+        }
+      }
+      setManagerNamespace(Legacy, "example");
+      addCommandHandler(Legacy, "read", "handle");
+      const plain = defineController("example", {
+        commands: { read: command({ handle: () => "plain" }) },
+      });
+      const registerPlain = () => registry.registerController(plain);
+      const registerLegacy = () => registry.registerManager(new Legacy());
+      const first = plainFirst ? registerPlain : registerLegacy;
+      const second = plainFirst ? registerLegacy : registerPlain;
+      first();
+      expect(second).toThrow("Command already registered: example/read");
+    },
+  );
 
   it("establishes the session user as the principal for interactive commands", async () => {
     const profile = {

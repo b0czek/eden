@@ -1,10 +1,8 @@
 import "reflect-metadata";
 import type { EventData, EventName } from "@edenapp/types";
-import { log } from "../logging";
+import { createEvent, type Event, type EventListener } from "../events/event";
 import type { EventScope } from "./EventScope";
 import type { IPCBridge } from "./IPCBridge";
-
-type EdenEventListener<T> = (payload: T) => void | Promise<void>;
 
 /**
  * Base class for managers that emit events within a specific namespace.
@@ -37,7 +35,7 @@ export abstract class EdenEmitter<TEvents> {
   protected ipcBridge: IPCBridge;
   private readonly listeners = new Map<
     keyof TEvents,
-    Set<EdenEventListener<TEvents[keyof TEvents]>>
+    Event<TEvents[keyof TEvents]>
   >();
 
   constructor(ipcBridge: IPCBridge) {
@@ -52,24 +50,14 @@ export abstract class EdenEmitter<TEvents> {
    */
   public on<K extends keyof TEvents>(
     event: K,
-    listener: EdenEventListener<TEvents[K]>,
+    listener: EventListener<TEvents[K]>,
   ): () => void {
-    let eventListeners = this.listeners.get(event);
-    if (!eventListeners) {
-      eventListeners = new Set();
-      this.listeners.set(event, eventListeners);
+    let source = this.listeners.get(event);
+    if (!source) {
+      source = createEvent<TEvents[keyof TEvents]>();
+      this.listeners.set(event, source);
     }
-
-    eventListeners.add(listener as EdenEventListener<TEvents[keyof TEvents]>);
-
-    return () => {
-      eventListeners.delete(
-        listener as EdenEventListener<TEvents[keyof TEvents]>,
-      );
-      if (eventListeners.size === 0) {
-        this.listeners.delete(event);
-      }
-    };
+    return source.on(listener as EventListener<TEvents[keyof TEvents]>);
   }
 
   /**
@@ -102,32 +90,13 @@ export abstract class EdenEmitter<TEvents> {
     const eventListeners = this.listeners.get(event);
     if (typeof data === "function") {
       if (
-        !eventListeners?.size &&
+        !eventListeners?.hasListeners() &&
         !this.ipcBridge.eventSubscribers.hasSubscribers(fullEventName, scope)
       )
         return;
       data = (data as () => TEvents[K])();
     }
-    if (eventListeners) {
-      for (const listener of eventListeners) {
-        try {
-          const result = listener(data);
-          if (result && typeof result.then === "function") {
-            void result.catch((error) => {
-              log.error(
-                `Error in local listener for ${String(fullEventName)}:`,
-                error,
-              );
-            });
-          }
-        } catch (error) {
-          log.error(
-            `Error in local listener for ${String(fullEventName)}:`,
-            error,
-          );
-        }
-      }
-    }
+    eventListeners?.emit(data);
 
     // Broadcast to all subscribed views
     this.ipcBridge.eventSubscribers.notify(
@@ -174,6 +143,7 @@ export abstract class EdenEmitter<TEvents> {
 
   /** Release every in-process subscription owned by this emitter. */
   public dispose(): void {
+    for (const source of this.listeners.values()) source.dispose();
     this.listeners.clear();
   }
 }

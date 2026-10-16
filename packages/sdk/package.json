@@ -61,6 +61,7 @@
     "@edenapp/genesis": "workspace:*",
     "@edenapp/types": "workspace:*",
     "@keyv/sqlite": "^4.0.8",
+    "effect": "^4.0.5",
     "fast-glob": "^3.3.3",
     "keyv": "^5.6.0",
     "reflect-metadata": "^0.2.2",
@@ -71,6 +72,7 @@
     "wasmagic": "^1.0.8"
   },
   "devDependencies": {
+    "@edenapp/client": "workspace:*",
     "@edenapp/scripts": "workspace:*",
     "@playwright/test": "^1.62.1",
     "@types/jest": "catalog:",
@@ -88,7 +90,6 @@
     "ts-node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-solid": "catalog:",
-    "@edenapp/client": "workspace:*"
+    "vite-plugin-solid": "catalog:"
   }
 }
