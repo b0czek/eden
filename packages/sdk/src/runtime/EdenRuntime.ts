@@ -40,6 +40,12 @@ import { createAppearanceController } from "../appearance/controller";
 import { createAppearance, type Appearance } from "../appearance/service";
 import { createAppearanceSettings } from "../appearance/settings-adapter";
 import {
+  createAutostart,
+  createAutostartProcesses,
+  createDevelopmentAutostart,
+  type Autostart,
+} from "../autostart";
+import {
   createBranding,
   createBrandingController,
   createFilesystemBrandingAssets,
@@ -113,14 +119,10 @@ import {
   createPowerOperations,
   createPowerShutdown,
 } from "../power";
-import {
-  AutostartManager,
-  BackendManager,
-  ProcessManager,
-} from "../process-manager";
+import { BackendManager, ProcessManager } from "../process-manager";
 import { SystemHandler } from "../SystemHandler";
 import { seedDatabase } from "../seed";
-import { SessionManager } from "../session";
+import { SessionContext, SessionManager } from "../session";
 import {
   registerBuiltinSettingsPanels,
   createSettings,
@@ -189,7 +191,7 @@ export class EdenRuntime {
   private readonly legacySettings = createLegacySettingsAccess(this.effects);
   private appearanceService!: Appearance;
   private appAssociationManager!: AppAssociations;
-  private autostartManager!: AutostartManager;
+  private autostart!: Autostart;
   private userManager!: UserManager;
   private sessionManager!: SessionManager;
   private daemonManager!: DaemonManager;
@@ -539,7 +541,25 @@ export class EdenRuntime {
     this.ipcBridge.registerController(
       createFileOpenController(fileOpen, fileOpenOperations),
     );
-    this.autostartManager = this.resolveOwned(AutostartManager);
+    const sessionContext = this.resolveOwned(SessionContext);
+    this.autostart = await this.effects.acquire(
+      createAutostart({
+        development: !!this.config.development,
+        loginAppId: this.config.loginAppId,
+        settings,
+        sessions: {
+          currentUser: () => sessionContext.getCurrentUser(),
+          changed: {
+            on: (listener) => this.sessionManager.on("changed", listener),
+          },
+        },
+        processes: createAutostartProcesses(
+          this.processManager,
+          this.resolveOwned(ExecutionContext),
+        ),
+        developmentApps: createDevelopmentAutostart(this.config),
+      }),
+    );
     this.keyboardService = await this.effects.acquire(
       createKeyboard({
         assets: createKeyboardAssets(),
@@ -692,7 +712,7 @@ export class EdenRuntime {
       path.join(this.paths.distPath, "foundation/foundation.html"),
     );
     this.mainWindow.webContents.once("did-finish-load", () => {
-      this.autostartManager.onFoundationReady();
+      this.autostart.onFoundationReady();
     });
     this.mainWindow.once("ready-to-show", () => {
       this.mainWindow?.show();
@@ -733,7 +753,7 @@ export class EdenRuntime {
       await this.resolveOwned(FilesystemManager).closeHandles();
     await this.resolveOwned(OperationManager).shutdown();
     if (this.managersInitialized) {
-      await this.autostartManager?.dispose();
+      if (this.autostart) await this.effects.run(this.autostart.shutdown());
       await this.daemonManager?.shutdown();
       await this.processManager?.shutdown();
     }
