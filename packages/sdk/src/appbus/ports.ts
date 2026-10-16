@@ -29,5 +29,3 @@ export interface AppChannelBackends {
 export interface AppChannelLifecycle {
   unregisterAllServices(appId: string): number;
 }
-
-export const APP_CHANNELS = Symbol("App channel lifecycle");

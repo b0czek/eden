@@ -15,10 +15,10 @@ async function scenario() {
   const denied = "app.channel-denied";
   const { user } = await createTestCaller(eden, provider, ["appbus/expose"]);
   await eden.runtime.sessions.login(user.username, "password");
-  const packages = eden.runtime.resolve(PackageRegistry);
-  const permissions = eden.runtime.resolve(PermissionRegistry);
-  const processes = eden.runtime.resolve(ProcessManager);
-  const views = eden.runtime.resolve(ViewManager);
+  const packages = eden.runtime.services.packageRegistry;
+  const permissions = eden.runtime.services.permissions;
+  const processes = eden.runtime.services.processes;
+  const views = eden.runtime.services.views;
   const contents = new Map<string, number>();
   for (const appId of [provider, client, denied]) {
     packages.register(testApp(appId));
@@ -147,9 +147,8 @@ describe("AppBus command and process lifecycle integration", () => {
     s.permissions.registerApp(backendAppId, ["appbus/connect"]);
     const launching = eden.complete("process/launch", { appId: backendAppId });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    const backendProcess = eden.runtime
-      .resolve(BackendManager)
-      .getBackend(backendAppId);
+    const backendProcess =
+      eden.runtime.services.backends.getBackend(backendAppId);
     if (!backendProcess?.pid) throw new Error("Backend did not start");
     eden.platform.utilityProcesses
       .get(backendProcess.pid)!
@@ -166,8 +165,7 @@ describe("AppBus command and process lifecycle integration", () => {
       { appId: backendAppId, principal: { kind: "user", profile: s.user } },
     );
     expect(connection.success).toBe(true);
-    const pid = eden.runtime.resolve(BackendManager).getBackend(backendAppId)!
-      .pid!;
+    const pid = eden.runtime.services.backends.getBackend(backendAppId)!.pid!;
     const backend = eden.platform.utilityProcesses.get(pid)!;
     expect(backend.messages).toContainEqual({
       type: "appbus-port",
