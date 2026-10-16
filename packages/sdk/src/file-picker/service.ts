@@ -4,7 +4,8 @@ import type {
   FilePickerResult,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import * as Queue from "effect/Queue";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import * as v from "valibot";
 import type { TargetedNotification } from "../controllers/events";
 import { createEvent } from "../events/event";
@@ -36,9 +37,7 @@ export function createFilePicker({
   return Effect.gen(function* () {
     let idCounter = 0;
     let activeRequest: Request | null = null;
-    let idleTimer: NodeJS.Timeout | undefined;
-    let idleGeneration = 0;
-    let idleTarget: string | undefined;
+    let idleStop: Fiber.Fiber<void> | undefined;
     let disposed = false;
     const providers = createPickerDisplayProvider(views);
     const opened = yield* Effect.acquireRelease(
@@ -51,55 +50,42 @@ export function createFilePicker({
       Effect.sync(() => createEvent<TargetedNotification<FilePickerResult>>()),
       (event) => Effect.sync(event.dispose),
     );
-    const idleWork = yield* Queue.unbounded<{
-      appId: string;
-      generation: number;
-    }>();
-    yield* Effect.forkScoped(
-      Effect.forever(
-        Effect.gen(function* () {
-          const { appId, generation } = yield* Queue.take(idleWork);
-          if (
-            disposed ||
-            generation !== idleGeneration ||
-            appId !== idleTarget ||
-            !processes.isRunning(appId)
-          )
-            return;
-          yield* Effect.match(processes.stop(appId), {
-            onFailure: (error) =>
-              log.warn(
-                `Failed to stop idle file picker provider ${appId}:`,
-                error,
-              ),
-            onSuccess: () => undefined,
-          });
-        }),
-      ),
-    );
+    // Synchronous lifecycle callbacks can replace the delay; the scope still
+    // owns any previous fiber finishing an uninterruptible stop.
+    const forkIdleStop = yield* FiberSet.makeRuntime<never, void, never>();
 
     function cancelIdleStop() {
-      idleGeneration++;
-      clearTimeout(idleTimer);
-      idleTimer = undefined;
-    }
-
-    function clearIdleTarget(appId?: string) {
-      if (appId !== undefined && idleTarget !== appId) return;
-      idleTarget = undefined;
-      cancelIdleStop();
+      const pending = idleStop;
+      idleStop = undefined;
+      pending?.interruptUnsafe();
     }
 
     function scheduleIdleStop() {
       cancelIdleStop();
-      if (!idleTarget || disposed) return;
-      const appId = idleTarget;
-      const generation = idleGeneration;
-      idleTimer = setTimeout(() => {
-        idleTimer = undefined;
-        Queue.offerUnsafe(idleWork, { appId, generation });
-      }, 10_000);
-      idleTimer.unref?.();
+      const provider = providers.get();
+      if (!provider || disposed) return;
+      idleStop = forkIdleStop(
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            yield* restore(Effect.sleep(10_000));
+            if (
+              disposed ||
+              activeRequest ||
+              providers.get() !== provider ||
+              !processes.isRunning(provider.appId)
+            )
+              return;
+            yield* Effect.match(processes.stop(provider.appId), {
+              onFailure: (error) =>
+                log.warn(
+                  `Failed to stop idle file picker provider ${provider.appId}:`,
+                  error,
+                ),
+              onSuccess: () => undefined,
+            });
+          }),
+        ),
+      );
     }
 
     function targets(openerViewId: number) {
@@ -119,9 +105,8 @@ export function createFilePicker({
     }
 
     function pruneStaleState() {
-      const provider = providers.get();
       if (providers.clearIfStale()) {
-        clearIdleTarget(provider?.appId);
+        cancelIdleStop();
         closeActiveRequest("close");
         return;
       }
@@ -136,7 +121,7 @@ export function createFilePicker({
       Effect.sync(() =>
         processes.stopped.on(({ appId }) => {
           if (providers.clearIfAppStopped(appId)) {
-            clearIdleTarget(appId);
+            cancelIdleStop();
             closeActiveRequest("close");
           } else if (activeRequest?.opener.appId === appId)
             closeActiveRequest("close");
@@ -147,7 +132,6 @@ export function createFilePicker({
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         disposed = true;
-        cancelIdleStop();
         closeActiveRequest("close");
         providers.dispose();
       }),
@@ -157,7 +141,7 @@ export function createFilePicker({
       return attempt(() => {
         if (activeRequest) closeActiveRequest("close");
         const result = providers.register(caller);
-        if (result.success && caller.appId) idleTarget = caller.appId;
+        if (result.success) cancelIdleStop();
         return result;
       });
     }

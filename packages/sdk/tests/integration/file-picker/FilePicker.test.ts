@@ -570,46 +570,62 @@ describe("file picker composition and request lifecycle", () => {
     expect(s.picker.closed.hasListeners()).toBe(false);
   });
 
-  it("waits for an uncancellable provider stop before releasing its service scope", async () => {
+  it("cancels a pending idle shutdown when the service scope closes", async () => {
     const s = await scenario();
     jest.useFakeTimers({ doNotFake: ["queueMicrotask", "setImmediate"] });
-    let started!: () => void;
-    let finish!: () => void;
-    const stopping = new Promise<void>((resolve) => {
-      started = resolve;
-    });
-    const finishStop = new Promise<void>((resolve) => {
-      finish = resolve;
-    });
-    s.dependencies.processes.stop = createFilePickerProcesses({
-      ensureAppRunning: () => Effect.succeed(undefined as never),
-      getAppInstance: () => undefined,
-      stopped: s.stopped,
-      stopApp: () =>
-        Effect.promise(async () => {
-          started();
-          await finishStop;
-          s.running.delete(provider.appId);
-          s.stopped.emit({ appId: provider.appId });
-        }).pipe(Effect.uninterruptible),
-    }).stop;
     await s.register();
     const { requestId } = await s.open();
     await s.run(s.picker.closePicker(requestId, opener));
+    await s.runtime.dispose();
+    expect(jest.getTimerCount()).toBe(0);
     await jest.advanceTimersByTimeAsync(10_000);
-    await stopping;
-    let disposed = false;
-    const disposing = s.runtime.dispose().then(() => {
-      disposed = true;
-    });
-    await jest.advanceTimersByTimeAsync(1);
-    expect(disposed).toBe(false);
     expect(s.running.has(provider.appId)).toBe(true);
-    finish();
-    await disposing;
-    expect(s.running.has(provider.appId)).toBe(false);
-    expect(s.stopped.hasListeners()).toBe(false);
   });
+
+  it.each([false, true])(
+    "finishes an idle provider stop before releasing its scope (activity resumes: %s)",
+    async (resumeActivity) => {
+      const s = await scenario();
+      jest.useFakeTimers({ doNotFake: ["queueMicrotask", "setImmediate"] });
+      let started!: () => void;
+      let finish!: () => void;
+      const stopping = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const finishStop = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      s.dependencies.processes.stop = createFilePickerProcesses({
+        ensureAppRunning: () => Effect.succeed(undefined as never),
+        getAppInstance: () => undefined,
+        stopped: s.stopped,
+        stopApp: () =>
+          Effect.promise(async () => {
+            started();
+            await finishStop;
+            s.running.delete(provider.appId);
+            s.stopped.emit({ appId: provider.appId });
+          }),
+      }).stop;
+      await s.register();
+      const { requestId } = await s.open();
+      await s.run(s.picker.closePicker(requestId, opener));
+      await jest.advanceTimersByTimeAsync(10_000);
+      await stopping;
+      if (resumeActivity) await s.open();
+      let disposed = false;
+      const disposing = s.runtime.dispose().then(() => {
+        disposed = true;
+      });
+      await jest.advanceTimersByTimeAsync(1);
+      expect(disposed).toBe(false);
+      expect(s.running.has(provider.appId)).toBe(true);
+      finish();
+      await disposing;
+      expect(s.running.has(provider.appId)).toBe(false);
+      expect(s.stopped.hasListeners()).toBe(false);
+    },
+  );
 
   it("interrupts provider registration waits on shutdown and releases their timers", async () => {
     const s = await scenario();
