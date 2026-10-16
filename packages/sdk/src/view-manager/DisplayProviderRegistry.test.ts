@@ -1,6 +1,6 @@
-import "reflect-metadata";
+import * as Effect from "effect/Effect";
 
-import { DisplayProviderRegistry } from "./DisplayProviderRegistry";
+import { createDisplayProviderRegistry } from "./DisplayProviderRegistry";
 import type { ViewInfo } from "./types";
 import type { ViewManager } from "./ViewManager";
 
@@ -31,8 +31,13 @@ const createRegistry = () => {
     }),
   };
 
+  const registry = createDisplayProviderRegistry(viewManager, "Test");
   return {
-    registry: new DisplayProviderRegistry(viewManager, "Test"),
+    registry: {
+      ...registry,
+      waitFor: (...args: Parameters<typeof registry.waitFor>) =>
+        Effect.runPromise(registry.waitFor(...args)),
+    },
     viewManager,
   };
 };

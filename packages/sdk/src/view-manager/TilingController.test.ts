@@ -1,5 +1,5 @@
 import type { AppManifest } from "@edenapp/types";
-import { TilingController } from "./TilingController";
+import { createTilingController } from "./TilingController";
 import type { ViewInfo } from "./types";
 
 function createTiledView(
@@ -45,7 +45,7 @@ function createTiledView(
 
 describe("TilingController tile layout actions", () => {
   function createHorizontalPair(options: { firstMaxWidth?: number } = {}) {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "horizontal",
         columns: 2,
@@ -86,7 +86,7 @@ describe("TilingController tile layout actions", () => {
   });
 
   it("maps all four edges around a tile in a grid", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "grid",
         rows: 3,
@@ -189,7 +189,7 @@ describe("TilingController tile layout actions", () => {
 
 describe("TilingController.resolveTiledVisibilityChanges", () => {
   it("keeps the preferred tiled view visible when capacity is full", () => {
-    const controller = new TilingController({
+    const controller = createTilingController({
       mode: "grid",
       rows: 1,
       columns: 2,
@@ -225,7 +225,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("fills newly available smart capacity without swapping the current visible set", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "smart",
         minTileWidth: 388,
@@ -265,7 +265,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("does not evict another tile when the preferred view is already visible", () => {
-    const controller = new TilingController({
+    const controller = createTilingController({
       mode: "grid",
       rows: 2,
       columns: 2,
@@ -300,7 +300,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("does not auto-promote a user-hidden tiled view into a free slot", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "smart",
         minTileWidth: 388,
@@ -344,7 +344,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("respects per-app minSize in grid mode", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "grid",
         rows: 1,
@@ -384,7 +384,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("respects per-app minSize in horizontal mode", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "horizontal",
         columns: 2,
@@ -423,7 +423,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
   });
 
   it("drops smart layout to a single visible app when another split would violate minSize", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "smart",
         minTileWidth: 300,
@@ -465,7 +465,7 @@ describe("TilingController.resolveTiledVisibilityChanges", () => {
 
 describe("TilingController.determineViewMode", () => {
   it("uses defaultMode when an app supports both modes", () => {
-    const controller = new TilingController({
+    const controller = createTilingController({
       mode: "grid",
       rows: 1,
       columns: 1,
@@ -482,14 +482,14 @@ describe("TilingController.determineViewMode", () => {
   });
 
   it("falls back to tiling state when defaultMode is not set", () => {
-    const tiledController = new TilingController({
+    const tiledController = createTilingController({
       mode: "grid",
       rows: 1,
       columns: 1,
       gap: 0,
       padding: 0,
     });
-    const floatingController = new TilingController({
+    const floatingController = createTilingController({
       mode: "none",
       gap: 0,
       padding: 0,
@@ -510,7 +510,7 @@ describe("TilingController.determineViewMode", () => {
 
 describe("TilingController.recalculateTiledViews", () => {
   it("centers tiled apps within their cell when maxSize is smaller than the tile", () => {
-    const controller = new TilingController(
+    const controller = createTilingController(
       {
         mode: "smart",
         minTileWidth: 300,

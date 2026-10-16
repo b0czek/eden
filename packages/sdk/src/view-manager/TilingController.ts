@@ -6,94 +6,71 @@ import type {
 } from "@edenapp/types";
 import type { Bounds } from "../platform/ports";
 import {
-  calculateTileBounds,
+  calculateTileBounds as calculateLayoutTileBounds,
   getSmartTilingCapacity,
 } from "./layoutCalculator";
 import type { ViewInfo, ViewMode } from "./types";
+export function createTilingController(
+  config: TilingConfig = { mode: "none", gap: 0, padding: 0 },
+  workspaceBounds: Bounds = { x: 0, y: 0, width: 800, height: 600 },
+  getInterfaceScale: () => number = () => 1,
+) {
+  let _config: TilingConfig;
+  let _workspaceBounds: Bounds;
+  let _expandedTiles = new Map<number, number>();
+  const _getInterfaceScale = getInterfaceScale;
 
-/**
- * TilingController
- *
- * Handles tiling calculations and view positioning for tiled window mode.
- * Extracted from ViewManager for better separation of concerns.
- */
-export class TilingController {
-  private config: TilingConfig;
-  private workspaceBounds: Bounds;
-  private readonly expandedTiles = new Map<number, number>();
+  _config = config;
+  _workspaceBounds = workspaceBounds;
 
-  constructor(
-    config: TilingConfig = { mode: "none", gap: 0, padding: 0 },
-    workspaceBounds: Bounds = { x: 0, y: 0, width: 800, height: 600 },
-    private readonly getInterfaceScale: () => number = () => 1,
-  ) {
-    this.config = config;
-    this.workspaceBounds = workspaceBounds;
-  }
-
-  private scaleForView(view: ViewInfo): number {
+  function scaleForView(view: ViewInfo): number {
     return view.manifest.window?.scaling === "manual"
       ? 1
-      : this.getInterfaceScale();
+      : _getInterfaceScale();
   }
 
-  /**
-   * Update the workspace bounds used for tile calculations
-   */
-  setWorkspaceBounds(bounds: Bounds): void {
-    this.workspaceBounds = bounds;
+  function setWorkspaceBounds(bounds: Bounds): void {
+    _workspaceBounds = bounds;
   }
 
-  /**
-   * Get current workspace bounds
-   */
-  getWorkspaceBounds(): Bounds {
-    return this.workspaceBounds;
+  function getWorkspaceBounds(): Bounds {
+    return _workspaceBounds;
   }
 
-  /**
-   * Update tiling configuration
-   */
-  setConfig(config: TilingConfig): void {
-    this.config = config;
+  function setConfig(config: TilingConfig): void {
+    _config = config;
     if (config.mode === "none") {
-      this.expandedTiles.clear();
+      _expandedTiles.clear();
     }
   }
 
-  /**
-   * Get current tiling configuration
-   */
-  getConfig(): TilingConfig {
-    return this.config;
+  function getConfig(): TilingConfig {
+    return _config;
   }
 
-  /**
-   * Check if tiling is enabled
-   */
-  isEnabled(): boolean {
-    return this.config.mode !== "none";
+  function isEnabled(): boolean {
+    return _config.mode !== "none";
   }
 
-  private normalizeCount(value: number | undefined, fallback: number): number {
+  function normalizeCount(value: number | undefined, fallback: number): number {
     if (typeof value !== "number" || Number.isNaN(value)) {
       return fallback;
     }
     return Math.max(1, Math.floor(value));
   }
 
-  private getEffectiveSmartConstraints(views: Iterable<ViewInfo>): {
+  function getEffectiveSmartConstraints(views: Iterable<ViewInfo>): {
     minTileWidth: number;
     minTileHeight: number;
   } {
-    const scale = this.getInterfaceScale();
+    const scale = _getInterfaceScale();
     const baseMinTileWidth = Math.max(
       1,
-      Math.round((this.config.minTileWidth ?? 600) * scale),
+      Math.round((_config.minTileWidth ?? 600) * scale),
     );
     const baseMinTileHeight = Math.max(
       1,
-      Math.round((this.config.minTileHeight ?? 400) * scale),
+      Math.round((_config.minTileHeight ?? 400) * scale),
     );
 
     let minTileWidth = baseMinTileWidth;
@@ -105,14 +82,13 @@ export class TilingController {
       minTileWidth = Math.max(
         minTileWidth,
         Math.round(
-          (view.manifest.window?.minSize?.width ?? 0) * this.scaleForView(view),
+          (view.manifest.window?.minSize?.width ?? 0) * scaleForView(view),
         ),
       );
       minTileHeight = Math.max(
         minTileHeight,
         Math.round(
-          (view.manifest.window?.minSize?.height ?? 0) *
-            this.scaleForView(view),
+          (view.manifest.window?.minSize?.height ?? 0) * scaleForView(view),
         ),
       );
     }
@@ -120,18 +96,18 @@ export class TilingController {
     return { minTileWidth, minTileHeight };
   }
 
-  private getEffectiveConfig(views: Iterable<ViewInfo>): TilingConfig {
-    if (this.config.mode !== "smart") {
-      return this.config;
+  function getEffectiveConfig(views: Iterable<ViewInfo>): TilingConfig {
+    if (_config.mode !== "smart") {
+      return _config;
     }
 
     return {
-      ...this.config,
-      ...this.getEffectiveSmartConstraints(views),
+      ..._config,
+      ...getEffectiveSmartConstraints(views),
     };
   }
 
-  private getSortedVisibleTiledViews(visibleViews: ViewInfo[]): ViewInfo[] {
+  function getSortedVisibleTiledViews(visibleViews: ViewInfo[]): ViewInfo[] {
     return [...visibleViews].sort(
       (a, b) =>
         (a.tileIndex ?? Number.MAX_SAFE_INTEGER) -
@@ -139,18 +115,18 @@ export class TilingController {
     );
   }
 
-  private calculateVisibleSetBounds(
+  function calculateVisibleSetBounds(
     visibleViews: ViewInfo[],
   ): Map<number, Bounds> {
-    const sortedVisibleViews = this.getSortedVisibleTiledViews(visibleViews);
+    const sortedVisibleViews = getSortedVisibleTiledViews(visibleViews);
     const visibleCount = sortedVisibleViews.length;
-    const config = this.getEffectiveConfig(sortedVisibleViews);
+    const config = getEffectiveConfig(sortedVisibleViews);
     const boundsByViewId = new Map<number, Bounds>();
 
     sortedVisibleViews.forEach((view, index) => {
-      const bounds = this.constrainTiledBounds(
-        calculateTileBounds({
-          workspace: this.workspaceBounds,
+      const bounds = constrainTiledBounds(
+        calculateLayoutTileBounds({
+          workspace: _workspaceBounds,
           tileIndex: index,
           visibleCount,
           config,
@@ -163,8 +139,8 @@ export class TilingController {
     return boundsByViewId;
   }
 
-  private getVisibleTiledViews(views: Map<number, ViewInfo>): ViewInfo[] {
-    return this.getSortedVisibleTiledViews(
+  function getVisibleTiledViews(views: Map<number, ViewInfo>): ViewInfo[] {
+    return getSortedVisibleTiledViews(
       Array.from(views.values()).filter(
         (view) =>
           view.viewType === "app" && view.visible && view.mode === "tiled",
@@ -172,18 +148,18 @@ export class TilingController {
     );
   }
 
-  private getBaseLayout(views: Map<number, ViewInfo>): {
+  function getBaseLayout(views: Map<number, ViewInfo>): {
     visibleViews: ViewInfo[];
     boundsByViewId: Map<number, Bounds>;
   } {
-    const visibleViews = this.getVisibleTiledViews(views);
+    const visibleViews = getVisibleTiledViews(views);
     return {
       visibleViews,
-      boundsByViewId: this.calculateVisibleSetBounds(visibleViews),
+      boundsByViewId: calculateVisibleSetBounds(visibleViews),
     };
   }
 
-  private getNeighbor(
+  function getNeighbor(
     sourceId: number,
     direction: TileLayoutDirection,
     visibleViews: ViewInfo[],
@@ -260,7 +236,7 @@ export class TilingController {
     )[0]?.view;
   }
 
-  private canCoverNeighbor(
+  function canCoverNeighbor(
     source: ViewInfo,
     neighbor: ViewInfo,
     direction: TileLayoutDirection,
@@ -283,15 +259,15 @@ export class TilingController {
 
     if (!sharesBand) return false;
 
-    const combinedBounds = this.combineBounds(sourceBounds, neighborBounds);
-    const constrainedBounds = this.constrainTiledBounds(combinedBounds, source);
+    const combinedBounds = combineBounds(sourceBounds, neighborBounds);
+    const constrainedBounds = constrainTiledBounds(combinedBounds, source);
     return (
       Math.abs(constrainedBounds.width - combinedBounds.width) <= 1 &&
       Math.abs(constrainedBounds.height - combinedBounds.height) <= 1
     );
   }
 
-  private combineBounds(first: Bounds, second: Bounds): Bounds {
+  function combineBounds(first: Bounds, second: Bounds): Bounds {
     const x = Math.min(first.x, second.x);
     const y = Math.min(first.y, second.y);
     const right = Math.max(first.x + first.width, second.x + second.width);
@@ -299,12 +275,12 @@ export class TilingController {
     return { x, y, width: right - x, height: bottom - y };
   }
 
-  private isExpansionParticipant(viewId: number): boolean {
-    if (this.expandedTiles.has(viewId)) return true;
-    return Array.from(this.expandedTiles.values()).includes(viewId);
+  function isExpansionParticipant(viewId: number): boolean {
+    if (_expandedTiles.has(viewId)) return true;
+    return Array.from(_expandedTiles.values()).includes(viewId);
   }
 
-  private findDirectionToView(
+  function findDirectionToView(
     sourceId: number,
     targetId: number,
     visibleViews: ViewInfo[],
@@ -318,33 +294,28 @@ export class TilingController {
     ];
     return directions.find(
       (direction) =>
-        this.getNeighbor(sourceId, direction, visibleViews, boundsByViewId)
-          ?.id === targetId,
+        getNeighbor(sourceId, direction, visibleViews, boundsByViewId)?.id ===
+        targetId,
     );
   }
 
-  getTileLayoutState(
+  function getTileLayoutState(
     viewId: number,
     views: Map<number, ViewInfo>,
   ): TileLayoutState {
     const source = views.get(viewId);
-    if (
-      !source ||
-      !this.isEnabled() ||
-      source.mode !== "tiled" ||
-      !source.visible
-    ) {
+    if (!source || !isEnabled() || source.mode !== "tiled" || !source.visible) {
       return {
         mode: source?.mode ?? "floating",
         neighbors: {},
       };
     }
 
-    if (this.isExpansionParticipant(source.id)) {
+    if (isExpansionParticipant(source.id)) {
       return { mode: "tiled", neighbors: {} };
     }
 
-    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const { visibleViews, boundsByViewId } = getBaseLayout(views);
     const directions: TileLayoutDirection[] = [
       "top",
       "right",
@@ -354,16 +325,16 @@ export class TilingController {
     const neighbors: TileLayoutState["neighbors"] = {};
 
     for (const direction of directions) {
-      const neighbor = this.getNeighbor(
+      const neighbor = getNeighbor(
         source.id,
         direction,
         visibleViews,
         boundsByViewId,
       );
-      if (!neighbor || this.isExpansionParticipant(neighbor.id)) continue;
+      if (!neighbor || isExpansionParticipant(neighbor.id)) continue;
       neighbors[direction] = {
         name: neighbor.manifest.name,
-        canExpand: this.canCoverNeighbor(
+        canExpand: canCoverNeighbor(
           source,
           neighbor,
           direction,
@@ -378,7 +349,7 @@ export class TilingController {
     };
   }
 
-  swapTile(
+  function swapTile(
     viewId: number,
     direction: TileLayoutDirection,
     views: Map<number, ViewInfo>,
@@ -387,19 +358,19 @@ export class TilingController {
     if (
       source?.mode !== "tiled" ||
       !source.visible ||
-      this.isExpansionParticipant(viewId)
+      isExpansionParticipant(viewId)
     ) {
       return false;
     }
 
-    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
-    const neighbor = this.getNeighbor(
+    const { visibleViews, boundsByViewId } = getBaseLayout(views);
+    const neighbor = getNeighbor(
       source.id,
       direction,
       visibleViews,
       boundsByViewId,
     );
-    if (!neighbor || this.isExpansionParticipant(neighbor.id)) return false;
+    if (!neighbor || isExpansionParticipant(neighbor.id)) return false;
 
     const sourceIndex = source.tileIndex;
     source.tileIndex = neighbor.tileIndex;
@@ -407,7 +378,7 @@ export class TilingController {
     return true;
   }
 
-  expandTile(
+  function expandTile(
     viewId: number,
     direction: TileLayoutDirection,
     views: Map<number, ViewInfo>,
@@ -416,13 +387,13 @@ export class TilingController {
     if (
       source?.mode !== "tiled" ||
       !source.visible ||
-      this.isExpansionParticipant(viewId)
+      isExpansionParticipant(viewId)
     ) {
       return false;
     }
 
-    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
-    const neighbor = this.getNeighbor(
+    const { visibleViews, boundsByViewId } = getBaseLayout(views);
+    const neighbor = getNeighbor(
       source.id,
       direction,
       visibleViews,
@@ -430,39 +401,39 @@ export class TilingController {
     );
     if (
       !neighbor ||
-      this.isExpansionParticipant(neighbor.id) ||
-      !this.canCoverNeighbor(source, neighbor, direction, boundsByViewId)
+      isExpansionParticipant(neighbor.id) ||
+      !canCoverNeighbor(source, neighbor, direction, boundsByViewId)
     ) {
       return false;
     }
 
-    this.expandedTiles.set(source.id, neighbor.id);
+    _expandedTiles.set(source.id, neighbor.id);
     return true;
   }
 
-  restoreExpansionForView(viewId: number): boolean {
-    let restored = this.expandedTiles.delete(viewId);
-    for (const [sourceId, targetId] of this.expandedTiles) {
+  function restoreExpansionForView(viewId: number): boolean {
+    let restored = _expandedTiles.delete(viewId);
+    for (const [sourceId, targetId] of _expandedTiles) {
       if (targetId !== viewId) continue;
-      this.expandedTiles.delete(sourceId);
+      _expandedTiles.delete(sourceId);
       restored = true;
     }
     return restored;
   }
 
-  private canFitVisibleSet(visibleViews: ViewInfo[]): boolean {
-    if (!this.isEnabled()) return true;
+  function canFitVisibleSet(visibleViews: ViewInfo[]): boolean {
+    if (!isEnabled()) return true;
 
     if (visibleViews.length === 0) {
       return true;
     }
 
-    const capacity = this.getTiledCapacity();
+    const capacity = getTiledCapacity();
     if (capacity !== undefined && visibleViews.length > capacity) {
       return false;
     }
 
-    const boundsByViewId = this.calculateVisibleSetBounds(visibleViews);
+    const boundsByViewId = calculateVisibleSetBounds(visibleViews);
 
     return visibleViews.every((view) => {
       const bounds = boundsByViewId.get(view.id);
@@ -470,7 +441,7 @@ export class TilingController {
         return false;
       }
 
-      const scale = this.scaleForView(view);
+      const scale = scaleForView(view);
       const minWidth = Math.round(
         (view.manifest.window?.minSize?.width ?? 0) * scale,
       );
@@ -482,8 +453,8 @@ export class TilingController {
     });
   }
 
-  private constrainTiledBounds(bounds: Bounds, view: ViewInfo): Bounds {
-    const scale = this.scaleForView(view);
+  function constrainTiledBounds(bounds: Bounds, view: ViewInfo): Bounds {
+    const scale = scaleForView(view);
     const configuredMaxWidth = view.manifest.window?.maxSize?.width;
     const configuredMaxHeight = view.manifest.window?.maxSize?.height;
     const maxWidth =
@@ -516,48 +487,40 @@ export class TilingController {
     };
   }
 
-  /**
-   * Get the maximum number of visible tiled views allowed by configuration.
-   * Returns undefined when capacity is unlimited for the current mode.
-   */
-  getTiledCapacity(): number | undefined {
-    if (!this.isEnabled()) return undefined;
+  function getTiledCapacity(): number | undefined {
+    if (!isEnabled()) return undefined;
 
-    const { mode, columns, rows } = this.config;
+    const { mode, columns, rows } = _config;
 
     switch (mode) {
       case "grid": {
-        const safeColumns = this.normalizeCount(columns, 2);
-        const safeRows = this.normalizeCount(rows, 2);
+        const safeColumns = normalizeCount(columns, 2);
+        const safeRows = normalizeCount(rows, 2);
         return safeColumns * safeRows;
       }
       case "smart":
-        return getSmartTilingCapacity(this.workspaceBounds, this.config);
+        return getSmartTilingCapacity(_workspaceBounds, _config);
       case "horizontal": {
         if (columns === undefined) return undefined;
-        return this.normalizeCount(columns, 1);
+        return normalizeCount(columns, 1);
       }
       case "vertical": {
         if (rows === undefined) return undefined;
-        return this.normalizeCount(rows, 1);
+        return normalizeCount(rows, 1);
       }
       default:
         return undefined;
     }
   }
 
-  /**
-   * Resolve which tiled app views should change visibility to match the
-   * current capacity without needlessly swapping already visible views.
-   */
-  resolveTiledVisibilityChanges(
+  function resolveTiledVisibilityChanges(
     views: Map<number, ViewInfo>,
     options: {
       preferredViewId?: number;
       excludedViewId?: number;
     } = {},
   ): { toHide: number[]; toShow: number[] } {
-    if (!this.isEnabled()) return { toHide: [], toShow: [] };
+    if (!isEnabled()) return { toHide: [], toShow: [] };
 
     const { preferredViewId, excludedViewId } = options;
 
@@ -581,7 +544,7 @@ export class TilingController {
     );
 
     const canFitDesiredSet = (): boolean =>
-      this.canFitVisibleSet(
+      canFitVisibleSet(
         Array.from(desiredVisibleIds)
           .map((viewId) => tiledAppById.get(viewId))
           .filter((view): view is ViewInfo => view !== undefined),
@@ -668,29 +631,20 @@ export class TilingController {
     };
   }
 
-  /**
-   * Calculate bounds for a tile based on tiling configuration
-   * @param tileIndex - Index of the tile to calculate
-   * @param visibleCount - Total number of visible tiled views
-   */
-  calculateTileBounds(
+  function calculateTileBounds(
     tileIndex: number,
     visibleCount: number,
     views: Iterable<ViewInfo> = [],
   ): Bounds {
-    return calculateTileBounds({
-      workspace: this.workspaceBounds,
+    return calculateLayoutTileBounds({
+      workspace: _workspaceBounds,
       tileIndex,
       visibleCount,
-      config: this.getEffectiveConfig(views),
+      config: getEffectiveConfig(views),
     });
   }
 
-  /**
-   * Get the next available tile index from a collection of views
-   * @param views - Iterable of view information
-   */
-  getNextTileIndex(views: Iterable<ViewInfo>): number {
+  function getNextTileIndex(views: Iterable<ViewInfo>): number {
     const indices: number[] = [];
 
     for (const view of views) {
@@ -707,30 +661,21 @@ export class TilingController {
     return Math.max(...indices) + 1;
   }
 
-  /**
-   * Get count of visible tiled views
-   * @param views - Iterable of view information
-   */
-  getVisibleTiledCount(views: Iterable<ViewInfo>): number {
+  function getVisibleTiledCount(views: Iterable<ViewInfo>): number {
     return Array.from(views).filter((v) => v.visible && v.mode === "tiled")
       .length;
   }
 
-  /**
-   * Recalculate bounds for all tiled views
-   * Returns updated views with new bounds applied
-   * @param views - Map of viewId to ViewInfo
-   */
-  recalculateTiledViews(views: Map<number, ViewInfo>): void {
-    if (!this.isEnabled()) return;
+  function recalculateTiledViews(views: Map<number, ViewInfo>): void {
+    if (!isEnabled()) return;
 
-    const { visibleViews, boundsByViewId } = this.getBaseLayout(views);
+    const { visibleViews, boundsByViewId } = getBaseLayout(views);
     const presentedBoundsByViewId = new Map(boundsByViewId);
 
-    for (const [sourceId, targetId] of this.expandedTiles) {
+    for (const [sourceId, targetId] of _expandedTiles) {
       const source = views.get(sourceId);
       const target = views.get(targetId);
-      const direction = this.findDirectionToView(
+      const direction = findDirectionToView(
         sourceId,
         targetId,
         visibleViews,
@@ -740,9 +685,9 @@ export class TilingController {
         !source ||
         !target ||
         !direction ||
-        !this.canCoverNeighbor(source, target, direction, boundsByViewId)
+        !canCoverNeighbor(source, target, direction, boundsByViewId)
       ) {
-        this.expandedTiles.delete(sourceId);
+        _expandedTiles.delete(sourceId);
         continue;
       }
 
@@ -751,7 +696,7 @@ export class TilingController {
       if (!sourceBounds || !targetBounds) continue;
       presentedBoundsByViewId.set(
         sourceId,
-        this.combineBounds(sourceBounds, targetBounds),
+        combineBounds(sourceBounds, targetBounds),
       );
       presentedBoundsByViewId.set(targetId, {
         x: 0,
@@ -777,15 +722,12 @@ export class TilingController {
     });
   }
 
-  /**
-   * Determine view mode based on manifest window config and tiling state
-   */
-  determineViewMode(windowConfig?: WindowConfig): ViewMode {
+  function determineViewMode(windowConfig?: WindowConfig): ViewMode {
     const windowMode = windowConfig?.mode;
 
     // If no window config mode specified
     if (!windowMode) {
-      return this.isEnabled() ? "tiled" : "floating";
+      return isEnabled() ? "tiled" : "floating";
     }
 
     // Check what the app supports
@@ -800,9 +742,29 @@ export class TilingController {
         }
 
         // If app supports both, prefer tiled if tiling is enabled
-        return this.isEnabled() ? "tiled" : "floating";
+        return isEnabled() ? "tiled" : "floating";
       default:
-        return this.isEnabled() ? "tiled" : "floating";
+        return isEnabled() ? "tiled" : "floating";
     }
   }
+  return {
+    setWorkspaceBounds,
+    getWorkspaceBounds,
+    setConfig,
+    getConfig,
+    isEnabled,
+    getTileLayoutState,
+    swapTile,
+    expandTile,
+    restoreExpansionForView,
+    getTiledCapacity,
+    resolveTiledVisibilityChanges,
+    calculateTileBounds,
+    getNextTileIndex,
+    getVisibleTiledCount,
+    recalculateTiledViews,
+    determineViewMode,
+  };
 }
+
+export type TilingController = ReturnType<typeof createTilingController>;

@@ -4,52 +4,45 @@ import type {
   FilesystemLocation,
   WindowConfig,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Queue from "effect/Queue";
+import { fromPromise } from "../effects/io";
 import { log } from "../logging";
 import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
 import { encodeLaunchContext } from "../utils/appLaunchContext";
-import { CachedFileReader } from "../utils/cachedFileReader";
+import { createCachedFileReader } from "../utils/cachedFileReader";
 import type { FloatingWindowController } from "./FloatingWindowController";
 import type { TilingController } from "./TilingController";
 import { type ViewInfo, type ViewMode, type ViewType, Z_LAYERS } from "./types";
-import { createView } from "./viewLifecycle";
-/**
- * ViewCreator
- *
- * Handles creation and injection of views.
- * Extracted from ViewManager for better separation of concerns.
- */
-export class ViewCreator {
-  private nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
-  private nextViewId = 1;
-  private readonly fileReader = new CachedFileReader();
+import { createView as createPlatformView } from "./viewLifecycle";
+export const createViewCreator = Effect.fn(function* (
+  basePath: string,
+  tilingController: TilingController,
+  floatingWindows: FloatingWindowController,
+  windows: WindowingPort,
+) {
+  const pending = yield* Queue.unbounded<Effect.Effect<unknown, Error>>();
+  let _nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
+  let _nextViewId = 1;
+  let _fileReader = createCachedFileReader();
+  const _basePath = basePath;
+  const _tilingController = tilingController;
+  const _floatingWindows = floatingWindows;
+  const _windows = windows;
 
-  constructor(
-    private readonly basePath: string,
-    private readonly tilingController: TilingController,
-    private readonly floatingWindows: FloatingWindowController,
-    private readonly windows: WindowingPort,
-  ) {}
-
-  /**
-   * Check if a frontend entry points to a remote URL
-   */
-  isRemoteEntry(entry: string): boolean {
+  function isRemoteEntry(entry: string): boolean {
     return /^https?:\/\//i.test(entry);
   }
 
-  /**
-   * Determine whether the app frame should be injected
-   */
-  shouldInjectAppFrame(windowConfig?: WindowConfig): boolean {
+  function shouldInjectAppFrame(windowConfig?: WindowConfig): boolean {
     const appFrameMode = windowConfig?.injections?.appFrame;
     return appFrameMode !== false && appFrameMode !== "none";
   }
 
-  /**
-   * Get the CSS injection mode from window config
-   * Returns "full" by default if not specified
-   */
-  getCSSInjectionMode(windowConfig?: WindowConfig): "full" | "tokens" | "none" {
+  function getCSSInjectionMode(
+    windowConfig?: WindowConfig,
+  ): "full" | "tokens" | "none" {
     const cssOption = windowConfig?.injections?.css;
     if (cssOption === undefined) {
       return "full";
@@ -57,10 +50,7 @@ export class ViewCreator {
     return cssOption;
   }
 
-  /**
-   * Callback that strips X-Frame-Options and CSP headers from responses.
-   */
-  private static embeddingHeadersFilter(
+  function embeddingHeadersFilter(
     details: { responseHeaders?: Record<string, string[]> },
     callback: (response: {
       responseHeaders?: Record<string, string[]>;
@@ -79,66 +69,60 @@ export class ViewCreator {
     callback({ responseHeaders });
   }
 
-  /**
-   * Inject Eden CSS into the view
-   * Makes design tokens and utilities available to all apps
-   * @param view - The WebContentsView to inject CSS into
-   * @param mode - "full" for complete CSS or "tokens" for only CSS custom properties
-   */
-  async injectEdenCSS(
+  const injectEdenCSS = Effect.fn(function* (
     view: PlatformView,
     mode: "full" | "tokens",
-  ): Promise<boolean> {
+  ) {
     if (view.webContents.isDestroyed()) {
       log.error("Cannot inject CSS - webContents destroyed");
       return false;
     }
 
-    try {
-      const edenCssPath = path.join(this.basePath, "edencss");
+    return yield* Effect.gen(function* () {
+      const edenCssPath = path.join(_basePath, "edencss");
       const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
       const cssPath = path.join(edenCssPath, cssFileName);
 
-      const css = await this.fileReader.readAsync(cssPath, "utf-8");
-      await view.webContents.insertCSS(css);
+      const css = yield* _fileReader.readAsync(cssPath, "utf-8");
+      yield* fromPromise(() => view.webContents.insertCSS(css));
 
       log.info(`Injected Eden CSS (${mode})`);
       return true;
-    } catch (err) {
-      log.error("Failed to inject Eden CSS:", err);
-      return false;
-    }
-  }
+    }).pipe(
+      Effect.catch((err) =>
+        Effect.sync(() => {
+          log.error("Failed to inject Eden CSS:", err);
+          return false;
+        }),
+      ),
+    );
+  });
 
-  /**
-   * Inject app frame script into the view
-   * Adds a title bar with close button to each app
-   */
-  async injectAppFrame(
+  const injectAppFrame = Effect.fn(function* (
     view: PlatformView,
     appId: string,
     manifestName: string | Record<string, string>,
     viewMode: ViewMode,
     windowConfig?: WindowConfig,
     bounds?: Bounds,
-  ): Promise<boolean> {
+  ) {
     if (view.webContents.isDestroyed()) {
       log.error("Cannot inject frame - webContents destroyed");
       return false;
     }
 
-    try {
+    return yield* Effect.gen(function* () {
       // Inject CSS first
-      const frameCSSPath = path.join(this.basePath, "app-frame/frame.css");
-      const frameCSS = await this.fileReader.readAsync(frameCSSPath, "utf-8");
-      await view.webContents.insertCSS(frameCSS);
+      const frameCSSPath = path.join(_basePath, "app-frame/frame.css");
+      const frameCSS = yield* _fileReader.readAsync(frameCSSPath, "utf-8");
+      yield* fromPromise(() => view.webContents.insertCSS(frameCSS));
 
       // Inject bundled JavaScript
       const frameScriptPath = path.join(
-        this.basePath,
+        _basePath,
         "app-frame/frame-injector.js",
       );
-      const frameScript = await this.fileReader.readAsync(
+      const frameScript = yield* _fileReader.readAsync(
         frameScriptPath,
         "utf-8",
       );
@@ -160,20 +144,23 @@ export class ViewCreator {
       `;
 
       // Execute config initialization followed by frame script
-      await view.webContents.executeJavaScript(configScript + frameScript);
+      yield* fromPromise(() =>
+        view.webContents.executeJavaScript(configScript + frameScript),
+      );
 
       log.info(`App frame injected (mode: ${viewMode})`);
       return true;
-    } catch (error) {
-      log.error("Failed to inject app frame:", error);
-      return false;
-    }
-  }
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          log.error("Failed to inject app frame:", error);
+          return false;
+        }),
+      ),
+    );
+  });
 
-  /**
-   * Calculate view bounds, tile index, and Z-index based on view type and mode
-   */
-  private calculateViewBounds(
+  function calculateViewBounds(
     isOverlay: boolean,
     viewMode: ViewMode,
     appId: string,
@@ -182,26 +169,23 @@ export class ViewCreator {
     existingViews: Iterable<ViewInfo>,
   ) {
     if (isOverlay) {
-      return this.calculateOverlayBounds(appId, bounds, windowConfig);
+      return calculateOverlayBounds(appId, bounds, windowConfig);
     } else if (viewMode === "floating") {
-      return this.calculateFloatingAppBounds(appId, bounds, windowConfig);
+      return calculateFloatingAppBounds(appId, bounds, windowConfig);
     } else {
-      return this.calculateTiledAppBounds(appId, bounds, existingViews);
+      return calculateTiledAppBounds(appId, bounds, existingViews);
     }
   }
 
-  /**
-   * Calculate bounds and Z-index for overlay views
-   */
-  private calculateOverlayBounds(
+  function calculateOverlayBounds(
     appId: string,
     bounds: Bounds | undefined,
     windowConfig?: WindowConfig,
   ) {
-    const zIndex = this.nextOverlayZIndex++;
+    const zIndex = _nextOverlayZIndex++;
     const viewBounds =
       bounds ||
-      this.floatingWindows.calculateInitialBounds(
+      _floatingWindows.calculateInitialBounds(
         windowConfig,
         windowConfig?.scaling === "auto",
       );
@@ -209,39 +193,33 @@ export class ViewCreator {
     return { viewBounds, zIndex, tileIndex: undefined };
   }
 
-  /**
-   * Calculate bounds and Z-index for floating app views
-   */
-  private calculateFloatingAppBounds(
+  function calculateFloatingAppBounds(
     appId: string,
     bounds: Bounds | undefined,
     windowConfig?: WindowConfig,
   ) {
     const viewBounds =
       bounds ||
-      this.floatingWindows.calculateInitialBounds(
+      _floatingWindows.calculateInitialBounds(
         windowConfig,
         windowConfig?.scaling !== "manual",
       );
-    const zIndex = this.floatingWindows.getNextZIndex();
+    const zIndex = _floatingWindows.getNextZIndex();
     log.info(`Creating floating app view for ${appId}`);
     return { viewBounds, zIndex, tileIndex: undefined };
   }
 
-  /**
-   * Calculate bounds and tile index for tiled app views
-   */
-  private calculateTiledAppBounds(
+  function calculateTiledAppBounds(
     appId: string,
     bounds: Bounds | undefined,
     existingViews: Iterable<ViewInfo>,
   ) {
     log.info(`Creating tiled app view for ${appId}`);
 
-    if (this.tilingController.isEnabled()) {
-      const tileIndex = this.tilingController.getNextTileIndex(existingViews);
+    if (_tilingController.isEnabled()) {
+      const tileIndex = _tilingController.getNextTileIndex(existingViews);
       const viewBounds = bounds || {
-        ...this.tilingController.getWorkspaceBounds(),
+        ..._tilingController.getWorkspaceBounds(),
       };
       return { viewBounds, tileIndex, zIndex: undefined };
     }
@@ -251,11 +229,7 @@ export class ViewCreator {
     return { viewBounds, tileIndex: undefined, zIndex: undefined };
   }
 
-  /**
-   * Create a view for an app (regular or overlay)
-   * ViewType is determined by manifest.overlay flag
-   */
-  public createView(
+  function createView(
     appId: string,
     manifest: AppManifest,
     installPath: string,
@@ -280,10 +254,10 @@ export class ViewCreator {
     // Determine view mode
     const viewMode: ViewMode = isOverlay
       ? "floating"
-      : this.tilingController.determineViewMode(windowConfig);
+      : _tilingController.determineViewMode(windowConfig);
 
     // Calculate bounds and Z-index based on view type and mode
-    const { viewBounds, tileIndex, zIndex } = this.calculateViewBounds(
+    const { viewBounds, tileIndex, zIndex } = calculateViewBounds(
       isOverlay,
       viewMode,
       appId,
@@ -293,13 +267,10 @@ export class ViewCreator {
     );
 
     // View identifiers and paths
-    const viewId = this.nextViewId++;
-    const preloadScript = path.join(
-      this.basePath,
-      "app-runtime/app-preload.js",
-    );
+    const viewId = _nextViewId++;
+    const preloadScript = path.join(_basePath, "app-runtime/app-preload.js");
 
-    const view = createView(
+    const view = createPlatformView(
       {
         preloadScript,
         additionalArguments: encodeLaunchContext({
@@ -308,7 +279,7 @@ export class ViewCreator {
           file: launchFile,
         }),
       },
-      this.windows,
+      _windows,
     );
 
     log.info(
@@ -322,12 +293,12 @@ export class ViewCreator {
     if (manifest.frontend?.allowEmbedding) {
       view.webContents.session.webRequest.onHeadersReceived(
         { urls: ["*://*/*"] },
-        ViewCreator.embeddingHeadersFilter,
+        embeddingHeadersFilter,
       );
     }
 
     // Load the frontend HTML or remote URL
-    if (this.isRemoteEntry(frontendEntry)) {
+    if (isRemoteEntry(frontendEntry)) {
       log.info(`Loading remote frontend for ${appId}: ${frontendEntry}`);
       view.webContents.loadURL(frontendEntry);
     } else {
@@ -338,24 +309,26 @@ export class ViewCreator {
     // Setup injections after view is loaded
     view.webContents.on("did-finish-load", () => {
       // Inject the Eden CSS first (based on mode)
-      const cssMode = this.getCSSInjectionMode(windowConfig);
+      const cssMode = getCSSInjectionMode(windowConfig);
       if (cssMode !== "none") {
-        this.injectEdenCSS(view, cssMode).catch((err) => {
-          log.error(`Failed to inject Eden CSS for ${appId}:`, err);
-        });
+        Queue.offerUnsafe(pending, injectEdenCSS(view, cssMode));
       }
 
-      if (this.shouldInjectAppFrame(windowConfig)) {
-        this.injectAppFrame(
-          view,
-          appId,
-          manifest.name,
-          viewMode,
-          windowConfig,
-          view.getBounds(),
-        ).catch((err) => {
-          log.error(`Failed to inject app frame for ${appId}:`, err);
-        });
+      if (shouldInjectAppFrame(windowConfig)) {
+        Queue.offerUnsafe(
+          pending,
+          Effect.suspend(() => {
+            if (view.webContents.isDestroyed()) return Effect.succeed(false);
+            return injectAppFrame(
+              view,
+              appId,
+              manifest.name,
+              viewMode,
+              windowConfig,
+              view.getBounds(),
+            );
+          }),
+        );
       }
     });
 
@@ -375,4 +348,29 @@ export class ViewCreator {
       launchArgs,
     };
   }
-}
+  yield* Effect.forkScoped(
+    Effect.forever(
+      Queue.take(pending).pipe(
+        Effect.flatMap((work) => work),
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause)
+            : Effect.sync(() =>
+                log.error("View injection failed:", Cause.squash(cause)),
+              ),
+        ),
+      ),
+    ),
+  );
+  yield* Effect.addFinalizer(() => Effect.sync(_fileReader.flushCache));
+  return {
+    isRemoteEntry,
+    shouldInjectAppFrame,
+    getCSSInjectionMode,
+    injectEdenCSS,
+    injectAppFrame,
+    createView,
+  };
+});
+
+export type ViewCreator = Effect.Success<ReturnType<typeof createViewCreator>>;

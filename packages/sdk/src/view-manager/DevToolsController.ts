@@ -1,20 +1,9 @@
 import { log } from "../logging";
 import type { PlatformView } from "../platform/ports";
-/**
- * DevToolsController
- *
- * Manages DevTools for WebContentsViews, including:
- * - Keyboard shortcut registration (Ctrl+Shift+D)
- * - Automatic cleanup when views are destroyed
- */
-export class DevToolsController {
-  private viewsWithDevTools: Set<number> = new Set();
+export function createDevToolsController() {
+  let _viewsWithDevTools: Set<number> = new Set();
 
-  /**
-   * Register DevTools shortcut (Ctrl+Shift+D) on a WebContentsView
-   * Works on both X11 and Wayland
-   */
-  registerShortcut(view: PlatformView): void {
+  function registerShortcut(view: PlatformView): void {
     view.webContents.on(
       "before-input-event",
       (
@@ -42,11 +31,11 @@ export class DevToolsController {
 
             if (view.webContents.isDevToolsOpened()) {
               view.webContents.closeDevTools();
-              this.viewsWithDevTools.delete(webContentsId);
+              _viewsWithDevTools.delete(webContentsId);
               log.info("Closed DevTools for view");
             } else {
               view.webContents.openDevTools();
-              this.viewsWithDevTools.add(webContentsId);
+              _viewsWithDevTools.add(webContentsId);
               log.info("Opened DevTools for view");
             }
           } catch (err) {
@@ -57,10 +46,7 @@ export class DevToolsController {
     );
   }
 
-  /**
-   * Close DevTools for a view when it's being destroyed
-   */
-  closeDevToolsForView(view: PlatformView): void {
+  function closeDevToolsForView(view: PlatformView): void {
     try {
       const webContentsId = view.webContents.id;
 
@@ -72,24 +58,26 @@ export class DevToolsController {
         log.info(`Closed DevTools for view (webContents ID: ${webContentsId})`);
       }
 
-      this.viewsWithDevTools.delete(webContentsId);
+      _viewsWithDevTools.delete(webContentsId);
     } catch (err) {
       // Ignore errors during cleanup
       log.debug("Error closing DevTools during cleanup:", err);
     }
   }
 
-  /**
-   * Get the set of webContents IDs that have DevTools open
-   */
-  getViewsWithDevTools(): Set<number> {
-    return new Set(this.viewsWithDevTools);
+  function getViewsWithDevTools(): Set<number> {
+    return new Set(_viewsWithDevTools);
   }
 
-  /**
-   * Clear all tracked DevTools
-   */
-  clear(): void {
-    this.viewsWithDevTools.clear();
+  function clear(): void {
+    _viewsWithDevTools.clear();
   }
+  return {
+    registerShortcut,
+    closeDevToolsForView,
+    getViewsWithDevTools,
+    clear,
+  };
 }
+
+export type DevToolsController = ReturnType<typeof createDevToolsController>;

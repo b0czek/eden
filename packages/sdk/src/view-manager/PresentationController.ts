@@ -1,34 +1,34 @@
 import type { Bounds } from "../platform/ports";
+export function createPresentationController() {
+  let _viewLift = 0;
 
-/**
- * Applies transient shell-owned offsets to hosted web contents without mutating
- * their logical bounds. Used by the docked keyboard to lift the full scene.
- */
-export class PresentationController {
-  private viewLift = 0;
-
-  setViewLift(nextLift: number): boolean {
+  function setViewLift(nextLift: number): boolean {
     const normalizedLift = Math.max(0, Math.round(nextLift));
-    if (normalizedLift === this.viewLift) {
+    if (normalizedLift === _viewLift) {
       return false;
     }
 
-    this.viewLift = normalizedLift;
+    _viewLift = normalizedLift;
     return true;
   }
 
-  getViewLift(): number {
-    return this.viewLift;
+  function getViewLift(): number {
+    return _viewLift;
   }
 
-  applyToBounds(bounds: Bounds): Bounds {
-    if (this.viewLift <= 0) {
+  function applyToBounds(bounds: Bounds): Bounds {
+    if (_viewLift <= 0) {
       return { ...bounds };
     }
 
     return {
       ...bounds,
-      y: bounds.y - this.viewLift,
+      y: bounds.y - _viewLift,
     };
   }
+  return { setViewLift, getViewLift, applyToBounds };
 }
+
+export type PresentationController = ReturnType<
+  typeof createPresentationController
+>;

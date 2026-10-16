@@ -7,30 +7,38 @@ import type {
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
-import { delay, inject, injectable, Lifecycle, scoped } from "tsyringe";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import * as Effect from "effect/Effect";
+import type { TargetedNotification } from "../controllers/events";
+import { scopedEvent } from "../events/scoped";
+
 import { log } from "../logging";
 import {
   type Bounds,
-  type DisplayPort,
-  PLATFORM_DISPLAY,
-  PLATFORM_WINDOWS,
   type PlatformView,
   type PlatformWindow,
   type WindowingPort,
 } from "../platform/ports";
+import type { Settings } from "../settings/service";
 import {
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../settings/legacy-access";
-import { DevToolsController } from "./DevToolsController";
-import { FloatingWindowController } from "./FloatingWindowController";
-import { PresentationController } from "./PresentationController";
-import { ScaleController } from "./ScaleController";
-import { TilingController } from "./TilingController";
+  createDevToolsController,
+  type DevToolsController,
+} from "./DevToolsController";
+import {
+  createFloatingWindowController,
+  type FloatingWindowController,
+} from "./FloatingWindowController";
+import {
+  createPresentationController,
+  type PresentationController,
+} from "./PresentationController";
+import { createScaleController, type ScaleController } from "./ScaleController";
+import {
+  createTilingController,
+  type TilingController,
+} from "./TilingController";
 import { compareOverlayViews, type ViewInfo, type ViewMode } from "./types";
-import { ViewCreator } from "./ViewCreator";
-import { ViewHandler } from "./ViewHandler";
+import { createViewCreator, type ViewCreator } from "./ViewCreator";
+
 import {
   cleanupDestroyedViews,
   destroyView,
@@ -59,92 +67,88 @@ export interface ViewManagerEvents {
     windowSize: WindowSize;
   };
 }
+export interface ViewManagerDependencies {
+  config: EdenConfig;
+  distPath: string;
+  settings: Pick<Settings, "get" | "changed">;
+  windows: WindowingPort;
+}
 
-/**
- * ViewManager
- *
- * Central orchestrator for view management in Eden.
- */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
-@EdenNamespace("view")
-export class ViewManager extends EdenEmitter<ViewManagerEvents> {
-  private views: Map<number, ViewInfo> = new Map();
-  private mainWindow: PlatformWindow | null = null;
+export const createViewManager = Effect.fn(function* ({
+  config,
+  distPath,
+  settings,
+  windows,
+}: ViewManagerDependencies) {
+  const viewRemoved = yield* scopedEvent<ViewManagerEvents["view-removed"]>();
+  const viewLoaded = yield* scopedEvent<ViewManagerEvents["view-loaded"]>();
+  const viewLoadFailed =
+    yield* scopedEvent<ViewManagerEvents["view-load-failed"]>();
+  const interfaceScaleChanged =
+    yield* scopedEvent<ViewManagerEvents["interface-scale-changed"]>();
+  const globalBoundsChanged =
+    yield* scopedEvent<ViewManagerEvents["global-bounds-changed"]>();
+  const boundsUpdated = yield* scopedEvent<TargetedNotification<ViewBounds>>();
+  const modeChanged =
+    yield* scopedEvent<
+      TargetedNotification<ViewManagerEvents["mode-changed"]>
+    >();
+  const _windows = windows;
+  let _views: Map<number, ViewInfo> = new Map();
+  let _mainWindow: PlatformWindow | null = null;
+  let _tilingController: TilingController;
+  let _floatingWindows: FloatingWindowController;
+  let _presentationController: PresentationController;
+  let _viewCreator: ViewCreator;
+  let _devToolsController: DevToolsController;
+  let _scaleController: ScaleController;
+  let _windowSize: WindowSize = { width: 800, height: 600 };
 
-  // Specialized modules
-  private readonly tilingController: TilingController;
-  private readonly floatingWindows: FloatingWindowController;
-  private readonly presentationController: PresentationController;
-  private readonly viewCreator: ViewCreator;
-  private readonly devToolsController: DevToolsController;
-  private readonly scaleController: ScaleController;
+  // Initialize specialized modules
+  const tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
+  const getViews = () => _views.values();
 
-  private windowSize: WindowSize = { width: 800, height: 600 };
-  private viewHandler: ViewHandler;
+  _devToolsController = createDevToolsController();
+  _presentationController = createPresentationController();
+  _scaleController = yield* createScaleController(
+    settings,
+    getViews,
+    (scale, previousScale) => handleInterfaceScaleChanged(scale, previousScale),
+  );
+  _tilingController = createTilingController(tilingConfig, undefined, () =>
+    _scaleController.getScale(),
+  );
 
-  constructor(
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(delay(() => IPCBridge)) ipcBridge: IPCBridge,
-    @inject("EdenConfig") config: EdenConfig,
-    @inject("distPath") distPath: string,
-    @inject(LEGACY_SETTINGS) settingsManager: LegacySettingsAccess,
-    @inject(PLATFORM_WINDOWS) private windows: WindowingPort,
-    @inject(PLATFORM_DISPLAY) display: DisplayPort,
-  ) {
-    super(ipcBridge);
+  _floatingWindows = createFloatingWindowController(
+    () => _tilingController.getWorkspaceBounds(),
+    getViews,
+    () => _scaleController.getScale(),
+  );
 
-    // Initialize specialized modules
-    const tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
-    const getViews = () => this.views.values();
+  // Use consumer's dist path for runtime assets
+  _viewCreator = yield* createViewCreator(
+    distPath,
+    _tilingController,
+    _floatingWindows,
+    _windows,
+  );
 
-    this.devToolsController = new DevToolsController();
-    this.presentationController = new PresentationController();
-    this.scaleController = new ScaleController(
-      settingsManager,
-      getViews,
-      (scale, previousScale) =>
-        this.handleInterfaceScaleChanged(scale, previousScale),
-    );
-    this.tilingController = new TilingController(tilingConfig, undefined, () =>
-      this.scaleController.getScale(),
-    );
-
-    this.floatingWindows = new FloatingWindowController(
-      () => this.tilingController.getWorkspaceBounds(),
-      getViews,
-      () => this.scaleController.getScale(),
-    );
-
-    // Use consumer's dist path for runtime assets
-    this.viewCreator = new ViewCreator(
-      distPath,
-      this.tilingController,
-      this.floatingWindows,
-      this.windows,
-    );
-
-    // Create and register handler
-    this.viewHandler = new ViewHandler(this, display);
-    commandRegistry.registerManager(this.viewHandler);
-  }
-
-  private markViewFocused(viewInfo: ViewInfo): void {
+  function markViewFocused(viewInfo: ViewInfo): void {
     viewInfo.lastFocusedAt = Date.now();
   }
 
-  private handleInterfaceScaleChanged(
+  function handleInterfaceScaleChanged(
     scale: number,
     previousScale: number,
   ): void {
-    this.notify("interface-scale-changed", { scale });
+    interfaceScaleChanged.emit({ scale });
 
-    if (scale === previousScale || !this.floatingWindows) {
+    if (scale === previousScale || !_floatingWindows) {
       return;
     }
 
     const ratio = scale / previousScale;
-    for (const viewInfo of this.views.values()) {
+    for (const viewInfo of _views.values()) {
       const automaticallyScaled =
         viewInfo.manifest.window?.scaling === "auto" ||
         (viewInfo.viewType === "app" &&
@@ -161,73 +165,68 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       const finalBounds =
         viewInfo.viewType === "overlay"
           ? scaledBounds
-          : this.floatingWindows.applyWindowConstraints(
+          : _floatingWindows.applyWindowConstraints(
               scaledBounds,
               viewInfo.manifest.window,
             );
       viewInfo.bounds = finalBounds;
       if (viewInfo.visible) {
-        this.applyPresentedBounds(viewInfo, finalBounds);
+        applyPresentedBounds(viewInfo, finalBounds);
       }
     }
 
-    this.syncTiledLayout();
+    syncTiledLayout();
   }
 
-  private attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
+  function attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
     viewInfo.view.webContents.on("focus", () => {
-      const trackedView = this.views.get(viewId);
+      const trackedView = _views.get(viewId);
       if (!trackedView) return;
-      this.markViewFocused(trackedView);
+      markViewFocused(trackedView);
     });
   }
 
-  /**
-   * Set the main window that will host the views
-   */
-  setMainWindow(window: PlatformWindow): void {
-    this.mainWindow = window;
+  function setMainWindow(window: PlatformWindow): void {
+    _mainWindow = window;
   }
 
-  updateGlobalBounds(bounds: ViewBounds, windowSize: WindowSize): void {
-    this.setWorkspaceBounds(bounds);
-    this.setWindowSize(windowSize);
-    this.notify("global-bounds-changed", {
+  function updateGlobalBounds(
+    bounds: ViewBounds,
+    windowSize: WindowSize,
+  ): void {
+    setWorkspaceBounds(bounds);
+    setWindowSize(windowSize);
+    globalBoundsChanged.emit({
       workspaceBounds: bounds,
       windowSize,
     });
   }
 
-  /**
-   * Set workspace bounds (the area where views can be placed)
-   */
-  setWorkspaceBounds(bounds: Bounds): void {
-    this.tilingController.setWorkspaceBounds(bounds);
-    if (this.tilingController.isEnabled()) {
-      const visibilityChanged = this.syncTiledLayout();
+  function setWorkspaceBounds(bounds: Bounds): void {
+    _tilingController.setWorkspaceBounds(bounds);
+    if (_tilingController.isEnabled()) {
+      const visibilityChanged = syncTiledLayout();
       if (visibilityChanged) {
-        this.reorderViewLayers();
+        reorderViewLayers();
       }
     }
   }
 
-  /**
-   * Apply tiling visibility rules in one pass, then recalculate tile bounds.
-   * Returns true when any view visibility changed.
-   */
-  private syncTiledLayout(
+  function syncTiledLayout(
     options: { preferredViewId?: number; excludedViewId?: number } = {},
   ): boolean {
-    const { toHide, toShow } =
-      this.tilingController.resolveTiledVisibilityChanges(this.views, options);
+    const { toHide, toShow } = _tilingController.resolveTiledVisibilityChanges(
+      _views,
+      options,
+    );
 
     let visibilityChanged = false;
 
     for (const viewId of toHide) {
-      const viewInfo = this.views.get(viewId);
+      const viewInfo = _views.get(viewId);
       if (!viewInfo?.visible) continue;
 
-      this.tilingController.restoreExpansionForView(viewId);
+      _tilingController.restoreExpansionForView(viewId);
       viewInfo.visible = false;
       viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -239,30 +238,27 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
 
     for (const viewId of toShow) {
-      const viewInfo = this.views.get(viewId);
+      const viewInfo = _views.get(viewId);
       if (!viewInfo || viewInfo.visible) continue;
 
       viewInfo.visible = true;
       visibilityChanged = true;
     }
 
-    this.tilingController.recalculateTiledViews(this.views);
-    this.reapplyPresentedBounds();
+    _tilingController.recalculateTiledViews(_views);
+    reapplyPresentedBounds();
     return visibilityChanged;
   }
 
-  setWindowSize(windowSize: WindowSize): void {
-    this.windowSize = windowSize;
+  function setWindowSize(windowSize: WindowSize): void {
+    _windowSize = windowSize;
   }
 
-  getWindowSize(): WindowSize {
-    return this.windowSize;
+  function getWindowSize(): WindowSize {
+    return _windowSize;
   }
 
-  /**
-   * Create a view for an app or overlay
-   */
-  public createView(
+  function createView(
     appId: string,
     manifest: AppManifest,
     installPath: string,
@@ -270,41 +266,41 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
   ): number {
-    if (!isWindowAlive(this.mainWindow)) {
+    if (!isWindowAlive(_mainWindow)) {
       throw new Error("Main window not set. Call setMainWindow first.");
     }
 
-    const viewInfo = this.viewCreator.createView(
+    const viewInfo = _viewCreator.createView(
       appId,
       manifest,
       installPath,
       bounds,
-      this.views.values(),
+      _views.values(),
       launchArgs,
       launchFile,
     );
 
     const viewId = viewInfo.id;
 
-    this.windows.attachWebContentsLogger(viewInfo.view.webContents, {
+    _windows.attachWebContentsLogger(viewInfo.view.webContents, {
       appId,
       viewId,
       source: viewInfo.viewType === "overlay" ? "overlay" : "app",
     });
 
     // Store view info
-    this.views.set(viewId, viewInfo);
-    this.attachFocusTracking(viewId, viewInfo);
+    _views.set(viewId, viewInfo);
+    attachFocusTracking(viewId, viewInfo);
 
     // Apply current interface scale to the new view
-    this.scaleController.applyToView(viewInfo);
+    _scaleController.applyToView(viewInfo);
 
     // Register DevTools shortcut on this view
-    this.devToolsController.registerShortcut(viewInfo.view);
+    _devToolsController.registerShortcut(viewInfo.view);
 
     // Re-apply zoom after page finishes loading (content load can reset zoom)
     viewInfo.view.webContents.on("did-finish-load", () => {
-      this.scaleController.applyToView(viewInfo);
+      _scaleController.applyToView(viewInfo);
     });
 
     // Electron event listener for view load failure
@@ -312,7 +308,7 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       "did-fail-load",
       (_event, errorCode: number, errorDescription: string) => {
         log.error(`View load failed for ${appId}:`, errorDescription);
-        this.notify("view-load-failed", {
+        viewLoadFailed.emit({
           viewId: viewInfo.id,
           appId,
           errorCode,
@@ -322,47 +318,43 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     );
 
     // Notify listeners that the view has been loaded
-    this.notify("view-loaded", {
+    viewLoaded.emit({
       viewId: viewInfo.id,
       appId,
       overlay: viewInfo.viewType === "overlay",
     });
 
     // Recalculate all tiles if using tiling and this is a tiled view
-    if (viewInfo.mode === "tiled" && this.tilingController.isEnabled()) {
-      this.syncTiledLayout({ preferredViewId: viewId });
+    if (viewInfo.mode === "tiled" && _tilingController.isEnabled()) {
+      syncTiledLayout({ preferredViewId: viewId });
     }
 
     // Add to main window's contentView and maintain proper layering
-    this.reorderViewLayers();
+    reorderViewLayers();
 
     return viewId;
   }
 
-  /**
-   * Remove a view
-   */
-  removeView(viewId: number): void {
-    const viewInfo = this.views.get(viewId);
+  function removeView(viewId: number): void {
+    const viewInfo = _views.get(viewId);
     if (!viewInfo) {
       throw new Error(`View ${viewId} not found`);
     }
 
     try {
-      this.tilingController.restoreExpansionForView(viewId);
+      _tilingController.restoreExpansionForView(viewId);
 
       // Close DevTools if open
-      this.devToolsController.closeDevToolsForView(viewInfo.view);
+      _devToolsController.closeDevToolsForView(viewInfo.view);
 
       // Destroy the view safely
-      destroyView(viewInfo, this.mainWindow);
+      destroyView(viewInfo, _mainWindow);
 
       // Clean up all event subscriptions for this view
-      this.ipcBridge.eventSubscribers.removeViewSubscriptions(viewId);
 
       // Remove from tracking map
-      if (this.views.delete(viewId)) {
-        this.notify("view-removed", {
+      if (_views.delete(viewId)) {
+        viewRemoved.emit({
           viewId,
           appId: viewInfo.appId,
           webContentsId: viewInfo.view.webContents.id,
@@ -370,10 +362,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
       }
 
       // Recalculate tiles if using tiling and this was an app view
-      if (viewInfo.viewType === "app" && this.tilingController.isEnabled()) {
-        const visibilityChanged = this.syncTiledLayout();
+      if (viewInfo.viewType === "app" && _tilingController.isEnabled()) {
+        const visibilityChanged = syncTiledLayout();
         if (visibilityChanged) {
-          this.reorderViewLayers();
+          reorderViewLayers();
         }
       }
     } catch (error) {
@@ -381,8 +373,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         error instanceof Error ? error.message : String(error);
       log.error(`Failed to remove view ${viewId}:`, errorMessage);
       // Still remove from tracking even if removal failed
-      if (this.views.delete(viewId)) {
-        this.notify("view-removed", {
+      if (_views.delete(viewId)) {
+        viewRemoved.emit({
           viewId,
           appId: viewInfo.appId,
           webContentsId: viewInfo.view.webContents.id,
@@ -392,23 +384,20 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Update view bounds
-   */
-  setViewBounds(
+  function setViewBounds(
     viewId: number,
     bounds: Bounds,
     options: { notify?: boolean } = {},
   ): void {
-    const viewInfo = requireView(viewId, this.views);
-    this.applyViewBounds(viewId, viewInfo, bounds);
+    const viewInfo = requireView(viewId, _views);
+    applyViewBounds(viewId, viewInfo, bounds);
 
     if (options.notify) {
-      this.notifySubscriber(viewId, "bounds-updated", bounds);
+      boundsUpdated.emit({ viewIds: [viewId], payload: bounds });
     }
   }
 
-  private applyViewBounds(
+  function applyViewBounds(
     viewId: number,
     viewInfo: ViewInfo,
     bounds: Bounds,
@@ -440,13 +429,13 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     try {
       const windowConfig = viewInfo.manifest.window;
-      const finalBounds = this.floatingWindows.applyWindowConstraints(
+      const finalBounds = _floatingWindows.applyWindowConstraints(
         bounds,
         windowConfig,
         windowConfig?.scaling !== "manual",
       );
       viewInfo.bounds = finalBounds;
-      this.applyPresentedBounds(viewInfo, finalBounds);
+      applyPresentedBounds(viewInfo, finalBounds);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -454,26 +443,17 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Get view by ID
-   */
-  getView(viewId: number): PlatformView | undefined {
-    return this.views.get(viewId)?.view;
+  function getView(viewId: number): PlatformView | undefined {
+    return _views.get(viewId)?.view;
   }
 
-  /**
-   * Get view info
-   */
-  getViewInfo(viewId: number): ViewInfo | undefined {
-    return this.views.get(viewId);
+  function getViewInfo(viewId: number): ViewInfo | undefined {
+    return _views.get(viewId);
   }
 
-  /**
-   * Find views by app ID
-   */
-  getViewsByAppId(appId: string): number[] {
+  function getViewsByAppId(appId: string): number[] {
     const viewIds: number[] = [];
-    for (const [viewId, info] of this.views.entries()) {
+    for (const [viewId, info] of _views.entries()) {
       if (info.appId === appId) {
         viewIds.push(viewId);
       }
@@ -481,11 +461,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     return viewIds;
   }
 
-  /**
-   * Get app ID from a webContents ID
-   */
-  getAppIdByWebContentsId(webContentsId: number): string | undefined {
-    for (const [, info] of this.views.entries()) {
+  function getAppIdByWebContentsId(webContentsId: number): string | undefined {
+    for (const [, info] of _views.entries()) {
       if (info.view.webContents.id === webContentsId) {
         return info.appId;
       }
@@ -493,11 +470,8 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     return undefined;
   }
 
-  /**
-   * Get view ID from a webContents ID
-   */
-  getViewIdByWebContentsId(webContentsId: number): number | undefined {
-    for (const [viewId, info] of this.views.entries()) {
+  function getViewIdByWebContentsId(webContentsId: number): number | undefined {
+    for (const [viewId, info] of _views.entries()) {
       if (info.view.webContents.id === webContentsId) {
         return viewId;
       }
@@ -505,59 +479,53 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     return undefined;
   }
 
-  /**
-   * Get all views (as entries for iteration)
-   */
-  getAllViews(): [number, ViewInfo][] {
-    return Array.from(this.views.entries());
+  function getAllViews(): [number, ViewInfo][] {
+    return Array.from(_views.entries());
   }
 
-  getTileLayoutState(viewId: number): TileLayoutState {
-    requireView(viewId, this.views);
-    return this.tilingController.getTileLayoutState(viewId, this.views);
+  function getTileLayoutState(viewId: number): TileLayoutState {
+    requireView(viewId, _views);
+    return _tilingController.getTileLayoutState(viewId, _views);
   }
 
-  swapTiledView(
+  function swapTiledView(
     viewId: number,
     direction: TileLayoutDirection,
   ): TileLayoutState {
-    if (!this.tilingController.swapTile(viewId, direction, this.views)) {
+    if (!_tilingController.swapTile(viewId, direction, _views)) {
       throw new Error(`No tiled window is available to swap ${direction}`);
     }
-    this.syncTiledLayout();
-    this.reorderViewLayers();
-    return this.getTileLayoutState(viewId);
+    syncTiledLayout();
+    reorderViewLayers();
+    return getTileLayoutState(viewId);
   }
 
-  expandTiledView(
+  function expandTiledView(
     viewId: number,
     direction: TileLayoutDirection,
   ): TileLayoutState {
-    if (!this.tilingController.expandTile(viewId, direction, this.views)) {
+    if (!_tilingController.expandTile(viewId, direction, _views)) {
       throw new Error(`The tiled window cannot expand ${direction}`);
     }
-    this.syncTiledLayout();
-    this.reorderViewLayers();
-    return this.getTileLayoutState(viewId);
+    syncTiledLayout();
+    reorderViewLayers();
+    return getTileLayoutState(viewId);
   }
 
-  /**
-   * Show a view (bring to front)
-   */
-  showView(viewId: number): void {
-    const viewInfo = requireView(viewId, this.views);
+  function showView(viewId: number): void {
+    const viewInfo = requireView(viewId, _views);
 
     try {
-      this.tilingController.restoreExpansionForView(viewId);
+      _tilingController.restoreExpansionForView(viewId);
       viewInfo.requestedVisible = true;
       viewInfo.visible = true;
 
       if (viewInfo.mode === "tiled") {
-        this.syncTiledLayout({ preferredViewId: viewId });
-        this.reorderViewLayers();
+        syncTiledLayout({ preferredViewId: viewId });
+        reorderViewLayers();
       } else {
-        viewInfo.zIndex = this.floatingWindows.getNextZIndex();
-        this.reorderViewLayers();
+        viewInfo.zIndex = _floatingWindows.getNextZIndex();
+        reorderViewLayers();
       }
     } catch (error) {
       const errorMessage =
@@ -566,33 +534,27 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Focus a view's webContents (does not change bounds).
-   */
-  focusView(viewId: number): void {
-    const viewInfo = requireView(viewId, this.views);
+  function focusView(viewId: number): void {
+    const viewInfo = requireView(viewId, _views);
     if (viewInfo.view.webContents.isDestroyed()) return;
     viewInfo.view.webContents.focus();
   }
 
-  /**
-   * Hide a view by setting its bounds to zero
-   */
-  hideView(viewId: number): void {
-    const viewInfo = requireView(viewId, this.views);
+  function hideView(viewId: number): void {
+    const viewInfo = requireView(viewId, _views);
 
     try {
-      this.tilingController.restoreExpansionForView(viewId);
+      _tilingController.restoreExpansionForView(viewId);
       viewInfo.requestedVisible = false;
       viewInfo.visible = false;
       viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
 
       if (viewInfo.mode === "tiled") {
-        const visibilityChanged = this.syncTiledLayout({
+        const visibilityChanged = syncTiledLayout({
           excludedViewId: viewId,
         });
         if (visibilityChanged) {
-          this.reorderViewLayers();
+          reorderViewLayers();
         }
       }
     } catch (error) {
@@ -602,17 +564,14 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Reorder all views to maintain proper layering
-   */
-  private reorderViewLayers(): void {
-    if (!isWindowAlive(this.mainWindow)) return;
+  function reorderViewLayers(): void {
+    if (!isWindowAlive(_mainWindow)) return;
 
     // Clean up any destroyed views first
-    cleanupDestroyedViews(this.views);
+    cleanupDestroyedViews(_views);
 
     try {
-      const appViews = Array.from(this.views.values()).filter(
+      const appViews = Array.from(_views.values()).filter(
         (v) => v.viewType === "app",
       );
 
@@ -620,40 +579,40 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
         .filter((v) => v.mode === "tiled" && v.visible)
         .sort((a, b) => (a.tileIndex || 0) - (b.tileIndex || 0));
 
-      const floatingAppViews = this.floatingWindows
+      const floatingAppViews = _floatingWindows
         .getOrderedFloatingViews()
         .filter((v) => v.visible);
 
-      const overlayViews = Array.from(this.views.values())
+      const overlayViews = Array.from(_views.values())
         .filter((v) => v.viewType === "overlay" && v.visible)
         .sort(compareOverlayViews);
 
       // Remove all views
-      for (const info of this.views.values()) {
+      for (const info of _views.values()) {
         if (isViewAlive(info.view)) {
-          this.mainWindow.contentView.removeChildView(info.view);
+          _mainWindow.contentView.removeChildView(info.view);
         }
       }
 
       // Add back in order: tiled (bottom), floating apps (middle), overlays (top)
       for (const info of tiledViews) {
         if (isViewAlive(info.view)) {
-          this.mainWindow.contentView.addChildView(info.view);
-          this.applyPresentedBounds(info);
+          _mainWindow.contentView.addChildView(info.view);
+          applyPresentedBounds(info);
         }
       }
 
       for (const info of floatingAppViews) {
         if (isViewAlive(info.view)) {
-          this.mainWindow.contentView.addChildView(info.view);
-          this.applyPresentedBounds(info);
+          _mainWindow.contentView.addChildView(info.view);
+          applyPresentedBounds(info);
         }
       }
 
       for (const info of overlayViews) {
         if (isViewAlive(info.view)) {
-          this.mainWindow.contentView.addChildView(info.view);
-          this.applyPresentedBounds(info);
+          _mainWindow.contentView.addChildView(info.view);
+          applyPresentedBounds(info);
         }
       }
     } catch (error) {
@@ -661,12 +620,13 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Send message to view's webContents
-   */
-  sendToView(viewId: number, channel: string, ...args: unknown[]): boolean {
+  function sendToView(
+    viewId: number,
+    channel: string,
+    ...args: unknown[]
+  ): boolean {
     try {
-      const viewInfo = requireView(viewId, this.views);
+      const viewInfo = requireView(viewId, _views);
       viewInfo.view.webContents.send(channel, ...args);
       return true;
     } catch (error) {
@@ -675,13 +635,10 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  /**
-   * Send message to the main window (foundation layer)
-   */
-  sendToMainWindow(channel: string, ...args: unknown[]): boolean {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+  function sendToMainWindow(channel: string, ...args: unknown[]): boolean {
+    if (_mainWindow && !_mainWindow.isDestroyed()) {
       try {
-        this.mainWindow.webContents.send(channel, ...args);
+        _mainWindow.webContents.send(channel, ...args);
         return true;
       } catch (error) {
         log.error(`Failed to send to main window:`, error);
@@ -691,18 +648,12 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     return false;
   }
 
-  /**
-   * Get all active view IDs
-   */
-  getActiveViews(): number[] {
-    return Array.from(this.views.keys());
+  function getActiveViews(): number[] {
+    return Array.from(_views.keys());
   }
 
-  /**
-   * Toggle or set view mode between tiled and floating
-   */
-  setViewMode(viewId: number, targetMode?: ViewMode): void {
-    const viewInfo = requireView(viewId, this.views);
+  function setViewMode(viewId: number, targetMode?: ViewMode): void {
+    const viewInfo = requireView(viewId, _views);
     const manifest = viewInfo.manifest;
     const windowConfig = manifest.window;
 
@@ -731,47 +682,56 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
 
     try {
       if (newMode === "floating") {
-        this.tilingController.restoreExpansionForView(viewId);
+        _tilingController.restoreExpansionForView(viewId);
         viewInfo.tileIndex = undefined;
         const floatingBounds =
-          this.floatingWindows.calculateInitialBounds(windowConfig);
+          _floatingWindows.calculateInitialBounds(windowConfig);
         viewInfo.bounds = floatingBounds;
-        viewInfo.zIndex = this.floatingWindows.getNextZIndex();
+        viewInfo.zIndex = _floatingWindows.getNextZIndex();
         viewInfo.mode = "floating";
-        this.applyPresentedBounds(viewInfo, floatingBounds);
+        applyPresentedBounds(viewInfo, floatingBounds);
 
-        if (this.tilingController.isEnabled()) {
-          this.syncTiledLayout();
+        if (_tilingController.isEnabled()) {
+          syncTiledLayout();
         }
 
-        this.reorderViewLayers();
-        this.notifySubscriber(viewId, "mode-changed", {
-          mode: "floating",
-          bounds: floatingBounds,
+        reorderViewLayers();
+        modeChanged.emit({
+          viewIds: [viewId],
+          payload: {
+            mode: "floating",
+            bounds: floatingBounds,
+          },
         });
       } else {
         viewInfo.zIndex = undefined;
 
-        if (this.tilingController.isEnabled()) {
-          viewInfo.tileIndex = this.tilingController.getNextTileIndex(
-            this.views.values(),
+        if (_tilingController.isEnabled()) {
+          viewInfo.tileIndex = _tilingController.getNextTileIndex(
+            _views.values(),
           );
           viewInfo.mode = "tiled";
-          this.syncTiledLayout({ preferredViewId: viewId });
-          this.reorderViewLayers();
-          this.notifySubscriber(viewId, "mode-changed", {
-            mode: "tiled",
-            bounds: viewInfo.bounds,
+          syncTiledLayout({ preferredViewId: viewId });
+          reorderViewLayers();
+          modeChanged.emit({
+            viewIds: [viewId],
+            payload: {
+              mode: "tiled",
+              bounds: viewInfo.bounds,
+            },
           });
         } else {
-          const bounds = { ...this.tilingController.getWorkspaceBounds() };
+          const bounds = { ..._tilingController.getWorkspaceBounds() };
           viewInfo.bounds = bounds;
           viewInfo.mode = "tiled";
-          this.applyPresentedBounds(viewInfo, bounds);
-          this.reorderViewLayers();
-          this.notifySubscriber(viewId, "mode-changed", {
-            mode: "tiled",
-            bounds,
+          applyPresentedBounds(viewInfo, bounds);
+          reorderViewLayers();
+          modeChanged.emit({
+            viewIds: [viewId],
+            payload: {
+              mode: "tiled",
+              bounds,
+            },
           });
         }
       }
@@ -782,66 +742,93 @@ export class ViewManager extends EdenEmitter<ViewManagerEvents> {
     }
   }
 
-  // ===================================================================
-  // Interface Scale Methods
-  // ===================================================================
-
-  /**
-   * Get the current interface scale factor
-   */
-  getCurrentScale(): number {
-    return this.scaleController.getScale();
+  function getCurrentScale(): number {
+    return _scaleController.getScale();
   }
 
-  /**
-   * Set the interface scale for all views
-   * @param scale - Zoom factor (e.g., 1.0 = 100%, 1.5 = 150%)
-   */
-  setInterfaceScale(scale: number): void {
-    this.scaleController.setScale(scale);
+  function setInterfaceScale(scale: number): void {
+    _scaleController.setScale(scale);
   }
 
-  setKeyboardPresentationLift(lift: number): void {
-    if (!this.presentationController.setViewLift(lift)) {
+  function setKeyboardPresentationLift(lift: number): void {
+    if (!_presentationController.setViewLift(lift)) {
       return;
     }
 
-    this.reapplyPresentedBounds();
+    reapplyPresentedBounds();
   }
 
-  getKeyboardPresentationLift(): number {
-    return this.presentationController.getViewLift();
+  function getKeyboardPresentationLift(): number {
+    return _presentationController.getViewLift();
   }
 
-  private applyPresentedBounds(
+  function applyPresentedBounds(
     viewInfo: ViewInfo,
     bounds = viewInfo.bounds,
   ): void {
-    viewInfo.view.setBounds(this.presentationController.applyToBounds(bounds));
+    viewInfo.view.setBounds(_presentationController.applyToBounds(bounds));
   }
 
-  private reapplyPresentedBounds(): void {
-    for (const info of this.views.values()) {
+  function reapplyPresentedBounds(): void {
+    for (const info of _views.values()) {
       if (!info.visible || !isViewAlive(info.view)) {
         continue;
       }
 
-      this.applyPresentedBounds(info);
+      applyPresentedBounds(info);
     }
   }
 
-  override dispose(): void {
-    this.viewHandler.dispose();
-    this.scaleController.dispose();
-    for (const info of this.views.values()) {
+  function dispose(): void {
+    for (const info of _views.values()) {
       try {
-        destroyView(info, this.mainWindow);
+        destroyView(info, _mainWindow);
       } catch (error) {
         log.warn(`Failed to destroy view ${info.id} during disposal:`, error);
       }
     }
-    this.views.clear();
-    this.mainWindow = null;
-    super.dispose();
+    _views.clear();
+    _mainWindow = null;
   }
-}
+  yield* Effect.addFinalizer(() => Effect.sync(dispose));
+  return {
+    initialize: _scaleController.initialize,
+    viewRemoved,
+    viewLoaded,
+    viewLoadFailed,
+    interfaceScaleChanged,
+    globalBoundsChanged,
+    boundsUpdated,
+    modeChanged,
+    setMainWindow,
+    updateGlobalBounds,
+    setWorkspaceBounds,
+    setWindowSize,
+    getWindowSize,
+    createView,
+    removeView,
+    setViewBounds,
+    getView,
+    getViewInfo,
+    getViewsByAppId,
+    getAppIdByWebContentsId,
+    getViewIdByWebContentsId,
+    getAllViews,
+    getTileLayoutState,
+    swapTiledView,
+    expandTiledView,
+    showView,
+    focusView,
+    hideView,
+    sendToView,
+    sendToMainWindow,
+    getActiveViews,
+    setViewMode,
+    getCurrentScale,
+    setInterfaceScale,
+    setKeyboardPresentationLift,
+    getKeyboardPresentationLift,
+  };
+});
+
+export type ViewManager = Effect.Success<ReturnType<typeof createViewManager>>;

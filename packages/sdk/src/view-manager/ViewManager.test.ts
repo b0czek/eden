@@ -1,66 +1,54 @@
-import "reflect-metadata";
-
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
-import type { CommandRegistry, IPCBridge } from "../ipc";
-import type {
-  Bounds,
-  DisplayPort,
-  PlatformWindow,
-  WindowingPort,
-} from "../platform/ports";
-import { type LegacySettingsAccess } from "../settings/legacy-access";
+import * as Effect from "effect/Effect";
+import { createEffectRuntime } from "../effects/runtime";
+import { createEvent } from "../events/event";
+import type { Bounds, PlatformWindow, WindowingPort } from "../platform/ports";
 import type { ViewInfo, ViewMode } from "./types";
-import { ViewManager } from "./ViewManager";
+import { createViewManager, type ViewManager } from "./ViewManager";
 
 const HIDDEN_BOUNDS: Bounds = { x: 0, y: 0, width: 0, height: 0 };
+const cleanups: (() => Promise<void>)[] = [];
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
-interface ViewManagerInternals {
-  views: Map<number, ViewInfo>;
-}
-
-function createManager(tiling: TilingConfig): ViewManager {
-  const commandRegistry = {
-    registerManager: jest.fn(),
-  } as unknown as CommandRegistry;
-  const ipcBridge = {
-    eventSubscribers: {
-      notify: jest.fn(),
-      notifyView: jest.fn(),
-    },
-  } as unknown as IPCBridge;
-  const settingsManager = {
-    changed: { on: jest.fn(() => jest.fn()) },
-    get: jest.fn().mockResolvedValue(undefined),
-  } as unknown as LegacySettingsAccess;
-
-  const manager = new ViewManager(
-    commandRegistry,
-    ipcBridge,
-    { tiling } as EdenConfig,
-    "/tmp",
-    settingsManager,
-    {
-      createView: jest.fn(),
-      createWindow: jest.fn(),
-      attachWebContentsLogger: jest.fn(),
-      getWebContentsById: jest.fn(),
-    } as unknown as WindowingPort,
-    {
-      getCursorScreenPoint: jest.fn(() => ({ x: 0, y: 0 })),
-      getDisplayMatching: jest.fn(),
-    } as unknown as DisplayPort,
+async function createManager(tiling: TilingConfig): Promise<ViewManager> {
+  const effects = createEffectRuntime();
+  cleanups.unshift(() => effects.dispose());
+  const manager = await effects.acquire(
+    createViewManager({
+      config: { tiling } as EdenConfig,
+      distPath: "/tmp",
+      settings: {
+        get: () => Effect.succeed(undefined),
+        changed: createEvent(),
+      },
+      windows: {
+        createView: () => ({
+          setBounds: jest.fn(),
+          getBounds: () => HIDDEN_BOUNDS,
+          webContents: {
+            id: 1,
+            isDestroyed: () => false,
+            setZoomFactor: jest.fn(),
+            on: jest.fn(),
+            loadFile: jest.fn(),
+            isDevToolsOpened: () => false,
+            close: jest.fn(),
+          },
+        }),
+        createWindow: jest.fn(),
+        attachWebContentsLogger: jest.fn(),
+        getWebContentsById: jest.fn(),
+      } as unknown as WindowingPort,
+    }),
   );
   manager.setMainWindow({
     isDestroyed: () => false,
-    contentView: {
-      addChildView: jest.fn(),
-      removeChildView: jest.fn(),
-    },
+    contentView: { addChildView: jest.fn(), removeChildView: jest.fn() },
   } as unknown as PlatformWindow);
-
   return manager;
 }
-
 function addView(
   manager: ViewManager,
   mode: ViewMode,
@@ -70,39 +58,22 @@ function addView(
     scaling?: "auto" | "manual";
   } = {},
 ): { info: ViewInfo; setBounds: jest.Mock } {
-  const setBounds = jest.fn();
-  const info: ViewInfo = {
-    id: 1,
-    view: {
-      setBounds,
-      webContents: {
-        isDestroyed: () => false,
-        setZoomFactor: jest.fn(),
-      },
-    } as unknown as ViewInfo["view"],
-    appId: "com.example.app",
-    manifest: {
-      id: "com.example.app",
-      name: "Example",
-      version: "1.0.0",
-      window: { mode, scaling: options.scaling },
-    } as AppManifest,
-    bounds,
-    requestedVisible: true,
-    visible: true,
-    mode,
-    viewType: options.viewType ?? "app",
-    tileIndex: mode === "tiled" ? 0 : undefined,
-    zIndex: mode === "floating" ? 1 : undefined,
-  };
-
-  (manager as unknown as ViewManagerInternals).views.set(info.id, info);
-  return { info, setBounds };
+  const manifest = {
+    id: "com.example.app",
+    name: "Example",
+    version: "1.0.0",
+    frontend: { entry: "index.html" },
+    overlay: options.viewType === "overlay",
+    window: { mode, scaling: options.scaling },
+  } as AppManifest;
+  const id = manager.createView(manifest.id, manifest, "/apps/example", bounds);
+  const info = manager.getViewInfo(id)!;
+  return { info, setBounds: info.view.setBounds as jest.Mock };
 }
 
 describe("ViewManager visibility", () => {
-  it("preserves a floating app's logical size when interface scale changes", () => {
-    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+  it("preserves a floating app's logical size when interface scale changes", async () => {
+    const manager = await createManager({ mode: "none", gap: 0, padding: 0 });
     const { info, setBounds } = addView(manager, "floating", {
       x: 120,
       y: 80,
@@ -116,8 +87,8 @@ describe("ViewManager visibility", () => {
     expect(setBounds).toHaveBeenLastCalledWith(info.bounds);
   });
 
-  it("resizes an explicitly auto-scaled overlay when interface scale changes", () => {
-    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+  it("resizes an explicitly auto-scaled overlay when interface scale changes", async () => {
+    const manager = await createManager({ mode: "none", gap: 0, padding: 0 });
     const { info, setBounds } = addView(
       manager,
       "floating",
@@ -131,8 +102,8 @@ describe("ViewManager visibility", () => {
     expect(setBounds).toHaveBeenLastCalledWith(info.bounds);
   });
 
-  it("restores oversized floating bounds after a scale round trip", () => {
-    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+  it("restores oversized floating bounds after a scale round trip", async () => {
+    const manager = await createManager({ mode: "none", gap: 0, padding: 0 });
     const { info } = addView(manager, "floating", {
       x: 0,
       y: 0,
@@ -147,8 +118,8 @@ describe("ViewManager visibility", () => {
     expect(info.bounds).toMatchObject({ width: 1000, height: 800 });
   });
 
-  it("restores a floating view to its bounds after hiding it", () => {
-    const manager = createManager({ mode: "none", gap: 0, padding: 0 });
+  it("restores a floating view to its bounds after hiding it", async () => {
+    const manager = await createManager({ mode: "none", gap: 0, padding: 0 });
     const originalBounds = { x: 120, y: 80, width: 640, height: 480 };
     const { info, setBounds } = addView(manager, "floating", originalBounds);
 
@@ -167,8 +138,8 @@ describe("ViewManager visibility", () => {
     expect(info.visible).toBe(true);
   });
 
-  it("recalculates tiled bounds after hiding and showing a view", () => {
-    const manager = createManager({
+  it("recalculates tiled bounds after hiding and showing a view", async () => {
+    const manager = await createManager({
       mode: "grid",
       rows: 1,
       columns: 1,

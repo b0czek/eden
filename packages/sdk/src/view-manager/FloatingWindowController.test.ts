@@ -1,8 +1,8 @@
-import { FloatingWindowController } from "./FloatingWindowController";
+import { createFloatingWindowController } from "./FloatingWindowController";
 
 describe("FloatingWindowController.applyWindowConstraints", () => {
   it("scales manifest sizes into physical view bounds", () => {
-    const controller = new FloatingWindowController(
+    const controller = createFloatingWindowController(
       () => ({ x: 0, y: 0, width: 1600, height: 1200 }),
       () => [],
       () => 1.5,
@@ -29,7 +29,7 @@ describe("FloatingWindowController.applyWindowConstraints", () => {
   });
 
   it("can leave manually scaled overlay sizes unscaled", () => {
-    const controller = new FloatingWindowController(
+    const controller = createFloatingWindowController(
       () => ({ x: 0, y: 0, width: 1600, height: 1200 }),
       () => [],
       () => 1.5,
@@ -47,7 +47,7 @@ describe("FloatingWindowController.applyWindowConstraints", () => {
   });
 
   it("allows floating windows to extend below the workspace", () => {
-    const controller = new FloatingWindowController(
+    const controller = createFloatingWindowController(
       () => ({ x: 0, y: 0, width: 800, height: 600 }),
       () => [],
     );
@@ -68,7 +68,7 @@ describe("FloatingWindowController.applyWindowConstraints", () => {
   });
 
   it("keeps a grabbable strip visible at the bottom of the workspace", () => {
-    const controller = new FloatingWindowController(
+    const controller = createFloatingWindowController(
       () => ({ x: 0, y: 50, width: 800, height: 600 }),
       () => [],
     );

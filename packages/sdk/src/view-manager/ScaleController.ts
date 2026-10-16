@@ -1,138 +1,53 @@
-/**
- * ScaleController
- *
- * Handles interface scaling (zoom) for views.
- * Extracted from ViewManager to reduce complexity.
- */
-
 import type { AppManifest } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import * as v from "valibot";
+import { listen } from "../events/scoped";
 import { log } from "../logging";
-import { type LegacySettingsAccess } from "../settings/legacy-access";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
+import type { Settings } from "../settings/service";
+import { interfaceScaleSchema } from "./schemas";
 import type { ViewInfo, ViewType } from "./types";
 
 const INTERFACE_SCALE_KEY = "general.interfaceScale";
 
-export class ScaleController {
-  private readonly stopListening: () => void;
-  private currentScale: number = 1.0;
-  private readonly getViews: () => Iterable<ViewInfo>;
-  private readonly settingsManager: LegacySettingsAccess;
-  private readonly notifyScaleChanged: (
-    scale: number,
-    previousScale: number,
-  ) => void;
-
-  constructor(
-    settingsManager: LegacySettingsAccess,
-    getViews: () => Iterable<ViewInfo>,
-    notifyScaleChanged: (
-      scale: number,
-      previousScale: number,
-    ) => void = () => {},
-  ) {
-    this.settingsManager = settingsManager;
-    this.getViews = getViews;
-    this.notifyScaleChanged = notifyScaleChanged;
-
-    // Listen for interface scale setting changes
-    this.stopListening = settingsManager.changed.on((data) => {
-      if (data.key === INTERFACE_SCALE_KEY) {
-        const scale = parseFloat(data.value);
-        if (!Number.isNaN(scale)) {
-          this.setScale(scale);
-        }
-      }
-    });
-
-    // Initialize scale on next tick (after construction completes)
-    this.initialize();
+export const createScaleController = Effect.fn(function* (
+  settings: Pick<Settings, "get" | "changed">,
+  getViews: () => Iterable<ViewInfo>,
+  notifyScaleChanged: (scale: number, previousScale: number) => void = () => {},
+) {
+  let currentScale = 1;
+  const storedScale = (value: string) => {
+    const parsed = v.safeParse(interfaceScaleSchema, parseFloat(value));
+    return parsed.success ? parsed.output : undefined;
+  };
+  function setScale(scale: number) {
+    const previousScale = currentScale;
+    currentScale = scale;
+    for (const view of getViews()) applyToView(view);
+    notifyScaleChanged(scale, previousScale);
   }
-
-  dispose(): void {
-    this.stopListening();
-  }
-
-  /**
-   * Get the current interface scale
-   */
-  getScale(): number {
-    return this.currentScale;
-  }
-
-  /**
-   * Initialize interface scale from settings
-   */
-  private async initialize(): Promise<void> {
-    try {
-      const scaleSetting = await this.settingsManager.get(
-        EDEN_SETTINGS_APP_ID,
-        INTERFACE_SCALE_KEY,
+  yield* listen(settings.changed, (data) => {
+    if (data.appId !== EDEN_SETTINGS_APP_ID || data.key !== INTERFACE_SCALE_KEY)
+      return;
+    const scale = storedScale(data.value);
+    if (scale !== undefined) setScale(scale);
+  });
+  const initialize = Effect.fn(function* () {
+    const value = yield* settings
+      .get(EDEN_SETTINGS_APP_ID, INTERFACE_SCALE_KEY)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            log.error("Failed to initialize interface scale:", error);
+            return undefined;
+          }),
+        ),
       );
-
-      if (scaleSetting) {
-        const scale = parseFloat(scaleSetting);
-        if (Number.isFinite(scale) && scale >= 0.5 && scale <= 2.0) {
-          log.info(`Initialized interface scale to ${scale * 100}%`);
-          this.setScale(scale);
-        }
-      }
-    } catch (error) {
-      log.error("Failed to initialize interface scale:", error);
-    }
-  }
-
-  /**
-   * Set the interface scale and apply to all views
-   * @param scale - Zoom factor (e.g., 1.0 = 100%, 1.5 = 150%)
-   */
-  setScale(scale: number): void {
-    if (!Number.isFinite(scale) || scale < 0.5 || scale > 2.0) {
-      throw new Error(`Invalid scale ${scale}. Must be between 0.5 and 2.0`);
-    }
-
-    const previousScale = this.currentScale;
-    this.currentScale = scale;
-    log.info(`Setting interface scale to ${scale * 100}%`);
-
-    for (const viewInfo of this.getViews()) {
-      this.applyToView(viewInfo);
-    }
-
-    this.notifyScaleChanged(scale, previousScale);
-  }
-
-  /**
-   * Apply the current zoom factor to a single view
-   * Respects the manifest's window.scaling setting:
-   * - "auto": SDK applies interface scale (default for regular apps)
-   * - "manual": SDK doesn't apply scaling (default for overlays)
-   */
-  applyToView(viewInfo: ViewInfo): void {
-    try {
-      if (viewInfo.view.webContents.isDestroyed()) {
-        return;
-      }
-
-      const scalingMode = this.getScalingMode(
-        viewInfo.manifest,
-        viewInfo.viewType,
-      );
-
-      if (scalingMode === "manual") {
-        return;
-      }
-
-      viewInfo.view.webContents.setZoomFactor(this.currentScale);
-    } catch (error) {
-      log.error(`Failed to set zoom for view ${viewInfo.id}:`, error);
-    }
-  }
-
-  /**
-   * Determine the scaling mode for a view based on manifest and view type
-   */
-  private getScalingMode(
+    if (value === undefined) return;
+    const scale = storedScale(value);
+    if (scale !== undefined) setScale(scale);
+  });
+  function getScalingMode(
     manifest: AppManifest,
     viewType: ViewType,
   ): "auto" | "manual" {
@@ -140,4 +55,20 @@ export class ScaleController {
       manifest.window?.scaling ?? (viewType === "overlay" ? "manual" : "auto")
     );
   }
-}
+  function applyToView(view: ViewInfo) {
+    try {
+      if (
+        view.view.webContents.isDestroyed() ||
+        getScalingMode(view.manifest, view.viewType) === "manual"
+      )
+        return;
+      view.view.webContents.setZoomFactor(currentScale);
+    } catch (error) {
+      log.error(`Failed to set zoom for view ${view.id}:`, error);
+    }
+  }
+  return { initialize, getScale: () => currentScale, setScale, applyToView };
+});
+export type ScaleController = Effect.Success<
+  ReturnType<typeof createScaleController>
+>;

@@ -1,6 +1,8 @@
+export { createViewController } from "./controller-edenapi";
 export {
+  createDisplayProviderRegistry,
   type DisplayProvider,
   type DisplayProviderCaller,
-  DisplayProviderRegistry,
+  type DisplayProviderRegistry,
 } from "./DisplayProviderRegistry";
-export { ViewManager } from "./ViewManager";
+export { createViewManager, type ViewManager } from "./ViewManager";

@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import { log } from "../logging";
 import type { ViewManager } from "./ViewManager";
 
@@ -17,130 +18,146 @@ interface DisplayProviderWaiter {
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
 }
+export function createDisplayProviderRegistry(
+  viewManager: Pick<ViewManager, "getViewIdByWebContentsId" | "getViewInfo">,
+  label: string,
+) {
+  let _provider: DisplayProvider | null = null;
+  let _waiters = new Set<DisplayProviderWaiter>();
+  const _viewManager = viewManager;
+  const _label = label;
 
-export class DisplayProviderRegistry {
-  private provider: DisplayProvider | null = null;
-  private waiters = new Set<DisplayProviderWaiter>();
-
-  constructor(
-    private viewManager: Pick<
-      ViewManager,
-      "getViewIdByWebContentsId" | "getViewInfo"
-    >,
-    private label: string,
-  ) {}
-
-  register(caller: DisplayProviderCaller): { success: boolean } {
-    const viewId = this.resolveCallerViewId(caller.webContentsId);
+  function register(caller: DisplayProviderCaller): { success: boolean } {
+    const viewId = resolveCallerViewId(caller.webContentsId);
     if (viewId === undefined || !caller.appId) {
-      throw new Error(`${this.label} display provider must be a valid view`);
+      throw new Error(`${_label} display provider must be a valid view`);
     }
 
-    for (const waiter of this.waiters) {
+    for (const waiter of _waiters) {
       if (waiter.appId !== caller.appId) {
         throw new Error(
-          `${this.label} display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
+          `${_label} display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
         );
       }
     }
 
-    this.provider = { appId: caller.appId, viewId };
-    for (const waiter of Array.from(this.waiters)) {
+    _provider = { appId: caller.appId, viewId };
+    for (const waiter of Array.from(_waiters)) {
       if (waiter.appId === caller.appId) {
         waiter.resolve();
       }
     }
-    log.info(`${this.label} display provider registered: ${caller.appId}`);
+    log.info(`${_label} display provider registered: ${caller.appId}`);
     return { success: true };
   }
 
-  getProvider(): DisplayProvider | null {
-    return this.provider && this.isProviderAlive() ? this.provider : null;
+  function getProvider(): DisplayProvider | null {
+    return _provider && isProviderAlive() ? _provider : null;
   }
 
-  clear(): void {
-    this.provider = null;
+  function clear(): void {
+    _provider = null;
   }
 
-  clearIfAppStopped(appId: string): boolean {
-    if (this.provider?.appId !== appId) {
+  function clearIfAppStopped(appId: string): boolean {
+    if (_provider?.appId !== appId) {
       return false;
     }
 
-    this.provider = null;
+    _provider = null;
     return true;
   }
 
-  clearIfStale(): boolean {
-    if (!this.provider || this.isProviderAlive()) {
+  function clearIfStale(): boolean {
+    if (!_provider || isProviderAlive()) {
       return false;
     }
 
-    this.provider = null;
+    _provider = null;
     return true;
   }
 
-  isProvider(caller: DisplayProviderCaller): boolean {
-    const provider = this.getProvider();
+  function isProvider(caller: DisplayProviderCaller): boolean {
+    const provider = getProvider();
     if (!provider || !caller.appId) return false;
-    const callerViewId = this.resolveCallerViewId(caller.webContentsId);
+    const callerViewId = resolveCallerViewId(caller.webContentsId);
     return callerViewId === provider.viewId;
   }
 
-  isProviderAlive(): boolean {
-    if (!this.provider) return false;
-    const viewInfo = this.viewManager.getViewInfo(this.provider.viewId);
+  function isProviderAlive(): boolean {
+    if (!_provider) return false;
+    const viewInfo = _viewManager.getViewInfo(_provider.viewId);
     return Boolean(viewInfo && !viewInfo.view.webContents.isDestroyed());
   }
 
-  async waitFor(appId: string, timeoutMs: number): Promise<void> {
-    const provider = this.getProvider();
+  const waitFor = Effect.fn(function* (appId: string, timeoutMs: number) {
+    const provider = getProvider();
     if (provider?.appId === appId) {
       return;
     }
 
-    await new Promise<void>((resolve, reject) => {
-      let waiter: DisplayProviderWaiter;
-      waiter = {
+    yield* Effect.callback<void, Error>((resume) => {
+      const cleanup = () => {
+        clearTimeout(waiter.timer);
+        _waiters.delete(waiter);
+      };
+      const waiter: DisplayProviderWaiter = {
         appId,
         resolve: () => {
-          clearTimeout(waiter.timer);
-          this.waiters.delete(waiter);
-          resolve();
+          cleanup();
+          resume(Effect.void);
         },
-        reject: (error: Error) => {
-          clearTimeout(waiter.timer);
-          this.waiters.delete(waiter);
-          reject(error);
+        reject: (error) => {
+          cleanup();
+          resume(Effect.fail(error));
         },
-        timer: setTimeout(() => {
-          waiter.reject(
-            new Error(`Timed out waiting for ${this.label} display provider`),
-          );
-        }, timeoutMs),
+        timer: setTimeout(
+          () =>
+            waiter.reject(
+              new Error(`Timed out waiting for ${_label} display provider`),
+            ),
+          timeoutMs,
+        ),
       };
       waiter.timer.unref?.();
-      this.waiters.add(waiter);
+      _waiters.add(waiter);
+      return Effect.sync(cleanup);
     });
-  }
+  });
 
-  resolveCallerViewId(webContentsId?: number): number | undefined {
+  function resolveCallerViewId(webContentsId?: number): number | undefined {
     if (webContentsId === undefined) return undefined;
-    const viewId = this.viewManager.getViewIdByWebContentsId(webContentsId);
+    const viewId = _viewManager.getViewIdByWebContentsId(webContentsId);
     if (viewId === undefined) {
       log.warn(
-        `${this.label} caller view not found for webContents ${webContentsId}`,
+        `${_label} caller view not found for webContents ${webContentsId}`,
       );
     }
     return viewId;
   }
 
-  dispose(): void {
-    this.provider = null;
-    for (const waiter of this.waiters) {
+  function dispose(): void {
+    _provider = null;
+    for (const waiter of _waiters) {
       clearTimeout(waiter.timer);
-      waiter.reject(new Error(`${this.label} display provider disposed`));
+      waiter.reject(new Error(`${_label} display provider disposed`));
     }
-    this.waiters.clear();
+    _waiters.clear();
   }
+  return {
+    register,
+    getProvider,
+    clear,
+    clearIfAppStopped,
+    clearIfStale,
+    isProvider,
+    isProviderAlive,
+    waitFor,
+    resolveCallerViewId,
+    dispose,
+  };
 }
+
+export type DisplayProviderRegistry = ReturnType<
+  typeof createDisplayProviderRegistry
+>;

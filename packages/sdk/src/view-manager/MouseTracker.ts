@@ -8,132 +8,103 @@ export type MouseUpdateCallback = (position: {
   y: number;
   deltaTime: number;
 }) => void;
+export function createMouseTracker(
+  display: Pick<DisplayPort, "getCursorScreenPoint">,
+  updateInterval: number = 8,
+) {
+  let _subscribers: Map<string, MouseUpdateCallback> = new Map();
+  let _interval: NodeJS.Timeout | null = null;
+  let _lastUpdateTime: number = 0;
+  let _lastPosition: { x: number; y: number } = { x: 0, y: 0 };
+  let _updateInterval: number;
+  const _display = display;
 
-/**
- * MouseTracker
- *
- * Centralized mouse position tracker for Eden.
- * Provides a single efficient polling mechanism that multiple
- * operations (drag, resize, etc.) can subscribe to.
- */
-export class MouseTracker {
-  private subscribers: Map<string, MouseUpdateCallback> = new Map();
-  private interval: NodeJS.Timeout | null = null;
-  private lastUpdateTime: number = 0;
-  private lastPosition: { x: number; y: number } = { x: 0, y: 0 };
-  private readonly updateInterval: number;
+  _updateInterval = updateInterval;
 
-  /**
-   * @param updateInterval - Update interval in milliseconds (default: 8ms for ~120fps)
-   */
-  constructor(
-    private readonly display: Pick<DisplayPort, "getCursorScreenPoint">,
-    updateInterval: number = 8,
-  ) {
-    this.updateInterval = updateInterval;
-  }
-
-  /**
-   * Subscribe to mouse position updates
-   * @param id - Unique identifier for this subscriber
-   * @param callback - Function to call with mouse updates
-   */
-  subscribe(id: string, callback: MouseUpdateCallback): void {
+  function subscribe(id: string, callback: MouseUpdateCallback): void {
     // Add subscriber
-    this.subscribers.set(id, callback);
+    _subscribers.set(id, callback);
 
     // Start tracking if this is the first subscriber
-    if (this.subscribers.size === 1) {
-      this.start();
+    if (_subscribers.size === 1) {
+      start();
     }
   }
 
-  /**
-   * Unsubscribe from mouse position updates
-   * @param id - Unique identifier of the subscriber to remove
-   */
-  unsubscribe(id: string): void {
-    this.subscribers.delete(id);
+  function unsubscribe(id: string): void {
+    _subscribers.delete(id);
 
     // Stop tracking if no more subscribers
-    if (this.subscribers.size === 0) {
-      this.stop();
+    if (_subscribers.size === 0) {
+      stop();
     }
   }
 
-  /**
-   * Get the current mouse position
-   */
-  getCurrentPosition(): { x: number; y: number } {
-    return this.display.getCursorScreenPoint();
+  function getCurrentPosition(): { x: number; y: number } {
+    return _display.getCursorScreenPoint();
   }
 
-  /**
-   * Check if currently tracking
-   */
-  isTracking(): boolean {
-    return this.interval !== null;
+  function isTracking(): boolean {
+    return _interval !== null;
   }
 
-  /**
-   * Get number of active subscribers
-   */
-  getSubscriberCount(): number {
-    return this.subscribers.size;
+  function getSubscriberCount(): number {
+    return _subscribers.size;
   }
 
-  /**
-   * Start the mouse tracking interval
-   */
-  private start(): void {
-    if (this.interval) return;
+  function start(): void {
+    if (_interval) return;
 
-    this.lastUpdateTime = Date.now();
-    this.lastPosition = this.getCurrentPosition();
+    _lastUpdateTime = Date.now();
+    _lastPosition = getCurrentPosition();
 
-    this.interval = setInterval(() => {
+    _interval = setInterval(() => {
       const now = Date.now();
-      const deltaTime = now - this.lastUpdateTime;
-      this.lastUpdateTime = now;
+      const deltaTime = now - _lastUpdateTime;
+      _lastUpdateTime = now;
 
-      const currentPosition = this.getCurrentPosition();
+      const currentPosition = getCurrentPosition();
 
       // Only emit if cursor has actually moved (skip unnecessary callbacks)
       if (
-        Math.abs(currentPosition.x - this.lastPosition.x) < 1 &&
-        Math.abs(currentPosition.y - this.lastPosition.y) < 1
+        Math.abs(currentPosition.x - _lastPosition.x) < 1 &&
+        Math.abs(currentPosition.y - _lastPosition.y) < 1
       ) {
         return;
       }
 
-      this.lastPosition = currentPosition;
+      _lastPosition = currentPosition;
 
       // Notify all subscribers of the position change
-      for (const callback of this.subscribers.values()) {
+      for (const callback of _subscribers.values()) {
         try {
           callback({ ...currentPosition, deltaTime });
         } catch (error) {
           log.error("Error in MouseTracker callback:", error);
         }
       }
-    }, this.updateInterval);
+    }, _updateInterval);
   }
 
-  /**
-   * Stop the mouse tracking interval
-   */
-  private stop(): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
+  function stop(): void {
+    if (_interval) {
+      clearInterval(_interval);
+      _interval = null;
     }
   }
 
-  /**
-   * Cleanup and stop tracking
-   */
-  dispose(): void {
-    this.subscribers.clear();
-    this.stop();
+  function dispose(): void {
+    _subscribers.clear();
+    stop();
   }
+  return {
+    subscribe,
+    unsubscribe,
+    getCurrentPosition,
+    isTracking,
+    getSubscriberCount,
+    dispose,
+  };
 }
+
+export type MouseTracker = ReturnType<typeof createMouseTracker>;
