@@ -1,8 +1,8 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createExecutionContext } from "../../../src/execution/ExecutionContext";
-import type { SessionContext } from "../../../src/session/SessionContext";
-import { createSettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
+import { createExecutionContext } from "../../../src/execution/context";
+import type { SessionContext } from "../../../src/session/context";
+import { createSettingsPanels } from "../../../src/settings/panel-service";
 import { panelUser } from "./panels";
 
 export function createSettingsPanelHarness(
@@ -26,8 +26,8 @@ export function createSettingsPanelHarness(
     ),
   };
   const execution = createExecutionContext({ config: {} });
-  const manager = createSettingsPanelManager({
-    settingsManager: settings,
+  const panels = createSettingsPanels({
+    settings,
     packageCatalog: catalog,
     sessionContext: {
       getCurrentUser: () =>
@@ -38,9 +38,9 @@ export function createSettingsPanelHarness(
     } as SessionContext,
     executionContext: execution,
   });
-  manager.changed.on(notify);
+  panels.changed.on(notify);
   return {
-    manager,
+    panels,
     settings,
     catalog,
     execution,

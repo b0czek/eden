@@ -1,9 +1,9 @@
-import type { ViewManager } from "../view-manager";
+import type { Views } from "../views";
 import type { ContextMenuViews } from "./ports";
 
 export function createContextMenuViews(
   views: Pick<
-    ViewManager,
+    Views,
     "getViewIdByWebContentsId" | "getViewInfo" | "getWindowSize"
   >,
 ): ContextMenuViews {

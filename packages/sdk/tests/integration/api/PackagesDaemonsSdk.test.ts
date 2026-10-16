@@ -47,7 +47,7 @@ describe("package and daemon SDK boundaries", () => {
   it("rejects malformed daemon identities and definitions without persisting or admitting work", async () => {
     eden = await createTestEden();
     const appId = "app.sdk-daemon";
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, {
         frontend: undefined,
         backend: { entry: "backend.js" },
@@ -92,7 +92,7 @@ describe("package and daemon SDK boundaries", () => {
     eden = await createTestEden();
     const appId = "app.sdk-callback-daemon";
     const management = "app.sdk-daemon-management";
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, {
         frontend: undefined,
         backend: { entry: "backend.js" },
@@ -154,7 +154,7 @@ describe("package and daemon SDK boundaries", () => {
         frontend: { entry: "index.html" },
       }),
     );
-    eden.runtime.services.packageRegistry.register(testApp(appId));
+    eden.runtime.services.installedPackages.register(testApp(appId));
     const execution = eden.runtime.services.execution;
     const contexts: unknown[] = [];
     const off = eden.runtime.packages.onChanged((change) => {
@@ -197,7 +197,7 @@ describe("package and daemon SDK boundaries", () => {
     await eden.start();
     const appId = "app.sdk-vendor-daemon";
     const management = "app.sdk-vendor-management";
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, {
         frontend: undefined,
         backend: { entry: "backend.js" },

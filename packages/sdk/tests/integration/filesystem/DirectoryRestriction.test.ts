@@ -9,22 +9,22 @@ import {
 import { createEvent } from "../../../src/events/event";
 import type { ExecutionContext } from "../../../src/execution";
 import {
-  createFilesystemManager,
-  type FilesystemManager,
-} from "../../../src/filesystem/FilesystemManager";
-import { createVolumeManager } from "../../../src/filesystem/VolumeManager";
+  createFilesystem,
+  type Filesystem,
+} from "../../../src/filesystem/service";
+import { createVolumes } from "../../../src/filesystem/volumes";
 
-describe("FilesystemManager shared addresses and folder restrictions", () => {
+describe("Filesystem shared addresses and folder restrictions", () => {
   let root: string;
   let currentUser: UserProfile | null;
-  let manager: FilesystemManager;
+  let filesystem: Filesystem;
   let effects: EffectRuntime;
   const removed = createEvent<{ viewId: number; webContentsId: number }>();
   const views = { resolveViewId: () => undefined, removed };
-  async function createManager(executionContext: ExecutionContext) {
-    const volumes = await effects.acquire(createVolumeManager());
+  async function createFilesystemFixture(executionContext: ExecutionContext) {
+    const volumes = await effects.acquire(createVolumes());
     return effects.acquire(
-      createFilesystemManager({
+      createFilesystem({
         baseDir: root,
         executionContext,
         views,
@@ -46,7 +46,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     currentUser = createUser();
     effects = createEffectRuntime();
 
-    manager = await createManager({
+    filesystem = await createFilesystemFixture({
       getPrincipal: () =>
         currentUser ? { kind: "user", profile: currentUser } : undefined,
     } as ExecutionContext);
@@ -59,7 +59,9 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
 
   it("keeps userDirectory as the root for unrestricted users and vendors", async () => {
     await expect(
-      effects.run(manager.resolvePath({ volume: "home", path: "/Documents" })),
+      effects.run(
+        filesystem.resolvePath({ volume: "home", path: "/Documents" }),
+      ),
     ).resolves.toBe(path.join(root, "Documents"));
 
     currentUser = {
@@ -68,7 +70,9 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
       directoryRestriction: "ignored",
     };
     await expect(
-      effects.run(manager.resolvePath({ volume: "home", path: "/Documents" })),
+      effects.run(
+        filesystem.resolvePath({ volume: "home", path: "/Documents" }),
+      ),
     ).resolves.toBe(path.join(root, "Documents"));
   });
 
@@ -76,10 +80,12 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     const executionContext = {
       getPrincipal: () => ({ kind: "system" as const }),
     } as unknown as ExecutionContext;
-    manager = await createManager(executionContext);
+    filesystem = await createFilesystemFixture(executionContext);
 
     await expect(
-      effects.run(manager.resolvePath({ volume: "home", path: "/state.json" })),
+      effects.run(
+        filesystem.resolvePath({ volume: "home", path: "/state.json" }),
+      ),
     ).resolves.toBe(path.join(root, "state.json"));
   });
 
@@ -92,13 +98,13 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     await fs.mkdir(path.join(root, daemonUser.directoryRestriction), {
       recursive: true,
     });
-    manager = await createManager({
+    filesystem = await createFilesystemFixture({
       getPrincipal: () => ({ kind: "user" as const, profile: daemonUser }),
     } as ExecutionContext);
 
     await expect(
       effects.run(
-        manager.resolvePath({
+        filesystem.resolvePath({
           volume: "home",
           path: "/services/stateful-daemon/state.json",
         }),
@@ -119,7 +125,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
 
     await expect(
       effects.run(
-        manager.resolvePath({
+        filesystem.resolvePath({
           volume: "home",
           path: "/teams/operators/Documents/report.txt",
         }),
@@ -132,7 +138,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
   it("denies access without an execution principal", async () => {
     currentUser = null;
     await expect(
-      effects.run(manager.resolvePath({ volume: "home", path: "/" })),
+      effects.run(filesystem.resolvePath({ volume: "home", path: "/" })),
     ).rejects.toThrow("Caller has no filesystem execution principal");
   });
 
@@ -145,7 +151,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
 
     await expect(
       effects.run(
-        manager.resolvePath({
+        filesystem.resolvePath({
           volume: "home",
           path: "/homes/operator/../../shared.txt",
         }),
@@ -166,7 +172,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
 
     await expect(
       effects.run(
-        manager.resolvePath({
+        filesystem.resolvePath({
           volume: "home",
           path: "/homes/operator/other/private.txt",
         }),
@@ -174,7 +180,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     ).rejects.toThrow("outside of the allowed directory");
     await expect(
       effects.run(
-        manager.writeFile(
+        filesystem.writeFile(
           { volume: "home", path: "/homes/operator/other/private.txt" },
           "secret",
         ),
@@ -182,7 +188,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     ).rejects.toThrow("outside of the allowed directory");
     await expect(
       effects.run(
-        manager.writeBinaryFile(
+        filesystem.writeBinaryFile(
           { volume: "home", path: "/homes/operator/other/private.bin" },
           new Uint8Array([1, 2, 3]),
         ),
@@ -195,7 +201,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     const location = { volume: "home", path: "/projects/design/notes.txt" };
     await fs.mkdir(path.join(root, "projects/design"), { recursive: true });
     currentUser = { ...createUser(), directoryRestriction: "projects" };
-    await effects.run(manager.writeFile(location, "project notes"));
+    await effects.run(filesystem.writeFile(location, "project notes"));
     for (const restriction of ["projects", "projects/design", undefined]) {
       currentUser = {
         ...createUser(),
@@ -204,15 +210,15 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
           : "unrestricted",
         directoryRestriction: restriction,
       };
-      await expect(effects.run(manager.resolvePath(location))).resolves.toBe(
+      await expect(effects.run(filesystem.resolvePath(location))).resolves.toBe(
         path.join(root, "projects/design/notes.txt"),
       );
-      await expect(effects.run(manager.readFile(location))).resolves.toBe(
+      await expect(effects.run(filesystem.readFile(location))).resolves.toBe(
         "project notes",
       );
       await expect(
         effects.run(
-          manager.toMaskedPath(
+          filesystem.toMaskedPath(
             path.join(root, "projects/design/notes.txt"),
             "home",
           ),
@@ -220,16 +226,18 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
       ).resolves.toEqual(location);
     }
     currentUser = { ...createUser(), directoryRestriction: "projects/design" };
-    expect(manager.accessScope("home")).toEqual({
+    expect(filesystem.accessScope("home")).toEqual({
       volume: "home",
       path: "/projects/design",
     });
     await expect(
-      effects.run(manager.resolvePath({ volume: "home", path: "/notes.txt" })),
+      effects.run(
+        filesystem.resolvePath({ volume: "home", path: "/notes.txt" }),
+      ),
     ).rejects.toThrow("outside of the allowed directory");
     await expect(
       effects.run(
-        manager.toMaskedPath(path.join(root, "other/notes.txt"), "home"),
+        filesystem.toMaskedPath(path.join(root, "other/notes.txt"), "home"),
       ),
     ).rejects.toThrow("outside of the allowed directory");
   });
@@ -244,15 +252,16 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
       "research notes",
     );
     currentUser = { ...createUser(), directoryRestriction: "projects/design" };
-    await effects.run(manager.writeFile(own, "design notes"));
+    await effects.run(filesystem.writeFile(own, "design notes"));
     for (const operation of [
-      () => effects.run(manager.readFile(sibling)),
-      () => effects.run(manager.stat(sibling)),
-      () => effects.run(manager.readdir({ volume: "home", path: "/projects" })),
-      () => effects.run(manager.writeFile(sibling, "overwritten")),
-      () => effects.run(manager.copy(sibling, own, true)),
-      () => effects.run(manager.copy(own, sibling, true)),
-      () => effects.run(manager.move(own, sibling, true)),
+      () => effects.run(filesystem.readFile(sibling)),
+      () => effects.run(filesystem.stat(sibling)),
+      () =>
+        effects.run(filesystem.readdir({ volume: "home", path: "/projects" })),
+      () => effects.run(filesystem.writeFile(sibling, "overwritten")),
+      () => effects.run(filesystem.copy(sibling, own, true)),
+      () => effects.run(filesystem.copy(own, sibling, true)),
+      () => effects.run(filesystem.move(own, sibling, true)),
     ])
       await expect(operation()).rejects.toThrow(
         "outside of the allowed directory",
@@ -260,7 +269,7 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     await expect(
       fs.readFile(path.join(root, "projects/research/notes.txt"), "utf8"),
     ).resolves.toBe("research notes");
-    await expect(effects.run(manager.readFile(own))).resolves.toBe(
+    await expect(effects.run(filesystem.readFile(own))).resolves.toBe(
       "design notes",
     );
   });
@@ -270,22 +279,22 @@ describe("FilesystemManager shared addresses and folder restrictions", () => {
     const boundary = { volume: "home", path: "/projects/design" };
     const file = { volume: "home", path: "/projects/design/notes.txt" };
     currentUser = { ...createUser(), directoryRestriction: "projects/design" };
-    await effects.run(manager.writeFile(file, "project notes"));
-    await expect(effects.run(manager.delete(boundary))).rejects.toThrow(
+    await effects.run(filesystem.writeFile(file, "project notes"));
+    await expect(effects.run(filesystem.delete(boundary))).rejects.toThrow(
       "access root",
     );
     await expect(
       effects.run(
-        manager.move(boundary, {
+        filesystem.move(boundary, {
           volume: "home",
           path: "/projects/design/moved",
         }),
       ),
     ).rejects.toThrow("access root");
     await expect(
-      effects.run(manager.copy(file, boundary, true)),
+      effects.run(filesystem.copy(file, boundary, true)),
     ).rejects.toThrow("access root");
-    await expect(effects.run(manager.readFile(file))).resolves.toBe(
+    await expect(effects.run(filesystem.readFile(file))).resolves.toBe(
       "project notes",
     );
   });

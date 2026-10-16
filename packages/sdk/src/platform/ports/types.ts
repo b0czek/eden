@@ -41,7 +41,7 @@ export interface ResourceProtocolPort {
   /**
    * Declare custom URL schemes before the platform becomes ready so the
    * renderer treats them as secure, standard schemes. This does not attach a
-   * request handler; runtime managers do that later through `handle`.
+   * request handler; runtime services do that later through `handle`.
    */
   registerSchemes(schemes: string[]): void;
   handle(

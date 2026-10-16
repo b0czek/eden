@@ -13,7 +13,7 @@ it("delivers through real notification controllers only to the display and origi
       "notification/display",
     ]);
     await eden.runtime.sessions.login(user.username, "password");
-    const packages = eden.runtime.services.packageRegistry;
+    const packages = eden.runtime.services.installedPackages;
     const permissions = eden.runtime.services.permissions;
     const processes = eden.runtime.services.processes;
     const views = eden.runtime.services.views;

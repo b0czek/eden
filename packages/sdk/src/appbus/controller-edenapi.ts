@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
-import type { CommandCallerContext } from "../execution/ExecutionContext";
+import type { CommandCallerContext } from "../execution/context";
 import type { AppChannels } from "./service";
 
 function callerAppId(caller: CommandCallerContext) {

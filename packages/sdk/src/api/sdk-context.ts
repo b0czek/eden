@@ -1,8 +1,8 @@
 import type * as Effect from "effect/Effect";
 import type { EffectRuntime } from "../effects/runtime";
-import type { ExecutionContext } from "../execution/ExecutionContext";
-import type { OperationManager } from "../operations/OperationManager";
-import type { OperationTask } from "../operations/OperationTask";
+import type { ExecutionContext } from "../execution/context";
+import type { Operations } from "../operations/service";
+import type { OperationTask } from "../operations/task";
 
 /** Trusted SDK entry points execute independently of any ambient app caller. */
 export function createSdkContext({
@@ -12,7 +12,7 @@ export function createSdkContext({
 }: {
   execution: Pick<ExecutionContext, "run">;
   effects: Pick<EffectRuntime, "run">;
-  operations: Pick<OperationManager, "runHost">;
+  operations: Pick<Operations, "runHost">;
 }) {
   function run<A>(work: () => A): A {
     return execution.run({ principal: { kind: "system" } }, work);

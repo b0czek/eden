@@ -20,16 +20,16 @@ import type {
   ShellCommandResponse,
   ShellTransport,
 } from "../../../src/app-runtime/common/shell-transport";
-import { IPCBridge } from "../../../src/ipc/IPCBridge";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { OperationManager } from "../../../src/operations/OperationManager";
+import { Permissions } from "../../../src/ipc/permissions";
+import { IpcTransport } from "../../../src/ipc/transport";
+import { Operations } from "../../../src/operations/service";
 import {
   type OperationReporter,
   operationTask,
-} from "../../../src/operations/OperationTask";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+} from "../../../src/operations/task";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Processes } from "../../../src/processes/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
@@ -51,7 +51,7 @@ describe("client subscriptions across renderer IPC", () => {
   beforeEach(async () => {
     eden = await createTestEden();
     const appId = "com.example.subscription-observer";
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, { name: "Observer" }),
     );
     const { user: profile, caller } = await createTestCaller(
@@ -425,7 +425,7 @@ describe("client subscriptions across renderer IPC", () => {
 
   it("routes by operation and delivers only completion to waiters", async () => {
     const api = createEdenAPI(transport, listeners);
-    const manager = eden.runtime.services.operations;
+    const operations = eden.runtime.services.operations;
     const watched = work("watched");
     const waited = work("waited");
     const ignored = work("ignored");
@@ -444,10 +444,10 @@ describe("client subscriptions across renderer IPC", () => {
       });
     const completion = api.operations.from(waited.handle).result();
     await tick();
-    const initialRevision = manager.get(watched.handle, owner).revision;
+    const initialRevision = operations.get(watched.handle, owner).revision;
     watched.update("copying");
     watched.update("copying");
-    expect(manager.get(watched.handle, owner).revision).toBeGreaterThan(
+    expect(operations.get(watched.handle, owner).revision).toBeGreaterThan(
       initialRevision,
     );
     expect(
@@ -465,7 +465,7 @@ describe("client subscriptions across renderer IPC", () => {
     ignored.update("copying");
     expect(operationMessages(waited.handle)).toEqual([]);
     expect(operationMessages(ignored.handle)).toEqual([]);
-    expect(manager.get(ignored.handle, owner).phase).toBe("copying");
+    expect(operations.get(ignored.handle, owner).phase).toBe("copying");
     stopFirst();
     await tick();
     watched.update("finishing");
@@ -486,8 +486,8 @@ describe("client subscriptions across renderer IPC", () => {
     watched.finish();
     ignored.finish();
     await Promise.all([
-      manager.wait(watched.handle, owner),
-      manager.wait(ignored.handle, owner),
+      operations.wait(watched.handle, owner),
+      operations.wait(ignored.handle, owner),
     ]);
     stopSecond();
     await tick();
@@ -629,8 +629,8 @@ describe("client subscriptions across renderer IPC", () => {
     expect(targeted.some((snapshot) => snapshot.phase === "finishing")).toBe(
       true,
     );
-    const manager = eden.runtime.services.operations;
-    const foreign = manager.submit(
+    const operations = eden.runtime.services.operations;
+    const foreign = operations.submit(
       "integration/foreign",
       {},
       { ...owner, appId: "another.app" },
@@ -646,7 +646,7 @@ describe("client subscriptions across renderer IPC", () => {
       }),
     ).rejects.toThrow("access denied");
     watched.finish();
-    await manager.wait(watched.handle, owner);
+    await operations.wait(watched.handle, owner);
     stop();
     await tick();
   });

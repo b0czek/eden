@@ -7,7 +7,7 @@ import {
   namespaceArgsSchema,
   namespacedKeyArgsSchema,
 } from "../controllers/schemas";
-import type { CommandCallerContext } from "../execution/ExecutionContext";
+import type { CommandCallerContext } from "../execution/context";
 import type { Settings } from "./service";
 
 function callerNamespace(caller: CommandCallerContext) {

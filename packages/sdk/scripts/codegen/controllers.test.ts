@@ -17,7 +17,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     import { command, defineController } from "./controller";
     import { createEvent } from "../events/event";
     import { targetedEvent, routedEvent, type TargetedNotification, type RoutedNotification } from "./events";
-    import { operationTask } from "../operations/OperationTask";
+    import { operationTask } from "../operations/task";
     export const example = defineController("example", {
       commands: {
         /**
@@ -126,7 +126,7 @@ it("generates public success values without Effect failures or service requireme
     import { Effect } from "effect";
     import * as v from "valibot";
     import { command, defineController, operation } from "./controller";
-    import { operationTask } from "../operations/OperationTask";
+    import { operationTask } from "../operations/task";
     declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }, { storage: true }>;
     declare const empty: Effect.Effect<undefined, { _tag: "EmptyFailed" }, { storage: true }>;
     declare const nullable: Effect.Effect<string | null | undefined, never, never>;

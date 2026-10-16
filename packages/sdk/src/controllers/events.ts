@@ -1,5 +1,5 @@
 import type { Event } from "../events/event";
-import type { EventScope } from "../ipc/EventScope";
+import type { EventScope } from "../ipc/event-scope";
 
 export interface RoutedNotification<Payload> {
   readonly payload: Payload;

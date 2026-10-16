@@ -5,10 +5,7 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
-import type {
-  OperationReporter,
-  OperationTask,
-} from "../operations/OperationTask";
+import type { OperationReporter, OperationTask } from "../operations/task";
 
 /** Association capabilities needed to select and persist file handlers. */
 export interface FileOpenAssociations {

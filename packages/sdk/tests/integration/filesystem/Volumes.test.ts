@@ -8,8 +8,8 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createFilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
-import { decodeLaunchContext } from "../../../src/utils/appLaunchContext";
+import { createFileTransfers } from "../../../src/filesystem/transfers";
+import { decodeLaunchContext } from "../../../src/utils/app-launch-context";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
@@ -413,7 +413,7 @@ describe("consumer-managed filesystem volumes", () => {
       const sourceLease = requireValue(
         eden.runtime.services.volumes.getRoot("usb"),
       );
-      const transfer = createFilesystemTransfer();
+      const transfer = createFileTransfers();
       await expect(
         Effect.runPromise(
           transfer[operation]({
@@ -546,7 +546,7 @@ describe("consumer-managed filesystem volumes", () => {
       name: "Handler",
       fileHandlers: [{ name: "Folders", directories: true }],
     });
-    eden.runtime.services.packageRegistry.register(handler);
+    eden.runtime.services.installedPackages.register(handler);
     await execute("fs/mkdir", {
       location: { volume: "usb", path: "/same-path" },
     });
@@ -603,7 +603,7 @@ describe("consumer-managed filesystem volumes", () => {
 
   it("allows another picker after a drive disconnects during provider startup", async () => {
     const providerId = "com.example.volume-picker";
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     registry.register(testApp(appId));
     registry.register(testApp(providerId));
     eden.runtime.services.permissions.registerApp(providerId, [
@@ -662,7 +662,7 @@ describe("consumer-managed filesystem volumes", () => {
 
   it("keeps picker selections within allowed, available volumes", async () => {
     const providerId = "com.example.volume-picker";
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     for (const id of [appId, providerId]) {
       registry.register(testApp(id, { name: "Picker test" }));
       await eden.complete("process/launch", { appId: id });
@@ -939,7 +939,7 @@ describe("consumer-managed filesystem volumes", () => {
     "invalidates owned watches and sends live volume inventory on %s",
     async (removal) => {
       const app = testApp(appId, { name: "Volumes" });
-      eden.runtime.services.packageRegistry.register(app);
+      eden.runtime.services.installedPackages.register(app);
       await eden.complete("process/launch", { appId });
       const instance = requireValue(
         eden.runtime.services.processes.getAppInstance(appId),

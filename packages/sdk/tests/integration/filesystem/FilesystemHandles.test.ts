@@ -5,7 +5,7 @@ import type {
   OperationHandle,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import type { CommandCallerContext } from "../../../src/execution/ExecutionContext";
+import type { CommandCallerContext } from "../../../src/execution/context";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { registerTestVolume } from "../../support/filesystem";
@@ -212,7 +212,7 @@ describe("file handle access and lifetime", () => {
       "volume/*",
       "process/manage",
     ]);
-    eden.runtime.services.packageRegistry.register({
+    eden.runtime.services.installedPackages.register({
       kind: "app",
       id: appId,
       name: "File Handles",

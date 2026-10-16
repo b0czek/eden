@@ -17,12 +17,12 @@ const BUILTIN_PANELS = [
 export const BUILTIN_SETTINGS_CATEGORIES: SettingsCategory[] =
   BUILTIN_PANELS.map((panel) => panel.category);
 
-const registeredManagers = new WeakSet<BuiltinSettingsDependencies["panels"]>();
+const registeredPanels = new WeakSet<BuiltinSettingsDependencies["panels"]>();
 
 export function registerBuiltinSettingsPanels(
   dependencies: BuiltinSettingsDependencies,
 ): void {
-  if (registeredManagers.has(dependencies.panels)) return;
+  if (registeredPanels.has(dependencies.panels)) return;
 
   for (const panel of BUILTIN_PANELS) {
     if (panel.kind === "generated") {
@@ -55,7 +55,7 @@ export function registerBuiltinSettingsPanels(
     );
   }
 
-  registeredManagers.add(dependencies.panels);
+  registeredPanels.add(dependencies.panels);
 }
 
 export type { BuiltinSettingsDependencies } from "./types";

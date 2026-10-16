@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import Keyv from "keyv";
 import { createDb, createSqliteDbStorage } from "../../../src/db";
 import { createEffectRuntime } from "../../../src/effects/runtime";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
+import { Permissions } from "../../../src/ipc/permissions";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
 

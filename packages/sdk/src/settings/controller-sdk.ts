@@ -1,12 +1,12 @@
 import * as v from "valibot";
-import type { EdenSettingsApi } from "../api/EdenSettingsApi";
 import type { SdkContext } from "../api/sdk-context";
+import type { EdenSettingsApi } from "../api/settings";
 import { fromPromise } from "../effects/io";
 import {
   cloneAndValidatePanelDefinition,
   validatePanelProvider,
-} from "./SettingsPanelCodec";
-import type { SettingsPanelManager } from "./SettingsPanelManager";
+} from "./panel-codec";
+import type { SettingsPanels } from "./panel-service";
 
 const registrationOptionsSchema = v.optional(
   v.object({
@@ -20,7 +20,7 @@ export function createSettingsSdkController({
   panels,
   sdk,
 }: {
-  panels: SettingsPanelManager;
+  panels: SettingsPanels;
   sdk: SdkContext;
 }): EdenSettingsApi {
   return {

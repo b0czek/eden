@@ -1,14 +1,14 @@
 import type { OperationHandle } from "@edenapp/types";
 import { command, defineController } from "../../../src/controllers/controller";
-import { CommandRegistry } from "../../../src/ipc/CommandRegistry";
-import { OperationManager } from "../../../src/operations/OperationManager";
+import { Commands } from "../../../src/ipc/commands";
+import { Operations } from "../../../src/operations/service";
 import {
   type OperationTask,
   operationTask,
-} from "../../../src/operations/OperationTask";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+} from "../../../src/operations/task";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Processes } from "../../../src/processes/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -27,7 +27,7 @@ describe("one bounded IPC deadline", () => {
       grants: ["*"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, { name: "Deadlines" }),
     );
     await eden.complete("process/launch", { appId });
@@ -83,13 +83,13 @@ describe("one bounded IPC deadline", () => {
       handle: OperationHandle;
     };
     const handle = response.handle;
-    const manager = eden.runtime.services.operations;
+    const commands = eden.runtime.services.operations;
     const caller = { appId };
-    expect(manager.get(handle, caller).status).toBe("queued");
+    expect(commands.get(handle, caller).status).toBe("queued");
     await jest.advanceTimersByTimeAsync(120_000);
-    expect(manager.get(handle, caller).status).toBe("running");
+    expect(commands.get(handle, caller).status).toBe("running");
     complete("finished");
-    await expect(manager.wait(handle, caller)).resolves.toBe("finished");
+    await expect(commands.wait(handle, caller)).resolves.toBe("finished");
   });
 
   it("rejects pending result responses when the runtime is disposed", async () => {

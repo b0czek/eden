@@ -34,7 +34,7 @@ describe("daemon operation lifecycle", () => {
   it("retains start, restart, and stop completion across real daemon and process managers", async () => {
     eden = await createTestEden();
     const appId = "com.example.operation-daemon";
-    eden.runtime.services.packageRegistry.register({
+    eden.runtime.services.installedPackages.register({
       kind: "app",
       id: appId,
       name: "Operation daemon",
@@ -61,26 +61,26 @@ describe("daemon operation lifecycle", () => {
     eden.runtime.services.daemons.changed.on(({ status }) => {
       if (status.appId === appId) states.push(status.state);
     });
-    const manager = eden.runtime.services.operations;
+    const daemons = eden.runtime.services.operations;
     const ready = (previousPid = 0) => readyBackend(eden, previousPid);
     const start = await eden.execute<OperationHandle>("daemon/start", {
       appId,
     });
-    expect(manager.get(start).status).toBe("queued");
+    expect(daemons.get(start).status).toBe("queued");
     const pid = await ready();
-    await expect(manager.wait(start)).resolves.toEqual({ success: true });
+    await expect(daemons.wait(start)).resolves.toEqual({ success: true });
     expect((await eden.runtime.daemons.list())[0].state).toBe("active");
     const restart = await eden.execute<OperationHandle>("daemon/restart", {
       appId,
     });
     expect(await ready(pid)).not.toBe(pid);
-    await expect(manager.wait(restart)).resolves.toEqual({ success: true });
+    await expect(daemons.wait(restart)).resolves.toEqual({ success: true });
     const stop = await eden.execute<OperationHandle>("daemon/stop", { appId });
-    await expect(manager.wait(stop)).resolves.toEqual({ success: true });
+    await expect(daemons.wait(stop)).resolves.toEqual({ success: true });
     expect(
       eden.runtime.services.processes.getAppInstance(appId),
     ).toBeUndefined();
-    expect(manager.get(stop)).toMatchObject({
+    expect(daemons.get(stop)).toMatchObject({
       status: "succeeded",
       phase: "stopping-daemon",
     });
@@ -91,7 +91,7 @@ describe("daemon operation lifecycle", () => {
   it("ignores a delayed stop from the previous instance and keeps the replacement supervised", async () => {
     eden = await createTestEden();
     const appId = "com.example.queued-daemon";
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, { frontend: undefined, backend: { entry: "backend.js" } }),
     );
     const profile = await eden.runtime.users.create({

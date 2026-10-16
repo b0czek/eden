@@ -13,10 +13,10 @@ import {
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
 import type { ShellCommandResponse } from "../../../src/app-runtime/common/shell-transport";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { Permissions } from "../../../src/ipc/permissions";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Processes } from "../../../src/processes/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -31,7 +31,7 @@ describe.each(["window", "worker"])(
     beforeEach(async () => {
       original = Object.getOwnPropertyDescriptor(globalThis, globalName);
       eden = await createTestEden();
-      eden.runtime.services.packageRegistry.register(
+      eden.runtime.services.installedPackages.register(
         testApp(appId, {
           name: "Generated Client",
           window: {

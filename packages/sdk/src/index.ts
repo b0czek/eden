@@ -21,7 +21,7 @@ export type {
   ResultCommand,
 } from "@edenapp/types";
 export * from "./api";
-export { createEden, type Eden } from "./Eden";
+export { createEden, type Eden } from "./host";
 export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";
 export {
   configureLogger,

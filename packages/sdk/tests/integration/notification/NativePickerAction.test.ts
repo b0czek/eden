@@ -13,7 +13,7 @@ it("executes a native notification action to replace the busy file picker across
     const providerId = "com.example.displays";
     const firstId = "com.example.first-opener";
     const secondId = "com.example.second-opener";
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     for (const id of [providerId, firstId, secondId])
       registry.register(
         testApp(id, {

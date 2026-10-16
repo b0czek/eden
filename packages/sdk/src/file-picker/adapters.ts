@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
-import type { FilesystemManager } from "../filesystem/FilesystemManager";
+import type { Filesystem } from "../filesystem/service";
 import type { Notifications } from "../notification/service";
-import type { ProcessManager } from "../process-manager/ProcessManager";
-import type { ViewManager } from "../view-manager/ViewManager";
+import type { Processes } from "../processes/service";
+import type { Views } from "../views/service";
 import type {
   FilePickerFiles,
   FilePickerNotifications,
@@ -15,7 +15,7 @@ const asError = (error: unknown) =>
 
 export function createFilePickerProcesses(
   processes: Pick<
-    ProcessManager,
+    Processes,
     "ensureAppRunning" | "getAppInstance" | "stopApp" | "stopped"
   >,
 ): FilePickerProcesses {
@@ -29,7 +29,7 @@ export function createFilePickerProcesses(
 
 export function createFilePickerViews(
   views: Pick<
-    ViewManager,
+    Views,
     "getViewIdByWebContentsId" | "getViewInfo" | "showView" | "focusView"
   >,
 ): FilePickerViews {
@@ -54,7 +54,7 @@ export function createFilePickerViews(
 }
 
 export function createFilePickerFiles(
-  files: Pick<FilesystemManager, "resolvePath" | "accessScope">,
+  files: Pick<Filesystem, "resolvePath" | "accessScope">,
 ): FilePickerFiles {
   return {
     resolvePath: (location) => Effect.asVoid(files.resolvePath(location)),

@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { createEden } from "./Eden";
+import { createEden } from "./host";
 
 const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
 const userDirectory =

@@ -10,19 +10,19 @@ import type {
 import * as Effect from "effect/Effect";
 
 import type { Appearance } from "../../appearance/service";
-import type { DaemonManager } from "../../daemon";
-import type { PackageManager } from "../../package-manager";
-import type { UserManager } from "../../user";
-import type { SettingsPanelManager } from "../SettingsPanelManager";
+import type { Daemons } from "../../daemon";
+import type { Packages } from "../../packages";
+import type { Users } from "../../user";
+import type { SettingsPanels } from "../panel-service";
 import type { Settings } from "../service";
 
 export interface BuiltinSettingsDependencies {
-  panels: SettingsPanelManager;
+  panels: SettingsPanels;
   settings: Settings;
   appearance: Appearance;
-  packageManager: PackageManager;
-  daemonManager: DaemonManager;
-  userManager: UserManager;
+  packages: Packages;
+  daemons: Daemons;
+  users: Users;
   config: EdenConfig;
 }
 

@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
-import type { ProcessManager } from "../process-manager";
+import type { Processes } from "../processes";
 import type { FileOpenProcesses } from "./ports";
 
 export function createFileOpenProcesses(
-  processes: Pick<ProcessManager, "getAppInstance" | "launchApp">,
+  processes: Pick<Processes, "getAppInstance" | "launchApp">,
 ): FileOpenProcesses {
   return {
     isRunning: (appId) => processes.getAppInstance(appId) !== undefined,

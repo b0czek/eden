@@ -3,15 +3,15 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
-import type { PackageManager } from "../package-manager/PackageManager";
-import type { ProcessManager } from "../process-manager/ProcessManager";
-import type { DaemonManager } from "./DaemonManager";
+import type { Packages } from "../packages/service";
+import type { Processes } from "../processes/service";
+import type { Daemons } from "./service";
 
 /** Serialize supervision notifications within the runtime's lifecycle scope. */
 export const connectDaemonLifecycle = Effect.fn(function* (
-  daemons: DaemonManager,
-  processes: ProcessManager,
-  packages: PackageManager,
+  daemons: Daemons,
+  processes: Processes,
+  packages: Packages,
 ) {
   const pending = yield* Queue.unbounded<Effect.Effect<void, Error>>();
   const enqueue = (work: Effect.Effect<void, Error>) => {

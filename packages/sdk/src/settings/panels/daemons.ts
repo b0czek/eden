@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { authorizeDaemonDefinition } from "../../daemon/authorization";
 import { daemonDefinitionSchema } from "../../daemon/schemas";
-import { cloneRendererValue } from "../SettingsPanelCodec";
+import { cloneRendererValue } from "../panel-codec";
 import type { BuiltinPanelModule } from "./types";
 
 export const daemonsSettingsCategory = {
@@ -43,7 +43,7 @@ export const daemonsPanel: BuiltinPanelModule = {
         properties: { definition: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: ({ daemonManager, userManager }, invocation, context) =>
+      handler: ({ daemons, users }, invocation, context) =>
         Effect.gen(function* () {
           const definition = yield* Effect.try(() =>
             v.parse(
@@ -55,51 +55,51 @@ export const daemonsPanel: BuiltinPanelModule = {
           yield* authorizeDaemonDefinition(
             definition,
             context.user.role === "vendor",
-            userManager,
+            users,
           );
-          yield* daemonManager.updateDefinition(definition);
+          yield* daemons.updateDefinition(definition);
         }),
     },
     enable: {
       params: daemonActionSchema,
-      handler: ({ daemonManager }, invocation) =>
-        daemonManager.setEnabled(
+      handler: ({ daemons }, invocation) =>
+        daemons.setEnabled(
           (invocation.params as { appId: string }).appId,
           true,
         ),
     },
     disable: {
       params: daemonActionSchema,
-      handler: ({ daemonManager }, invocation) =>
-        daemonManager.setEnabled(
+      handler: ({ daemons }, invocation) =>
+        daemons.setEnabled(
           (invocation.params as { appId: string }).appId,
           false,
         ),
     },
     start: {
       params: daemonActionSchema,
-      handler: ({ daemonManager }, invocation) =>
-        daemonManager.start((invocation.params as { appId: string }).appId),
+      handler: ({ daemons }, invocation) =>
+        daemons.start((invocation.params as { appId: string }).appId),
     },
     stop: {
       params: daemonActionSchema,
-      handler: ({ daemonManager }, invocation) =>
-        daemonManager.stop((invocation.params as { appId: string }).appId),
+      handler: ({ daemons }, invocation) =>
+        daemons.stop((invocation.params as { appId: string }).appId),
     },
     restart: {
       params: daemonActionSchema,
-      handler: ({ daemonManager }, invocation) =>
-        daemonManager.restart((invocation.params as { appId: string }).appId),
+      handler: ({ daemons }, invocation) =>
+        daemons.restart((invocation.params as { appId: string }).appId),
     },
   },
   createLoader:
-    ({ daemonManager, userManager }) =>
+    ({ daemons, users }) =>
     () =>
       Effect.gen(function* () {
         return {
           data: cloneRendererValue({
-            statuses: yield* daemonManager.list(),
-            users: yield* userManager.listUsers(),
+            statuses: yield* daemons.list(),
+            users: yield* users.listUsers(),
           }) as unknown as SettingsPanelValue,
         };
       }),

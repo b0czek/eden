@@ -7,9 +7,9 @@ import type {
   UserProfile,
   WallpaperConfig,
 } from "@edenapp/types";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { ExecutionContext } from "../../../src/execution/context";
+import { Permissions } from "../../../src/ipc/permissions";
+import { InstalledPackages } from "../../../src/packages/installed";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -96,7 +96,7 @@ describe("control-plane API integration", () => {
       contributions: [],
       isPrebuilt: false,
     };
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     registry.register(app);
     registry.register(dlc);
 
@@ -111,7 +111,7 @@ describe("control-plane API integration", () => {
     const app = testApp("com.example.control-plane", {
       name: "Control Plane App",
     });
-    eden.runtime.services.packageRegistry.register(app);
+    eden.runtime.services.installedPackages.register(app);
 
     const user = await eden.runtime.users.create({
       username: "operator",

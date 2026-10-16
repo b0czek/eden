@@ -6,7 +6,7 @@ import type {
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
 import { log, setLogContext } from "../logging";
-import { decodeLaunchContext } from "../utils/appLaunchContext";
+import { decodeLaunchContext } from "../utils/app-launch-context";
 import {
   createAppBusAPI,
   createEdenAPI,

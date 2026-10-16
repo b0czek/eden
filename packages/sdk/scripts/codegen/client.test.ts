@@ -20,7 +20,7 @@ function extract(commands: string, namespace = "fs", declarations = "") {
     `
     import * as v from "valibot";
     import { command, defineController } from "./controller";
-    import { operationTask } from "../operations/OperationTask";
+    import { operationTask } from "../operations/task";
     ${declarations}
     export const fixture = defineController(${JSON.stringify(namespace)}, {
       commands: { ${commands} },

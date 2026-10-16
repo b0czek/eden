@@ -3,12 +3,12 @@ import * as Effect from "effect/Effect";
 import { createEvent } from "../events/event";
 import { log } from "../logging";
 import { EDEN_SETTINGS_APP_ID } from "./constants";
-import { EDEN_SETTINGS_SCHEMA } from "./EdenSettings";
 import type {
   SettingsAuthorization,
   SettingsCatalog,
   SettingsStorage,
 } from "./ports";
+import { EDEN_SETTINGS_SCHEMA } from "./schema";
 
 interface SettingsDependencies {
   storage: SettingsStorage;

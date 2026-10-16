@@ -5,7 +5,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { EDEN_SETTINGS_APP_ID } from "../constants";
-import { cloneRendererValue } from "../SettingsPanelCodec";
+import { cloneRendererValue } from "../panel-codec";
 import type { BuiltinPanelModule, BuiltinSettingsDependencies } from "./types";
 
 export const appsSettingsCategory = {
@@ -23,11 +23,11 @@ export const appsSettingsCategory = {
 } satisfies SettingsCategory;
 
 const loadAppsPanelData = Effect.fn(function* ({
-  packageManager,
+  packages,
   settings,
   config,
 }: BuiltinSettingsDependencies): Effect.fn.Return<SettingsPanelValue, Error> {
-  const manifests = packageManager.listInstalledPackages({
+  const manifests = packages.listInstalledPackages({
     kind: "app",
     showHidden: true,
   });
@@ -43,8 +43,8 @@ const loadAppsPanelData = Effect.fn(function* ({
         const key = `autostart.${manifest.id}`;
         const [icon, hotReload, autostart] = yield* Effect.all(
           [
-            packageManager.getPackageIcon(manifest.id),
-            packageManager
+            packages.getPackageIcon(manifest.id),
+            packages
               .isHotReloadEnabled(manifest.id)
               .pipe(Effect.catch(() => Effect.succeed(false))),
             autostartKeys.has(key)
@@ -60,10 +60,10 @@ const loadAppsPanelData = Effect.fn(function* ({
     { concurrency: "unbounded" },
   );
   const dlcs = yield* Effect.forEach(
-    packageManager.listInstalledPackages({ kind: "dlc" }),
+    packages.listInstalledPackages({ kind: "dlc" }),
     (manifest) =>
       Effect.map(
-        packageManager
+        packages
           .getPackageIcon(manifest.id)
           .pipe(Effect.catch(() => Effect.succeed(undefined))),
         (icon) => ({ manifest, icon }),
@@ -107,18 +107,18 @@ export const appsPanel: BuiltinPanelModule = {
     },
     "toggle-hot-reload": {
       params: appActionSchema,
-      handler: ({ packageManager }, invocation) =>
+      handler: ({ packages }, invocation) =>
         Effect.asVoid(
-          packageManager.toggleHotReload(
+          packages.toggleHotReload(
             (invocation.params as { appId: string }).appId,
           ),
         ),
     },
     "uninstall-package": {
       params: packageActionSchema,
-      handler: ({ packageManager }, invocation) =>
+      handler: ({ packages }, invocation) =>
         Effect.asVoid(
-          packageManager.uninstallPackage(
+          packages.uninstallPackage(
             (invocation.params as { packageId: string }).packageId,
           ),
         ),

@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { createExecutionContext } from "../execution/ExecutionContext";
+import { createExecutionContext } from "../execution/context";
 import { createEffectRuntime } from "./runtime";
 
 describe("Effect runtime ownership", () => {

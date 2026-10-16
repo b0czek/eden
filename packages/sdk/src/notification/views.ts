@@ -1,8 +1,8 @@
-import type { ViewManager } from "../view-manager/ViewManager";
+import type { Views } from "../views/service";
 import type { NotificationViews } from "./ports";
 
 export function createNotificationViews(
-  views: Pick<ViewManager, "getViewIdByWebContentsId" | "getViewInfo">,
+  views: Pick<Views, "getViewIdByWebContentsId" | "getViewInfo">,
 ): NotificationViews {
   return {
     resolve: (webContentsId) =>

@@ -1,2 +1,2 @@
-export * from "./ControlPlaneApi";
-export * from "./EdenSettingsApi";
+export * from "./control-plane";
+export * from "./settings";

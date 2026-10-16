@@ -8,7 +8,7 @@ import * as Queue from "effect/Queue";
 import * as v from "valibot";
 import type { TargetedNotification } from "../controllers/events";
 import { createEvent } from "../events/event";
-import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
+import { filesystemLocationSchema } from "../filesystem/location-schema";
 import { log } from "../logging";
 import { createPickerDisplayProvider } from "./display-provider";
 import type { FilePickerCaller, FilePickerDependencies } from "./ports";

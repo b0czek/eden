@@ -5,16 +5,16 @@ import {
   defineController,
   operation,
 } from "../controllers/controller";
-import type { ExecutionContext } from "../execution/ExecutionContext";
-import type { UserManager } from "../user/UserManager";
+import type { ExecutionContext } from "../execution/context";
+import type { Users } from "../user/service";
 import { authorizeDaemonDefinition } from "./authorization";
-import type { DaemonManager } from "./DaemonManager";
 import { daemonAppIdSchema, daemonDefinitionSchema } from "./schemas";
+import type { Daemons } from "./service";
 
 export function createDaemonController(
-  daemons: DaemonManager,
+  daemons: Daemons,
   execution: ExecutionContext,
-  users: UserManager,
+  users: Users,
 ) {
   const appArgs = v.object({ appId: daemonAppIdSchema });
   return defineController("daemon", {

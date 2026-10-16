@@ -1,11 +1,11 @@
 const path = require("node:path");
 const Effect = require("effect/Effect");
 const v = require("valibot");
-const { createEdenHost } = require("../../dist/Eden.js");
+const { createEdenHost } = require("../../dist/host.js");
 const {
   createElectronPlatform,
 } = require("../../dist/platform/electron/index.js");
-const { createEdenRuntime } = require("../../dist/runtime/EdenRuntime.js");
+const { createEdenRuntime } = require("../../dist/runtime/runtime.js");
 const {
   defineController,
   operation,

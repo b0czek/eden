@@ -1,10 +1,10 @@
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { routedEvent } from "../controllers/events";
-import type { OperationManager } from "./OperationManager";
 import { operationHandleSchema } from "./schemas";
+import type { Operations } from "./service";
 
-export function createOperationController(operations: OperationManager) {
+export function createOperationController(operations: Operations) {
   const input = v.object({ handle: operationHandleSchema });
   return defineController("operation", {
     commands: {

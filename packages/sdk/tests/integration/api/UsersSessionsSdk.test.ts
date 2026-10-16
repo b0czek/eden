@@ -1,7 +1,7 @@
 import type {
   EdenCreateUserInput,
   EdenUpdateUserInput,
-} from "../../../src/api/ControlPlaneApi";
+} from "../../../src/api/control-plane";
 import { createTestEden } from "../../support/createTestEden";
 
 it("validates host user writes before persistence or current-session changes", async () => {

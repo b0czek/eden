@@ -1,9 +1,9 @@
 import type { ConnectResult } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { BackendManager } from "../../../src/process-manager/BackendManager";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { Permissions } from "../../../src/ipc/permissions";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Backends } from "../../../src/processes/backends";
+import { Processes } from "../../../src/processes/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -15,7 +15,7 @@ async function scenario() {
   const denied = "app.channel-denied";
   const { user } = await createTestCaller(eden, provider, ["appbus/expose"]);
   await eden.runtime.sessions.login(user.username, "password");
-  const packages = eden.runtime.services.packageRegistry;
+  const packages = eden.runtime.services.installedPackages;
   const permissions = eden.runtime.services.permissions;
   const processes = eden.runtime.services.processes;
   const views = eden.runtime.services.views;

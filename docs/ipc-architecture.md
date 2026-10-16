@@ -101,7 +101,7 @@ Service-side declarations and event publishing are described in
 ### How It Works
 
 1. **Command Execution**: The `shellCommand` method sends a command through `ipcRenderer.invoke("shell-command", ...)` to the main process
-2. **CommandRegistry**: The main process uses `CommandRegistry` to route commands to the appropriate handlers (e.g., `process/launch`, `view/create`, etc.)
+2. **Commands**: The main process uses `Commands` to route commands to the appropriate handlers (e.g., `process/launch`, `view/create`, etc.)
 3. **Permission Checking**: Commands can require permissions (e.g., `"process/launch"` requires `"process/launch"` permission)
 4. **Event System**: Events use a separate `shell-message` channel where the main process broadcasts events to subscribed apps
 
@@ -315,10 +315,10 @@ const appServices = await window.appBus.listServicesByApp("com.app-a");
 1. **Service Registration**: When `exposeService` is called:
    - The callback is stored locally
    - A command `appbus/register` is sent to the main process
-   - `AppChannelHandler` registers the service in `AppChannelManager`
+   - The appbus controller registers the service in `AppChannels`
 
 2. **Service Connection**: When `connect` is called:
-   - `AppChannelManager` validates the target service exists
+   - `AppChannels` validates the target service exists
    - A `MessageChannel` is created with two ports
    - The provider's port is sent via `appbus-port` IPC event
    - The caller's port is sent via `appbus-port` IPC event

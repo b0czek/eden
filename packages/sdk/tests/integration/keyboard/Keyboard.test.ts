@@ -12,7 +12,7 @@ import { createKeyboardViews } from "../../../src/keyboard/views";
 import { EDEN_SETTINGS_APP_ID } from "../../../src/settings/constants";
 import { createSettings } from "../../../src/settings/service";
 import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
-import type { ViewInfo } from "../../../src/view-manager/types";
+import type { ViewInfo } from "../../../src/views/types";
 import { testApp } from "../../support/apps";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 

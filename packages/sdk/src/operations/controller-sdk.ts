@@ -1,14 +1,14 @@
 import * as v from "valibot";
-import type { EdenOperationsObserver } from "../api/ControlPlaneApi";
+import type { EdenOperationsObserver } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
-import type { OperationManager } from "./OperationManager";
 import { operationHandleSchema } from "./schemas";
+import type { Operations } from "./service";
 
 export function createOperationsSdkController({
   operations,
   sdk,
 }: {
-  operations: OperationManager;
+  operations: Operations;
   sdk: SdkContext;
 }): EdenOperationsObserver {
   return {

@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as Effect from "effect/Effect";
 import { WASMagic } from "wasmagic";
 import { fromPromise } from "../effects/io";
-import type { FilesystemManager } from "../filesystem";
+import type { Filesystem } from "../filesystem";
 import { log } from "../logging";
 import { normalizeMimeType } from "./handlers";
 import type { FileOpenFilesystem } from "./ports";
@@ -11,7 +11,7 @@ const MIME_DETECTION_BYTES = 8192;
 
 /** Keep the volume lease through metadata/content I/O and defer the WASM load. */
 export function createFileOpenFilesystem(
-  filesystem: Pick<FilesystemManager, "withVolume">,
+  filesystem: Pick<Filesystem, "withVolume">,
 ): FileOpenFilesystem {
   let detector: Promise<WASMagic> | undefined;
 

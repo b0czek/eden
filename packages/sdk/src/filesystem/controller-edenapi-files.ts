@@ -9,8 +9,8 @@ import {
   filesystemLocationSchema,
   filesystemSourceArgsSchema,
   filesystemSourceSchema,
-} from "./FilesystemLocationSchema";
-import type { FilesystemManager } from "./FilesystemManager";
+} from "./location-schema";
+import type { Filesystem } from "./service";
 
 const encoding = v.optional(
   v.picklist([
@@ -67,7 +67,7 @@ const transferArgs = v.object({
   overwrite: v.optional(v.boolean(), false),
 });
 
-export function createFilesystemController(files: FilesystemManager) {
+export function createFilesystemController(files: Filesystem) {
   return defineController("fs", {
     commands: {
       "access-scope": command({

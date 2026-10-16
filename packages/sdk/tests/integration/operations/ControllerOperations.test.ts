@@ -5,9 +5,9 @@ import {
   defineController,
   operation,
 } from "../../../src/controllers/controller";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { CommandRegistry, PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
+import { ExecutionContext } from "../../../src/execution/context";
+import { Commands, Permissions } from "../../../src/ipc";
+import { Operations } from "../../../src/operations/service";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -30,7 +30,7 @@ describe("Effect controller operations", () => {
     const started = gate();
     const finish = gate();
     const execution = eden.runtime.services.execution;
-    const manager = eden.runtime.services.operations;
+    const operations = eden.runtime.services.operations;
     const registry = eden.runtime.services.commands;
     registry.registerController(
       defineController("effect-work", {
@@ -57,27 +57,27 @@ describe("Effect controller operations", () => {
     await expect(
       eden.execute("effect-work/run", { value: -1 }, owner),
     ).rejects.toThrow("Value must be nonnegative");
-    expect(manager.list(owner)).toEqual([]);
+    expect(operations.list(owner)).toEqual([]);
     const handle = await eden.execute<OperationHandle>(
       "effect-work/run",
       { value: 3 },
       owner,
     );
-    expect(manager.get(handle, owner).status).toBe("queued");
+    expect(operations.get(handle, owner).status).toBe("queued");
     await started.promise;
     try {
-      expect(manager.get(handle, owner)).toMatchObject({
+      expect(operations.get(handle, owner)).toMatchObject({
         status: "running",
         phase: "processing",
       });
     } finally {
       finish.release();
     }
-    await expect(manager.wait(handle, owner)).resolves.toEqual({
+    await expect(operations.wait(handle, owner)).resolves.toEqual({
       value: 3,
       appId: owner.appId,
     });
-    expect(manager.get(handle, owner)).toMatchObject({
+    expect(operations.get(handle, owner)).toMatchObject({
       status: "succeeded",
       result: { value: 3, appId: owner.appId },
     });
@@ -99,11 +99,11 @@ describe("Effect controller operations", () => {
       {},
       owner,
     );
-    const manager = eden.runtime.services.operations;
-    await expect(manager.wait(handle, owner)).rejects.toThrow(
+    const operations = eden.runtime.services.operations;
+    await expect(operations.wait(handle, owner)).rejects.toThrow(
       "Effect work failed",
     );
-    expect(manager.get(handle, owner)).toMatchObject({
+    expect(operations.get(handle, owner)).toMatchObject({
       status: "failed",
       error: { message: "Effect work failed" },
     });

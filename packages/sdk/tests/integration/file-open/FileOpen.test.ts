@@ -15,7 +15,7 @@ describe("file opening integration", () => {
       name: "Files",
       fileHandlers: [{ name: "Directories", directories: true }],
     });
-    eden.runtime.services.packageRegistry.register(filesApp);
+    eden.runtime.services.installedPackages.register(filesApp);
     const user = await eden.runtime.users.create({
       username: "files-user",
       name: "Files User",
@@ -52,7 +52,7 @@ describe("file opening integration", () => {
 
   it("exposes DLC file handlers through their host only while installed", async () => {
     eden = await createTestEden();
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     const editor = testApp("com.example.editor", { name: "Editor" });
     const highlighter = {
       kind: "dlc",
@@ -120,7 +120,7 @@ describe("file opening integration", () => {
 
   it("uses current locale and persisted associations when completing file opening", async () => {
     eden = await createTestEden();
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     const first = testApp("com.example.first", {
       name: { en: "First editor", pl: "Pierwszy edytor" },
       fileHandlers: [{ name: "Text", extensions: ["txt"] }],

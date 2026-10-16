@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { EdenAppearanceApi } from "../api/ControlPlaneApi";
+import type { EdenAppearanceApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
 import { wallpaperConfigSchema } from "./schemas";
 import type { Appearance } from "./service";

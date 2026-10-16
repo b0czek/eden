@@ -4,41 +4,37 @@ import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
 import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { command, defineController } from "../../../src/controllers/controller";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { RuntimeContextRegistry } from "../../../src/execution/RuntimeContextRegistry";
+import { ExecutionContext } from "../../../src/execution/context";
+import { RuntimeContexts } from "../../../src/execution/runtime-contexts";
+import { Commands, IpcTransport, Permissions } from "../../../src/ipc";
+import { operationQuotaLimits } from "../../../src/operations/quota";
 import {
-  CommandRegistry,
-  IPCBridge,
-  PermissionRegistry,
-} from "../../../src/ipc";
-import {
-  type OperationManager,
+  type Operations,
   operationRetentionMs,
-} from "../../../src/operations/OperationManager";
-import { operationQuotaLimits } from "../../../src/operations/OperationQuota";
+} from "../../../src/operations/service";
 import {
   type OperationReporter,
   type OperationTask,
   operationTask,
-} from "../../../src/operations/OperationTask";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { BackendManager } from "../../../src/process-manager/BackendManager";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { SessionContext } from "../../../src/session/SessionContext";
-import { SessionManager } from "../../../src/session/SessionManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+} from "../../../src/operations/task";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Backends } from "../../../src/processes/backends";
+import { Processes } from "../../../src/processes/service";
+import { SessionContext } from "../../../src/session/context";
+import { Sessions } from "../../../src/session/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("runtime-owned operations", () => {
   let eden: TestEden;
-  let manager: OperationManager;
+  let operations: Operations;
   let prepareWork: (args: { value: string }) => OperationTask<unknown>;
   const owner = { appId: "work.app", principal: { kind: "system" as const } };
   beforeEach(async () => {
     eden = await createTestEden();
-    manager = eden.runtime.services.operations;
+    operations = eden.runtime.services.operations;
     eden.runtime.services.commands.registerController(
       defineController("integration", {
         commands: {
@@ -73,11 +69,11 @@ describe("runtime-owned operations", () => {
   it("rejects cancellation for tasks that do not support it", async () => {
     register(() => operationTask(async () => "done"));
     const handle = await submit();
-    expect(manager.get(handle, owner).cancellable).toBe(false);
+    expect(operations.get(handle, owner).cancellable).toBe(false);
     await expect(
       eden.execute("operation/cancel", { handle }, owner),
     ).rejects.toThrow("cannot be cancelled");
-    await expect(manager.wait(handle, owner)).resolves.toBe("done");
+    await expect(operations.wait(handle, owner)).resolves.toBe("done");
   });
 
   it("accepts promptly, queues execution, retains completion and captured context", async () => {
@@ -93,21 +89,21 @@ describe("runtime-owned operations", () => {
       }),
     );
     const handle = await submit();
-    const accepted = manager.get(handle, owner);
+    const accepted = operations.get(handle, owner);
     expect(accepted.status).toBe("queued");
     await tick();
-    const running = manager.get(handle, owner);
+    const running = operations.get(handle, owner);
     expect(running).toMatchObject({
       status: "running",
       phase: "writing",
     });
     expect(running.revision).toBeGreaterThan(accepted.revision);
     blocked.release();
-    await expect(manager.wait(handle, owner)).resolves.toEqual({
+    await expect(operations.wait(handle, owner)).resolves.toEqual({
       value: "value",
     });
     expect(await fs.readFile(file, "utf8")).toBe("value");
-    expect(manager.get(handle, owner)).toMatchObject({
+    expect(operations.get(handle, owner)).toMatchObject({
       status: "succeeded",
       result: { value: "value" },
     });
@@ -117,12 +113,12 @@ describe("runtime-owned operations", () => {
   it("observes completion that predates subscription and reconciles revisions", async () => {
     register(() => operationTask(async () => "done"));
     const handle = await submit();
-    await manager.wait(handle, owner);
-    const completed = manager.get(handle, owner);
+    await operations.wait(handle, owner);
+    const completed = operations.get(handle, owner);
     const callbacks = new Set<
       (data: { snapshot: OperationSnapshot }) => void
     >();
-    const off = manager.changed.on(({ payload: data }) => {
+    const off = operations.changed.on(({ payload: data }) => {
       for (const callback of callbacks) callback(data);
     });
     const api = createOperationsAPI({
@@ -170,14 +166,14 @@ describe("runtime-owned operations", () => {
     );
     expect(preparations).toBe(1);
     expect(() =>
-      manager.get(first, { ...owner, appId: "another.app" }),
+      operations.get(first, { ...owner, appId: "another.app" }),
     ).toThrow("access denied");
     expect(() =>
-      manager.get(first, { ...owner, sessionId: "another-session" }),
+      operations.get(first, { ...owner, sessionId: "another-session" }),
     ).toThrow("access denied");
-    expect(manager.list({ ...owner, appId: "another.app" })).toEqual([]);
+    expect(operations.list({ ...owner, appId: "another.app" })).toEqual([]);
     blocked.release();
-    await manager.wait(first, owner);
+    await operations.wait(first, owner);
   });
 
   it("retains typed failure responses and sanitizes thrown failures", async () => {
@@ -189,11 +185,11 @@ describe("runtime-owned operations", () => {
       })),
     );
     const domain = await submit();
-    await expect(manager.wait(domain, owner)).resolves.toMatchObject({
+    await expect(operations.wait(domain, owner)).resolves.toMatchObject({
       success: false,
       validation: { field: "value" },
     });
-    expect(manager.get(domain, owner)).toMatchObject({
+    expect(operations.get(domain, owner)).toMatchObject({
       status: "failed",
       response: { success: false },
     });
@@ -203,12 +199,14 @@ describe("runtime-owned operations", () => {
       }),
     );
     const thrown = await submit();
-    await expect(manager.wait(thrown, owner)).rejects.toThrow("Unavailable");
-    expect(manager.get(thrown, owner)).toMatchObject({
+    await expect(operations.wait(thrown, owner)).rejects.toThrow("Unavailable");
+    expect(operations.get(thrown, owner)).toMatchObject({
       status: "failed",
       error: { name: "TypeError", message: "Unavailable" },
     });
-    expect(JSON.stringify(manager.get(thrown, owner))).not.toContain("stack");
+    expect(JSON.stringify(operations.get(thrown, owner))).not.toContain(
+      "stack",
+    );
   });
 
   it("reserves capacity before preparation and retains results and keys until expiry", async () => {
@@ -229,7 +227,7 @@ describe("runtime-owned operations", () => {
       for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
         const handle = await submit(String(i), `key-${i}`);
         handles.push(handle);
-        await manager.wait(handle, owner);
+        await operations.wait(handle, owner);
       }
       await expect(submit("rejected")).rejects.toThrow("capacity exhausted");
       expect(preparations).toBe(operationQuotaLimits.perAppLimit);
@@ -247,24 +245,24 @@ describe("runtime-owned operations", () => {
         ),
       ).rejects.toThrow("capacity exhausted");
       clock.mockReturnValue(now + operationRetentionMs - 1);
-      expect(manager.list(owner)).toHaveLength(
+      expect(operations.list(owner)).toHaveLength(
         operationQuotaLimits.perAppLimit,
       );
-      expect(await manager.wait(handles[0], owner)).toBe("1");
+      expect(await operations.wait(handles[0], owner)).toBe("1");
       await expect(submit("still-full")).rejects.toThrow("capacity exhausted");
       clock.mockReturnValue(now + operationRetentionMs);
-      expect(manager.list(owner)).toHaveLength(1);
-      expect(manager.get(active, owner).status).toBe("running");
-      expect(() => manager.get(handles[0], owner)).toThrow("not found");
+      expect(operations.list(owner)).toHaveLength(1);
+      expect(operations.get(active, owner).status).toBe("running");
+      expect(() => operations.get(handles[0], owner)).toThrow("not found");
       const next = await submit("new-value", "key-1");
       expect(next.id).not.toBe(handles[0].id);
-      await expect(manager.wait(next, owner)).resolves.toBe("new-value");
+      await expect(operations.wait(next, owner)).resolves.toBe("new-value");
       blocked.release();
-      await manager.wait(active, owner);
+      await operations.wait(active, owner);
       clock.mockReturnValue(now + 2 * operationRetentionMs - 1);
-      expect(manager.get(active, owner).status).toBe("succeeded");
+      expect(operations.get(active, owner).status).toBe("succeeded");
       clock.mockReturnValue(now + 2 * operationRetentionMs);
-      expect(manager.list(owner)).toEqual([]);
+      expect(operations.list(owner)).toEqual([]);
     } finally {
       clock.mockRestore();
       blocked.release();
@@ -315,7 +313,7 @@ describe("runtime-owned operations", () => {
             caller,
             caller === owner ? "done" : "active",
           );
-          if (caller === owner) await manager.wait(handle, caller);
+          if (caller === owner) await operations.wait(handle, caller);
         }
       }
       expect(remainingShared).toBe(0);
@@ -327,11 +325,11 @@ describe("runtime-owned operations", () => {
       for (const caller of [callers[3], host]) {
         for (let i = 0; i < operationQuotaLimits.reservedPerApp; i++)
           await submitFor(caller);
-        expect(manager.list(caller)).toHaveLength(
+        expect(operations.list(caller)).toHaveLength(
           operationQuotaLimits.reservedPerApp,
         );
         expect(
-          manager
+          operations
             .list(caller)
             .every((snapshot) => snapshot.status === "queued"),
         ).toBe(true);
@@ -342,8 +340,8 @@ describe("runtime-owned operations", () => {
       await tick();
       clock.mockReturnValue(now + operationRetentionMs);
       // Only the first app's completed records expire; active records stay.
-      expect(manager.list(owner)).toEqual([]);
-      expect(manager.list(callers[1])).toHaveLength(
+      expect(operations.list(owner)).toEqual([]);
+      expect(operations.list(callers[1])).toHaveLength(
         operationQuotaLimits.perAppLimit,
       );
       for (
@@ -352,14 +350,14 @@ describe("runtime-owned operations", () => {
         i++
       )
         await submitFor(callers[3]);
-      expect(manager.list(callers[3])).toHaveLength(
+      expect(operations.list(callers[3])).toHaveLength(
         operationQuotaLimits.perAppLimit,
       );
       await expect(submitFor(callers[2])).rejects.toThrow(
         "Shared operation capacity exhausted",
       );
       // Reading or expiring another app's records never removes active work.
-      expect(manager.list(callers[2])).toHaveLength(
+      expect(operations.list(callers[2])).toHaveLength(
         operationQuotaLimits.reservedPerApp +
           operationQuotaLimits.sharedLimit -
           2 *
@@ -370,7 +368,7 @@ describe("runtime-owned operations", () => {
       clock.mockRestore();
       blocked.release();
     }
-    await manager.drain();
+    await operations.drain();
   });
 
   it("returns reserved and shared capacity when preparation fails", async () => {
@@ -380,11 +378,11 @@ describe("runtime-owned operations", () => {
     await expect(submit("retry", "failed-preparation")).rejects.toThrow(
       "Preparation failed",
     );
-    expect(manager.list(owner)).toEqual([]);
+    expect(operations.list(owner)).toEqual([]);
     register(() => operationTask(async () => "done"));
     for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
       const handle = await submit();
-      await manager.wait(handle, owner);
+      await operations.wait(handle, owner);
     }
     register(() => {
       throw new Error("Preparation failed");
@@ -397,9 +395,11 @@ describe("runtime-owned operations", () => {
     await expect(submit()).rejects.toThrow("synchronously prepare a task");
     register(() => operationTask(async () => "recovered"));
     const handle = await submit("retry", "failed-preparation");
-    await expect(manager.wait(handle, owner)).resolves.toBe("recovered");
+    await expect(operations.wait(handle, owner)).resolves.toBe("recovered");
     await expect(submit()).rejects.toThrow("capacity exhausted");
-    expect(manager.list(owner)).toHaveLength(operationQuotaLimits.perAppLimit);
+    expect(operations.list(owner)).toHaveLength(
+      operationQuotaLimits.perAppLimit,
+    );
   });
 
   it("reserves session transitions before acceptance and drains without waiting on itself", async () => {
@@ -433,9 +433,9 @@ describe("runtime-owned operations", () => {
     await tick();
     expect(session.getSessionId()).toBe(originalId);
     blocked.release();
-    await manager.wait(work, owner);
+    await operations.wait(work, owner);
     await expect(
-      manager.wait(transition, { ...owner, sessionId: originalId }),
+      operations.wait(transition, { ...owner, sessionId: originalId }),
     ).resolves.toBe("changed");
   });
 
@@ -458,7 +458,7 @@ describe("runtime-owned operations", () => {
     const handle = await submit();
     try {
       await transitioned.promise;
-      expect(manager.get(handle, owner).status).toBe("running");
+      expect(operations.get(handle, owner).status).toBe("running");
       await expect(submit()).rejects.toThrow("draining");
       await expect(
         eden.runtime.effects.run(eden.runtime.services.sessions.logout()),
@@ -466,7 +466,7 @@ describe("runtime-owned operations", () => {
     } finally {
       blocked.release();
     }
-    await expect(manager.wait(handle, owner)).resolves.toBe("done");
+    await expect(operations.wait(handle, owner)).resolves.toBe("done");
     await expect(
       eden.runtime.effects.run(eden.runtime.services.sessions.logout()),
     ).resolves.toBeUndefined();
@@ -564,9 +564,9 @@ describe("runtime-owned operations", () => {
       handle: { command: "integration/work", id: expect.any(String) },
     });
     const handle = response!.result.handle;
-    expect(manager.get(handle, owner).status).toBe("running");
+    expect(operations.get(handle, owner).status).toBe("running");
     blocked.release();
-    await manager.wait(handle, owner);
+    await operations.wait(handle, owner);
     expect(processes[0].messages).toContainEqual(
       expect.objectContaining({
         type: "shell-event",
@@ -598,7 +598,7 @@ describe("runtime-owned operations", () => {
     restarted.emit("message", { type: "backend-ready" });
     await restarting;
     const afterRestart = await submit();
-    await manager.wait(afterRestart, owner);
+    await operations.wait(afterRestart, owner);
     expect(restarted.messages).not.toContainEqual(
       expect.objectContaining({
         type: "shell-event",
@@ -664,7 +664,7 @@ describe("runtime-owned operations", () => {
       });
       await tick();
       reporter.update("writing");
-      expect(manager.get(handle, owner).phase).toBe("writing");
+      expect(operations.get(handle, owner).phase).toBe("writing");
       expect(process.messages).not.toContainEqual(
         expect.objectContaining({
           type: "shell-event",
@@ -672,7 +672,7 @@ describe("runtime-owned operations", () => {
         }),
       );
       blocked.release();
-      await expect(manager.wait(handle, owner)).resolves.toBe("finished");
+      await expect(operations.wait(handle, owner)).resolves.toBe("finished");
       expect(
         await fs.readFile(
           path.join(eden.paths.root, "backend-filtered"),
@@ -704,7 +704,7 @@ describe("runtime-owned operations", () => {
       // A restarted backend must not inherit interest in the previous operation.
       eden.runtime.services.ipc.eventSubscribers.notify(
         "operation/changed",
-        { snapshot: manager.get(handle, owner) },
+        { snapshot: operations.get(handle, owner) },
         {
           appId: owner.appId,
           sessionId: eden.runtime.services.sessionContext.getSessionId(),
@@ -725,7 +725,7 @@ describe("runtime-owned operations", () => {
 
   it("keeps work across caller closure and reopening and filters renderer/backend notifications", async () => {
     const permissions = eden.runtime.services.permissions;
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     const profile = {
       username: "vendor",
       name: "Vendor",
@@ -796,7 +796,7 @@ describe("runtime-owned operations", () => {
       eden.runtime.services.processes.stopApp(owner.appId),
     );
     blocked.release();
-    await manager.wait(handle, owner);
+    await operations.wait(handle, owner);
     await launch(owner.appId);
     expect(view(owner.appId).webContents.id).not.toBe(originalWebContentsId);
     expect(

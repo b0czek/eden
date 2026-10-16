@@ -26,6 +26,12 @@ domain rules and data use ordinary functions, such as wallpaper resolution in
 [appearance/presets.ts](../packages/sdk/src/appearance/presets.ts). Service
 closures own instance state and resource lifetimes.
 
+Name services for the capabilities they expose: `Processes` from
+`createProcesses`, `Volumes` from `createVolumes`, and `SettingsPanels` from
+`createSettingsPanels`. Use lowercase filenames such as `service.ts`,
+`volumes.ts`, and `panel-service.ts`. Reserve `controller` for API boundaries;
+view behavior lives in modules such as `tiling.ts` and `rendering.ts`.
+
 Dependencies describe domain capabilities using fully provided Effects for I/O.
 Keep small contracts beside the factory; use `ports.ts` when the set of contracts
 benefits from its own module:
@@ -40,7 +46,7 @@ export interface AppearanceSettings {
 }
 ```
 
-The domain owns this contract. Translate existing managers into it at the
+The domain owns this contract. Adapt collaborating services to it at the
 composition boundary, as in
 [appearance/settings-adapter.ts](../packages/sdk/src/appearance/settings-adapter.ts)
 and [i18n/settings.ts](../packages/sdk/src/i18n/settings.ts). Those adapters
@@ -48,7 +54,7 @@ translate persistence keys and notifications while composing the settings
 service's Effects directly. Adapters for legacy Promise APIs defer work with
 `Effect.tryPromise`; converted services compose Effects without an intermediate
 Promise or interpreter. Services receive neither a dependency container nor a
-concrete settings manager.
+concrete settings implementation.
 
 Controllers validate external inputs before passing domain values to services.
 Share input schemas between EdenAPI and SDK controllers where their contracts

@@ -1,15 +1,15 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import type { EdenDaemonsApi } from "../api/ControlPlaneApi";
+import type { EdenDaemonsApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
-import { operationTask } from "../operations/OperationTask";
-import type { DaemonManager } from "./DaemonManager";
+import { operationTask } from "../operations/task";
 import { daemonAppIdSchema, daemonDefinitionSchema } from "./schemas";
+import type { Daemons } from "./service";
 export function createDaemonsSdkController({
   daemons,
   sdk,
 }: {
-  daemons: DaemonManager;
+  daemons: Daemons;
   sdk: SdkContext;
 }): EdenDaemonsApi {
   const retained = (

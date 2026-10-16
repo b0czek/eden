@@ -1,19 +1,19 @@
 import * as v from "valibot";
-import type { EdenVolumesApi } from "../api/ControlPlaneApi";
+import type { EdenVolumesApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
-import type { VolumeManager } from "./VolumeManager";
 import {
   volumeEjectArgsSchema,
   volumeIdSchema,
   volumeOptionsSchema,
   volumeRegistrationSchema,
 } from "./volume-schemas";
+import type { Volumes } from "./volumes";
 
 export function createVolumesSdkController({
   volumes,
   sdk,
 }: {
-  volumes: VolumeManager;
+  volumes: Volumes;
   sdk: SdkContext;
 }): EdenVolumesApi {
   return {

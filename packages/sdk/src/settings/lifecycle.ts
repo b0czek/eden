@@ -1,16 +1,16 @@
 import * as Effect from "effect/Effect";
-import type { DaemonManager } from "../daemon/DaemonManager";
+import type { Daemons } from "../daemon/service";
 import { listen } from "../events/scoped";
-import type { PackageManager } from "../package-manager/PackageManager";
-import type { SessionManager } from "../session/SessionManager";
-import type { GrantCatalogManager } from "../user/GrantCatalogManager";
-import type { SettingsPanelManager } from "./SettingsPanelManager";
+import type { Packages } from "../packages/service";
+import type { Sessions } from "../session/service";
+import type { GrantCatalog } from "../user/grant-catalog";
+import type { SettingsPanels } from "./panel-service";
 export const connectSettingsLifecycle = Effect.fn(function* (
-  panels: SettingsPanelManager,
-  sessions: SessionManager,
-  packages: PackageManager,
-  daemons: DaemonManager,
-  grants: GrantCatalogManager,
+  panels: SettingsPanels,
+  sessions: Sessions,
+  packages: Packages,
+  daemons: Daemons,
+  grants: GrantCatalog,
 ) {
   yield* listen(sessions.changed, ({ currentUser, previousUsername }) =>
     panels.invalidate(

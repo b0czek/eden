@@ -9,7 +9,7 @@ import { log } from "../logging";
 import {
   calculateResizeBounds,
   type ResizeDirection,
-} from "../view-manager/resize-geometry.js";
+} from "../views/resize-geometry.js";
 import {
   getEdenFrameInternal,
   getScreenCoords,

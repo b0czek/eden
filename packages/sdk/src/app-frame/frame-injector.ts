@@ -238,7 +238,7 @@ import { setupWindowResizing } from "./window-resizing.js";
       return;
     }
 
-    // Initialize current bounds from the actual bounds set by ViewManager
+    // Initialize current bounds from the actual bounds set by Views
     if (initialBounds && initialBounds.x !== undefined) {
       currentBoundsRef.current = { ...initialBounds };
     } else if (windowConfig.defaultSize) {

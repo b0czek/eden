@@ -1,16 +1,16 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import type { EdenSessionsApi } from "../api/ControlPlaneApi";
+import type { EdenSessionsApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
-import { operationTask } from "../operations/OperationTask";
-import type { SessionManager } from "./SessionManager";
+import { operationTask } from "../operations/task";
 import { sessionLoginSchema } from "./schemas";
+import type { Sessions } from "./service";
 
 export function createSessionsSdkController({
   sessions,
   sdk,
 }: {
-  sessions: SessionManager;
+  sessions: Sessions;
   sdk: SdkContext;
 }): EdenSessionsApi {
   return {

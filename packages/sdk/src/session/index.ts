@@ -1,2 +1,2 @@
-export { createSessionContext, type SessionContext } from "./SessionContext";
-export { createSessionManager, type SessionManager } from "./SessionManager";
+export { createSessionContext, type SessionContext } from "./context";
+export { createSessions, type Sessions } from "./service";

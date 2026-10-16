@@ -2,7 +2,7 @@ import type { FilePickerOpenArgs, FilePickerResult } from "@edenapp/types";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { targetedEvent } from "../controllers/events";
-import { filesystemLocationSchema } from "../filesystem/FilesystemLocationSchema";
+import { filesystemLocationSchema } from "../filesystem/location-schema";
 import type { FilePicker } from "./service";
 
 const openInput: v.GenericSchema<FilePickerOpenArgs> = v.object({

@@ -1,10 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle } from "@edenapp/types";
-import { PermissionRegistry } from "../../../src/ipc";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { operationTask } from "../../../src/operations/OperationTask";
-import { SessionContext } from "../../../src/session/SessionContext";
+import { Permissions } from "../../../src/ipc";
+import { Operations } from "../../../src/operations/service";
+import { operationTask } from "../../../src/operations/task";
+import { SessionContext } from "../../../src/session/context";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -26,10 +26,10 @@ describe("session operation transactions", () => {
     const session = eden.runtime.services.sessionContext;
     const sessionId = session.getSessionId();
     const caller = { ...owner, sessionId };
-    const manager = eden.runtime.services.operations;
+    const sessions = eden.runtime.services.operations;
     const blocked = gate();
     const file = path.join(eden.paths.root, "session-work");
-    const work = manager.submit("integration/session-work", {}, caller, () =>
+    const work = sessions.submit("integration/session-work", {}, caller, () =>
       operationTask(async () => {
         await blocked.promise;
         await fs.writeFile(file, "drained");
@@ -40,26 +40,26 @@ describe("session operation transactions", () => {
       {},
       caller,
     );
-    expect(manager.get(transition, caller).status).toBe("queued");
+    expect(sessions.get(transition, caller).status).toBe("queued");
     await expect(eden.execute("session/logout", {}, caller)).rejects.toThrow(
       "draining",
     );
     await tick();
-    expect(manager.get(transition, caller)).toMatchObject({
+    expect(sessions.get(transition, caller)).toMatchObject({
       status: "running",
       phase: "waiting-for-operations",
     });
     expect(session.getCurrentUser()?.username).toBe("operator");
     blocked.release();
-    await manager.wait(work, caller);
-    await expect(manager.wait(transition, caller)).resolves.toEqual({
+    await sessions.wait(work, caller);
+    await expect(sessions.wait(transition, caller)).resolves.toEqual({
       success: true,
     });
     expect(await fs.readFile(file, "utf8")).toBe("drained");
     expect(session.getCurrentUser()).toBeNull();
     expect(session.getSessionId()).not.toBe(sessionId);
     expect(() =>
-      manager.get(work, { ...caller, sessionId: session.getSessionId() }),
+      sessions.get(work, { ...caller, sessionId: session.getSessionId() }),
     ).toThrow("access denied");
   });
 
@@ -91,19 +91,19 @@ describe("session operation transactions", () => {
       "session/manage",
       "system/power",
     ]);
-    const manager = eden.runtime.services.operations;
+    const sessions = eden.runtime.services.operations;
     const login = await eden.execute<OperationHandle>(
       "session/login",
       { username: "operator", password: "password" },
       caller,
     );
-    expect(manager.get(login, caller).status).toBe("queued");
+    expect(sessions.get(login, caller).status).toBe("queued");
     const power = await eden.execute<OperationHandle>(
       "system/power",
       { action: "poweroff" },
       caller,
     );
-    const refused = expect(manager.wait(power, caller)).rejects.toThrow(
+    const refused = expect(sessions.wait(power, caller)).rejects.toThrow(
       "Host refused poweroff",
     );
     await expect(
@@ -113,7 +113,7 @@ describe("session operation transactions", () => {
         caller,
       ),
     ).rejects.toThrow("draining");
-    await expect(manager.wait(login, caller)).resolves.toMatchObject({
+    await expect(sessions.wait(login, caller)).resolves.toMatchObject({
       success: true,
       user: { username: "operator" },
     });
@@ -134,16 +134,16 @@ describe("session operation transactions", () => {
       name: "Operator",
       password: "password",
     });
-    const manager = eden.runtime.services.operations;
+    const sessions = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>("session/login", {
       username: "operator",
       password: "wrong",
     });
-    await expect(manager.wait(handle)).resolves.toMatchObject({
+    await expect(sessions.wait(handle)).resolves.toMatchObject({
       success: false,
       error: expect.any(String),
     });
-    expect(manager.get(handle)).toMatchObject({
+    expect(sessions.get(handle)).toMatchObject({
       status: "failed",
       response: { success: false },
     });

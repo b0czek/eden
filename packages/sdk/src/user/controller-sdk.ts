@@ -1,7 +1,7 @@
 import * as v from "valibot";
-import type { EdenUsersApi } from "../api/ControlPlaneApi";
+import type { EdenUsersApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
-import type { SessionManager } from "../session/SessionManager";
+import type { Sessions } from "../session/service";
 import {
   createUserSchema,
   defaultUsernameSchema,
@@ -9,15 +9,15 @@ import {
   updateUserSchema,
   usernameSchema,
 } from "./schemas";
-import type { UserManager } from "./UserManager";
+import type { Users } from "./service";
 
 export function createUsersSdkController({
   users,
   sessions,
   sdk,
 }: {
-  users: UserManager;
-  sessions: SessionManager;
+  users: Users;
+  sessions: Sessions;
   sdk: SdkContext;
 }): EdenUsersApi {
   return {

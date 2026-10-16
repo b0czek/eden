@@ -5,7 +5,7 @@ import { targetedEvent } from "../controllers/events";
 import {
   filesystemLocationArgsSchema,
   filesystemLocationSchema,
-} from "../filesystem/FilesystemLocationSchema";
+} from "../filesystem/location-schema";
 import type { FileOpenOperations } from "./operations";
 import type { FileOpen } from "./service";
 

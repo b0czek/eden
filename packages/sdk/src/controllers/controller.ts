@@ -1,7 +1,7 @@
 import type { Effect } from "effect";
 import * as v from "valibot";
-import type { CommandCallerContext } from "../execution/ExecutionContext";
-import { type OperationTask, operationTask } from "../operations/OperationTask";
+import type { CommandCallerContext } from "../execution/context";
+import { type OperationTask, operationTask } from "../operations/task";
 import type { ControllerEvent } from "./events";
 
 type CommandMode = "result" | "operation";

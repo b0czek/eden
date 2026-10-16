@@ -82,13 +82,13 @@ ownership and schema sharing.
 
 Sandboxed apps use the shell-command transport instead. Its handlers enforce
 the caller app's manifest permission and, when applicable, the active user's
-grant through `CommandRegistry` and `ExecutionContext`. The built-in Control
+grant through `Commands` and `ExecutionContext`. The built-in Control
 Plane must use those typed commands rather than importing or proxying the host
 facades.
 
 Settings panel providers are a special host extension boundary: declarations
 are copied and validated, callbacks remain in the main process, and renderer
-actions are authorized and routed by `SettingsPanelManager`.
+actions are authorized and routed by `SettingsPanels`.
 
 ## Logging
 

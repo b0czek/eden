@@ -1,5 +1,5 @@
-import type { EdenCreateUserInput } from "../../src/api/ControlPlaneApi";
-import { PermissionRegistry } from "../../src/ipc";
+import type { EdenCreateUserInput } from "../../src/api/control-plane";
+import { Permissions } from "../../src/ipc";
 import type { TestEden } from "./createTestEden";
 
 export async function createTestCaller(

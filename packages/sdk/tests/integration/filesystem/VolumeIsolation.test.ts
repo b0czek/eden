@@ -7,8 +7,8 @@ import {
   createEffectRuntime,
   type EffectRuntime,
 } from "../../../src/effects/runtime";
-import { createVolumeManager } from "../../../src/filesystem/VolumeManager";
-import type { OperationTask } from "../../../src/operations/OperationTask";
+import { createVolumes } from "../../../src/filesystem/volumes";
+import type { OperationTask } from "../../../src/operations/task";
 
 function runTask<A>(
   runtime: EffectRuntime,
@@ -25,8 +25,8 @@ it("keeps admitted volume access independent when two runtimes use the same volu
     path.join(os.tmpdir(), "eden-volume-isolation-"),
   );
   try {
-    const a = await first.acquire(createVolumeManager());
-    const b = await second.acquire(createVolumeManager());
+    const a = await first.acquire(createVolumes());
+    const b = await second.acquire(createVolumes());
     const input = {
       id: "usb",
       label: "USB",

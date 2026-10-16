@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { EdenAssociationsApi } from "../api/ControlPlaneApi";
+import type { EdenAssociationsApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
 import { keyArgsSchema } from "../controllers/schemas";
 import {

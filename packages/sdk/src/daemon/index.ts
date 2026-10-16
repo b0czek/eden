@@ -1,1 +1,1 @@
-export * from "./DaemonManager";
+export * from "./service";

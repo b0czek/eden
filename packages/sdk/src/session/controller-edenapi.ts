@@ -5,10 +5,10 @@ import {
   defineController,
   operation,
 } from "../controllers/controller";
-import type { SessionManager } from "./SessionManager";
 import { sessionLoginSchema } from "./schemas";
+import type { Sessions } from "./service";
 
-export function createSessionController(sessions: SessionManager) {
+export function createSessionController(sessions: Sessions) {
   return defineController("session", {
     commands: {
       "get-current": command({

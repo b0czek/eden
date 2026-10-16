@@ -1,0 +1,61 @@
+import type { UserProfile } from "@edenapp/types";
+import { createRuntimeContexts } from "../../../src/execution/runtime-contexts";
+import { createSessionContext } from "../../../src/session";
+
+const user: UserProfile = {
+  username: "operator",
+  name: "Operator",
+  role: "standard",
+  grants: [],
+  createdAt: 1,
+  updatedAt: 1,
+};
+
+describe("RuntimeContexts", () => {
+  it("resolves a pre-login session app's system principal", () => {
+    const session = createSessionContext();
+    const registry = createRuntimeContexts({ sessionContext: session });
+    registry.register("com.eden.login", {
+      owner: {
+        kind: "session",
+        sessionId: session.getSessionId(),
+        username: null,
+      },
+      principal: { kind: "system" },
+    });
+
+    expect(registry.resolvePrincipal("com.eden.login")).toEqual({
+      kind: "system",
+    });
+  });
+
+  it("rejects a system principal owned by a stale session", () => {
+    const session = createSessionContext();
+    const registry = createRuntimeContexts({ sessionContext: session });
+    registry.register("com.eden.login", {
+      owner: { kind: "session", sessionId: "stale", username: null },
+      principal: { kind: "system" },
+    });
+
+    expect(registry.resolvePrincipal("com.eden.login")).toBeUndefined();
+  });
+
+  it("resolves a session user's current profile", () => {
+    const session = createSessionContext();
+    session.setCurrentUser(user);
+    const registry = createRuntimeContexts({ sessionContext: session });
+    registry.register("com.example.app", {
+      owner: {
+        kind: "session",
+        sessionId: session.getSessionId(),
+        username: user.username,
+      },
+      principal: { kind: "user", username: user.username },
+    });
+
+    expect(registry.resolvePrincipal("com.example.app")).toEqual({
+      kind: "user",
+      profile: user,
+    });
+  });
+});

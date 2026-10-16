@@ -80,9 +80,9 @@ Node.js app backends remain trusted processes and can access Node APIs directly.
 
 ## Sessions and Identity
 
-- `SessionManager` owns the active identity and commits a new session only after
+- `Sessions` owns the active identity and commits a new session only after
   all apps from the previous session have stopped.
-- `UserManager` owns account storage, authentication, grants, and passwords.
+- `Users` owns account storage, authentication, grants, and passwords.
 - Key commands:
   - `user/list` (all user profiles)
   - `session/login`, `session/logout` (session control)

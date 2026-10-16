@@ -1,5 +1,5 @@
 import type { OperationHandle } from "@edenapp/types";
-import { operationTask } from "../../../src/operations/OperationTask";
+import { operationTask } from "../../../src/operations/task";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("power operation lifecycle", () => {
@@ -21,12 +21,12 @@ describe("power operation lifecycle", () => {
         },
       },
     });
-    const manager = eden.runtime.services.operations;
+    const operations = eden.runtime.services.operations;
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const work = manager.submit("integration/power-work", {}, {}, () =>
+    const work = operations.submit("integration/power-work", {}, {}, () =>
       operationTask(async () => {
         await blocked;
       }),
@@ -34,22 +34,24 @@ describe("power operation lifecycle", () => {
     const handle = await eden.execute<OperationHandle>("system/power", {
       action: "poweroff",
     });
-    expect(manager.get(handle).status).toBe("queued");
+    expect(operations.get(handle).status).toBe("queued");
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(handoffs).toBe(0);
-    expect(manager.get(handle).status).toBe("running");
+    expect(operations.get(handle).status).toBe("running");
     release();
-    await manager.wait(work);
-    await expect(manager.wait(handle)).rejects.toThrow("Host refused poweroff");
-    expect(manager.get(handle)).toMatchObject({
+    await operations.wait(work);
+    await expect(operations.wait(handle)).rejects.toThrow(
+      "Host refused poweroff",
+    );
+    expect(operations.get(handle)).toMatchObject({
       status: "failed",
       phase: "host-handoff",
     });
     const retry = await eden.execute<OperationHandle>("system/power", {
       action: "poweroff",
     });
-    await expect(manager.wait(retry)).resolves.toBeUndefined();
-    expect(manager.get(retry)).toMatchObject({
+    await expect(operations.wait(retry)).resolves.toBeUndefined();
+    expect(operations.get(retry)).toMatchObject({
       status: "succeeded",
       phase: "host-handoff",
     });
@@ -66,12 +68,12 @@ describe("power operation lifecycle", () => {
         },
       },
     });
-    const manager = eden.runtime.services.operations;
+    const operations = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>("system/power", {
       action: "poweroff",
     });
     let admissionDuringFailure: Promise<unknown> | undefined;
-    const stop = manager.changed.on(({ payload: { snapshot } }) => {
+    const stop = operations.changed.on(({ payload: { snapshot } }) => {
       if (snapshot.id !== handle.id || snapshot.status !== "failed") return;
       admissionDuringFailure = eden
         .execute("system/power", { action: "poweroff" })
@@ -81,7 +83,7 @@ describe("power operation lifecycle", () => {
         );
     });
     try {
-      await expect(manager.wait(handle)).rejects.toThrow(
+      await expect(operations.wait(handle)).rejects.toThrow(
         "Host refused poweroff",
       );
       expect(admissionDuringFailure).toBeDefined();

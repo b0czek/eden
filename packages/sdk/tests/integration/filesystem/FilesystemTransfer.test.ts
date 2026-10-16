@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test as nodeTest } from "node:test";
 import * as Effect from "effect/Effect";
-import { createFilesystemTransfer } from "../../../src/filesystem/FilesystemTransfer";
+import { createFileTransfers } from "../../../src/filesystem/transfers";
 
 const test = typeof it === "function" ? it : nodeTest;
 
@@ -20,7 +20,7 @@ async function fixture(run: (root: string) => Promise<void>) {
 for (const operation of ["copy", "move"] as const) {
   test(`concurrent ${operation} without overwrite preserves the winning destination`, async () => {
     await fixture(async (root) => {
-      const transfer = createFilesystemTransfer();
+      const transfer = createFileTransfers();
       const sources = [path.join(root, "first"), path.join(root, "second")];
       const contents = [
         "first source".repeat(100000),
@@ -70,7 +70,7 @@ for (const operation of ["copy", "move"] as const) {
 
   test(`failed overwrite ${operation} restores the previous destination and releases admission`, async () => {
     await fixture(async (root) => {
-      const transfer = createFilesystemTransfer();
+      const transfer = createFileTransfers();
       const source = path.join(root, "source");
       const replacement = path.join(root, "replacement");
       const destination = path.join(root, "destination");
@@ -126,7 +126,7 @@ for (const operation of ["copy", "move"] as const) {
 
 test("concurrent copies through a directory alias preserve the winning destination", async () => {
   await fixture(async (root) => {
-    const transfer = createFilesystemTransfer();
+    const transfer = createFileTransfers();
     const target = path.join(root, "target");
     const alias = path.join(root, "alias");
     await fs.mkdir(target);
@@ -167,7 +167,7 @@ test("concurrent copies through a directory alias preserve the winning destinati
 
 test("concurrent overwrite copies publish complete content and remove their backups", async () => {
   await fixture(async (root) => {
-    const transfer = createFilesystemTransfer();
+    const transfer = createFileTransfers();
     const contents = ["first".repeat(100000), "second".repeat(100000)];
     const sources = [path.join(root, "first"), path.join(root, "second")];
     const destination = path.join(root, "destination");
@@ -200,7 +200,7 @@ test("concurrent overwrite copies publish complete content and remove their back
 for (const operation of ["copy", "move"] as const) {
   test(`${operation} preserves file and recursive directory contents`, async () => {
     await fixture(async (root) => {
-      const transfer = createFilesystemTransfer();
+      const transfer = createFileTransfers();
       for (const kind of ["file", "directory"] as const) {
         const source = path.join(root, kind);
         const destination = path.join(root, "nested", kind);
@@ -238,7 +238,7 @@ for (const operation of ["copy", "move"] as const) {
       await fs.writeFile(path.join(source, "nested/new.txt"), "new");
       await fs.writeFile(path.join(destination, "stale/old.txt"), "old");
       await Effect.runPromise(
-        createFilesystemTransfer()[operation]({
+        createFileTransfers()[operation]({
           source,
           destination,
           destinationLabel: destination,
@@ -266,7 +266,7 @@ for (const operation of ["copy", "move"] as const) {
       const source = path.join(root, "tree");
       await fs.mkdir(path.join(source, "child"), { recursive: true });
       await fs.writeFile(path.join(source, "data.txt"), "preserved");
-      const transfer = createFilesystemTransfer();
+      const transfer = createFileTransfers();
       for (const [destination, error] of [
         [source, /must be different/],
         [path.join(source, "child/nested"), /descendant/],

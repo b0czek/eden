@@ -3,14 +3,14 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { EdenConfig, OperationHandle } from "@edenapp/types";
 import type { CommandCallerContext } from "../../src/execution";
-import { CommandRegistry, PermissionRegistry } from "../../src/ipc";
-import { OperationManager } from "../../src/operations/OperationManager";
+import { Commands, Permissions } from "../../src/ipc";
+import { Operations } from "../../src/operations/service";
 import {
   createEdenRuntime,
   type EdenRuntime,
   type EdenRuntimePaths,
-} from "../../src/runtime/EdenRuntime";
-import { SessionContext } from "../../src/session/SessionContext";
+} from "../../src/runtime/runtime";
+import { SessionContext } from "../../src/session/context";
 import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,
@@ -44,7 +44,7 @@ export interface TestEden {
 
 /**
  * Internal integration harness. It substitutes only the Electron platform
- * edge; all Eden managers, handlers, permissions, persistence, and filesystem
+ * edge; all Eden services, handlers, permissions, persistence, and filesystem
  * behavior are the production implementations.
  */
 export async function createTestEden(

@@ -13,15 +13,15 @@ import { createAppAssociations } from "../../../src/app-associations/service";
 import type { TargetedNotification } from "../../../src/controllers/events";
 import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
-import { createExecutionContext } from "../../../src/execution/ExecutionContext";
+import { createExecutionContext } from "../../../src/execution/context";
 import { createFilePickerProcesses } from "../../../src/file-picker/adapters";
 import { createFilePickerController } from "../../../src/file-picker/controller-edenapi";
 import type { FilePickerDependencies } from "../../../src/file-picker/ports";
 import { createFilePicker } from "../../../src/file-picker/service";
-import { createVolumeManager } from "../../../src/filesystem/VolumeManager";
-import { createPermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import { createPackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { createPackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { createVolumes } from "../../../src/filesystem/volumes";
+import { createPermissions } from "../../../src/ipc/permissions";
+import { createPackageCatalog } from "../../../src/packages/catalog";
+import { createInstalledPackages } from "../../../src/packages/installed";
 import { testApp } from "../../support/apps";
 
 const provider = { appId: "com.example.picker", webContentsId: 100 };
@@ -44,8 +44,8 @@ async function createScenario() {
     execution.run({ principal: { kind: "user", profile: vendor } }, () =>
       runtime.run(work),
     );
-  const registry = createPackageRegistry();
-  const permissions = createPermissionRegistry();
+  const registry = createInstalledPackages();
+  const permissions = createPermissions();
   const installProvider = (id: string, permitted = true) => {
     registry.register(
       testApp(id, {
@@ -88,7 +88,7 @@ async function createScenario() {
   const closed: TargetedNotification<FilePickerResult>[] = [];
   const opened: TargetedNotification<{ picker: FilePickerOpenEvent }>[] = [];
   const replacements: Effect.Effect<{ requestId: string }, Error>[] = [];
-  const volumes = await runtime.acquire(createVolumeManager());
+  const volumes = await runtime.acquire(createVolumes());
   const dependencies: FilePickerDependencies = {
     associations,
     views: {

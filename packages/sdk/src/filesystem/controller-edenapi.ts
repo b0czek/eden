@@ -1,10 +1,10 @@
 import { command, defineController } from "../controllers/controller";
-import type { ExecutionContext } from "../execution/ExecutionContext";
-import type { VolumeManager } from "./VolumeManager";
+import type { ExecutionContext } from "../execution/context";
 import { volumeEjectArgsSchema } from "./volume-schemas";
+import type { Volumes } from "./volumes";
 
 export function createVolumeController(
-  manager: VolumeManager,
+  volumes: Volumes,
   execution: ExecutionContext,
 ) {
   function requirePrincipal(): void {
@@ -18,7 +18,7 @@ export function createVolumeController(
         permission: "read",
         handle: () => {
           requirePrincipal();
-          return manager.list();
+          return volumes.list();
         },
       }),
       eject: command({
@@ -27,10 +27,10 @@ export function createVolumeController(
         input: volumeEjectArgsSchema,
         handle: ({ volume }) => {
           requirePrincipal();
-          return manager.prepareEject(volume);
+          return volumes.prepareEject(volume);
         },
       }),
     },
-    events: { changed: manager.changed },
+    events: { changed: volumes.changed },
   });
 }

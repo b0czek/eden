@@ -1,6 +1,6 @@
 import type { EdenPowerCapabilities } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { OperationReporter } from "../operations/OperationTask";
+import type { OperationReporter } from "../operations/task";
 
 export type PowerAction = "poweroff" | "reboot";
 

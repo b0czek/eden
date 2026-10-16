@@ -1,12 +1,12 @@
 import * as Effect from "effect/Effect";
-import type { ExecutionContext } from "../execution/ExecutionContext";
-import type { ProcessManager } from "../process-manager/ProcessManager";
+import type { ExecutionContext } from "../execution/context";
+import type { Processes } from "../processes/service";
 import type { AutostartProcesses } from "./ports";
 
 /** Launch autostart apps under the selected account authority. */
 export function createAutostartProcesses(
   processes: Pick<
-    ProcessManager,
+    Processes,
     "getAppInstance" | "getInstalledManifest" | "launchApp"
   >,
   execution: Pick<ExecutionContext, "provide">,

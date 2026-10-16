@@ -1,9 +1,9 @@
-import type { ViewManager } from "../view-manager/ViewManager";
+import type { Views } from "../views/service";
 import type { KeyboardViews } from "./ports";
 
 export function createKeyboardViews(
   views: Pick<
-    ViewManager,
+    Views,
     | "getAppIdByWebContentsId"
     | "getViewIdByWebContentsId"
     | "getViewInfo"

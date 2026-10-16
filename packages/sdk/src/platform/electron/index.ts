@@ -1,1 +1,1 @@
-export { createElectronPlatform } from "./ElectronPlatform";
+export { createElectronPlatform } from "./platform";

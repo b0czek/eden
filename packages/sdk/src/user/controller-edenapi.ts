@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
-import type { ExecutionContext } from "../execution/ExecutionContext";
-import type { SessionManager } from "../session/SessionManager";
-import type { GrantCatalogManager } from "./GrantCatalogManager";
+import type { ExecutionContext } from "../execution/context";
+import type { Sessions } from "../session/service";
+import type { GrantCatalog } from "./grant-catalog";
 import {
   createUserSchema,
   defaultUsernameSchema,
@@ -12,7 +12,7 @@ import {
   updateUserSchema,
   usernameSchema,
 } from "./schemas";
-import type { UserManager } from "./UserManager";
+import type { Users } from "./service";
 
 export function createUserController({
   users,
@@ -20,10 +20,10 @@ export function createUserController({
   execution,
   grants,
 }: {
-  users: UserManager;
-  sessions: SessionManager;
+  users: Users;
+  sessions: Sessions;
   execution: ExecutionContext;
-  grants: GrantCatalogManager;
+  grants: GrantCatalog;
 }) {
   function assertVendor() {
     if (!execution.isVendor()) throw new Error("Vendor account required");

@@ -4,12 +4,12 @@ import {
   logFromConsole,
   setLogContext,
 } from "../logging";
-import { decodeLaunchContext } from "../utils/appLaunchContext";
+import { decodeLaunchContext } from "../utils/app-launch-context";
 import { dispatchEvent } from "./common/event-subscriptions";
 /**
  * Backend Runtime
  *
- * This module runs inside Electron's utility process (forked by BackendManager).
+ * This module runs inside Electron's utility process (forked by Backends).
  * It provides the global `worker` object with `edenAPI` and `appBus` APIs,
  * mirroring the frontend's `window.edenAPI` and `window.appBus`.
  *

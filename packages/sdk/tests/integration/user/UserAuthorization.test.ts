@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
-import type { UserManager } from "../../../src/user/UserManager";
+import type { Users } from "../../../src/user/service";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -15,7 +15,7 @@ const mutations = [
 
 describe("account command authorization", () => {
   let eden: TestEden;
-  let users: UserManager;
+  let users: Users;
   let vendor: UserProfile;
   let standard: UserProfile;
 
@@ -52,7 +52,7 @@ describe("account command authorization", () => {
         grants: [],
       }),
     );
-    eden.runtime.services.permissions.registerApp("account-manager", [
+    eden.runtime.services.permissions.registerApp("account-users", [
       "user/manage",
     ]);
   });
@@ -70,7 +70,7 @@ describe("account command authorization", () => {
     ],
     [
       "permitted app without vendor account",
-      "account-manager",
+      "account-users",
       "standard",
       "Vendor account required",
     ],
@@ -101,7 +101,7 @@ describe("account command authorization", () => {
 
   it("allows a permitted vendor to create, update, reset credentials, set the default, and delete accounts", async () => {
     const caller = {
-      appId: "account-manager",
+      appId: "account-users",
       principal: { kind: "user" as const, profile: vendor },
     };
     await eden.execute(
@@ -137,7 +137,7 @@ describe("account command authorization", () => {
   it("revokes a grant for an already running app on its next renderer command", async () => {
     const appId = "com.example.granted-reader";
     const grant = `app/${appId}/read`;
-    eden.runtime.services.packageRegistry.register(
+    eden.runtime.services.installedPackages.register(
       testApp(appId, {
         resolvedGrants: [
           {
@@ -192,7 +192,7 @@ describe("account command authorization", () => {
       "user/update",
       { username: standard.username, grants: [`apps/launch/${appId}`] },
       {
-        appId: "account-manager",
+        appId: "account-users",
         principal: { kind: "user", profile: vendor },
       },
     );

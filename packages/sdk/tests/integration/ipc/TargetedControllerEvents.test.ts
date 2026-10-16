@@ -6,10 +6,10 @@ import {
   targetedEvent,
 } from "../../../src/controllers/events";
 import { createEvent } from "../../../src/events/event";
-import { IPCBridge } from "../../../src/ipc/IPCBridge";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
-import { ViewManager } from "../../../src/view-manager/ViewManager";
+import { IpcTransport } from "../../../src/ipc/transport";
+import { InstalledPackages } from "../../../src/packages/installed";
+import { Processes } from "../../../src/processes/service";
+import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
@@ -19,7 +19,7 @@ it("delivers a controller notification only to selected subscribed views and rel
   const source = createEvent<TargetedNotification<{ value: string }>>();
   const mixed = createEvent<RoutedNotification<{ value: string }>>();
   try {
-    const registry = eden.runtime.services.packageRegistry;
+    const registry = eden.runtime.services.installedPackages;
     const ids = ["com.example.first", "com.example.second"];
     for (const id of ids) registry.register(testApp(id));
     const { user } = await createTestCaller(eden, ids[0], []);

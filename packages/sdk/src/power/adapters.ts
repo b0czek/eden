@@ -24,13 +24,13 @@ export function createPowerHost(
   };
 }
 
-export function createPowerShutdown(manager: {
+export function createPowerShutdown(target: {
   shutdown(): Promise<void>;
 }): PowerShutdown {
   return {
     shutdown: () =>
       Effect.tryPromise({
-        try: () => manager.shutdown(),
+        try: () => target.shutdown(),
         catch: asError,
       }).pipe(Effect.uninterruptible),
   };

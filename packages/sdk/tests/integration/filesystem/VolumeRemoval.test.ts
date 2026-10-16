@@ -5,7 +5,7 @@ import type {
   OperationHandle,
   UserProfile,
 } from "@edenapp/types";
-import type { EdenVolumeOptions } from "../../../src/api/ControlPlaneApi";
+import type { EdenVolumeOptions } from "../../../src/api/control-plane";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -73,7 +73,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.services.operations;
+    const filesystem = eden.runtime.services.operations;
     const copy = await eden.execute<OperationHandle>(
       "fs/cp",
       {
@@ -82,18 +82,18 @@ describe("safe volume removal", () => {
       },
       caller,
     );
-    expect(manager.get(copy, caller).status).toBe("queued");
+    expect(filesystem.get(copy, caller).status).toBe("queued");
     const eject = await eden.execute<OperationHandle>(
       "volume/eject",
       { volume: "usb" },
       caller,
     );
-    expect(manager.get(copy, caller).status).toBe("queued");
+    expect(filesystem.get(copy, caller).status).toBe("queued");
     expect(
       eden.runtime.volumes.list().find((volume) => volume.id === "usb")?.state,
     ).toBe("ejecting");
-    await manager.wait(copy, caller);
-    await manager.wait(eject, caller);
+    await filesystem.wait(copy, caller);
+    await filesystem.wait(eject, caller);
     expect(hostContent).toBe("queued work");
   });
 
@@ -122,7 +122,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.services.operations;
+    const filesystem = eden.runtime.services.operations;
     const first = await eden.execute<OperationHandle>(
       "fs/cp",
       {
@@ -132,7 +132,7 @@ describe("safe volume removal", () => {
       caller,
     );
     let firstFinished = false;
-    const firstResult = manager.wait(first, caller).then(() => {
+    const firstResult = filesystem.wait(first, caller).then(() => {
       firstFinished = true;
     });
     // Release stalled I/O even if cancellation is broken, so failure can clean up.
@@ -153,10 +153,10 @@ describe("safe volume removal", () => {
         { volume: "usb" },
         caller,
       );
-      await expect(manager.wait(second, caller)).rejects.toMatchObject({
+      await expect(filesystem.wait(second, caller)).rejects.toMatchObject({
         name: "AbortError",
       });
-      await manager.wait(eject, caller);
+      await filesystem.wait(eject, caller);
       expect(firstFinished).toBe(false);
       expect(ejected).toBe(true);
       expect(await fs.readdir(usbRoot)).toEqual([]);
@@ -199,7 +199,7 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.services.operations;
+    const filesystem = eden.runtime.services.operations;
     try {
       const opening = await eden.execute<OperationHandle>(
         "file/open",
@@ -208,7 +208,7 @@ describe("safe volume removal", () => {
         },
         caller,
       );
-      expect(manager.get(opening, caller).status).toBe("queued");
+      expect(filesystem.get(opening, caller).status).toBe("queued");
       const ejecting = await eden.execute<OperationHandle>(
         "volume/eject",
         { volume: "usb" },
@@ -220,10 +220,10 @@ describe("safe volume removal", () => {
       expect(hostCalls).toBe(0);
       finishClose.resolve();
       // No handler is installed, but the real metadata read must finish safely.
-      await expect(manager.wait(opening, caller)).resolves.toMatchObject({
+      await expect(filesystem.wait(opening, caller)).resolves.toMatchObject({
         success: false,
       });
-      await manager.wait(ejecting, caller);
+      await filesystem.wait(ejecting, caller);
       expect(hostCalls).toBe(1);
     } finally {
       finishClose.resolve();
@@ -290,23 +290,23 @@ describe("safe volume removal", () => {
       appId,
       principal: { kind: "user" as const, profile: user },
     };
-    const manager = eden.runtime.services.operations;
+    const filesystem = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>(
       "volume/eject",
       { volume: "usb" },
       caller,
     );
-    expect(manager.get(handle, caller).status).toBe("queued");
+    expect(filesystem.get(handle, caller).status).toBe("queued");
     expect(
       eden.runtime.volumes.list().find((volume) => volume.id === "usb")?.state,
     ).toBe("ejecting");
     await expect(
       execute("fs/read", { location: { volume: "usb", path: "/late.txt" } }),
     ).rejects.toThrow("ejecting");
-    await expect(manager.wait(handle, caller)).rejects.toThrow(
+    await expect(filesystem.wait(handle, caller)).rejects.toThrow(
       "Device is busy",
     );
-    expect(manager.get(handle, caller)).toMatchObject({
+    expect(filesystem.get(handle, caller)).toMatchObject({
       status: "failed",
       phase: "host-eject",
       error: { message: "Device is busy" },
@@ -328,9 +328,11 @@ describe("safe volume removal", () => {
       caller,
     );
     expect(retry.id).not.toBe(handle.id);
-    await manager.wait(retry, caller);
-    expect(manager.get(retry, caller)).toMatchObject({ status: "succeeded" });
-    expect(manager.get(handle, caller).status).toBe("failed");
+    await filesystem.wait(retry, caller);
+    expect(filesystem.get(retry, caller)).toMatchObject({
+      status: "succeeded",
+    });
+    expect(filesystem.get(handle, caller).status).toBe("failed");
     expect(states).toEqual(["ejecting", "ready", "ejecting", undefined]);
     stop();
   });
@@ -412,12 +414,12 @@ describe("safe volume removal", () => {
         path.join(eden.paths.userDirectory, "report.txt"),
         "complete report",
       );
-      const manager = eden.runtime.services.volumes;
-      const getRoot = manager.getRoot.bind(manager);
+      const filesystem = eden.runtime.services.volumes;
+      const getRoot = filesystem.getRoot.bind(filesystem);
       let paused = false;
       // Pause one real operation at its mount check to make the race deterministic.
       // The remaining permissions, path checks, transfer, and IO are production code.
-      jest.spyOn(manager, "getRoot").mockImplementation((id, inherited) => {
+      jest.spyOn(filesystem, "getRoot").mockImplementation((id, inherited) => {
         const root = getRoot(id, inherited);
         if (id !== "usb" || !root || paused) return root;
         paused = true;

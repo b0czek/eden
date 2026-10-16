@@ -35,7 +35,7 @@
       "includes": [
         "packages/sdk/src/**/*.ts",
         "!packages/sdk/src/**/*.test.ts",
-        "!packages/sdk/src/Eden.ts",
+        "!packages/sdk/src/host.ts",
         "!packages/sdk/src/platform/electron/**",
         "!packages/sdk/src/app-runtime/**"
       ],

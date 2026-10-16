@@ -1,24 +1,24 @@
 # Processes and Daemons
 
-`ProcessManager` manages the lifecycle of every Eden app process.
-`DaemonManager` adds persistent configuration and supervision policy for
+`Processes` manages the lifecycle of every Eden app process.
+`Daemons` adds persistent configuration and supervision policy for
 backend-only processes and delegates their lifecycle operations to
-`ProcessManager`.
+`Processes`.
 
 ## Responsibilities
 
-`ProcessManager` owns process mechanics:
+`Processes` owns process mechanics:
 
 - the authoritative map of running `AppInstance` objects;
 - the one-running-instance-per-app-ID invariant;
-- backend creation and termination through `BackendManager`;
-- frontend view creation and removal through `ViewManager`;
+- backend creation and termination through `Backends`;
+- frontend view creation and removal through `Views`;
 - appbus service cleanup;
 - runtime execution-context registration;
 - process launch, stop, exit, reload, metrics, and shutdown events;
 - filtering and stopping processes by lifetime owner.
 
-`DaemonManager` owns daemon policy:
+`Daemons` owns daemon policy:
 
 - discovering installed backend-only apps;
 - loading and persisting daemon definitions;
@@ -29,7 +29,7 @@ backend-only processes and delegates their lifecycle operations to
 - presenting daemon status to management UI.
 
 All daemon process creation, view handling, runtime-instance tracking, and
-termination remain within `ProcessManager` and its existing collaborators.
+termination remain within `Processes` and its existing collaborators.
 
 ## Classifying Apps
 
@@ -76,40 +76,41 @@ Node.js code and retains its host-process UID and GID.
 
 ### Execution Context
 
-`ExecutionContext.run(context, task)` establishes the caller identity for one
-asynchronous operation. Code reached from `task`, including code after an
-`await`, can use `getPrincipal()`, `hasGrant()`, and the other execution-context
-checks without passing the caller through every method:
+`executionContext.provide(work, context)` establishes the caller identity for an
+Effect workflow. Use `executionContext.run(context, task)` at JavaScript callback
+boundaries. Both let domain operations use `getPrincipal()`, `hasGrant()`, and
+the other execution-context checks without passing the caller through every
+method:
 
 ```ts
-await executionContext.run(
-  { principal: { kind: "user", profile } },
-  async () => {
-    await processManager.launchApp("com.example.app");
-  },
+await effects.run(
+  executionContext.provide(processes.launchApp("com.example.app"), {
+    principal: { kind: "user", profile },
+  }),
 );
 ```
 
-The context uses Node.js `AsyncLocalStorage`. Concurrent operations may carry
-different principals without changing each other, and the context stops being
+Effect workflows use the runtime's caller context; JavaScript callbacks use
+Node.js `AsyncLocalStorage`. Concurrent operations may carry different principals
+without changing each other, and the context stops being
 active when its task finishes. It does not change `SessionContext` or the
-logged-in user. IPC commands establish it in `CommandRegistry`;
+logged-in user. IPC commands establish it in `Commands`;
 system-triggered work such as session autostart establishes it explicitly
 before calling code that performs authorization checks.
 
 ## Sessions and Autostart
 
 Session IDs are opaque and change when the interactive identity changes.
-`SessionManager` stops all processes owned by the old session before committing
+`Sessions` stops all processes owned by the old session before committing
 the new session. System-owned daemons remain outside that selection.
 
-`AutostartManager` handles frontend-bearing session applications after a
-session is committed. It ignores backend-only apps. `DaemonManager` handles
+`Autostart` handles frontend-bearing session applications after a
+session is committed. It ignores backend-only apps. `Daemons` handles
 backend-only boot services independently and initializes before the first
 interactive session is committed.
 
-Daemon boot launch belongs to `DaemonManager`; interactive application launch
-belongs to `AutostartManager`. Process ownership is assigned at launch.
+Daemon boot launch belongs to `Daemons`; interactive application launch
+belongs to `Autostart`. Process ownership is assigned at launch.
 
 ## Definitions and Runtime Behavior
 

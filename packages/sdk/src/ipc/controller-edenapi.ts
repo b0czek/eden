@@ -1,16 +1,16 @@
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { APP_EVENT_NAMES } from "../generated/runtime";
-import type { OperationManager } from "../operations/OperationManager";
 import { operationHandleSchema } from "../operations/schemas";
-import type { ViewManager } from "../view-manager/ViewManager";
-import type { EventSubscriberManager } from "./EventSubscriberManager";
-import { assertFoundationEventAllowed } from "./FoundationPolicy";
+import type { Operations } from "../operations/service";
+import type { Views } from "../views/service";
+import type { EventRouting } from "./event-routing";
+import { assertFoundationEventAllowed } from "./foundation-policy";
 
 export function createEventController(
-  subscriptions: EventSubscriberManager,
-  views: ViewManager,
-  operations: OperationManager,
+  subscriptions: EventRouting,
+  views: Views,
+  operations: Operations,
 ) {
   const eventArgs = v.object({
     eventName: v.string(),
