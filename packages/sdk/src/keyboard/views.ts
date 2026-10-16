@@ -10,7 +10,7 @@ export function createKeyboardViews(
     | "getAllViews"
     | "sendToView"
     | "setKeyboardPresentationLift"
-    | "on"
+    | "globalBoundsChanged"
   >,
 ): KeyboardViews {
   return {
@@ -32,8 +32,6 @@ export function createKeyboardViews(
     list: () => [...views.getAllViews()].map(([id]) => id),
     send: (id, channel, payload) => views.sendToView(id, channel, payload),
     setPresentationLift: (lift) => views.setKeyboardPresentationLift(lift),
-    boundsChanged: {
-      on: (listener) => views.on("global-bounds-changed", listener),
-    },
+    boundsChanged: views.globalBoundsChanged,
   };
 }

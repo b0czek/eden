@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -6,15 +5,15 @@ import * as path from "node:path";
 import type { EdenKeyboardState, ViewBounds } from "@edenapp/types";
 import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
-import type { KeyboardViews } from "../../../src/keyboard/ports";
-import { createKeyboardViews } from "../../../src/keyboard/views";
-import type { ViewInfo } from "../../../src/view-manager/types";
-import { testApp } from "../../support/apps";
 import { createKeyboardAssets } from "../../../src/keyboard/assets";
+import type { KeyboardViews } from "../../../src/keyboard/ports";
 import { createKeyboard } from "../../../src/keyboard/service";
+import { createKeyboardViews } from "../../../src/keyboard/views";
 import { EDEN_SETTINGS_APP_ID } from "../../../src/settings/constants";
 import { createSettings } from "../../../src/settings/service";
 import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
+import type { ViewInfo } from "../../../src/view-manager/types";
+import { testApp } from "../../support/apps";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 
 const resources: Array<() => Promise<void>> = [];
@@ -208,7 +207,7 @@ describe("keyboard settings and native lifetime", () => {
       getAllViews: () => [[info.id, info]],
       sendToView: () => !target.webContents.isDestroyed(),
       setKeyboardPresentationLift: () => undefined,
-      on: () => () => undefined,
+      globalBoundsChanged: createEvent(),
     });
     const nativeEvents = new EventEmitter();
     const s = await createScenario(
