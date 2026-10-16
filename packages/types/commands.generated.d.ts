@@ -646,20 +646,15 @@ export interface NotificationCommands {
    */
   "notification/register-display": {
     mode: "result";
-    args: { };
-    response: { success: boolean };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
   /**
    * Push a new notification to subscribers.
    */
   "notification/push": {
     mode: "result";
-    args: {
-    title: string;
-    message: string;
-    timeout?: number;
-    type?: import("./index").NotificationType;
-    actions?: import("./index").NotificationAction[] };
+    args: { title: string; message: string; timeout?: number | undefined; type?: import("./index").NotificationType | undefined; actions?: import("./index").NotificationAction[] | undefined; };
     response: import("./index").Notification;
   };
   /**
@@ -667,19 +662,16 @@ export interface NotificationCommands {
    */
   "notification/action-clicked": {
     mode: "result";
-    args: {
-    notificationId: string;
-    actionId: string };
-    response: { success: boolean };
+    args: { notificationId: string; actionId: string; };
+    response: { success: boolean; };
   };
   /**
    * Report a notification dismissal from the toaster.
    */
   "notification/dismissed": {
     mode: "result";
-    args: {
-    notificationId: string };
-    response: { success: boolean };
+    args: { notificationId: string; };
+    response: { success: boolean; };
   };
 }
 

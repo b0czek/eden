@@ -68,12 +68,9 @@ export interface I18nEvents {
  * NotificationEvents - Events for the "notification" namespace
  */
 export interface NotificationEvents {
-  "notification/added": { notification: import("./index").Notification };
-  "notification/removed": { id: string };
-  "notification/action-clicked": {
-    notificationId: string;
-    actionId: string;
-  };
+  "notification/added": { notification: import("./index").Notification; };
+  "notification/removed": { id: string; };
+  "notification/action-clicked": { notificationId: string; actionId: string; };
 }
 
 /**

@@ -188,7 +188,10 @@ export function createFilePicker({
       });
     }
 
-    function openPicker(args: FilePickerOpenArgs, caller?: FilePickerCaller) {
+    function openPicker(
+      args: FilePickerOpenArgs,
+      caller?: FilePickerCaller,
+    ): Effect.Effect<{ requestId: string }, Error> {
       return Effect.gen(function* () {
         yield* attempt(() => {
           if (disposed) throw new Error("File picker is disposed");
@@ -229,18 +232,20 @@ export function createFilePicker({
           return { appId: caller.appId, viewId };
         });
         yield* ensureDisplayProvider();
+        if (activeRequest) {
+          yield* notifications.busy(
+            forceOpenPicker({ ...args }, { ...(caller ?? {}) }),
+          );
+          return yield* Effect.fail(
+            new Error(
+              "File picker is busy. Resolve the current file picker before opening another.",
+            ),
+          );
+        }
         const request = yield* attempt(() => {
           const provider = providers.get();
           if (!provider)
             throw new Error("File picker display provider is not registered");
-          if (activeRequest) {
-            const blockedArgs = { ...args };
-            const blockedCaller = { ...(caller ?? {}) };
-            notifications.busy(forceOpenPicker(blockedArgs, blockedCaller));
-            throw new Error(
-              "File picker is busy. Resolve the current file picker before opening another.",
-            );
-          }
           const initialLocation =
             args.initialLocation ??
             files.accessScope(args.allowedVolumes?.[0] ?? "home");
@@ -275,7 +280,7 @@ export function createFilePicker({
     function forceOpenPicker(
       args: FilePickerOpenArgs,
       caller: FilePickerCaller,
-    ) {
+    ): Effect.Effect<{ requestId: string }, Error> {
       return Effect.gen(function* () {
         yield* attempt(() => {
           pruneStaleState();

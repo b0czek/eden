@@ -47,7 +47,9 @@ export interface FilePickerPermissions {
 }
 
 export interface FilePickerNotifications {
-  busy(replace: Effect.Effect<{ requestId: string }, Error>): void;
+  busy(
+    replace: Effect.Effect<{ requestId: string }, Error>,
+  ): Effect.Effect<void, Error>;
 }
 
 export interface FilePickerDependencies {

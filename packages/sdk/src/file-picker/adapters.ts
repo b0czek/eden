@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import type { EventListener } from "../events/event";
 import type { FilesystemManager } from "../filesystem/FilesystemManager";
-import type { NotificationManager } from "../notification/NotificationManager";
+import type { Notifications } from "../notification/service";
 import type { ProcessManager } from "../process-manager/ProcessManager";
 import type { ViewManager } from "../view-manager/ViewManager";
 import type {
@@ -84,25 +84,23 @@ export function createFilePickerFiles(
   };
 }
 
-/** The notification callback is a host boundary and uses its owning runtime. */
+/** Compose native notification callbacks with the picker replacement Effect. */
 export function createFilePickerNotifications(
-  notifications: Pick<NotificationManager, "pushNotification">,
-  run: <A>(effect: Effect.Effect<A, Error>) => Promise<A>,
+  notifications: Pick<Notifications, "pushNotification">,
 ): FilePickerNotifications {
   return {
-    busy: (replace) => {
-      notifications.pushNotification(
-        "File picker is busy",
-        "Resolve the current file picker before opening another.",
-        0,
-        "warning",
-        [{ id: "force-open-file-picker", label: "Force open" }],
-        {
-          "force-open-file-picker": async () => {
-            await run(replace);
+    busy: (replace) =>
+      Effect.asVoid(
+        notifications.pushNotification(
+          "File picker is busy",
+          "Resolve the current file picker before opening another.",
+          0,
+          "warning",
+          [{ id: "force-open-file-picker", label: "Force open" }],
+          {
+            "force-open-file-picker": () => Effect.asVoid(replace),
           },
-        },
-      );
-    },
+        ),
+      ),
   };
 }

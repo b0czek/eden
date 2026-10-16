@@ -74,7 +74,11 @@ import { createI18nSettings } from "../i18n/settings";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
 import { log } from "../logging";
-import { NotificationManager } from "../notification";
+import {
+  createNotifications,
+  createNotificationController,
+  createNotificationViews,
+} from "../notification";
 import { OperationHandler } from "../operations/OperationHandler";
 import { OperationManager } from "../operations/OperationManager";
 import { PackageManager } from "../package-manager";
@@ -502,7 +506,12 @@ export class EdenRuntime {
 
     this.resolveOwned(SystemHandler);
     this.resolveOwned(PowerHandler);
-    this.resolveOwned(NotificationManager);
+    const notifications = await this.effects.acquire(
+      createNotifications({ views: createNotificationViews(this.viewManager) }),
+    );
+    this.ipcBridge.registerController(
+      createNotificationController(notifications),
+    );
     const contextMenu = await this.effects.acquire(
       createContextMenu({ views: createContextMenuViews(this.viewManager) }),
     );
@@ -516,8 +525,7 @@ export class EdenRuntime {
         volumes: this.resolveOwned(VolumeManager),
         permissions: this.resolveOwned(PermissionRegistry),
         notifications: createFilePickerNotifications(
-          this.resolveOwned(NotificationManager),
-          this.effects.run,
+          notifications,
         ),
       }),
     );

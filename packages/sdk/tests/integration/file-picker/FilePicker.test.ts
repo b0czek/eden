@@ -115,9 +115,10 @@ async function createScenario() {
       stopped,
     },
     notifications: {
-      busy: (replace) => {
-        replacements.push(replace);
-      },
+      busy: (replace) =>
+        Effect.sync(() => {
+          replacements.push(replace);
+        }),
     },
     permissions,
     volumes,
