@@ -72,7 +72,12 @@ import { createI18nController } from "../i18n/controller";
 import { createI18n } from "../i18n/service";
 import { createI18nSettings } from "../i18n/settings";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
-import { KeyboardManager } from "../keyboard/KeyboardManager";
+import {
+  createKeyboard,
+  createKeyboardAssets,
+  createKeyboardViews,
+  type Keyboard,
+} from "../keyboard";
 import { log } from "../logging";
 import {
   createNotifications,
@@ -177,7 +182,7 @@ export class EdenRuntime {
   private userManager!: UserManager;
   private sessionManager!: SessionManager;
   private daemonManager!: DaemonManager;
-  private keyboardManager!: KeyboardManager;
+  private keyboardService!: Keyboard;
 
   public readonly settings: EdenSettingsApi;
 
@@ -372,7 +377,9 @@ export class EdenRuntime {
   /** Recreate the foundation window when the host application is activated. */
   public activate(): void {
     if (this.lifecycleState === "ready" && this.mainWindow === null) {
-      this.createMainWindow();
+      void this.createMainWindow().catch((error) =>
+        log.error("Failed to activate foundation window:", error),
+      );
     }
   }
 
@@ -395,7 +402,8 @@ export class EdenRuntime {
       await this.effects.run(this.appearanceService.initialize());
       await this.effects.run(this.appAssociationManager.initialize());
       this.assertStartupActive();
-      this.createMainWindow();
+      await this.createMainWindow();
+      this.assertStartupActive();
 
       this.lifecycleState = "ready";
       this.readySettled = true;
@@ -502,7 +510,23 @@ export class EdenRuntime {
       createFileOpenController(fileOpen, fileOpenOperations),
     );
     this.autostartManager = this.resolveOwned(AutostartManager);
-    this.keyboardManager = this.resolveOwned(KeyboardManager);
+    this.keyboardService = await this.effects.acquire(
+      createKeyboard({
+        assets: createKeyboardAssets(),
+        settings,
+        views: createKeyboardViews(this.viewManager),
+        processes: {
+          stopped: {
+            on: (listener) => this.processManager.on("stopped", listener),
+          },
+        },
+        windows: this.platform.windows,
+        rendererIpc: this.platform.rendererIpc,
+        display: this.platform.display,
+        run: this.effects.run,
+      }),
+    );
+    await this.effects.run(this.keyboardService.initialize());
 
     this.resolveOwned(SystemHandler);
     this.resolveOwned(PowerHandler);
@@ -524,9 +548,7 @@ export class EdenRuntime {
         files: createFilePickerFiles(filesystem),
         volumes: this.resolveOwned(VolumeManager),
         permissions: this.resolveOwned(PermissionRegistry),
-        notifications: createFilePickerNotifications(
-          notifications,
-        ),
+        notifications: createFilePickerNotifications(notifications),
       }),
     );
     this.ipcBridge.registerController(createFilePickerController(filePicker));
@@ -591,7 +613,7 @@ export class EdenRuntime {
     }
   }
 
-  private createMainWindow(): void {
+  private async createMainWindow(): Promise<void> {
     const windowConfig = this.config.window || {};
     const title = this.brandingService.getWindowTitle(windowConfig.title);
     const icon = this.brandingService.getWindowIconPath();
@@ -623,7 +645,7 @@ export class EdenRuntime {
     });
     this.viewManager.setMainWindow(this.mainWindow);
     this.ipcBridge.setMainWindow(this.mainWindow);
-    this.keyboardManager.setMainWindow(this.mainWindow);
+    await this.effects.run(this.keyboardService.setMainWindow(this.mainWindow));
     this.mainWindow.loadFile(
       path.join(this.paths.distPath, "foundation/foundation.html"),
     );

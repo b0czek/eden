@@ -201,6 +201,26 @@ describe("EdenRuntime integration", () => {
     }
   });
 
+  it("aborts readiness when shutdown starts while attaching the keyboard to the foundation window", async () => {
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+    const windows = eden.platform.windows;
+    const createWindow = windows.createWindow.bind(windows);
+    windows.createWindow = (options) => {
+      const window = createWindow(options);
+      void eden.dispose();
+      return window;
+    };
+    const readiness = expect(eden.runtime.whenReady()).rejects.toThrow(
+      "startup aborted by shutdown",
+    );
+    await expect(eden.start()).rejects.toThrow("startup aborted by shutdown");
+    await eden.dispose();
+    await readiness;
+    expect(eden.runtime.state).toBe("stopped");
+    expect(eden.platform.activeResourceCount).toBe(0);
+  });
+
   it("preserves changed credentials, default account, settings, and wallpaper when restarting the same seeded profile", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-restart-"));
     try {
