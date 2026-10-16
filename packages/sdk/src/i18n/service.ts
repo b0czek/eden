@@ -1,9 +1,14 @@
 import type { RecursiveObject } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEvent } from "../events/event";
+import type { Event } from "../events/event";
+import { listen, scopedEvent } from "../events/scoped";
 import { commonEn } from "./locales/en";
 import { commonPl } from "./locales/pl";
-import type { I18nSettings } from "./ports";
+
+export interface I18nSettings {
+  readLocale(): Effect.Effect<string | undefined, Error>;
+  readonly localeChanged: Pick<Event<{ locale: string }>, "on">;
+}
 
 const CommonTranslations = {
   en: commonEn,
@@ -16,32 +21,24 @@ interface I18nDependencies {
   settings: I18nSettings;
 }
 
-export function createI18n({ settings }: I18nDependencies) {
-  return Effect.gen(function* () {
-    const localeChanged = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<{ locale: string }>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() => settings.localeChanged.on(localeChanged.emit)),
-      (stop) => Effect.sync(stop),
-    );
+export const createI18n = Effect.fn(function* ({ settings }: I18nDependencies) {
+  const localeChanged = yield* scopedEvent<{ locale: string }>();
+  yield* listen(settings.localeChanged, localeChanged.emit);
 
-    function getLocale() {
-      return Effect.map(settings.readLocale(), (locale) => locale || "en");
-    }
-
-    function getCommon(locale: string): {
-      translations: RecursiveObject<string>;
-    } {
-      const validLocale = locale as keyof typeof CommonTranslations;
-      return {
-        translations: CommonTranslations[validLocale] || CommonTranslations.en,
-      };
-    }
-
-    return { getLocale, getCommon, localeChanged };
+  const getLocale = Effect.fn(function* () {
+    return (yield* settings.readLocale()) || "en";
   });
-}
+
+  function getCommon(locale: string): {
+    translations: RecursiveObject<string>;
+  } {
+    const validLocale = locale as keyof typeof CommonTranslations;
+    return {
+      translations: CommonTranslations[validLocale] || CommonTranslations.en,
+    };
+  }
+
+  return { getLocale, getCommon, localeChanged };
+});
 
 export type I18n = Effect.Success<ReturnType<typeof createI18n>>;

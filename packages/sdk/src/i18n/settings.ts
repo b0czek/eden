@@ -1,5 +1,5 @@
 import type { Settings } from "../settings/service";
-import type { I18nSettings } from "./ports";
+import type { I18nSettings } from "./service";
 
 /** Translate persisted settings into the localization domain's capabilities. */
 export function createI18nSettings(
