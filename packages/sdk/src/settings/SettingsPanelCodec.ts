@@ -17,10 +17,25 @@ export interface ValidationFailure {
   path: string;
   message: string;
 }
-export class SettingsPanelViewValidationError extends Error {
-  constructor(readonly path: string) {
-    super(`Invalid settings panel view at ${path}`);
-  }
+const panelViewValidationError = Symbol("SettingsPanelViewValidationError");
+export type SettingsPanelViewValidationError = Error & {
+  readonly path: string;
+  readonly [panelViewValidationError]: true;
+};
+
+export function invalidPanelView(
+  path: string,
+): SettingsPanelViewValidationError {
+  return Object.assign(new Error(`Invalid settings panel view at ${path}`), {
+    path,
+    [panelViewValidationError]: true as const,
+  });
+}
+
+export function isSettingsPanelViewValidationError(
+  error: unknown,
+): error is SettingsPanelViewValidationError {
+  return error instanceof Error && panelViewValidationError in error;
 }
 
 const PANEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
@@ -425,6 +440,13 @@ export function validatePanelProvider(
 ): void {
   if (!provider || typeof provider.load !== "function")
     throw new Error("Settings panel provider requires a load function");
+  if (
+    provider.actions !== undefined &&
+    (provider.actions === null ||
+      typeof provider.actions !== "object" ||
+      Array.isArray(provider.actions))
+  )
+    throw new Error("Settings panel provider actions must be an object");
   for (const action of definition.actions ?? [])
     if (typeof provider.actions?.[action.id] !== "function")
       throw new Error(
@@ -444,16 +466,14 @@ const validateBinding = (
   path: string,
 ): void => {
   const action = definition.actions?.find(({ id }) => id === value.actionId);
-  if (!action) throw new SettingsPanelViewValidationError(`${path}.actionId`);
+  if (!action) throw invalidPanelView(`${path}.actionId`);
   const failures = validatePanelActionInput(
     value.params,
     action.params,
     `${path}.params`,
   );
   if (failures.length)
-    throw new SettingsPanelViewValidationError(
-      failures[0]?.path ?? `${path}.params`,
-    );
+    throw invalidPanelView(failures[0]?.path ?? `${path}.params`);
 };
 
 const validateNode = (
@@ -467,16 +487,14 @@ const validateNode = (
     try {
       validateRules(value.validation, `${path}.validation`);
     } catch {
-      throw new SettingsPanelViewValidationError(`${path}.validation`);
+      throw invalidPanelView(`${path}.validation`);
     }
   }
   if (value.kind === "dialog") {
     const fieldIds = new Set<string>();
     for (const field of value.dialog.fields) {
       if (fieldIds.has(field.id))
-        throw new SettingsPanelViewValidationError(
-          `${path}.dialog.fields.${field.id}`,
-        );
+        throw invalidPanelView(`${path}.dialog.fields.${field.id}`);
       fieldIds.add(field.id);
       try {
         validateRules(
@@ -484,9 +502,7 @@ const validateNode = (
           `${path}.dialog.fields.${field.id}.validation`,
         );
       } catch {
-        throw new SettingsPanelViewValidationError(
-          `${path}.dialog.fields.${field.id}.validation`,
-        );
+        throw invalidPanelView(`${path}.dialog.fields.${field.id}.validation`);
       }
     }
   }
@@ -494,14 +510,12 @@ const validateNode = (
     const itemIds = new Set<string>();
     for (const item of value.items) {
       if (itemIds.has(item.id))
-        throw new SettingsPanelViewValidationError(`${path}.items.${item.id}`);
+        throw invalidPanelView(`${path}.items.${item.id}`);
       itemIds.add(item.id);
       const rowIds = new Set<string>();
       for (const child of item.nodes) {
         if (rowIds.has(child.id))
-          throw new SettingsPanelViewValidationError(
-            `${path}.items.${item.id}.nodes.${child.id}`,
-          );
+          throw invalidPanelView(`${path}.items.${item.id}.nodes.${child.id}`);
         rowIds.add(child.id);
         validateNode(
           child,
@@ -525,24 +539,20 @@ export function cloneAndValidatePanelView(
       error instanceof Error
         ? error.message.match(/ at value\.(.+)$/)?.[1]
         : undefined;
-    throw new SettingsPanelViewValidationError(path ?? "view");
+    throw invalidPanelView(path ?? "view");
   }
   const parsed = v.safeParse(panelView, cloned);
   if (!parsed.success)
-    throw new SettingsPanelViewValidationError(
-      issuePath(parsed.issues) ?? "view",
-    );
+    throw invalidPanelView(issuePath(parsed.issues) ?? "view");
   const sectionIds = new Set<string>();
   for (const section of cloned.sections) {
     if (sectionIds.has(section.id))
-      throw new SettingsPanelViewValidationError(`sections.${section.id}`);
+      throw invalidPanelView(`sections.${section.id}`);
     sectionIds.add(section.id);
     const nodeIds = new Set<string>();
     for (const child of section.nodes) {
       if (nodeIds.has(child.id))
-        throw new SettingsPanelViewValidationError(
-          `sections.${section.id}.nodes.${child.id}`,
-        );
+        throw invalidPanelView(`sections.${section.id}.nodes.${child.id}`);
       nodeIds.add(child.id);
       validateNode(
         child,

@@ -7,19 +7,19 @@ import type {
   SettingsPanelProviderContext,
   SettingsPanelValue,
 } from "@edenapp/types";
-import type { EffectRuntime } from "../../effects/runtime";
+import * as Effect from "effect/Effect";
+
 import type { Appearance } from "../../appearance/service";
 import type { DaemonManager } from "../../daemon";
 import type { PackageManager } from "../../package-manager";
 import type { UserManager } from "../../user";
-import { type LegacySettingsAccess } from "../legacy-access";
 import type { SettingsPanelManager } from "../SettingsPanelManager";
+import type { Settings } from "../service";
 
 export interface BuiltinSettingsDependencies {
   panels: SettingsPanelManager;
-  settings: LegacySettingsAccess;
+  settings: Settings;
   appearance: Appearance;
-  effects: EffectRuntime;
   packageManager: PackageManager;
   daemonManager: DaemonManager;
   userManager: UserManager;
@@ -41,14 +41,14 @@ export interface CustomBuiltinPanel {
     dependencies: BuiltinSettingsDependencies,
   ): (
     context: SettingsPanelProviderContext,
-  ) => { data?: SettingsPanelValue } | Promise<{ data?: SettingsPanelValue }>;
+  ) => Effect.Effect<{ data?: SettingsPanelValue }, Error>;
 }
 
 export type BuiltinPanelAction = Omit<SettingsPanelActionDefinition, "id"> & {
   handler(
     dependencies: BuiltinSettingsDependencies,
     ...args: Parameters<SettingsPanelActionHandler>
-  ): ReturnType<SettingsPanelActionHandler>;
+  ): Effect.Effect<void, Error>;
 };
 
 export type BuiltinPanelModule = GeneratedBuiltinPanel | CustomBuiltinPanel;

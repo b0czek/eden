@@ -16,10 +16,11 @@ import type {
   UserGrantOption,
   UserProfile,
 } from "@edenapp/types";
-import { delay, inject, Lifecycle, scoped } from "tsyringe";
+import * as Effect from "effect/Effect";
 import type { DaemonManager } from "../daemon";
+import { asError } from "../effects/io";
+import { createEvent } from "../events/event";
 import { ExecutionContext } from "../execution";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import type { PackageManager } from "../package-manager";
 import { PackageCatalog } from "../package-manager/PackageCatalog";
@@ -28,7 +29,6 @@ import {
   createGeneratedSettingsPanel,
   type GeneratedPanelOwner,
 } from "./GeneratedSettingsPanel";
-import { LEGACY_SETTINGS, type LegacySettingsAccess } from "./legacy-access";
 import {
   actionAuthorization,
   applyActionAuthorization,
@@ -42,16 +42,16 @@ import {
   cloneAndValidatePanelView,
   cloneRendererValue,
   type InternalPanelDefinition,
-  SettingsPanelViewValidationError,
+  isSettingsPanelViewValidationError,
   validatePanelProvider,
 } from "./SettingsPanelCodec";
-import { SettingsPanelHandler } from "./SettingsPanelHandler";
 import type {
   InternalSettingsPanelProvider,
   PanelRenderer,
   PanelSource,
   SettingsPanelRecord,
 } from "./SettingsPanelRecord";
+import type { Settings } from "./service";
 
 interface SettingsPanelNamespaceEvents {
   "panels-changed": {
@@ -61,44 +61,31 @@ interface SettingsPanelNamespaceEvents {
   };
 }
 
-@scoped(Lifecycle.ContainerScoped)
-@EdenNamespace("settings")
-export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEvents> {
-  private readonly panels = new Map<string, SettingsPanelRecord>();
-  private lifecycleConnected = false;
+export function createSettingsPanelManager({
+  settingsManager,
+  packageCatalog,
+  sessionContext,
+  executionContext,
+}: {
+  settingsManager: Pick<Settings, "get" | "set">;
+  packageCatalog: Pick<PackageCatalog, "getIcon" | "allApps">;
+  sessionContext: SessionContext;
+  executionContext: ExecutionContext;
+}) {
+  const changed = createEvent<SettingsPanelNamespaceEvents["panels-changed"]>();
+  let panels = new Map<string, SettingsPanelRecord>();
 
-  constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(LEGACY_SETTINGS)
-    private readonly settingsManager: LegacySettingsAccess,
-    @inject(PackageCatalog) private readonly packageCatalog: PackageCatalog,
-    @inject(SessionContext) private readonly sessionContext: SessionContext,
-    @inject(ExecutionContext)
-    private readonly executionContext: ExecutionContext,
-  ) {
-    super(ipcBridge);
-    commandRegistry.registerManager(new SettingsPanelHandler(this));
-  }
-
-  /**
-   * Register a trusted host panel. Declarations are copied and callbacks remain
-   * private to this manager.
-   */
-  registerPanel(
+  function registerPanel(
     definition: SettingsPanelDefinition,
-    provider: SettingsPanelProvider,
+    provider: InternalSettingsPanelProvider,
     options: SettingsPanelRegistrationOptions = {},
   ): SettingsPanelRegistration {
-    if (options.visible !== undefined && typeof options.visible !== "boolean") {
-      throw new Error("Settings panel visibility must be a boolean");
-    }
     if (definition.id.startsWith("eden.") || definition.id.startsWith("app.")) {
       throw new Error(
         `Panel ID "${definition.id}" uses an Eden-reserved prefix`,
       );
     }
-    return this.register(
+    return register(
       definition,
       provider,
       "host",
@@ -108,89 +95,49 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       options.visible,
     );
   }
-
-  /** Register an Eden-owned panel, including private custom renderers. */
-  registerBuiltinPanel(
+  function registerBuiltinPanel(
     definition: InternalPanelDefinition,
     provider: InternalSettingsPanelProvider,
     renderer: PanelRenderer = "generic",
   ): SettingsPanelRegistration {
+    const copied = cloneAndValidatePanelDefinition(definition);
+    validatePanelProvider(copied, provider as unknown as SettingsPanelProvider);
     if (!definition.id.startsWith("eden.")) {
       throw new Error("Built-in panel IDs must begin with eden.");
     }
     if (renderer !== "generic" && !definition.grant?.trim()) {
       throw new Error("Custom settings panels require a panel grant");
     }
-    return this.register(definition, provider, "eden", renderer);
+    return register(copied, provider, "eden", renderer);
   }
 
-  connectLifecycle(
-    sessionManager: SessionManager,
-    packageManager: PackageManager,
-    daemonManager: DaemonManager,
-  ): void {
-    if (this.lifecycleConnected) return;
-    this.lifecycleConnected = true;
-
-    sessionManager.on("changed", ({ currentUser, previousUsername }) => {
-      this.notify(
-        "panels-changed",
-        currentUser?.username === previousUsername
-          ? { reason: "grants" }
-          : { reason: "session" },
-      );
-    });
-    packageManager.on("installed", ({ manifest }) => {
-      if (manifest.kind === "dlc") {
-        this.notify("panels-changed", { reason: "catalog" });
-        return;
-      }
-      this.synchronizeManifestPanel(manifest);
-      if (!manifest.settings?.length) {
-        this.notify("panels-changed", { reason: "catalog" });
-      }
-    });
-    packageManager.on("uninstalled", (change) => {
-      if (change.kind === "dlc") {
-        this.notify("panels-changed", { reason: "catalog" });
-        return;
-      }
-      this.removeManifestPanel(change.packageId);
-      this.notify("panels-changed", { reason: "catalog" });
-    });
-    daemonManager.on("changed", () => {
-      this.notify("panels-changed", { reason: "state" });
-    });
-  }
-
-  synchronizeManifestPanels(): void {
+  function synchronizeManifestPanels(): void {
     const liveIds = new Set<string>();
-    for (const manifest of this.packageCatalog.allApps()) {
+    for (const manifest of packageCatalog.allApps()) {
       if (!manifest.settings?.length) continue;
       liveIds.add(manifest.id);
-      this.synchronizeManifestPanel(manifest);
+      synchronizeManifestPanel(manifest);
     }
 
-    for (const record of this.panels.values()) {
+    for (const record of panels.values()) {
       if (
         record.source === "application" &&
         record.ownerAppId &&
         !liveIds.has(record.ownerAppId)
       ) {
-        this.deletePanelTree(record.definition.id);
+        deletePanelTree(record.definition.id);
       }
     }
   }
-
-  registerGeneratedBuiltinCategory(category: SettingsCategory): void {
+  function registerGeneratedBuiltinCategory(category: SettingsCategory): void {
     if (category.view) {
       throw new Error(
         `Custom settings category "${category.id}" requires a trusted provider`,
       );
     }
     const panelId = `eden.${category.id}`;
-    if (this.panels.has(panelId)) return;
-    this.registerGeneratedPanel(
+    if (panels.has(panelId)) return;
+    registerGeneratedPanel(
       panelId,
       {
         id: "com.eden",
@@ -202,19 +149,21 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       "eden",
     );
   }
-
-  async listPanels(): Promise<SettingsPanelSummary[]> {
-    const snapshot = this.activeSnapshot();
+  const listPanels = Effect.fn(function* (): Effect.fn.Return<
+    SettingsPanelSummary[],
+    Error
+  > {
+    const snapshot = activeSnapshot();
     if (!snapshot) return [];
 
     const summaries: SettingsPanelSummary[] = [];
-    for (const record of this.panels.values()) {
-      if (!this.canOpen(record, snapshot.user)) continue;
+    for (const record of panels.values()) {
+      if (!canOpen(record, snapshot.user)) continue;
 
       let icon = record.definition.icon;
       if (record.source === "application" && record.ownerAppId) {
-        icon = await this.packageCatalog.getIcon(record.ownerAppId);
-        if (!this.sameSession(snapshot)) return [];
+        icon = yield* packageCatalog.getIcon(record.ownerAppId);
+        if (!sameSession(snapshot)) return [];
       }
       summaries.push(
         cloneRendererValue({
@@ -228,98 +177,101 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       );
     }
     return summaries;
-  }
-
-  async loadPanel(panelId: string): Promise<SettingsPanelResponse> {
-    const snapshot = this.activeSnapshot();
-    if (!snapshot) return { error: this.authorizationError() };
-
-    const record = this.panels.get(panelId);
-    if (!record) return { error: this.notFoundError() };
-    if (!this.canOpen(record, snapshot.user))
-      return { error: this.authorizationError() };
-
-    const current = this.recheck(record, snapshot);
-    if (!current) return { error: this.sessionChangedError() };
-
-    try {
-      const loaded = await this.executionContext.run(
+  });
+  const loadPanel = Effect.fn(function* (
+    panelId: string,
+  ): Effect.fn.Return<SettingsPanelResponse, Error> {
+    const snapshot = activeSnapshot();
+    if (!snapshot) return { error: authorizationError() };
+    const record = panels.get(panelId);
+    if (!record) return { error: notFoundError() };
+    if (!canOpen(record, snapshot.user)) return { error: authorizationError() };
+    const current = recheck(record, snapshot);
+    if (!current) return { error: sessionChangedError() };
+    return yield* Effect.gen(function* () {
+      const loaded = yield* executionContext.provide(
+        record.provider.load(providerContext(record, current)),
         { principal: { kind: "user", profile: current.user } },
-        () => record.provider.load(this.providerContext(record, current)),
       );
-      if (!this.recheck(record, snapshot)) {
-        return { error: this.sessionChangedError() };
-      }
-      const actions = actionAuthorization(record, current.user);
-      const metadata = {
-        id: record.definition.id,
-        parentId: record.definition.parentId,
-        title: record.definition.title,
-        description: record.definition.description,
-        icon: record.definition.icon,
-        source: record.source,
-        actions,
-      };
-      if (record.renderer === "generic") {
-        const view = cloneAndValidatePanelView(
-          record.definition,
-          loaded as SettingsPanelView,
-        );
-        const access = new Map(
-          actions.map((action) => [action.id, action.authorized]),
-        );
-        return {
-          panel: cloneRendererValue({
-            ...metadata,
-            renderer: "generic" as const,
-            view: applyActionAuthorization(view, access),
-          }),
-        };
-      }
-      const custom = cloneRendererValue(
-        loaded as { data?: SettingsPanelValue },
-      );
-      return {
-        panel: cloneRendererValue({
-          ...metadata,
-          renderer: record.renderer,
-          data: custom.data,
-        }),
-      };
-    } catch (error) {
-      if (error instanceof SettingsPanelViewValidationError) {
-        return {
-          error: {
-            code: "load_failed",
-            message: `The settings panel returned an invalid view at ${error.path}.`,
-            fields: { [error.path]: "This view value is invalid." },
-          },
-        };
-      }
-      log.warn(`Settings panel "${panelId}" loader failed`);
-      return {
-        error: {
-          code: "load_failed",
-          message: "The settings panel could not be loaded.",
+      return yield* Effect.try({
+        try: () => {
+          if (!recheck(record, snapshot)) {
+            return { error: sessionChangedError() };
+          }
+          const actions = actionAuthorization(record, current.user);
+          const metadata = {
+            id: record.definition.id,
+            parentId: record.definition.parentId,
+            title: record.definition.title,
+            description: record.definition.description,
+            icon: record.definition.icon,
+            source: record.source,
+            actions,
+          };
+          if (record.renderer === "generic") {
+            const view = cloneAndValidatePanelView(
+              record.definition,
+              loaded as SettingsPanelView,
+            );
+            const access = new Map(
+              actions.map((action) => [action.id, action.authorized]),
+            );
+            return {
+              panel: cloneRendererValue({
+                ...metadata,
+                renderer: "generic" as const,
+                view: applyActionAuthorization(view, access),
+              }),
+            };
+          }
+          const custom = cloneRendererValue(
+            loaded as { data?: SettingsPanelValue },
+          );
+          return {
+            panel: cloneRendererValue({
+              ...metadata,
+              renderer: record.renderer,
+              data: custom.data,
+            }),
+          };
         },
-      };
-    }
-  }
-
-  async invokeAction(
+        catch: asError,
+      });
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync((): SettingsPanelResponse => {
+          if (isSettingsPanelViewValidationError(error)) {
+            return {
+              error: {
+                code: "load_failed",
+                message: `The settings panel returned an invalid view at ${error.path}.`,
+                fields: { [error.path]: "This view value is invalid." },
+              },
+            };
+          }
+          log.warn(`Settings panel "${panelId}" loader failed`);
+          return {
+            error: {
+              code: "load_failed",
+              message: "The settings panel could not be loaded.",
+            },
+          };
+        }),
+      ),
+    );
+  });
+  const invokeAction = Effect.fn(function* (
     panelId: string,
     actionId: string,
     invocation: SettingsPanelActionInvocation,
-  ): Promise<SettingsPanelActionResponse> {
-    const snapshot = this.activeSnapshot();
-    if (!snapshot) return { success: false, error: this.authorizationError() };
-
-    const record = this.panels.get(panelId);
-    if (!record) return { success: false, error: this.notFoundError() };
-    if (!this.canOpen(record, snapshot.user)) {
-      return { success: false, error: this.authorizationError() };
+  ): Effect.fn.Return<SettingsPanelActionResponse, Error> {
+    const snapshot = activeSnapshot();
+    if (!snapshot) return { success: false, error: authorizationError() };
+    const record = panels.get(panelId);
+    if (!record) return { success: false, error: notFoundError() };
+    if (!canOpen(record, snapshot.user)) {
+      return { success: false, error: authorizationError() };
     }
-
     const action = record.definition.actions?.find(
       (candidate) => candidate.id === actionId,
     );
@@ -334,9 +286,8 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       };
     }
     if (action.grant && !hasUserGrant(snapshot.user, action.grant)) {
-      return { success: false, error: this.authorizationError() };
+      return { success: false, error: authorizationError() };
     }
-
     const validated = cloneAndValidatePanelActionInvocation(invocation, action);
     const failures = validated.failures;
     if (failures.length > 0) {
@@ -351,43 +302,42 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
         },
       };
     }
-
-    const current = this.recheck(record, snapshot);
+    const current = recheck(record, snapshot);
     if (!current) {
-      return { success: false, error: this.sessionChangedError() };
+      return { success: false, error: sessionChangedError() };
     }
     if (action.grant && !hasUserGrant(current.user, action.grant)) {
-      return { success: false, error: this.authorizationError() };
+      return { success: false, error: authorizationError() };
     }
-    try {
-      await this.executionContext.run(
+    return yield* Effect.gen(function* () {
+      yield* executionContext.provide(
+        handler(validated.invocation, providerContext(record, current)),
         { principal: { kind: "user", profile: current.user } },
-        () =>
-          handler(validated.invocation, this.providerContext(record, current)),
       );
-      if (!this.recheck(record, snapshot)) {
-        return { success: false, error: this.sessionChangedError() };
+      if (!recheck(record, snapshot)) {
+        return { success: false, error: sessionChangedError() };
       }
       return { success: true };
-    } catch {
-      // Action input is deliberately never included in diagnostics.
-      log.warn(`Settings panel "${panelId}" action "${actionId}" failed`);
-      return {
-        success: false,
-        error: {
-          code: "action_failed",
-          message: "The settings operation failed.",
-        },
-      };
-    }
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync((): SettingsPanelActionResponse => {
+          // Action input is deliberately never included in diagnostics.
+          log.warn(`Settings panel "${panelId}" action "${actionId}" failed`);
+          return {
+            success: false,
+            error: {
+              code: "action_failed",
+              message: "The settings operation failed.",
+            },
+          };
+        }),
+      ),
+    );
+  });
+  function listGrantOptions(): UserGrantOption[] {
+    return collectPanelGrantOptions(panels.values());
   }
-
-  /** Return every grant declared by the current panel catalog. */
-  listGrantOptions(): UserGrantOption[] {
-    return collectPanelGrantOptions(this.panels.values());
-  }
-
-  private register(
+  function register(
     definition: InternalPanelDefinition,
     provider: InternalSettingsPanelProvider,
     source: PanelSource,
@@ -396,20 +346,20 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
     generatedSettings?: SettingsCategory[],
     visible = true,
   ): SettingsPanelRegistration {
-    const cloned = cloneAndValidatePanelDefinition(definition);
-    if (this.panels.has(cloned.id)) {
+    const cloned = cloneRendererValue(definition);
+    if (panels.has(cloned.id)) {
       throw new Error(`Settings panel "${cloned.id}" is already registered`);
     }
     if (cloned.parentId === cloned.id) {
       throw new Error(`Settings panel "${cloned.id}" cannot be its own parent`);
     }
-    if (cloned.parentId && !this.panels.has(cloned.parentId)) {
+    if (cloned.parentId && !panels.has(cloned.parentId)) {
       throw new Error(
         `Parent settings panel "${cloned.parentId}" must be registered first`,
       );
     }
     if (cloned.parentId) {
-      const parent = this.panels.get(cloned.parentId);
+      const parent = panels.get(cloned.parentId);
       const sameDomain =
         parent &&
         ((source === "host" && parent.source === "host") ||
@@ -422,7 +372,6 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
           `Settings panel "${cloned.id}" must share its parent's ownership domain`,
         );
     }
-    validatePanelProvider(cloned, provider as SettingsPanelProvider);
     const trustedProvider: InternalSettingsPanelProvider = Object.freeze({
       load: provider.load.bind(provider),
       actions: Object.freeze(
@@ -436,7 +385,7 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
     });
 
     const token = Symbol(cloned.id);
-    this.panels.set(cloned.id, {
+    panels.set(cloned.id, {
       definition: cloned,
       provider: trustedProvider,
       source,
@@ -446,16 +395,16 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       token,
       visible,
     });
-    this.notify("panels-changed", { reason: "catalog" });
+    changed.emit({ reason: "catalog" });
 
     let active = true;
     const unregister = () => {
       if (!active) return;
-      if (this.panels.get(cloned.id)?.token !== token) {
+      if (panels.get(cloned.id)?.token !== token) {
         active = false;
         return;
       }
-      const child = Array.from(this.panels.values()).find(
+      const child = Array.from(panels.values()).find(
         (record) => record.definition.parentId === cloned.id,
       );
       if (child) {
@@ -464,8 +413,8 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
         );
       }
       active = false;
-      this.panels.delete(cloned.id);
-      this.notify("panels-changed", { reason: "catalog" });
+      panels.delete(cloned.id);
+      changed.emit({ reason: "catalog" });
     };
     return Object.freeze({
       panelId: cloned.id,
@@ -473,11 +422,11 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
         if (!active) {
           throw new Error(`Settings panel "${cloned.id}" is unregistered`);
         }
-        const record = this.panels.get(cloned.id);
+        const record = panels.get(cloned.id);
         if (!record || record.token !== token) {
           throw new Error(`Settings panel "${cloned.id}" is stale`);
         }
-        this.notify("panels-changed", {
+        changed.emit({
           reason: "state",
           panelId: cloned.id,
         });
@@ -486,48 +435,40 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
         if (!active) {
           throw new Error(`Settings panel "${cloned.id}" is unregistered`);
         }
-        const record = this.panels.get(cloned.id);
+        const record = panels.get(cloned.id);
         if (!record || record.token !== token) {
           throw new Error(`Settings panel "${cloned.id}" is stale`);
         }
         if (record.visible === nextVisible) return;
         record.visible = nextVisible;
-        this.notify("panels-changed", { reason: "visibility" });
+        changed.emit({ reason: "visibility" });
       },
       unregister,
     });
   }
-
-  private synchronizeManifestPanel(manifest: RuntimeAppManifest): void {
-    this.removeManifestPanel(manifest.id);
+  function synchronizeManifestPanel(manifest: RuntimeAppManifest): void {
+    removeManifestPanel(manifest.id);
     if (!manifest.settings?.length) return;
     try {
-      this.registerGeneratedPanel(
-        `app.${manifest.id}`,
-        manifest,
-        "application",
-      );
+      registerGeneratedPanel(`app.${manifest.id}`, manifest, "application");
     } catch (error) {
       log.warn(
-        `Skipping invalid settings panel for app "${manifest.id}": ${this.errorMessage(error)}`,
+        `Skipping invalid settings panel for app "${manifest.id}": ${errorMessage(error)}`,
       );
     }
   }
-
-  private removeManifestPanel(appId: string): void {
-    this.deletePanelTree(`app.${appId}`);
+  function removeManifestPanel(appId: string): void {
+    deletePanelTree(`app.${appId}`);
   }
-
-  private deletePanelTree(panelId: string): void {
-    for (const record of Array.from(this.panels.values())) {
+  function deletePanelTree(panelId: string): void {
+    for (const record of Array.from(panels.values())) {
       if (record.definition.parentId === panelId) {
-        this.deletePanelTree(record.definition.id);
+        deletePanelTree(record.definition.id);
       }
     }
-    this.panels.delete(panelId);
+    panels.delete(panelId);
   }
-
-  private registerGeneratedPanel(
+  function registerGeneratedPanel(
     panelId: string,
     owner: GeneratedPanelOwner,
     source: "eden" | "application",
@@ -536,11 +477,16 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       panelId,
       owner,
       source,
-      this.settingsManager,
+      settingsManager,
       hasUserGrant,
     );
-    this.register(
-      generated.definition,
+    const definition = cloneAndValidatePanelDefinition(generated.definition);
+    validatePanelProvider(
+      definition,
+      generated.provider as unknown as SettingsPanelProvider,
+    );
+    register(
+      definition,
       generated.provider,
       source,
       "generic",
@@ -548,22 +494,20 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       generated.settings,
     );
   }
-
-  private activeSnapshot():
+  function activeSnapshot():
     | { sessionId: string; user: UserProfile }
     | undefined {
-    const user = this.sessionContext.getCurrentUser();
+    const user = sessionContext.getCurrentUser();
     if (!user) return undefined;
-    return { sessionId: this.sessionContext.getSessionId(), user };
+    return { sessionId: sessionContext.getSessionId(), user };
   }
-
-  private sameSession(snapshot: {
+  function sameSession(snapshot: {
     sessionId: string;
     user: UserProfile;
   }): boolean {
-    const current = this.sessionContext.getCurrentUser();
+    const current = sessionContext.getCurrentUser();
     return (
-      this.sessionContext.getSessionId() === snapshot.sessionId &&
+      sessionContext.getSessionId() === snapshot.sessionId &&
       current?.username === snapshot.user.username &&
       current.role === snapshot.user.role &&
       current.updatedAt === snapshot.user.updatedAt &&
@@ -573,21 +517,19 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       )
     );
   }
-
-  private recheck(
+  function recheck(
     record: SettingsPanelRecord,
     snapshot: { sessionId: string; user: UserProfile },
   ): { sessionId: string; user: UserProfile } | undefined {
-    if (this.panels.get(record.definition.id)?.token !== record.token) {
+    if (panels.get(record.definition.id)?.token !== record.token) {
       return undefined;
     }
-    if (!this.sameSession(snapshot)) return undefined;
-    const user = this.sessionContext.getCurrentUser();
-    if (!user || !this.canOpen(record, user)) return undefined;
+    if (!sameSession(snapshot)) return undefined;
+    const user = sessionContext.getCurrentUser();
+    if (!user || !canOpen(record, user)) return undefined;
     return { sessionId: snapshot.sessionId, user };
   }
-
-  private providerContext(
+  function providerContext(
     record: SettingsPanelRecord,
     snapshot: { sessionId: string; user: UserProfile },
   ): SettingsPanelProviderContext {
@@ -597,54 +539,68 @@ export class SettingsPanelManager extends EdenEmitter<SettingsPanelNamespaceEven
       user: snapshot.user,
     };
   }
-
-  private ancestors(
+  function ancestors(
     record: SettingsPanelRecord,
   ): SettingsPanelRecord[] | undefined {
     const ancestors: SettingsPanelRecord[] = [];
     let parentId = record.definition.parentId;
     while (parentId) {
-      const parent = this.panels.get(parentId);
+      const parent = panels.get(parentId);
       if (!parent) return undefined;
       ancestors.push(parent);
       parentId = parent.definition.parentId;
     }
     return ancestors;
   }
-
-  private canOpen(record: SettingsPanelRecord, user: UserProfile): boolean {
-    const ancestors = this.ancestors(record);
-    return !!ancestors && canOpenPanel(record, user, ancestors);
+  function canOpen(record: SettingsPanelRecord, user: UserProfile): boolean {
+    const parents = ancestors(record);
+    return !!parents && canOpenPanel(record, user, parents);
   }
-
-  private authorizationError(): SettingsPanelError {
+  function authorizationError(): SettingsPanelError {
     return {
       code: "authorization",
       message: "You are not authorized to access this settings panel.",
     };
   }
-
-  private notFoundError(): SettingsPanelError {
+  function notFoundError(): SettingsPanelError {
     return {
       code: "not_found",
       message: "The requested settings panel does not exist.",
     };
   }
-
-  private sessionChangedError(): SettingsPanelError {
+  function sessionChangedError(): SettingsPanelError {
     return {
       code: "session_changed",
       message: "The active session changed. Reload the settings panel.",
     };
   }
-
-  private errorMessage(error: unknown): string {
+  function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : "Unknown error";
   }
+  function dispose(): void {
+    panels.clear();
 
-  override dispose(): void {
-    this.panels.clear();
-    this.lifecycleConnected = false;
-    super.dispose();
+    changed.dispose();
   }
+  return {
+    registerPanel,
+    registerBuiltinPanel,
+    synchronizeManifestPanels,
+    registerGeneratedBuiltinCategory,
+    listPanels,
+    loadPanel,
+    invokeAction,
+    listGrantOptions,
+    dispose,
+    changed,
+    synchronizeManifestPanel,
+    removeManifestPanel,
+    invalidate: (
+      reason: SettingsPanelNamespaceEvents["panels-changed"]["reason"],
+      panelId?: string,
+    ) => changed.emit({ reason, panelId }),
+  };
 }
+export type SettingsPanelManager = ReturnType<
+  typeof createSettingsPanelManager
+>;

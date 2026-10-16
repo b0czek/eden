@@ -3,6 +3,9 @@ import type {
   SettingsPanelValue,
   WallpaperConfig,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import * as v from "valibot";
+import { wallpaperConfigSchema } from "../../appearance/schemas";
 import { cloneRendererValue } from "../SettingsPanelCodec";
 import type { BuiltinPanelModule } from "./types";
 
@@ -38,20 +41,26 @@ export const appearancePanel: BuiltinPanelModule = {
         properties: { wallpaper: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: async ({ appearance, effects }, invocation) => {
-        const { wallpaper } = invocation.value as unknown as {
-          wallpaper: WallpaperConfig;
-        };
-        await effects.run(appearance.setWallpaper(wallpaper));
-      },
+      handler: ({ appearance }, invocation) =>
+        Effect.gen(function* () {
+          const input = yield* Effect.try(() =>
+            v.parse(
+              wallpaperConfigSchema,
+              (invocation.value as unknown as { wallpaper: WallpaperConfig })
+                .wallpaper,
+            ),
+          );
+          yield* appearance.setWallpaper(input);
+        }),
     },
   },
   createLoader:
-    ({ appearance, effects }) =>
-    async () => ({
-      data: cloneRendererValue({
-        presets: appearance.getPresets(),
-        wallpaper: await effects.run(appearance.getWallpaper()),
-      }) as unknown as SettingsPanelValue,
-    }),
+    ({ appearance }) =>
+    () =>
+      Effect.map(appearance.getWallpaper(), (wallpaper) => ({
+        data: cloneRendererValue({
+          presets: appearance.getPresets(),
+          wallpaper,
+        }) as unknown as SettingsPanelValue,
+      })),
 };

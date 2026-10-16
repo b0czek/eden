@@ -4,6 +4,10 @@ import type {
   SettingsPanelActionInputSchema,
   SettingsPanelValue,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import * as v from "valibot";
+import { authorizeDaemonDefinition } from "../../daemon/authorization";
+import { daemonDefinitionSchema } from "../../daemon/schemas";
 import { cloneRendererValue } from "../SettingsPanelCodec";
 import type { BuiltinPanelModule } from "./types";
 
@@ -39,15 +43,26 @@ export const daemonsPanel: BuiltinPanelModule = {
         properties: { definition: { type: "object", required: true } },
         additionalProperties: false,
       },
-      handler: async ({ daemonManager }, invocation) =>
-        daemonManager.updateDefinition(
-          (invocation.value as unknown as { definition: DaemonDefinition })
-            .definition,
-        ),
+      handler: ({ daemonManager, userManager }, invocation, context) =>
+        Effect.gen(function* () {
+          const definition = yield* Effect.try(() =>
+            v.parse(
+              daemonDefinitionSchema,
+              (invocation.value as unknown as { definition: DaemonDefinition })
+                .definition,
+            ),
+          );
+          yield* authorizeDaemonDefinition(
+            definition,
+            context.user.role === "vendor",
+            userManager,
+          );
+          yield* daemonManager.updateDefinition(definition);
+        }),
     },
     enable: {
       params: daemonActionSchema,
-      handler: async ({ daemonManager }, invocation) =>
+      handler: ({ daemonManager }, invocation) =>
         daemonManager.setEnabled(
           (invocation.params as { appId: string }).appId,
           true,
@@ -55,7 +70,7 @@ export const daemonsPanel: BuiltinPanelModule = {
     },
     disable: {
       params: daemonActionSchema,
-      handler: async ({ daemonManager }, invocation) =>
+      handler: ({ daemonManager }, invocation) =>
         daemonManager.setEnabled(
           (invocation.params as { appId: string }).appId,
           false,
@@ -63,26 +78,29 @@ export const daemonsPanel: BuiltinPanelModule = {
     },
     start: {
       params: daemonActionSchema,
-      handler: async ({ daemonManager }, invocation) =>
+      handler: ({ daemonManager }, invocation) =>
         daemonManager.start((invocation.params as { appId: string }).appId),
     },
     stop: {
       params: daemonActionSchema,
-      handler: async ({ daemonManager }, invocation) =>
+      handler: ({ daemonManager }, invocation) =>
         daemonManager.stop((invocation.params as { appId: string }).appId),
     },
     restart: {
       params: daemonActionSchema,
-      handler: async ({ daemonManager }, invocation) =>
+      handler: ({ daemonManager }, invocation) =>
         daemonManager.restart((invocation.params as { appId: string }).appId),
     },
   },
   createLoader:
     ({ daemonManager, userManager }) =>
-    async () => ({
-      data: cloneRendererValue({
-        statuses: await daemonManager.list(),
-        users: await userManager.listUsers(),
-      }) as unknown as SettingsPanelValue,
-    }),
+    () =>
+      Effect.gen(function* () {
+        return {
+          data: cloneRendererValue({
+            statuses: yield* daemonManager.list(),
+            users: yield* userManager.listUsers(),
+          }) as unknown as SettingsPanelValue,
+        };
+      }),
 };

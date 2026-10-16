@@ -1,7 +1,9 @@
+import * as Effect from "effect/Effect";
 import {
   panelDefinition,
   panelUser,
 } from "../../tests/support/settings/panels";
+import { fromPromise } from "../effects/io";
 import {
   actionAuthorization,
   applyActionAuthorization,
@@ -16,8 +18,8 @@ const record = (
 ): SettingsPanelRecord => ({
   definition: panelDefinition(),
   provider: {
-    load: async () => ({ sections: [] }),
-    actions: { toggle: async () => undefined },
+    load: () => fromPromise(async () => ({ sections: [] })),
+    actions: { toggle: () => fromPromise(async () => undefined) },
   },
   source: "host",
   renderer: "generic",

@@ -3,6 +3,7 @@ import type {
   SettingsPanelActionInputSchema,
   SettingsPanelValue,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { EDEN_SETTINGS_APP_ID } from "../constants";
 import { cloneRendererValue } from "../SettingsPanelCodec";
 import type { BuiltinPanelModule, BuiltinSettingsDependencies } from "./types";
@@ -21,50 +22,60 @@ export const appsSettingsCategory = {
   settings: [],
 } satisfies SettingsCategory;
 
-const loadAppsPanelData = async ({
+const loadAppsPanelData = Effect.fn(function* ({
   packageManager,
   settings,
   config,
-}: BuiltinSettingsDependencies): Promise<SettingsPanelValue> => {
+}: BuiltinSettingsDependencies): Effect.fn.Return<SettingsPanelValue, Error> {
   const manifests = packageManager.listInstalledPackages({
     kind: "app",
     showHidden: true,
   });
-  const storedKeys = await settings.list(EDEN_SETTINGS_APP_ID, true);
   const autostartKeys = new Set(
-    storedKeys.filter((key) => key.startsWith("autostart.")),
+    (yield* settings.list(EDEN_SETTINGS_APP_ID, true)).filter((key) =>
+      key.startsWith("autostart."),
+    ),
   );
-  const apps = await Promise.all(
-    manifests.map(async (manifest) => {
-      const autostartKey = `autostart.${manifest.id}`;
-      const [icon, hotReload, autostart] = await Promise.all([
-        packageManager.getPackageIcon(manifest.id),
-        packageManager.isHotReloadEnabled(manifest.id).catch(() => false),
-        autostartKeys.has(autostartKey)
-          ? settings
-              .get(EDEN_SETTINGS_APP_ID, autostartKey)
-              .then((value) => value === "true")
-          : false,
-      ]);
-      return { manifest, icon, hotReload, autostart };
-    }),
+  const apps = yield* Effect.forEach(
+    manifests,
+    (manifest) =>
+      Effect.gen(function* () {
+        const key = `autostart.${manifest.id}`;
+        const [icon, hotReload, autostart] = yield* Effect.all(
+          [
+            packageManager.getPackageIcon(manifest.id),
+            packageManager
+              .isHotReloadEnabled(manifest.id)
+              .pipe(Effect.catch(() => Effect.succeed(false))),
+            autostartKeys.has(key)
+              ? settings
+                  .get(EDEN_SETTINGS_APP_ID, key)
+                  .pipe(Effect.map((value) => value === "true"))
+              : Effect.succeed(false),
+          ],
+          { concurrency: "unbounded" },
+        );
+        return { manifest, icon, hotReload, autostart };
+      }),
+    { concurrency: "unbounded" },
   );
-  const dlcs = await Promise.all(
-    packageManager
-      .listInstalledPackages({ kind: "dlc" })
-      .map(async (manifest) => ({
-        manifest,
-        icon: await packageManager
+  const dlcs = yield* Effect.forEach(
+    packageManager.listInstalledPackages({ kind: "dlc" }),
+    (manifest) =>
+      Effect.map(
+        packageManager
           .getPackageIcon(manifest.id)
-          .catch(() => undefined),
-      })),
+          .pipe(Effect.catch(() => Effect.succeed(undefined))),
+        (icon) => ({ manifest, icon }),
+      ),
+    { concurrency: "unbounded" },
   );
   return cloneRendererValue({
     apps,
     dlcs,
     development: config.development === true,
   }) as unknown as SettingsPanelValue;
-};
+});
 
 const appActionSchema: SettingsPanelActionInputSchema = {
   type: "object",
@@ -87,34 +98,32 @@ export const appsPanel: BuiltinPanelModule = {
     "set-autostart": {
       params: appActionSchema,
       value: { type: "boolean", required: true },
-      handler: async ({ settings }, invocation) => {
-        const { appId } = invocation.params as { appId: string };
-        const enabled = invocation.value as boolean;
-        await settings.set(
+      handler: ({ settings }, invocation) =>
+        settings.set(
           EDEN_SETTINGS_APP_ID,
-          `autostart.${appId}`,
-          enabled ? "true" : "false",
-        );
-      },
+          `autostart.${(invocation.params as { appId: string }).appId}`,
+          invocation.value ? "true" : "false",
+        ),
     },
     "toggle-hot-reload": {
       params: appActionSchema,
-      handler: async ({ packageManager }, invocation) => {
-        await packageManager.toggleHotReload(
-          (invocation.params as { appId: string }).appId,
-        );
-      },
+      handler: ({ packageManager }, invocation) =>
+        Effect.asVoid(
+          packageManager.toggleHotReload(
+            (invocation.params as { appId: string }).appId,
+          ),
+        ),
     },
     "uninstall-package": {
       params: packageActionSchema,
-      handler: async ({ packageManager }, invocation) => {
-        await packageManager.uninstallPackage(
-          (invocation.params as { packageId: string }).packageId,
-        );
-      },
+      handler: ({ packageManager }, invocation) =>
+        Effect.asVoid(
+          packageManager.uninstallPackage(
+            (invocation.params as { packageId: string }).packageId,
+          ),
+        ),
     },
   },
-  createLoader: (dependencies) => async () => ({
-    data: await loadAppsPanelData(dependencies),
-  }),
+  createLoader: (dependencies) => () =>
+    Effect.map(loadAppsPanelData(dependencies), (data) => ({ data })),
 };

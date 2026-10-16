@@ -138,6 +138,9 @@ describe("SettingsPanelCodec", () => {
 
   it("strictly validates definitions and providers", () => {
     expect(() =>
+      cloneAndValidatePanelDefinition(panelDefinition({ id: "bad id" })),
+    ).toThrow("Invalid");
+    expect(() =>
       cloneAndValidatePanelDefinition({
         ...definition(),
         extra: true,

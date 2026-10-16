@@ -2,6 +2,11 @@ import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
+import {
+  keyArgsSchema,
+  namespaceArgsSchema,
+  namespacedKeyArgsSchema,
+} from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/ExecutionContext";
 import type { Settings } from "./service";
 
@@ -12,13 +17,20 @@ function callerNamespace(caller: CommandCallerContext) {
 }
 
 const resetSchema = v.optional(v.custom<SettingsCategory[]>(Array.isArray));
+const namespaceQuerySchema = v.object({
+  appId: namespaceArgsSchema.entries.appId,
+  showRestricted: v.optional(v.boolean()),
+});
 
 export function createSettingsController(settings: Settings) {
   return defineController("settings", {
     commands: {
       /** Get a setting value (scoped to caller's app) */
       get: command({
-        input: v.object({ key: v.string(), appId: v.optional(v.string()) }),
+        input: v.object({
+          key: keyArgsSchema.entries.key,
+          appId: v.optional(namespaceArgsSchema.entries.appId),
+        }),
         permission: "rw",
         handle: ({ key, appId }, caller) =>
           Effect.gen(function* () {
@@ -31,7 +43,7 @@ export function createSettingsController(settings: Settings) {
       }),
       /** Set a setting value (scoped to caller's app) */
       set: command({
-        input: v.object({ key: v.string(), value: v.string() }),
+        input: v.object({ key: keyArgsSchema.entries.key, value: v.string() }),
         permission: "rw",
         handle: ({ key, value }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -61,7 +73,10 @@ export function createSettingsController(settings: Settings) {
       }),
       /** Reset a setting to default (scoped to caller's app) */
       reset: command({
-        input: v.object({ key: v.string(), schema: resetSchema }),
+        input: v.object({
+          key: keyArgsSchema.entries.key,
+          schema: resetSchema,
+        }),
         permission: "rw",
         handle: ({ key, schema }, caller) =>
           Effect.flatMap(callerNamespace(caller), (appId) =>
@@ -73,7 +88,7 @@ export function createSettingsController(settings: Settings) {
       }),
       /** Get a setting from any app's namespace (superuser only) */
       "get/su": command({
-        input: v.object({ appId: v.string(), key: v.string() }),
+        input: namespacedKeyArgsSchema,
         permission: "superuser",
         handle: ({ appId, key }) =>
           Effect.gen(function* () {
@@ -85,8 +100,8 @@ export function createSettingsController(settings: Settings) {
       /** Set a setting in any app's namespace (superuser only) */
       "set/su": command({
         input: v.object({
-          appId: v.string(),
-          key: v.string(),
+          appId: namespaceArgsSchema.entries.appId,
+          key: keyArgsSchema.entries.key,
           value: v.string(),
         }),
         permission: "superuser",
@@ -101,10 +116,7 @@ export function createSettingsController(settings: Settings) {
        * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
        */
       "list/su": command({
-        input: v.object({
-          appId: v.string(),
-          showRestricted: v.optional(v.boolean()),
-        }),
+        input: namespaceQuerySchema,
         permission: "superuser",
         handle: ({ appId, showRestricted }) =>
           Effect.map(settings.list(appId, showRestricted), (keys) => ({
@@ -115,10 +127,7 @@ export function createSettingsController(settings: Settings) {
        * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
        */
       "get-all/su": command({
-        input: v.object({
-          appId: v.string(),
-          showRestricted: v.optional(v.boolean()),
-        }),
+        input: namespaceQuerySchema,
         permission: "superuser",
         handle: ({ appId, showRestricted }) =>
           Effect.map(settings.getAll(appId, showRestricted), (values) => ({
@@ -128,8 +137,8 @@ export function createSettingsController(settings: Settings) {
       /** Reset a setting for any app (superuser only) */
       "reset/su": command({
         input: v.object({
-          appId: v.string(),
-          key: v.string(),
+          appId: namespaceArgsSchema.entries.appId,
+          key: keyArgsSchema.entries.key,
           schema: resetSchema,
         }),
         permission: "superuser",

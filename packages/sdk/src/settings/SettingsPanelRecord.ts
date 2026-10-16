@@ -1,25 +1,32 @@
 import type {
   SettingsCategory,
-  SettingsPanelActionHandler,
+  SettingsPanelActionInvocation,
   SettingsPanelCustomSnapshot,
   SettingsPanelProviderContext,
   SettingsPanelSummary,
   SettingsPanelValue,
   SettingsPanelView,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import type { InternalPanelDefinition } from "./SettingsPanelCodec";
 
 export type PanelRenderer = "generic" | SettingsPanelCustomSnapshot["renderer"];
 export type PanelSource = SettingsPanelSummary["source"];
 
+export type InternalPanelLoad =
+  | SettingsPanelView
+  | { data?: SettingsPanelValue };
 export interface InternalSettingsPanelProvider {
   load(
     context: SettingsPanelProviderContext,
-  ):
-    | SettingsPanelView
-    | { data?: SettingsPanelValue }
-    | Promise<SettingsPanelView | { data?: SettingsPanelValue }>;
-  actions?: Record<string, SettingsPanelActionHandler>;
+  ): Effect.Effect<InternalPanelLoad, Error>;
+  actions?: Record<
+    string,
+    (
+      invocation: SettingsPanelActionInvocation,
+      context: SettingsPanelProviderContext,
+    ) => Effect.Effect<void, Error>
+  >;
 }
 
 export interface SettingsPanelRecord {

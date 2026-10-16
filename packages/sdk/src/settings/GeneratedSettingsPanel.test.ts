@@ -1,7 +1,9 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { testApp } from "../../tests/support/apps";
 import { panelUser as user } from "../../tests/support/settings/panels";
 import { createSettingsPanelHarness as harness } from "../../tests/support/settings/SettingsPanelTestHarness";
+import { fromPromise } from "../effects/io";
 
 describe("SettingsPanelManager manifest panels", () => {
   it("normalizes one app panel and reads only setting-granted keys", async () => {
@@ -22,8 +24,8 @@ describe("SettingsPanelManager manifest panels", () => {
       ],
     });
     catalog.allApps.mockReturnValue([manifest]);
-    settings.get.mockImplementation(
-      async (_appId: string, key: string) => `${key}-value`,
+    settings.get.mockImplementation((_appId: string, key: string) =>
+      fromPromise(async () => `${key}-value`),
     );
 
     manager.synchronizeManifestPanels();
@@ -39,14 +41,16 @@ describe("SettingsPanelManager manifest panels", () => {
         }),
       ]),
     );
-    expect(await manager.listPanels()).toEqual([
+    expect(await Effect.runPromise(manager.listPanels())).toEqual([
       expect.objectContaining({
         id: "app.com.example.app",
         source: "application",
       }),
     ]);
 
-    const response = await manager.loadPanel("app.com.example.app");
+    const response = await Effect.runPromise(
+      manager.loadPanel("app.com.example.app"),
+    );
     expect(response.panel?.renderer).toBe("generic");
     if (response.panel?.renderer !== "generic")
       throw new Error("Expected generic panel");
@@ -79,7 +83,7 @@ describe("SettingsPanelManager manifest panels", () => {
     ]);
 
     manager.synchronizeManifestPanels();
-    expect(await manager.listPanels()).toHaveLength(1);
+    expect(await Effect.runPromise(manager.listPanels())).toHaveLength(1);
   });
 
   it("skips invalid app panels without interrupting catalog synchronization", async () => {
@@ -124,7 +128,7 @@ describe("SettingsPanelManager manifest panels", () => {
     ]);
 
     expect(() => manager.synchronizeManifestPanels()).not.toThrow();
-    expect(await manager.listPanels()).toEqual([
+    expect(await Effect.runPromise(manager.listPanels())).toEqual([
       expect.objectContaining({ id: "app.com.example.valid" }),
     ]);
   });

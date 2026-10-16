@@ -5,16 +5,17 @@ import type {
   SettingsPanelActionInputSchema,
   SettingsPanelDefinition,
   SettingsPanelNode,
-  SettingsPanelProvider,
   SettingsPanelValue,
   UserProfile,
 } from "@edenapp/types";
-import { type LegacySettingsAccess } from "./legacy-access";
+import * as Effect from "effect/Effect";
 import {
   cloneAndValidatePanelView,
   cloneRendererValue,
   type InternalPanelDefinition,
 } from "./SettingsPanelCodec";
+import type { InternalSettingsPanelProvider } from "./SettingsPanelRecord";
+import type { Settings } from "./service";
 
 export interface GeneratedPanelOwner {
   id: string;
@@ -25,7 +26,7 @@ export interface GeneratedPanelOwner {
 }
 export interface GeneratedSettingsPanel {
   definition: InternalPanelDefinition;
-  provider: SettingsPanelProvider;
+  provider: InternalSettingsPanelProvider;
   ownerAppId: string;
   settings: SettingsCategory[];
 }
@@ -126,12 +127,12 @@ export function createGeneratedSettingsPanel(
   panelId: string,
   owner: GeneratedPanelOwner,
   source: "eden" | "application",
-  settingsManager: LegacySettingsAccess,
+  settingsManager: Pick<Settings, "get" | "set">,
   hasGrant: (user: UserProfile, grant: string) => boolean,
 ): GeneratedSettingsPanel {
   const settings = cloneRendererValue(owner.settings ?? []);
   const actions: SettingsPanelActionDefinition[] = [];
-  const handlers: NonNullable<SettingsPanelProvider["actions"]> = {};
+  const handlers: NonNullable<InternalSettingsPanelProvider["actions"]> = {};
   settings.forEach((category, categoryIndex) => {
     category.settings.forEach((setting, settingIndex) => {
       const id = actionId(categoryIndex, settingIndex);
@@ -141,13 +142,8 @@ export function createGeneratedSettingsPanel(
         label: setting.label,
         value: valueSchema(setting),
       });
-      handlers[id] = async (invocation) => {
-        await settingsManager.set(
-          owner.id,
-          setting.key,
-          String(invocation.value),
-        );
-      };
+      handlers[id] = (invocation) =>
+        settingsManager.set(owner.id, setting.key, String(invocation.value));
     });
   });
   const definition: InternalPanelDefinition = {
@@ -168,36 +164,47 @@ export function createGeneratedSettingsPanel(
   return {
     definition,
     provider: {
-      load: async (context) => ({
-        sections: (
-          await Promise.all(
-            settings.map(async (category, categoryIndex) => ({
-              id: category.id,
-              title: category.name,
-              description: category.description,
-              nodes: (
-                await Promise.all(
-                  category.settings.map(async (setting, settingIndex) => {
+      load: (context) =>
+        Effect.gen(function* () {
+          const sections = yield* Effect.forEach(
+            settings,
+            (category, categoryIndex) =>
+              Effect.gen(function* () {
+                const nodes = yield* Effect.forEach(
+                  category.settings,
+                  (setting, settingIndex) => {
                     if (
                       !hasGrant(context.user, settingGrant(owner.id, setting))
                     )
-                      return undefined;
-                    return resolvedNode(
-                      setting,
-                      categoryIndex,
-                      settingIndex,
-                      parseValue(
-                        setting,
-                        await settingsManager.get(owner.id, setting.key),
-                      ),
+                      return Effect.succeed(undefined);
+                    return Effect.map(
+                      settingsManager.get(owner.id, setting.key),
+                      (value) =>
+                        resolvedNode(
+                          setting,
+                          categoryIndex,
+                          settingIndex,
+                          parseValue(setting, value),
+                        ),
                     );
-                  }),
-                )
-              ).filter((node): node is SettingsPanelNode => node !== undefined),
-            })),
-          )
-        ).filter((section) => section.nodes.length > 0),
-      }),
+                  },
+                  { concurrency: "unbounded" },
+                );
+                return {
+                  id: category.id,
+                  title: category.name,
+                  description: category.description,
+                  nodes: nodes.filter(
+                    (node): node is SettingsPanelNode => node !== undefined,
+                  ),
+                };
+              }),
+            { concurrency: "unbounded" },
+          );
+          return {
+            sections: sections.filter((section) => section.nodes.length > 0),
+          };
+        }),
       actions: handlers,
     },
     ownerAppId: owner.id,

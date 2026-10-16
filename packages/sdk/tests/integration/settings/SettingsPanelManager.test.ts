@@ -1,10 +1,4 @@
-import "reflect-metadata";
 import type { SettingsPanelResponse } from "@edenapp/types";
-import {
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../../../src/settings/legacy-access";
-import { SettingsPanelManager } from "../../../src/settings/SettingsPanelManager";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("SettingsPanelManager integration", () => {
@@ -24,26 +18,33 @@ describe("SettingsPanelManager integration", () => {
     });
     await eden.runtime.sessions.login(user.username, "password");
 
-    const panels = eden.runtime.resolve(SettingsPanelManager);
-    await panels.invokeAction("eden.appearance", "set-wallpaper", {
-      value: { wallpaper: { type: "preset", id: "midnight" } },
-    });
-    await panels.invokeAction("eden.apps", "set-autostart", {
-      params: { appId: "com.example.autostart" },
-      value: true,
-    });
+    const panels = eden.runtime.services.settingsPanels;
+    await eden.runtime.effects.run(
+      panels.invokeAction("eden.appearance", "set-wallpaper", {
+        value: { wallpaper: { type: "preset", id: "midnight" } },
+      }),
+    );
+    await eden.runtime.effects.run(
+      panels.invokeAction("eden.apps", "set-autostart", {
+        params: { appId: "com.example.autostart" },
+        value: true,
+      }),
+    );
 
     expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
       id: "midnight",
       value: "#1a1b26",
     });
-    const settings =
-      eden.runtime.resolve<LegacySettingsAccess>(LEGACY_SETTINGS);
-    expect(await settings.get("com.eden", "appearance.wallpaper")).toBe(
-      JSON.stringify({ type: "preset", id: "midnight" }),
-    );
+    const settings = eden.runtime.services.settings;
     expect(
-      await settings.get("com.eden", "autostart.com.example.autostart"),
+      await eden.runtime.effects.run(
+        settings.get("com.eden", "appearance.wallpaper"),
+      ),
+    ).toBe(JSON.stringify({ type: "preset", id: "midnight" }));
+    expect(
+      await eden.runtime.effects.run(
+        settings.get("com.eden", "autostart.com.example.autostart"),
+      ),
     ).toBe("true");
   });
 
@@ -56,9 +57,9 @@ describe("SettingsPanelManager integration", () => {
       grants: ["panels/devices"],
     });
     await eden.runtime.sessions.login(user.username, "password");
-    const manager = eden.runtime.resolve(SettingsPanelManager);
+    const manager = eden.runtime.services.settingsPanels;
     let items = ["one", "two"];
-    const registration = manager.registerPanel(
+    const registration = eden.runtime.settings.registerPanel(
       {
         id: "vendor.devices",
         title: "Devices",

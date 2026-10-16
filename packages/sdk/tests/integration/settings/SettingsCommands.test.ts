@@ -1,4 +1,3 @@
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
 
@@ -8,7 +7,7 @@ it("routes settings commands by trusted caller and gates cross-namespace access"
     const { caller } = await createTestCaller(eden, "app.first", [
       "settings/rw",
     ]);
-    const permissions = eden.runtime.resolve(PermissionRegistry);
+    const permissions = eden.runtime.services.permissions;
     permissions.registerApp("app.second", ["settings/rw"]);
     permissions.registerApp("app.admin", ["settings/superuser"]);
     const second = { ...caller, appId: "app.second" };
