@@ -1,11 +1,29 @@
-import { tick } from "../../support/async";
-import "reflect-metadata";
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
-import { DaemonManager } from "../../../src/daemon/DaemonManager";
-import { OperationManager } from "../../../src/operations/OperationManager";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
-import { ProcessManager } from "../../../src/process-manager/ProcessManager";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../../../src/effects/io";
+import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+
+async function readyBackend(eden: TestEden, previousPid = 0) {
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    const effect = eden.platform.effects
+      .filter((item) => item.type === "utility-process-started")
+      .at(-1);
+    if (
+      effect?.type === "utility-process-started" &&
+      effect.pid !== previousPid
+    ) {
+      eden.platform.utilityProcesses
+        .get(effect.pid)!
+        .emit("message", { type: "backend-ready" });
+      return effect.pid;
+    }
+    await tick();
+  }
+  throw new Error("Daemon backend did not start");
+}
 
 describe("daemon operation lifecycle", () => {
   let eden: TestEden;
@@ -16,7 +34,7 @@ describe("daemon operation lifecycle", () => {
   it("retains start, restart, and stop completion across real daemon and process managers", async () => {
     eden = await createTestEden();
     const appId = "com.example.operation-daemon";
-    eden.runtime.resolve(PackageRegistry).register({
+    eden.runtime.services.packageRegistry.register({
       kind: "app",
       id: appId,
       name: "Operation daemon",
@@ -40,29 +58,11 @@ describe("daemon operation lifecycle", () => {
       restart: "never",
     });
     const states: string[] = [];
-    eden.runtime.resolve(DaemonManager).on("changed", ({ status }) => {
+    eden.runtime.services.daemons.changed.on(({ status }) => {
       if (status.appId === appId) states.push(status.state);
     });
-    const manager = eden.runtime.resolve(OperationManager);
-    const ready = async (previousPid = 0) => {
-      const deadline = Date.now() + 2000;
-      while (Date.now() < deadline) {
-        const effect = eden.platform.effects
-          .filter((item) => item.type === "utility-process-started")
-          .at(-1);
-        if (
-          effect?.type === "utility-process-started" &&
-          effect.pid !== previousPid
-        ) {
-          eden.platform.utilityProcesses
-            .get(effect.pid)!
-            .emit("message", { type: "backend-ready" });
-          return effect.pid;
-        }
-        await tick();
-      }
-      throw new Error("Daemon backend did not start");
-    };
+    const manager = eden.runtime.services.operations;
+    const ready = (previousPid = 0) => readyBackend(eden, previousPid);
     const start = await eden.execute<OperationHandle>("daemon/start", {
       appId,
     });
@@ -78,7 +78,7 @@ describe("daemon operation lifecycle", () => {
     const stop = await eden.execute<OperationHandle>("daemon/stop", { appId });
     await expect(manager.wait(stop)).resolves.toEqual({ success: true });
     expect(
-      eden.runtime.resolve(ProcessManager).getAppInstance(appId),
+      eden.runtime.services.processes.getAppInstance(appId),
     ).toBeUndefined();
     expect(manager.get(stop)).toMatchObject({
       status: "succeeded",
@@ -87,5 +87,76 @@ describe("daemon operation lifecycle", () => {
     await eden.dispose();
     expect(states).toContain("active");
     expect(states.at(-1)).toBe("inactive");
+  });
+  it("ignores a delayed stop from the previous instance and keeps the replacement supervised", async () => {
+    eden = await createTestEden();
+    const appId = "com.example.queued-daemon";
+    eden.runtime.services.packageRegistry.register(
+      testApp(appId, { frontend: undefined, backend: { entry: "backend.js" } }),
+    );
+    const profile = await eden.runtime.users.create({
+      username: "daemon",
+      name: "Daemon",
+      password: "password",
+    });
+    await eden.runtime.daemons.updateDefinition({
+      appId,
+      enabled: false,
+      runAs: { kind: "user", username: profile.username },
+      restart: "always",
+    });
+    const launching = eden.runtime.daemons.start(appId);
+    const pid = await readyBackend(eden);
+    await launching;
+
+    const queued = gate();
+    const resume = gate();
+    const processed = gate();
+    const daemons = eden.runtime.services.daemons;
+    const stopped = daemons.processStopped;
+    const pause = jest
+      .spyOn(daemons, "processStopped")
+      .mockImplementation((id) => {
+        const notification = stopped(id);
+        if (id !== appId) return notification;
+        queued.release();
+        return fromPromise(() => resume.promise).pipe(
+          Effect.andThen(notification),
+          Effect.ensuring(Effect.sync(() => processed.release())),
+        );
+      });
+    try {
+      const restarting = eden.runtime.daemons.restart(appId);
+      await queued.promise;
+      const nextPid = await readyBackend(eden, pid);
+      await restarting;
+      resume.release();
+      await processed.promise;
+      expect((await eden.runtime.daemons.list())[0]).toMatchObject({
+        state: "active",
+        restartCount: 0,
+        lastError: undefined,
+      });
+      expect(nextPid).not.toBe(pid);
+
+      const backoff = gate();
+      const off = daemons.changed.on(({ status }) => {
+        if (status.appId === appId && status.state === "backoff")
+          backoff.release();
+      });
+      try {
+        eden.platform.utilityProcesses.get(nextPid)!.kill();
+        await backoff.promise;
+        expect((await eden.runtime.daemons.list())[0]).toMatchObject({
+          state: "backoff",
+          restartCount: 1,
+        });
+      } finally {
+        off();
+      }
+    } finally {
+      resume.release();
+      pause.mockRestore();
+    }
   });
 });

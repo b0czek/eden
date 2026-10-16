@@ -3,438 +3,495 @@ import type {
   DaemonRuntimeState,
   DaemonStatus,
   ExecutionPrincipal,
-  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
-import { inject, Lifecycle, scoped } from "tsyringe";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as v from "valibot";
+import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
-import { PackageCatalog } from "../package-manager/PackageCatalog";
-import { PackageManager } from "../package-manager/PackageManager";
-import { ProcessManager } from "../process-manager/ProcessManager";
-import {
-  LEGACY_SETTINGS,
-  type LegacySettingsAccess,
-} from "../settings/legacy-access";
+import type { PackageCatalog } from "../package-manager/PackageCatalog";
+import type { ProcessManager } from "../process-manager/ProcessManager";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
-import { UserManager } from "../user/UserManager";
-import { DaemonHandler } from "./DaemonHandler";
-
-interface DaemonNamespaceEvents {
-  changed: { status: DaemonStatus };
-}
+import type { Settings } from "../settings/service";
+import type { UserManager } from "../user/UserManager";
+import { daemonDefinitionSchema } from "./schemas";
 
 interface RuntimeState {
   state: DaemonRuntimeState;
   restartCount: number;
   lastError?: string;
   nextRestartAt?: number;
-  timer?: NodeJS.Timeout;
-  stableTimer?: NodeJS.Timeout;
+  timer?: Fiber.Fiber<void, Error>;
+  stableTimer?: Fiber.Fiber<void, Error>;
 }
-
-@scoped(Lifecycle.ContainerScoped)
-@EdenNamespace("daemon")
-export class DaemonManager extends EdenEmitter<DaemonNamespaceEvents> {
-  private static readonly KEY_PREFIX = "daemon.";
-  private readonly loaded = new Map<string, DaemonDefinition>();
-  private readonly runtime = new Map<string, RuntimeState>();
-  private readonly supervised = new Set<string>();
-  private readonly intentionalStops = new Set<string>();
-  private shuttingDown = false;
-  private readonly statusUpdates = new Set<Promise<void>>();
-
-  constructor(
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
-    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
-    @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(LEGACY_SETTINGS) private settingsManager: LegacySettingsAccess,
-    @inject(UserManager) private userManager: UserManager,
-    @inject(ExecutionContext) private executionContext: ExecutionContext,
-    @inject(PackageManager) packageManager: PackageManager,
-  ) {
-    super(ipcBridge);
-    commandRegistry.registerManager(new DaemonHandler(this));
-    processManager.on("exited", ({ appId, code }) => {
-      if (!this.supervised.delete(appId)) return;
-      void this.handleExit(appId, code);
-    });
-    processManager.on("stopped", ({ appId }) => {
-      const intentional = this.intentionalStops.delete(appId);
-      const supervised = this.supervised.delete(appId);
-      if (intentional) {
-        this.setRuntime(appId, { state: "inactive", restartCount: 0 });
-        return;
-      }
-      if (!supervised) return;
-      void this.handleExit(appId, 1);
-    });
-    processManager.on("launched", ({ instance }) => {
-      const appId = instance.manifest.id;
-      if (
-        !this.isDaemon(appId) ||
-        instance.owner.kind !== "system" ||
-        this.getRuntime(appId).state === "starting"
-      ) {
-        return;
-      }
-      this.supervised.add(appId);
-      this.markActive(appId);
-    });
-    processManager.on("reloading", ({ appId }) => {
-      if (this.isDaemon(appId)) {
-        this.clearTimers(appId);
-        this.intentionalStops.add(appId);
-      }
-    });
-    packageManager.on("uninstalled", async (change) => {
-      if (change.kind !== "app") return;
-      const appId = change.packageId;
-      if (!this.isDaemon(appId)) return;
-      this.clearTimers(appId);
-      this.loaded.delete(appId);
-      await this.settingsManager.delete(
-        EDEN_SETTINGS_APP_ID,
-        `${DaemonManager.KEY_PREFIX}${appId}`,
-      );
-    });
+const KEY_PREFIX = "daemon.";
+export const createDaemonManager = Effect.fn(function* ({
+  catalog,
+  processes,
+  settings,
+  users,
+}: {
+  catalog: Pick<PackageCatalog, "allApps" | "getApp">;
+  processes: Pick<
+    ProcessManager,
+    "getAppInstance" | "launchDaemon" | "stopApp"
+  >;
+  settings: Pick<Settings, "list" | "get" | "set" | "delete">;
+  users: Pick<UserManager, "getUser">;
+}) {
+  const scope = yield* Effect.scope;
+  const changed = yield* scopedEvent<{ status: DaemonStatus }>();
+  const loaded = new Map<string, DaemonDefinition>();
+  const states = new Map<string, RuntimeState>();
+  const supervised = new Map<string, number>();
+  const intentionalStops = new Map<string, number>();
+  const generations = new Map<string, number>();
+  const generationOf = (appId: string) => generations.get(appId) ?? 0;
+  const isCurrent = (appId: string, generation: number) =>
+    generationOf(appId) === generation;
+  function nextGeneration(appId: string): number {
+    const generation = generationOf(appId) + 1;
+    generations.set(appId, generation);
+    supervised.delete(appId);
+    intentionalStops.delete(appId);
+    return generation;
   }
-
-  async initialize(): Promise<void> {
-    await this.loadDefinitions();
-    for (const definition of this.loaded.values()) {
-      if (!definition.enabled) continue;
-      try {
-        await this.start(definition.appId);
-      } catch (error) {
-        this.markFailed(definition.appId, error);
-        await this.handleExit(definition.appId, 1);
-      }
-    }
-  }
-
-  async list(): Promise<DaemonStatus[]> {
-    const persisted = await this.readPersisted();
-    return this.daemonApps().map((manifest) => {
-      const definition =
-        persisted.get(manifest.id) ??
-        this.loaded.get(manifest.id) ??
-        this.defaultDefinition(manifest.id);
-      const runtime = this.getRuntime(manifest.id);
-      const instance = this.processManager.getAppInstance(manifest.id);
-      return {
-        appId: manifest.id,
-        name: manifest.name,
-        definition,
-        state: instance ? "active" : runtime.state,
-        restartRequired:
-          !!instance &&
-          !this.samePrincipal(instance.principal, definition.runAs),
-        instanceId: instance?.instanceId,
-        restartCount: runtime.restartCount,
-        lastError: runtime.lastError,
-        nextRestartAt: runtime.nextRestartAt,
-      };
-    });
-  }
-
-  async updateDefinition(definition: DaemonDefinition): Promise<void> {
-    const profile = await this.validateDefinition(definition);
-    if (profile?.role === "vendor" && !this.executionContext.isVendor()) {
-      throw new Error("Only a vendor can assign a vendor daemon principal");
-    }
-    await this.persist(definition);
-    this.loaded.set(definition.appId, definition);
-    await this.emitStatus(definition.appId);
-  }
-
-  private async loadDefinitions(): Promise<void> {
-    const persisted = await this.readPersisted();
-    for (const app of this.daemonApps()) {
-      const definition =
-        persisted.get(app.id) ?? this.defaultDefinition(app.id);
-      try {
-        await this.validateDefinition(definition);
-        this.loaded.set(app.id, definition);
-      } catch (error) {
-        this.markFailed(app.id, error);
-      }
-    }
-  }
-
-  async setEnabled(appId: string, enabled: boolean): Promise<void> {
-    this.requireDaemon(appId);
-    const persisted = await this.readPersisted();
-    const definition = persisted.get(appId) ?? this.defaultDefinition(appId);
-    const updated = { ...definition, enabled };
-    await this.validateDefinition(updated);
-    await this.persist(updated);
-    const loaded = this.loaded.get(appId);
-    if (loaded) this.loaded.set(appId, { ...loaded, enabled });
-    await this.emitStatus(appId);
-  }
-
-  async start(appId: string): Promise<void> {
-    this.requireDaemon(appId);
-    if (this.processManager.getAppInstance(appId)) return;
-    const definition = this.loaded.get(appId) ?? this.defaultDefinition(appId);
-    const profile = await this.validateDefinition(definition, true);
-    if (!profile) {
-      throw new Error(`Daemon ${appId} requires a runAs account`);
-    }
-    this.clearTimers(appId);
-    this.setRuntime(appId, {
-      ...this.getRuntime(appId),
-      state: "starting",
-      lastError: undefined,
-      nextRestartAt: undefined,
-    });
-    try {
-      this.supervised.add(appId);
-      await this.processManager.launchDaemon(
-        appId,
-        { kind: "user", username: profile.username },
-        profile,
-      );
-      this.markActive(appId);
-    } catch (error) {
-      this.supervised.delete(appId);
-      this.markFailed(appId, error);
-      throw error;
-    }
-  }
-
-  async stop(appId: string): Promise<void> {
-    this.requireDaemon(appId);
-    this.clearTimers(appId);
-    if (!this.processManager.getAppInstance(appId)) {
-      this.setRuntime(appId, { state: "inactive", restartCount: 0 });
-      return;
-    }
-    const supervised = this.supervised.has(appId);
-    if (supervised) this.intentionalStops.add(appId);
-    this.setRuntime(appId, { ...this.getRuntime(appId), state: "stopping" });
-    try {
-      await this.processManager.stopApp(appId);
-      if (!supervised) {
-        this.setRuntime(appId, { state: "inactive", restartCount: 0 });
-      }
-    } catch (error) {
-      this.intentionalStops.delete(appId);
-      this.markFailed(appId, error);
-      throw error;
-    }
-  }
-
-  async restart(appId: string): Promise<void> {
-    if (this.processManager.getAppInstance(appId)) await this.stop(appId);
-    await this.start(appId);
-  }
-
-  async shutdown(): Promise<void> {
-    this.shuttingDown = true;
-    for (const appId of this.runtime.keys()) this.clearTimers(appId);
-    await this.drainStatusUpdates();
-  }
-
-  override async dispose(): Promise<void> {
-    await this.shutdown();
-    this.runtime.clear();
-    this.loaded.clear();
-    this.supervised.clear();
-    this.intentionalStops.clear();
-    super.dispose();
-  }
-
-  private async handleExit(appId: string, code: number): Promise<void> {
-    if (this.intentionalStops.has(appId) || this.shuttingDown) return;
-    this.clearTimers(appId);
-    const definition = this.loaded.get(appId) ?? this.defaultDefinition(appId);
-    const shouldRestart =
-      definition.restart === "always" ||
-      (definition.restart === "on-failure" && code !== 0);
-    if (!shouldRestart) {
-      this.setRuntime(appId, {
-        ...this.getRuntime(appId),
-        state: code === 0 ? "inactive" : "failed",
-        lastError: code === 0 ? undefined : `Exited with code ${code}`,
-      });
-      return;
-    }
-    const count = this.getRuntime(appId).restartCount + 1;
-    const delay = Math.min(2 ** (count - 1), 30) * 1000;
-    const nextRestartAt = Date.now() + delay;
-    const runtime = this.setRuntime(appId, {
-      state: "backoff",
-      restartCount: count,
-      lastError: `Exited with code ${code}`,
-      nextRestartAt,
-    });
-    runtime.timer = setTimeout(() => {
-      void this.start(appId).catch((error) => {
-        log.error(`Failed to restart daemon ${appId}:`, error);
-        void this.handleExit(appId, 1);
-      });
-    }, delay);
-  }
-
-  private daemonApps(): RuntimeAppManifest[] {
-    return this.packageCatalog
+  let shuttingDown = false;
+  const defaultDefinition = (appId: string): DaemonDefinition => ({
+    appId,
+    enabled: false,
+    runAs: null,
+    restart: "on-failure",
+  });
+  const daemonApps = () =>
+    catalog
       .allApps()
       .filter((app) => !!app.backend?.entry && !app.frontend?.entry);
-  }
-
-  private isDaemon(appId: string): boolean {
-    const app = this.packageCatalog.getApp(appId);
+  const isDaemon = (appId: string) => {
+    const app = catalog.getApp(appId);
     return !!app?.backend?.entry && !app.frontend?.entry;
-  }
-
-  private requireDaemon(appId: string): RuntimeAppManifest {
-    const app = this.packageCatalog.getApp(appId);
-    if (!app?.backend?.entry || app.frontend?.entry) {
-      throw new Error(`App ${appId} is not a backend-only daemon`);
-    }
-    return app;
-  }
-
-  private defaultDefinition(appId: string): DaemonDefinition {
-    return {
-      appId,
-      enabled: false,
-      runAs: null,
-      restart: "on-failure",
-    };
-  }
-
-  private samePrincipal(
+  };
+  const requireDaemon = (appId: string) =>
+    Effect.try({
+      try: () => {
+        if (!isDaemon(appId))
+          throw new Error(`App ${appId} is not a backend-only daemon`);
+      },
+      catch: (error) => error as Error,
+    });
+  const samePrincipal = (
     current: ExecutionPrincipal,
     configured: DaemonDefinition["runAs"],
-  ): boolean {
-    return (
-      configured !== null &&
-      current.kind === "user" &&
-      current.username === configured.username
-    );
-  }
-
-  private validateShape(definition: DaemonDefinition): void {
-    if (!["never", "on-failure", "always"].includes(definition.restart)) {
-      throw new Error(`Invalid restart policy for ${definition.appId}`);
-    }
-    if (definition.runAs && !definition.runAs.username.trim()) {
-      throw new Error("runAs username is required");
-    }
-  }
-
-  private async validateDefinition(
-    definition: DaemonDefinition,
-    requirePrincipal = definition.enabled,
-  ): Promise<UserProfile | undefined> {
-    this.requireDaemon(definition.appId);
-    this.validateShape(definition);
-    if (!definition.runAs) {
-      if (requirePrincipal) {
-        throw new Error(`Daemon ${definition.appId} requires a runAs account`);
-      }
-      return undefined;
-    }
-    return await this.resolveProfile(definition);
-  }
-
-  private async resolveProfile(
-    definition: DaemonDefinition,
-  ): Promise<UserProfile> {
-    if (!definition.runAs) {
-      throw new Error(`Daemon ${definition.appId} requires a runAs account`);
-    }
-    const profile = await this.userManager.getUser(definition.runAs.username);
-    if (!profile) {
-      throw new Error(
-        `Daemon user ${definition.runAs.username} does not exist`,
-      );
-    }
-    return profile;
-  }
-
-  private async readPersisted(): Promise<Map<string, DaemonDefinition>> {
+  ) =>
+    configured !== null &&
+    current.kind === "user" &&
+    current.username === configured.username;
+  const getRuntime = (appId: string): RuntimeState =>
+    states.get(appId) ?? { state: "inactive", restartCount: 0 };
+  const readPersisted = Effect.fn(function* () {
     const result = new Map<string, DaemonDefinition>();
-    const keys = await this.settingsManager.list(EDEN_SETTINGS_APP_ID, true);
-    for (const key of keys) {
-      if (!key.startsWith(DaemonManager.KEY_PREFIX)) continue;
-      const value = await this.settingsManager.get(EDEN_SETTINGS_APP_ID, key);
+    for (const key of yield* settings.list(EDEN_SETTINGS_APP_ID, true)) {
+      if (!key.startsWith(KEY_PREFIX)) continue;
+      const value = yield* settings.get(EDEN_SETTINGS_APP_ID, key);
       if (!value) continue;
       try {
-        const definition = JSON.parse(value) as DaemonDefinition;
-        if (definition.runAs?.kind !== "user") {
-          definition.runAs = null;
-          definition.enabled = false;
-        }
+        const definition = v.parse(daemonDefinitionSchema, JSON.parse(value));
         result.set(definition.appId, definition);
       } catch (error) {
         log.warn(`Invalid daemon definition ${key}:`, error);
       }
     }
     return result;
-  }
-
-  private async persist(definition: DaemonDefinition): Promise<void> {
-    await this.settingsManager.set(
+  });
+  const list = Effect.fn(function* (): Effect.fn.Return<DaemonStatus[], Error> {
+    const persisted = yield* readPersisted();
+    return daemonApps().map((manifest) => {
+      const definition =
+        persisted.get(manifest.id) ??
+        loaded.get(manifest.id) ??
+        defaultDefinition(manifest.id);
+      const state = getRuntime(manifest.id);
+      const instance = processes.getAppInstance(manifest.id);
+      return {
+        appId: manifest.id,
+        name: manifest.name,
+        definition,
+        state: instance ? "active" : state.state,
+        restartRequired:
+          !!instance && !samePrincipal(instance.principal, definition.runAs),
+        instanceId: instance?.instanceId,
+        restartCount: state.restartCount,
+        lastError: state.lastError,
+        nextRestartAt: state.nextRestartAt,
+      };
+    });
+  });
+  const emitStatus = Effect.fn(function* (appId: string, generation?: number) {
+    if (generation !== undefined && !isCurrent(appId, generation)) return;
+    const status = (yield* list()).find((entry) => entry.appId === appId);
+    if (status && (generation === undefined || isCurrent(appId, generation)))
+      changed.emit({ status });
+  });
+  const setRuntime = Effect.fn(function* (
+    appId: string,
+    state: RuntimeState,
+    generation?: number,
+  ) {
+    if (generation !== undefined && !isCurrent(appId, generation)) return state;
+    states.set(appId, state);
+    yield* emitStatus(appId, generation);
+    return state;
+  });
+  const clearTimers = Effect.fn(function* (appId: string, generation?: number) {
+    if (generation !== undefined && !isCurrent(appId, generation)) return;
+    const state = states.get(appId);
+    if (!state) return;
+    const timer = state.timer;
+    const stableTimer = state.stableTimer;
+    state.timer = undefined;
+    state.stableTimer = undefined;
+    if (timer) yield* Fiber.interrupt(timer);
+    if (stableTimer) yield* Fiber.interrupt(stableTimer);
+  });
+  const markFailed = (appId: string, error: unknown, generation?: number) =>
+    setRuntime(
+      appId,
+      {
+        ...getRuntime(appId),
+        state: "failed",
+        lastError: error instanceof Error ? error.message : String(error),
+      },
+      generation,
+    );
+  const markActive = Effect.fn(function* (appId: string, generation: number) {
+    if (!isCurrent(appId, generation) || shuttingDown) return;
+    yield* clearTimers(appId, generation);
+    if (!isCurrent(appId, generation)) return;
+    const state = yield* setRuntime(
+      appId,
+      {
+        ...getRuntime(appId),
+        state: "active",
+        lastError: undefined,
+        nextRestartAt: undefined,
+      },
+      generation,
+    );
+    if (!isCurrent(appId, generation) || states.get(appId) !== state) return;
+    const timer = yield* Effect.forkIn(
+      Effect.sleep(60_000).pipe(
+        Effect.flatMap(() => {
+          if (
+            !isCurrent(appId, generation) ||
+            states.get(appId) !== state ||
+            shuttingDown
+          )
+            return Effect.void;
+          state.stableTimer = undefined;
+          return Effect.asVoid(
+            setRuntime(appId, { state: "active", restartCount: 0 }, generation),
+          );
+        }),
+      ),
+      scope,
+    );
+    if (isCurrent(appId, generation) && states.get(appId) === state)
+      state.stableTimer = timer;
+    else yield* Fiber.interrupt(timer);
+  });
+  const validateDefinition = Effect.fn(function* (
+    definition: DaemonDefinition,
+    requirePrincipal = definition.enabled,
+  ): Effect.fn.Return<UserProfile | undefined, Error> {
+    yield* requireDaemon(definition.appId);
+    if (!definition.runAs) {
+      if (requirePrincipal)
+        return yield* Effect.fail(
+          new Error(`Daemon ${definition.appId} requires a runAs account`),
+        );
+      return undefined;
+    }
+    const profile = yield* users.getUser(definition.runAs.username);
+    if (!profile)
+      return yield* Effect.fail(
+        new Error(`Daemon user ${definition.runAs.username} does not exist`),
+      );
+    return profile;
+  });
+  const persist = (definition: DaemonDefinition) =>
+    settings.set(
       EDEN_SETTINGS_APP_ID,
-      `${DaemonManager.KEY_PREFIX}${definition.appId}`,
+      `${KEY_PREFIX}${definition.appId}`,
       JSON.stringify(definition),
     );
-  }
-
-  private getRuntime(appId: string): RuntimeState {
-    return this.runtime.get(appId) ?? { state: "inactive", restartCount: 0 };
-  }
-
-  private setRuntime(appId: string, state: RuntimeState): RuntimeState {
-    this.runtime.set(appId, state);
-    const update = this.emitStatus(appId).catch((error) => {
-      log.error(`Failed to publish daemon status for ${appId}:`, error);
-    });
-    this.statusUpdates.add(update);
-    void update.then(() => this.statusUpdates.delete(update));
-    return state;
-  }
-
-  private async drainStatusUpdates(): Promise<void> {
-    while (this.statusUpdates.size > 0) {
-      await Promise.all(this.statusUpdates);
+  const updateDefinition = Effect.fn(function* (definition: DaemonDefinition) {
+    yield* validateDefinition(definition);
+    yield* persist(definition);
+    loaded.set(definition.appId, definition);
+    yield* emitStatus(definition.appId);
+  });
+  const setEnabled = Effect.fn(function* (appId: string, enabled: boolean) {
+    yield* requireDaemon(appId);
+    const definition =
+      (yield* readPersisted()).get(appId) ?? defaultDefinition(appId);
+    const updated = { ...definition, enabled };
+    yield* validateDefinition(updated);
+    yield* persist(updated);
+    const previous = loaded.get(appId);
+    if (previous) loaded.set(appId, { ...previous, enabled });
+    yield* emitStatus(appId);
+  });
+  const startAttempt = Effect.fn(function* (
+    appId: string,
+    retryOnFailure: boolean,
+    expectedGeneration?: number,
+  ): Effect.fn.Return<void, Error> {
+    if (
+      expectedGeneration !== undefined &&
+      !isCurrent(appId, expectedGeneration)
+    )
+      return;
+    yield* requireDaemon(appId);
+    if (processes.getAppInstance(appId) || shuttingDown) return;
+    const generation = nextGeneration(appId);
+    yield* clearTimers(appId, generation);
+    yield* Effect.gen(function* () {
+      const definition = loaded.get(appId) ?? defaultDefinition(appId);
+      const profile = yield* validateDefinition(definition, true);
+      if (!profile)
+        return yield* Effect.fail(
+          new Error(`Daemon ${appId} requires a runAs account`),
+        );
+      if (!isCurrent(appId, generation) || shuttingDown) return;
+      yield* setRuntime(
+        appId,
+        {
+          ...getRuntime(appId),
+          state: "starting",
+          lastError: undefined,
+          nextRestartAt: undefined,
+        },
+        generation,
+      );
+      if (!isCurrent(appId, generation) || shuttingDown) return;
+      supervised.set(appId, generation);
+      yield* processes.launchDaemon(
+        appId,
+        { kind: "user", username: profile.username },
+        profile,
+      );
+      if (isCurrent(appId, generation)) yield* markActive(appId, generation);
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.gen(function* () {
+          if (!isCurrent(appId, generation)) return;
+          supervised.delete(appId);
+          yield* markFailed(appId, error, generation);
+          if (retryOnFailure) yield* handleExit(appId, 1, generation);
+          else return yield* Effect.fail(error);
+        }),
+      ),
+    );
+  });
+  const start = (appId: string) => startAttempt(appId, false);
+  const stop = Effect.fn(function* (appId: string) {
+    yield* requireDaemon(appId);
+    const wasSupervised = supervised.get(appId) === generationOf(appId);
+    const generation = nextGeneration(appId);
+    if (wasSupervised) intentionalStops.set(appId, generation);
+    yield* clearTimers(appId, generation);
+    if (!isCurrent(appId, generation)) return;
+    if (!processes.getAppInstance(appId)) {
+      intentionalStops.delete(appId);
+      yield* setRuntime(
+        appId,
+        { state: "inactive", restartCount: 0 },
+        generation,
+      );
+      return;
     }
-  }
-
-  private markFailed(appId: string, error: unknown): void {
-    this.setRuntime(appId, {
-      ...this.getRuntime(appId),
-      state: "failed",
-      lastError: error instanceof Error ? error.message : String(error),
+    yield* setRuntime(
+      appId,
+      { ...getRuntime(appId), state: "stopping" },
+      generation,
+    );
+    if (!isCurrent(appId, generation)) return;
+    yield* processes.stopApp(appId).pipe(
+      Effect.catch((error) =>
+        Effect.gen(function* () {
+          if (isCurrent(appId, generation)) {
+            intentionalStops.delete(appId);
+            yield* markFailed(appId, error, generation);
+          }
+          return yield* Effect.fail(error);
+        }),
+      ),
+    );
+    if (!isCurrent(appId, generation)) return;
+    intentionalStops.delete(appId);
+    supervised.delete(appId);
+    yield* setRuntime(
+      appId,
+      { state: "inactive", restartCount: 0 },
+      generation,
+    );
+  });
+  const restart = Effect.fn(function* (appId: string) {
+    if (processes.getAppInstance(appId)) yield* stop(appId);
+    yield* start(appId);
+  });
+  const handleExit = Effect.fn(function* (
+    appId: string,
+    code: number,
+    generation: number,
+  ): Effect.fn.Return<void, Error> {
+    if (!isCurrent(appId, generation) || shuttingDown) return;
+    yield* clearTimers(appId, generation);
+    if (!isCurrent(appId, generation) || shuttingDown) return;
+    const definition = loaded.get(appId) ?? defaultDefinition(appId);
+    const shouldRestart =
+      definition.restart === "always" ||
+      (definition.restart === "on-failure" && code !== 0);
+    if (!shouldRestart) {
+      yield* setRuntime(
+        appId,
+        {
+          ...getRuntime(appId),
+          state: code === 0 ? "inactive" : "failed",
+          lastError: code === 0 ? undefined : `Exited with code ${code}`,
+        },
+        generation,
+      );
+      return;
+    }
+    const count = getRuntime(appId).restartCount + 1;
+    const delay = Math.min(2 ** (count - 1), 30) * 1000;
+    const state = yield* setRuntime(
+      appId,
+      {
+        state: "backoff",
+        restartCount: count,
+        lastError: `Exited with code ${code}`,
+        nextRestartAt: Date.now() + delay,
+      },
+      generation,
+    );
+    if (!isCurrent(appId, generation) || states.get(appId) !== state) return;
+    const timer = yield* Effect.forkIn(
+      Effect.sleep(delay).pipe(
+        Effect.flatMap(() => {
+          if (
+            !isCurrent(appId, generation) ||
+            states.get(appId) !== state ||
+            shuttingDown
+          )
+            return Effect.void;
+          state.timer = undefined;
+          return startAttempt(appId, true, generation);
+        }),
+      ),
+      scope,
+    );
+    if (isCurrent(appId, generation) && states.get(appId) === state)
+      state.timer = timer;
+    else yield* Fiber.interrupt(timer);
+  });
+  // Notification preparation captures ownership before a queued consumer can observe a replacement process.
+  function processTerminated(appId: string, code: number) {
+    const generation = generationOf(appId);
+    const intentional = intentionalStops.get(appId) === generation;
+    const wasSupervised = supervised.get(appId) === generation;
+    if (intentional) intentionalStops.delete(appId);
+    if (wasSupervised) supervised.delete(appId);
+    return Effect.suspend(() => {
+      if (!isCurrent(appId, generation) || shuttingDown) return Effect.void;
+      if (intentional)
+        return Effect.asVoid(
+          setRuntime(appId, { state: "inactive", restartCount: 0 }, generation),
+        );
+      return wasSupervised ? handleExit(appId, code, generation) : Effect.void;
     });
   }
-
-  private markActive(appId: string): void {
-    const runtime = this.setRuntime(appId, {
-      ...this.getRuntime(appId),
-      state: "active",
-      lastError: undefined,
-      nextRestartAt: undefined,
+  const processExited = (appId: string, code: number) =>
+    processTerminated(appId, code);
+  const processStopped = (appId: string) => processTerminated(appId, 1);
+  function processLaunched(appId: string, ownerKind: string) {
+    if (
+      !isDaemon(appId) ||
+      ownerKind !== "system" ||
+      getRuntime(appId).state === "starting" ||
+      shuttingDown
+    )
+      return Effect.void;
+    const generation = nextGeneration(appId);
+    supervised.set(appId, generation);
+    return markActive(appId, generation);
+  }
+  function processReloading(appId: string) {
+    if (!isDaemon(appId) || shuttingDown) return Effect.void;
+    const generation = nextGeneration(appId);
+    intentionalStops.set(appId, generation);
+    return clearTimers(appId, generation);
+  }
+  function packageUninstalled(appId: string) {
+    if (
+      !loaded.has(appId) &&
+      !states.has(appId) &&
+      !generations.has(appId) &&
+      !isDaemon(appId)
+    )
+      return Effect.void;
+    const generation = nextGeneration(appId);
+    return Effect.gen(function* () {
+      yield* clearTimers(appId, generation);
+      if (!isCurrent(appId, generation)) return;
+      loaded.delete(appId);
+      states.delete(appId);
+      yield* settings.delete(EDEN_SETTINGS_APP_ID, `${KEY_PREFIX}${appId}`);
     });
-    runtime.stableTimer = setTimeout(() => {
-      this.setRuntime(appId, { state: "active", restartCount: 0 });
-    }, 60_000);
   }
-
-  private clearTimers(appId: string): void {
-    const runtime = this.runtime.get(appId);
-    if (runtime?.timer) clearTimeout(runtime.timer);
-    if (runtime?.stableTimer) clearTimeout(runtime.stableTimer);
-  }
-
-  private async emitStatus(appId: string): Promise<void> {
-    const status = (await this.list()).find((entry) => entry.appId === appId);
-    if (status) this.notify("changed", { status });
-  }
-}
+  const shutdown = Effect.fn(function* () {
+    shuttingDown = true;
+    for (const appId of new Set([...states.keys(), ...generations.keys()])) {
+      nextGeneration(appId);
+      yield* clearTimers(appId);
+    }
+  });
+  const initialize = Effect.fn(function* () {
+    const persisted = yield* readPersisted();
+    for (const app of daemonApps()) {
+      const definition = persisted.get(app.id) ?? defaultDefinition(app.id);
+      yield* validateDefinition(definition).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            loaded.set(app.id, definition);
+          }),
+        ),
+        Effect.catch((error) => Effect.asVoid(markFailed(app.id, error))),
+      );
+    }
+    for (const definition of loaded.values())
+      if (definition.enabled) yield* startAttempt(definition.appId, true);
+  });
+  yield* Effect.addFinalizer(() => shutdown().pipe(Effect.orDie));
+  return {
+    initialize,
+    list,
+    updateDefinition,
+    setEnabled,
+    start,
+    stop,
+    restart,
+    shutdown,
+    changed,
+    processExited,
+    processStopped,
+    processLaunched,
+    processReloading,
+    packageUninstalled,
+  };
+});
+export type DaemonManager = Effect.Success<
+  ReturnType<typeof createDaemonManager>
+>;

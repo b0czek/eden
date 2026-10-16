@@ -1,15 +1,7 @@
-import "reflect-metadata";
-
-import { EventEmitter } from "node:events";
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
-import { ExecutionContext } from "../execution/ExecutionContext";
-import type { CommandRegistry, IPCBridge } from "../ipc";
-import type { PackageCatalog } from "../package-manager/PackageCatalog";
-import type { PackageManager } from "../package-manager/PackageManager";
-import type { ProcessManager } from "../process-manager/ProcessManager";
-import { type LegacySettingsAccess } from "../settings/legacy-access";
-import type { UserManager } from "../user/UserManager";
-import { DaemonManager } from "./DaemonManager";
+import * as Effect from "effect/Effect";
+import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
+import { createDaemonManager, type DaemonManager } from "./DaemonManager";
 
 const manifest = {
   id: "com.example.daemon",
@@ -20,68 +12,67 @@ const manifest = {
 
 describe("DaemonManager", () => {
   const definitions = new Map<string, string>();
-  let processManager: EventEmitter & {
+  let processManager: {
     launchDaemon: jest.Mock;
     stopApp: jest.Mock;
     getAppInstance: jest.Mock;
   };
   let manager: DaemonManager;
-  let executionContext: ExecutionContext;
-  let getUser: jest.Mock<Promise<UserProfile | null>, [string]>;
+  let getUser: jest.Mock<Effect.Effect<UserProfile | null, Error>, [string]>;
+  let effects: EffectRuntime;
+  let catalogAvailable: boolean;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     definitions.clear();
-    processManager = Object.assign(new EventEmitter(), {
-      launchDaemon: jest.fn().mockResolvedValue({
-        success: true,
-        appId: manifest.id,
-        instanceId: "instance",
-      }),
-      stopApp: jest.fn().mockResolvedValue(undefined),
+    catalogAvailable = true;
+    effects = createEffectRuntime();
+    processManager = {
+      launchDaemon: jest.fn().mockReturnValue(
+        Effect.succeed({
+          success: true,
+          appId: manifest.id,
+          instanceId: "instance",
+        }),
+      ),
+      stopApp: jest.fn().mockReturnValue(Effect.void),
       getAppInstance: jest.fn().mockReturnValue(undefined),
-    });
-    executionContext = new ExecutionContext({});
-    getUser = jest.fn().mockResolvedValue(null);
-    manager = new DaemonManager(
-      { eventSubscribers: { notify: jest.fn() } } as unknown as IPCBridge,
-      { registerManager: jest.fn() } as unknown as CommandRegistry,
-      {
-        allApps: () => [manifest],
-        getApp: (appId: string) =>
-          appId === manifest.id ? manifest : undefined,
-      } as unknown as PackageCatalog,
-      processManager as unknown as ProcessManager,
-      {
-        list: jest
-          .fn()
-          .mockImplementation(async () =>
-            Array.from(definitions.keys()).map((key) =>
-              key.slice("com.eden:".length),
+    };
+    getUser = jest.fn().mockReturnValue(Effect.succeed(null));
+    manager = await effects.acquire(
+      createDaemonManager({
+        catalog: {
+          allApps: () => (catalogAvailable ? [manifest] : []),
+          getApp: (appId) =>
+            catalogAvailable && appId === manifest.id ? manifest : undefined,
+        },
+        processes: processManager,
+        settings: {
+          list: (appId) =>
+            Effect.sync(() =>
+              [...definitions.keys()]
+                .filter((key) => key.startsWith(`${appId}:`))
+                .map((key) => key.slice(appId.length + 1)),
             ),
-          ),
-        get: jest
-          .fn()
-          .mockImplementation(async (appId: string, key: string) =>
-            definitions.get(`${appId}:${key}`),
-          ),
-        set: jest
-          .fn()
-          .mockImplementation(
-            async (appId: string, key: string, value: string) => {
+          get: (appId, key) =>
+            Effect.sync(() => definitions.get(`${appId}:${key}`)),
+          set: (appId, key, value) =>
+            Effect.sync(() => {
               definitions.set(`${appId}:${key}`, value);
-            },
-          ),
-        delete: jest.fn(),
-      } as unknown as LegacySettingsAccess,
-      { getUser } as unknown as UserManager,
-      executionContext,
-      { on: jest.fn() } as unknown as PackageManager,
+            }),
+          delete: (appId, key) =>
+            Effect.sync(() => {
+              definitions.delete(`${appId}:${key}`);
+            }),
+        },
+        users: { getUser },
+      }),
     );
   });
+  afterEach(() => effects.dispose());
 
   it("discovers backend-only apps as disabled unassigned daemons", async () => {
-    await manager.initialize();
-    await expect(manager.list()).resolves.toMatchObject([
+    await effects.run(manager.initialize());
+    await expect(effects.run(manager.list())).resolves.toMatchObject([
       {
         appId: manifest.id,
         state: "inactive",
@@ -94,6 +85,31 @@ describe("DaemonManager", () => {
     ]);
   });
 
+  it("ignores malformed stored definitions before they enter daemon state", async () => {
+    const key = `com.eden:daemon.${manifest.id}`;
+    const definition = {
+      appId: manifest.id,
+      enabled: false,
+      runAs: null,
+      restart: "always",
+    };
+    definitions.set(
+      key,
+      JSON.stringify({ ...definition, restart: "sometimes" }),
+    );
+
+    await effects.run(manager.initialize());
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
+      state: "inactive",
+      definition: { enabled: false, runAs: null, restart: "on-failure" },
+    });
+
+    definitions.set(key, JSON.stringify(definition));
+    expect((await effects.run(manager.list()))[0].definition).toEqual(
+      definition,
+    );
+  });
+
   it("adopts persisted edits immediately without restarting", async () => {
     const operator: UserProfile = {
       username: "operator",
@@ -103,17 +119,19 @@ describe("DaemonManager", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    getUser.mockResolvedValue(operator);
-    await manager.initialize();
-    await manager.updateDefinition({
-      appId: manifest.id,
-      enabled: true,
-      runAs: { kind: "user", username: operator.username },
-      restart: "always",
-    });
+    getUser.mockReturnValue(Effect.succeed(operator));
+    await effects.run(manager.initialize());
+    await effects.run(
+      manager.updateDefinition({
+        appId: manifest.id,
+        enabled: true,
+        runAs: { kind: "user", username: operator.username },
+        restart: "always",
+      }),
+    );
 
     expect(processManager.launchDaemon).not.toHaveBeenCalled();
-    expect((await manager.list())[0]).toMatchObject({
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
       definition: {
         enabled: true,
         runAs: { kind: "user", username: operator.username },
@@ -125,11 +143,11 @@ describe("DaemonManager", () => {
   });
 
   it("requires an assigned account before enabling or starting", async () => {
-    await manager.initialize();
-    await expect(manager.setEnabled(manifest.id, true)).rejects.toThrow(
-      "requires a runAs account",
-    );
-    await expect(manager.start(manifest.id)).rejects.toThrow(
+    await effects.run(manager.initialize());
+    await expect(
+      effects.run(manager.setEnabled(manifest.id, true)),
+    ).rejects.toThrow("requires a runAs account");
+    await expect(effects.run(manager.start(manifest.id))).rejects.toThrow(
       "requires a runAs account",
     );
   });
@@ -143,23 +161,25 @@ describe("DaemonManager", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    getUser.mockResolvedValue(operator);
-    await manager.initialize();
-    await manager.updateDefinition({
-      appId: manifest.id,
-      enabled: true,
-      runAs: { kind: "user", username: operator.username },
-      restart: "always",
-    });
-    await manager.start(manifest.id);
+    getUser.mockReturnValue(Effect.succeed(operator));
+    await effects.run(manager.initialize());
+    await effects.run(
+      manager.updateDefinition({
+        appId: manifest.id,
+        enabled: true,
+        runAs: { kind: "user", username: operator.username },
+        restart: "always",
+      }),
+    );
+    await effects.run(manager.start(manifest.id));
 
-    processManager.emit("stopped", { appId: manifest.id });
+    await effects.run(manager.processStopped(manifest.id));
 
-    expect((await manager.list())[0]).toMatchObject({
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
       state: "backoff",
       restartCount: 1,
     });
-    await manager.shutdown();
+    await effects.run(manager.shutdown());
   });
 
   it("suppresses restart policy for daemon/stop", async () => {
@@ -171,76 +191,68 @@ describe("DaemonManager", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    getUser.mockResolvedValue(operator);
-    await manager.initialize();
-    await manager.updateDefinition({
-      appId: manifest.id,
-      enabled: true,
-      runAs: { kind: "user", username: operator.username },
-      restart: "always",
-    });
-    await manager.start(manifest.id);
+    getUser.mockReturnValue(Effect.succeed(operator));
+    await effects.run(manager.initialize());
+    await effects.run(
+      manager.updateDefinition({
+        appId: manifest.id,
+        enabled: true,
+        runAs: { kind: "user", username: operator.username },
+        restart: "always",
+      }),
+    );
+    await effects.run(manager.start(manifest.id));
     processManager.getAppInstance.mockReturnValue({
       manifest,
       principal: { kind: "user", username: operator.username },
     });
-    processManager.stopApp.mockImplementation(async () => {
-      processManager.getAppInstance.mockReturnValue(undefined);
-      processManager.emit("stopped", { appId: manifest.id });
-    });
+    processManager.stopApp.mockImplementation(() =>
+      Effect.gen(function* () {
+        processManager.getAppInstance.mockReturnValue(undefined);
+        yield* manager.processStopped(manifest.id);
+      }),
+    );
 
-    await manager.stop(manifest.id);
+    await effects.run(manager.stop(manifest.id));
 
-    expect((await manager.list())[0]).toMatchObject({
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
       state: "inactive",
       restartCount: 0,
     });
   });
-
-  it("does not let a non-vendor assign a vendor daemon principal", async () => {
-    const vendor: UserProfile = {
-      username: "vendor",
-      name: "Vendor",
-      role: "vendor",
-      grants: ["*"],
-      createdAt: 1,
-      updatedAt: 1,
-    };
+  it("removes daemon configuration and pending supervision after its package leaves the catalog", async () => {
     const operator: UserProfile = {
       username: "operator",
       name: "Operator",
       role: "standard",
-      grants: ["preset/daemon/manage"],
+      grants: [],
       createdAt: 1,
       updatedAt: 1,
     };
-    getUser.mockResolvedValue(vendor);
-
-    await expect(
-      executionContext.run(
-        { principal: { kind: "user", profile: operator } },
-        () =>
-          manager.updateDefinition({
-            appId: manifest.id,
-            enabled: true,
-            runAs: { kind: "user", username: vendor.username },
-            restart: "on-failure",
-          }),
-      ),
-    ).rejects.toThrow("Only a vendor");
-    expect(definitions.size).toBe(0);
-
-    await expect(
-      executionContext.run(
-        { principal: { kind: "user", profile: vendor } },
-        () =>
-          manager.updateDefinition({
-            appId: manifest.id,
-            enabled: true,
-            runAs: { kind: "user", username: vendor.username },
-            restart: "on-failure",
-          }),
-      ),
-    ).resolves.toBeUndefined();
+    getUser.mockReturnValue(Effect.succeed(operator));
+    await effects.run(manager.initialize());
+    await effects.run(
+      manager.updateDefinition({
+        appId: manifest.id,
+        enabled: true,
+        runAs: { kind: "user", username: operator.username },
+        restart: "always",
+      }),
+    );
+    await effects.run(manager.start(manifest.id));
+    await effects.run(manager.processStopped(manifest.id));
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
+      state: "backoff",
+      restartCount: 1,
+    });
+    catalogAvailable = false;
+    await effects.run(manager.packageUninstalled(manifest.id));
+    expect(definitions.has(`com.eden:daemon.${manifest.id}`)).toBe(false);
+    catalogAvailable = true;
+    expect((await effects.run(manager.list()))[0]).toMatchObject({
+      state: "inactive",
+      restartCount: 0,
+      definition: { enabled: false, runAs: null, restart: "on-failure" },
+    });
   });
 });
