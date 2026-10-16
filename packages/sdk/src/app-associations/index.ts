@@ -1,8 +1,8 @@
-export { createAppAssociationsController } from "./controller";
+export { createAppAssociationsController } from "./controller-edenapi";
 export { createJsonFileAssociationStorage } from "./json-file";
 export type { AppAssociationCatalog, AppAssociationStorage } from "./ports";
 export {
-  createAppAssociations,
-  type AppAssociations,
   type AppAssociationListOptions,
+  type AppAssociations,
+  createAppAssociations,
 } from "./service";

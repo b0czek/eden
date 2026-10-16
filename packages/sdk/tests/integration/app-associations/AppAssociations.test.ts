@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -6,9 +5,9 @@ import type { UserProfile } from "@edenapp/types";
 import { createJsonFileAssociationStorage } from "../../../src/app-associations/json-file";
 import { createAppAssociations } from "../../../src/app-associations/service";
 import { createEffectRuntime } from "../../../src/effects/runtime";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { createExecutionContext } from "../../../src/execution/ExecutionContext";
+import { createPackageCatalog } from "../../../src/package-manager/PackageCatalog";
+import { createPackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { testApp } from "../../support/apps";
 
 const vendor: UserProfile = {
@@ -35,14 +34,14 @@ describe("app associations persistence and catalog integration", () => {
     const storePath = path.join(userDirectory, "app-associations.json");
     if (content !== undefined) await fs.writeFile(storePath, content);
 
-    const registry = new PackageRegistry();
-    const execution = new ExecutionContext({});
-    const catalog = new PackageCatalog(
-      registry,
-      execution,
-      userDirectory,
-      userDirectory,
-    );
+    const registry = createPackageRegistry();
+    const execution = createExecutionContext({ config: {} });
+    const catalog = createPackageCatalog({
+      registry: registry,
+      executionContext: execution,
+      appsDirectory: userDirectory,
+      distPath: userDirectory,
+    });
     const open = async () => {
       const service = await runtime.acquire(
         createAppAssociations({

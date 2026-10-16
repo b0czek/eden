@@ -4,8 +4,10 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as v from "valibot";
 import { log } from "../logging";
 import type { AppAssociationCatalog, AppAssociationStorage } from "./ports";
+import { appAssociationSchema } from "./schemas";
 
 export interface AppAssociationListOptions {
   kindPrefix?: string;
@@ -16,21 +18,10 @@ interface AppAssociationsDependencies {
   storage: AppAssociationStorage;
 }
 
-function validateKey(key: string): void {
-  if (!key.trim()) throw new Error("Association key is required");
-}
-
-function isValidAssociation(
+function isValidStoredAssociation(
   association: unknown,
 ): association is AppAssociation {
-  if (!association || typeof association !== "object") return false;
-  const candidate = association as Partial<AppAssociation>;
-  const valid =
-    typeof candidate.appId === "string" &&
-    candidate.appId.trim().length > 0 &&
-    typeof candidate.kind === "string" &&
-    candidate.kind.trim().length > 0 &&
-    (candidate.label === undefined || typeof candidate.label === "string");
+  const valid = v.safeParse(appAssociationSchema, association).success;
 
   if (!valid) log.warn("Ignoring invalid app association entry");
   return valid;
@@ -70,7 +61,7 @@ export function createAppAssociations({
             typeof store.associations === "object"
               ? new Map(
                   Object.entries(store.associations).filter(([, association]) =>
-                    isValidAssociation(association),
+                    isValidStoredAssociation(association),
                   ),
                 )
               : new Map();
@@ -121,16 +112,12 @@ export function createAppAssociations({
 
     function set(key: string, association: AppAssociation) {
       return persistMutation(() => {
-        validateKey(key);
-        if (!isValidAssociation(association))
-          throw new Error("Invalid app association");
         associations.set(key, { ...association });
       });
     }
 
     function remove(key: string) {
       return persistMutation(() => {
-        validateKey(key);
         associations.delete(key);
       });
     }
