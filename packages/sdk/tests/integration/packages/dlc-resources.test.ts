@@ -120,7 +120,9 @@ describe("DLC package lifecycle", () => {
         .list()
         .find((volume) => volume.id === "archive-source")?.state,
     ).toBe("ejecting");
-    await expect(resources.wait(handle, caller)).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(resources.wait(handle, caller)),
+    ).resolves.toMatchObject({
       id: manifest.id,
     });
     await removal;
@@ -158,7 +160,9 @@ describe("DLC package lifecycle", () => {
       caller,
     );
     expect(resources.get(handle, caller).status).toBe("queued");
-    await expect(resources.wait(handle, caller)).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(resources.wait(handle, caller)),
+    ).resolves.toMatchObject({
       id: manifest.id,
     });
     expect(phases).toEqual(
@@ -183,7 +187,9 @@ describe("DLC package lifecycle", () => {
       { packageId: manifest.id },
       caller,
     );
-    await expect(resources.wait(removal, caller)).resolves.toBe(true);
+    await expect(
+      eden.runtime.effects.run(resources.wait(removal, caller)),
+    ).resolves.toBe(true);
     expect(eden.runtime.packages.list()).toEqual([]);
     off();
   });

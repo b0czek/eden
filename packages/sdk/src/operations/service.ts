@@ -4,16 +4,18 @@ import type {
   OperationSnapshot,
   OperationSubmission,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import type { RoutedNotification } from "../controllers/events";
-import { fromPromise } from "../effects/io";
+import { asError } from "../effects/io";
 import { type EffectRuntime } from "../effects/runtime";
 import { createEvent } from "../events/event";
 import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/context";
-import type { Filesystem } from "../filesystem/service";
 import { SessionContext } from "../session/context";
 import { createOperationQuota } from "./quota";
 import type { OperationTask } from "./task";
@@ -24,11 +26,8 @@ interface OperationNamespaceEvents {
 
 interface RecordEntry {
   snapshot: OperationSnapshot;
-  cancellation?: AbortController;
   owner: { appId?: string; sessionId: string };
-  context: CommandCallerContext;
-  done: Promise<void>;
-  finish: () => void;
+  fiber: Fiber.Fiber<unknown, unknown>;
   requestKey?: string;
   fingerprint: string;
   transitionSessionId?: string;
@@ -71,10 +70,15 @@ export function createOperations({
   let accepting = true;
   let shuttingDown = false;
   let runtimeTransition: string | undefined;
-  let expiryTimer: NodeJS.Timeout;
-
-  expiryTimer = setInterval(() => prune(), 60_000);
-  expiryTimer.unref();
+  const expiry = effects.fork(
+    Effect.forever(Effect.andThen(Effect.sleep(60_000), Effect.sync(prune))),
+  );
+  // The transport must queue its acceptance response before execution can tear
+  // down the submitting view or backend.
+  const afterResponse = Effect.callback<void>((resume) => {
+    const immediate = setImmediate(() => resume(Effect.void));
+    return Effect.sync(() => clearImmediate(immediate));
+  });
   function submit(
     command: string,
     args: unknown,
@@ -112,17 +116,21 @@ export function createOperations({
       throw new Error("Operations are draining; new submissions are closed");
     quota.reserve(owner.appId);
     let retained = false;
+    let task: OperationTask<unknown> | undefined;
+    let id: string | undefined;
+    let transitionSessionId: string | undefined;
     try {
-      const task = prepare();
+      task = prepare();
       if (!task || typeof task.run !== "function" || "then" in task)
         throw new Error("Operation handlers must synchronously prepare a task");
-      const id = randomUUID();
+      const prepared = task;
+      id = randomUUID();
       const capturedContext = structuredClone({
         ...context,
         sessionId,
         operationId: id,
       });
-      const transitionSessionId =
+      transitionSessionId =
         task.transition === "session" ? session.getSessionId() : undefined;
       if (transitionSessionId) {
         if (closedSessions.has(transitionSessionId))
@@ -133,10 +141,6 @@ export function createOperations({
         accepting = false;
         runtimeTransition = id;
       }
-      let finish!: () => void;
-      const done = new Promise<void>((resolve) => {
-        finish = resolve;
-      });
       const now = Date.now();
       const record: RecordEntry = {
         snapshot: {
@@ -149,58 +153,79 @@ export function createOperations({
           updatedAt: now,
         },
         owner,
-        cancellation: task.cancellable ? new AbortController() : undefined,
         transitionSessionId,
-        context: capturedContext,
-        done,
-        finish,
+        fiber: execution.run(capturedContext, () =>
+          effects.fork(
+            execution.provide(
+              Effect.andThen(
+                afterResponse,
+                Effect.suspend(() => execute(record, prepared)),
+              ),
+              capturedContext,
+            ),
+          ),
+        ),
         fingerprint,
         requestKey: requestKey === undefined ? undefined : requestIdentity,
       };
       records.set(id, record);
       retained = true;
       if (record.requestKey) requests.set(record.requestKey, id);
+      record.fiber.addObserver((exit) => complete(record, prepared, exit));
       publish(record);
-      // IPC response delivery is queued before tasks may tear down their caller.
-      setImmediate(() => {
-        void execution.run(record.context, () => execute(record, task));
-      });
       return { command, id };
     } finally {
-      if (!retained) quota.release(owner.appId);
+      if (!retained) {
+        if (
+          transitionSessionId &&
+          closedSessions.get(transitionSessionId) === id
+        )
+          closedSessions.delete(transitionSessionId);
+        if (id && runtimeTransition === id) {
+          runtimeTransition = undefined;
+          accepting = !shuttingDown;
+        }
+        try {
+          task?.release?.();
+        } finally {
+          quota.release(owner.appId);
+        }
+      }
     }
   }
-  async function runHost<R>(
+  function runHost<R>(
     command: string,
     args: unknown,
     prepare: () => OperationTask<R>,
-  ): Promise<R> {
-    const context: CommandCallerContext = {
-      principal: { kind: "system" },
-      sessionId: session.getSessionId(),
-    };
-    const handle = submit(command, args, context, prepare);
-    return (await wait(handle, context)) as R;
+  ): Effect.Effect<R, unknown> {
+    return Effect.gen(function* () {
+      const context: CommandCallerContext = {
+        principal: { kind: "system" },
+        sessionId: session.getSessionId(),
+      };
+      const handle = yield* Effect.try({
+        try: () => submit(command, args, context, prepare),
+        catch: asError,
+      });
+      return (yield* wait(handle, context)) as R;
+    });
   }
-  async function execute(
+  const execute = Effect.fn(function* (
     record: RecordEntry,
     task: OperationTask<unknown>,
-  ): Promise<void> {
-    try {
-      update(record, { status: "running", startedAt: Date.now() });
-      if (task.transition) update(record, { phase: "waiting-for-operations" });
-      if (record.transitionSessionId) {
-        await effects.run(
-          filesystem.releaseHandles(record.transitionSessionId),
-        );
-        await drainSession(record.transitionSessionId, record.snapshot.id);
-      }
-      if (task.transition === "runtime") {
-        await effects.run(filesystem.releaseHandles());
-        await drain(record.snapshot.id);
-      }
-      const work = task.run({
-        signal: record.cancellation?.signal,
+  ) {
+    update(record, { status: "running", startedAt: Date.now() });
+    if (task.transition) update(record, { phase: "waiting-for-operations" });
+    if (record.transitionSessionId) {
+      yield* filesystem.releaseHandles(record.transitionSessionId);
+      yield* drainSession(record.transitionSessionId, record.snapshot.id);
+    }
+    if (task.transition === "runtime") {
+      yield* filesystem.releaseHandles();
+      yield* drain(record.snapshot.id);
+    }
+    return structuredClone(
+      yield* task.run({
         update: (phase, progress) => {
           const previous = record.snapshot.progress;
           const unchanged =
@@ -211,51 +236,33 @@ export function createOperations({
           if (record.snapshot.status === "running" && !unchanged)
             update(record, { phase, progress: structuredClone(progress) });
         },
-      });
-      const result = Effect.isEffect(work)
-        ? await effects.run(work)
-        : await work;
-      const failed =
-        result === false ||
-        (result !== null &&
-          typeof result === "object" &&
-          "success" in result &&
-          result.success === false);
-      if (failed) {
-        const message =
-          result &&
-          typeof result === "object" &&
-          "error" in result &&
-          typeof result.error === "string"
-            ? result.error
-            : "Operation failed";
-        update(record, {
-          status: "failed",
-          completedAt: Date.now(),
-          error: { name: "OperationError", message },
-          response: structuredClone(result),
-        });
-      } else
+      }),
+    );
+  });
+  function complete(
+    record: RecordEntry,
+    task: OperationTask<unknown>,
+    exit: Exit.Exit<unknown, unknown>,
+  ) {
+    try {
+      task.release?.();
+      if (Exit.isSuccess(exit)) {
         update(record, {
           status: "succeeded",
           completedAt: Date.now(),
-          result: structuredClone(result),
+          result: exit.value,
         });
-    } catch (error) {
-      const failure = Error.isError(error) ? error : undefined;
-      if (
-        record.cancellation?.signal.aborted &&
-        failure?.name === "AbortError"
-      ) {
+      } else if (Cause.hasInterruptsOnly(exit.cause)) {
         update(record, { status: "cancelled", completedAt: Date.now() });
       } else {
+        const failure = asError(Cause.squash(exit.cause));
         update(record, {
           status: "failed",
           completedAt: Date.now(),
-          error: {
-            name: failure?.name ?? "Error",
-            message: failure?.message ?? "Operation failed",
-          },
+          error: { name: failure.name, message: failure.message },
+          ...(task.encodeFailure
+            ? { response: structuredClone(task.encodeFailure(failure)) }
+            : {}),
         });
       }
     } finally {
@@ -274,7 +281,6 @@ export function createOperations({
             record.snapshot.status === "cancelled") &&
           !shuttingDown;
       }
-      record.finish();
       prune();
     }
   }
@@ -331,12 +337,10 @@ export function createOperations({
     const snapshot = get(handle, context);
     if (snapshot.status !== "queued" && snapshot.status !== "running") return;
     const record = records.get(handle.id)!;
-    if (!record.cancellation) throw new Error("Operation cannot be cancelled");
-    if (record.cancellation.signal.aborted) return;
-    const error = new Error("Operation cancelled");
-    error.name = "AbortError";
-    record.cancellation.abort(error);
+    if (!snapshot.cancellable) throw new Error("Operation cannot be cancelled");
+    if (snapshot.phase === "cancelling") return;
     update(record, { phase: "cancelling" });
+    record.fiber.interruptUnsafe();
   }
   function list(context = execution.get() ?? {}): OperationSnapshot[] {
     prune();
@@ -344,28 +348,23 @@ export function createOperations({
       .filter((record) => authorized(record, context))
       .map((record) => structuredClone(record.snapshot));
   }
-  async function wait(
+  function wait(
     handle: OperationHandle,
     context = execution.get() ?? {},
-  ): Promise<unknown> {
-    get(handle, context);
-    const record = records.get(handle.id)!;
-    await record.done;
-    const snapshot = record.snapshot;
-    if (snapshot.status === "succeeded")
-      return structuredClone(snapshot.result);
-    if (snapshot.status === "cancelled") {
-      const error = new Error("Operation cancelled");
-      error.name = "AbortError";
-      throw error;
-    }
-    if (snapshot.status === "failed") {
-      if ("response" in snapshot) return structuredClone(snapshot.response);
-      const error = new Error(snapshot.error.message);
-      error.name = snapshot.error.name;
-      throw error;
-    }
-    throw new Error("Operation has not completed");
+  ): Effect.Effect<unknown, unknown> {
+    return Effect.suspend(() => {
+      get(handle, context);
+      const record = records.get(handle.id)!;
+      return Fiber.join(record.fiber).pipe(
+        Effect.map((value) => structuredClone(value)),
+        Effect.catchCause((cause) => {
+          if (!Cause.hasInterruptsOnly(cause)) return Effect.failCause(cause);
+          const error = new Error("Operation cancelled");
+          error.name = "AbortError";
+          return Effect.fail(error);
+        }),
+      );
+    });
   }
   function inspect(handle: OperationHandle): OperationSnapshot | undefined {
     prune();
@@ -380,18 +379,19 @@ export function createOperations({
       structuredClone(record.snapshot),
     );
   }
-  async function drainSession(
-    sessionId: string,
-    excludeId?: string,
-  ): Promise<void> {
-    await Promise.all(
-      [...records.values()]
-        .filter(
-          (record) =>
-            record.owner.sessionId === sessionId &&
-            record.snapshot.id !== excludeId,
-        )
-        .map((record) => record.done),
+  function drainSession(sessionId: string, excludeId?: string) {
+    return Effect.suspend(() =>
+      Effect.asVoid(
+        Fiber.awaitAll(
+          [...records.values()]
+            .filter(
+              (record) =>
+                record.owner.sessionId === sessionId &&
+                record.snapshot.id !== excludeId,
+            )
+            .map((record) => record.fiber),
+        ),
+      ),
     );
   }
   function withSessionTransition<A, E>(
@@ -413,7 +413,7 @@ export function createOperations({
       closedSessions.set(sessionId, reservation);
       return Effect.gen(function* () {
         yield* filesystem.releaseHandles(sessionId);
-        yield* fromPromise(() => drainSession(sessionId, operationId));
+        yield* drainSession(sessionId, operationId);
         return yield* work;
       }).pipe(
         Effect.ensuring(
@@ -443,7 +443,7 @@ export function createOperations({
       accepting = false;
       return Effect.gen(function* () {
         yield* filesystem.releaseHandles();
-        yield* fromPromise(() => drain(operationId));
+        yield* drain(operationId);
         return yield* work;
       }).pipe(
         Effect.onError(() =>
@@ -460,18 +460,22 @@ export function createOperations({
       );
     });
   }
-  async function drain(excludeId?: string): Promise<void> {
-    await Promise.all(
-      [...records.values()]
-        .filter((record) => record.snapshot.id !== excludeId)
-        .map((record) => record.done),
+  function drain(excludeId?: string) {
+    return Effect.suspend(() =>
+      Effect.asVoid(
+        Fiber.awaitAll(
+          [...records.values()]
+            .filter((record) => record.snapshot.id !== excludeId)
+            .map((record) => record.fiber),
+        ),
+      ),
     );
   }
-  async function shutdown(): Promise<void> {
+  const shutdown = Effect.fn(function* () {
     shuttingDown = true;
     accepting = false;
-    await drain(execution.get()?.operationId);
-  }
+    yield* drain(execution.get()?.operationId);
+  });
   function prune(): void {
     const now = Date.now();
     for (const record of records.values()) {
@@ -488,13 +492,15 @@ export function createOperations({
       }
     }
   }
-  function dispose(): void {
-    clearInterval(expiryTimer);
+  const dispose = Effect.fn(function* () {
+    yield* shutdown();
+    yield* Fiber.interrupt(expiry);
     records.clear();
     requests.clear();
     quota.clear();
     changed.dispose();
-  }
+  });
+
   return {
     changed,
     submit,

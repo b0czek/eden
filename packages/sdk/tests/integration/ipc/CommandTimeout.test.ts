@@ -2,15 +2,13 @@ import type { OperationHandle } from "@edenapp/types";
 import { command, defineController } from "../../../src/controllers/controller";
 import { Commands } from "../../../src/ipc/commands";
 import { Operations } from "../../../src/operations/service";
-import {
-  type OperationTask,
-  operationTask,
-} from "../../../src/operations/task";
+import type { OperationTask } from "../../../src/operations/task";
 import { InstalledPackages } from "../../../src/packages/installed";
 import { Processes } from "../../../src/processes/service";
 import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { promiseOperationTask } from "../../support/operations";
 
 const appId = "com.example.command-deadlines";
 
@@ -43,7 +41,7 @@ describe("one bounded IPC deadline", () => {
           result: command({ handle: () => completion }),
           operation: command({
             mode: "operation",
-            handle: () => operationTask(async () => completion),
+            handle: () => promiseOperationTask(async () => completion),
           }),
         },
       }),
@@ -89,7 +87,9 @@ describe("one bounded IPC deadline", () => {
     await jest.advanceTimersByTimeAsync(120_000);
     expect(commands.get(handle, caller).status).toBe("running");
     complete("finished");
-    await expect(commands.wait(handle, caller)).resolves.toBe("finished");
+    await expect(
+      eden.runtime.effects.run(commands.wait(handle, caller)),
+    ).resolves.toBe("finished");
   });
 
   it("rejects pending result responses when the runtime is disposed", async () => {

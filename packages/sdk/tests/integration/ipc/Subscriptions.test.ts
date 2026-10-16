@@ -23,10 +23,7 @@ import type {
 import { Permissions } from "../../../src/ipc/permissions";
 import { IpcTransport } from "../../../src/ipc/transport";
 import { Operations } from "../../../src/operations/service";
-import {
-  type OperationReporter,
-  operationTask,
-} from "../../../src/operations/task";
+import type { OperationReporter } from "../../../src/operations/task";
 import { InstalledPackages } from "../../../src/packages/installed";
 import { Processes } from "../../../src/processes/service";
 import { Views } from "../../../src/views/service";
@@ -34,6 +31,7 @@ import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { promiseOperationTask } from "../../support/operations";
 
 const eventName = "volume/changed";
 
@@ -136,7 +134,7 @@ describe("client subscriptions across renderer IPC", () => {
       { name },
       owner,
       () =>
-        operationTask(async (reporter) => {
+        promiseOperationTask(async (reporter) => {
           report = reporter;
           started.release();
           await finish.promise;
@@ -486,8 +484,8 @@ describe("client subscriptions across renderer IPC", () => {
     watched.finish();
     ignored.finish();
     await Promise.all([
-      operations.wait(watched.handle, owner),
-      operations.wait(ignored.handle, owner),
+      eden.runtime.effects.run(operations.wait(watched.handle, owner)),
+      eden.runtime.effects.run(operations.wait(ignored.handle, owner)),
     ]);
     stopSecond();
     await tick();
@@ -517,7 +515,7 @@ describe("client subscriptions across renderer IPC", () => {
       requestKey: "copy",
     });
     expect(repeated.handle).toEqual(copy.handle);
-    await eden.runtime.services.operations.drain();
+    await eden.runtime.effects.run(eden.runtime.services.operations.drain());
     await expect(copy.result()).resolves.toBeUndefined();
     expect(
       await fs.readFile(
@@ -589,7 +587,7 @@ describe("client subscriptions across renderer IPC", () => {
       expect(
         (await fs.stat(path.join(source, "nested", "large.bin"))).size,
       ).toBe(8 * 1024 * 1024);
-      await eden.runtime.services.operations.drain();
+      await eden.runtime.effects.run(eden.runtime.services.operations.drain());
     } finally {
       stop();
     }
@@ -634,7 +632,7 @@ describe("client subscriptions across renderer IPC", () => {
       "integration/foreign",
       {},
       { ...owner, appId: "another.app" },
-      () => operationTask(async () => "private"),
+      () => promiseOperationTask(async () => "private"),
     );
     await expect(
       api.operations.from(foreign).watch(() => undefined),
@@ -646,7 +644,7 @@ describe("client subscriptions across renderer IPC", () => {
       }),
     ).rejects.toThrow("access denied");
     watched.finish();
-    await operations.wait(watched.handle, owner);
+    await eden.runtime.effects.run(operations.wait(watched.handle, owner));
     stop();
     await tick();
   });

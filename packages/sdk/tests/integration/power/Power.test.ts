@@ -1,6 +1,6 @@
 import type { OperationHandle } from "@edenapp/types";
-import { operationTask } from "../../../src/operations/task";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { promiseOperationTask } from "../../support/operations";
 
 describe("power operation lifecycle", () => {
   let eden: TestEden;
@@ -27,7 +27,7 @@ describe("power operation lifecycle", () => {
       release = resolve;
     });
     const work = operations.submit("integration/power-work", {}, {}, () =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked;
       }),
     );
@@ -39,10 +39,10 @@ describe("power operation lifecycle", () => {
     expect(handoffs).toBe(0);
     expect(operations.get(handle).status).toBe("running");
     release();
-    await operations.wait(work);
-    await expect(operations.wait(handle)).rejects.toThrow(
-      "Host refused poweroff",
-    );
+    await eden.runtime.effects.run(operations.wait(work));
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle)),
+    ).rejects.toThrow("Host refused poweroff");
     expect(operations.get(handle)).toMatchObject({
       status: "failed",
       phase: "host-handoff",
@@ -50,7 +50,9 @@ describe("power operation lifecycle", () => {
     const retry = await eden.execute<OperationHandle>("system/power", {
       action: "poweroff",
     });
-    await expect(operations.wait(retry)).resolves.toBeUndefined();
+    await expect(
+      eden.runtime.effects.run(operations.wait(retry)),
+    ).resolves.toBeUndefined();
     expect(operations.get(retry)).toMatchObject({
       status: "succeeded",
       phase: "host-handoff",
@@ -83,9 +85,9 @@ describe("power operation lifecycle", () => {
         );
     });
     try {
-      await expect(operations.wait(handle)).rejects.toThrow(
-        "Host refused poweroff",
-      );
+      await expect(
+        eden.runtime.effects.run(operations.wait(handle)),
+      ).rejects.toThrow("Host refused poweroff");
       expect(admissionDuringFailure).toBeDefined();
       expect(await admissionDuringFailure).toBeInstanceOf(Error);
       expect(((await admissionDuringFailure) as Error).message).toContain(

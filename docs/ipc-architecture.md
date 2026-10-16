@@ -411,9 +411,11 @@ stopWatching();
 `worker.edenAPI.shellCommand` returns the same operation objects. `copy.get()` reads a
 snapshot and `operations.list()` lists the caller's operations. Watchers subscribe before
 reading the retained snapshot and reconcile changes using increasing revisions.
-Completion before observation works too. A failed operation preserves a typed
-domain failure response when available; `result()` returns that response. Other
-failures reject with a sanitized error.
+Completion before observation works too. A controller can declare a typed failure
+response, such as the login command's `{ success: false, error }`; a failed
+operation then carries that response and `result()` returns it. Other failures
+reject with a sanitized error. Returned values themselves do not determine
+success or failure; the execution Effect's outcome does.
 
 For operations with `snapshot.cancellable`, call `copy.cancel()` to
 request a stop. Continue observing until cleanup completes. A cancelled operation

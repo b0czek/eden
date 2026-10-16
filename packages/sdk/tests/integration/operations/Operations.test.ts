@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { command, defineController } from "../../../src/controllers/controller";
@@ -26,6 +27,7 @@ import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { promiseOperationTask } from "../../support/operations";
 
 describe("runtime-owned operations", () => {
   let eden: TestEden;
@@ -67,20 +69,92 @@ describe("runtime-owned operations", () => {
     );
 
   it("rejects cancellation for tasks that do not support it", async () => {
-    register(() => operationTask(async () => "done"));
+    register(() => promiseOperationTask(async () => "done"));
     const handle = await submit();
     expect(operations.get(handle, owner).cancellable).toBe(false);
     await expect(
       eden.execute("operation/cancel", { handle }, owner),
     ).rejects.toThrow("cannot be cancelled");
-    await expect(operations.wait(handle, owner)).resolves.toBe("done");
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).resolves.toBe("done");
+  });
+
+  it("interrupts native Effect work and publishes cancellation only after its cleanup", async () => {
+    const started = gate();
+    const finishWork = gate();
+    const finishCleanup = gate();
+    let cleaningUp = false;
+    register(() =>
+      operationTask(
+        () =>
+          Effect.acquireUseRelease(
+            Effect.sync(() => started.release()),
+            () => Effect.promise(() => finishWork.promise),
+            () =>
+              Effect.promise(async () => {
+                cleaningUp = true;
+                await finishCleanup.promise;
+              }),
+          ),
+        { cancellable: true },
+      ),
+    );
+    const handle = await submit();
+    try {
+      await started.promise;
+      operations.cancel(handle, owner);
+      await tick();
+      expect(cleaningUp).toBe(true);
+      expect(operations.get(handle, owner)).toMatchObject({
+        status: "running",
+        phase: "cancelling",
+      });
+      finishCleanup.release();
+      await expect(
+        eden.runtime.effects.run(operations.wait(handle, owner)),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      expect(operations.get(handle, owner).status).toBe("cancelled");
+    } finally {
+      finishWork.release();
+      finishCleanup.release();
+    }
+  });
+
+  it("releases synchronous admission when cancelled before execution", async () => {
+    let admitted = false;
+    let executed = false;
+    register(() => {
+      admitted = true;
+      return operationTask(
+        () =>
+          Effect.sync(() => {
+            executed = true;
+          }),
+        {
+          cancellable: true,
+          release: () => {
+            admitted = false;
+          },
+        },
+      );
+    });
+    const handle = await submit();
+    expect(operations.get(handle, owner).status).toBe("queued");
+    expect(admitted).toBe(true);
+    operations.cancel(handle, owner);
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(admitted).toBe(false);
+    expect(executed).toBe(false);
   });
 
   it("accepts promptly, queues execution, retains completion and captured context", async () => {
     const blocked = gate();
     const file = path.join(eden.paths.root, "accepted.txt");
     register(({ value }) =>
-      operationTask(async (reporter) => {
+      promiseOperationTask(async (reporter) => {
         expect(eden.runtime.services.execution.get()?.appId).toBe(owner.appId);
         reporter.update("writing");
         await blocked.promise;
@@ -99,7 +173,9 @@ describe("runtime-owned operations", () => {
     });
     expect(running.revision).toBeGreaterThan(accepted.revision);
     blocked.release();
-    await expect(operations.wait(handle, owner)).resolves.toEqual({
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).resolves.toEqual({
       value: "value",
     });
     expect(await fs.readFile(file, "utf8")).toBe("value");
@@ -111,9 +187,9 @@ describe("runtime-owned operations", () => {
   });
 
   it("observes completion that predates subscription and reconciles revisions", async () => {
-    register(() => operationTask(async () => "done"));
+    register(() => promiseOperationTask(async () => "done"));
     const handle = await submit();
-    await operations.wait(handle, owner);
+    await eden.runtime.effects.run(operations.wait(handle, owner));
     const completed = operations.get(handle, owner);
     const callbacks = new Set<
       (data: { snapshot: OperationSnapshot }) => void
@@ -154,7 +230,7 @@ describe("runtime-owned operations", () => {
     let preparations = 0;
     register(() => {
       preparations++;
-      return operationTask(async () => {
+      return promiseOperationTask(async () => {
         await blocked.promise;
         return "done";
       });
@@ -173,33 +249,34 @@ describe("runtime-owned operations", () => {
     ).toThrow("access denied");
     expect(operations.list({ ...owner, appId: "another.app" })).toEqual([]);
     blocked.release();
-    await operations.wait(first, owner);
+    await eden.runtime.effects.run(operations.wait(first, owner));
   });
 
-  it("retains typed failure responses and sanitizes thrown failures", async () => {
+  it.each([false, { success: false, error: "Payload, not a failure" }])(
+    "retains successful payloads without inferring failure: %p",
+    async (result) => {
+      register(() => operationTask(() => Effect.succeed(result)));
+      const handle = await submit();
+      await expect(
+        eden.runtime.effects.run(operations.wait(handle, owner)),
+      ).resolves.toEqual(result);
+      expect(operations.get(handle, owner)).toMatchObject({
+        status: "succeeded",
+        result,
+      });
+    },
+  );
+
+  it("sanitizes thrown failures", async () => {
     register(() =>
-      operationTask(async () => ({
-        success: false,
-        error: "Invalid input",
-        validation: { field: "value" },
-      })),
-    );
-    const domain = await submit();
-    await expect(operations.wait(domain, owner)).resolves.toMatchObject({
-      success: false,
-      validation: { field: "value" },
-    });
-    expect(operations.get(domain, owner)).toMatchObject({
-      status: "failed",
-      response: { success: false },
-    });
-    register(() =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         throw new TypeError("Unavailable");
       }),
     );
     const thrown = await submit();
-    await expect(operations.wait(thrown, owner)).rejects.toThrow("Unavailable");
+    await expect(
+      eden.runtime.effects.run(operations.wait(thrown, owner)),
+    ).rejects.toThrow("Unavailable");
     expect(operations.get(thrown, owner)).toMatchObject({
       status: "failed",
       error: { name: "TypeError", message: "Unavailable" },
@@ -216,7 +293,7 @@ describe("runtime-owned operations", () => {
     let preparations = 0;
     register(({ value }) => {
       preparations++;
-      return operationTask(async () => {
+      return promiseOperationTask(async () => {
         if (value === "active") await blocked.promise;
         return value;
       });
@@ -227,7 +304,7 @@ describe("runtime-owned operations", () => {
       for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
         const handle = await submit(String(i), `key-${i}`);
         handles.push(handle);
-        await operations.wait(handle, owner);
+        await eden.runtime.effects.run(operations.wait(handle, owner));
       }
       await expect(submit("rejected")).rejects.toThrow("capacity exhausted");
       expect(preparations).toBe(operationQuotaLimits.perAppLimit);
@@ -248,7 +325,9 @@ describe("runtime-owned operations", () => {
       expect(operations.list(owner)).toHaveLength(
         operationQuotaLimits.perAppLimit,
       );
-      expect(await operations.wait(handles[0], owner)).toBe("1");
+      expect(
+        await eden.runtime.effects.run(operations.wait(handles[0], owner)),
+      ).toBe("1");
       await expect(submit("still-full")).rejects.toThrow("capacity exhausted");
       clock.mockReturnValue(now + operationRetentionMs);
       expect(operations.list(owner)).toHaveLength(1);
@@ -256,9 +335,11 @@ describe("runtime-owned operations", () => {
       expect(() => operations.get(handles[0], owner)).toThrow("not found");
       const next = await submit("new-value", "key-1");
       expect(next.id).not.toBe(handles[0].id);
-      await expect(operations.wait(next, owner)).resolves.toBe("new-value");
+      await expect(
+        eden.runtime.effects.run(operations.wait(next, owner)),
+      ).resolves.toBe("new-value");
       blocked.release();
-      await operations.wait(active, owner);
+      await eden.runtime.effects.run(operations.wait(active, owner));
       clock.mockReturnValue(now + 2 * operationRetentionMs - 1);
       expect(operations.get(active, owner).status).toBe("succeeded");
       clock.mockReturnValue(now + 2 * operationRetentionMs);
@@ -274,7 +355,7 @@ describe("runtime-owned operations", () => {
     const now = Date.now();
     const clock = jest.spyOn(Date, "now").mockReturnValue(now);
     register(({ value }) =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         if (value === "active") await blocked.promise;
         return value;
       }),
@@ -313,7 +394,8 @@ describe("runtime-owned operations", () => {
             caller,
             caller === owner ? "done" : "active",
           );
-          if (caller === owner) await operations.wait(handle, caller);
+          if (caller === owner)
+            await eden.runtime.effects.run(operations.wait(handle, caller));
         }
       }
       expect(remainingShared).toBe(0);
@@ -368,7 +450,7 @@ describe("runtime-owned operations", () => {
       clock.mockRestore();
       blocked.release();
     }
-    await operations.drain();
+    await eden.runtime.effects.run(operations.drain());
   });
 
   it("returns reserved and shared capacity when preparation fails", async () => {
@@ -379,10 +461,10 @@ describe("runtime-owned operations", () => {
       "Preparation failed",
     );
     expect(operations.list(owner)).toEqual([]);
-    register(() => operationTask(async () => "done"));
+    register(() => promiseOperationTask(async () => "done"));
     for (let i = 1; i < operationQuotaLimits.perAppLimit; i++) {
       const handle = await submit();
-      await operations.wait(handle, owner);
+      await eden.runtime.effects.run(operations.wait(handle, owner));
     }
     register(() => {
       throw new Error("Preparation failed");
@@ -393,9 +475,11 @@ describe("runtime-owned operations", () => {
       );
     register(() => null as unknown as OperationTask<unknown>);
     await expect(submit()).rejects.toThrow("synchronously prepare a task");
-    register(() => operationTask(async () => "recovered"));
+    register(() => promiseOperationTask(async () => "recovered"));
     const handle = await submit("retry", "failed-preparation");
-    await expect(operations.wait(handle, owner)).resolves.toBe("recovered");
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).resolves.toBe("recovered");
     await expect(submit()).rejects.toThrow("capacity exhausted");
     expect(operations.list(owner)).toHaveLength(
       operationQuotaLimits.perAppLimit,
@@ -405,7 +489,7 @@ describe("runtime-owned operations", () => {
   it("reserves session transitions before acceptance and drains without waiting on itself", async () => {
     const blocked = gate();
     register(() =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked.promise;
         return "done";
       }),
@@ -415,7 +499,7 @@ describe("runtime-owned operations", () => {
     const originalId = session.getSessionId();
     // Exercise the existing awaited session method inside an operation transaction.
     register(() =>
-      operationTask(
+      promiseOperationTask(
         async () => {
           await eden.runtime.effects.run(
             eden.runtime.services.sessions.logout(),
@@ -433,9 +517,11 @@ describe("runtime-owned operations", () => {
     await tick();
     expect(session.getSessionId()).toBe(originalId);
     blocked.release();
-    await operations.wait(work, owner);
+    await eden.runtime.effects.run(operations.wait(work, owner));
     await expect(
-      operations.wait(transition, { ...owner, sessionId: originalId }),
+      eden.runtime.effects.run(
+        operations.wait(transition, { ...owner, sessionId: originalId }),
+      ),
     ).resolves.toBe("changed");
   });
 
@@ -443,7 +529,7 @@ describe("runtime-owned operations", () => {
     const transitioned = gate();
     const blocked = gate();
     register(() =>
-      operationTask(
+      promiseOperationTask(
         async () => {
           await eden.runtime.effects.run(
             eden.runtime.services.sessions.logout(),
@@ -466,7 +552,9 @@ describe("runtime-owned operations", () => {
     } finally {
       blocked.release();
     }
-    await expect(operations.wait(handle, owner)).resolves.toBe("done");
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).resolves.toBe("done");
     await expect(
       eden.runtime.effects.run(eden.runtime.services.sessions.logout()),
     ).resolves.toBeUndefined();
@@ -475,7 +563,7 @@ describe("runtime-owned operations", () => {
   it("drains accepted work before runtime resource disposal", async () => {
     const blocked = gate();
     register(() =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked.promise;
         await fs.writeFile(path.join(eden.paths.root, "drained"), "done");
       }),
@@ -498,7 +586,7 @@ describe("runtime-owned operations", () => {
   it("accepts backend submissions and delivers changes only to the owning backend", async () => {
     const blocked = gate();
     register(() =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked.promise;
         return "backend-done";
       }),
@@ -566,7 +654,7 @@ describe("runtime-owned operations", () => {
     const handle = response!.result.handle;
     expect(operations.get(handle, owner).status).toBe("running");
     blocked.release();
-    await operations.wait(handle, owner);
+    await eden.runtime.effects.run(operations.wait(handle, owner));
     expect(processes[0].messages).toContainEqual(
       expect.objectContaining({
         type: "shell-event",
@@ -598,7 +686,7 @@ describe("runtime-owned operations", () => {
     restarted.emit("message", { type: "backend-ready" });
     await restarting;
     const afterRestart = await submit();
-    await operations.wait(afterRestart, owner);
+    await eden.runtime.effects.run(operations.wait(afterRestart, owner));
     expect(restarted.messages).not.toContainEqual(
       expect.objectContaining({
         type: "shell-event",
@@ -612,7 +700,7 @@ describe("runtime-owned operations", () => {
     const blocked = gate();
     let reporter!: OperationReporter;
     register(() =>
-      operationTask(async (progress) => {
+      promiseOperationTask(async (progress) => {
         reporter = progress;
         await blocked.promise;
         await fs.writeFile(
@@ -672,7 +760,9 @@ describe("runtime-owned operations", () => {
         }),
       );
       blocked.release();
-      await expect(operations.wait(handle, owner)).resolves.toBe("finished");
+      await expect(
+        eden.runtime.effects.run(operations.wait(handle, owner)),
+      ).resolves.toBe("finished");
       expect(
         await fs.readFile(
           path.join(eden.paths.root, "backend-filtered"),
@@ -781,7 +871,7 @@ describe("runtime-owned operations", () => {
     }
     const blocked = gate();
     register(() =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked.promise;
         return "persisted";
       }),
@@ -796,7 +886,7 @@ describe("runtime-owned operations", () => {
       eden.runtime.services.processes.stopApp(owner.appId),
     );
     blocked.release();
-    await operations.wait(handle, owner);
+    await eden.runtime.effects.run(operations.wait(handle, owner));
     await launch(owner.appId);
     expect(view(owner.appId).webContents.id).not.toBe(originalWebContentsId);
     expect(

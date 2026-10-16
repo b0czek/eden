@@ -14,6 +14,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     path.join(__dirname, "../../src/controllers/contract.fixture.ts"),
     `
     import * as v from "valibot";
+    import * as Effect from "effect/Effect";
     import { command, defineController } from "./controller";
     import { createEvent } from "../events/event";
     import { targetedEvent, routedEvent, type TargetedNotification, type RoutedNotification } from "./events";
@@ -33,7 +34,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
         }),
         // Internal implementation comment is not public documentation.
         /** Save the current value. */
-        save: command({ mode: "operation", handle: () => operationTask(async () => "saved") }),
+        save: command({ mode: "operation", handle: () => operationTask(() => Effect.succeed("saved")) }),
       },
       events: {
         changed: createEvent<{ value: number }>(),
@@ -123,8 +124,8 @@ it("generates public success values without Effect failures or service requireme
   const fixture = project.createSourceFile(
     path.join(directory, "effect-contract.fixture.ts"),
     `
-    import { Effect } from "effect";
     import * as v from "valibot";
+    import * as Effect from "effect/Effect";
     import { command, defineController, operation } from "./controller";
     import { operationTask } from "../operations/task";
     declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }, { storage: true }>;
@@ -147,7 +148,7 @@ it("generates public success values without Effect failures or service requireme
         undefined: command({ handle: () => undefined }),
         save: command({
           mode: "operation",
-          handle: () => operationTask(async () => ({ saved: true })),
+          handle: () => operationTask(() => Effect.succeed({ saved: true })),
         }),
         saveEffect: operation({
           input: v.object({ value: v.optional(v.number(), 4) }),

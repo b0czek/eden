@@ -92,8 +92,8 @@ describe("safe volume removal", () => {
     expect(
       eden.runtime.volumes.list().find((volume) => volume.id === "usb")?.state,
     ).toBe("ejecting");
-    await filesystem.wait(copy, caller);
-    await filesystem.wait(eject, caller);
+    await eden.runtime.effects.run(filesystem.wait(copy, caller));
+    await eden.runtime.effects.run(filesystem.wait(eject, caller));
     expect(hostContent).toBe("queued work");
   });
 
@@ -132,9 +132,11 @@ describe("safe volume removal", () => {
       caller,
     );
     let firstFinished = false;
-    const firstResult = filesystem.wait(first, caller).then(() => {
-      firstFinished = true;
-    });
+    const firstResult = eden.runtime.effects
+      .run(filesystem.wait(first, caller))
+      .then(() => {
+        firstFinished = true;
+      });
     // Release stalled I/O even if cancellation is broken, so failure can clean up.
     const watchdog = setTimeout(() => resumeCopy.resolve(), 2000);
     try {
@@ -153,10 +155,12 @@ describe("safe volume removal", () => {
         { volume: "usb" },
         caller,
       );
-      await expect(filesystem.wait(second, caller)).rejects.toMatchObject({
+      await expect(
+        eden.runtime.effects.run(filesystem.wait(second, caller)),
+      ).rejects.toMatchObject({
         name: "AbortError",
       });
-      await filesystem.wait(eject, caller);
+      await eden.runtime.effects.run(filesystem.wait(eject, caller));
       expect(firstFinished).toBe(false);
       expect(ejected).toBe(true);
       expect(await fs.readdir(usbRoot)).toEqual([]);
@@ -220,10 +224,12 @@ describe("safe volume removal", () => {
       expect(hostCalls).toBe(0);
       finishClose.resolve();
       // No handler is installed, but the real metadata read must finish safely.
-      await expect(filesystem.wait(opening, caller)).resolves.toMatchObject({
+      await expect(
+        eden.runtime.effects.run(filesystem.wait(opening, caller)),
+      ).resolves.toMatchObject({
         success: false,
       });
-      await filesystem.wait(ejecting, caller);
+      await eden.runtime.effects.run(filesystem.wait(ejecting, caller));
       expect(hostCalls).toBe(1);
     } finally {
       finishClose.resolve();
@@ -303,9 +309,9 @@ describe("safe volume removal", () => {
     await expect(
       execute("fs/read", { location: { volume: "usb", path: "/late.txt" } }),
     ).rejects.toThrow("ejecting");
-    await expect(filesystem.wait(handle, caller)).rejects.toThrow(
-      "Device is busy",
-    );
+    await expect(
+      eden.runtime.effects.run(filesystem.wait(handle, caller)),
+    ).rejects.toThrow("Device is busy");
     expect(filesystem.get(handle, caller)).toMatchObject({
       status: "failed",
       phase: "host-eject",
@@ -328,7 +334,7 @@ describe("safe volume removal", () => {
       caller,
     );
     expect(retry.id).not.toBe(handle.id);
-    await filesystem.wait(retry, caller);
+    await eden.runtime.effects.run(filesystem.wait(retry, caller));
     expect(filesystem.get(retry, caller)).toMatchObject({
       status: "succeeded",
     });

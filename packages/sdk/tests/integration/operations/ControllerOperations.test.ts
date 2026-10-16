@@ -73,7 +73,9 @@ describe("Effect controller operations", () => {
     } finally {
       finish.release();
     }
-    await expect(operations.wait(handle, owner)).resolves.toEqual({
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).resolves.toEqual({
       value: 3,
       appId: owner.appId,
     });
@@ -100,9 +102,9 @@ describe("Effect controller operations", () => {
       owner,
     );
     const operations = eden.runtime.services.operations;
-    await expect(operations.wait(handle, owner)).rejects.toThrow(
-      "Effect work failed",
-    );
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, owner)),
+    ).rejects.toThrow("Effect work failed");
     expect(operations.get(handle, owner)).toMatchObject({
       status: "failed",
       error: { message: "Effect work failed" },

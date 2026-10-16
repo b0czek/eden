@@ -272,18 +272,19 @@ export const createVolumes = Effect.fn(function* () {
   ): OperationTask<R> {
     const access = acquire(ids, true);
     let started = false;
-    return operationTask((reporter) =>
-      Effect.suspend(() => {
-        if (started)
-          return Effect.fail(new Error("Volume operation has already started"));
-        started = true;
-        return access
-          .effect(Effect.suspend(() => run(reporter)))
-          .pipe(
-            Effect.ensuring(Effect.sync(access.release)),
-            Effect.uninterruptible,
-          );
-      }),
+    return operationTask(
+      (reporter) =>
+        Effect.suspend(() => {
+          if (started)
+            return Effect.fail(
+              new Error("Volume operation has already started"),
+            );
+          started = true;
+          return access
+            .effect(Effect.suspend(() => run(reporter)))
+            .pipe(Effect.ensuring(Effect.sync(access.release)));
+        }),
+      { release: access.release },
     );
   }
 
@@ -299,7 +300,7 @@ export const createVolumes = Effect.fn(function* () {
           try: () => acquire(ids, true, inherited),
           catch: asError,
         }),
-        (access) => access.effect(work).pipe(Effect.uninterruptible),
+        (access) => access.effect(work),
         (access) => Effect.sync(access.release),
       );
     });

@@ -678,7 +678,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
       await release("filesystem handles", () =>
         effects.run(services.filesystem.closeHandles()),
       );
-    await release("operation drain", operations.shutdown);
+    await release("operation drain", () => effects.run(operations.shutdown()));
     if (autostart)
       await release("autostart", () => effects.run(autostart.shutdown()));
     if (services.daemons)
@@ -692,11 +692,11 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
       mainWindow = null;
     });
     await release("IPC", () => services.ipc?.dispose());
+    await release("operations", () => effects.run(operations.dispose()));
     await release("service scopes", effects.dispose);
     await release("grant catalog", grants.dispose);
     await release("settings panels", settingsPanels.dispose);
     await release("command registry", commands.dispose);
-    await release("operations", operations.dispose);
     await release("permissions", permissions.dispose);
     await release("runtime contexts", runtimeContexts.dispose);
     await release("session context", sessionContext.dispose);

@@ -79,6 +79,7 @@ interface OperationOptions<Args, Result> {
   permission?: string;
   transition?: OperationTask<Result>["transition"];
   cancellable?: boolean;
+  encodeFailure?: (error: unknown) => NoInfer<Result>;
   prepare: (
     args: Args,
     caller: CommandCallerContext,
@@ -108,6 +109,7 @@ export function operation(
       operationTask(options.prepare(args as never, caller), {
         transition: options.transition,
         cancellable: options.cancellable,
+        encodeFailure: options.encodeFailure,
       }),
   });
 }

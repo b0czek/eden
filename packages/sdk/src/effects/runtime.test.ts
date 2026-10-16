@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import { createExecutionContext } from "../execution/context";
 import { createEffectRuntime } from "./runtime";
 
@@ -39,22 +40,23 @@ describe("Effect runtime ownership", () => {
     }
   });
 
-  it("awaits active work finalizers before disposing its service resources", async () => {
-    const runtime = createEffectRuntime();
-    const released: string[] = [];
-    let started!: () => void;
-    const ready = new Promise<void>((resolve) => {
-      started = resolve;
-    });
-    await runtime.acquire(
-      Effect.acquireRelease(Effect.void, () =>
-        Effect.sync(() => {
-          released.push("service");
-        }),
-      ),
-    );
-    const running = runtime.run(
-      Effect.gen(function* () {
+  it.each(["run", "fork"] as const)(
+    "awaits %s work finalizers before disposing its service resources",
+    async (entry) => {
+      const runtime = createEffectRuntime();
+      const released: string[] = [];
+      let started!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      await runtime.acquire(
+        Effect.acquireRelease(Effect.void, () =>
+          Effect.sync(() => {
+            released.push("service");
+          }),
+        ),
+      );
+      const work = Effect.gen(function* () {
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             released.push("work");
@@ -62,14 +64,18 @@ describe("Effect runtime ownership", () => {
         );
         started();
         yield* Effect.never;
-      }).pipe(Effect.scoped),
-    );
-    const stopped = expect(running).rejects.toBeDefined();
-    await ready;
-    await runtime.dispose();
-    await stopped;
-    expect(released).toEqual(["work", "service"]);
-  });
+      }).pipe(Effect.scoped);
+      const running =
+        entry === "run"
+          ? runtime.run(work)
+          : Effect.runPromise(Fiber.join(runtime.fork(work)));
+      const stopped = expect(running).rejects.toBeDefined();
+      await ready;
+      await runtime.dispose();
+      await stopped;
+      expect(released).toEqual(["work", "service"]);
+    },
+  );
 
   it("keeps caller identity isolated across yielding concurrent work", async () => {
     const runtime = createEffectRuntime();

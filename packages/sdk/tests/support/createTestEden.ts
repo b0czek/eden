@@ -98,9 +98,11 @@ export async function createTestEden(
       const result = await registry.execute(command, args, context);
       return (
         registry.getMode(command) === "operation"
-          ? await runtime.services.operations.wait(
-              result as OperationHandle,
-              context,
+          ? await runtime.effects.run(
+              runtime.services.operations.wait(
+                result as OperationHandle,
+                context,
+              ),
             )
           : result
       ) as TResult;

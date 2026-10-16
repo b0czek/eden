@@ -27,7 +27,7 @@ export function createSdkContext({
     args: unknown,
     prepare: () => OperationTask<R>,
   ): Promise<R> {
-    return run(() => operations.runHost(command, args, prepare));
+    return effect(operations.runHost(command, args, prepare));
   }
 
   return { run, effect, operation };

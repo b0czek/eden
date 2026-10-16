@@ -5,6 +5,7 @@ import {
   defineController,
   operation,
 } from "../controllers/controller";
+import { asError } from "../effects/io";
 import { sessionLoginSchema } from "./schemas";
 import type { Sessions } from "./service";
 
@@ -19,6 +20,10 @@ export function createSessionController(sessions: Sessions) {
         permission: "manage",
         input: sessionLoginSchema,
         transition: "session",
+        encodeFailure: (error) => ({
+          success: false,
+          error: asError(error).message,
+        }),
         prepare:
           ({ username, password }) =>
           (reporter) => {
@@ -32,9 +37,6 @@ export function createSessionController(sessions: Sessions) {
                   user?: UserProfile;
                   error?: string;
                 } => ({ success: true, user }),
-              ),
-              Effect.catch((error) =>
-                Effect.succeed({ success: false, error: error.message }),
               ),
             );
           },

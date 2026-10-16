@@ -43,7 +43,7 @@ globalThis.__edenIntegration = {
     const caller = { sessionId: sessionContext.getSessionId() };
     const result = await commands.execute(command, args, caller);
     return commands.getMode(command) === "operation"
-      ? operations.wait(result, caller)
+      ? runtime.effects.run(operations.wait(result, caller))
       : result;
   },
 };

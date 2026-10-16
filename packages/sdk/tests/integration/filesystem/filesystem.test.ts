@@ -61,9 +61,11 @@ describe("Filesystem native watch integration", () => {
     const result =
       response.mode === "operation" ? response.handle : response.result;
     return command === "fs/mv"
-      ? eden.runtime.services.operations.wait(
-          result as OperationHandle,
-          caller(appId, profile),
+      ? eden.runtime.effects.run(
+          eden.runtime.services.operations.wait(
+            result as OperationHandle,
+            caller(appId, profile),
+          ),
         )
       : result;
   };
@@ -360,7 +362,7 @@ describe("Filesystem integration", () => {
       transferCaller,
     );
     expect(filesystem.get(handle, transferCaller).status).toBe("queued");
-    await filesystem.wait(handle, transferCaller);
+    await eden.runtime.effects.run(filesystem.wait(handle, transferCaller));
     expect(
       await fs.readFile(
         path.join(eden.paths.userDirectory, "operation-destination"),
@@ -375,9 +377,9 @@ describe("Filesystem integration", () => {
       args,
       transferCaller,
     );
-    await expect(filesystem.wait(collision, transferCaller)).rejects.toThrow(
-      "already exists",
-    );
+    await expect(
+      eden.runtime.effects.run(filesystem.wait(collision, transferCaller)),
+    ).rejects.toThrow("already exists");
     expect(filesystem.get(collision, transferCaller)).toMatchObject({
       status: "failed",
       error: { message: expect.stringContaining("already exists") },
@@ -471,7 +473,7 @@ describe("Filesystem integration", () => {
           transferCaller,
         );
         await expect(
-          filesystem.wait(handle, transferCaller),
+          eden.runtime.effects.run(filesystem.wait(handle, transferCaller)),
         ).rejects.toMatchObject({ name: "AbortError" });
         await cancellation;
         expect(filesystem.get(handle, transferCaller)).toMatchObject({
@@ -531,11 +533,11 @@ describe("Filesystem integration", () => {
       ),
     ).rejects.toThrow("access denied");
     await eden.execute("operation/cancel", { handle }, transferCaller);
-    await expect(filesystem.wait(handle, transferCaller)).rejects.toMatchObject(
-      {
-        name: "AbortError",
-      },
-    );
+    await expect(
+      eden.runtime.effects.run(filesystem.wait(handle, transferCaller)),
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
     expect(await fs.readFile(source, "utf8")).toBe("source");
     expect(await fs.readFile(destination, "utf8")).toBe("destination");
     await expect(
@@ -568,7 +570,7 @@ describe("Filesystem integration", () => {
       },
       transferCaller,
     );
-    await filesystem.wait(handle, transferCaller);
+    await eden.runtime.effects.run(filesystem.wait(handle, transferCaller));
     expect(filesystem.get(handle, transferCaller)).toMatchObject({
       status: "succeeded",
       progress: { completed: 11, unit: "bytes" },

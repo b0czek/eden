@@ -960,10 +960,12 @@ describe("consumer-managed filesystem volumes", () => {
         const result =
           response.mode === "operation" ? response.handle : response.result;
         return command === "volume/eject"
-          ? eden.runtime.services.operations.wait(result as OperationHandle, {
-              appId,
-              principal: { kind: "user", profile: user },
-            })
+          ? eden.runtime.effects.run(
+              eden.runtime.services.operations.wait(result as OperationHandle, {
+                appId,
+                principal: { kind: "user", profile: user },
+              }),
+            )
           : result;
       };
       await invoke("event/subscribe", { eventName: "fs/changed" });

@@ -56,7 +56,9 @@ describe("Processes integration", () => {
       id: expect.any(String),
     });
     expect(processes.getAppInstance(appId)).toBeDefined();
-    await eden.runtime.services.operations.wait(handle, caller(appId, profile));
+    await eden.runtime.effects.run(
+      eden.runtime.services.operations.wait(handle, caller(appId, profile)),
+    );
     expect(processes.getAppInstance(appId)).toBeUndefined();
     expect(view.webContents.isDestroyed()).toBe(true);
     expect(eden.runtime.operations.get(handle)).toMatchObject({

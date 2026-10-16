@@ -96,7 +96,7 @@ describe("grouped volume removal", () => {
       expect(hostCalls).toBe(0);
       finish.resolve();
       await reading;
-      await operations.wait(eject, caller());
+      await eden.runtime.effects.run(operations.wait(eject, caller()));
       await disposed;
       expect(hostCalls).toBe(1);
     } finally {

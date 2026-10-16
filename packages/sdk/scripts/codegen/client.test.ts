@@ -19,6 +19,7 @@ function extract(commands: string, namespace = "fs", declarations = "") {
     ),
     `
     import * as v from "valibot";
+    import * as Effect from "effect/Effect";
     import { command, defineController } from "./controller";
     import { operationTask } from "../operations/task";
     ${declarations}
@@ -42,7 +43,7 @@ it("extracts public fields from resolved aliases and intersections", () => {
     cp: command({
       input: transfer,
       mode: "operation",
-      handle: () => operationTask(async () => {}),
+      handle: () => operationTask(() => Effect.void),
     }),
   `,
     "fs",
@@ -105,7 +106,7 @@ it("rejects operation submission field collisions", () => {
     copy: command({
       input: v.object({ submission: v.optional(v.string()) }),
       mode: "operation",
-      handle: () => operationTask(async () => {}),
+      handle: () => operationTask(() => Effect.void),
     }),
   `),
   ).toThrow("fs/copy: argument submission conflicts");

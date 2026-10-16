@@ -60,7 +60,7 @@ describe("Sessions", () => {
   });
 
   afterEach(async () => {
-    operations.dispose();
+    await effects.run(operations.dispose());
     await effects.dispose();
   });
 

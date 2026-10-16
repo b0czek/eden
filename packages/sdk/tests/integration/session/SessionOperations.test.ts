@@ -1,13 +1,14 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle } from "@edenapp/types";
+import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { Permissions } from "../../../src/ipc";
 import { Operations } from "../../../src/operations/service";
-import { operationTask } from "../../../src/operations/task";
 import { SessionContext } from "../../../src/session/context";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { promiseOperationTask } from "../../support/operations";
 
 describe("session operation transactions", () => {
   let eden: TestEden;
@@ -30,7 +31,7 @@ describe("session operation transactions", () => {
     const blocked = gate();
     const file = path.join(eden.paths.root, "session-work");
     const work = sessions.submit("integration/session-work", {}, caller, () =>
-      operationTask(async () => {
+      promiseOperationTask(async () => {
         await blocked.promise;
         await fs.writeFile(file, "drained");
       }),
@@ -51,8 +52,10 @@ describe("session operation transactions", () => {
     });
     expect(session.getCurrentUser()?.username).toBe("operator");
     blocked.release();
-    await sessions.wait(work, caller);
-    await expect(sessions.wait(transition, caller)).resolves.toEqual({
+    await eden.runtime.effects.run(sessions.wait(work, caller));
+    await expect(
+      eden.runtime.effects.run(sessions.wait(transition, caller)),
+    ).resolves.toEqual({
       success: true,
     });
     expect(await fs.readFile(file, "utf8")).toBe("drained");
@@ -103,9 +106,9 @@ describe("session operation transactions", () => {
       { action: "poweroff" },
       caller,
     );
-    const refused = expect(sessions.wait(power, caller)).rejects.toThrow(
-      "Host refused poweroff",
-    );
+    const refused = expect(
+      eden.runtime.effects.run(sessions.wait(power, caller)),
+    ).rejects.toThrow("Host refused poweroff");
     await expect(
       eden.execute(
         "session/login",
@@ -113,7 +116,9 @@ describe("session operation transactions", () => {
         caller,
       ),
     ).rejects.toThrow("draining");
-    await expect(sessions.wait(login, caller)).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(sessions.wait(login, caller)),
+    ).resolves.toMatchObject({
       success: true,
       user: { username: "operator" },
     });
@@ -139,7 +144,20 @@ describe("session operation transactions", () => {
       username: "operator",
       password: "wrong",
     });
-    await expect(sessions.wait(handle)).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(sessions.wait(handle)),
+    ).rejects.toThrow("Invalid credentials");
+    let unsubscribe = () => {};
+    const api = createOperationsAPI({
+      shellCommand: (command, args) => eden.execute(command, args),
+      subscribe: async (_event, listener) => {
+        unsubscribe = sessions.changed.on(({ payload }) =>
+          listener(payload as never),
+        );
+      },
+      unsubscribe: () => unsubscribe(),
+    });
+    await expect(api.from(handle).result()).resolves.toMatchObject({
       success: false,
       error: expect.any(String),
     });

@@ -714,7 +714,7 @@ export interface SessionCommands {
     mode: "operation";
     args: { username: string; password: string; };
     response: import("./index").OperationHandle<"session/login">;
-    completion: { success: boolean; user?: import("./index").UserProfile; error?: string; } | { success: boolean; error: string; };
+    completion: { success: boolean; user?: import("./index").UserProfile; error?: string; };
   };
   "session/logout": {
     mode: "operation";

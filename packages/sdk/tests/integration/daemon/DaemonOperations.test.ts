@@ -68,15 +68,21 @@ describe("daemon operation lifecycle", () => {
     });
     expect(daemons.get(start).status).toBe("queued");
     const pid = await ready();
-    await expect(daemons.wait(start)).resolves.toEqual({ success: true });
+    await expect(
+      eden.runtime.effects.run(daemons.wait(start)),
+    ).resolves.toEqual({ success: true });
     expect((await eden.runtime.daemons.list())[0].state).toBe("active");
     const restart = await eden.execute<OperationHandle>("daemon/restart", {
       appId,
     });
     expect(await ready(pid)).not.toBe(pid);
-    await expect(daemons.wait(restart)).resolves.toEqual({ success: true });
+    await expect(
+      eden.runtime.effects.run(daemons.wait(restart)),
+    ).resolves.toEqual({ success: true });
     const stop = await eden.execute<OperationHandle>("daemon/stop", { appId });
-    await expect(daemons.wait(stop)).resolves.toEqual({ success: true });
+    await expect(eden.runtime.effects.run(daemons.wait(stop))).resolves.toEqual(
+      { success: true },
+    );
     expect(
       eden.runtime.services.processes.getAppInstance(appId),
     ).toBeUndefined();

@@ -172,7 +172,9 @@ describe("file handle access and lifetime", () => {
     expect(await execute("fs/read", { location: handle })).toBe("original");
     expect(ejected).toBe(false);
     await execute("fs/close", { handle });
-    await eden.runtime.services.operations.wait(eject, caller);
+    await eden.runtime.effects.run(
+      eden.runtime.services.operations.wait(eject, caller),
+    );
     expect(ejected).toBe(true);
   });
 
@@ -307,7 +309,9 @@ describe("file handle access and lifetime", () => {
       );
       if (entry === "operation") await eden.complete("session/logout");
       else await eden.runtime.sessions.logout();
-      await eden.runtime.services.operations.wait(eject, caller);
+      await eden.runtime.effects.run(
+        eden.runtime.services.operations.wait(eject, caller),
+      );
       expect(ejected).toBe(true);
       expect(eden.runtime.sessions.current()).toBeNull();
       expect(
@@ -338,7 +342,9 @@ describe("file handle access and lifetime", () => {
           password: "password",
         });
       else await eden.runtime.sessions.login("other", "password");
-      await eden.runtime.services.operations.wait(eject, caller);
+      await eden.runtime.effects.run(
+        eden.runtime.services.operations.wait(eject, caller),
+      );
       expect(ejected).toBe(true);
       expect(eden.runtime.sessions.current()?.username).toBe("other");
       expect(
@@ -358,7 +364,9 @@ describe("file handle access and lifetime", () => {
         caller,
       );
       await eden.complete("system/power", { action });
-      await eden.runtime.services.operations.wait(eject, caller);
+      await eden.runtime.effects.run(
+        eden.runtime.services.operations.wait(eject, caller),
+      );
       expect(ejected).toBe(true);
       expect(powerHandoffs).toBe(1);
       expect(

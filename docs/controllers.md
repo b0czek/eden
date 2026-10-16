@@ -51,8 +51,9 @@ composition boundary, as in
 [appearance/settings-adapter.ts](../packages/sdk/src/appearance/settings-adapter.ts)
 and [i18n/settings.ts](../packages/sdk/src/i18n/settings.ts). Those adapters
 translate persistence keys and notifications while composing the settings
-service's Effects directly. Adapters for legacy Promise APIs defer work with
-`Effect.tryPromise`; converted services compose Effects without an intermediate
+service's Effects directly. Adapters for native Promise APIs defer work with
+`fromPromise`, which forwards interruption through an `AbortSignal` and awaits
+native cleanup. Converted services compose Effects without an intermediate
 Promise or interpreter. Services receive neither a dependency container nor a
 concrete settings implementation.
 
@@ -160,14 +161,29 @@ power: operation({
 ```
 
 `prepare` receives validated arguments and trusted caller context. It returns a
-function that accepts the operation reporter and produces a fully provided Effect
-or Promise. Preparation finishes before acceptance; execution starts afterward.
+function that accepts the operation reporter and produces a fully provided Effect.
+Preparation finishes before acceptance; execution starts afterward.
 The operation runtime interprets Effects and retains their completion or failure
-through the existing operation lifecycle. The reporter supplies progress updates
-and a cancellation signal for work that declares `cancellable: true`.
+through the existing operation lifecycle. The reporter supplies progress updates;
+work that declares `cancellable: true` is cancelled by fiber interruption.
 
 Commands may also declare `mode: "operation"` and return an `OperationTask`
 directly, for example when a filesystem capability prepares resource admission.
+
+`OperationTask.run` returns only Effect. Adapt native Promise producers before
+passing them into the task. A task that reserves resources during synchronous
+admission supplies an idempotent `release` callback, so cancellation before
+execution also releases that reservation.
+
+Execution and completion belong to an owned fiber. Cancellation interrupts that
+fiber, and terminal status is published after its finalizers complete. Draining
+awaits fiber exits, including failed or cancelled work. The transport queues its
+acceptance response before the execution fiber can run domain work.
+
+For commands with a typed public failure response, supply `encodeFailure` at the
+controller boundary. The execution fiber and internal waits still fail; only the
+public failed snapshot carries the encoded response. Successful values, including
+`false` or `{ success: false }`, remain successful operation results.
 
 Codegen extracts the successful result from value, Promise, and Effect handlers,
 and the completion value from an operation task. Effect failure types and service
@@ -241,7 +257,9 @@ preserves that scope so only authorized subscribers receive them.
 One [Effect runtime](../packages/sdk/src/effects/runtime.ts) belongs to each Eden
 runtime. Its `acquire` method constructs a scoped service; `run` executes a fully
 provided Effect and returns a Promise. Use these methods only at composition,
-IPC, and host-facing integration boundaries:
+IPC, and host-facing integration boundaries. Its `fork` method starts an owned
+fiber; disposal interrupts and awaits these fibers before releasing service
+resources:
 
 ```ts
 const effects = createEffectRuntime();
