@@ -1,11 +1,10 @@
-export { createFilePicker, type FilePicker } from "./service";
-export { createFilePickerController } from "./controller";
 export {
   createFilePickerFiles,
   createFilePickerNotifications,
   createFilePickerProcesses,
   createFilePickerViews,
 } from "./adapters";
+export { createFilePickerController } from "./controller-edenapi";
 export type {
   FilePickerAssociations,
   FilePickerCaller,
@@ -17,3 +16,4 @@ export type {
   FilePickerViews,
   FilePickerVolumes,
 } from "./ports";
+export { createFilePicker, type FilePicker } from "./service";

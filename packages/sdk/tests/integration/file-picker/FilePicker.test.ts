@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -10,20 +9,19 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { TargetedNotification } from "../../../src/controllers/events";
 import { createAppAssociations } from "../../../src/app-associations/service";
+import type { TargetedNotification } from "../../../src/controllers/events";
 import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
-import { ExecutionContext } from "../../../src/execution/ExecutionContext";
-import { createFilePickerController } from "../../../src/file-picker/controller";
+import { createExecutionContext } from "../../../src/execution/ExecutionContext";
 import { createFilePickerProcesses } from "../../../src/file-picker/adapters";
-import { createFilePicker } from "../../../src/file-picker/service";
+import { createFilePickerController } from "../../../src/file-picker/controller-edenapi";
 import type { FilePickerDependencies } from "../../../src/file-picker/ports";
-import { VolumeManager } from "../../../src/filesystem/VolumeManager";
-import { PermissionRegistry } from "../../../src/ipc/PermissionRegistry";
-import type { IPCBridge } from "../../../src/ipc/IPCBridge";
-import { PackageCatalog } from "../../../src/package-manager/PackageCatalog";
-import { PackageRegistry } from "../../../src/package-manager/PackageRegistry";
+import { createFilePicker } from "../../../src/file-picker/service";
+import { createVolumeManager } from "../../../src/filesystem/VolumeManager";
+import { createPermissionRegistry } from "../../../src/ipc/PermissionRegistry";
+import { createPackageCatalog } from "../../../src/package-manager/PackageCatalog";
+import { createPackageRegistry } from "../../../src/package-manager/PackageRegistry";
 import { testApp } from "../../support/apps";
 
 const provider = { appId: "com.example.picker", webContentsId: 100 };
@@ -41,13 +39,13 @@ const vendor: UserProfile = {
 
 async function createScenario() {
   const runtime = createEffectRuntime();
-  const execution = new ExecutionContext({});
+  const execution = createExecutionContext({ config: {} });
   const run = <A, E>(work: Effect.Effect<A, E>) =>
     execution.run({ principal: { kind: "user", profile: vendor } }, () =>
       runtime.run(work),
     );
-  const registry = new PackageRegistry();
-  const permissions = new PermissionRegistry();
+  const registry = createPackageRegistry();
+  const permissions = createPermissionRegistry();
   const installProvider = (id: string, permitted = true) => {
     registry.register(
       testApp(id, {
@@ -58,7 +56,12 @@ async function createScenario() {
     permissions.registerApp(id, permitted ? ["file-picker/display"] : []);
   };
   installProvider(provider.appId);
-  const catalog = new PackageCatalog(registry, execution, "/tmp", "/tmp");
+  const catalog = createPackageCatalog({
+    registry,
+    executionContext: execution,
+    appsDirectory: "/tmp",
+    distPath: "/tmp",
+  });
   const associations = await runtime.acquire(
     createAppAssociations({
       catalog,
@@ -85,9 +88,7 @@ async function createScenario() {
   const closed: TargetedNotification<FilePickerResult>[] = [];
   const opened: TargetedNotification<{ picker: FilePickerOpenEvent }>[] = [];
   const replacements: Effect.Effect<{ requestId: string }, Error>[] = [];
-  const volumes = new VolumeManager({
-    eventSubscribers: { notify() {} },
-  } as unknown as IPCBridge);
+  const volumes = await runtime.acquire(createVolumeManager());
   const dependencies: FilePickerDependencies = {
     associations,
     views: {
@@ -173,7 +174,6 @@ afterEach(async () => {
   for (const resource of resources.splice(0)) {
     await resource.runtime.dispose();
     resource.stopped.dispose();
-    resource.volumes.dispose();
   }
   jest.useRealTimers();
 });
@@ -335,7 +335,7 @@ describe("file picker composition and request lifecycle", () => {
       rootPath,
     };
     try {
-      await s.volumes.register({ ...registration, readOnly: true });
+      await s.run(s.volumes.register({ ...registration, readOnly: true }));
       await s.register();
       const { requestId } = await s.open({
         mode: "save",
@@ -371,7 +371,9 @@ describe("file picker composition and request lifecycle", () => {
         ),
       ).rejects.toThrow("Selected volume is read-only");
       s.volumes.unregister("archive");
-      await s.volumes.register(registration, { eject: async () => undefined });
+      await s.run(
+        s.volumes.register(registration, { eject: async () => undefined }),
+      );
       const eject = s.volumes.prepareEject("archive");
       await expect(
         s.run(
@@ -385,8 +387,9 @@ describe("file picker composition and request lifecycle", () => {
           ),
         ),
       ).rejects.toThrow("Selected volume is being removed");
-      await eject.run({ update() {} });
-      await s.volumes.register(registration);
+      const ejectWork = eject.run({ update() {} });
+      await (Effect.isEffect(ejectWork) ? s.run(ejectWork) : ejectWork);
+      await s.run(s.volumes.register(registration));
       expect(
         await s.run(
           s.picker.resolvePicker(
@@ -579,15 +582,16 @@ describe("file picker composition and request lifecycle", () => {
       finish = resolve;
     });
     s.dependencies.processes.stop = createFilePickerProcesses({
-      ensureAppRunning: async () => undefined as never,
+      ensureAppRunning: () => Effect.succeed(undefined as never),
       getAppInstance: () => undefined,
-      on: (_event, listener) => s.stopped.on(listener),
-      stopApp: async () => {
-        started();
-        await finishStop;
-        s.running.delete(provider.appId);
-        s.stopped.emit({ appId: provider.appId });
-      },
+      stopped: s.stopped,
+      stopApp: () =>
+        Effect.promise(async () => {
+          started();
+          await finishStop;
+          s.running.delete(provider.appId);
+          s.stopped.emit({ appId: provider.appId });
+        }).pipe(Effect.uninterruptible),
     }).stop;
     await s.register();
     const { requestId } = await s.open();

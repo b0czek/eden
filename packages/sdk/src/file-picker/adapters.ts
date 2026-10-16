@@ -1,5 +1,4 @@
 import * as Effect from "effect/Effect";
-import type { EventListener } from "../events/event";
 import type { FilesystemManager } from "../filesystem/FilesystemManager";
 import type { Notifications } from "../notification/service";
 import type { ProcessManager } from "../process-manager/ProcessManager";
@@ -17,29 +16,14 @@ const asError = (error: unknown) =>
 export function createFilePickerProcesses(
   processes: Pick<
     ProcessManager,
-    "ensureAppRunning" | "getAppInstance" | "stopApp"
-  > & {
-    on(
-      event: "stopped",
-      listener: EventListener<{ appId: string }>,
-    ): () => void;
-  },
+    "ensureAppRunning" | "getAppInstance" | "stopApp" | "stopped"
+  >,
 ): FilePickerProcesses {
   return {
-    ensureRunning: (appId) =>
-      Effect.tryPromise({
-        try: async () => {
-          await processes.ensureAppRunning(appId);
-        },
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
+    ensureRunning: (appId) => Effect.asVoid(processes.ensureAppRunning(appId)),
     isRunning: (appId) => Boolean(processes.getAppInstance(appId)),
-    stop: (appId) =>
-      Effect.tryPromise({
-        try: () => processes.stopApp(appId),
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
-    stopped: { on: (listener) => processes.on("stopped", listener) },
+    stop: (appId) => processes.stopApp(appId),
+    stopped: processes.stopped,
   };
 }
 
@@ -73,13 +57,7 @@ export function createFilePickerFiles(
   files: Pick<FilesystemManager, "resolvePath" | "accessScope">,
 ): FilePickerFiles {
   return {
-    resolvePath: (location) =>
-      Effect.tryPromise({
-        try: async () => {
-          await files.resolvePath(location);
-        },
-        catch: asError,
-      }),
+    resolvePath: (location) => Effect.asVoid(files.resolvePath(location)),
     accessScope: (volume) => files.accessScope(volume),
   };
 }
