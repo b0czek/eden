@@ -23,6 +23,7 @@ import {
   dispatchEvent,
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
+import { SettingsManager } from "../../../src/settings/SettingsManager";
 import { EdenNamespace } from "../../../src/ipc/CommandDecorators";
 import { EdenEmitter } from "../../../src/ipc/EdenEmitter";
 import { IPCBridge } from "../../../src/ipc/IPCBridge";
@@ -172,6 +173,25 @@ describe("client subscriptions across renderer IPC", () => {
         ? [message.payload.snapshot]
         : [];
     });
+
+  it("publishes localization events from a plain controller alongside legacy domains", async () => {
+    const api = createEdenAPI(transport, listeners);
+    const locales: string[] = [];
+    const onLocale = ({ locale }: { locale: string }) => {
+      locales.push(locale);
+    };
+    await api.subscribe("i18n/locale-changed", onLocale);
+    await eden.runtime
+      .resolve(SettingsManager)
+      .set("com.eden", "general.locale", "pl");
+    expect(locales).toEqual(["pl"]);
+    await expect(api.shellCommand("i18n/get-locale", {})).resolves.toEqual({
+      locale: "pl",
+    });
+    const common = await api.shellCommand("i18n/get-common", { locale: "pl" });
+    expect(common.translations).toMatchObject({ common: { cancel: "Anuluj" } });
+    api.unsubscribe("i18n/locale-changed", onLocale);
+  });
 
   it.each([false, true])(
     "preserves a replacement listener after an older request fails (same callback: %s)",

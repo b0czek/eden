@@ -8,11 +8,9 @@ import type {
   FilesystemLocation,
   RuntimeAppManifest,
 } from "@edenapp/types";
-import { inject, injectable, Lifecycle, scoped } from "tsyringe";
 import { WASMagic } from "wasmagic";
 import { AppAssociationManager } from "../app-associations";
 import { FilesystemManager } from "../filesystem";
-import { I18nManager } from "../i18n/I18nManager";
 import { CommandRegistry, EdenEmitter, EdenNamespace, IPCBridge } from "../ipc";
 import { log } from "../logging";
 import type { OperationTask } from "../operations/OperationTask";
@@ -33,8 +31,6 @@ interface FileNamespaceEvents {
  *
  * Manages file type associations and handles opening files with appropriate applications.
  */
-@scoped(Lifecycle.ContainerScoped)
-@injectable()
 @EdenNamespace("file")
 export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   private fileOpenHandler: FileOpenHandler;
@@ -45,15 +41,14 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   private static readonly MIME_DETECTION_BYTES = 8192;
 
   constructor(
-    @inject(AppAssociationManager)
     private appAssociationManager: AppAssociationManager,
-    @inject(PackageCatalog) private packageCatalog: PackageCatalog,
-    @inject(ProcessManager) private processManager: ProcessManager,
-    @inject(ViewManager) private viewManager: ViewManager,
-    @inject(FilesystemManager) private fsManager: FilesystemManager,
-    @inject(I18nManager) private i18nManager: I18nManager,
-    @inject(IPCBridge) ipcBridge: IPCBridge,
-    @inject(CommandRegistry) commandRegistry: CommandRegistry,
+    private packageCatalog: PackageCatalog,
+    private processManager: ProcessManager,
+    private viewManager: ViewManager,
+    private fsManager: FilesystemManager,
+    private i18n: { getLocale(): Promise<string> },
+    ipcBridge: IPCBridge,
+    commandRegistry: CommandRegistry,
   ) {
     super(ipcBridge);
 
@@ -463,7 +458,7 @@ export class FileOpenManager extends EdenEmitter<FileNamespaceEvents> {
   ): Promise<FileHandlerInfo[]> {
     const fileContext = await this.getFileContext(location);
     const handlers = new Map<string, FileHandlerInfo>();
-    const locale = await this.i18nManager.getLocale();
+    const locale = await this.i18n.getLocale();
 
     for (const { app, handler } of this.getMatchingHandlers({
       extension: fileContext.extension,

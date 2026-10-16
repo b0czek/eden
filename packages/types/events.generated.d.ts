@@ -61,7 +61,7 @@ export interface VolumeEvents {
  * I18nEvents - Events for the "i18n" namespace
  */
 export interface I18nEvents {
-  "i18n/locale-changed": { locale: string };
+  "i18n/locale-changed": { locale: string; };
 }
 
 /**

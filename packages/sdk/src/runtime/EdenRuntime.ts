@@ -38,7 +38,9 @@ import { FilePickerManager } from "../file-picker";
 import { FilesystemManager } from "../filesystem";
 import { VolumeHandler } from "../filesystem/VolumeHandler";
 import { VolumeManager } from "../filesystem/VolumeManager";
-import { I18nManager } from "../i18n/I18nManager";
+import { createI18nController } from "../i18n/controller";
+import { createI18n } from "../i18n/service";
+import { createI18nSettings } from "../i18n/settings";
 import { CommandRegistry, IPCBridge, PermissionRegistry } from "../ipc";
 import { KeyboardManager } from "../keyboard/KeyboardManager";
 import { log } from "../logging";
@@ -46,6 +48,7 @@ import { NotificationManager } from "../notification";
 import { OperationHandler } from "../operations/OperationHandler";
 import { OperationManager } from "../operations/OperationManager";
 import { PackageManager } from "../package-manager";
+import { PackageCatalog } from "../package-manager/PackageCatalog";
 import {
   type EdenPlatform,
   PLATFORM_APP_CHANNELS,
@@ -381,9 +384,14 @@ export class EdenRuntime {
     this.resolveOwned(AppChannelManager);
     this.resolveOwned(FilesystemManager);
     this.userManager = this.resolveOwned(UserManager);
-    this.resolveOwned(SettingsManager);
+    const settings = this.resolveOwned(SettingsManager);
     this.own(this.effects);
-    this.resolveOwned(I18nManager);
+    const i18n = await this.effects.acquire(
+      createI18n({
+        settings: createI18nSettings(settings),
+      }),
+    );
+    this.ipcBridge.registerController(createI18nController(i18n));
     this.packageManager = this.resolveOwned(PackageManager);
     this.processManager = this.resolveOwned(ProcessManager);
     this.resolveOwned(FilesystemManager).connectLifecycle(this.processManager);
@@ -398,7 +406,19 @@ export class EdenRuntime {
       ),
     );
     this.appAssociationManager = this.resolveOwned(AppAssociationManager);
-    this.fileOpenManager = this.resolveOwned(FileOpenManager);
+    this.fileOpenManager = this.own(
+      new FileOpenManager(
+        this.appAssociationManager,
+        this.resolveOwned(PackageCatalog),
+        this.processManager,
+        this.viewManager,
+        this.resolveOwned(FilesystemManager),
+        { getLocale: () => this.effects.run(i18n.getLocale()) },
+        this.ipcBridge,
+        this.resolveOwned(CommandRegistry),
+      ),
+    );
+    this.container.registerInstance(FileOpenManager, this.fileOpenManager);
     this.autostartManager = this.resolveOwned(AutostartManager);
     this.keyboardManager = this.resolveOwned(KeyboardManager);
 

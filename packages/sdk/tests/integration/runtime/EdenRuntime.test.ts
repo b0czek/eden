@@ -75,6 +75,11 @@ describe("EdenRuntime integration", () => {
     expect(await firstSettings.get("isolated-app", "value")).toBe("first");
     expect(await secondSettings.get("isolated-app", "value")).toBe("second");
 
+    await firstSettings.set("com.eden", "general.locale", "pl");
+    await secondSettings.set("com.eden", "general.locale", "en");
+    expect(await first.execute("i18n/get-locale")).toEqual({ locale: "pl" });
+    expect(await second.execute("i18n/get-locale")).toEqual({ locale: "en" });
+
     await first.execute(
       "fs/write",
       {

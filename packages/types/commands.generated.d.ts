@@ -644,14 +644,12 @@ export interface I18nCommands {
   "i18n/get-locale": {
     mode: "result";
     args: Record<string, never>;
-    response: { locale: string };
+    response: { locale: string; };
   };
   "i18n/get-common": {
     mode: "result";
-    args: { locale: string };
-    response: {
-    translations: import("./index").RecursiveObject<string>;
-  };
+    args: { locale: string; };
+    response: { translations: import("./index").RecursiveObject<string>; };
   };
 }
 
