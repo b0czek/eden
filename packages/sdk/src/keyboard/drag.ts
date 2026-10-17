@@ -5,7 +5,10 @@ import type {
   EdenKeyboardUpdateDragRequest,
   ViewBounds,
 } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import type { DisplayPort } from "../platform/ports";
 import { effectivePlacement } from "./placement";
 import type { KeyboardDragState, KeyboardState } from "./state";
@@ -43,10 +46,11 @@ export function createKeyboardDrag({
 }: DragDependencies) {
   return Effect.gen(function* () {
     let current: KeyboardDragState | null = null;
-    let polling: NodeJS.Timeout | undefined;
+    const forkPolling = yield* FiberSet.makeRuntime<never, void, never>();
+    let polling: Fiber.Fiber<void> | undefined;
 
     function end() {
-      clearInterval(polling);
+      polling?.interruptUnsafe();
       polling = undefined;
       const bounds = overlay.bounds();
       if (current && bounds) state.floatingBounds = bounds;
@@ -113,19 +117,27 @@ export function createKeyboardDrag({
         current = { input: payload.input, startPoint, startBounds: bounds };
         if (payload.input === "system-cursor") {
           let lastPosition = display.getCursorScreenPoint();
-          polling = setInterval(() => {
-            const position = display.getCursorScreenPoint();
-            if (
-              Math.abs(position.x - lastPosition.x) < 1 &&
-              Math.abs(position.y - lastPosition.y) < 1
-            )
-              return;
-            lastPosition = position;
-            schedule(
-              apply(position.x, position.y),
-              "Failed to move keyboard overlay:",
-            );
-          }, 8);
+          polling = forkPolling(
+            Effect.forever(
+              Effect.sleep(Duration.millis(8)).pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    const position = display.getCursorScreenPoint();
+                    if (
+                      Math.abs(position.x - lastPosition.x) < 1 &&
+                      Math.abs(position.y - lastPosition.y) < 1
+                    )
+                      return;
+                    lastPosition = position;
+                    schedule(
+                      apply(position.x, position.y),
+                      "Failed to move keyboard overlay:",
+                    );
+                  }),
+                ),
+              ),
+            ),
+          );
         }
         return { success: true };
       });
