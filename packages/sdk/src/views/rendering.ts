@@ -25,7 +25,7 @@ export const createViewRendering = Effect.fn(function* (
   const pending = yield* Queue.unbounded<Effect.Effect<unknown, Error>>();
   let _nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
   let _nextViewId = 1;
-  let _fileReader = createCachedFileReader();
+  const _fileReader = yield* createCachedFileReader();
   const _basePath = basePath;
   const _tiling = tilingController;
   const _floatingWindows = floatingWindows;
@@ -83,7 +83,7 @@ export const createViewRendering = Effect.fn(function* (
       const cssFileName = mode === "full" ? "eden.css" : "eden-tokens.css";
       const cssPath = path.join(edenCssPath, cssFileName);
 
-      const css = yield* _fileReader.readAsync(cssPath, "utf-8");
+      const css = yield* _fileReader.read(cssPath);
       yield* fromPromise(() => view.webContents.insertCSS(css));
 
       log.info(`Injected Eden CSS (${mode})`);
@@ -114,7 +114,7 @@ export const createViewRendering = Effect.fn(function* (
     return yield* Effect.gen(function* () {
       // Inject CSS first
       const frameCSSPath = path.join(_basePath, "app-frame/frame.css");
-      const frameCSS = yield* _fileReader.readAsync(frameCSSPath, "utf-8");
+      const frameCSS = yield* _fileReader.read(frameCSSPath);
       yield* fromPromise(() => view.webContents.insertCSS(frameCSS));
 
       // Inject bundled JavaScript
@@ -122,10 +122,7 @@ export const createViewRendering = Effect.fn(function* (
         _basePath,
         "app-frame/frame-injector.js",
       );
-      const frameScript = yield* _fileReader.readAsync(
-        frameScriptPath,
-        "utf-8",
-      );
+      const frameScript = yield* _fileReader.read(frameScriptPath);
 
       // Pre-populate window.edenFrame with config
       const configScript = `
@@ -362,7 +359,6 @@ export const createViewRendering = Effect.fn(function* (
       ),
     ),
   );
-  yield* Effect.addFinalizer(() => Effect.sync(_fileReader.flushCache));
   return {
     isRemoteEntry,
     shouldInjectAppFrame,

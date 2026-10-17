@@ -1,65 +1,19 @@
 import * as fs from "node:fs";
+import * as Cache from "effect/Cache";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { fromPromise } from "../effects/io";
 
-export function createCachedFileReader() {
-  let cache: Map<string, string> = new Map();
-
-  function read(filePath: string, encoding: BufferEncoding = "utf-8"): string {
-    const cacheKey = `${filePath}:${encoding}`;
-
-    if (cache.has(cacheKey)) {
-      const cached = cache.get(cacheKey);
-      if (cached !== undefined) {
-        return cached;
-      }
-    }
-
-    const content = fs.readFileSync(filePath, encoding);
-    cache.set(cacheKey, content);
-
-    return content;
-  }
-  const readAsync = Effect.fn(function* readAsync(
-    filePath: string,
-    encoding: BufferEncoding = "utf-8",
-  ): Effect.fn.Return<string, Error> {
-    const cacheKey = `${filePath}:${encoding}`;
-
-    if (cache.has(cacheKey)) {
-      const cached = cache.get(cacheKey);
-      if (cached !== undefined) {
-        return cached;
-      }
-    }
-
-    const content = yield* fromPromise(() =>
-      fs.promises.readFile(filePath, encoding),
-    );
-    cache.set(cacheKey, content);
-
-    return content;
-  });
-  function flushCache(): void {
-    cache.clear();
-  }
-  function flushFile(
-    filePath: string,
-    encoding: BufferEncoding = "utf-8",
-  ): void {
-    const cacheKey = `${filePath}:${encoding}`;
-    cache.delete(cacheKey);
-  }
-  function isCached(
-    filePath: string,
-    encoding: BufferEncoding = "utf-8",
-  ): boolean {
-    const cacheKey = `${filePath}:${encoding}`;
-    return cache.has(cacheKey);
-  }
-  function getCacheSize(): number {
-    return cache.size;
-  }
-  return { read, readAsync, flushCache, flushFile, isCached, getCacheSize };
-}
-export type CachedFileReader = ReturnType<typeof createCachedFileReader>;
+export const createCachedFileReader = Effect.fn(function* () {
+  const cache = yield* Cache.makeWith(
+    (filePath: string) =>
+      fromPromise(() => fs.promises.readFile(filePath, "utf-8")),
+    {
+      capacity: Number.POSITIVE_INFINITY,
+      // Assets stay fixed for this rendering scope; failed reads must be retryable.
+      timeToLive: (exit) => (Exit.isSuccess(exit) ? Infinity : 0),
+    },
+  );
+  yield* Effect.addFinalizer(() => Cache.invalidateAll(cache));
+  return { read: (filePath: string) => Cache.get(cache, filePath) };
+});

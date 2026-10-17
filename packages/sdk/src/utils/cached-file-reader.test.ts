@@ -2,58 +2,66 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as Effect from "effect/Effect";
-
+import { createEffectRuntime } from "../effects/runtime";
 import { createCachedFileReader } from "./cached-file-reader";
 
-describe("CachedFileReader", () => {
-  const tempDirs: string[] = [];
+describe("cached asset reads", () => {
+  let directory: string;
+  let effects: ReturnType<typeof createEffectRuntime>;
 
-  function createTempFile(initialContents: string): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "eden-sdk-"));
-    tempDirs.push(dir);
-    const filePath = path.join(dir, "file.txt");
-    fs.writeFileSync(filePath, initialContents, "utf-8");
-    return filePath;
-  }
-
-  afterEach(() => {
-    for (const dir of tempDirs.splice(0)) {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+  beforeEach(() => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), "eden-sdk-"));
+    effects = createEffectRuntime();
   });
 
-  it("caches sync reads until the cache is flushed", () => {
-    const reader = createCachedFileReader();
-    const filePath = createTempFile("first");
-
-    expect(reader.read(filePath)).toBe("first");
-    expect(reader.isCached(filePath)).toBe(true);
-    expect(reader.getCacheSize()).toBe(1);
-
-    fs.writeFileSync(filePath, "second", "utf-8");
-    expect(reader.read(filePath)).toBe("first");
-
-    reader.flushFile(filePath);
-    expect(reader.isCached(filePath)).toBe(false);
-    expect(reader.read(filePath)).toBe("second");
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await effects.dispose();
+    fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  it("caches async reads and supports flushing the entire cache", async () => {
-    const reader = createCachedFileReader();
-    const filePath = createTempFile("alpha");
+  it("keeps successful reads for the rendering lifetime", async () => {
+    const reader = await effects.acquire(createCachedFileReader());
+    const filePath = path.join(directory, "asset.css");
+    fs.writeFileSync(filePath, "first");
+    expect(await effects.run(reader.read(filePath))).toBe("first");
+    fs.writeFileSync(filePath, "second");
+    expect(await effects.run(reader.read(filePath))).toBe("first");
+  });
 
-    await expect(Effect.runPromise(reader.readAsync(filePath))).resolves.toBe(
-      "alpha",
+  it("shares one pending native read across concurrent requests", async () => {
+    const reader = await effects.acquire(createCachedFileReader());
+    let started!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const read = jest
+      .spyOn(fs.promises, "readFile")
+      .mockImplementation(async () => {
+        started();
+        await pending;
+        return "shared asset";
+      });
+    const result = effects.run(
+      Effect.all([reader.read("asset.css"), reader.read("asset.css")], {
+        concurrency: "unbounded",
+      }),
     );
-    expect(reader.isCached(filePath)).toBe(true);
+    await reading;
+    finish();
+    expect(await result).toEqual(["shared asset", "shared asset"]);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
 
-    reader.flushCache();
-    expect(reader.getCacheSize()).toBe(0);
-    expect(reader.isCached(filePath)).toBe(false);
-
-    fs.writeFileSync(filePath, "beta", "utf-8");
-    await expect(Effect.runPromise(reader.readAsync(filePath))).resolves.toBe(
-      "beta",
-    );
+  it("retries immediately after a failed read", async () => {
+    const reader = await effects.acquire(createCachedFileReader());
+    const filePath = path.join(directory, "late.css");
+    await expect(effects.run(reader.read(filePath))).rejects.toThrow("ENOENT");
+    fs.writeFileSync(filePath, "now present");
+    expect(await effects.run(reader.read(filePath))).toBe("now present");
   });
 });
