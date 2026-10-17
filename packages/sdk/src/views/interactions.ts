@@ -13,7 +13,7 @@ export const createViewInteractions = Effect.fn(function* (
   _views: Views,
   display: DisplayPort,
 ) {
-  const _pointer = createPointerTracking(display, 8);
+  const _pointer = yield* createPointerTracking(display, 8);
   let _dragState: {
     appId: string;
     startX: number;
@@ -174,7 +174,6 @@ export const createViewInteractions = Effect.fn(function* (
   function dispose() {
     _dragState = null;
     _resizeState = null;
-    _pointer.dispose();
   }
   yield* Effect.addFinalizer(() => Effect.sync(dispose));
   return {

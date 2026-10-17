@@ -1,3 +1,7 @@
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
 /**
@@ -8,12 +12,13 @@ export type MouseUpdateCallback = (position: {
   y: number;
   deltaTime: number;
 }) => void;
-export function createPointerTracking(
+export const createPointerTracking = Effect.fn(function* (
   display: Pick<DisplayPort, "getCursorScreenPoint">,
   updateInterval: number = 8,
 ) {
+  const forkPolling = yield* FiberSet.makeRuntime<never, void, never>();
   let _subscribers: Map<string, MouseUpdateCallback> = new Map();
-  let _interval: NodeJS.Timeout | null = null;
+  let _interval: Fiber.Fiber<void> | null = null;
   let _lastUpdateTime: number = 0;
   let _lastPosition: { x: number; y: number } = { x: 0, y: 0 };
   let _updateInterval: number;
@@ -58,37 +63,45 @@ export function createPointerTracking(
     _lastUpdateTime = Date.now();
     _lastPosition = getCurrentPosition();
 
-    _interval = setInterval(() => {
-      const now = Date.now();
-      const deltaTime = now - _lastUpdateTime;
-      _lastUpdateTime = now;
+    _interval = forkPolling(
+      Effect.forever(
+        Effect.sleep(Duration.millis(_updateInterval)).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              const now = Date.now();
+              const deltaTime = now - _lastUpdateTime;
+              _lastUpdateTime = now;
 
-      const currentPosition = getCurrentPosition();
+              const currentPosition = getCurrentPosition();
 
-      // Only emit if cursor has actually moved (skip unnecessary callbacks)
-      if (
-        Math.abs(currentPosition.x - _lastPosition.x) < 1 &&
-        Math.abs(currentPosition.y - _lastPosition.y) < 1
-      ) {
-        return;
-      }
+              // Only emit if cursor has actually moved (skip unnecessary callbacks)
+              if (
+                Math.abs(currentPosition.x - _lastPosition.x) < 1 &&
+                Math.abs(currentPosition.y - _lastPosition.y) < 1
+              ) {
+                return;
+              }
 
-      _lastPosition = currentPosition;
+              _lastPosition = currentPosition;
 
-      // Notify all subscribers of the position change
-      for (const callback of _subscribers.values()) {
-        try {
-          callback({ ...currentPosition, deltaTime });
-        } catch (error) {
-          log.error("Error in PointerTracking callback:", error);
-        }
-      }
-    }, _updateInterval);
+              // Notify all subscribers of the position change
+              for (const callback of _subscribers.values()) {
+                try {
+                  callback({ ...currentPosition, deltaTime });
+                } catch (error) {
+                  log.error("Error in PointerTracking callback:", error);
+                }
+              }
+            }),
+          ),
+        ),
+      ),
+    );
   }
 
   function stop(): void {
     if (_interval) {
-      clearInterval(_interval);
+      _interval.interruptUnsafe();
       _interval = null;
     }
   }
@@ -97,14 +110,16 @@ export function createPointerTracking(
     _subscribers.clear();
     stop();
   }
+  yield* Effect.addFinalizer(() => Effect.sync(dispose));
   return {
     subscribe,
     unsubscribe,
     getCurrentPosition,
     isTracking,
     getSubscriberCount,
-    dispose,
   };
-}
+});
 
-export type PointerTracking = ReturnType<typeof createPointerTracking>;
+export type PointerTracking = Effect.Success<
+  ReturnType<typeof createPointerTracking>
+>;
