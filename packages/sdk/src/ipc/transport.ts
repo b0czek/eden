@@ -39,6 +39,7 @@ export const createIpcTransport = Effect.fn(function* ({
 }) {
   const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
   const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
+  const awaitResponse = Effect.runPromiseWith(yield* Effect.context<never>());
   let eventSubscribers: EventRouting;
   let mainWindow: PlatformWindow | null = null;
   let controllerEvents = new Map<string, () => void>();
@@ -234,7 +235,7 @@ export const createIpcTransport = Effect.fn(function* ({
   });
 
   function runResponse(work: Effect.Effect<unknown, unknown>) {
-    return Effect.runPromise(
+    return awaitResponse(
       Fiber.join(forkResponse(work)).pipe(
         Effect.catchCause((cause) => {
           const error = Cause.hasInterruptsOnly(cause)

@@ -14,7 +14,38 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "NodeNext",
     "types": ["jest", "node"],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "namespaceImportPackages": ["effect"],
+        "diagnosticSeverity": {
+          "floatingEffect": "error",
+          "missingEffectContext": "error",
+          "missingEffectError": "error",
+          "missingLayerContext": "error",
+          "leakingRequirements": "error",
+          "unsafeEffectTypeAssertion": "error",
+          "runEffectInsideEffect": "error",
+          "globalTimers": "error",
+          "globalTimersInEffect": "error",
+          "lazyPromiseInEffectSync": "error",
+          "anyUnknownInErrorContext": "warning",
+          "globalErrorInEffectCatch": "warning",
+          "globalErrorInEffectFailure": "warning",
+          "unknownInEffectCatch": "warning",
+          "globalDate": "warning",
+          "globalDateInEffect": "warning",
+          "globalRandom": "warning",
+          "globalRandomInEffect": "warning",
+          "globalFetch": "warning",
+          "globalFetchInEffect": "warning",
+          "globalConsole": "warning",
+          "globalConsoleInEffect": "warning",
+          "importFromBarrel": "error"
+        }
+      }
+    ]
   },
   "include": ["src/**/*"],
   "exclude": [

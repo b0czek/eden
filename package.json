@@ -26,7 +26,8 @@
     "prepare": "pnpm --filter @edenapp/files-core run prepare && simple-git-hooks",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm run build && changeset publish"
+    "release": "pnpm run build && changeset publish",
+    "check:effects": "pnpm --filter @edenapp/sdk run check:effects"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

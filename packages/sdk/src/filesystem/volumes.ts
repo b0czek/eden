@@ -338,7 +338,7 @@ export const createVolumes = Effect.fn(function* () {
       stats.dev !== entry.device ||
       stats.ino !== entry.inode
     )
-      yield* Effect.fail(
+      return yield* Effect.fail(
         new Error(`Filesystem volume '${id}' mount has changed`),
       );
   });

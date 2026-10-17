@@ -32,13 +32,15 @@
     "test": "pnpm run test:unit && pnpm run test:integration:node",
     "pretest:unit": "pnpm run build:test-dependencies",
     "test:types": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p src/app-runtime/tsconfig.test.json",
-    "test:unit": "pnpm run test:types && pnpm run test:codegen && jest --runInBand --testPathPatterns=src/",
+    "test:unit": "pnpm run test:effect-checks && pnpm run test:types && pnpm run test:codegen && jest --runInBand --testPathPatterns=src/",
     "pretest:integration:node": "pnpm run build:test-dependencies",
     "test:integration:node": "jest --runInBand --silent --testPathPatterns=tests/integration/",
     "pretest:integration:electron": "pnpm run build:electron-test-dependencies && pnpm run build",
     "test:integration:electron": "playwright test -c tests/electron/playwright.config.ts",
     "build:client": "pnpm run codegen && pnpm --filter @edenapp/client run build",
-    "test:codegen": "jest --runInBand --config scripts/codegen/jest.config.cjs"
+    "test:codegen": "jest --runInBand --config scripts/codegen/jest.config.cjs",
+    "check:effects": "effect-language-service diagnostics --project tsconfig.json --format text --severity error",
+    "test:effect-checks": "node --test scripts/effect-diagnostics.test.mjs"
   },
   "keywords": [
     "eden",
@@ -72,6 +74,7 @@
   "devDependencies": {
     "@edenapp/client": "workspace:*",
     "@edenapp/scripts": "workspace:*",
+    "@effect/language-service": "^0.87.5",
     "@playwright/test": "^1.62.1",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",

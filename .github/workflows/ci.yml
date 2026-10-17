@@ -165,3 +165,6 @@ jobs:
 
       - name: Run typecheck
         run: pnpm typecheck
+
+      - name: Check Effect contracts
+        run: pnpm check:effects

@@ -42,11 +42,37 @@ pnpm test:integration:node        # Node integration only
 pnpm test:integration:electron    # SDK and app workflows; builds assets first
 pnpm lint
 pnpm typecheck
+pnpm check:effects                # SDK runtime Effect diagnostics
 ```
 
 For Electron, append a filename to select a suite or use `--project=sdk` /
 `--project=apps`. On headless Linux, prefix the command with
 `xvfb-run --auto-servernum`.
+
+## Effect diagnostics
+
+The SDK's `tsconfig.json` configures `@effect/language-service` for editor
+feedback. Select the workspace TypeScript version in your editor. CI runs
+`pnpm check:effects` separately from TypeScript; plain `tsc` does not load
+language-service plugins. The check uses the
+[official diagnostics CLI](https://github.com/Effect-TS/language-service#effect-language-service-cli)
+and does not patch the installed compiler. It covers the main-process SDK project;
+renderer clients and app preload projects keep their own TypeScript configuration.
+
+Unmet requirements, unsafe Effect assertions, floating Effects, nested runtime
+execution, native timers, and Promise-returning `Effect.sync` calls are errors.
+Broad error channels and ambient clocks, logging, randomness, and fetch calls
+are editor warnings. Use the SDK command below to include those warnings in a
+terminal audit:
+
+```sh
+pnpm --filter @edenapp/sdk exec effect-language-service diagnostics --project tsconfig.json --format text --severity error,warning
+```
+
+Keep an exception next to the expression it governs, explain the ownership or
+type guarantee that makes it safe, and suppress only that diagnostic. Native
+adapters and heterogeneous execution boundaries may need exceptions; domain
+work should compose Effects with its dependencies provided.
 
 ## Electron setup
 

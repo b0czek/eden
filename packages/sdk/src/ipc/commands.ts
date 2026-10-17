@@ -138,11 +138,15 @@ export function createCommands({
             },
             catch: asError,
           });
-          return (
-            Effect.isEffect(result)
-              ? yield* result as Effect.Effect<unknown, unknown>
-              : result
-          ) as TResult;
+          if (Effect.isEffect(result)) {
+            // command() rejects unmet requirements before heterogeneous registry erasure.
+            // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off
+            return (yield* result as Effect.Effect<
+              unknown,
+              unknown
+            >) as TResult;
+          }
+          return result as TResult;
         }),
         context,
       );

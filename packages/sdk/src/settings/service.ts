@@ -57,13 +57,17 @@ export function createSettings({
       });
     }
 
-    function set(appId: string, key: string, value: string) {
+    function set(
+      appId: string,
+      key: string,
+      value: string,
+    ): Effect.Effect<void, Error> {
       // Persistence cannot be aborted once SQLite has accepted the write.
       // Publish the completed write before honoring interruption.
       return Effect.uninterruptible(
         Effect.gen(function* () {
           if (typeof value !== "string")
-            yield* Effect.fail(
+            return yield* Effect.fail(
               new Error(`Value must be a string, got ${typeof value}`),
             );
           yield* connection.write(`${appId}:${key}`, value);
