@@ -77,25 +77,23 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
       const waiter = {
         appId,
         complete(error?: Error) {
-          clearTimeout(timer);
           waiters.delete(waiter);
           resume(error ? Effect.fail(error) : Effect.void);
         },
       };
-      const timer = setTimeout(
-        () =>
-          waiter.complete(
-            new Error("Timed out waiting for File picker display provider"),
-          ),
-        5_000,
-      );
-      timer.unref?.();
       waiters.add(waiter);
       return Effect.sync(() => {
-        clearTimeout(timer);
         waiters.delete(waiter);
       });
-    });
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: "5 seconds",
+        orElse: () =>
+          Effect.fail(
+            new Error("Timed out waiting for File picker display provider"),
+          ),
+      }),
+    );
   }
 
   function dispose() {

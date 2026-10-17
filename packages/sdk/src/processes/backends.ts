@@ -132,22 +132,21 @@ export const createBackends = Effect.fn(function* ({
         finish(
           new Error(`Backend ${appId} exited before becoming ready (${code})`),
         );
-      const timer = setTimeout(
-        () =>
-          finish(
-            new Error(`Backend ${appId} startup timed out after 10 seconds`),
-          ),
-        10000,
-      );
       backend.on("message", onMessage);
       backend.once("exit", onExit);
       function cleanup() {
-        clearTimeout(timer);
         backend.removeListener("message", onMessage);
         backend.removeListener("exit", onExit);
       }
       return Effect.sync(cleanup);
     }).pipe(
+      Effect.timeoutOrElse({
+        duration: "10 seconds",
+        orElse: () =>
+          Effect.fail(
+            new Error(`Backend ${appId} startup timed out after 10 seconds`),
+          ),
+      }),
       Effect.onError(() =>
         Effect.sync(() => {
           _backends.delete(appId);
@@ -219,38 +218,40 @@ export const createBackends = Effect.fn(function* ({
     const candidate = _backends.get(appId);
     if (!candidate) return;
     const backend = candidate;
-    yield* Effect.callback<void, Error>((resume) => {
-      let completed = false;
-      function finish(error?: Error) {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        resume(error ? Effect.fail(error) : Effect.void);
-      }
-      const onExit = () => finish();
-      backend.once("exit", onExit);
-      const killTimer = setTimeout(() => {
-        if (_backends.has(appId)) backend.kill();
-      }, 500);
-      const timeout = setTimeout(
-        () =>
-          finish(
-            new Error(`Backend ${appId} termination timed out after 5 seconds`),
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        yield* Effect.forkScoped(
+          Effect.sleep("500 millis").pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                if (_backends.get(appId) === backend) backend.kill();
+              }),
+            ),
           ),
-        5000,
-      );
-      try {
-        backend.postMessage({ type: "shutdown" });
-      } catch (error) {
-        finish(asError(error));
-      }
-      function cleanup() {
-        clearTimeout(killTimer);
-        clearTimeout(timeout);
-        backend.removeListener("exit", onExit);
-      }
-      return Effect.sync(cleanup);
-    }).pipe(
+        );
+        yield* Effect.callback<void, Error>((resume) => {
+          const onExit = () => resume(Effect.void);
+          backend.once("exit", onExit);
+          try {
+            backend.postMessage({ type: "shutdown" });
+          } catch (error) {
+            backend.removeListener("exit", onExit);
+            resume(Effect.fail(asError(error)));
+          }
+          return Effect.sync(() => backend.removeListener("exit", onExit));
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: "5 seconds",
+            orElse: () =>
+              Effect.fail(
+                new Error(
+                  `Backend ${appId} termination timed out after 5 seconds`,
+                ),
+              ),
+          }),
+        );
+      }),
+    ).pipe(
       Effect.ensuring(
         Effect.sync(() => {
           _backends.delete(appId);
