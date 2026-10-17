@@ -42,10 +42,23 @@ export interface Command<
   };
 }
 
+/** Reject outstanding requirements, including Effects returned through Promises. */
+type ProvidedResult<Result> =
+  Result extends Effect.Effect<infer _Success, infer _Error, infer Services>
+    ? [Services] extends [never]
+      ? Result
+      : never
+    : Result extends PromiseLike<infer Value>
+      ? PromiseLike<ProvidedResult<Value>>
+      : Result;
+
 interface CommandOptions<Args, Result, Mode extends CommandMode> {
   permission?: string;
   mode?: Mode;
-  handle: (args: Args, caller: CommandCallerContext) => Result;
+  handle: (
+    args: Args,
+    caller: CommandCallerContext,
+  ) => Result & ProvidedResult<Result>;
 }
 
 export function command<

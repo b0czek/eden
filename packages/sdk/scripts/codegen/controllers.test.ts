@@ -128,8 +128,8 @@ it("generates public success values without Effect failures or service requireme
     import * as Effect from "effect/Effect";
     import { command, defineController, operation } from "./controller";
     import { operationTask } from "../operations/task";
-    declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }, { storage: true }>;
-    declare const empty: Effect.Effect<undefined, { _tag: "EmptyFailed" }, { storage: true }>;
+    declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }>;
+    declare const empty: Effect.Effect<undefined, { _tag: "EmptyFailed" }>;
     declare const nullable: Effect.Effect<string | null | undefined, never, never>;
     export const example = defineController("example", {
       commands: {
@@ -157,7 +157,7 @@ it("generates public success values without Effect failures or service requireme
       },
     });
     // @ts-expect-error operation work must have its dependencies provided
-    operation({ prepare: () => () => load });
+    operation({ prepare: () => () => Effect.scope });
     // @ts-expect-error preparation must finish before operation acceptance
     operation({ prepare: async () => () => Effect.succeed(1) });
   `,
