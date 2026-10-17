@@ -15,12 +15,14 @@ const ServiceLifetime = Context.Service<ServiceLifetime>(
 );
 
 /** Scoped fixture ownership for tests that acquire standalone services. */
-export function createEffectRuntime() {
+export function createEffectRuntime(
+  ambientServices: Layer.Layer<never> = Layer.empty,
+) {
   const runtime = ManagedRuntime.make(
     Layer.effect(
       ServiceLifetime,
       Effect.map(Effect.scope, (scope) => ({ scope })),
-    ),
+    ).pipe(Layer.provideMerge(ambientServices)),
   );
   let disposal: Promise<void> | undefined;
 
