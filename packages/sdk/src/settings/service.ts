@@ -43,18 +43,20 @@ export function createSettings({
       return undefined;
     }
 
+    function resolveValue(appId: string, key: string, value: unknown) {
+      if (value === undefined)
+        return getSettingDefinition(appId, key)?.defaultValue;
+      if (typeof value !== "string") {
+        log.warn(`Non-string value found for key ${key}, converting to string`);
+        return String(value);
+      }
+      return value;
+    }
+
     function get(appId: string, key: string) {
-      return Effect.map(connection.read(`${appId}:${key}`), (value) => {
-        if (value === undefined)
-          return getSettingDefinition(appId, key)?.defaultValue;
-        if (typeof value !== "string") {
-          log.warn(
-            `Non-string value found for key ${key}, converting to string`,
-          );
-          return String(value);
-        }
-        return value;
-      });
+      return Effect.map(connection.read(`${appId}:${key}`), (value) =>
+        resolveValue(appId, key, value),
+      );
     }
 
     function set(
@@ -105,8 +107,12 @@ export function createSettings({
               )
             : yield* list(appId, showRestricted);
         const result: Record<string, string> = {};
-        for (const key of keys) {
-          const value = yield* get(appId, key);
+        if (keys.length === 0) return result;
+        const values = yield* connection.readMany(
+          keys.map((key) => `${appId}:${key}`),
+        );
+        for (const [index, key] of keys.entries()) {
+          const value = resolveValue(appId, key, values[index]);
           if (value !== undefined) result[key] = value;
         }
         return result;

@@ -22,14 +22,16 @@ const ownerSettings: SettingsCategory[] = [
 
 async function acquireSettings(
   runtime: ReturnType<typeof createEffectRuntime>,
-  grants = true,
+  grants: boolean | ((grant: string) => boolean) = true,
+  values = new Map<string, unknown>(),
 ) {
-  const values = new Map<string, string>();
   return runtime.acquire(
     createSettings({
       storage: {
         open: Effect.succeed({
           read: (key) => Effect.sync(() => values.get(key)),
+          readMany: (keys) =>
+            Effect.sync(() => keys.map((key) => values.get(key))),
           write: (key, value) =>
             Effect.sync(() => {
               values.set(key, value);
@@ -45,7 +47,9 @@ async function acquireSettings(
         getAppSettings: (appId) =>
           appId === "app.owner" ? ownerSettings : undefined,
       },
-      authorization: { hasGrant: () => grants },
+      authorization: {
+        hasGrant: typeof grants === "function" ? grants : () => grants,
+      },
     }),
   );
 }
@@ -81,5 +85,40 @@ describe("settings shared reads", () => {
     await expect(
       runtime.run(settings.get("app.owner", "shared")),
     ).resolves.toBe("false");
+  });
+
+  it("filters bulk app values by namespace and grants while normalizing legacy values", async () => {
+    const settings = await acquireSettings(
+      runtime,
+      (grant) => grant === "settings/app.owner/shared",
+      new Map<string, unknown>([
+        ["app.owner:private", "secret"],
+        ["app.other:shared", "foreign"],
+        ["app.owner:shared", false],
+      ]),
+    );
+    await expect(runtime.run(settings.getAll("app.owner"))).resolves.toEqual({
+      shared: "false",
+    });
+    await expect(
+      runtime.run(settings.getAll("app.owner", true)),
+    ).resolves.toEqual({ private: "secret", shared: "false" });
+  });
+
+  it("combines bulk system values with schema defaults and excludes undeclared keys", async () => {
+    const settings = await acquireSettings(
+      runtime,
+      (grant) =>
+        grant === "settings/com.eden/general.locale" ||
+        grant === "settings/com.eden/general.interfaceScale",
+      new Map([
+        ["com.eden:general.locale", "pl"],
+        ["com.eden:undeclared", "ignored"],
+      ]),
+    );
+    await expect(runtime.run(settings.getAll("com.eden"))).resolves.toEqual({
+      "general.locale": "pl",
+      "general.interfaceScale": "1.0",
+    });
   });
 });

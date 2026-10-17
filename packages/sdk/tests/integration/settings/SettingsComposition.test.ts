@@ -19,6 +19,36 @@ function settingsFactory(storage: SettingsStorage) {
   });
 }
 
+it("keeps a missing first SQLite value aligned with its default in bulk reads", async () => {
+  const appsDirectory = await fs.mkdtemp(
+    path.join(os.tmpdir(), "eden-settings-bulk-"),
+  );
+  const effects = createEffectRuntime();
+  try {
+    const settings = await effects.acquire(
+      createSettings({
+        storage: createSqliteSettingsStorage({ appsDirectory }),
+        catalog: { getAppSettings: () => undefined },
+        authorization: {
+          hasGrant: (grant) =>
+            grant === "settings/com.eden/general.locale" ||
+            grant === "settings/com.eden/general.interfaceScale",
+        },
+      }),
+    );
+    await effects.run(
+      settings.set("com.eden", "general.interfaceScale", "1.5"),
+    );
+    await expect(effects.run(settings.getAll("com.eden"))).resolves.toEqual({
+      "general.locale": "en",
+      "general.interfaceScale": "1.5",
+    });
+  } finally {
+    await effects.dispose();
+    await fs.rm(appsDirectory, { recursive: true, force: true });
+  }
+});
+
 it("composes persisted settings with locale notifications and appearance state across restart", async () => {
   const appsDirectory = await fs.mkdtemp(
     path.join(os.tmpdir(), "eden-settings-composition-"),

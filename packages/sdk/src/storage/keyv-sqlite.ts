@@ -46,6 +46,7 @@ export const openKeyvSqlite = Effect.fn(function* ({
 
   return {
     read: (key: string) => perform(() => keyv.get(key)),
+    readMany: (keys: string[]) => perform(() => keyv.getMany(keys)),
     write: (key: string, value: unknown) =>
       perform(() => keyv.set(key, value)).pipe(Effect.asVoid),
     remove: (key: string) => perform(() => keyv.delete(key)),

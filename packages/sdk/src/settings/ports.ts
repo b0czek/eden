@@ -4,6 +4,8 @@ import type * as Scope from "effect/Scope";
 
 export interface SettingsConnection {
   read(key: string): Effect.Effect<unknown, Error>;
+  /** Values follow key order; missing values retain their undefined positions. */
+  readMany(keys: string[]): Effect.Effect<readonly unknown[], Error>;
   write(key: string, value: string): Effect.Effect<void, Error>;
   remove(key: string): Effect.Effect<void, Error>;
   keys(): Effect.Effect<readonly unknown[], Error>;
