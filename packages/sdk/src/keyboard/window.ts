@@ -1,6 +1,6 @@
 import type { EdenKeyboardPlacementMode, ViewBounds } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import type { PlatformWindow, WindowingPort } from "../platform/ports";
 import { defaultContentBounds } from "./placement";
 import type { KeyboardAssets } from "./ports";
@@ -27,22 +27,10 @@ export function createKeyboardOverlay({
     let mainListeners: (() => void) | undefined;
     let overlayListeners: (() => void) | undefined;
     const { frontendPath, preloadPath } = assets;
-    const loaded = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<void>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    const moved = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<void>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    const closed = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<void>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    const mainBoundsChanged = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<void>()),
-      (event) => Effect.sync(event.dispose),
-    );
+    const loaded = yield* scopedEvent<void>();
+    const moved = yield* scopedEvent<void>();
+    const closed = yield* scopedEvent<void>();
+    const mainBoundsChanged = yield* scopedEvent<void>();
 
     function get() {
       return keyboardWindow && !keyboardWindow.isDestroyed()

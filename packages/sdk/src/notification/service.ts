@@ -6,10 +6,10 @@ import type {
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import type {
-  TargetedNotification,
   RoutedNotification,
+  TargetedNotification,
 } from "../controllers/events";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
 import type { NotificationCaller, NotificationViews } from "./ports";
 
@@ -35,24 +35,15 @@ export function createNotifications({ views }: { views: NotificationViews }) {
     let provider: { appId: string; viewId: number } | undefined;
     let disposed = false;
     const activeNotifications = new Map<string, ActiveNotification>();
-    const added = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        createEvent<TargetedNotification<{ notification: Notification }>>(),
-      ),
-      (event) => Effect.sync(event.dispose),
-    );
-    const removed = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<TargetedNotification<{ id: string }>>()),
-      (event) => Effect.sync(event.dispose),
-    );
-    const actionClicked = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        createEvent<
-          RoutedNotification<{ notificationId: string; actionId: string }>
-        >(),
-      ),
-      (event) => Effect.sync(event.dispose),
-    );
+    const added =
+      yield* scopedEvent<
+        TargetedNotification<{ notification: Notification }>
+      >();
+    const removed = yield* scopedEvent<TargetedNotification<{ id: string }>>();
+    const actionClicked =
+      yield* scopedEvent<
+        RoutedNotification<{ notificationId: string; actionId: string }>
+      >();
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         disposed = true;

@@ -2,9 +2,10 @@ import type {
   EdenKeyboardAction,
   EdenKeyboardFocusState,
 } from "@edenapp/types";
-import * as Effect from "effect/Effect";
 import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
+import { listen } from "../events/scoped";
 import { log } from "../logging";
 import type { PlatformWindow } from "../platform/ports";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
@@ -318,85 +319,52 @@ export function createKeyboard({
       });
     }
 
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        views.boundsChanged.on(({ workspaceBounds }) => {
-          state.workspaceBounds = workspaceBounds;
-          if (overlay.visible() && effectivePlacement(state) === "docked")
-            schedule(
-              refreshPresentation(),
-              "Failed to reposition keyboard overlay:",
-            );
+    yield* listen(views.boundsChanged, ({ workspaceBounds }) => {
+      state.workspaceBounds = workspaceBounds;
+      if (overlay.visible() && effectivePlacement(state) === "docked")
+        schedule(
+          refreshPresentation(),
+          "Failed to reposition keyboard overlay:",
+        );
+    });
+    yield* listen(processes.stopped, ({ appId }) => {
+      if (state.currentTarget?.appId !== appId) return;
+      state.currentTarget = null;
+      state.dismissedTarget = null;
+      schedule(
+        state.persistentVisibility ? refreshPresentation() : hideKeyboard(),
+        "Failed to update keyboard after process stop:",
+      );
+    });
+    yield* listen(settings.changed, ({ appId, key, value }) => {
+      if (appId === EDEN_SETTINGS_APP_ID)
+        schedule(
+          settingChanged(key, value),
+          "Failed to update keyboard settings:",
+        );
+    });
+    yield* listen(overlay.loaded, () => {
+      schedule(
+        Effect.gen(function* () {
+          if (state.visibilityRequested && !overlay.visible())
+            yield* overlay.show();
+          yield* notifyStateChanged();
         }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        processes.stopped.on(({ appId }) => {
-          if (state.currentTarget?.appId !== appId) return;
-          state.currentTarget = null;
-          state.dismissedTarget = null;
-          schedule(
-            state.persistentVisibility ? refreshPresentation() : hideKeyboard(),
-            "Failed to update keyboard after process stop:",
-          );
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        settings.changed.on(({ appId, key, value }) => {
-          if (appId === EDEN_SETTINGS_APP_ID)
-            schedule(
-              settingChanged(key, value),
-              "Failed to update keyboard settings:",
-            );
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        overlay.loaded.on(() => {
-          schedule(
-            Effect.gen(function* () {
-              if (state.visibilityRequested && !overlay.visible())
-                yield* overlay.show();
-              yield* notifyStateChanged();
-            }),
-            "Failed to initialize keyboard overlay:",
-          );
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        overlay.moved.on(() => {
-          if (!drag.active() && effectivePlacement(state) === "floating")
-            state.floatingBounds = overlay.bounds() ?? null;
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() => overlay.closed.on(drag.end)),
-      (stop) => Effect.sync(stop),
-    );
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        overlay.mainBoundsChanged.on(() => {
-          if (overlay.visible() && effectivePlacement(state) === "docked")
-            schedule(
-              refreshPresentation(),
-              "Failed to reposition keyboard overlay:",
-            );
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
+        "Failed to initialize keyboard overlay:",
+      );
+    });
+    yield* listen(overlay.moved, () => {
+      if (!drag.active() && effectivePlacement(state) === "floating")
+        state.floatingBounds = overlay.bounds() ?? null;
+    });
+    yield* listen(overlay.closed, drag.end);
+    yield* listen(overlay.mainBoundsChanged, () => {
+      if (overlay.visible() && effectivePlacement(state) === "docked")
+        schedule(
+          refreshPresentation(),
+          "Failed to reposition keyboard overlay:",
+        );
+    });
     yield* bindKeyboardIpc(
       rendererIpc,
       {

@@ -1,6 +1,6 @@
 import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
 import { EDEN_SETTINGS_APP_ID } from "./constants";
 import type {
@@ -23,12 +23,11 @@ export function createSettings({
 }: SettingsDependencies) {
   return Effect.gen(function* () {
     const connection = yield* storage.open;
-    const changed = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        createEvent<{ appId: string; key: string; value: string }>(),
-      ),
-      (event) => Effect.sync(event.dispose),
-    );
+    const changed = yield* scopedEvent<{
+      appId: string;
+      key: string;
+      value: string;
+    }>();
 
     function getSettingDefinition(appId: string, key: string) {
       const schema =

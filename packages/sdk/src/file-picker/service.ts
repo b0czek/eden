@@ -9,7 +9,7 @@ import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
 import * as v from "valibot";
 import type { TargetedNotification } from "../controllers/events";
-import { createEvent } from "../events/event";
+import { listen, scopedEvent } from "../events/scoped";
 import { filesystemLocationSchema } from "../filesystem/location-schema";
 import { log } from "../logging";
 import { createPickerDisplayProvider } from "./display-provider";
@@ -41,16 +41,11 @@ export function createFilePicker({
     let idleStop: Fiber.Fiber<void> | undefined;
     let disposed = false;
     const providers = createPickerDisplayProvider(views);
-    const opened = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        createEvent<TargetedNotification<{ picker: FilePickerOpenEvent }>>(),
-      ),
-      (event) => Effect.sync(event.dispose),
-    );
-    const closed = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<TargetedNotification<FilePickerResult>>()),
-      (event) => Effect.sync(event.dispose),
-    );
+    const opened =
+      yield* scopedEvent<
+        TargetedNotification<{ picker: FilePickerOpenEvent }>
+      >();
+    const closed = yield* scopedEvent<TargetedNotification<FilePickerResult>>();
     // Synchronous lifecycle callbacks can replace the delay; the scope still
     // owns any previous fiber finishing an uninterruptible stop.
     const forkIdleStop = yield* FiberSet.makeRuntime<never, void, never>();
@@ -118,18 +113,13 @@ export function createFilePicker({
         closeActiveRequest("close");
     }
 
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        processes.stopped.on(({ appId }) => {
-          if (providers.clearIfAppStopped(appId)) {
-            cancelIdleStop();
-            closeActiveRequest("close");
-          } else if (activeRequest?.opener.appId === appId)
-            closeActiveRequest("close");
-        }),
-      ),
-      (stop) => Effect.sync(stop),
-    );
+    yield* listen(processes.stopped, ({ appId }) => {
+      if (providers.clearIfAppStopped(appId)) {
+        cancelIdleStop();
+        closeActiveRequest("close");
+      } else if (activeRequest?.opener.appId === appId)
+        closeActiveRequest("close");
+    });
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         disposed = true;
