@@ -146,3 +146,9 @@ rejected if it would invalidate installed DLCs.
 The Installer prompts explicitly for upgrades, same-version reinstalls, and
 downgrades. Distribution remains local and file-based; DLC support does not add
 a catalog or network source.
+
+If a package change fails and rollback also fails, the error reports both
+failures and the retained recovery directory under
+`<appsDirectory>/.package-transactions`. Leave that directory intact, correct the
+filesystem problem (such as permissions), and restart Eden to retry recovery
+before installed packages are loaded.

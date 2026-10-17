@@ -1,3 +1,4 @@
+import * as nativeFs from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -25,6 +26,77 @@ describe("PackageTransactions", () => {
 
   afterEach(async () => {
     await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it("retains recoverable originals and both failures when rollback cannot finish", async () => {
+    const blockedParent = path.join(apps, "protected");
+    const targets = [
+      path.join(blockedParent, "first"),
+      path.join(apps, "second"),
+    ];
+    const failure = new Error("Commit rejected");
+    try {
+      for (const target of targets) {
+        await fs.mkdir(target, { recursive: true });
+        await fs.writeFile(
+          path.join(target, "content"),
+          `original ${path.basename(target)}`,
+        );
+      }
+      const transactions = coordinator;
+      const error: unknown = await Effect.runPromise(
+        transactions.execute(
+          targets.map((target) => ({
+            target,
+            prepare: (stage) =>
+              fromPromise(() =>
+                fs.writeFile(path.join(stage, "content"), "replacement"),
+              ),
+          })),
+          {
+            update: (phase) => {
+              if (phase === "committing-transaction") {
+                nativeFs.chmodSync(blockedParent, 0o555);
+                throw failure;
+              }
+            },
+          },
+        ),
+      ).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([
+        failure,
+        expect.objectContaining({ code: "EACCES" }),
+      ]);
+      const recoveryRoot = path.join(apps, ".package-transactions");
+      const directories = await fs.readdir(recoveryRoot);
+      expect(directories).toHaveLength(1);
+      const directory = path.join(recoveryRoot, directories[0]);
+      expect((error as Error).message).toContain(directory);
+      expect((error as Error).message).toContain(failure.message);
+      expect((error as Error).message).toContain("EACCES");
+      await expect(
+        fs.readFile(path.join(directory, "backups/0/content"), "utf8"),
+      ).resolves.toBe("original first");
+      await expect(
+        fs.readFile(path.join(directory, "journal.json"), "utf8"),
+      ).resolves.toContain('"applying"');
+      await expect(
+        fs.readFile(path.join(targets[1], "content"), "utf8"),
+      ).resolves.toBe("original second");
+
+      await fs.chmod(blockedParent, 0o755);
+      await Effect.runPromise(
+        createPackageTransactions({ appsDirectory: apps }).initialize(),
+      );
+      for (const target of targets)
+        await expect(
+          fs.readFile(path.join(target, "content"), "utf8"),
+        ).resolves.toBe(`original ${path.basename(target)}`);
+      await expect(fs.readdir(recoveryRoot)).resolves.toEqual([]);
+    } finally {
+      await fs.chmod(blockedParent, 0o755).catch(() => undefined);
+    }
   });
 
   it("rolls back an applied swap when a later operation fails", async () => {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Semaphore from "effect/Semaphore";
 import { asError, fromPromise } from "../effects/io";
@@ -148,16 +149,23 @@ export const createPackageTransactions = ({
       (error) =>
         Effect.gen(function* () {
           reporter?.update("rolling-back-transaction");
-          yield* Effect.catch(rollback(directory, journal), (rollbackError) =>
-            Effect.sync(() => {
-              log.error("Package transaction rollback failed:", rollbackError);
-            }),
+          yield* Effect.catchCause(
+            rollback(directory, journal),
+            (rollbackCause) => {
+              const failure = asError(Cause.squash(error));
+              const rollbackFailure = asError(Cause.squash(rollbackCause));
+              return Effect.fail(
+                new AggregateError(
+                  [failure, rollbackFailure],
+                  `Package transaction failed: ${failure.message}. Rollback failed: ${rollbackFailure.message}. Recovery files retained at ${directory}`,
+                  { cause: failure },
+                ),
+              );
+            },
           );
           yield* fromPromise(() =>
-            fs
-              .rm(directory, { recursive: true, force: true })
-              .catch(() => undefined),
-          );
+            fs.rm(directory, { recursive: true, force: true }),
+          ).pipe(Effect.catch(() => Effect.void));
           return yield* Effect.failCause(error);
         }),
     );
@@ -171,8 +179,10 @@ export const createPackageTransactions = ({
       const backupExists = yield* exists(entry.backup);
       const stageExists = entry.stage ? yield* exists(entry.stage) : false;
       const inferredInstalled = !!entry.stage && !stageExists && targetExists;
+      // A previous rollback may already have restored a recorded backup.
       if (
-        (entry.installed || inferredInstalled || backupExists) &&
+        (backupExists ||
+          (!entry.backedUp && (entry.installed || inferredInstalled))) &&
         targetExists
       ) {
         yield* fromPromise(() =>
@@ -180,6 +190,10 @@ export const createPackageTransactions = ({
         );
       }
       if (backupExists) {
+        if (!entry.backedUp) {
+          entry.backedUp = true;
+          yield* writeJournal(directory, journal);
+        }
         yield* fromPromise(() =>
           fs.mkdir(path.dirname(entry.target), { recursive: true }),
         );
@@ -240,10 +254,12 @@ export const createPackageTransactions = ({
         yield* fromPromise(() => fs.access(target));
         return true;
       }),
-      (_error) =>
-        Effect.sync(() => {
-          return false;
-        }),
+      (error) =>
+        ["ENOENT", "ENOTDIR"].includes(
+          (error as NodeJS.ErrnoException).code ?? "",
+        )
+          ? Effect.succeed(false)
+          : Effect.fail(error),
     );
   });
   return { initialize, runExclusive, execute };
