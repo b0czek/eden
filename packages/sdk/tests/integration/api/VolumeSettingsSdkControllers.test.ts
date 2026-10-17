@@ -131,27 +131,31 @@ describe("volume and settings SDK controllers", () => {
       count: 0,
       owners: [] as unknown[],
       load() {
-        this.owners.push(this);
-        return {
-          sections: [
-            {
-              id: "main",
-              nodes: [
-                {
-                  id: "count",
-                  kind: "status" as const,
-                  label: "Count",
-                  value: String(this.count),
-                },
-              ],
-            },
-          ],
-        };
+        return Effect.sync(() => {
+          this.owners.push(this);
+          return {
+            sections: [
+              {
+                id: "main",
+                nodes: [
+                  {
+                    id: "count",
+                    kind: "status" as const,
+                    label: "Count",
+                    value: String(this.count),
+                  },
+                ],
+              },
+            ],
+          };
+        });
       },
       actions: {
         increment(this: { count: number; owners: unknown[] }) {
-          this.owners.push(this);
-          this.count++;
+          return Effect.sync(() => {
+            this.owners.push(this);
+            this.count++;
+          });
         },
       },
     };

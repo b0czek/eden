@@ -25,9 +25,11 @@ Supported types are `text`, `number`, `checkbox`, `radio`, `select`, `toggle`, `
 
 ## Host-Registered Panels
 
-A registration contains stable metadata and action declarations. Its loader returns the complete resolved generic view on every call:
+A registration contains stable metadata and action declarations. Its loader and action handlers return Effects. The loader produces the complete resolved generic view on every execution. In this example, `readEnabled()` and `writeEnabled()` are host Effects:
 
 ```ts
+import * as Effect from "effect/Effect";
+
 const registration = eden.settings.registerPanel(
   {
     id: "acme.network",
@@ -39,22 +41,23 @@ const registration = eden.settings.registerPanel(
     }],
   },
   {
-    load: async () => ({
-      sections: [{
-        id: "connection",
-        nodes: [{
-          kind: "toggle",
-          id: "enabled",
-          label: { en: "Enabled", pl: "Włączone" },
-          value: await readEnabled(),
-          action: { actionId: "set-enabled" },
+    load: () => Effect.gen(function* () {
+      const enabled = yield* readEnabled();
+      return {
+        sections: [{
+          id: "connection",
+          nodes: [{
+            kind: "toggle",
+            id: "enabled",
+            label: { en: "Enabled", pl: "Włączone" },
+            value: enabled,
+            action: { actionId: "set-enabled" },
+          }],
         }],
-      }],
+      };
     }),
     actions: {
-      "set-enabled": async ({ value }) => {
-        await writeEnabled(value as boolean);
-      },
+      "set-enabled": ({ value }) => writeEnabled(value as boolean),
     },
   },
 );
@@ -151,7 +154,7 @@ For a host navigation category with no controls or grant of its own, register an
 ```ts
 const parent = eden.settings.registerPanel(
   { id: "acme.device", title: { en: "Device", pl: "Urządzenie" } },
-  { load: () => ({ sections: [] }) },
+  { load: () => Effect.succeed({ sections: [] }) },
 );
 eden.settings.registerPanel(
   {

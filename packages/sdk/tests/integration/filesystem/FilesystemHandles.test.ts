@@ -34,10 +34,15 @@ describe("file handle access and lifetime", () => {
   beforeEach(async () => {
     powerHandoffs = 0;
     powerFailure = undefined;
-    const handoff = async () => {
-      powerHandoffs++;
-      if (powerFailure) throw powerFailure;
-    };
+    const handoff = () =>
+      Effect.try({
+        try: () => {
+          powerHandoffs++;
+          if (powerFailure) throw powerFailure;
+        },
+        catch: (error) =>
+          error instanceof Error ? error : new Error(String(error)),
+      });
     eden = await createTestEden({
       config: {
         powerProvider: {

@@ -1,4 +1,5 @@
 import type { SettingsPanelResponse } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 describe("SettingsPanels integration", () => {
@@ -87,38 +88,49 @@ describe("SettingsPanels integration", () => {
         ],
       },
       {
-        load: async () => ({
-          sections: [
-            {
-              id: "devices",
-              nodes: [
+        load: () =>
+          Effect.try({
+            try: () => ({
+              sections: [
                 {
-                  kind: "collection",
                   id: "devices",
-                  label: "Devices",
-                  items: items.map((id) => ({
-                    id,
-                    title: id,
-                    nodes: [
-                      {
-                        kind: "button",
-                        id: "remove",
-                        label: "Remove",
-                        action: {
-                          actionId: "remove",
-                          params: { deviceId: id },
-                        },
-                      },
-                    ],
-                  })),
+                  nodes: [
+                    {
+                      kind: "collection" as const,
+                      id: "devices",
+                      label: "Devices",
+                      items: items.map((id) => ({
+                        id,
+                        title: id,
+                        nodes: [
+                          {
+                            kind: "button" as const,
+                            id: "remove",
+                            label: "Remove",
+                            action: {
+                              actionId: "remove",
+                              params: { deviceId: id },
+                            },
+                          },
+                        ],
+                      })),
+                    },
+                  ],
                 },
               ],
-            },
-          ],
-        }),
+            }),
+            catch: (error) =>
+              error instanceof Error ? error : new Error(String(error)),
+          }),
         actions: {
-          remove: async ({ params }) => {
-            items = items.filter((id) => id !== params?.deviceId);
+          remove: ({ params }) => {
+            return Effect.try({
+              try: () => {
+                items = items.filter((id) => id !== params?.deviceId);
+              },
+              catch: (error) =>
+                error instanceof Error ? error : new Error(String(error)),
+            });
           },
         },
       },

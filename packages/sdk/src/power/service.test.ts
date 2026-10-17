@@ -37,12 +37,14 @@ it("drains an accepted host handoff before scope teardown and preserves provider
   });
   const provider = {
     completed: false,
-    async poweroff() {
-      expect(daemonStopped).toBe(true);
-      expect(processesStopped).toBe(true);
-      accepted();
-      await pending;
-      this.completed = true;
+    poweroff() {
+      return Effect.promise(async () => {
+        expect(daemonStopped).toBe(true);
+        expect(processesStopped).toBe(true);
+        accepted();
+        await pending;
+        this.completed = true;
+      });
     },
   };
   try {

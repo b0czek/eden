@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { EdenConfig } from "@edenapp/types";
+import type { EdenConfig } from "./api/config";
 import { log } from "./logging";
 import { createElectronPlatform } from "./platform/electron";
 import type { ApplicationLifecyclePort } from "./platform/ports";

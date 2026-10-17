@@ -1,7 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { EdenConfig, OperationHandle } from "@edenapp/types";
+import type { OperationHandle } from "@edenapp/types";
+import type { EdenConfig } from "../../src/api/config";
 import type { CommandCallerContext } from "../../src/execution";
 import { Commands, Permissions } from "../../src/ipc";
 import { Operations } from "../../src/operations/service";

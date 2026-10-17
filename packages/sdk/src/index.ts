@@ -1,9 +1,7 @@
 export type {
   CommandCompletion,
   CommunicationMode,
-  EdenConfig,
   EdenPowerCapabilities,
-  EdenPowerProvider,
   FilesystemLocation,
   FilesystemVolume,
   FilesystemVolumeKind,

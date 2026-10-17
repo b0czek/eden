@@ -4,7 +4,6 @@ import type {
   SettingsPanelActionInvocation,
   SettingsPanelActionResponse,
   SettingsPanelError,
-  SettingsPanelProvider,
   SettingsPanelProviderContext,
   SettingsPanelRegistration,
   SettingsPanelResponse,
@@ -73,7 +72,7 @@ export function createSettingsPanels({
     renderer: PanelRenderer = "generic",
   ): SettingsPanelRegistration {
     const copied = cloneAndValidatePanelDefinition(definition);
-    validatePanelProvider(copied, provider as unknown as SettingsPanelProvider);
+    validatePanelProvider(copied, provider);
     if (!definition.id.startsWith("eden.")) {
       throw new Error("Built-in panel IDs must begin with eden.");
     }
@@ -344,10 +343,7 @@ export function createSettingsPanels({
       hasUserGrant,
     );
     const definition = cloneAndValidatePanelDefinition(generated.definition);
-    validatePanelProvider(
-      definition,
-      generated.provider as unknown as SettingsPanelProvider,
-    );
+    validatePanelProvider(definition, generated.provider);
     register(
       definition,
       generated.provider,

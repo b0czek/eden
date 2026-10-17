@@ -1,6 +1,6 @@
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenSettingsApi } from "../api/settings";
-import { fromPromise } from "../effects/io";
 import {
   cloneAndValidatePanelDefinition,
   validatePanelProvider,
@@ -29,15 +29,13 @@ export function createSettingsSdkController({
         copied,
         {
           load: (context) =>
-            fromPromise(() =>
-              Promise.resolve(provider.load.call(provider, context)),
-            ),
+            Effect.suspend(() => provider.load.call(provider, context)),
           actions: Object.fromEntries(
             Object.entries(provider.actions ?? {}).map(([id, handler]) => [
               id,
               (invocation, context) =>
-                fromPromise(() =>
-                  Promise.resolve(handler.call(provider, invocation, context)),
+                Effect.suspend(() =>
+                  handler.call(provider, invocation, context),
                 ),
             ]),
           ),

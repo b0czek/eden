@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { Permissions } from "../../../src/ipc";
 import { Operations } from "../../../src/operations/service";
@@ -73,10 +74,17 @@ describe("session operation transactions", () => {
     eden = await createTestEden({
       config: {
         powerProvider: {
-          poweroff: async () => {
-            userAtHandoff =
-              eden.runtime.services.sessionContext.getCurrentUser()?.username;
-            throw new Error("Host refused poweroff");
+          poweroff: () => {
+            return Effect.try({
+              try: () => {
+                userAtHandoff =
+                  eden.runtime.services.sessionContext.getCurrentUser()
+                    ?.username;
+                throw new Error("Host refused poweroff");
+              },
+              catch: (error) =>
+                error instanceof Error ? error : new Error(String(error)),
+            });
           },
         },
       },

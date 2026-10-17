@@ -265,7 +265,7 @@ describe("EdenRuntime integration", () => {
       id: "host.before-start",
       title: { en: "Before startup" },
     };
-    const provider = { load: () => ({ sections: [] }) };
+    const provider = { load: () => Effect.sync(() => ({ sections: [] })) };
     const registration = eden.runtime.settings.registerPanel(
       definition,
       provider,

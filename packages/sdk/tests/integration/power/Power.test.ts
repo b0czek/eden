@@ -1,4 +1,5 @@
 import type { OperationHandle } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { promiseOperationTask } from "../../support/operations";
 
@@ -14,9 +15,15 @@ describe("power operation lifecycle", () => {
     eden = await createTestEden({
       config: {
         powerProvider: {
-          poweroff: async () => {
-            handoffs++;
-            if (handoffs === 1) throw new Error("Host refused poweroff");
+          poweroff: () => {
+            return Effect.try({
+              try: () => {
+                handoffs++;
+                if (handoffs === 1) throw new Error("Host refused poweroff");
+              },
+              catch: (error) =>
+                error instanceof Error ? error : new Error(String(error)),
+            });
           },
         },
       },
@@ -64,8 +71,14 @@ describe("power operation lifecycle", () => {
     eden = await createTestEden({
       config: {
         powerProvider: {
-          poweroff: async () => {
-            throw new Error("Host refused poweroff");
+          poweroff: () => {
+            return Effect.try({
+              try: () => {
+                throw new Error("Host refused poweroff");
+              },
+              catch: (error) =>
+                error instanceof Error ? error : new Error(String(error)),
+            });
           },
         },
       },

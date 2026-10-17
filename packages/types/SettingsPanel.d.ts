@@ -258,18 +258,6 @@ export interface SettingsPanelProviderContext {
   sessionId: string;
   user: UserProfile;
 }
-export type SettingsPanelLoader = (
-  context: SettingsPanelProviderContext,
-) => SettingsPanelView | Promise<SettingsPanelView>;
-export type SettingsPanelActionHandler = (
-  invocation: SettingsPanelActionInvocation,
-  context: SettingsPanelProviderContext,
-) => void | Promise<void>;
-export interface SettingsPanelProvider {
-  load: SettingsPanelLoader;
-  actions?: Record<string, SettingsPanelActionHandler>;
-}
-
 export interface SettingsPanelRegistrationOptions {
   visible?: boolean;
 }

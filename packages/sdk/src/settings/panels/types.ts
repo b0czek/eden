@@ -2,12 +2,12 @@ import type {
   EdenConfig,
   SettingsCategory,
   SettingsPanelActionDefinition,
-  SettingsPanelActionHandler,
   SettingsPanelCustomSnapshot,
   SettingsPanelProviderContext,
   SettingsPanelValue,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import type { SettingsPanelActionHandler } from "../../api/settings";
 
 import type { Appearance } from "../../appearance/service";
 import type { Daemons } from "../../daemon";

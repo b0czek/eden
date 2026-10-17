@@ -1,9 +1,6 @@
-import type { EdenPowerProvider } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { PowerHost, PowerShutdown } from "./service";
-
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
+import type { EdenPowerProvider } from "../api/config";
+import type { PowerHost } from "./service";
 
 export function createPowerHost(
   provider?: EdenPowerProvider,
@@ -15,23 +12,8 @@ export function createPowerHost(
       reboot: typeof provider.reboot === "function",
     }),
     perform: (action) =>
-      Effect.tryPromise({
-        try: async () => {
-          await provider[action]!.call(provider);
-        },
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
-  };
-}
-
-export function createPowerShutdown(target: {
-  shutdown(): Promise<void>;
-}): PowerShutdown {
-  return {
-    shutdown: () =>
-      Effect.tryPromise({
-        try: () => target.shutdown(),
-        catch: asError,
-      }).pipe(Effect.uninterruptible),
+      Effect.suspend(() => provider[action]!.call(provider)).pipe(
+        Effect.uninterruptible,
+      ),
   };
 }

@@ -1,4 +1,4 @@
-import type { EdenConfig } from "@edenapp/types";
+import type { EdenConfig } from "../api/config";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import { createControlPlaneApis } from "../api/control-plane-controllers";

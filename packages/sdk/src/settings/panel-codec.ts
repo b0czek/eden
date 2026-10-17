@@ -4,13 +4,13 @@ import type {
   SettingsPanelActionInvocation,
   SettingsPanelDefinition,
   SettingsPanelNode,
-  SettingsPanelProvider,
   SettingsPanelRowNode,
   SettingsPanelValidation,
   SettingsPanelValue,
   SettingsPanelView,
 } from "@edenapp/types";
 import * as v from "valibot";
+import type { InternalSettingsPanelProvider } from "./panel-record";
 
 export type InternalPanelDefinition = SettingsPanelDefinition;
 export interface ValidationFailure {
@@ -436,7 +436,7 @@ export function cloneAndValidatePanelDefinition(
 
 export function validatePanelProvider(
   definition: InternalPanelDefinition,
-  provider: SettingsPanelProvider,
+  provider: InternalSettingsPanelProvider,
 ): void {
   if (!provider || typeof provider.load !== "function")
     throw new Error("Settings panel provider requires a load function");

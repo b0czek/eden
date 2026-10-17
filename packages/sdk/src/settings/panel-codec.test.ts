@@ -1,4 +1,5 @@
 import type { SettingsPanelView } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { panelDefinition } from "../../tests/support/settings/panels";
 import {
   cloneAndValidatePanelActionInvocation,
@@ -153,7 +154,7 @@ describe("SettingsPanelCodec", () => {
     ).toThrow("requires a label");
     expect(() =>
       validatePanelProvider(definition(), {
-        load: async () => ({ sections: [] }),
+        load: () => Effect.succeed({ sections: [] }),
       }),
     ).toThrow("missing action");
   });

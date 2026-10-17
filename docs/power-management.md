@@ -8,16 +8,19 @@ host-side provider to `createEden(...)`:
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createEden, type EdenPowerProvider } from "@edenapp/sdk";
+import * as Effect from "effect/Effect";
 
 const execFileAsync = promisify(execFile);
 
+const powerAction = (action: "poweroff" | "reboot") =>
+  Effect.tryPromise({
+    try: () => execFileAsync("/usr/bin/systemctl", [action]),
+    catch: (error) => error instanceof Error ? error : new Error(String(error)),
+  }).pipe(Effect.asVoid);
+
 const powerProvider: EdenPowerProvider = {
-  poweroff: async () => {
-    await execFileAsync("/usr/bin/systemctl", ["poweroff"]);
-  },
-  reboot: async () => {
-    await execFileAsync("/usr/bin/systemctl", ["reboot"]);
-  },
+  poweroff: () => powerAction("poweroff"),
+  reboot: () => powerAction("reboot"),
 };
 
 createEden({ powerProvider });
@@ -34,8 +37,8 @@ that action. This makes power management opt-in and keeps development hosts
 safe by default without duplicating capability configuration.
 
 Before invoking `poweroff()` or `reboot()`, Eden stops managed daemons and
-applications. The provider should resolve only after the host has accepted the
-requested operation and should reject when the operation cannot be scheduled.
+applications. The provider returns an Effect that succeeds after the host accepts the
+requested operation and fails when the operation cannot be scheduled.
 
 The operating-system account running Eden must be authorized for the chosen
 integration. On Linux, configure a narrowly scoped polkit policy for the
