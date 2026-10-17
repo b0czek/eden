@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
 import { pauseCommand } from "../../../../../tests/electron/support/commands.js";
 import { APP_ID } from "../../../../../tests/electron/support/fixtures.js";
@@ -29,21 +30,18 @@ test.describe
           async (_electron, input) => {
             const integration = globalThis as typeof globalThis & {
               __edenIntegration: {
-                eden: {
-                  volumes: {
-                    register(input: unknown): Promise<unknown>;
-                    unregister(id: string): boolean;
-                  };
-                };
+                eden: Eden;
               };
             };
             if (input.connected) {
-              await integration.__edenIntegration.eden.volumes.register({
-                id: "reconnect-usb",
-                label: "Reconnect USB",
-                kind: "removable",
-                rootPath: input.driveRoot,
-              });
+              await integration.__edenIntegration.eden.runPromise(
+                integration.__edenIntegration.eden.volumes.register({
+                  id: "reconnect-usb",
+                  label: "Reconnect USB",
+                  kind: "removable",
+                  rootPath: input.driveRoot,
+                }),
+              );
             } else {
               integration.__edenIntegration.eden.volumes.unregister(
                 "reconnect-usb",
@@ -104,15 +102,17 @@ test.describe
       await app.evaluate(async (_electron, rootPath) => {
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: { volumes: { register(args: unknown): Promise<unknown> } };
+            eden: Eden;
           };
         };
-        await integration.__edenIntegration.eden.volumes.register({
-          id: "initializing-drive",
-          label: "Initializing drive",
-          kind: "removable",
-          rootPath,
-        });
+        await integration.__edenIntegration.eden.runPromise(
+          integration.__edenIntegration.eden.volumes.register({
+            id: "initializing-drive",
+            label: "Initializing drive",
+            kind: "removable",
+            rootPath,
+          }),
+        );
       }, driveRoot);
       const scope = await pauseCommand(host, "fs/access-scope", {
         appId: "com.eden.file-picker",
@@ -134,7 +134,7 @@ test.describe
         await app.evaluate(() => {
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { unregister(id: string): boolean } };
+              eden: Eden;
             };
           };
           integration.__edenIntegration.eden.volumes.unregister(

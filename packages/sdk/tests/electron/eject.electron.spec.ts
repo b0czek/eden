@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
 import { APP_ID } from "./support/fixtures";
 import { useElectronHost } from "./support/host";
@@ -29,30 +30,41 @@ test.describe
       const driveRoot = path.join(host.root, "slow-eject");
       await fs.mkdir(driveRoot);
       await host.electronApp?.evaluate(async (_electron, rootPath) => {
+        const Effect = (
+          globalThis as typeof globalThis & {
+            __edenIntegration: { Effect: typeof import("effect/Effect") };
+          }
+        ).__edenIntegration.Effect;
+
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: {
-              volumes: {
-                register(
-                  input: unknown,
-                  options: { eject: () => Promise<void> },
-                ): Promise<unknown>;
-              };
-            };
+            eden: Eden;
           };
         };
-        await integration.__edenIntegration.eden.volumes.register(
-          { id: "slow-eject", label: "Slow USB", kind: "removable", rootPath },
-          {
-            eject: () =>
-              new Promise<void>((resolve) => {
-                (
-                  globalThis as typeof globalThis & {
-                    __finishIntegrationEject?: () => void;
-                  }
-                ).__finishIntegrationEject = resolve;
-              }),
-          },
+        await integration.__edenIntegration.eden.runPromise(
+          integration.__edenIntegration.eden.volumes.register(
+            {
+              id: "slow-eject",
+              label: "Slow USB",
+              kind: "removable",
+              rootPath,
+            },
+            {
+              eject: () =>
+                Effect.tryPromise({
+                  try: () =>
+                    new Promise<void>((resolve) => {
+                      (
+                        globalThis as typeof globalThis & {
+                          __finishIntegrationEject?: () => void;
+                        }
+                      ).__finishIntegrationEject = resolve;
+                    }),
+                  catch: (error) =>
+                    error instanceof Error ? error : new Error(String(error)),
+                }),
+            },
+          ),
         );
       }, driveRoot);
       await expect

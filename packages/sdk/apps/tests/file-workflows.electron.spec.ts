@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
 import { pauseCommand } from "../../tests/electron/support/commands.js";
 import { APP_ID } from "../../tests/electron/support/fixtures.js";
@@ -25,26 +26,27 @@ test.describe
       await fs.mkdir(driveRoot);
       await fs.writeFile(path.join(driveRoot, "usb-report.txt"), "USB report");
       await host.electronApp?.evaluate(async (_electron, rootPath) => {
+        const Effect = (
+          globalThis as typeof globalThis & {
+            __edenIntegration: { Effect: typeof import("effect/Effect") };
+          }
+        ).__edenIntegration.Effect;
+
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: {
-              volumes: {
-                register(
-                  input: unknown,
-                  options: { eject: () => Promise<void> },
-                ): Promise<unknown>;
-              };
-            };
+            eden: Eden;
           };
         };
-        await integration.__edenIntegration.eden.volumes.register(
-          {
-            id: "test-usb",
-            label: "Test USB",
-            kind: "removable",
-            rootPath,
-          },
-          { eject: async () => undefined },
+        await integration.__edenIntegration.eden.runPromise(
+          integration.__edenIntegration.eden.volumes.register(
+            {
+              id: "test-usb",
+              label: "Test USB",
+              kind: "removable",
+              rootPath,
+            },
+            { eject: () => Effect.void },
+          ),
         );
       }, driveRoot);
       await expect(
@@ -138,7 +140,7 @@ test.describe
       await host.electronApp?.evaluate(() => {
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: { volumes: { unregister(id: string): boolean } };
+            eden: Eden;
           };
         };
         integration.__edenIntegration.eden.volumes.unregister("test-usb");
@@ -180,33 +182,39 @@ test.describe
         await fs.mkdir(driveRoot);
         await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
         await host.electronApp?.evaluate(async (_electron, rootPath) => {
+          const Effect = (
+            globalThis as typeof globalThis & {
+              __edenIntegration: { Effect: typeof import("effect/Effect") };
+            }
+          ).__edenIntegration.Effect;
+
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: {
-                volumes: {
-                  register(
-                    input: unknown,
-                    options: { eject(): Promise<void> },
-                  ): Promise<unknown>;
-                };
-              };
+              eden: Eden;
             };
             __rejectExplorerEject?: () => void;
           };
-          await integration.__edenIntegration.eden.volumes.register(
-            {
-              id: "failed-eject-drive",
-              label: "Busy drive",
-              kind: "removable",
-              rootPath,
-            },
-            {
-              eject: () =>
-                new Promise<void>((_resolve, reject) => {
-                  integration.__rejectExplorerEject = () =>
-                    reject(new Error("Device is busy"));
-                }),
-            },
+          await integration.__edenIntegration.eden.runPromise(
+            integration.__edenIntegration.eden.volumes.register(
+              {
+                id: "failed-eject-drive",
+                label: "Busy drive",
+                kind: "removable",
+                rootPath,
+              },
+              {
+                eject: () =>
+                  Effect.tryPromise({
+                    try: () =>
+                      new Promise<void>((_resolve, reject) => {
+                        integration.__rejectExplorerEject = () =>
+                          reject(new Error("Device is busy"));
+                      }),
+                    catch: (error) =>
+                      error instanceof Error ? error : new Error(String(error)),
+                  }),
+              },
+            ),
           );
         }, driveRoot);
 
@@ -271,7 +279,7 @@ test.describe
           await host.electronApp?.evaluate(() => {
             const integration = globalThis as typeof globalThis & {
               __edenIntegration: {
-                eden: { volumes: { unregister(id: string): boolean } };
+                eden: Eden;
               };
               __rejectExplorerEject?: () => void;
             };
@@ -301,15 +309,17 @@ test.describe
         await host.electronApp?.evaluate(async (_electron, rootPath) => {
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { register(input: unknown): Promise<unknown> } };
+              eden: Eden;
             };
           };
-          await integration.__edenIntegration.eden.volumes.register({
-            id: "recovery-drive",
-            label: "Recovery drive",
-            kind: "local",
-            rootPath,
-          });
+          await integration.__edenIntegration.eden.runPromise(
+            integration.__edenIntegration.eden.volumes.register({
+              id: "recovery-drive",
+              label: "Recovery drive",
+              kind: "local",
+              rootPath,
+            }),
+          );
         }, driveRoot);
 
         const listing = () =>
@@ -347,7 +357,7 @@ test.describe
           await host.electronApp?.evaluate(() => {
             const integration = globalThis as typeof globalThis & {
               __edenIntegration: {
-                eden: { volumes: { unregister(id: string): boolean } };
+                eden: Eden;
               };
             };
             integration.__edenIntegration.eden.volumes.unregister(
@@ -378,22 +388,19 @@ test.describe
         const { eden } = (
           globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: {
-                users: { create(args: unknown): Promise<unknown> };
-                sessions: {
-                  login(username: string, password: string): Promise<unknown>;
-                };
-              };
+              eden: Eden;
             };
           }
         ).__edenIntegration;
-        await eden.users.create({
-          username: "designer",
-          name: "Designer",
-          password: "password",
-          directoryRestriction: "projects/design",
-        });
-        await eden.sessions.login("designer", "password");
+        await eden.runPromise(
+          eden.users.create({
+            username: "designer",
+            name: "Designer",
+            password: "password",
+            directoryRestriction: "projects/design",
+          }),
+        );
+        await eden.runPromise(eden.sessions.login("designer", "password"));
       });
       const scope = await pauseCommand(host, "fs/access-scope", {
         appId: "com.eden.files",
@@ -416,15 +423,17 @@ test.describe
         await app.evaluate(async (_electron, rootPath) => {
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { register(args: unknown): Promise<unknown> } };
+              eden: Eden;
             };
           };
-          await integration.__edenIntegration.eden.volumes.register({
-            id: "initial-inventory",
-            label: "Initial inventory",
-            kind: "removable",
-            rootPath,
-          });
+          await integration.__edenIntegration.eden.runPromise(
+            integration.__edenIntegration.eden.volumes.register({
+              id: "initial-inventory",
+              label: "Initial inventory",
+              kind: "removable",
+              rootPath,
+            }),
+          );
         }, driveRoot);
         await expect(
           files.locator('[data-volume="initial-inventory"]'),
@@ -434,7 +443,7 @@ test.describe
         await app.evaluate(() => {
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { unregister(id: string): boolean } };
+              eden: Eden;
             };
           };
           integration.__edenIntegration.eden.volumes.unregister(
@@ -480,16 +489,18 @@ test.describe
         const { eden } = (
           globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { register(args: unknown): Promise<unknown> } };
+              eden: Eden;
             };
           }
         ).__edenIntegration;
-        await eden.volumes.register({
-          id: "scope-usb",
-          label: "Scope USB",
-          kind: "removable",
-          rootPath,
-        });
+        await eden.runPromise(
+          eden.volumes.register({
+            id: "scope-usb",
+            label: "Scope USB",
+            kind: "removable",
+            rootPath,
+          }),
+        );
       }, driveRoot);
       await host.executeHostCommand("file/open", {
         location: { volume: "scope-usb", path: "/" },
@@ -510,7 +521,7 @@ test.describe
         (
           globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { unregister(id: string): void } };
+              eden: Eden;
             };
           }
         ).__edenIntegration.eden.volumes.unregister("scope-usb");

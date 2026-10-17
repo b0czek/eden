@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
 import { APP_ID } from "./support/fixtures";
 import { useElectronHost } from "./support/host";
@@ -71,15 +72,17 @@ test.describe
       await host.electronApp?.evaluate(async (_electron, rootPath) => {
         const integration = globalThis as typeof globalThis & {
           __edenIntegration: {
-            eden: { volumes: { register(input: unknown): Promise<unknown> } };
+            eden: Eden;
           };
         };
-        await integration.__edenIntegration.eden.volumes.register({
-          id: "operation-delay",
-          label: "Operation trigger",
-          kind: "local",
-          rootPath,
-        });
+        await integration.__edenIntegration.eden.runPromise(
+          integration.__edenIntegration.eden.volumes.register({
+            id: "operation-delay",
+            label: "Operation trigger",
+            kind: "local",
+            rootPath,
+          }),
+        );
       }, host.root);
       try {
         const rendererHandle = (await host.electronApp?.evaluate(
@@ -224,7 +227,7 @@ test.describe
         await host.electronApp?.evaluate(() => {
           const integration = globalThis as typeof globalThis & {
             __edenIntegration: {
-              eden: { volumes: { unregister(id: string): boolean } };
+              eden: Eden;
               releaseOperation(name: string): void;
             };
           };

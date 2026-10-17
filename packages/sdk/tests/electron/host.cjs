@@ -36,13 +36,16 @@ const eden = createEdenHost({ runtime, application: platform.application });
 const operationReleases = new Map();
 
 globalThis.__edenIntegration = {
+  Effect,
   releaseOperation: (name) => operationReleases.get(name)?.(),
   eden,
   runtime,
   execute: async (command, args) => {
     const { commands, sessionContext, operations } = runtime.services;
     const caller = { sessionId: sessionContext.getSessionId() };
-    const result = await commands.execute(command, args, caller);
+    const result = await runtime.effects.run(
+      commands.execute(command, args, caller),
+    );
     return commands.getMode(command) === "operation"
       ? runtime.effects.run(operations.wait(result, caller))
       : result;

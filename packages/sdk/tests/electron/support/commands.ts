@@ -22,11 +22,11 @@ export async function pauseCommand<C extends CommandName>(
   if (!app) throw new Error("Electron app is not running");
   await app.evaluate(
     (_electron, target) => {
-      const Effect = process
-        .getBuiltinModule("node:module")
-        .createRequire(`${process.cwd()}/package.json`)(
-        "effect/Effect",
-      ) as typeof import("effect/Effect");
+      const Effect = (
+        globalThis as typeof globalThis & {
+          __edenIntegration: { Effect: typeof import("effect/Effect") };
+        }
+      ).__edenIntegration.Effect;
       const { isDeepStrictEqual } = process.getBuiltinModule("node:util");
       const integration = globalThis as PauseGlobal & {
         __edenIntegration: {

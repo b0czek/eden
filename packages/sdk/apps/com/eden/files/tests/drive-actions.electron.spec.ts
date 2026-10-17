@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
 import { useElectronHost } from "../../../../../tests/electron/support/host.js";
 
@@ -129,34 +130,40 @@ test.describe
       };
       await host.electronApp?.evaluate(
         async (_electron, input) => {
+          const Effect = (
+            globalThis as typeof globalThis & {
+              __edenIntegration: { Effect: typeof import("effect/Effect") };
+            }
+          ).__edenIntegration.Effect;
+
           const host = globalThis as typeof globalThis & {
             __uiEjectFinish?: (busy: boolean) => void;
             __edenIntegration: {
-              eden: {
-                volumes: {
-                  register(
-                    input: unknown,
-                    options: { eject: () => Promise<void> },
-                  ): Promise<unknown>;
-                };
-              };
+              eden: Eden;
             };
           };
           delete host.__uiEjectFinish;
-          await host.__edenIntegration.eden.volumes.register(
-            {
-              id: input.volumeId,
-              label: "Toolbar USB",
-              kind: "removable",
-              rootPath: input.driveRoot,
-            },
-            {
-              eject: () =>
-                new Promise<void>((resolve, reject) => {
-                  host.__uiEjectFinish = (busy) =>
-                    busy ? reject(new Error("Device busy")) : resolve();
-                }),
-            },
+          await host.__edenIntegration.eden.runPromise(
+            host.__edenIntegration.eden.volumes.register(
+              {
+                id: input.volumeId,
+                label: "Toolbar USB",
+                kind: "removable",
+                rootPath: input.driveRoot,
+              },
+              {
+                eject: () =>
+                  Effect.tryPromise({
+                    try: () =>
+                      new Promise<void>((resolve, reject) => {
+                        host.__uiEjectFinish = (busy) =>
+                          busy ? reject(new Error("Device busy")) : resolve();
+                      }),
+                    catch: (error) =>
+                      error instanceof Error ? error : new Error(String(error)),
+                  }),
+              },
+            ),
           );
         },
         { volumeId, driveRoot },

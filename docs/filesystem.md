@@ -59,13 +59,13 @@ import { createEden } from "@edenapp/sdk";
 const eden = createEden();
 await eden.whenReady();
 
-await eden.volumes.register({
+await eden.runPromise(eden.volumes.register({
   id: "usb-work",
   label: "Work USB",
   kind: "removable",
   rootPath: "/media/operator/WORK",
   readOnly: false,
-});
+}));
 
 // When the consumer detects removal:
 eden.volumes.unregister("usb-work");
@@ -97,13 +97,13 @@ await volume.subscribe("changed", ({ volumes }) => {
 ## Safely Removing Volumes
 
 The consumer can supply an `eject` callback as the second argument to registration.
-It uses the consumer's device integration and must resolve only when the OS has
-finished flushing cached writes and releasing the volume. For a mounted share,
-this means unmounting it; for a USB drive, safely ejecting the device. Reject the
-callback when the OS reports a failure, such as a busy device.
+It returns an Effect using the consumer's device integration and succeeds only
+when the OS has finished flushing cached writes and releasing the volume. For a
+mounted share, this means unmounting it; for a USB drive, safely ejecting the
+device. Fail the Effect when the OS reports an error, such as a busy device.
 
 ```typescript
-await eden.volumes.register(
+await eden.runPromise(eden.volumes.register(
   {
     id: "usb-work",
     label: "Work USB",
@@ -111,13 +111,14 @@ await eden.volumes.register(
     rootPath: mountedDirectory,
   },
   { eject: () => volumeProvider.eject(deviceId) },
-);
+));
 
-await eden.volumes.eject("usb-work");
+await eden.runPromise(eden.volumes.eject("usb-work"));
 // The OS has confirmed safe removal.
 ```
 
-Here `volumeProvider` is the consumer's OS adapter. The callback is optional.
+Here `volumeProvider` is the consumer's OS adapter, whose `eject` method returns
+an Effect. The callback is optional.
 Public metadata advertises `supportsEject` when it is supplied. Home cannot be
 ejected.
 
