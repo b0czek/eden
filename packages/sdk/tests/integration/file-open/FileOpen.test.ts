@@ -1,4 +1,4 @@
-import type { RuntimeDlcManifest } from "@edenapp/types";
+import type { OperationHandle, RuntimeDlcManifest } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -7,6 +7,65 @@ describe("file opening integration", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+  });
+
+  it("encodes expected opening failures while retaining failure internally, and exposes defects as failures", async () => {
+    eden = await createTestEden();
+    const editor = testApp("test.editor", {
+      fileHandlers: [{ name: "Text", extensions: ["txt"] }],
+    });
+    eden.runtime.services.installedPackages.register(editor);
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "file-failures",
+        name: "File Failures",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
+    const location = { volume: "home", path: "/document.txt" };
+    await eden.execute("fs/write", { location, content: "Document" });
+    const operations = eden.runtime.services.operations;
+    const caller = {
+      sessionId: eden.runtime.services.sessionContext.getSessionId(),
+    };
+    const expected = await eden.execute<OperationHandle>("file/open-with", {
+      location,
+      appId: "missing.app",
+    });
+    await expect(
+      eden.runtime.effects.run(operations.wait(expected, caller)),
+    ).rejects.toThrow("App missing.app is not installed");
+    expect(operations.get(expected, caller)).toMatchObject({
+      status: "failed",
+      response: { success: false, error: "App missing.app is not installed" },
+    });
+
+    await eden.complete("file/open", { location });
+    const defect = new Error("Broken view focus");
+    const show = jest
+      .spyOn(eden.runtime.services.views, "showView")
+      .mockImplementation(() => {
+        throw defect;
+      });
+    try {
+      const broken = await eden.execute<OperationHandle>("file/open", {
+        location,
+      });
+      await expect(
+        eden.runtime.effects.run(operations.wait(broken, caller)),
+      ).rejects.toThrow("Broken view focus");
+      const snapshot = operations.get(broken, caller);
+      expect(snapshot).toMatchObject({
+        status: "failed",
+        error: { message: "Broken view focus" },
+      });
+      expect(snapshot).not.toHaveProperty("response");
+    } finally {
+      show.mockRestore();
+    }
   });
 
   it("persists associations through commands and reports compatibility data", async () => {

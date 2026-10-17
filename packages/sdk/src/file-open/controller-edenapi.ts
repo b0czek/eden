@@ -1,11 +1,14 @@
+import type { FileOpenResult } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { targetedEvent } from "../controllers/events";
+import { asError } from "../effects/io";
 import {
   filesystemLocationArgsSchema,
   filesystemLocationSchema,
 } from "../filesystem/location-schema";
+import type { OperationTask } from "../operations/task";
 import type { FileOpenOperations } from "./operations";
 import type { FileOpen } from "./service";
 
@@ -18,20 +21,40 @@ export function createFileOpenController(
   fileOpen: FileOpen,
   operations: FileOpenOperations,
 ) {
+  function publicOpen(
+    task: OperationTask<{ appId: string }>,
+  ): OperationTask<FileOpenResult> {
+    return {
+      ...task,
+      run: (reporter) =>
+        task
+          .run(reporter)
+          .pipe(
+            Effect.map(
+              ({ appId }): FileOpenResult => ({ success: true, appId }),
+            ),
+          ),
+      encodeFailure: (error) => ({
+        success: false,
+        error: asError(error).message,
+      }),
+    };
+  }
+
   return defineController("file", {
     commands: {
       /** Open a file with its default handler */
       open: command({
         mode: "operation",
         input: filesystemLocationArgsSchema,
-        handle: ({ location }) => operations.prepareOpen(location),
+        handle: ({ location }) => publicOpen(operations.prepareOpen(location)),
       }),
       /** Open a file with a specific app */
       "open-with": command({
         mode: "operation",
         input: handlerArgs,
         handle: ({ location, appId }) =>
-          operations.prepareOpen(location, appId),
+          publicOpen(operations.prepareOpen(location, appId)),
       }),
       /** Get the default handler app for a file path */
       "get-handler": command({

@@ -263,7 +263,7 @@ export const createOperations = Effect.fn(function* ({
           status: "failed",
           completedAt: Date.now(),
           error: { name: failure.name, message: failure.message },
-          ...(task.encodeFailure
+          ...(task.encodeFailure && !Cause.hasDies(exit.cause)
             ? { response: structuredClone(task.encodeFailure(failure)) }
             : {}),
         });

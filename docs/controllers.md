@@ -186,7 +186,8 @@ acceptance response before the execution fiber can run domain work.
 
 For commands with a typed public failure response, supply `encodeFailure` at the
 controller boundary. The execution fiber and internal waits still fail; only the
-public failed snapshot carries the encoded response. Successful values, including
+public failed snapshot carries the encoded response. Defects are never encoded
+as ordinary responses. Successful values, including
 `false` or `{ success: false }`, remain successful operation results.
 
 Codegen extracts the successful result from value, Promise, and Effect handlers,

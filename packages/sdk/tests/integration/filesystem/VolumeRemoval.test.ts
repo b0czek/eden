@@ -281,9 +281,7 @@ describe("safe volume removal", () => {
       // No handler is installed, but the real metadata read must finish safely.
       await expect(
         eden.runtime.effects.run(filesystem.wait(opening, caller)),
-      ).resolves.toMatchObject({
-        success: false,
-      });
+      ).rejects.toThrow("No handler found");
       await eden.runtime.effects.run(filesystem.wait(ejecting, caller));
       expect(hostCalls).toBe(1);
     } finally {

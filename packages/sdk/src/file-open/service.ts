@@ -1,7 +1,6 @@
 import type {
   FileHandlerInfo,
   FileOpenedEvent,
-  FileOpenResult,
   FilesystemLocation,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
@@ -26,6 +25,10 @@ import type {
   FileOpenProcesses,
   FileOpenViews,
 } from "./ports";
+
+/** Expected failures remain in the error channel; thrown defects are not converted. */
+const fileOpenFailure = (message: string) =>
+  Object.assign(new Error(message), { _tag: "FileOpenFailure" as const });
 
 interface FileOpenDependencies {
   associations: FileOpenAssociations;
@@ -203,58 +206,51 @@ export function createFileOpen({
       });
     }
 
-    function asResult(work: Effect.Effect<FileOpenResult, Error>) {
-      const failure = (error: unknown): FileOpenResult => ({
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return work.pipe(
-        Effect.catch((error) => Effect.succeed(failure(error))),
-        Effect.catchDefect((error) => Effect.succeed(failure(error))),
+    const openFile = Effect.fn(function* (location: FilesystemLocation) {
+      const context = yield* getFileContext(location).pipe(
+        Effect.mapError((error) => fileOpenFailure(error.message)),
       );
-    }
+      const appId = resolveHandler(context);
+      if (!appId)
+        return yield* Effect.fail(
+          fileOpenFailure(
+            `No handler found for ${
+              context.isDirectory
+                ? "directories"
+                : context.mimeType
+                  ? `MIME type ${context.mimeType}`
+                  : context.extension
+                    ? `extension .${context.extension}`
+                    : "this file"
+            }`,
+          ),
+        );
+      if (!catalog.getApp(appId))
+        return yield* Effect.fail(
+          fileOpenFailure(`Handler app ${appId} is not installed`),
+        );
+      yield* launchOrNotify(location, appId, context.isDirectory).pipe(
+        Effect.mapError((error) => fileOpenFailure(error.message)),
+      );
+      return { appId };
+    });
 
-    function openFile(location: FilesystemLocation) {
-      return asResult(
-        Effect.gen(function* () {
-          const context = yield* getFileContext(location);
-          const appId = resolveHandler(context);
-          if (!appId) {
-            return {
-              success: false,
-              error: `No handler found for ${
-                context.isDirectory
-                  ? "directories"
-                  : context.mimeType
-                    ? `MIME type ${context.mimeType}`
-                    : context.extension
-                      ? `extension .${context.extension}`
-                      : "this file"
-              }`,
-            };
-          }
-          if (!catalog.getApp(appId))
-            return {
-              success: false,
-              error: `Handler app ${appId} is not installed`,
-            };
-          yield* launchOrNotify(location, appId, context.isDirectory);
-          return { success: true, appId };
-        }),
+    const openFileWith = Effect.fn(function* (
+      location: FilesystemLocation,
+      appId: string,
+    ) {
+      const isDirectory = yield* filesystem
+        .isDirectory(location)
+        .pipe(Effect.mapError((error) => fileOpenFailure(error.message)));
+      if (!catalog.getApp(appId))
+        return yield* Effect.fail(
+          fileOpenFailure(`App ${appId} is not installed`),
+        );
+      yield* launchOrNotify(location, appId, isDirectory).pipe(
+        Effect.mapError((error) => fileOpenFailure(error.message)),
       );
-    }
-
-    function openFileWith(location: FilesystemLocation, appId: string) {
-      return asResult(
-        Effect.gen(function* () {
-          const isDirectory = yield* filesystem.isDirectory(location);
-          if (!catalog.getApp(appId))
-            return { success: false, error: `App ${appId} is not installed` };
-          yield* launchOrNotify(location, appId, isDirectory);
-          return { success: true, appId };
-        }),
-      );
-    }
+      return { appId };
+    });
 
     return {
       opened,
