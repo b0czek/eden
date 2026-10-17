@@ -3,12 +3,10 @@ import type {
   SettingsCategory,
   SettingsPanelActionInvocation,
   SettingsPanelActionResponse,
-  SettingsPanelDefinition,
   SettingsPanelError,
   SettingsPanelProvider,
   SettingsPanelProviderContext,
   SettingsPanelRegistration,
-  SettingsPanelRegistrationOptions,
   SettingsPanelResponse,
   SettingsPanelSummary,
   SettingsPanelValue,
@@ -17,14 +15,11 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { Daemons } from "../daemon";
 import { asError } from "../effects/io";
-import { createEvent } from "../events/event";
 import { ExecutionContext } from "../execution";
 import { log } from "../logging";
-import type { Packages } from "../packages";
 import { PackageCatalog } from "../packages/catalog";
-import { SessionContext, type Sessions } from "../session";
+import { SessionContext } from "../session";
 import {
   createGeneratedSettingsPanel,
   type GeneratedPanelOwner,
@@ -48,53 +43,30 @@ import {
 import type {
   InternalSettingsPanelProvider,
   PanelRenderer,
-  PanelSource,
   SettingsPanelRecord,
 } from "./panel-record";
+import {
+  createPanelRegistry,
+  type PanelRegistry,
+  type SettingsPanelEvents,
+} from "./panel-registry";
 import type { Settings } from "./service";
-
-interface SettingsPanelNamespaceEvents {
-  "panels-changed": {
-    reason: "catalog" | "grants" | "session" | "state" | "visibility";
-    /** Limits a state refresh to one panel when supplied. */
-    panelId?: string;
-  };
-}
 
 export function createSettingsPanels({
   settings,
   packageCatalog,
   sessionContext,
   executionContext,
+  registry = createPanelRegistry(),
 }: {
   settings: Pick<Settings, "get" | "set">;
   packageCatalog: Pick<PackageCatalog, "getIcon" | "allApps">;
   sessionContext: SessionContext;
   executionContext: ExecutionContext;
+  registry?: PanelRegistry;
 }) {
-  const changed = createEvent<SettingsPanelNamespaceEvents["panels-changed"]>();
-  let panels = new Map<string, SettingsPanelRecord>();
+  const { panels, changed, registerPanel, register } = registry;
 
-  function registerPanel(
-    definition: SettingsPanelDefinition,
-    provider: InternalSettingsPanelProvider,
-    options: SettingsPanelRegistrationOptions = {},
-  ): SettingsPanelRegistration {
-    if (definition.id.startsWith("eden.") || definition.id.startsWith("app.")) {
-      throw new Error(
-        `Panel ID "${definition.id}" uses an Eden-reserved prefix`,
-      );
-    }
-    return register(
-      definition,
-      provider,
-      "host",
-      "generic",
-      undefined,
-      undefined,
-      options.visible,
-    );
-  }
   function registerBuiltinPanel(
     definition: InternalPanelDefinition,
     provider: InternalSettingsPanelProvider,
@@ -337,115 +309,6 @@ export function createSettingsPanels({
   function listGrantOptions(): UserGrantOption[] {
     return collectPanelGrantOptions(panels.values());
   }
-  function register(
-    definition: InternalPanelDefinition,
-    provider: InternalSettingsPanelProvider,
-    source: PanelSource,
-    renderer: PanelRenderer,
-    ownerAppId?: string,
-    generatedSettings?: SettingsCategory[],
-    visible = true,
-  ): SettingsPanelRegistration {
-    const cloned = cloneRendererValue(definition);
-    if (panels.has(cloned.id)) {
-      throw new Error(`Settings panel "${cloned.id}" is already registered`);
-    }
-    if (cloned.parentId === cloned.id) {
-      throw new Error(`Settings panel "${cloned.id}" cannot be its own parent`);
-    }
-    if (cloned.parentId && !panels.has(cloned.parentId)) {
-      throw new Error(
-        `Parent settings panel "${cloned.parentId}" must be registered first`,
-      );
-    }
-    if (cloned.parentId) {
-      const parent = panels.get(cloned.parentId);
-      const sameDomain =
-        parent &&
-        ((source === "host" && parent.source === "host") ||
-          (source === "eden" && parent.source === "eden") ||
-          (source === "application" &&
-            parent.source === "application" &&
-            ownerAppId === parent.ownerAppId));
-      if (!sameDomain)
-        throw new Error(
-          `Settings panel "${cloned.id}" must share its parent's ownership domain`,
-        );
-    }
-    const trustedProvider: InternalSettingsPanelProvider = Object.freeze({
-      load: provider.load.bind(provider),
-      actions: Object.freeze(
-        Object.fromEntries(
-          Object.entries(provider.actions ?? {}).map(([id, handler]) => [
-            id,
-            handler.bind(provider),
-          ]),
-        ),
-      ),
-    });
-
-    const token = Symbol(cloned.id);
-    panels.set(cloned.id, {
-      definition: cloned,
-      provider: trustedProvider,
-      source,
-      renderer,
-      ownerAppId,
-      generatedSettings,
-      token,
-      visible,
-    });
-    changed.emit({ reason: "catalog" });
-
-    let active = true;
-    const unregister = () => {
-      if (!active) return;
-      if (panels.get(cloned.id)?.token !== token) {
-        active = false;
-        return;
-      }
-      const child = Array.from(panels.values()).find(
-        (record) => record.definition.parentId === cloned.id,
-      );
-      if (child) {
-        throw new Error(
-          `Settings panel "${cloned.id}" cannot be unregistered while child panel "${child.definition.id}" remains registered`,
-        );
-      }
-      active = false;
-      panels.delete(cloned.id);
-      changed.emit({ reason: "catalog" });
-    };
-    return Object.freeze({
-      panelId: cloned.id,
-      invalidate: () => {
-        if (!active) {
-          throw new Error(`Settings panel "${cloned.id}" is unregistered`);
-        }
-        const record = panels.get(cloned.id);
-        if (!record || record.token !== token) {
-          throw new Error(`Settings panel "${cloned.id}" is stale`);
-        }
-        changed.emit({
-          reason: "state",
-          panelId: cloned.id,
-        });
-      },
-      setVisible: (nextVisible: boolean) => {
-        if (!active) {
-          throw new Error(`Settings panel "${cloned.id}" is unregistered`);
-        }
-        const record = panels.get(cloned.id);
-        if (!record || record.token !== token) {
-          throw new Error(`Settings panel "${cloned.id}" is stale`);
-        }
-        if (record.visible === nextVisible) return;
-        record.visible = nextVisible;
-        changed.emit({ reason: "visibility" });
-      },
-      unregister,
-    });
-  }
   function synchronizeManifestPanel(manifest: RuntimeAppManifest): void {
     removeManifestPanel(manifest.id);
     if (!manifest.settings?.length) return;
@@ -577,11 +440,6 @@ export function createSettingsPanels({
   function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : "Unknown error";
   }
-  function dispose(): void {
-    panels.clear();
-
-    changed.dispose();
-  }
   return {
     registerPanel,
     registerBuiltinPanel,
@@ -591,12 +449,12 @@ export function createSettingsPanels({
     loadPanel,
     invokeAction,
     listGrantOptions,
-    dispose,
+    dispose: registry.dispose,
     changed,
     synchronizeManifestPanel,
     removeManifestPanel,
     invalidate: (
-      reason: SettingsPanelNamespaceEvents["panels-changed"]["reason"],
+      reason: SettingsPanelEvents["panels-changed"]["reason"],
       panelId?: string,
     ) => changed.emit({ reason, panelId }),
   };

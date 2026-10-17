@@ -281,6 +281,14 @@ preserves startup ordering: appearance initializes after settings and sessions
 are ready. Host and IPC boundaries execute service Effects while preserving
 their existing Promise APIs.
 
+The desktop [composition program](../packages/sdk/src/runtime/composition.ts)
+acquires the complete service graph in one scope. Dependencies are constructed
+before their consumers; synchronous resource owners register disposal with
+`Effect.acquireRelease` alongside construction. Shutdown explicitly closes
+operation admission, drains accepted work, and stops processes before closing
+the scope. Host settings registrations have a separate synchronous owner so
+registration does not require starting the desktop services.
+
 Controllers register their commands and selected event sources with one execution
 registry. A command name has one owner; registering a duplicate is an error.
 Codegen extracts command inputs, successful results, operation completions and

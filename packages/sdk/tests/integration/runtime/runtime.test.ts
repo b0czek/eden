@@ -161,6 +161,32 @@ describe("EdenRuntime integration", () => {
     });
   });
 
+  it("rolls back acquired resources when composition fails before a service bundle exists", async () => {
+    const failure = new Error("keyboard handler unavailable");
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+    const ipc = eden.platform.rendererIpc;
+    const handle = ipc.handle.bind(ipc);
+    let reachedKeyboard = false;
+    ipc.handle = (channel, listener) => {
+      if (channel.includes("keyboard")) {
+        reachedKeyboard = true;
+        throw failure;
+      }
+      return handle(channel, listener);
+    };
+    const readiness = expect(eden.runtime.whenReady()).rejects.toBe(failure);
+    await expect(eden.start()).rejects.toBe(failure);
+    await readiness;
+    expect(reachedKeyboard).toBe(true);
+    expect(eden.runtime.state).toBe("failed");
+    expect(eden.platform.activeResourceCount).toBe(0);
+    expect(() => eden.runtime.services).toThrow("unavailable");
+    await expect(eden.runtime.effects.run(Effect.void)).rejects.toThrow(
+      "disposed",
+    );
+  });
+
   it("preserves the startup failure and finishes disposal when a scoped finalizer fails", async () => {
     const startupFailure = new Error("foundation window unavailable");
     const eden = await createTestEden({
@@ -171,13 +197,19 @@ describe("EdenRuntime integration", () => {
     await eden.runtime.effects.acquire(
       Effect.addFinalizer(() => Effect.die(new Error("resource close failed"))),
     );
-    const { commands, permissions } = eden.runtime.services;
-    commands.registerController(
-      defineController("cleanup", {
-        commands: { transient: command({ handle: () => "active" }) },
-      }),
-    );
-    permissions.registerApp("cleanup-owner", ["package/read"]);
+    const windows = eden.platform.windows;
+    const createWindow = windows.createWindow.bind(windows);
+    windows.createWindow = (options) => {
+      const { commands, permissions } = eden.runtime.services;
+      commands.registerController(
+        defineController("cleanup", {
+          commands: { transient: command({ handle: () => "active" }) },
+        }),
+      );
+      permissions.registerApp("cleanup-owner", ["package/read"]);
+
+      return createWindow(options);
+    };
 
     const readiness = eden.runtime.whenReady();
     await expect(eden.start()).rejects.toBe(startupFailure);
@@ -185,6 +217,7 @@ describe("EdenRuntime integration", () => {
 
     expect(eden.runtime.state).toBe("failed");
     expect(eden.platform.activeResourceCount).toBe(0);
+    const { commands, permissions } = eden.runtime.services;
     expect(commands.has("cleanup/transient")).toBe(false);
     expect(permissions.hasApp("cleanup-owner")).toBe(false);
     await expect(eden.runtime.effects.run(Effect.void)).rejects.toThrow(
@@ -210,6 +243,27 @@ describe("EdenRuntime integration", () => {
     await expect(afterStart.start()).rejects.toThrow(
       "Cannot start Eden runtime from stopped state",
     );
+  });
+
+  it("releases pre-start settings registrations without constructing services", async () => {
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+    const definition = {
+      id: "host.before-start",
+      title: { en: "Before startup" },
+    };
+    const provider = { load: () => ({ sections: [] }) };
+    const registration = eden.runtime.settings.registerPanel(
+      definition,
+      provider,
+    );
+    registration.setVisible(false);
+    await eden.dispose();
+    expect(eden.platform.activeResourceCount).toBe(0);
+    expect(() => registration.invalidate()).toThrow(/stale|unregistered/);
+    expect(() =>
+      eden.runtime.settings.registerPanel(definition, provider),
+    ).toThrow("closed");
   });
 
   it("aborts readiness when disposal starts during startup", async () => {

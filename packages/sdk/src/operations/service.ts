@@ -471,9 +471,12 @@ export function createOperations({
       ),
     );
   }
-  const shutdown = Effect.fn(function* () {
+  function closeAdmission() {
     shuttingDown = true;
     accepting = false;
+  }
+  const shutdown = Effect.fn(function* () {
+    closeAdmission();
     yield* drain(execution.get()?.operationId);
   });
   function prune(): void {
@@ -515,6 +518,7 @@ export function createOperations({
     withSessionTransition,
     withRuntimeTransition,
     drain,
+    closeAdmission,
     shutdown,
     dispose,
   };

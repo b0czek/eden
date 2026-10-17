@@ -39,8 +39,23 @@ export function bindKeyboardIpc(
   requests: KeyboardRequests,
   run: <A>(work: Effect.Effect<A, Error>) => Promise<A>,
 ) {
-  return Effect.acquireRelease(
-    Effect.sync(() => {
+  return Effect.gen(function* () {
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        for (const name of [
+          channel.show,
+          channel.getState,
+          channel.sendAction,
+          channel.hide,
+          channel.startDrag,
+          channel.endDrag,
+        ])
+          ipc.removeHandler(name);
+        ipc.removeAllListeners(channel.focusState);
+        ipc.removeAllListeners(channel.updateDrag);
+      }),
+    );
+    yield* Effect.sync(() => {
       ipc.on<[EdenKeyboardFocusState | undefined]>(
         channel.focusState,
         (event, payload) => {
@@ -73,20 +88,6 @@ export function bindKeyboardIpc(
         run(requests.endDrag(event.sender.id)),
       );
       ipc.handle(channel.getState, () => requests.state());
-    }),
-    () =>
-      Effect.sync(() => {
-        for (const name of [
-          channel.show,
-          channel.getState,
-          channel.sendAction,
-          channel.hide,
-          channel.startDrag,
-          channel.endDrag,
-        ])
-          ipc.removeHandler(name);
-        ipc.removeAllListeners(channel.focusState);
-        ipc.removeAllListeners(channel.updateDrag);
-      }),
-  );
+    });
+  });
 }

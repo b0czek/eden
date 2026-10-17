@@ -118,10 +118,6 @@ export async function createTestEden(
     },
   };
 
-  // Resolve it here so tests can register callers before or after startup and
-  // so the registry's lifetime is always owned by the runtime.
-  runtime.services.permissions;
-
   try {
     if (options.autoStart !== false) await harness.start();
     return harness;

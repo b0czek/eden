@@ -34,7 +34,9 @@ explicit teardown; repeated calls await the same cleanup and release application
 lifecycle subscriptions. Disposing before Electron is ready prevents startup.
 
 Registration APIs, such as `eden.settings.registerPanel()`, are available both
-during startup and later when a host integration is loaded dynamically.
+during startup and later when a host integration is loaded dynamically. Disposal
+releases those registrations even when startup has not begun; new registrations
+and attempts to invalidate or change their visibility then throw.
 
 ## Domain facades
 

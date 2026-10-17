@@ -49,7 +49,10 @@ globalThis.__edenIntegration = {
 };
 
 eden.whenReady().then(
-  () => console.log("EDEN_INTEGRATION_READY"),
+  () => {
+    registerFixtureController();
+    console.log("EDEN_INTEGRATION_READY");
+  },
   (error) => {
     console.error("EDEN_INTEGRATION_FAILED", error);
     process.exitCode = 1;
@@ -58,31 +61,33 @@ eden.whenReady().then(
 
 // A fixture operation performs real I/O after a long phase, exercising both
 // transports independently of subsystem-specific elapsed time.
-runtime.services.commands.registerController(
-  defineController("integration", {
-    commands: {
-      delayed: operation({
-        permission: "operation",
-        input: v.object({ name: v.picklist(["renderer", "backend"]) }),
-        prepare:
-          ({ name }) =>
-          (reporter) =>
-            Effect.gen(function* () {
-              const released = new Promise((resolve) =>
-                operationReleases.set(name, resolve),
-              );
-              reporter.update("waiting-for-fixture");
-              yield* Effect.sleep("31 seconds");
-              yield* Effect.promise(() => released);
-              operationReleases.delete(name);
-              reporter.update("writing-fixture");
-              yield* runtime.services.filesystem.writeFile(
-                { volume: "home", path: `/operation-${name}.txt` },
-                name,
-              );
-              return { name };
-            }),
-      }),
-    },
-  }),
-);
+function registerFixtureController() {
+  runtime.services.commands.registerController(
+    defineController("integration", {
+      commands: {
+        delayed: operation({
+          permission: "operation",
+          input: v.object({ name: v.picklist(["renderer", "backend"]) }),
+          prepare:
+            ({ name }) =>
+            (reporter) =>
+              Effect.gen(function* () {
+                const released = new Promise((resolve) =>
+                  operationReleases.set(name, resolve),
+                );
+                reporter.update("waiting-for-fixture");
+                yield* Effect.sleep("31 seconds");
+                yield* Effect.promise(() => released);
+                operationReleases.delete(name);
+                reporter.update("writing-fixture");
+                yield* runtime.services.filesystem.writeFile(
+                  { volume: "home", path: `/operation-${name}.txt` },
+                  name,
+                );
+                return { name };
+              }),
+        }),
+      },
+    }),
+  );
+}
