@@ -418,12 +418,12 @@ export interface FsCommands {
   };
   "fs/read": {
     mode: "result";
-    args: { location: unknown; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
+    args: { location: import("./index").FilesystemSource; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
     response: string;
   };
   "fs/read-binary": {
     mode: "result";
-    args: { location: unknown; };
+    args: { location: import("./index").FilesystemSource; };
     response: Uint8Array<ArrayBuffer>;
   };
   "fs/write": {
@@ -453,7 +453,7 @@ export interface FsCommands {
   };
   "fs/stat": {
     mode: "result";
-    args: { location: unknown; };
+    args: { location: import("./index").FilesystemSource; };
     response: import("./index").FileStats;
   };
   "fs/watch": {

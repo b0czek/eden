@@ -19,9 +19,9 @@ export const filesystemHandleSchema = v.strictObject({
   handleId: v.pipe(v.string(), v.nonEmpty()),
 });
 
+// Inspect the raw source before object parsing strips keys, with a typed client input.
 export const filesystemSourceSchema = v.pipe(
-  v.unknown(),
-  v.check(
+  v.custom<FilesystemSource>(
     (source) =>
       !(
         source !== null &&
@@ -35,7 +35,7 @@ export const filesystemSourceSchema = v.pipe(
     [filesystemHandleSchema, filesystemLocationSchema],
     "Filesystem source requires volume and path or a handleId",
   ),
-) satisfies v.GenericSchema<unknown, FilesystemSource>;
+) satisfies v.GenericSchema<FilesystemSource, FilesystemSource>;
 
 export const filesystemSourceArgsSchema = v.object({
   location: filesystemSourceSchema,

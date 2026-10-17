@@ -70,6 +70,10 @@ function signatures() {
   fs.stat();
   // @ts-expect-error positional arguments unwrap the top-level args object
   fs.stat({ location });
+  // @ts-expect-error reads accept a source, not the command argument wrapper
+  fs.read({ location });
+  // @ts-expect-error filesystem sources require a location or a handle
+  fs.stat("/file.txt");
   // @ts-expect-error content must be a string
   fs.write(location, 12);
   // @ts-expect-error options must be typed
