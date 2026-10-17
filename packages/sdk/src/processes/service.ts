@@ -13,6 +13,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import { type AppChannelLifecycle } from "../appbus/ports";
@@ -599,7 +600,7 @@ export const createProcesses = Effect.fn(function* ({
       yield* stopApp(appId);
 
       // Small delay to ensure cleanup
-      yield* Effect.sleep(100);
+      yield* Effect.sleep(Duration.millis(100));
 
       // Relaunch with the same bounds and the identity of the process that was
       // already authorized to run.

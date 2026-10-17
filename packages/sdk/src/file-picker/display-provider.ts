@@ -1,3 +1,4 @@
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { log } from "../logging";
 import type { FilePickerCaller, FilePickerViews } from "./ports";
@@ -87,7 +88,7 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
       });
     }).pipe(
       Effect.timeoutOrElse({
-        duration: "5 seconds",
+        duration: Duration.seconds(5),
         orElse: () =>
           Effect.fail(
             new Error("Timed out waiting for File picker display provider"),

@@ -5,6 +5,7 @@ import type {
   OperationSubmission,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -71,7 +72,9 @@ export function createOperations({
   let shuttingDown = false;
   let runtimeTransition: string | undefined;
   const expiry = effects.fork(
-    Effect.forever(Effect.andThen(Effect.sleep(60_000), Effect.sync(prune))),
+    Effect.forever(
+      Effect.andThen(Effect.sleep(Duration.seconds(60)), Effect.sync(prune)),
+    ),
   );
   // The transport must queue its acceptance response before execution can tear
   // down the submitting view or backend.

@@ -5,6 +5,7 @@ import type {
   ExecutionPrincipal,
   UserProfile,
 } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as v from "valibot";
@@ -177,7 +178,7 @@ export const createDaemons = Effect.fn(function* ({
     );
     if (!isCurrent(appId, generation) || states.get(appId) !== state) return;
     const timer = yield* Effect.forkIn(
-      Effect.sleep(60_000).pipe(
+      Effect.sleep(Duration.seconds(60)).pipe(
         Effect.flatMap(() => {
           if (
             !isCurrent(appId, generation) ||
@@ -376,7 +377,7 @@ export const createDaemons = Effect.fn(function* ({
     );
     if (!isCurrent(appId, generation) || states.get(appId) !== state) return;
     const timer = yield* Effect.forkIn(
-      Effect.sleep(delay).pipe(
+      Effect.sleep(Duration.millis(delay)).pipe(
         Effect.flatMap(() => {
           if (
             !isCurrent(appId, generation) ||

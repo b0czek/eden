@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import type { AppManifest, FilesystemLocation } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { asError } from "../effects/io";
 import { scopedEvent } from "../events/scoped";
@@ -141,7 +142,7 @@ export const createBackends = Effect.fn(function* ({
       return Effect.sync(cleanup);
     }).pipe(
       Effect.timeoutOrElse({
-        duration: "10 seconds",
+        duration: Duration.seconds(10),
         orElse: () =>
           Effect.fail(
             new Error(`Backend ${appId} startup timed out after 10 seconds`),
@@ -221,7 +222,7 @@ export const createBackends = Effect.fn(function* ({
     yield* Effect.scoped(
       Effect.gen(function* () {
         yield* Effect.forkScoped(
-          Effect.sleep("500 millis").pipe(
+          Effect.sleep(Duration.millis(500)).pipe(
             Effect.andThen(
               Effect.sync(() => {
                 if (_backends.get(appId) === backend) backend.kill();
@@ -241,7 +242,7 @@ export const createBackends = Effect.fn(function* ({
           return Effect.sync(() => backend.removeListener("exit", onExit));
         }).pipe(
           Effect.timeoutOrElse({
-            duration: "5 seconds",
+            duration: Duration.seconds(5),
             orElse: () =>
               Effect.fail(
                 new Error(

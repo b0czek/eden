@@ -103,6 +103,9 @@ ordinary synchronous translation lookup. The
 state in a closure and composes storage Effects before updating state and
 publishing notifications.
 
+Use explicit `Duration` values for Effect waits and expiry: `Duration.seconds(5)`,
+`Duration.millis(delayMs)`, `Duration.zero`, or `Duration.infinity`.
+
 Factory acquisition may require `Scope.Scope`. Effects returned by service
 methods must have their dependencies provided, with no outstanding requirements
 (the third `Effect.Effect` type parameter is `never`). Services compose those

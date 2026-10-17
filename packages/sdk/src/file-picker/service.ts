@@ -3,6 +3,7 @@ import type {
   FilePickerOpenEvent,
   FilePickerResult,
 } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
@@ -67,7 +68,7 @@ export function createFilePicker({
       idleStop = forkIdleStop(
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            yield* restore(Effect.sleep(10_000));
+            yield* restore(Effect.sleep(Duration.seconds(10)));
             if (
               disposed ||
               activeRequest ||
