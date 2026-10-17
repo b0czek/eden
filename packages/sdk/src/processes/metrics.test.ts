@@ -1,5 +1,5 @@
 import type { AppInstance, AppManifest } from "@edenapp/types";
-import * as Effect from "effect/Effect";
+import { createEffectRuntime } from "../effects/runtime";
 import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
 import { createProcessMetrics } from "./metrics";
 
@@ -64,31 +64,38 @@ const metric = (
   ...extra,
 });
 
-const createMetricsFixture = (deps: {
+const runtimes: ReturnType<typeof createEffectRuntime>[] = [];
+
+const createMetricsFixture = async (deps: {
   backends: BackendsLike;
   views: ViewsLike;
   getRunningApps: MetricsDependencies["getRunningApps"];
 }) => {
-  const metrics = createProcessMetrics({
-    backends: deps.backends as MetricsDependencies["backends"],
-    views: deps.views as MetricsDependencies["views"],
-    getRunningApps: deps.getRunningApps,
-    processMetrics: { getAppMetrics },
-  });
+  const runtime = createEffectRuntime();
+  runtimes.push(runtime);
+  const metrics = await runtime.acquire(
+    createProcessMetrics({
+      backends: deps.backends as MetricsDependencies["backends"],
+      views: deps.views as MetricsDependencies["views"],
+      getRunningApps: deps.getRunningApps,
+      processMetrics: { getAppMetrics },
+    }),
+  );
   return {
     ...metrics,
     getMetrics: (...args: Parameters<typeof metrics.getMetrics>) =>
-      Effect.runPromise(metrics.getMetrics(...args)),
+      runtime.run(metrics.getMetrics(...args)),
   };
 };
 
 describe("ProcessMetrics", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask", "setImmediate"] });
     getAppMetrics.mockReset();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
     jest.useRealTimers();
   });
 
@@ -124,7 +131,7 @@ describe("ProcessMetrics", () => {
       appId === "com.eden.visible" ? createMockBackend(333) : undefined,
     );
 
-    const metrics = createMetricsFixture({
+    const metrics = await createMetricsFixture({
       backends: {
         getBackend,
       },
@@ -256,7 +263,7 @@ describe("ProcessMetrics", () => {
   it("can return an immediate cold-start sample without waiting for the first CPU interval", async () => {
     const visibleApp = createApp("com.eden.visible", 10);
 
-    const metrics = createMetricsFixture({
+    const metrics = await createMetricsFixture({
       backends: {
         getBackend: jest.fn(() => undefined),
       },

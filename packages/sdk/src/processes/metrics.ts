@@ -4,19 +4,17 @@ import type {
   EdenProcessMetric,
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
+import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import type {
   PlatformProcessMetric,
   ProcessMetricsPort,
 } from "../platform/ports";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
-
-interface MetricsRequest {
-  showHidden: boolean;
-  resolve: (snapshot: ProcessMetricsSnapshot) => void;
-  reject: (error: Error) => void;
-}
 
 interface CachedMetricsSample {
   sampledAt: string;
@@ -33,14 +31,18 @@ interface ProcessMetricsDeps {
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   processMetrics: ProcessMetricsPort;
 }
-export function createProcessMetrics(deps: ProcessMetricsDeps) {
+export const createProcessMetrics = Effect.fn(function* (
+  deps: ProcessMetricsDeps,
+) {
+  const forkSampler = yield* FiberSet.makeRuntime<never, void, never>();
   let _backends: Pick<Backends, "getBackend">;
   let _views: Pick<Views, "getView">;
   let _getRunningApps: (showHidden?: boolean) => AppInstance[];
   let _processMetrics: ProcessMetricsPort;
-  let _metricsSampler: NodeJS.Timeout | null = null;
-  let _nextMetricsRequestId = 0;
-  let _pendingMetricsRequests: Map<number, MetricsRequest> = new Map();
+  let _metricsSampler: Fiber.Fiber<void> | null = null;
+  const pendingSamples = new Set<
+    Deferred.Deferred<CachedMetricsSample, Error>
+  >();
   let _metricsSamplerKeepAliveUntil = 0;
   let _latestMetricsSample: CachedMetricsSample | null = null;
 
@@ -78,17 +80,20 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
       );
     }
 
-    return yield* Effect.callback<ProcessMetricsSnapshot, Error>((resume) => {
-      const id = _nextMetricsRequestId++;
-      _pendingMetricsRequests.set(id, {
-        showHidden,
-        resolve: (value) => resume(Effect.succeed(value)),
-        reject: (error) => resume(Effect.fail(error)),
-      });
-      return Effect.sync(() => {
-        _pendingMetricsRequests.delete(id);
-      });
-    });
+    const waiting = yield* Deferred.make<CachedMetricsSample, Error>();
+    pendingSamples.add(waiting);
+    const sample = yield* Deferred.await(waiting).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          pendingSamples.delete(waiting);
+        }),
+      ),
+    );
+    return buildMetricsSnapshot(
+      sample.appMetrics,
+      sample.sampledAt,
+      showHidden,
+    );
   });
 
   function ensureMetricsSampler(waitForAccurateCpu: boolean): void {
@@ -102,9 +107,13 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
       captureMetricsSample();
     }
 
-    _metricsSampler = setInterval(() => {
-      collectMetricsSample();
-    }, METRICS_SAMPLE_INTERVAL_MS);
+    _metricsSampler = forkSampler(
+      Effect.forever(
+        Effect.sleep(Duration.millis(METRICS_SAMPLE_INTERVAL_MS)).pipe(
+          Effect.andThen(Effect.sync(collectMetricsSample)),
+        ),
+      ),
+    );
   }
 
   function extendMetricsSamplerKeepAlive(timeoutMs: number): void {
@@ -116,7 +125,7 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
 
   function collectMetricsSample(): void {
     if (
-      _pendingMetricsRequests.size === 0 &&
+      pendingSamples.size === 0 &&
       Date.now() >= _metricsSamplerKeepAliveUntil
     ) {
       stopMetricsSampler();
@@ -126,22 +135,19 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
     try {
       const { appMetrics, sampledAt } = captureMetricsSample();
 
-      for (const [requestId, request] of _pendingMetricsRequests.entries()) {
-        request.resolve(
-          buildMetricsSnapshot(appMetrics, sampledAt, request.showHidden),
-        );
-        _pendingMetricsRequests.delete(requestId);
+      for (const waiting of pendingSamples) {
+        Deferred.doneUnsafe(waiting, Effect.succeed({ appMetrics, sampledAt }));
       }
+      pendingSamples.clear();
     } catch (error) {
       const failure =
         error instanceof Error
           ? error
           : new Error(`Failed to collect process metrics: ${String(error)}`);
 
-      for (const [, request] of _pendingMetricsRequests.entries()) {
-        request.reject(failure);
-      }
-      _pendingMetricsRequests.clear();
+      for (const waiting of pendingSamples)
+        Deferred.doneUnsafe(waiting, Effect.fail(failure));
+      pendingSamples.clear();
       stopMetricsSampler();
     }
   }
@@ -156,7 +162,7 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
 
   function stopMetricsSampler(): void {
     if (!_metricsSampler) return;
-    clearInterval(_metricsSampler);
+    _metricsSampler.interruptUnsafe();
     _metricsSampler = null;
     _metricsSamplerKeepAliveUntil = 0;
     _latestMetricsSample = null;
@@ -330,16 +336,21 @@ export function createProcessMetrics(deps: ProcessMetricsDeps) {
 
   function dispose(): void {
     if (_metricsSampler) {
-      clearInterval(_metricsSampler);
+      _metricsSampler.interruptUnsafe();
       _metricsSampler = null;
     }
-    for (const request of _pendingMetricsRequests.values()) {
-      request.reject(new Error("Eden runtime disposed"));
-    }
-    _pendingMetricsRequests.clear();
+    for (const waiting of pendingSamples)
+      Deferred.doneUnsafe(
+        waiting,
+        Effect.fail(new Error("Eden runtime disposed")),
+      );
+    pendingSamples.clear();
     _latestMetricsSample = null;
   }
-  return { getMetrics, dispose };
-}
+  yield* Effect.addFinalizer(() => Effect.sync(dispose));
+  return { getMetrics };
+});
 
-export type ProcessMetrics = ReturnType<typeof createProcessMetrics>;
+export type ProcessMetrics = Effect.Success<
+  ReturnType<typeof createProcessMetrics>
+>;

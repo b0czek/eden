@@ -15,6 +15,8 @@ import type {
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import * as Queue from "effect/Queue";
 import { type AppChannelLifecycle } from "../appbus/ports";
 import { asError, fromPromise } from "../effects/io";
@@ -90,7 +92,8 @@ export const createProcesses = Effect.fn(function* ({
   let _hotReloadStates = new Map<string, string>();
   let _hotReloadWatcher: fs.FSWatcher | undefined;
 
-  let _hotReloadDebounceTimer: NodeJS.Timeout | undefined;
+  const forkHotReload = yield* FiberSet.makeRuntime<never, void, never>();
+  let _hotReloadDebounceTimer: Fiber.Fiber<void> | undefined;
   let _shuttingDown = false;
   const _backends = backends;
   const _views = views;
@@ -103,7 +106,7 @@ export const createProcesses = Effect.fn(function* ({
   const _runtimeContexts = runtimeContexts;
 
   _loginAppId = _config.loginAppId;
-  _processMetrics = createProcessMetrics({
+  _processMetrics = yield* createProcessMetrics({
     backends: _backends,
     views: _views,
     getRunningApps: (showHidden) => getRunningApps(showHidden),
@@ -136,10 +139,17 @@ export const createProcesses = Effect.fn(function* ({
         return;
       if (filename && filename.toString() !== path.basename(serversPath))
         return;
-      if (_hotReloadDebounceTimer) clearTimeout(_hotReloadDebounceTimer);
-      _hotReloadDebounceTimer = setTimeout(
-        () => Queue.offerUnsafe(pending, handleHotReloadStateChanged),
-        Math.max(config.hotReload?.debounce ?? 300, 50),
+      _hotReloadDebounceTimer?.interruptUnsafe();
+      _hotReloadDebounceTimer = forkHotReload(
+        Effect.sleep(
+          Duration.millis(Math.max(config.hotReload?.debounce ?? 300, 50)),
+        ).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              Queue.offerUnsafe(pending, handleHotReloadStateChanged);
+            }),
+          ),
+        ),
       );
     });
     Queue.offerUnsafe(pending, handleHotReloadStateChanged);
@@ -532,7 +542,7 @@ export const createProcesses = Effect.fn(function* ({
 
     _hotReloadWatcher?.close();
     if (_hotReloadDebounceTimer) {
-      clearTimeout(_hotReloadDebounceTimer);
+      _hotReloadDebounceTimer.interruptUnsafe();
     }
 
     const runningAppIds = Array.from(_runningApps.keys());
@@ -563,10 +573,9 @@ export const createProcesses = Effect.fn(function* ({
     _hotReloadWatcher?.close();
     _hotReloadWatcher = undefined;
     if (_hotReloadDebounceTimer) {
-      clearTimeout(_hotReloadDebounceTimer);
+      _hotReloadDebounceTimer.interruptUnsafe();
       _hotReloadDebounceTimer = undefined;
     }
-    _processMetrics.dispose();
     _runningApps.clear();
     _hotReloadStates.clear();
   }
