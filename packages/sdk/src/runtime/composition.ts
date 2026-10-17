@@ -373,7 +373,7 @@ export const composeRuntime = Effect.fn(function* ({
     catalog,
     processes: createFileOpenProcesses(processes),
     views,
-    filesystem: createFileOpenFilesystem(filesystem),
+    filesystem: yield* createFileOpenFilesystem(filesystem),
     i18n,
   });
   const fileOpenOperations = createFileOpenOperations(fileOpen, {

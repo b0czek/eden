@@ -1,5 +1,7 @@
 import * as fs from "node:fs/promises";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { WASMagic } from "wasmagic";
 import { fromPromise } from "../effects/io";
 import type { Filesystem } from "../filesystem";
@@ -10,46 +12,53 @@ import type { FileOpenFilesystem } from "./ports";
 const MIME_DETECTION_BYTES = 8192;
 
 /** Keep the volume lease through metadata/content I/O and defer the WASM load. */
-export function createFileOpenFilesystem(
+export const createFileOpenFilesystem = Effect.fn(function* (
   filesystem: Pick<Filesystem, "withVolume">,
-): FileOpenFilesystem {
-  let detector: Promise<WASMagic> | undefined;
-
-  async function detectMimeType(fullPath: string): Promise<string | undefined> {
-    let handle: fs.FileHandle | undefined;
-    try {
-      handle = await fs.open(fullPath, "r");
+) {
+  const detector = yield* Effect.cachedWithTTL(
+    fromPromise(() => WASMagic.create()),
+    (exit) => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero),
+  );
+  const detectMimeType = Effect.fn(function* (fullPath: string) {
+    return yield* Effect.gen(function* () {
+      const handle = yield* Effect.acquireRelease(
+        fromPromise(() => fs.open(fullPath, "r")),
+        (handle) => fromPromise(() => handle.close()).pipe(Effect.orDie),
+      );
       const buffer = Buffer.alloc(MIME_DETECTION_BYTES);
-      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      const { bytesRead } = yield* fromPromise(() =>
+        handle.read(buffer, 0, buffer.length, 0),
+      );
       if (bytesRead === 0) return undefined;
-      detector ??= WASMagic.create();
-      const magic = await detector;
+      const magic = yield* detector;
       return normalizeMimeType(magic.detect(buffer.subarray(0, bytesRead)));
-    } catch (error) {
-      log.warn(`Failed to detect MIME type for ${fullPath}:`, error);
-      return undefined;
-    } finally {
-      await handle?.close();
-    }
-  }
-
+    }).pipe(
+      Effect.scoped,
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          log.warn(`Failed to detect MIME type for ${fullPath}:`, error);
+          return undefined;
+        }),
+      ),
+    );
+  });
   return {
     inspect: (location) =>
       filesystem.withVolume(location, (fullPath) =>
-        fromPromise(async () => {
-          const stats = await fs.stat(fullPath);
+        Effect.gen(function* () {
+          const stats = yield* fromPromise(() => fs.stat(fullPath));
           const isDirectory = stats.isDirectory();
           return {
             isDirectory,
-            mimeType: isDirectory ? undefined : await detectMimeType(fullPath),
+            mimeType: isDirectory ? undefined : yield* detectMimeType(fullPath),
           };
-        }).pipe(Effect.uninterruptible),
+        }),
       ),
     isDirectory: (location) =>
       filesystem.withVolume(location, (fullPath) =>
-        fromPromise(async () => (await fs.stat(fullPath)).isDirectory()).pipe(
-          Effect.uninterruptible,
+        fromPromise(() => fs.stat(fullPath)).pipe(
+          Effect.map((stat) => stat.isDirectory()),
         ),
       ),
-  };
-}
+  } satisfies FileOpenFilesystem;
+});
