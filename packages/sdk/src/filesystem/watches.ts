@@ -2,13 +2,18 @@ import { randomUUID } from "node:crypto";
 import { type FSWatcher, watch as watchNative } from "node:fs";
 import * as path from "node:path";
 import type { FilesystemChangeKind } from "@edenapp/types";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import type * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import type { Event } from "../events/event";
+import { listen } from "../events/scoped";
 import { log } from "../logging";
 
 interface DirectoryWatch {
   watcher: FSWatcher;
   watchIds: Set<string>;
-  debounce?: NodeJS.Timeout;
+  debounce?: Fiber.Fiber<void>;
 }
 
 interface ViewWatch {
@@ -26,13 +31,14 @@ interface FilesystemWatchesOptions {
   ) => void;
 }
 
-export function createFilesystemWatches(options: FilesystemWatchesOptions) {
+export const createFilesystemWatches = Effect.fn(function* (
+  options: FilesystemWatchesOptions,
+) {
+  const forkDebounce = yield* FiberSet.makeRuntime<never, void, never>();
   const directoryWatches = new Map<string, DirectoryWatch>();
   const viewWatches = new Map<string, ViewWatch>();
 
-  const stopViewRemovalListener = options.viewRemoved.on(({ viewId }) =>
-    removeViewWatches(viewId),
-  );
+  yield* listen(options.viewRemoved, ({ viewId }) => removeViewWatches(viewId));
 
   function watch(
     hostPath: string,
@@ -85,9 +91,8 @@ export function createFilesystemWatches(options: FilesystemWatchesOptions) {
   }
 
   function dispose(): void {
-    stopViewRemovalListener();
     for (const directoryWatch of directoryWatches.values()) {
-      if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
+      directoryWatch.debounce?.interruptUnsafe();
       directoryWatch.watcher.close();
     }
     directoryWatches.clear();
@@ -106,16 +111,22 @@ export function createFilesystemWatches(options: FilesystemWatchesOptions) {
   function scheduleChange(hostPath: string, kind: FilesystemChangeKind): void {
     const directoryWatch = directoryWatches.get(hostPath);
     if (!directoryWatch) return;
-    if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
-    directoryWatch.debounce = setTimeout(() => {
-      directoryWatch.debounce = undefined;
-      for (const watchId of directoryWatch.watchIds) {
-        const ownedWatch = viewWatches.get(watchId);
-        if (ownedWatch) {
-          options.notify(ownedWatch.viewId, { watchId, kind });
-        }
-      }
-    }, 100);
+    directoryWatch.debounce?.interruptUnsafe();
+    directoryWatch.debounce = forkDebounce(
+      Effect.sleep(Duration.millis(100)).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            directoryWatch.debounce = undefined;
+            for (const watchId of directoryWatch.watchIds) {
+              const ownedWatch = viewWatches.get(watchId);
+              if (ownedWatch) {
+                options.notify(ownedWatch.viewId, { watchId, kind });
+              }
+            }
+          }),
+        ),
+      ),
+    );
   }
 
   function removeWatch(watchId: string): void {
@@ -126,7 +137,7 @@ export function createFilesystemWatches(options: FilesystemWatchesOptions) {
     if (!directoryWatch) return;
     directoryWatch.watchIds.delete(watchId);
     if (directoryWatch.watchIds.size === 0) {
-      if (directoryWatch.debounce) clearTimeout(directoryWatch.debounce);
+      directoryWatch.debounce?.interruptUnsafe();
       directoryWatch.watcher.close();
       directoryWatches.delete(ownedWatch.hostPath);
     }
@@ -137,5 +148,6 @@ export function createFilesystemWatches(options: FilesystemWatchesOptions) {
       if (watch.viewId === viewId) removeWatch(watchId);
     }
   }
-  return { watch, unwatch, removeUnavailableVolumes, invalidate, dispose };
-}
+  yield* Effect.addFinalizer(() => Effect.sync(dispose));
+  return { watch, unwatch, removeUnavailableVolumes, invalidate };
+});

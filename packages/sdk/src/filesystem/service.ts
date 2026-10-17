@@ -164,12 +164,11 @@ export const createFilesystem = Effect.fn(function* ({
     );
   });
   const handles = yield* createFileHandles(executionContext, openFile);
-  const watcher = createFilesystemWatches({
+  const watcher = yield* createFilesystemWatches({
     resolveViewId: views.resolveViewId,
     viewRemoved: views.removed,
     notify: (viewId, payload) => changed.emit({ payload, viewIds: [viewId] }),
   });
-  yield* Effect.addFinalizer(() => Effect.sync(watcher.dispose));
   const runListener = Effect.runPromiseWith(yield* Effect.context<never>());
   yield* listen(views.removed, ({ webContentsId }) =>
     runListener(handles.closeOwner({ webContentsId })),
