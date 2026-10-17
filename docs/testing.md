@@ -70,7 +70,9 @@ pnpm --filter @edenapp/sdk exec effect-language-service diagnostics --project ts
 ```
 
 Eden's boundary check inspects the methods and Effect-valued properties returned
-by exported `create...` factories, including Promise-wrapped results. Acquisition
+by exported `create...` factories, including nested capabilities defined in the
+factory module and Promise-wrapped results. Imported services are checked at their
+own factories. Acquisition
 may require a scope; ordinary service methods must have their requirements
 provided. Generic combinators may preserve the caller's requirement parameter.
 Raw `Effect.run*` references, new `ManagedRuntime` instances, and `forkDetach`

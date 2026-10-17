@@ -109,6 +109,7 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
         promised: async () => Effect.scope,
         conditional: () => Math.random() ? Effect.scope : Effect.succeed(1),
         ready: () => Effect.void,
+        files: { read: () => Effect.scope },
         invented: <R>(): Effect.Effect<void, never, R> => Effect.void,
       });
       export { make as createBroken };
@@ -120,7 +121,7 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
         result.output.includes("createBroken.invented requires R"),
         result.output,
       );
-      for (const method of ["direct", "promised", "conditional"])
+      for (const method of ["direct", "promised", "conditional", "files.read"])
         assert.ok(
           result.output.includes(`createBroken.${method} requires Scope`),
           result.output,
@@ -155,6 +156,40 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
   );
 
   await t.test(
+    "rejects destructured interpreters and detached forks, including renamed properties",
+    async () => {
+      const result = await check(
+        `
+      import * as Effect from "effect/Effect";
+      import * as ManagedRuntime from "effect/ManagedRuntime";
+      import * as Layer from "effect/Layer";
+      const { runPromise, forkDetach } = Effect;
+      const { make } = ManagedRuntime;
+      const { runSync: execute } = Effect;
+      export const createEscaped = () => ({
+        read: () => runPromise(Effect.void),
+        watch: () => forkDetach(Effect.void),
+        runtime: () => make(Layer.empty),
+        execute: () => execute(Effect.void),
+      });
+    `,
+        true,
+      );
+      assert.equal(result.status, 1, result.output);
+      assert.equal(
+        result.output.match(/eden\/domain-interpreter/g)?.length,
+        3,
+        result.output,
+      );
+      assert.equal(
+        result.output.match(/eden\/unowned-fiber/g)?.length,
+        1,
+        result.output,
+      );
+    },
+  );
+
+  await t.test(
     "accepts owned fibers, generic composition and explained adapter exceptions",
     async () => {
       const result = await check(
@@ -164,6 +199,7 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
         yield* Effect.forkScoped(Effect.void);
         return {
           read: () => Effect.void,
+          files: { read: () => Effect.void },
           preserve: <A, E, R>(work: Effect.Effect<A, E, R>) => work,
           // @eden-effect-next-line unresolved-requirements -- Acquire the resource in its caller-owned scope.
           acquire: () => Effect.scope,
@@ -174,7 +210,12 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
         return Effect.runPromise(Effect.void);
       };
       const unrelated = { runPromise: () => 1, forkDetach: () => 2 };
-      export const ordinary = unrelated.runPromise() + unrelated.forkDetach();
+      const { runPromise, forkDetach } = unrelated;
+      export const ordinary = runPromise() + forkDetach();
+      interface Nested { read(): Effect.Effect<void>; child?: Nested }
+      const nested: Nested = { read: () => Effect.void };
+      nested.child = nested;
+      export const createNested = () => ({ first: nested, second: nested });
     `,
         true,
       );

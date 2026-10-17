@@ -131,12 +131,14 @@ export function checkEffectBoundaries(program) {
       }
     }
 
-    function checkFactory(type, at, name) {
+    function checkFactory(type, at, name, ancestors = new Set()) {
+      if (ancestors.has(type)) return;
+      const visited = new Set(ancestors).add(type);
       for (const variant of variants(type)) {
         const success = effectChannel(variant, "_A", at);
         const promised = checker.getPromisedTypeOfPromise(variant);
         if (success || promised) {
-          checkFactory(success ?? promised, at, name);
+          checkFactory(success ?? promised, at, name, visited);
           continue;
         }
         for (const member of checker.getPropertiesOfType(variant)) {
@@ -147,10 +149,25 @@ export function checkEffectBoundaries(program) {
           const memberType = checker.getTypeOfSymbolAtLocation(member, at);
           const label = `${name}.${member.name}`;
           checkMethodResult(memberType, location, label);
-          for (const signature of checker.getSignaturesOfType(
+          const signatures = checker.getSignaturesOfType(
             memberType,
             ts.SignatureKind.Call,
-          )) {
+          );
+          // Follow capabilities defined here; imported services are checked at their own factory.
+          if (
+            !signatures.length &&
+            !effectChannel(memberType, "_R", location)
+          ) {
+            for (const nested of variants(memberType)) {
+              if (
+                nested.symbol?.declarations?.some(
+                  (node) => node.getSourceFile() === source,
+                )
+              )
+                checkFactory(nested, location, label, visited);
+            }
+          }
+          for (const signature of signatures) {
             const provided = new Set();
             for (const parameter of signature.parameters)
               inputRequirements(
@@ -193,7 +210,34 @@ export function checkEffectBoundaries(program) {
 
     function visit(node) {
       // Check references, including aliased imports and assigning an interpreter to a variable.
-      if (ts.isIdentifier(node) && !ts.isImportSpecifier(node.parent)) {
+      if (
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent) &&
+        !node.dotDotDotToken
+      ) {
+        const property = node.propertyName ?? node.name;
+        const key = ts.isComputedPropertyName(property)
+          ? property.expression
+          : property;
+        if (ts.isIdentifier(key) || ts.isStringLiteralLike(key)) {
+          const symbol = checker.getPropertyOfType(
+            checker.getTypeAtLocation(node.parent),
+            key.text,
+          );
+          const rule = apiSymbols.get(symbol);
+          if (rule)
+            report(
+              node,
+              rule,
+              "Destructuring this Effect API still requires an explicit interpreter boundary or scoped fiber ownership.",
+            );
+        }
+      }
+      if (
+        ts.isIdentifier(node) &&
+        !ts.isImportSpecifier(node.parent) &&
+        !ts.isBindingElement(node.parent)
+      ) {
         let symbol = checker.getSymbolAtLocation(node);
         if (symbol?.flags & ts.SymbolFlags.Alias)
           symbol = checker.getAliasedSymbol(symbol);
