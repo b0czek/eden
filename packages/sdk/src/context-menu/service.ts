@@ -6,7 +6,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { TargetedNotification } from "../controllers/events";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
 import type { ContextMenuCaller, ContextMenuViews } from "./ports";
 
@@ -27,16 +27,12 @@ export function createContextMenu({ views }: { views: ContextMenuViews }) {
     let idCounter = 0;
     let activeRequest: Request | null = null;
     let provider: { appId: string; viewId: number } | null = null;
-    const opened = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        createEvent<TargetedNotification<{ menu: ContextMenuOpenEvent }>>(),
-      ),
-      (event) => Effect.sync(event.dispose),
-    );
-    const closed = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<TargetedNotification<ContextMenuResult>>()),
-      (event) => Effect.sync(event.dispose),
-    );
+    const opened =
+      yield* scopedEvent<
+        TargetedNotification<{ menu: ContextMenuOpenEvent }>
+      >();
+    const closed =
+      yield* scopedEvent<TargetedNotification<ContextMenuResult>>();
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         activeRequest = null;
