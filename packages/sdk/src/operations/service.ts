@@ -9,6 +9,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Schedule from "effect/Schedule";
 import type { RoutedNotification } from "../controllers/events";
 import { asError } from "../effects/io";
 import { type EffectRuntime } from "../effects/runtime";
@@ -72,9 +73,7 @@ export function createOperations({
   let shuttingDown = false;
   let runtimeTransition: string | undefined;
   const expiry = effects.fork(
-    Effect.forever(
-      Effect.andThen(Effect.sleep(Duration.seconds(60)), Effect.sync(prune)),
-    ),
+    Effect.schedule(Effect.sync(prune), Schedule.spaced(Duration.seconds(60))),
   );
   // The transport must queue its acceptance response before execution can tear
   // down the submitting view or backend.

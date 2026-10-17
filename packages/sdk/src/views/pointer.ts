@@ -2,6 +2,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
+import * as Schedule from "effect/Schedule";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
 /**
@@ -64,37 +65,34 @@ export const createPointerTracking = Effect.fn(function* (
     _lastPosition = getCurrentPosition();
 
     _interval = forkPolling(
-      Effect.forever(
-        Effect.sleep(Duration.millis(_updateInterval)).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              const now = Date.now();
-              const deltaTime = now - _lastUpdateTime;
-              _lastUpdateTime = now;
+      Effect.sync(() => {
+        const now = Date.now();
+        const deltaTime = now - _lastUpdateTime;
+        _lastUpdateTime = now;
 
-              const currentPosition = getCurrentPosition();
+        const currentPosition = getCurrentPosition();
 
-              // Only emit if cursor has actually moved (skip unnecessary callbacks)
-              if (
-                Math.abs(currentPosition.x - _lastPosition.x) < 1 &&
-                Math.abs(currentPosition.y - _lastPosition.y) < 1
-              ) {
-                return;
-              }
+        // Only emit if cursor has actually moved (skip unnecessary callbacks)
+        if (
+          Math.abs(currentPosition.x - _lastPosition.x) < 1 &&
+          Math.abs(currentPosition.y - _lastPosition.y) < 1
+        ) {
+          return;
+        }
 
-              _lastPosition = currentPosition;
+        _lastPosition = currentPosition;
 
-              // Notify all subscribers of the position change
-              for (const callback of _subscribers.values()) {
-                try {
-                  callback({ ...currentPosition, deltaTime });
-                } catch (error) {
-                  log.error("Error in PointerTracking callback:", error);
-                }
-              }
-            }),
-          ),
-        ),
+        // Notify all subscribers of the position change
+        for (const callback of _subscribers.values()) {
+          try {
+            callback({ ...currentPosition, deltaTime });
+          } catch (error) {
+            log.error("Error in PointerTracking callback:", error);
+          }
+        }
+      }).pipe(
+        Effect.schedule(Schedule.spaced(Duration.millis(_updateInterval))),
+        Effect.asVoid,
       ),
     );
   }

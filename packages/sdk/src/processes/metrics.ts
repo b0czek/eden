@@ -9,6 +9,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
+import * as Schedule from "effect/Schedule";
 import type {
   PlatformProcessMetric,
   ProcessMetricsPort,
@@ -108,10 +109,11 @@ export const createProcessMetrics = Effect.fn(function* (
     }
 
     _metricsSampler = forkSampler(
-      Effect.forever(
-        Effect.sleep(Duration.millis(METRICS_SAMPLE_INTERVAL_MS)).pipe(
-          Effect.andThen(Effect.sync(collectMetricsSample)),
+      Effect.sync(collectMetricsSample).pipe(
+        Effect.schedule(
+          Schedule.spaced(Duration.millis(METRICS_SAMPLE_INTERVAL_MS)),
         ),
+        Effect.asVoid,
       ),
     );
   }

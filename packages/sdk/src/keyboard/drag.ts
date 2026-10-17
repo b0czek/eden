@@ -9,6 +9,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
+import * as Schedule from "effect/Schedule";
 import type { DisplayPort } from "../platform/ports";
 import { effectivePlacement } from "./placement";
 import type { KeyboardDragState, KeyboardState } from "./state";
@@ -118,24 +119,21 @@ export function createKeyboardDrag({
         if (payload.input === "system-cursor") {
           let lastPosition = display.getCursorScreenPoint();
           polling = forkPolling(
-            Effect.forever(
-              Effect.sleep(Duration.millis(8)).pipe(
-                Effect.andThen(
-                  Effect.sync(() => {
-                    const position = display.getCursorScreenPoint();
-                    if (
-                      Math.abs(position.x - lastPosition.x) < 1 &&
-                      Math.abs(position.y - lastPosition.y) < 1
-                    )
-                      return;
-                    lastPosition = position;
-                    schedule(
-                      apply(position.x, position.y),
-                      "Failed to move keyboard overlay:",
-                    );
-                  }),
-                ),
-              ),
+            Effect.sync(() => {
+              const position = display.getCursorScreenPoint();
+              if (
+                Math.abs(position.x - lastPosition.x) < 1 &&
+                Math.abs(position.y - lastPosition.y) < 1
+              )
+                return;
+              lastPosition = position;
+              schedule(
+                apply(position.x, position.y),
+                "Failed to move keyboard overlay:",
+              );
+            }).pipe(
+              Effect.schedule(Schedule.spaced(Duration.millis(8))),
+              Effect.asVoid,
             ),
           );
         }
