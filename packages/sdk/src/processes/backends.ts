@@ -23,7 +23,11 @@ export const createBackends = Effect.fn(function* ({
   utilityProcesses,
   dlcResources,
 }: BackendsDependencies) {
-  const backendExit = yield* scopedEvent<{ appId: string; code: number }>();
+  const backendExit = yield* scopedEvent<{
+    appId: string;
+    backend: PlatformUtilityProcess;
+    code: number;
+  }>();
   const backendError = yield* scopedEvent<{ appId: string; error: unknown }>();
   const backendMessage = yield* scopedEvent<{
     appId: string;
@@ -57,52 +61,65 @@ export const createBackends = Effect.fn(function* ({
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
   ) {
-    const backend = yield* Effect.try({
+    const backend = yield* Effect.acquireRelease(
+      Effect.try({
+        try: () => {
+          if (_backends.has(appId))
+            throw new Error(`Backend for app ${appId} already exists`);
+          if (!manifest.backend?.entry)
+            throw new Error(`App ${appId} does not have a backend`);
+          const entry = manifest.backend.entry;
+          const binding = _dlcResources.createBackendBinding(appId);
+          let backend: PlatformUtilityProcess;
+          try {
+            backend = _utilityProcesses.fork(
+              path.join(distPath, "app-runtime/backend-preload.js"),
+              encodeLaunchContext({
+                appId,
+                args: launchArgs ?? [],
+                file: launchFile,
+              }),
+              {
+                serviceName: `eden-backend-${appId}`,
+                stdio: ["ignore", "pipe", "pipe"],
+                env: {
+                  ...process.env,
+                  EDEN_BACKEND_ENTRY: path.join(installPath, entry),
+                  EDEN_INSTALL_PATH: installPath,
+                  EDEN_MANIFEST: JSON.stringify(manifest),
+                  EDEN_DLC_BINDING: JSON.stringify(binding),
+                },
+              },
+            );
+          } catch (error) {
+            _dlcResources.revokeBackend(appId);
+            throw error;
+          }
+          backend.on("exit", (code) => {
+            if (_backends.get(appId) !== backend) return;
+            releaseBackend(appId, backend);
+            backendExit.emit({ appId, backend, code });
+          });
+          _backends.set(appId, backend);
+          _backendData.set(appId, { manifest, installPath });
+          return backend;
+        },
+        catch: asError,
+      }),
+      (backend) => terminateBackend(appId, backend).pipe(Effect.orDie),
+    );
+    yield* Effect.try({
       try: () => {
-        if (_backends.has(appId))
-          throw new Error(`Backend for app ${appId} already exists`);
-        const entry = manifest.backend?.entry;
-        if (!entry) throw new Error(`App ${appId} does not have a backend`);
-        const binding = _dlcResources.createBackendBinding(appId);
-        const backend = _utilityProcesses.fork(
-          path.join(distPath, "app-runtime/backend-preload.js"),
-          encodeLaunchContext({
-            appId,
-            args: launchArgs ?? [],
-            file: launchFile,
-          }),
-          {
-            serviceName: `eden-backend-${appId}`,
-            stdio: ["ignore", "pipe", "pipe"],
-            env: {
-              ...process.env,
-              EDEN_BACKEND_ENTRY: path.join(installPath, entry),
-              EDEN_INSTALL_PATH: installPath,
-              EDEN_MANIFEST: JSON.stringify(manifest),
-              EDEN_DLC_BINDING: JSON.stringify(binding),
-            },
-          },
-        );
         pipeBackendOutput(backend);
         if (manifest.frontend?.entry) {
           const { port1, port2 } = _utilityProcesses.createMessageChannel();
-          backend.postMessage({ type: "init-port" }, [port1]);
           _backendPorts.set(appId, port2);
+          backend.postMessage({ type: "init-port" }, [port1]);
         }
-        backend.on("message", (message: unknown) =>
-          handleBackendMessage(appId, message),
-        );
-        backend.on("exit", (code) => {
-          _backends.delete(appId);
-          _backendData.delete(appId);
-          _backendPorts.get(appId)?.close();
-          _backendPorts.delete(appId);
-          _dlcResources.revokeBackend(appId);
-          backendExit.emit({ appId, code });
+        backend.on("message", (message: unknown) => {
+          if (_backends.get(appId) === backend)
+            handleBackendMessage(appId, message);
         });
-        _backends.set(appId, backend);
-        _backendData.set(appId, { manifest, installPath });
-        return backend;
       },
       catch: asError,
     });
@@ -149,14 +166,7 @@ export const createBackends = Effect.fn(function* ({
           ),
       }),
       Effect.onError(() =>
-        Effect.sync(() => {
-          _backends.delete(appId);
-          _backendData.delete(appId);
-          _backendPorts.get(appId)?.close();
-          _backendPorts.delete(appId);
-          _dlcResources.revokeBackend(appId);
-          backend.kill();
-        }),
+        terminateBackend(appId, backend, true).pipe(Effect.orDie),
       ),
     );
     log.info(`Backend started for app ${appId}`);
@@ -215,9 +225,22 @@ export const createBackends = Effect.fn(function* ({
     return _backendPorts.get(appId);
   }
 
-  const terminateBackend = Effect.fn(function* (appId: string) {
+  function releaseBackend(appId: string, backend: PlatformUtilityProcess) {
+    if (_backends.get(appId) !== backend) return;
+    _backends.delete(appId);
+    _backendData.delete(appId);
+    _backendPorts.get(appId)?.close();
+    _backendPorts.delete(appId);
+    _dlcResources.revokeBackend(appId);
+  }
+
+  const terminateBackend = Effect.fn(function* (
+    appId: string,
+    expected = _backends.get(appId),
+    force = false,
+  ) {
     const candidate = _backends.get(appId);
-    if (!candidate) return;
+    if (!candidate || candidate !== expected) return;
     const backend = candidate;
     yield* Effect.scoped(
       Effect.gen(function* () {
@@ -234,9 +257,11 @@ export const createBackends = Effect.fn(function* ({
           const onExit = () => resume(Effect.void);
           backend.once("exit", onExit);
           try {
-            backend.postMessage({ type: "shutdown" });
+            if (force) backend.kill();
+            else backend.postMessage({ type: "shutdown" });
           } catch (error) {
             backend.removeListener("exit", onExit);
+            backend.kill();
             resume(Effect.fail(asError(error)));
           }
           return Effect.sync(() => backend.removeListener("exit", onExit));
@@ -255,11 +280,7 @@ export const createBackends = Effect.fn(function* ({
     ).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          _backends.delete(appId);
-          _backendData.delete(appId);
-          _backendPorts.get(appId)?.close();
-          _backendPorts.delete(appId);
-          _dlcResources.revokeBackend(appId);
+          releaseBackend(appId, backend);
         }),
       ),
     );

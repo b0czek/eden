@@ -55,6 +55,66 @@ test.describe
       );
     });
 
+    test("releases a ready native backend when frontend creation fails", async () => {
+      const host = getHost();
+      const result = await host.electronApp?.evaluate(
+        async (_electron, appId) => {
+          const integration = (
+            globalThis as typeof globalThis & {
+              __edenIntegration: {
+                execute(command: string, args: unknown): Promise<unknown>;
+                runtime: {
+                  services: {
+                    views: { createView(...args: unknown[]): number };
+                    backends: {
+                      getBackend(id: string): { pid?: number } | undefined;
+                    };
+                    processes: { getAppInstance(id: string): unknown };
+                    runtimeContexts: { get(id: string): unknown };
+                  };
+                };
+              };
+            }
+          ).__edenIntegration;
+          const { views, backends, processes, runtimeContexts } =
+            integration.runtime.services;
+          const createView = views.createView;
+          let pid: number | undefined;
+          views.createView = () => {
+            pid = backends.getBackend(appId)?.pid;
+            throw new Error("Frontend creation failed after backend readiness");
+          };
+          let error: string | undefined;
+          try {
+            await integration.execute("process/launch", { appId });
+          } catch (failure) {
+            error =
+              failure instanceof Error ? failure.message : String(failure);
+          } finally {
+            views.createView = createView;
+          }
+          return {
+            pid,
+            error,
+            hasBackend: backends.getBackend(appId) !== undefined,
+            hasInstance: processes.getAppInstance(appId) !== undefined,
+            hasIdentity: runtimeContexts.get(appId) !== undefined,
+          };
+        },
+        APP_ID,
+      );
+      expect(result).toMatchObject({
+        error: "Frontend creation failed after backend readiness",
+        hasBackend: false,
+        hasInstance: false,
+        hasIdentity: false,
+      });
+      expect(result?.pid).toEqual(expect.any(Number));
+      const pid = result?.pid;
+      if (pid !== undefined)
+        await expect.poll(() => isProcessAlive(pid)).toBe(false);
+    });
+
     test("launches a bundled app with an associated real view and utility process", async () => {
       const host = getHost();
 

@@ -279,72 +279,86 @@ export const createViewRendering = Effect.fn(function* (
       _windows,
     );
 
-    log.info(
-      `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,
-    );
-
-    // Set bounds
-    view.setBounds(viewBounds);
-
-    // Strip embedding headers if enabled
-    if (manifest.frontend?.allowEmbedding) {
-      view.webContents.session.webRequest.onHeadersReceived(
-        { urls: ["*://*/*"] },
-        embeddingHeadersFilter,
+    try {
+      log.info(
+        `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,
       );
-    }
 
-    // Load the frontend HTML or remote URL
-    if (isRemoteEntry(frontendEntry)) {
-      log.info(`Loading remote frontend for ${appId}: ${frontendEntry}`);
-      view.webContents.loadURL(frontendEntry);
-    } else {
-      const frontendPath = path.join(installPath, frontendEntry);
-      view.webContents.loadFile(frontendPath);
-    }
+      // Set bounds
+      view.setBounds(viewBounds);
 
-    // Setup injections after view is loaded
-    view.webContents.on("did-finish-load", () => {
-      // Inject the Eden CSS first (based on mode)
-      const cssMode = getCSSInjectionMode(windowConfig);
-      if (cssMode !== "none") {
-        Queue.offerUnsafe(pending, injectEdenCSS(view, cssMode));
-      }
-
-      if (shouldInjectAppFrame(windowConfig)) {
-        Queue.offerUnsafe(
-          pending,
-          Effect.suspend(() => {
-            if (view.webContents.isDestroyed()) return Effect.succeed(false);
-            return injectAppFrame(
-              view,
-              appId,
-              manifest.name,
-              viewMode,
-              windowConfig,
-              view.getBounds(),
-            );
-          }),
+      // Strip embedding headers if enabled
+      if (manifest.frontend?.allowEmbedding) {
+        view.webContents.session.webRequest.onHeadersReceived(
+          { urls: ["*://*/*"] },
+          embeddingHeadersFilter,
         );
       }
-    });
 
-    // Return view info
-    return {
-      id: viewId,
-      view,
-      appId,
-      manifest,
-      bounds: viewBounds,
-      requestedVisible: true,
-      visible: true,
-      mode: viewMode,
-      viewType,
-      tileIndex,
-      zIndex,
-      launchArgs,
-    };
+      // Load the frontend HTML or remote URL
+      if (isRemoteEntry(frontendEntry)) {
+        log.info(`Loading remote frontend for ${appId}: ${frontendEntry}`);
+        view.webContents.loadURL(frontendEntry);
+      } else {
+        const frontendPath = path.join(installPath, frontendEntry);
+        view.webContents.loadFile(frontendPath);
+      }
+
+      // Setup injections after view is loaded
+      view.webContents.on("did-finish-load", () => {
+        // Inject the Eden CSS first (based on mode)
+        const cssMode = getCSSInjectionMode(windowConfig);
+        if (cssMode !== "none") {
+          Queue.offerUnsafe(pending, injectEdenCSS(view, cssMode));
+        }
+
+        if (shouldInjectAppFrame(windowConfig)) {
+          Queue.offerUnsafe(
+            pending,
+            Effect.suspend(() => {
+              if (view.webContents.isDestroyed()) return Effect.succeed(false);
+              return injectAppFrame(
+                view,
+                appId,
+                manifest.name,
+                viewMode,
+                windowConfig,
+                view.getBounds(),
+              );
+            }),
+          );
+        }
+      });
+
+      // Return view info
+      return {
+        id: viewId,
+        view,
+        appId,
+        manifest,
+        bounds: viewBounds,
+        requestedVisible: true,
+        visible: true,
+        mode: viewMode,
+        viewType,
+        tileIndex,
+        zIndex,
+        launchArgs,
+      };
+    } catch (error) {
+      try {
+        if (!view.webContents.isDestroyed()) view.webContents.close();
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Failed to create and release frontend for ${appId}`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
   }
+
   yield* Effect.forkScoped(
     Effect.forever(
       Queue.take(pending).pipe(

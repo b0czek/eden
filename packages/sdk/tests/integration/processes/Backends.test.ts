@@ -32,7 +32,7 @@ describe("backend readiness and termination", () => {
   });
 
   async function start() {
-    const starting = effects.run(
+    const starting = effects.acquire(
       backends.createBackend(
         appId,
         testApp(appId, {
@@ -82,20 +82,18 @@ describe("backend readiness and termination", () => {
     },
   );
 
-  it("cleans up a failed shutdown request and cancels the force-kill", async () => {
+  it("kills the owned backend when its shutdown channel fails", async () => {
     const { starting, backend } = await start();
     backend.emit("message", { type: "backend-ready" });
     await starting;
     jest.spyOn(backend, "postMessage").mockImplementation(() => {
       throw new Error("closed channel");
     });
-    const kill = jest.spyOn(backend, "kill");
     await expect(effects.run(backends.terminateBackend(appId))).rejects.toThrow(
       "closed channel",
     );
     await jest.advanceTimersByTimeAsync(500);
-    expect(kill).not.toHaveBeenCalled();
-    expect(backend.listenerCount("exit")).toBe(1);
+    expect(platform.utilityProcesses.activeCount).toBe(0);
     expect(backends.hasBackend(appId)).toBe(false);
     backend.kill();
   });

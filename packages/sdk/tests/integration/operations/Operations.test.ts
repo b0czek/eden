@@ -2,6 +2,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Scope from "effect/Scope";
 import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { command, defineController } from "../../../src/controllers/controller";
@@ -31,10 +33,14 @@ import { promiseOperationTask } from "../../support/operations";
 
 describe("runtime-owned operations", () => {
   let eden: TestEden;
+  let backendScope: Scope.Closeable;
+  const acquireBackend = <A, E>(work: Effect.Effect<A, E, Scope.Scope>) =>
+    eden.runtime.effects.run(Scope.provide(work, backendScope));
   let operations: Operations;
   let prepareWork: (args: { value: string }) => OperationTask<unknown>;
   const owner = { appId: "work.app", principal: { kind: "system" as const } };
   beforeEach(async () => {
+    backendScope = Scope.makeUnsafe();
     eden = await createTestEden();
     operations = eden.runtime.services.operations;
     eden.runtime.services.commands.registerController(
@@ -54,6 +60,7 @@ describe("runtime-owned operations", () => {
     ]);
   });
   afterEach(async () => {
+    await Effect.runPromise(Scope.close(backendScope, Exit.void));
     await eden.dispose();
   });
   const register = (run: (args: { value: string }) => OperationTask<unknown>) =>
@@ -608,7 +615,7 @@ describe("runtime-owned operations", () => {
         principal: { kind: "system" },
       });
       const manifest = { ...testApp(id), backend: { entry: "backend.js" } };
-      const starting = eden.runtime.effects.run(
+      const starting = acquireBackend(
         eden.runtime.services.backends.createBackend(
           id,
           manifest,
@@ -675,7 +682,7 @@ describe("runtime-owned operations", () => {
     );
     expect(JSON.stringify(processes[1].messages)).not.toContain(handle.id);
     for (const process of processes) process.kill();
-    const restarting = eden.runtime.effects.run(
+    const restarting = acquireBackend(
       eden.runtime.services.backends.createBackend(
         owner.appId,
         { ...testApp(owner.appId), backend: { entry: "backend.js" } },
@@ -726,7 +733,7 @@ describe("runtime-owned operations", () => {
         },
         principal: { kind: "system" },
       });
-      const starting = eden.runtime.effects.run(
+      const starting = acquireBackend(
         eden.runtime.services.backends.createBackend(
           owner.appId,
           { ...testApp(owner.appId), backend: { entry: "backend.js" } },

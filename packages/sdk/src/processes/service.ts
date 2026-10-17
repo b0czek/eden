@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
@@ -15,9 +14,12 @@ import type {
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
 import * as Queue from "effect/Queue";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
 import { type AppChannelLifecycle } from "../appbus/ports";
 import { asError, fromPromise } from "../effects/io";
 import { listen, scopedEvent } from "../events/scoped";
@@ -32,10 +34,14 @@ import {
 import { log } from "../logging";
 import type { PackageCatalog } from "../packages/catalog";
 import type { Packages } from "../packages/service";
-import { type ProcessMetricsPort } from "../platform/ports";
+import {
+  type PlatformUtilityProcess,
+  type ProcessMetricsPort,
+} from "../platform/ports";
 import type { SessionContext } from "../session/context";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
+import { type AppRuntime, acquireAppInstance } from "./instance";
 
 import { createProcessMetrics, type ProcessMetrics } from "./metrics";
 
@@ -49,6 +55,14 @@ interface ProcessNamespaceEvents {
   error: { appId: string; error: unknown };
   exited: { appId: string; code: number };
 }
+interface InstanceRecord {
+  scope: Scope.Closeable;
+  runtime: AppRuntime;
+  instance?: AppInstance;
+  backend?: PlatformUtilityProcess;
+  closing: boolean;
+}
+
 export interface ProcessesDependencies {
   backends: Backends;
   views: Views;
@@ -85,7 +99,23 @@ export const createProcesses = Effect.fn(function* ({
   const exited = yield* scopedEvent<ProcessNamespaceEvents["exited"]>();
   const pending =
     yield* Queue.unbounded<() => Effect.Effect<unknown, unknown>>();
-  let _runningApps: Map<string, AppInstance> = new Map();
+  const processScope = yield* Effect.scope;
+  const instances = new Map<string, InstanceRecord>();
+  const admission = new Map<string, Semaphore.Semaphore>();
+  function withApp<A, E>(appId: string, work: Effect.Effect<A, E>) {
+    return Effect.suspend(() => {
+      let lock = admission.get(appId);
+      if (!lock) {
+        lock = Semaphore.makeUnsafe(1);
+        admission.set(appId, lock);
+      }
+      return lock.withPermit(work);
+    });
+  }
+  function closeInstance(record: InstanceRecord, exit = Exit.void) {
+    record.closing = true;
+    return Scope.close(record.scope, exit);
+  }
 
   let _processMetrics: ProcessMetrics;
   let _loginAppId: string | undefined;
@@ -116,8 +146,8 @@ export const createProcesses = Effect.fn(function* ({
   yield* listen(backends.backendError, ({ appId, error }) =>
     handleAppError(appId, error),
   );
-  yield* listen(backends.backendExit, ({ appId, code }) =>
-    handleAppExit(appId, code),
+  yield* listen(backends.backendExit, ({ appId, backend, code }) =>
+    handleAppExit(appId, backend, code),
   );
   yield* listen(views.viewLoaded, ({ viewId, appId }) => {
     const port = backends.getFrontendPort(appId);
@@ -126,7 +156,7 @@ export const createProcesses = Effect.fn(function* ({
       info.view.webContents.postMessage("backend-port", {}, [port]);
   });
   yield* listen(packages.uninstalled, (change) => {
-    if (change.kind === "app" && _runningApps.has(change.packageId))
+    if (change.kind === "app" && instances.has(change.packageId))
       Queue.offerUnsafe(pending, () => stopApp(change.packageId));
   });
   const setupHotReloadWatcher = Effect.fn(function* () {
@@ -194,7 +224,7 @@ export const createProcesses = Effect.fn(function* ({
         },
       }),
     );
-    if (!refreshed || !_runningApps.has(appId)) return;
+    if (!refreshed || !instances.has(appId)) return;
     yield* reloadApp(appId).pipe(
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
@@ -268,15 +298,11 @@ export const createProcesses = Effect.fn(function* ({
     });
   });
 
-  const launchAppInternal = Effect.fn(function* (
+  const launchInstance = Effect.fn(function* (
     appId: string,
     bounds?: { x: number; y: number; width: number; height: number },
     launchArgs?: string[],
-    runtime?: {
-      owner: ProcessOwner;
-      principal: ExecutionPrincipal;
-      profile?: UserProfile;
-    },
+    runtime?: AppRuntime,
     launchFile?: FilesystemLocation,
   ): Effect.fn.Return<LaunchResult, Error> {
     const manifest = _packages.getAppForLaunch(appId);
@@ -298,7 +324,7 @@ export const createProcesses = Effect.fn(function* ({
     }
 
     // Check if already running
-    if (_runningApps.has(appId)) {
+    if (instances.has(appId)) {
       return yield* Effect.fail(
         asError(new Error(`App ${appId} is already running`)),
       );
@@ -312,13 +338,8 @@ export const createProcesses = Effect.fn(function* ({
       );
     }
 
-    const instanceId = randomUUID();
     const currentUser = _sessionContext.getCurrentUser();
-    const resolvedRuntime: {
-      owner: ProcessOwner;
-      principal: ExecutionPrincipal;
-      profile?: UserProfile;
-    } = runtime ?? {
+    const resolvedRuntime: AppRuntime = runtime ?? {
       owner: {
         kind: "session" as const,
         sessionId: _sessionContext.getSessionId(),
@@ -329,129 +350,123 @@ export const createProcesses = Effect.fn(function* ({
         : ({ kind: "system" } as const),
     };
 
-    _runtimeContexts.register(appId, {
-      owner: resolvedRuntime.owner,
-      principal: resolvedRuntime.principal,
-      profile: resolvedRuntime.profile,
-    });
-
-    return yield* Effect.gen(function* () {
-      // Create backend utility process if one is defined
-      if (manifest.backend?.entry) {
-        yield* _backends.createBackend(
-          appId,
-          manifest,
-          installPath,
-          launchArgs,
-          launchFile,
+    if (_shuttingDown)
+      return yield* Effect.fail(new Error("Processes are shutting down"));
+    return yield* Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        const scope = yield* Scope.fork(processScope);
+        const record: InstanceRecord = {
+          scope,
+          runtime: resolvedRuntime,
+          closing: false,
+        };
+        instances.set(appId, record);
+        yield* Scope.addFinalizer(
+          scope,
+          Effect.sync(() => {
+            if (instances.get(appId) === record) {
+              instances.delete(appId);
+              syncRunningAppsState();
+            }
+          }),
         );
-      }
-
-      // Create view for frontend only if frontend is defined
-      let viewId: number | undefined;
-      if (manifest.frontend?.entry) {
-        viewId = _views.createView(
-          appId,
-          manifest,
-          installPath,
-          bounds,
-          launchArgs,
-          launchFile,
-        );
-      }
-
-      // Create app instance
-      const instance: AppInstance = {
-        manifest,
-        instanceId,
-        owner: resolvedRuntime.owner,
-        principal: resolvedRuntime.principal,
-        installPath,
-        viewId: viewId ?? -1, // -1 indicates no view (backend-only)
-        state: "running",
-        installedAt: new Date(),
-        lastLaunched: new Date(),
-      };
-
-      _runningApps.set(appId, instance);
-      syncRunningAppsState();
-
-      launched.emit({ instance });
-
-      // Return serializable data only
-      return {
-        success: true,
-        instanceId,
-        appId,
-      };
-    }).pipe(
-      Effect.onError(() =>
-        Effect.sync(() => _runtimeContexts.unregister(appId)),
-      ),
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.gen(function* () {
-              const error = Cause.squash(cause);
-              log.error(`Failed to launch app ${appId}:`, error);
-              return yield* Effect.fail(asError(error));
+        return yield* restore(
+          Scope.provide(
+            Effect.gen(function* () {
+              const acquired = yield* acquireAppInstance(
+                {
+                  appId,
+                  manifest,
+                  installPath,
+                  runtime: resolvedRuntime,
+                  bounds,
+                  launchArgs,
+                  launchFile,
+                },
+                {
+                  backends: _backends,
+                  views: _views,
+                  contexts: _runtimeContexts,
+                  channels: _channels,
+                },
+              );
+              if (_shuttingDown)
+                return yield* Effect.fail(
+                  new Error("Processes are shutting down"),
+                );
+              record.instance = acquired.instance;
+              record.backend = acquired.backend;
+              yield* Effect.addFinalizer(() =>
+                Effect.sync(() => {
+                  record.closing = true;
+                }),
+              );
+              syncRunningAppsState();
+              launched.emit({ instance: acquired.instance });
+              return {
+                success: true,
+                instanceId: acquired.instance.instanceId,
+                appId,
+              };
             }),
-      ),
+            scope,
+          ),
+        ).pipe(
+          Effect.onExit((exit) =>
+            Exit.isFailure(exit) ? closeInstance(record) : Effect.void,
+          ),
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.failCause(cause)
+              : Effect.gen(function* () {
+                  const error = Cause.squash(cause);
+                  log.error(`Failed to launch app ${appId}:`, error);
+                  return yield* Effect.fail(asError(error));
+                }),
+          ),
+        );
+      }),
     );
   });
 
-  const ensureAppRunning = Effect.fn(function* (
-    appId: string,
-    options: {
-      bounds?: { x: number; y: number; width: number; height: number };
-      launchArgs?: string[];
-    } = {},
-  ): Effect.fn.Return<AppInstance, Error> {
-    const existing = _runningApps.get(appId);
-    if (existing) {
-      return existing;
-    }
+  const launchAppInternal = (...args: Parameters<typeof launchInstance>) =>
+    withApp(args[0], launchInstance(...args));
 
-    yield* launchApp(appId, options.bounds, options.launchArgs);
+  const ensureAppRunning = Effect.fn(
+    function* (
+      appId: string,
+      options: {
+        bounds?: { x: number; y: number; width: number; height: number };
+        launchArgs?: string[];
+      } = {},
+    ): Effect.fn.Return<AppInstance, Error> {
+      const existing = getAppInstance(appId);
+      if (existing) {
+        return existing;
+      }
 
-    const launched = _runningApps.get(appId);
-    if (!launched) {
-      return yield* Effect.fail(
-        asError(new Error(`App ${appId} failed to start`)),
-      );
-    }
-    return launched;
-  });
+      yield* Effect.try({ try: () => assertCanLaunch(appId), catch: asError });
+      yield* launchInstance(appId, options.bounds, options.launchArgs);
 
-  const stopApp = Effect.fn(function* (
+      const launched = getAppInstance(appId);
+      if (!launched) {
+        return yield* Effect.fail(
+          asError(new Error(`App ${appId} failed to start`)),
+        );
+      }
+      return launched;
+    },
+    (work, appId) => withApp(appId, work),
+  );
+
+  const stopInstance = Effect.fn(function* (
     appId: string,
   ): Effect.fn.Return<void, Error> {
-    const instance = _runningApps.get(appId);
-    if (!instance) {
-      return yield* Effect.fail(
-        asError(new Error(`App ${appId} is not running`)),
-      );
-    }
-
+    const record = instances.get(appId);
+    if (!record)
+      return yield* Effect.fail(new Error(`App ${appId} is not running`));
     yield* Effect.gen(function* () {
-      // Unregister all services exposed by this app
-      _channels.unregisterAllServices(appId);
-
-      // Remove view first (before backend termination to avoid race)
-      if (instance.viewId !== -1) {
-        _views.removeView(instance.viewId);
-      }
-
-      // Terminate backend after view is removed
-      if (_backends.hasBackend(appId)) {
-        yield* _backends.terminateBackend(appId);
-      }
-
-      // Remove from running apps
-      _runningApps.delete(appId);
-      _runtimeContexts.unregister(appId);
-      syncRunningAppsState();
-
+      yield* closeInstance(record);
       stopped.emit({ appId });
     }).pipe(
       Effect.catchCause((cause) =>
@@ -466,8 +481,12 @@ export const createProcesses = Effect.fn(function* ({
     );
   });
 
+  const stopApp = (appId: string) => withApp(appId, stopInstance(appId));
+
   function getRunningApps(showHidden: boolean = false): AppInstance[] {
-    const apps = Array.from(_runningApps.values());
+    const apps = Array.from(instances.values()).flatMap(({ instance }) =>
+      instance ? [instance] : [],
+    );
     return showHidden
       ? apps
       : apps.filter(
@@ -479,7 +498,7 @@ export const createProcesses = Effect.fn(function* ({
   }
 
   function getAppInstance(appId: string): AppInstance | undefined {
-    return _runningApps.get(appId);
+    return instances.get(appId)?.instance;
   }
 
   function getInstalledManifest(appId: string) {
@@ -499,42 +518,37 @@ export const createProcesses = Effect.fn(function* ({
   });
 
   function syncRunningAppsState(): void {
-    routing.updateRunningApps(_runningApps.keys());
+    routing.updateRunningApps(
+      getRunningApps(true).map((instance) => instance.manifest.id),
+    );
   }
 
   function handleAppError(appId: string, error: unknown): void {
-    const instance = _runningApps.get(appId);
+    const instance = getAppInstance(appId);
     if (instance) {
       instance.state = "error";
       processError.emit({ appId, error });
     }
   }
 
-  function handleAppExit(appId: string, code: number): void {
+  function handleAppExit(
+    appId: string,
+    backend: PlatformUtilityProcess,
+    code: number,
+  ): void {
     routing.removeBackendSubscriptions(appId);
-    const instance = _runningApps.get(appId);
-    if (!instance) {
-      // App was already cleaned up by stopApp(), nothing to do
-      return;
-    }
-
-    // Unregister all services exposed by this app
-    _channels.unregisterAllServices(appId);
-
-    // Clean up view (only if frontend exists, viewId !== -1)
-    if (instance.viewId !== -1) {
-      try {
-        _views.removeView(instance.viewId);
-      } catch (_e) {
-        // View may already be removed
-      }
-    }
-
-    _runningApps.delete(appId);
-    _runtimeContexts.unregister(appId);
-    syncRunningAppsState();
-
-    exited.emit({ appId, code });
+    const record = instances.get(appId);
+    if (!record || record.backend !== backend || record.closing) return;
+    Queue.offerUnsafe(pending, () =>
+      withApp(
+        appId,
+        Effect.gen(function* () {
+          if (instances.get(appId) !== record || record.closing) return;
+          yield* closeInstance(record);
+          exited.emit({ appId, code });
+        }),
+      ),
+    );
   }
 
   const shutdown = Effect.fn(function* () {
@@ -545,7 +559,7 @@ export const createProcesses = Effect.fn(function* ({
       _hotReloadDebounceTimer.interruptUnsafe();
     }
 
-    const runningAppIds = Array.from(_runningApps.keys());
+    const runningAppIds = Array.from(instances.keys());
 
     log.info(`Stopping ${runningAppIds.length} running app(s)...`);
 
@@ -576,77 +590,69 @@ export const createProcesses = Effect.fn(function* ({
       _hotReloadDebounceTimer.interruptUnsafe();
       _hotReloadDebounceTimer = undefined;
     }
-    _runningApps.clear();
+    instances.clear();
+    admission.clear();
     _hotReloadStates.clear();
   }
 
-  const reloadApp = Effect.fn(function* (
-    appId: string,
-  ): Effect.fn.Return<void, Error> {
-    const instance = _runningApps.get(appId);
-    if (!instance) {
-      log.info(`App ${appId} is not running, skipping reload`);
-      return;
-    }
+  const reloadApp = Effect.fn(
+    function* (appId: string): Effect.fn.Return<void, Error> {
+      const instance = getAppInstance(appId);
+      if (!instance) {
+        log.info(`App ${appId} is not running, skipping reload`);
+        return;
+      }
 
-    // Save the current view bounds
-    const viewInfo = _views.getViewInfo(instance.viewId);
-    const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
+      // Save the current view bounds
+      const viewInfo = _views.getViewInfo(instance.viewId);
+      const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
 
-    log.info(`Reloading app ${appId}...`);
+      log.info(`Reloading app ${appId}...`);
 
-    // A hot-reload watcher runs outside the request's AsyncLocalStorage
-    // context. Preserve the running process identity before stopApp removes it
-    // so relaunch does not depend on ambient user authorization state.
-    const runtime = _runtimeContexts.get(appId);
+      // A hot-reload watcher runs outside the request's AsyncLocalStorage
+      // context. Preserve the running process identity before stopApp removes it
+      // so relaunch does not depend on ambient user authorization state.
+      const runtime = _runtimeContexts.get(appId);
 
-    // Stop the app
-    if (instance.owner.kind === "system") {
-      reloading.emit({ appId });
-      yield* stopApp(appId);
-      yield* launchDaemon(appId, instance.principal, runtime?.profile);
-    } else {
-      yield* stopApp(appId);
-
-      // Small delay to ensure cleanup
-      yield* Effect.sleep(Duration.millis(100));
-
-      // Relaunch with the same bounds and the identity of the process that was
-      // already authorized to run.
-      yield* launchAppInternal(appId, bounds, undefined, {
+      if (instance.owner.kind === "system") reloading.emit({ appId });
+      yield* stopInstance(appId);
+      yield* launchInstance(appId, bounds, undefined, {
         owner: instance.owner,
         principal: instance.principal,
         profile: runtime?.profile,
       });
-    }
 
-    log.info(`App ${appId} reloaded successfully`);
-  });
+      log.info(`App ${appId} reloaded successfully`);
+    },
+    (work, appId) => withApp(appId, work),
+  );
 
   const stopSessionApps = Effect.fn(function* (
     sessionId = _sessionContext.getSessionId(),
   ): Effect.fn.Return<void, Error> {
-    const running = Array.from(_runningApps.values())
+    const running = [...instances.entries()]
       .filter(
-        (instance) =>
-          instance.owner.kind === "session" &&
-          instance.owner.sessionId === sessionId,
+        ([
+          ,
+          {
+            runtime: { owner },
+          },
+        ]) => owner.kind === "session" && owner.sessionId === sessionId,
       )
-      .map((instance) => instance.manifest.id);
+      .map(([appId]) => appId);
     const errors: unknown[] = [];
     for (const appId of running) {
-      yield* Effect.gen(function* () {
-        yield* stopApp(appId);
-      }).pipe(
+      yield* withApp(
+        appId,
+        Effect.suspend(() =>
+          instances.has(appId) ? stopInstance(appId) : Effect.void,
+        ),
+      ).pipe(
         Effect.catchCause((cause) =>
           Cause.hasInterruptsOnly(cause)
             ? Effect.failCause(cause)
             : Effect.sync(() => {
-                const error = Cause.squash(cause);
-                // A process may exit on its own after the snapshot was taken.
-                if (_runningApps.has(appId)) {
-                  errors.push(error);
-                }
+                errors.push(Cause.squash(cause));
               }),
         ),
       );

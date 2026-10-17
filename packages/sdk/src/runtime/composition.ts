@@ -361,7 +361,8 @@ export const composeRuntime = Effect.fn(function* ({
       );
     }
     yield* listen(processes.stopped, closeProcessHandles);
-    yield* listen(processes.exited, closeProcessHandles);
+    // Native exit closes handle admission before asynchronous instance teardown.
+    yield* listen(backends.backendExit, closeProcessHandles);
   });
   const i18n = yield* createI18n({ settings: createI18nSettings(settings) });
   const associations = yield* createAppAssociations({

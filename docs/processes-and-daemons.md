@@ -18,6 +18,12 @@ backend-only processes and delegates their lifecycle operations to
 - process launch, stop, exit, reload, metrics, and shutdown events;
 - filtering and stopping processes by lifetime owner.
 
+Lifecycle work is serialized per app ID, including startup, stop, and reload.
+A launch publishes its running instance after backend readiness and frontend
+creation succeed. Its child scope owns execution identity, backend, and view;
+failed or interrupted startup releases them before another launch can proceed.
+Stop, reload, and native exit release the resources of that particular instance.
+
 `Daemons` owns daemon policy:
 
 - discovering installed backend-only apps;

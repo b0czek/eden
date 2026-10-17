@@ -82,7 +82,8 @@ describe("session process lifecycle", () => {
     ).rejects.toThrow("Failed to stop all session apps");
     expect(processes.getAppInstance("app.one")).toBeUndefined();
     expect(processes.getAppInstance("app.three")).toBeUndefined();
-    expect(processes.getAppInstance("app.two")).toBeDefined();
+    expect(processes.getAppInstance("app.two")).toBeUndefined();
+    expect(view.view.webContents.isDestroyed()).toBe(true);
   });
 
   it("leaves system-owned daemons running", async () => {

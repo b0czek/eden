@@ -267,59 +267,73 @@ export const createViews = Effect.fn(function* ({
       launchFile,
     );
 
-    const viewId = viewInfo.id;
+    try {
+      const viewId = viewInfo.id;
 
-    _windows.attachWebContentsLogger(viewInfo.view.webContents, {
-      appId,
-      viewId,
-      source: viewInfo.viewType === "overlay" ? "overlay" : "app",
-    });
+      _windows.attachWebContentsLogger(viewInfo.view.webContents, {
+        appId,
+        viewId,
+        source: viewInfo.viewType === "overlay" ? "overlay" : "app",
+      });
 
-    // Store view info
-    _views.set(viewId, viewInfo);
-    attachFocusTracking(viewId, viewInfo);
+      // Store view info
+      _views.set(viewId, viewInfo);
+      attachFocusTracking(viewId, viewInfo);
 
-    // Apply current interface scale to the new view
-    _interfaceScale.applyToView(viewInfo);
-
-    // Register DevTools shortcut on this view
-    _devtools.registerShortcut(viewInfo.view);
-
-    // Re-apply zoom after page finishes loading (content load can reset zoom)
-    viewInfo.view.webContents.on("did-finish-load", () => {
+      // Apply current interface scale to the new view
       _interfaceScale.applyToView(viewInfo);
-    });
 
-    // Electron event listener for view load failure
-    viewInfo.view.webContents.on(
-      "did-fail-load",
-      (_event, errorCode: number, errorDescription: string) => {
-        log.error(`View load failed for ${appId}:`, errorDescription);
-        viewLoadFailed.emit({
-          viewId: viewInfo.id,
-          appId,
-          errorCode,
-          errorDescription,
-        });
-      },
-    );
+      // Register DevTools shortcut on this view
+      _devtools.registerShortcut(viewInfo.view);
 
-    // Notify listeners that the view has been loaded
-    viewLoaded.emit({
-      viewId: viewInfo.id,
-      appId,
-      overlay: viewInfo.viewType === "overlay",
-    });
+      // Re-apply zoom after page finishes loading (content load can reset zoom)
+      viewInfo.view.webContents.on("did-finish-load", () => {
+        _interfaceScale.applyToView(viewInfo);
+      });
 
-    // Recalculate all tiles if using tiling and this is a tiled view
-    if (viewInfo.mode === "tiled" && _tiling.isEnabled()) {
-      syncTiledLayout({ preferredViewId: viewId });
+      // Electron event listener for view load failure
+      viewInfo.view.webContents.on(
+        "did-fail-load",
+        (_event, errorCode: number, errorDescription: string) => {
+          log.error(`View load failed for ${appId}:`, errorDescription);
+          viewLoadFailed.emit({
+            viewId: viewInfo.id,
+            appId,
+            errorCode,
+            errorDescription,
+          });
+        },
+      );
+
+      // Notify listeners that the view has been loaded
+      viewLoaded.emit({
+        viewId: viewInfo.id,
+        appId,
+        overlay: viewInfo.viewType === "overlay",
+      });
+
+      // Recalculate all tiles if using tiling and this is a tiled view
+      if (viewInfo.mode === "tiled" && _tiling.isEnabled()) {
+        syncTiledLayout({ preferredViewId: viewId });
+      }
+
+      // Add to main window's contentView and maintain proper layering
+      reorderViewLayers();
+
+      return viewId;
+    } catch (error) {
+      try {
+        if (_views.has(viewInfo.id)) removeView(viewInfo.id);
+        else destroyView(viewInfo, _mainWindow);
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Failed to create and release view for ${appId}`,
+          { cause: error },
+        );
+      }
+      throw error;
     }
-
-    // Add to main window's contentView and maintain proper layering
-    reorderViewLayers();
-
-    return viewId;
   }
 
   function removeView(viewId: number): void {
