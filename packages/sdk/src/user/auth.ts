@@ -1,5 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -7,24 +9,23 @@ const scryptAsync = promisify(scrypt) as (
   keylen: number,
 ) => Promise<Buffer>;
 
-export async function hashPassword(password: string): Promise<{
-  passwordHash: string;
-  passwordSalt: string;
-}> {
+export const hashPassword = Effect.fn(function* (password: string) {
   const salt = randomBytes(16).toString("hex");
-  const hash = (await scryptAsync(password, salt, 64)).toString("hex");
+  const hash = (yield* fromPromise(() =>
+    scryptAsync(password, salt, 64),
+  )).toString("hex");
   return { passwordHash: hash, passwordSalt: salt };
-}
+});
 
-export async function verifyPassword(
+export const verifyPassword = Effect.fn(function* (
   password: string,
   salt: string,
   hash: string,
-): Promise<boolean> {
-  const candidate = await scryptAsync(password, salt, 64);
+) {
+  const candidate = yield* fromPromise(() => scryptAsync(password, salt, 64));
   const hashBuf = Buffer.from(hash, "hex");
   if (hashBuf.length !== candidate.length) {
     return false;
   }
   return timingSafeEqual(candidate, hashBuf);
-}
+});

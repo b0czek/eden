@@ -70,9 +70,7 @@ export const createUsers = Effect.fn(function* ({
     if (role === "vendor") {
       return yield* Effect.fail(new Error("Vendor account can only be seeded"));
     }
-    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
-      hashPassword(args.password),
-    );
+    const { passwordHash, passwordSalt } = yield* hashPassword(args.password);
     const now = Date.now();
 
     const grants = normalizeUserGrants(
@@ -171,9 +169,7 @@ export const createUsers = Effect.fn(function* ({
     password: string,
   ): Effect.fn.Return<UserProfile, Error> {
     const user = yield* requireUserRecord(username);
-    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
-      hashPassword(password),
-    );
+    const { passwordHash, passwordSalt } = yield* hashPassword(password);
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
@@ -186,16 +182,16 @@ export const createUsers = Effect.fn(function* ({
     newPassword: string,
   ): Effect.fn.Return<UserProfile, Error> {
     const user = yield* requireUserRecord(username);
-    const valid = yield* fromPromise(() =>
-      verifyPassword(currentPassword, user.passwordSalt, user.passwordHash),
+    const valid = yield* verifyPassword(
+      currentPassword,
+      user.passwordSalt,
+      user.passwordHash,
     );
     if (!valid) {
       return yield* Effect.fail(new Error("Invalid password"));
     }
 
-    const { passwordHash, passwordSalt } = yield* fromPromise(() =>
-      hashPassword(newPassword),
-    );
+    const { passwordHash, passwordSalt } = yield* hashPassword(newPassword);
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
@@ -209,9 +205,7 @@ export const createUsers = Effect.fn(function* ({
     const user = yield* requireUserRecord(username);
 
     if (
-      !(yield* fromPromise(() =>
-        verifyPassword(password, user.passwordSalt, user.passwordHash),
-      ))
+      !(yield* verifyPassword(password, user.passwordSalt, user.passwordHash))
     ) {
       return yield* Effect.fail(new Error("Invalid credentials"));
     }

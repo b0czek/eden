@@ -373,7 +373,7 @@ describe("EdenRuntime integration", () => {
               username: "vendor",
               name: "Vendor",
               role: "vendor",
-              ...(await hashPassword("seed-password")),
+              ...(await Effect.runPromise(hashPassword("seed-password"))),
             },
           ],
           defaultUsername: "vendor",

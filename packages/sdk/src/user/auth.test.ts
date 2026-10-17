@@ -1,9 +1,12 @@
+import * as Effect from "effect/Effect";
 import { hashPassword, verifyPassword } from "./auth";
 
 describe("UserAuth", () => {
   it("hashes and verifies passwords", async () => {
     const password = "correct-horse-battery-staple";
-    const { passwordHash, passwordSalt } = await hashPassword(password);
+    const { passwordHash, passwordSalt } = await Effect.runPromise(
+      hashPassword(password),
+    );
 
     expect(passwordHash).toBeDefined();
     expect(passwordSalt).toBeDefined();
@@ -11,28 +14,30 @@ describe("UserAuth", () => {
     expect(passwordSalt.length).toBeGreaterThan(0);
 
     await expect(
-      verifyPassword(password, passwordSalt, passwordHash),
+      Effect.runPromise(verifyPassword(password, passwordSalt, passwordHash)),
     ).resolves.toBe(true);
 
     await expect(
-      verifyPassword("wrong-password", passwordSalt, passwordHash),
+      Effect.runPromise(
+        verifyPassword("wrong-password", passwordSalt, passwordHash),
+      ),
     ).resolves.toBe(false);
   });
 
   it("uses unique salts for subsequent hashes", async () => {
     const password = "repeatable";
-    const first = await hashPassword(password);
-    const second = await hashPassword(password);
+    const first = await Effect.runPromise(hashPassword(password));
+    const second = await Effect.runPromise(hashPassword(password));
 
     expect(first.passwordSalt).not.toEqual(second.passwordSalt);
     expect(first.passwordHash).not.toEqual(second.passwordHash);
   });
 
   it("returns false when hash length is invalid", async () => {
-    const { passwordSalt } = await hashPassword("password");
+    const { passwordSalt } = await Effect.runPromise(hashPassword("password"));
 
     await expect(
-      verifyPassword("password", passwordSalt, "deadbeef"),
+      Effect.runPromise(verifyPassword("password", passwordSalt, "deadbeef")),
     ).resolves.toBe(false);
   });
 });
