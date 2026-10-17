@@ -23,9 +23,9 @@ export const openKeyvSqlite = Effect.fn(function* ({
     }),
     (keyv) =>
       Effect.tryPromise({
-        try: async () => {
+        try: () => {
           closed = true;
-          await keyv.disconnect();
+          return keyv.disconnect();
         },
         catch: asError,
       }).pipe(Effect.orDie),
@@ -47,9 +47,7 @@ export const openKeyvSqlite = Effect.fn(function* ({
   return {
     read: (key: string) => perform(() => keyv.get(key)),
     write: (key: string, value: unknown) =>
-      perform(async () => {
-        await keyv.set(key, value);
-      }),
+      perform(() => keyv.set(key, value)).pipe(Effect.asVoid),
     remove: (key: string) => perform(() => keyv.delete(key)),
     keys: () =>
       perform(async () => {
