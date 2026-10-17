@@ -1,20 +1,24 @@
 import * as Effect from "effect/Effect";
+import * as FiberSet from "effect/FiberSet";
 import type { ResourceProtocolPort } from "../platform/ports";
 import type { DlcResourceProtocols } from "./dlc-resources";
-/** Interpret resource handlers at the platform's Promise callback boundary. */
+
+/** Own resource requests at the platform's Promise callback boundary. */
 export function createDlcResourceProtocols(
   protocols: ResourceProtocolPort,
-  run: <A, E>(work: Effect.Effect<A, E>) => Promise<A>,
 ): DlcResourceProtocols {
   return {
     serve: (scheme, authorize, handler) =>
-      Effect.acquireRelease(
-        Effect.try(() =>
-          protocols.handle(scheme, authorize, (request) =>
-            run(handler(request)),
+      Effect.gen(function* () {
+        const run = yield* FiberSet.makeRuntimePromise();
+        yield* Effect.acquireRelease(
+          Effect.try(() =>
+            protocols.handle(scheme, authorize, (request) =>
+              run(handler(request)),
+            ),
           ),
-        ),
-        () => Effect.sync(() => protocols.unhandle(scheme)),
-      ),
+          () => Effect.sync(() => protocols.unhandle(scheme)),
+        );
+      }),
   };
 }

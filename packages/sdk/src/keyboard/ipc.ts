@@ -6,6 +6,7 @@ import type {
   EdenKeyboardUpdateDragRequest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as FiberSet from "effect/FiberSet";
 import { log } from "../logging";
 import type { RendererIpcPort } from "../platform/ports";
 import { keyboardChannels as channel } from "./protocol";
@@ -37,9 +38,9 @@ interface KeyboardRequests {
 export function bindKeyboardIpc(
   ipc: RendererIpcPort,
   requests: KeyboardRequests,
-  run: <A>(work: Effect.Effect<A, Error>) => Promise<A>,
 ) {
   return Effect.gen(function* () {
+    const run = yield* FiberSet.makeRuntimePromise<never, unknown, Error>();
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         for (const name of [

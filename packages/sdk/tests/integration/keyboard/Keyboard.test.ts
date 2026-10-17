@@ -74,7 +74,6 @@ async function createScenario(
       windows: platform.windows,
       rendererIpc: platform.rendererIpc,
       display: platform.display,
-      run: runtime.run,
     }),
   );
   await runtime.run(keyboard.initialize());

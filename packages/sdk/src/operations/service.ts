@@ -9,11 +9,11 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import * as Schedule from "effect/Schedule";
 import type { RoutedNotification } from "../controllers/events";
 import { asError } from "../effects/io";
-import { type EffectRuntime } from "../effects/runtime";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import {
   type CommandCallerContext,
   ExecutionContext,
@@ -50,13 +50,11 @@ function canonical(value: unknown): string {
 }
 
 export const operationRetentionMs = 15 * 60 * 1000;
-export function createOperations({
-  effects,
+export const createOperations = Effect.fn(function* ({
   execution,
   session,
   filesystem,
 }: {
-  effects: EffectRuntime;
   execution: ExecutionContext;
   session: SessionContext;
   filesystem: {
@@ -64,7 +62,10 @@ export function createOperations({
   };
 }) {
   const changed =
-    createEvent<RoutedNotification<OperationNamespaceEvents["changed"]>>();
+    yield* scopedEvent<
+      RoutedNotification<OperationNamespaceEvents["changed"]>
+    >();
+  const forkOperation = yield* FiberSet.makeRuntime<never, unknown, unknown>();
   let records = new Map<string, RecordEntry>();
   let requests = new Map<string, string>();
   let quota = createOperationQuota();
@@ -72,7 +73,7 @@ export function createOperations({
   let accepting = true;
   let shuttingDown = false;
   let runtimeTransition: string | undefined;
-  const expiry = effects.fork(
+  yield* Effect.forkScoped(
     Effect.schedule(Effect.sync(prune), Schedule.spaced(Duration.seconds(60))),
   );
   // The transport must queue its acceptance response before execution can tear
@@ -157,7 +158,7 @@ export function createOperations({
         owner,
         transitionSessionId,
         fiber: execution.run(capturedContext, () =>
-          effects.fork(
+          forkOperation(
             execution.provide(
               Effect.andThen(
                 afterResponse,
@@ -497,14 +498,17 @@ export function createOperations({
       }
     }
   }
-  const dispose = Effect.fn(function* () {
-    yield* shutdown();
-    yield* Fiber.interrupt(expiry);
-    records.clear();
-    requests.clear();
-    quota.clear();
-    changed.dispose();
-  });
+  yield* Effect.addFinalizer(() =>
+    shutdown().pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          records.clear();
+          requests.clear();
+          quota.clear();
+        }),
+      ),
+    ),
+  );
 
   return {
     changed,
@@ -522,7 +526,6 @@ export function createOperations({
     drain,
     closeAdmission,
     shutdown,
-    dispose,
   };
-}
-export type Operations = ReturnType<typeof createOperations>;
+});
+export type Operations = Effect.Success<ReturnType<typeof createOperations>>;

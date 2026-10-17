@@ -9,7 +9,9 @@ import type {
   FilesystemSource,
   SearchResult,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as FiberSet from "effect/FiberSet";
 import fg from "fast-glob";
 import type { TargetedNotification } from "../controllers/events";
 import { asError, fromPromise } from "../effects/io";
@@ -172,10 +174,25 @@ export const createFilesystem = Effect.fn(function* ({
     viewRemoved: views.removed,
     notify: (viewId, payload) => changed.emit({ payload, viewIds: [viewId] }),
   });
-  const runListener = Effect.runPromiseWith(yield* Effect.context<never>());
-  yield* listen(views.removed, ({ webContentsId }) =>
-    runListener(handles.closeOwner({ webContentsId })),
-  );
+  const forkListener = yield* FiberSet.makeRuntime<never, void, never>();
+  yield* listen(views.removed, ({ webContentsId }) => {
+    forkListener(
+      handles
+        .closeOwner({ webContentsId })
+        .pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.failCause(cause)
+              : Effect.sync(() =>
+                  log.error(
+                    "Failed to close view file handles:",
+                    Cause.squash(cause),
+                  ),
+                ),
+          ),
+        ),
+    );
+  });
   yield* listen(volumes.changed, ({ volumes: inventory }) =>
     watcher.removeUnavailableVolumes(
       new Set(

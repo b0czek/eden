@@ -37,6 +37,4 @@ export interface KeyboardDependencies {
   windows: Pick<WindowingPort, "createWindow">;
   rendererIpc: RendererIpcPort;
   display: DisplayPort;
-  /** Executes work only at the renderer/native callback boundary. */
-  run<A>(work: Effect.Effect<A, Error>): Promise<A>;
 }

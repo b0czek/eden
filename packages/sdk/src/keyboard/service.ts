@@ -42,7 +42,6 @@ export function createKeyboard({
   windows,
   rendererIpc,
   display,
-  run,
 }: KeyboardDependencies) {
   return Effect.gen(function* () {
     const state: KeyboardState = {
@@ -365,20 +364,16 @@ export function createKeyboard({
           "Failed to reposition keyboard overlay:",
         );
     });
-    yield* bindKeyboardIpc(
-      rendererIpc,
-      {
-        focus,
-        action,
-        show,
-        hide,
-        startDrag: drag.start,
-        updateDrag: drag.update,
-        endDrag: drag.finish,
-        state: currentState,
-      },
-      run,
-    );
+    yield* bindKeyboardIpc(rendererIpc, {
+      focus,
+      action,
+      show,
+      hide,
+      startDrag: drag.start,
+      updateDrag: drag.update,
+      endDrag: drag.finish,
+      state: currentState,
+    });
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         disposed = true;

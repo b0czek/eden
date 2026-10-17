@@ -1,12 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { EdenConfig } from "../api/config";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import type { EdenLifecycleState } from "../api";
+import type { EdenConfig } from "../api/config";
 import { resolveBrandingName } from "../branding";
 import { createEffectRuntime } from "../effects/runtime";
 import { log } from "../logging";
@@ -91,7 +91,6 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
       config,
       paths,
       platform,
-      effects,
       registrations,
     });
     bundle = desktop;

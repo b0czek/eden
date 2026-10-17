@@ -42,12 +42,13 @@ describe("Sessions", () => {
     };
     notify = jest.fn();
     effects = createEffectRuntime();
-    operations = createOperations({
-      effects,
-      execution: createExecutionContext({ config: {} }),
-      session: context,
-      filesystem: { releaseHandles: () => Effect.void },
-    });
+    operations = await effects.acquire(
+      createOperations({
+        execution: createExecutionContext({ config: {} }),
+        session: context,
+        filesystem: { releaseHandles: () => Effect.void },
+      }),
+    );
     sessions = await effects.acquire(
       createSessions({
         users,
@@ -60,7 +61,6 @@ describe("Sessions", () => {
   });
 
   afterEach(async () => {
-    await effects.run(operations.dispose());
     await effects.dispose();
   });
 

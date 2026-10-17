@@ -1,6 +1,7 @@
-import type { EdenConfig } from "../api/config";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as FiberSet from "effect/FiberSet";
+import type { EdenConfig } from "../api/config";
 import { createControlPlaneApis } from "../api/control-plane-controllers";
 import { createSdkContext } from "../api/sdk-context";
 import {
@@ -31,7 +32,6 @@ import { createDaemonController } from "../daemon/controller-edenapi";
 import { connectDaemonLifecycle } from "../daemon/lifecycle";
 import { createDaemons, type Daemons } from "../daemon/service";
 import { createDb, createDbController, createSqliteDbStorage } from "../db";
-import type { EffectRuntime } from "../effects/runtime";
 import { listen } from "../events/scoped";
 import {
   createExecutionContext,
@@ -158,13 +158,11 @@ export const composeRuntime = Effect.fn(function* ({
   config,
   paths,
   platform,
-  effects,
   registrations,
 }: {
   config: EdenConfig;
   paths: EdenRuntimeOptions["paths"];
   platform: EdenPlatform;
-  effects: EffectRuntime;
   registrations: PanelRegistry;
 }) {
   const execution = createExecutionContext({ config });
@@ -220,17 +218,11 @@ export const composeRuntime = Effect.fn(function* ({
     },
   });
 
-  const operations = yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      createOperations({
-        effects,
-        execution,
-        session: sessionContext,
-        filesystem,
-      }),
-    ),
-    (value) => value.dispose(),
-  );
+  const operations = yield* createOperations({
+    execution,
+    session: sessionContext,
+    filesystem,
+  });
   const commands = yield* Effect.acquireRelease(
     Effect.sync(() =>
       createCommands({
@@ -267,7 +259,7 @@ export const composeRuntime = Effect.fn(function* ({
   const dlcResources = yield* createDlcResources({
     catalog,
     views,
-    protocols: createDlcResourceProtocols(platform.resources, effects.run),
+    protocols: createDlcResourceProtocols(platform.resources),
   });
   const backends = yield* createBackends({
     distPath: paths.distPath,
@@ -349,12 +341,27 @@ export const composeRuntime = Effect.fn(function* ({
     yield* listen(views.viewRemoved, ({ viewId }) =>
       ipc.eventSubscribers.removeViewSubscriptions(viewId),
     );
-    yield* listen(processes.stopped, ({ appId }) =>
-      effects.run(filesystem.closeOwner({ appId })),
-    );
-    yield* listen(processes.exited, ({ appId }) =>
-      effects.run(filesystem.closeOwner({ appId })),
-    );
+    const forkCleanup = yield* FiberSet.makeRuntime<never, void, never>();
+    function closeProcessHandles({ appId }: { appId: string }) {
+      forkCleanup(
+        filesystem
+          .closeOwner({ appId })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause)
+                ? Effect.failCause(cause)
+                : Effect.sync(() =>
+                    log.error(
+                      "Failed to close process file handles:",
+                      Cause.squash(cause),
+                    ),
+                  ),
+            ),
+          ),
+      );
+    }
+    yield* listen(processes.stopped, closeProcessHandles);
+    yield* listen(processes.exited, closeProcessHandles);
   });
   const i18n = yield* createI18n({ settings: createI18nSettings(settings) });
   const associations = yield* createAppAssociations({
@@ -391,7 +398,6 @@ export const composeRuntime = Effect.fn(function* ({
     windows: platform.windows,
     rendererIpc: platform.rendererIpc,
     display: platform.display,
-    run: effects.run,
   });
   yield* keyboard.initialize();
   const power = yield* createPower({
