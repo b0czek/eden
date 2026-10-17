@@ -1,6 +1,7 @@
 import type { OperationHandle } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { command, defineController } from "../../../src/controllers/controller";
+import { fromPromise } from "../../../src/effects/io";
 import { Commands } from "../../../src/ipc/commands";
 import { Operations } from "../../../src/operations/service";
 import type { OperationTask } from "../../../src/operations/task";
@@ -17,7 +18,11 @@ describe("one bounded IPC deadline", () => {
   let eden: TestEden;
   let webContentsId: number;
   let complete!: (value: string) => void;
+  let nativeSignal: AbortSignal | undefined;
+  let nativeReleased: boolean;
   beforeEach(async () => {
+    nativeSignal = undefined;
+    nativeReleased = false;
     eden = await createTestEden();
     const user = await eden.runtime.effects.run(
       eden.runtime.users.create({
@@ -44,6 +49,25 @@ describe("one bounded IPC deadline", () => {
       defineController("deadline-test", {
         commands: {
           result: command({ handle: () => Effect.promise(() => completion) }),
+          native: command({
+            handle: () =>
+              fromPromise((signal) => {
+                nativeSignal = signal;
+                return completion;
+              }).pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    nativeReleased = true;
+                  }),
+                ),
+              ),
+          }),
+          failure: command({
+            handle: () => Effect.fail(new TypeError("Command failed")),
+          }),
+          defect: command({
+            handle: () => Effect.die(new TypeError("Command failed")),
+          }),
           operation: command({
             mode: "operation",
             handle: () => promiseOperationTask(async () => completion),
@@ -96,6 +120,41 @@ describe("one bounded IPC deadline", () => {
       eden.runtime.effects.run(commands.wait(handle, caller)),
     ).resolves.toBe("finished");
   });
+
+  it("returns the deadline response while disposal waits for interrupted native cleanup", async () => {
+    const request = invoke("native");
+    const rejection = expect(request).rejects.toThrow(
+      "Command 'deadline-test/native' timed out",
+    );
+    await jest.advanceTimersByTimeAsync(9999);
+    expect(nativeSignal?.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    await rejection;
+    expect(nativeSignal?.aborted).toBe(true);
+
+    jest.useRealTimers();
+    let disposed = false;
+    const disposal = eden.runtime.dispose().then(() => {
+      disposed = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(disposed).toBe(false);
+    expect(nativeReleased).toBe(false);
+    complete("cleanup");
+    await disposal;
+    expect(nativeReleased).toBe(true);
+  });
+
+  it.each(["failure", "defect"])(
+    "preserves the %s message and name without exposing its stack",
+    async (command) => {
+      await expect(invoke(command)).rejects.toMatchObject({
+        message: "Command failed",
+        name: "TypeError",
+        stack: "",
+      });
+    },
+  );
 
   it("rejects pending result responses when the runtime is disposed", async () => {
     const request = invoke("result");

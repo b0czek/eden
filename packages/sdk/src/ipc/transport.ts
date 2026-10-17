@@ -2,11 +2,15 @@ import type { EventData, EventName, OperationSubmission } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
+import * as Exit from "effect/Exit";
+import type * as Fiber from "effect/Fiber";
 import * as FiberSet from "effect/FiberSet";
 import type { Controller } from "../controllers/controller";
 import { asError } from "../effects/io";
-import { ExecutionContext } from "../execution/context";
+import type {
+  CommandCallerContext,
+  ExecutionContext,
+} from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
 import { log } from "../logging";
 import { Operations } from "../operations/service";
@@ -38,9 +42,8 @@ export const createIpcTransport = Effect.fn(function* ({
   operations: Operations;
 }) {
   const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
-  const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
-  // @eden-effect-next-line domain-interpreter -- Native IPC requires a Promise; response work remains owned by forkResponse.
-  const awaitResponse = Effect.runPromiseWith(yield* Effect.context<never>());
+  const forkDeadline = yield* FiberSet.makeRuntime<never, void, never>();
+  const responseDeadline = Effect.sleep(Duration.seconds(10));
   let eventSubscribers: EventRouting;
   let mainWindow: PlatformWindow | null = null;
   let controllerEvents = new Map<string, () => void>();
@@ -117,21 +120,19 @@ export const createIpcTransport = Effect.fn(function* ({
           throw new Error("Shell command caller is not a registered Eden view");
         }
 
-        return runResponse(
-          handleShellCommand(
-            command,
-            args,
-            {
-              sessionId: appId ? callerSession(appId) : undefined,
-              appId,
-              webContentsId: event.sender.id,
-              principal: appId
-                ? runtimeContexts.resolvePrincipal(appId)
-                : undefined,
-              foundation: isFoundation,
-            },
-            submission,
-          ),
+        return runShellCommand(
+          command,
+          args,
+          {
+            sessionId: appId ? callerSession(appId) : undefined,
+            appId,
+            webContentsId: event.sender.id,
+            principal: appId
+              ? runtimeContexts.resolvePrincipal(appId)
+              : undefined,
+            foundation: isFoundation,
+          },
+          submission,
         );
       },
     );
@@ -160,17 +161,15 @@ export const createIpcTransport = Effect.fn(function* ({
 
         // Backend requesting a shell command execution
         try {
-          const result = await runResponse(
-            handleShellCommand(
-              backendMessage.command,
-              backendMessage.args,
-              {
-                appId,
-                sessionId: callerSession(appId),
-                principal: runtimeContexts.resolvePrincipal(appId),
-              },
-              backendMessage.submission,
-            ),
+          const result = await runShellCommand(
+            backendMessage.command,
+            backendMessage.args,
+            {
+              appId,
+              sessionId: callerSession(appId),
+              principal: runtimeContexts.resolvePrincipal(appId),
+            },
+            backendMessage.submission,
           );
           // Send response back to backend
           sendBackendResponse(appId, backendMessage.commandId, result);
@@ -209,47 +208,64 @@ export const createIpcTransport = Effect.fn(function* ({
         ? "runtime"
         : undefined;
   }
-  const handleShellCommand = Effect.fn(function* (
+  function runShellCommand(
     command: string,
     args: unknown,
-    callerContext: import("../execution").CommandCallerContext = {},
+    callerContext: CommandCallerContext = {},
     submission?: OperationSubmission,
-  ) {
+  ): Promise<unknown> {
     const mode = commands.getMode(command);
-    const running = forkCommand(
-      commands.execute(command, args, callerContext, submission),
-    );
-    const result = yield* Fiber.join(running).pipe(
-      Effect.timeoutOrElse({
-        duration: Duration.seconds(10),
-        orElse: () =>
-          Effect.sync(() => running.interruptUnsafe()).pipe(
-            Effect.andThen(
-              Effect.fail(new Error(`Command '${command}' timed out`)),
-            ),
-          ),
-      }),
-    );
-    return mode === "operation"
-      ? { mode: "operation", handle: result }
-      : { mode: "result", result };
-  });
+    return new Promise((resolve, reject) => {
+      // The response can time out before interrupted native I/O settles.
+      // Both fibers remain scoped, so disposal still awaits command cleanup.
+      const running = forkCommand(
+        commands.execute(command, args, callerContext, submission),
+      );
+      let deadline: Fiber.Fiber<void> | undefined;
+      let settled = false;
 
-  function runResponse(work: Effect.Effect<unknown, unknown>) {
-    return awaitResponse(
-      Fiber.join(forkResponse(work)).pipe(
-        Effect.catchCause((cause) => {
-          const error = Cause.hasInterruptsOnly(cause)
-            ? new Error("Eden runtime disposed")
-            : asError(Cause.squash(cause));
-          log.error("Shell command failed:", error.message);
-          const sanitized = new Error(error.message);
-          sanitized.name = error.name;
-          sanitized.stack = "";
-          return Effect.fail(sanitized);
-        }),
-      ),
-    );
+      function rejectResponse(error: Error) {
+        log.error("Shell command failed:", error.message);
+        const sanitized = new Error(error.message);
+        sanitized.name = error.name;
+        sanitized.stack = "";
+        reject(sanitized);
+      }
+
+      running.addObserver((exit) => {
+        if (settled) return;
+        settled = true;
+        deadline?.interruptUnsafe();
+        if (Exit.isSuccess(exit)) {
+          resolve(
+            mode === "operation"
+              ? { mode: "operation", handle: exit.value }
+              : { mode: "result", result: exit.value },
+          );
+        } else {
+          rejectResponse(
+            Cause.hasInterruptsOnly(exit.cause)
+              ? new Error("Eden runtime disposed")
+              : asError(Cause.squash(exit.cause)),
+          );
+        }
+      });
+      // A completed command needs neither a timeout fiber nor a native timer.
+      if (settled) return;
+      deadline = forkDeadline(responseDeadline);
+      deadline.addObserver((exit) => {
+        if (settled) return;
+        settled = true;
+        running.interruptUnsafe();
+        rejectResponse(
+          Exit.isSuccess(exit)
+            ? new Error(`Command '${command}' timed out`)
+            : Cause.hasInterruptsOnly(exit.cause)
+              ? new Error("Eden runtime disposed")
+              : asError(Cause.squash(exit.cause)),
+        );
+      });
+    });
   }
   function updateRunningApps(appIds: Iterable<string>): void {
     runningAppIds = new Set(appIds);
