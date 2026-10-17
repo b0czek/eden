@@ -1,8 +1,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
+import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import type { EdenLifecycleState } from "../api";
 import { resolveBrandingName } from "../branding";
+import { fromPromise } from "../effects/io";
 import { createEffectRuntime } from "../effects/runtime";
 import { log } from "../logging";
 import type { EdenPlatform } from "../platform/ports";
@@ -40,15 +46,27 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   const settings = createSettingsSdkController({ panels: registrations });
   let state: EdenLifecycleState = "created";
   let bundle: RuntimeBundle | undefined;
-  let startPromise: Promise<void> | undefined;
-  let disposePromise: Promise<void> | undefined;
-  let resourcesDisposed = false;
-  let readySettled = false;
-  let resolveReady!: () => void;
-  let rejectReady!: (error: unknown) => void;
-  const readyPromise = new Promise<void>((resolve, reject) => {
-    resolveReady = resolve;
-    rejectReady = reject;
+  let startup: Fiber.Fiber<void, unknown> | undefined;
+  let disposal: Promise<void> | undefined;
+  const launched = Deferred.makeUnsafe<Fiber.Fiber<void, unknown>, Error>();
+  const readyPromise = Effect.runPromise(
+    Deferred.await(launched).pipe(
+      Effect.flatMap(Fiber.join),
+      Effect.catchCause((cause) =>
+        Effect.fail(
+          Cause.hasInterruptsOnly(cause)
+            ? new Error("Eden runtime startup aborted by shutdown")
+            : Cause.squash(cause),
+        ),
+      ),
+    ),
+  ).catch(async (error) => {
+    if (state === "starting") {
+      state = "failed";
+      log.error("Eden failed to start", error);
+    }
+    await release();
+    throw error;
   });
   void readyPromise.catch(() => undefined);
   function requireBundle() {
@@ -63,95 +81,95 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
       );
     return bundle.controlPlane;
   }
-  function assertStartupActive() {
-    if (state !== "starting")
-      throw new Error("Eden runtime startup aborted by shutdown");
-  }
-  async function startInternal() {
-    try {
-      log.info("Eden starting...");
-      await seedDatabase(
+  const initialize = Effect.fn(function* () {
+    log.info("Eden starting...");
+    yield* fromPromise(() =>
+      seedDatabase(
         paths.appsDirectory,
         config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
         paths.userDirectory,
-      );
-      bundle = await effects.acquire(
-        composeRuntime({ config, paths, platform, effects, registrations }),
-      );
-      const { services, appearance, associations } = bundle;
-      await effects.run(services.users.initialize());
-      await effects.run(services.packages.initialize());
+      ),
+    );
+    const desktop = yield* composeRuntime({
+      config,
+      paths,
+      platform,
+      effects,
+      registrations,
+    });
+    bundle = desktop;
+    yield* Effect.gen(function* () {
+      const { services, appearance, associations } = desktop;
+      yield* services.users.initialize();
+      yield* services.packages.initialize();
       services.settingsPanels.synchronizeManifestPanels();
-      await effects.run(services.daemons.initialize());
-      await effects.run(services.sessions.initialize());
-      await effects.run(appearance.initialize());
-      await effects.run(associations.initialize());
-      assertStartupActive();
-      await effects.run(bundle.foundation.open());
-      assertStartupActive();
+      yield* services.daemons.initialize();
+      yield* services.sessions.initialize();
+      yield* appearance.initialize();
+      yield* associations.initialize();
+      yield* desktop.foundation.open();
       state = "ready";
-      readySettled = true;
-      resolveReady();
       log.info("Eden ready!");
-    } catch (error) {
-      try {
-        await disposeResources();
-      } catch (cleanupError) {
-        log.error("Error disposing failed Eden startup:", cleanupError);
-      } finally {
-        if (state !== "stopping") state = "failed";
-        readySettled = true;
-        rejectReady(error);
-      }
-      if (state === "failed") log.error("Eden failed to start", error);
-      throw error;
-    }
-  }
+    }).pipe(Effect.onError(() => desktop.shutdown()));
+  });
+
   function start() {
-    if (state === "starting" && startPromise) return startPromise;
-    if (state === "ready") return startPromise ?? Promise.resolve();
+    if (state === "starting" || state === "ready") return readyPromise;
     if (state !== "created")
       return Promise.reject(
         new Error(`Cannot start Eden runtime from ${state} state`),
       );
     state = "starting";
-    startPromise = startInternal();
-    return startPromise;
+    const fiber = effects.forkScoped(initialize());
+    startup = fiber;
+    Deferred.doneUnsafe(launched, Effect.succeed(fiber));
+    return readyPromise;
   }
-  async function disposeResources() {
-    if (resourcesDisposed) return;
-    resourcesDisposed = true;
-    try {
-      if (bundle) await effects.run(bundle.shutdown());
-    } finally {
-      try {
-        await effects.dispose();
-      } catch (error) {
-        log.error("Failed to dispose Eden service scope:", error);
-      } finally {
-        registrations.dispose();
-      }
-    }
+
+  function release() {
+    disposal ??= Effect.runPromise(
+      Effect.gen(function* () {
+        if (startup) {
+          yield* Fiber.interrupt(startup);
+          const exit = yield* Fiber.await(startup);
+          // Failed or interrupted acquisition already shut down and closed its scope.
+          if (Exit.isSuccess(exit) && bundle) yield* bundle.shutdown();
+        }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            log.error("Error during shutdown:", Cause.squash(cause)),
+          ),
+        ),
+        Effect.ensuring(
+          Effect.promise(() => effects.dispose()).pipe(
+            Effect.catchCause((cause) =>
+              Effect.sync(() =>
+                log.error(
+                  "Failed to dispose Eden service scope:",
+                  Cause.squash(cause),
+                ),
+              ),
+            ),
+            Effect.ensuring(Effect.sync(registrations.dispose)),
+          ),
+        ),
+      ),
+    );
+    return disposal;
   }
+
   function dispose() {
-    if (disposePromise) return disposePromise;
-    const beforeStart = state === "created";
+    if (state === "created")
+      Deferred.doneUnsafe(
+        launched,
+        Effect.fail(new Error("Eden runtime disposed before startup")),
+      );
     state = "stopping";
-    if (beforeStart && !readySettled) {
-      readySettled = true;
-      rejectReady(new Error("Eden runtime disposed before startup"));
-    }
-    disposePromise = (async () => {
-      try {
-        if (startPromise) await startPromise.catch(() => undefined);
-        await disposeResources();
-      } catch (error) {
-        log.error("Error during shutdown:", error);
-      } finally {
-        state = "stopped";
-      }
-    })();
-    return disposePromise;
+    bundle?.services.operations.closeAdmission();
+    return release().then(() => {
+      state = "stopped";
+    });
   }
   function activate() {
     if (state === "ready" && bundle && !bundle.foundation.isOpen())

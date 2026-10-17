@@ -277,6 +277,13 @@ await effects.run(appearance.initialize());
 await effects.dispose();
 ```
 
+`forkScoped` retains an acquisition program's fiber while keeping successful
+resources owned by the runtime. Desktop startup uses it to acquire and initialize
+the graph in one Effect program. Readiness follows the startup fiber's exit;
+shutdown interrupts pending startup and runs admission closure, draining, and
+process shutdown before releasing the graph. Native I/O still settles before
+its resources are released.
+
 The managed runtime owns a child scope for each acquisition. Failed acquisition
 closes its child scope immediately; successful acquisitions stay owned until
 runtime disposal closes their resources. Composition supplies adapters and

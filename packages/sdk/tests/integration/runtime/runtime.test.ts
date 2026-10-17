@@ -2,9 +2,12 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import { command, defineController } from "../../../src/controllers/controller";
+import * as packageService from "../../../src/packages/service";
 import { hashPassword } from "../../../src/user/auth";
+import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -264,6 +267,58 @@ describe("EdenRuntime integration", () => {
     expect(() =>
       eden.runtime.settings.registerPanel(definition, provider),
     ).toThrow("closed");
+  });
+
+  it("interrupts blocked service initialization and releases the graph without running later startup", async () => {
+    const entered = gate();
+    const proceed = Deferred.makeUnsafe<void>();
+    let interrupted = false;
+    const createPackages = packageService.createPackages;
+    const factory = jest
+      .spyOn(packageService, "createPackages")
+      .mockImplementation((dependencies) =>
+        Effect.map(createPackages(dependencies), (packages) => ({
+          ...packages,
+          initialize: () =>
+            Effect.gen(function* () {
+              entered.release();
+              yield* Deferred.await(proceed);
+              yield* packages.initialize();
+            }).pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                  interrupted = true;
+                }),
+              ),
+            ),
+        })),
+      );
+    const eden = await createTestEden({ autoStart: false });
+    active.push(eden);
+    const starting = eden.start();
+    const rejected = expect(starting).rejects.toThrow(
+      "startup aborted by shutdown",
+    );
+    let shutdown: Promise<void> | undefined;
+    try {
+      await entered.promise;
+      shutdown = eden.runtime.dispose();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(interrupted).toBe(true);
+      await shutdown;
+      await rejected;
+      expect(eden.runtime.state).toBe("stopped");
+      expect(eden.platform.activeResourceCount).toBe(0);
+      expect(
+        eden.platform.effects.some(
+          (effect) => effect.type === "window-created",
+        ),
+      ).toBe(false);
+    } finally {
+      Deferred.doneUnsafe(proceed, Effect.void);
+      factory.mockRestore();
+      await Promise.allSettled([starting, shutdown ?? eden.runtime.dispose()]);
+    }
   });
 
   it("aborts readiness when disposal starts during startup", async () => {
