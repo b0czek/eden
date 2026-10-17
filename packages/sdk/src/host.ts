@@ -45,6 +45,7 @@ export function createEdenHost({
   const scope = Scope.makeUnsafe("sequential");
 
   function dispose(): Promise<void> {
+    // @eden-effect-next-line domain-interpreter -- Native application shutdown awaits the owned host scope and runtime disposal.
     disposal ??= Effect.runPromise(
       Scope.close(scope, Exit.void).pipe(
         Effect.ensuring(Effect.promise(() => runtime.dispose())),
@@ -53,6 +54,7 @@ export function createEdenHost({
     return disposal;
   }
 
+  // @eden-effect-next-line domain-interpreter -- Host entry point registers synchronous native lifecycle callbacks in its owned scope.
   Effect.runSync(
     Scope.provide(
       Effect.gen(function* () {

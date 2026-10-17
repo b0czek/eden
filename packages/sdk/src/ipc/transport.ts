@@ -39,6 +39,7 @@ export const createIpcTransport = Effect.fn(function* ({
 }) {
   const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
   const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
+  // @eden-effect-next-line domain-interpreter -- Native IPC requires a Promise; response work remains owned by forkResponse.
   const awaitResponse = Effect.runPromiseWith(yield* Effect.context<never>());
   let eventSubscribers: EventRouting;
   let mainWindow: PlatformWindow | null = null;

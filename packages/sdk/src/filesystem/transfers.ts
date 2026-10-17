@@ -277,6 +277,7 @@ export function createFileTransfers() {
     report();
     lastReport = 0;
     // fs.cp requires Promise callbacks; keep that conversion at this native edge.
+    // @eden-effect-next-line domain-interpreter -- Native fs.cp filters require Promises; fs.cp awaits them before the volume lease releases.
     const runFilter = Effect.runPromiseWith(yield* Effect.context<never>());
     yield* fromPromise((signal) =>
       fs.cp(source, destination, {

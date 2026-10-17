@@ -392,6 +392,7 @@ export const createVolumes = Effect.fn(function* () {
     prepareEject,
     prepareOperation,
     withVolumes,
+    // @eden-effect-next-line unresolved-requirements -- Lease acquisition holds volume admission until its caller-owned scope closes.
     lease,
     root,
     changed,

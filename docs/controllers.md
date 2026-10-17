@@ -10,6 +10,9 @@ runtime composes the controllers and registers the EdenAPI command contracts.
 
 Use classless factory functions for domain services. Pass dependencies explicitly,
 keep instance state in closures, and return the operations and events consumers need.
+Introduce a Layer only when it solves a demonstrated composition or ownership
+problem.
+
 Factories acquire resources in an Effect scope; I/O methods return Effects that
 describe work without starting it. Infer the service type from the factory's
 successful result:

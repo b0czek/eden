@@ -343,6 +343,7 @@ export const createBackends = Effect.fn(function* ({
     backendExit,
     backendError,
     backendMessage,
+    // @eden-effect-next-line unresolved-requirements -- Backend acquisition belongs to the caller-owned app instance scope.
     createBackend,
     sendMessage,
     sendPortToBackend,

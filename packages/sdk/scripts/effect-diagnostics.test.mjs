@@ -33,20 +33,27 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
     }),
   );
 
-  const check = async (source) => {
+  const check = async (source, boundaries = false) => {
     await writeFile(path.join(directory, "fixture.ts"), source);
     const result = spawnSync(
       process.execPath,
-      [
-        cli,
-        "diagnostics",
-        "--project",
-        project,
-        "--format",
-        "text",
-        "--severity",
-        "error",
-      ],
+      boundaries
+        ? [
+            fileURLToPath(
+              new URL("check-effect-boundaries.mjs", import.meta.url),
+            ),
+            project,
+          ]
+        : [
+            cli,
+            "diagnostics",
+            "--project",
+            project,
+            "--format",
+            "text",
+            "--severity",
+            "error",
+          ],
       { cwd: sdk, encoding: "utf8", timeout: 60_000 },
     );
     assert.ifError(result.error);
@@ -89,6 +96,110 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
       ]) {
         assert.ok(result.output.includes(`effect(${rule})`), result.output);
       }
+    },
+  );
+  await t.test(
+    "rejects requirements in individual factory methods, including Promise results and unions",
+    async () => {
+      const result = await check(
+        `
+      import * as Effect from "effect/Effect";
+      const make = () => ({
+        direct: () => Effect.scope,
+        promised: async () => Effect.scope,
+        conditional: () => Math.random() ? Effect.scope : Effect.succeed(1),
+        ready: () => Effect.void,
+        invented: <R>(): Effect.Effect<void, never, R> => Effect.void,
+      });
+      export { make as createBroken };
+    `,
+        true,
+      );
+      assert.equal(result.status, 1, result.output);
+      assert.ok(
+        result.output.includes("createBroken.invented requires R"),
+        result.output,
+      );
+      for (const method of ["direct", "promised", "conditional"])
+        assert.ok(
+          result.output.includes(`createBroken.${method} requires Scope`),
+          result.output,
+        );
+    },
+  );
+
+  await t.test(
+    "rejects raw interpreters and detached fibers through aliases and computed access",
+    async () => {
+      const result = await check(
+        `
+      import * as E from "effect/Effect";
+      import { runPromise as interpret, forkDetach as detach } from "effect/Effect";
+      import * as ManagedRuntime from "effect/ManagedRuntime";
+      import * as Layer from "effect/Layer";
+      export const run = () => interpret(E.void);
+      export const copied = E["runSync"];
+      export const background = () => detach(E.void);
+      export const runtime = ManagedRuntime.make(Layer.empty);
+    `,
+        true,
+      );
+      assert.equal(result.status, 1, result.output);
+      assert.equal(
+        result.output.match(/eden\/domain-interpreter/g)?.length,
+        3,
+        result.output,
+      );
+      assert.ok(result.output.includes("eden/unowned-fiber"), result.output);
+    },
+  );
+
+  await t.test(
+    "accepts owned fibers, generic composition and explained adapter exceptions",
+    async () => {
+      const result = await check(
+        `
+      import * as Effect from "effect/Effect";
+      export const createWorker = Effect.fn(function* () {
+        yield* Effect.forkScoped(Effect.void);
+        return {
+          read: () => Effect.void,
+          preserve: <A, E, R>(work: Effect.Effect<A, E, R>) => work,
+          // @eden-effect-next-line unresolved-requirements -- Acquire the resource in its caller-owned scope.
+          acquire: () => Effect.scope,
+        };
+      });
+      export const nativeCallback = () => {
+        // @eden-effect-next-line domain-interpreter -- Native callback returns a Promise and awaits its work.
+        return Effect.runPromise(Effect.void);
+      };
+      const unrelated = { runPromise: () => 1, forkDetach: () => 2 };
+      export const ordinary = unrelated.runPromise() + unrelated.forkDetach();
+    `,
+        true,
+      );
+      assert.equal(result.status, 0, result.output);
+    },
+  );
+
+  await t.test(
+    "rejects exceptions without a reason and stale exceptions",
+    async () => {
+      const result = await check(
+        `
+      // @eden-effect-next-line domain-interpreter
+      export const first = 1;
+      // @eden-effect-next-line unowned-fiber -- This used to create a detached fiber.
+      export const second = 2;
+    `,
+        true,
+      );
+      assert.equal(result.status, 1, result.output);
+      assert.ok(
+        result.output.includes("eden/invalid-exception"),
+        result.output,
+      );
+      assert.ok(result.output.includes("eden/unused-exception"), result.output);
     },
   );
 });

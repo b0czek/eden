@@ -52,6 +52,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   let startup: Fiber.Fiber<void, unknown> | undefined;
   let disposal: Promise<void> | undefined;
   const launched = Deferred.makeUnsafe<Fiber.Fiber<void, unknown>, Error>();
+  // @eden-effect-next-line domain-interpreter -- Runtime boundary exposes startup readiness as a host Promise and joins its retained fiber.
   const readyPromise = Effect.runPromise(
     Deferred.await(launched).pipe(
       Effect.flatMap(Fiber.join),
@@ -112,6 +113,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     }).pipe(Effect.onError(() => desktop.shutdown()));
     return desktop;
   });
+  // @eden-effect-next-line domain-interpreter -- The composition root owns the desktop Layer and every host execution.
   const managed = ManagedRuntime.make(Layer.effect(Desktop, initialize()));
   const effects = {
     run<A, E>(work: Effect.Effect<A, E>): Promise<A> {
@@ -141,6 +143,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   }
 
   function release() {
+    // @eden-effect-next-line domain-interpreter -- Runtime boundary exposes disposal as an idempotent Promise and awaits managed shutdown.
     disposal ??= Effect.runPromise(
       Effect.gen(function* () {
         if (startup) {

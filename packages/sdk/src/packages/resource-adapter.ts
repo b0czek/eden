@@ -4,6 +4,7 @@ import type { ResourceProtocolPort } from "../platform/ports";
 import type { DlcResourceProtocols } from "./dlc-resources";
 
 /** Own resource requests at the platform's Promise callback boundary. */
+// @eden-effect-next-line unresolved-requirements -- Protocol registration acquires request fibers in the caller-owned DLC scope.
 export function createDlcResourceProtocols(
   protocols: ResourceProtocolPort,
 ): DlcResourceProtocols {
