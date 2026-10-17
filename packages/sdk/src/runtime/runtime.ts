@@ -8,7 +8,6 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import type { EdenLifecycleState } from "../api";
 import { resolveBrandingName } from "../branding";
-import { fromPromise } from "../effects/io";
 import { createEffectRuntime } from "../effects/runtime";
 import { log } from "../logging";
 import type { EdenPlatform } from "../platform/ports";
@@ -83,12 +82,10 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   }
   const initialize = Effect.fn(function* () {
     log.info("Eden starting...");
-    yield* fromPromise(() =>
-      seedDatabase(
-        paths.appsDirectory,
-        config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
-        paths.userDirectory,
-      ),
+    yield* seedDatabase(
+      paths.appsDirectory,
+      config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
+      paths.userDirectory,
     );
     const desktop = yield* composeRuntime({
       config,

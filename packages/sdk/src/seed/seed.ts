@@ -10,8 +10,9 @@ import { log } from "../logging";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
-import KeyvSqlite from "@keyv/sqlite";
-import Keyv from "keyv";
+import * as Effect from "effect/Effect";
+import { fromPromise } from "../effects/io";
+import { openKeyvSqlite } from "../storage/keyv-sqlite";
 import { ensureDirectoryRestriction } from "../user/directory-restriction";
 import { defaultGrantsForRole } from "../user/grants";
 
@@ -27,92 +28,80 @@ const DEFAULT_USER_KEY = "users:default";
  * This should be called once during Eden startup, before any services
  * are initialized. After seeding, services simply read from the database.
  */
-export async function seedDatabase(
+export const seedDatabase = Effect.fn(function* (
   appsDirectory: string,
   seedPath: string,
   userDirectory: string,
-): Promise<void> {
-  let seedConfig: EdenSeedConfig;
-
-  try {
-    const content = await fs.readFile(seedPath, "utf-8");
-    seedConfig = JSON.parse(content) as EdenSeedConfig;
-  } catch {
+) {
+  const seedConfig = yield* fromPromise(() =>
+    fs.readFile(seedPath, "utf-8"),
+  ).pipe(
+    Effect.flatMap((content) =>
+      Effect.try(() => JSON.parse(content) as EdenSeedConfig),
+    ),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+  if (!seedConfig) {
     log.info(`No seed configuration found at ${seedPath}`);
     return;
   }
-
-  // Check seeded status per section so one DB doesn't block the others.
-  const usersDb = createKeyv(appsDirectory, "users.db");
-  const usersSeeded = Boolean(await usersDb.get(USERS_SEED_VERSION_KEY));
-
+  const usersDb = yield* openKeyvSqlite({
+    dbPath: path.join(appsDirectory, "users.db"),
+    label: "user seed storage",
+    closedMessage: "User seed storage closed",
+  });
+  const usersSeeded = Boolean(yield* usersDb.read(USERS_SEED_VERSION_KEY));
   const settingsSeed = normalizeSeedSettings(seedConfig);
-  const hasSettingsSeed = Object.keys(settingsSeed).length > 0;
-  let settingsDb: Keyv | null = null;
-  let settingsSeeded = false;
-
-  if (hasSettingsSeed) {
-    settingsDb = createKeyv(appsDirectory, "settings.db");
-    const settingsSeedVersion = await settingsDb.get(SETTINGS_SEED_VERSION_KEY);
-    settingsSeeded = Boolean(settingsSeedVersion);
-  }
-
-  if (usersSeeded && (!hasSettingsSeed || settingsSeeded)) {
+  const settingsDb =
+    Object.keys(settingsSeed).length > 0
+      ? yield* openKeyvSqlite({
+          dbPath: path.join(appsDirectory, "settings.db"),
+          label: "settings seed storage",
+          closedMessage: "Settings seed storage closed",
+        })
+      : undefined;
+  const settingsSeeded = settingsDb
+    ? Boolean(yield* settingsDb.read(SETTINGS_SEED_VERSION_KEY))
+    : false;
+  if (usersSeeded && (!settingsDb || settingsSeeded)) {
     log.info("All sections already seeded, skipping");
     return;
   }
-
   log.info("Seeding database...");
-
-  // Seed users
   if (!usersSeeded) {
-    if (seedConfig.users && seedConfig.users.length > 0) {
-      await seedUsers(usersDb, seedConfig.users, userDirectory);
-    }
-
-    // Seed default user
+    if (seedConfig.users?.length)
+      yield* seedUsers(usersDb, seedConfig.users, userDirectory);
     if (seedConfig.defaultUsername) {
-      await usersDb.set(DEFAULT_USER_KEY, seedConfig.defaultUsername);
+      yield* usersDb.write(DEFAULT_USER_KEY, seedConfig.defaultUsername);
       log.info(`Seeded default user: ${seedConfig.defaultUsername}`);
     }
-
-    // Mark users as seeded
-    await usersDb.set(USERS_SEED_VERSION_KEY, "1");
-  } else {
-    log.info("Users already seeded, skipping");
-  }
-
-  // Seed settings entries (into settings.db)
-  if (hasSettingsSeed && settingsDb) {
-    if (settingsSeeded) {
-      log.info("Settings already seeded, skipping");
-    } else {
-      await seedSettings(settingsDb, settingsSeed);
-      await settingsDb.set(SETTINGS_SEED_VERSION_KEY, "1");
+    yield* usersDb.write(USERS_SEED_VERSION_KEY, "1");
+  } else log.info("Users already seeded, skipping");
+  if (settingsDb) {
+    if (settingsSeeded) log.info("Settings already seeded, skipping");
+    else {
+      yield* seedSettings(settingsDb, settingsSeed);
+      yield* settingsDb.write(SETTINGS_SEED_VERSION_KEY, "1");
     }
   }
   log.info("Seeding complete");
-}
+}, Effect.scoped);
 
-function createKeyv(appsDirectory: string, dbName: string): Keyv {
-  const dbPath = path.join(appsDirectory, dbName);
-  const sqlite = new KeyvSqlite(`sqlite://${dbPath}`);
-  return new Keyv({ store: sqlite });
-}
+type SeedConnection = Effect.Success<ReturnType<typeof openKeyvSqlite>>;
 
 function getUserKey(username: string): string {
   return `user:${username}`;
 }
 
-async function seedUsers(
-  db: Keyv,
+const seedUsers = Effect.fn(function* (
+  db: SeedConnection,
   users: EdenUserConfig[],
   userDirectory: string,
-): Promise<void> {
+) {
   const usernames: string[] = [];
 
   for (const user of users) {
-    const existingUser = await db.get(getUserKey(user.username));
+    const existingUser = yield* db.read(getUserKey(user.username));
     if (existingUser) {
       log.info(`User "${user.username}" already exists, skipping`);
       continue;
@@ -120,10 +109,12 @@ async function seedUsers(
 
     const now = Date.now();
     const role = user.role ?? "standard";
-    const directoryRestriction = await ensureDirectoryRestriction(
-      userDirectory,
-      role,
-      user.directoryRestriction,
+    const directoryRestriction = yield* fromPromise(() =>
+      ensureDirectoryRestriction(
+        userDirectory,
+        role,
+        user.directoryRestriction,
+      ),
     );
     const storedUser = {
       username: user.username,
@@ -137,17 +128,17 @@ async function seedUsers(
       passwordSalt: user.passwordSalt,
     };
 
-    await db.set(getUserKey(user.username), storedUser);
+    yield* db.write(getUserKey(user.username), storedUser);
     usernames.push(user.username);
     log.info(`Seeded user: ${user.name} (${user.username})`);
   }
 
   // Update user index
-  const existingIndex = await db.get(USERS_INDEX_KEY);
+  const existingIndex = yield* db.read(USERS_INDEX_KEY);
   const currentIds = Array.isArray(existingIndex) ? existingIndex : [];
   const mergedUsernames = [...new Set([...currentIds, ...usernames])];
-  await db.set(USERS_INDEX_KEY, mergedUsernames);
-}
+  yield* db.write(USERS_INDEX_KEY, mergedUsernames);
+});
 
 function normalizeSeedSettings(
   seedConfig: EdenSeedConfig,
@@ -173,21 +164,21 @@ function normalizeSeedSettings(
   return settings;
 }
 
-async function seedSettings(
-  db: Keyv,
+const seedSettings = Effect.fn(function* (
+  db: SeedConnection,
   settings: Record<string, Record<string, string>>,
-): Promise<void> {
+) {
   for (const [appId, appSettings] of Object.entries(settings)) {
     for (const [key, value] of Object.entries(appSettings)) {
       const namespacedKey = `${appId}:${key}`;
-      const existing = await db.get(namespacedKey);
+      const existing = yield* db.read(namespacedKey);
       if (existing !== undefined) {
         log.info(`Setting "${appId}:${key}" already exists, skipping`);
         continue;
       }
 
-      await db.set(namespacedKey, value);
+      yield* db.write(namespacedKey, value);
       log.info(`Seeded setting: ${appId}:${key}`);
     }
   }
-}
+});
