@@ -1,6 +1,11 @@
-import { randomUUID } from "node:crypto";
 import type { EventData, EventName, OperationSubmission } from "@edenapp/types";
+import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as FiberSet from "effect/FiberSet";
 import type { Controller } from "../controllers/controller";
+import { asError } from "../effects/io";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
 import { log } from "../logging";
@@ -13,7 +18,7 @@ import { createEventController } from "./controller-edenapi";
 import { createEventRouting, type EventRouting } from "./event-routing";
 import { Permissions } from "./permissions";
 
-export function createIpcTransport({
+export const createIpcTransport = Effect.fn(function* ({
   backends,
   commands,
   permissions,
@@ -32,18 +37,12 @@ export function createIpcTransport({
   rendererIpc: RendererIpcPort;
   operations: Operations;
 }) {
+  const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
+  const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
   let eventSubscribers: EventRouting;
   let mainWindow: PlatformWindow | null = null;
   let controllerEvents = new Map<string, () => void>();
   let runningAppIds: Set<string> = new Set();
-  let pendingCommands: Map<
-    string,
-    {
-      resolve: (value: unknown) => void;
-      reject: (reason: unknown) => void;
-      timeout: NodeJS.Timeout;
-    }
-  > = new Map();
   let stopBackendMessages: (() => void) | undefined;
   let backendMessageListener:
     | ((payload: { appId: string; message: unknown }) => void)
@@ -56,6 +55,7 @@ export function createIpcTransport({
     backends,
     permissions,
   });
+  yield* Effect.addFinalizer(() => Effect.sync(destroy));
   commands.registerController(
     createEventController(eventSubscribers, views, operations),
   );
@@ -115,19 +115,21 @@ export function createIpcTransport({
           throw new Error("Shell command caller is not a registered Eden view");
         }
 
-        return handleShellCommand(
-          command,
-          args,
-          {
-            sessionId: appId ? callerSession(appId) : undefined,
-            appId,
-            webContentsId: event.sender.id,
-            principal: appId
-              ? runtimeContexts.resolvePrincipal(appId)
-              : undefined,
-            foundation: isFoundation,
-          },
-          submission,
+        return runResponse(
+          handleShellCommand(
+            command,
+            args,
+            {
+              sessionId: appId ? callerSession(appId) : undefined,
+              appId,
+              webContentsId: event.sender.id,
+              principal: appId
+                ? runtimeContexts.resolvePrincipal(appId)
+                : undefined,
+              foundation: isFoundation,
+            },
+            submission,
+          ),
         );
       },
     );
@@ -156,15 +158,17 @@ export function createIpcTransport({
 
         // Backend requesting a shell command execution
         try {
-          const result = await handleShellCommand(
-            backendMessage.command,
-            backendMessage.args,
-            {
-              appId,
-              sessionId: callerSession(appId),
-              principal: runtimeContexts.resolvePrincipal(appId),
-            },
-            backendMessage.submission,
+          const result = await runResponse(
+            handleShellCommand(
+              backendMessage.command,
+              backendMessage.args,
+              {
+                appId,
+                sessionId: callerSession(appId),
+                principal: runtimeContexts.resolvePrincipal(appId),
+              },
+              backendMessage.submission,
+            ),
           );
           // Send response back to backend
           sendBackendResponse(appId, backendMessage.commandId, result);
@@ -203,55 +207,47 @@ export function createIpcTransport({
         ? "runtime"
         : undefined;
   }
-  async function handleShellCommand(
+  const handleShellCommand = Effect.fn(function* (
     command: string,
     args: unknown,
     callerContext: import("../execution").CommandCallerContext = {},
     submission?: OperationSubmission,
-  ): Promise<unknown> {
-    // Create a promise to wait for the command result
-    const commandId = randomUUID();
+  ) {
+    const mode = commands.getMode(command);
+    const running = forkCommand(
+      commands.execute(command, args, callerContext, submission),
+    );
+    const result = yield* Fiber.join(running).pipe(
+      Effect.timeoutOrElse({
+        duration: Duration.seconds(10),
+        orElse: () =>
+          Effect.sync(() => running.interruptUnsafe()).pipe(
+            Effect.andThen(
+              Effect.fail(new Error(`Command '${command}' timed out`)),
+            ),
+          ),
+      }),
+    );
+    return mode === "operation"
+      ? { mode: "operation", handle: result }
+      : { mode: "result", result };
+  });
 
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        log.error(
-          `Command '${command}' (ID: ${commandId}) timed out after 10s`,
-        );
-        pendingCommands.delete(commandId);
-        reject(new Error(`Command '${command}' timed out`));
-      }, 10000);
-
-      pendingCommands.set(commandId, { resolve, reject, timeout });
-
-      // Execute via Commands with trusted caller context
-      const mode = commands.getMode(command);
-      commands
-        .execute(command, args, callerContext, submission)
-        .then((result) => {
-          clearTimeout(timeout);
-          pendingCommands.delete(commandId);
-          resolve(
-            mode === "operation"
-              ? { mode: "operation", handle: result }
-              : { mode: "result", result },
-          );
-        })
-        .catch((error) => {
-          const err = error as Error;
-          const appInfo = callerContext.appId
-            ? ` (app: ${callerContext.appId})`
-            : "";
-          log.error(
-            `Command '${command}' (ID: ${commandId}) failed${appInfo}: ${err.message}`,
-          );
-          clearTimeout(timeout);
-          pendingCommands.delete(commandId);
-          const sanitized = new Error(err.message);
-          sanitized.name = err.name;
+  function runResponse(work: Effect.Effect<unknown, unknown>) {
+    return Effect.runPromise(
+      Fiber.join(forkResponse(work)).pipe(
+        Effect.catchCause((cause) => {
+          const error = Cause.hasInterruptsOnly(cause)
+            ? new Error("Eden runtime disposed")
+            : asError(Cause.squash(cause));
+          log.error("Shell command failed:", error.message);
+          const sanitized = new Error(error.message);
+          sanitized.name = error.name;
           sanitized.stack = "";
-          reject(sanitized);
-        });
-    });
+          return Effect.fail(sanitized);
+        }),
+      ),
+    );
   }
   function updateRunningApps(appIds: Iterable<string>): void {
     runningAppIds = new Set(appIds);
@@ -266,19 +262,11 @@ export function createIpcTransport({
       stopBackendMessages?.();
       backendMessageListener = undefined;
     }
-    for (const pending of pendingCommands.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error("Eden runtime disposed"));
-    }
-    pendingCommands.clear();
     for (const stop of controllerEvents.values()) stop();
     controllerEvents.clear();
     eventSubscribers.dispose();
 
     mainWindow = null;
-  }
-  function dispose(): void {
-    destroy();
   }
   return {
     eventSubscribers,
@@ -288,7 +276,8 @@ export function createIpcTransport({
     updateRunningApps,
     getRunningAppIds,
     destroy,
-    dispose,
   };
-}
-export type IpcTransport = ReturnType<typeof createIpcTransport>;
+});
+export type IpcTransport = Effect.Success<
+  ReturnType<typeof createIpcTransport>
+>;

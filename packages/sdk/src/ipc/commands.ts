@@ -1,7 +1,7 @@
 import type { OperationSubmission } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { Controller } from "../controllers/controller";
-import { type EffectRuntime } from "../effects/runtime";
+import { asError } from "../effects/io";
 import {
   type CommandCallerContext,
   ExecutionContext,
@@ -21,7 +21,7 @@ import { Permissions } from "./permissions";
 
 export type CommandHandler<TArgs = unknown, TResult = unknown> = (
   args: TArgs,
-) => Promise<TResult> | TResult;
+) => TResult;
 
 export interface RegisteredCommand {
   namespace: string;
@@ -36,13 +36,11 @@ export function createCommands({
   sessionContext,
   executionContext,
   operations,
-  effects,
 }: {
   permissions: Permissions;
   sessionContext: SessionContext;
   executionContext: ExecutionContext;
   operations: Operations;
-  effects: EffectRuntime;
 }) {
   let handlers = new Map<string, RegisteredCommand>();
 
@@ -65,80 +63,89 @@ export function createCommands({
     }
   }
 
-  async function execute<TResult = unknown>(
+  function execute<TResult = unknown>(
     fullCommand: string,
     args: unknown,
     callerContext: CommandCallerContext = {},
     submission: OperationSubmission = {},
-  ): Promise<TResult> {
-    const metadata = handlers.get(fullCommand);
+  ): Effect.Effect<TResult, unknown> {
+    return Effect.gen(function* () {
+      const { metadata, context } = yield* Effect.try({
+        try: () => {
+          const metadata = handlers.get(fullCommand);
+          if (!metadata) throw new Error(`Unknown command: ${fullCommand}`);
+          const context = resolveCallerContext(callerContext);
+          if (context.foundation) assertFoundationCommandAllowed(fullCommand);
+          return { metadata, context };
+        },
+        catch: asError,
+      });
+      const appId = context.appId;
+      return yield* executionContext.provide(
+        Effect.gen(function* () {
+          const result = yield* Effect.try({
+            try: () => {
+              // Check app permission if required
+              if (metadata.permission && appId) {
+                // First check if app has this as a base permission
+                const hasBasePermission = permissions.hasPermission(
+                  appId,
+                  metadata.permission,
+                );
 
-    if (!metadata) {
-      throw new Error(`Unknown command: ${fullCommand}`);
-    }
+                if (!hasBasePermission) {
+                  // Check if app declares a grant that would unlock this permission
+                  const requiredGrantKeys = permissions.getRequiredGrantKeys(
+                    appId,
+                    metadata.permission,
+                  );
 
-    const context = resolveCallerContext(callerContext);
-    const appId = context.appId;
+                  if (requiredGrantKeys.length === 0) {
+                    // App neither has base permission nor declares any grant for it
+                    throw new Error(
+                      `Permission denied: ${metadata.permission} required for ${fullCommand}`,
+                    );
+                  }
 
-    if (context.foundation) {
-      assertFoundationCommandAllowed(fullCommand);
-    }
+                  // Check if user has any of the grants that would unlock this permission
+                  const hasGrant = requiredGrantKeys.some((grantKey) =>
+                    executionContext.hasGrant(grantKey),
+                  );
 
-    return executionContext.run(context, async () => {
-      // Check app permission if required
-      if (metadata.permission && appId) {
-        // First check if app has this as a base permission
-        const hasBasePermission = permissions.hasPermission(
-          appId,
-          metadata.permission,
-        );
+                  if (!hasGrant) {
+                    throw new Error(
+                      `Grant denied: ${requiredGrantKeys.join(",")} required for ${fullCommand}`,
+                    );
+                  }
+                }
+              }
 
-        if (!hasBasePermission) {
-          // Check if app declares a grant that would unlock this permission
-          const requiredGrantKeys = permissions.getRequiredGrantKeys(
-            appId,
-            metadata.permission,
-          );
-
-          if (requiredGrantKeys.length === 0) {
-            // App neither has base permission nor declares any grant for it
-            throw new Error(
-              `Permission denied: ${metadata.permission} required for ${fullCommand}`,
-            );
-          }
-
-          // Check if user has any of the grants that would unlock this permission
-          const hasGrant = requiredGrantKeys.some((grantKey) =>
-            executionContext.hasGrant(grantKey),
-          );
-
-          if (!hasGrant) {
-            throw new Error(
-              `Grant denied: ${requiredGrantKeys.join(",")} required for ${fullCommand}`,
-            );
-          }
-        }
-      }
-
-      if (metadata.mode === "operation") {
-        const preparedArgs = structuredClone(sanitizeArgs(args));
-        const fingerprintArgs = { ...preparedArgs };
-        for (const key of Object.keys(fingerprintArgs))
-          if (key.startsWith("_")) delete fingerprintArgs[key];
-        return operations.submit(
-          fullCommand,
-          fingerprintArgs,
-          context,
-          () => metadata.handler(preparedArgs) as OperationTask<unknown>,
-          submission,
-        ) as TResult;
-      }
-      const result = await metadata.handler(sanitizeArgs(args));
-      return (
-        Effect.isEffect(result)
-          ? await effects.run(result as Effect.Effect<unknown, unknown>)
-          : await result
-      ) as TResult;
+              if (metadata.mode === "operation") {
+                const preparedArgs = structuredClone(sanitizeArgs(args));
+                const fingerprintArgs = { ...preparedArgs };
+                for (const key of Object.keys(fingerprintArgs))
+                  if (key.startsWith("_")) delete fingerprintArgs[key];
+                return operations.submit(
+                  fullCommand,
+                  fingerprintArgs,
+                  context,
+                  () =>
+                    metadata.handler(preparedArgs) as OperationTask<unknown>,
+                  submission,
+                );
+              }
+              return metadata.handler(sanitizeArgs(args));
+            },
+            catch: asError,
+          });
+          return (
+            Effect.isEffect(result)
+              ? yield* result as Effect.Effect<unknown, unknown>
+              : result
+          ) as TResult;
+        }),
+        context,
+      );
     });
   }
   function resolveCallerContext(

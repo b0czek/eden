@@ -22,6 +22,11 @@ export async function pauseCommand<C extends CommandName>(
   if (!app) throw new Error("Electron app is not running");
   await app.evaluate(
     (_electron, target) => {
+      const Effect = process
+        .getBuiltinModule("node:module")
+        .createRequire(`${process.cwd()}/package.json`)(
+        "effect/Effect",
+      ) as typeof import("effect/Effect");
       const { isDeepStrictEqual } = process.getBuiltinModule("node:util");
       const integration = globalThis as PauseGlobal & {
         __edenIntegration: {
@@ -33,7 +38,7 @@ export async function pauseCommand<C extends CommandName>(
                   args: Record<string, unknown>,
                   caller?: { appId?: string },
                   submission?: unknown,
-                ): Promise<unknown>;
+                ): import("effect/Effect").Effect<unknown, unknown>;
               };
             };
           };
@@ -56,31 +61,32 @@ export async function pauseCommand<C extends CommandName>(
         },
       };
       integration.__edenCommandPause = state;
-      registry.execute = async (command, args, caller, submission) => {
-        if (
-          command !== target.command ||
-          caller?.appId !== target.match.appId ||
-          !target.entries.every(([key, value]) =>
-            isDeepStrictEqual(args[key], value),
-          )
-        ) {
-          return execute.call(registry, command, args, caller, submission);
-        }
-        registry.execute = execute;
-        state.pending = true;
-        await resumed;
-        try {
-          return await execute.call(
-            registry,
-            command,
-            args,
-            caller,
-            submission,
+      registry.execute = (command, args, caller, submission) =>
+        Effect.suspend(() => {
+          if (
+            command !== target.command ||
+            caller?.appId !== target.match.appId ||
+            !target.entries.every(([key, value]) =>
+              isDeepStrictEqual(args[key], value),
+            )
+          ) {
+            return execute.call(registry, command, args, caller, submission);
+          }
+          registry.execute = execute;
+          state.pending = true;
+          return Effect.andThen(
+            Effect.promise(() => resumed),
+            Effect.suspend(() =>
+              execute.call(registry, command, args, caller, submission),
+            ),
+          ).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                state.completed = true;
+              }),
+            ),
           );
-        } finally {
-          state.completed = true;
-        }
-      };
+        });
     },
     {
       command,

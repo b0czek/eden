@@ -1,5 +1,6 @@
 const path = require("node:path");
 const Effect = require("effect/Effect");
+const Duration = require("effect/Duration");
 const v = require("valibot");
 const { createEdenHost } = require("../../dist/host.js");
 const {
@@ -76,7 +77,7 @@ function registerFixtureController() {
                   operationReleases.set(name, resolve),
                 );
                 reporter.update("waiting-for-fixture");
-                yield* Effect.sleep("31 seconds");
+                yield* Effect.sleep(Duration.seconds(31));
                 yield* Effect.promise(() => released);
                 operationReleases.delete(name);
                 reporter.update("writing-fixture");

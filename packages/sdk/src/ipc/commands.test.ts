@@ -13,13 +13,17 @@ function harness() {
   const session = createSessionContext();
   const effects = createEffectRuntime();
   const permissions = createPermissions();
-  const registry = createCommands({
+  const commands = createCommands({
     permissions,
     sessionContext: session,
     executionContext: execution,
     operations: {} as Operations,
-    effects,
   });
+  const registry = {
+    ...commands,
+    execute: <TResult>(...args: Parameters<typeof commands.execute>) =>
+      effects.run(commands.execute<TResult>(...args)),
+  };
   return { registry, execution, session, effects, permissions };
 }
 const profile = {

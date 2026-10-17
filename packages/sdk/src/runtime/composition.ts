@@ -238,7 +238,6 @@ export const composeRuntime = Effect.fn(function* ({
         sessionContext,
         executionContext: execution,
         operations,
-        effects,
       }),
     ),
     (value) => Effect.sync(value.dispose),
@@ -275,22 +274,16 @@ export const composeRuntime = Effect.fn(function* ({
     utilityProcesses: platform.utilityProcesses,
     dlcResources,
   });
-  const ipc = yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      createIpcTransport({
-        backends,
-        commands,
-        permissions,
-        views,
-        runtimeContexts,
-        execution,
-        rendererIpc: platform.rendererIpc,
-        operations,
-      }),
-    ),
-    (value) => Effect.sync(value.dispose),
-  );
-
+  const ipc = yield* createIpcTransport({
+    backends,
+    commands,
+    permissions,
+    views,
+    runtimeContexts,
+    execution,
+    rendererIpc: platform.rendererIpc,
+    operations,
+  });
   const packages = yield* createPackages({
     appsDirectory: paths.appsDirectory,
     distPath: paths.distPath,

@@ -83,7 +83,10 @@ export async function createTestEden(
       command: string,
       args: unknown = {},
       caller: CommandCallerContext = {},
-    ) => runtime.services.commands.execute<TResult>(command, args, caller),
+    ) =>
+      runtime.effects.run(
+        runtime.services.commands.execute<TResult>(command, args, caller),
+      ),
     complete: async <TResult>(
       command: string,
       args: unknown = {},
@@ -95,7 +98,9 @@ export async function createTestEden(
           caller.sessionId ?? runtime.services.sessionContext.getSessionId(),
       };
       const registry = runtime.services.commands;
-      const result = await registry.execute(command, args, context);
+      const result = await runtime.effects.run(
+        registry.execute(command, args, context),
+      );
       return (
         registry.getMode(command) === "operation"
           ? await runtime.effects.run(

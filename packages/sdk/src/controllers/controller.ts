@@ -1,5 +1,6 @@
-import type { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
+import { fromPromise } from "../effects/io";
 import type { CommandCallerContext } from "../execution/context";
 import { type OperationTask, operationTask } from "../operations/task";
 import type { ControllerEvent } from "./events";
@@ -70,8 +71,22 @@ export function command(
   return {
     ...options,
     mode: options.mode ?? "result",
-    execute: (input, caller) =>
-      options.handle(v.parse(schema, input) as never, caller),
+    execute: (input, caller) => {
+      const result = options.handle(v.parse(schema, input) as never, caller);
+      // Normalize Promise-based extensions once at their controller boundary.
+      if (
+        options.mode !== "operation" &&
+        result &&
+        typeof (result as PromiseLike<unknown>).then === "function"
+      ) {
+        return fromPromise(() => result as PromiseLike<unknown>).pipe(
+          Effect.flatMap((value) =>
+            Effect.isEffect(value) ? value : Effect.succeed(value),
+          ),
+        );
+      }
+      return result;
+    },
   };
 }
 

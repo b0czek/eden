@@ -1,4 +1,5 @@
 import type { OperationHandle } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { command, defineController } from "../../../src/controllers/controller";
 import { Commands } from "../../../src/ipc/commands";
 import { Operations } from "../../../src/operations/service";
@@ -38,7 +39,7 @@ describe("one bounded IPC deadline", () => {
     eden.runtime.services.commands.registerController(
       defineController("deadline-test", {
         commands: {
-          result: command({ handle: () => completion }),
+          result: command({ handle: () => Effect.promise(() => completion) }),
           operation: command({
             mode: "operation",
             handle: () => promiseOperationTask(async () => completion),
@@ -46,7 +47,7 @@ describe("one bounded IPC deadline", () => {
         },
       }),
     );
-    jest.useFakeTimers();
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask", "setImmediate"] });
   });
   afterEach(async () => {
     complete("cleanup");

@@ -59,13 +59,15 @@ describe("runtime-owned operations", () => {
   const register = (run: (args: { value: string }) => OperationTask<unknown>) =>
     (prepareWork = run);
   const submit = (value = "value", requestKey?: string) =>
-    eden.runtime.services.commands.execute<OperationHandle>(
-      "integration/work",
-      { value },
-      owner,
-      {
-        requestKey,
-      },
+    eden.runtime.effects.run(
+      eden.runtime.services.commands.execute<OperationHandle>(
+        "integration/work",
+        { value },
+        owner,
+        {
+          requestKey,
+        },
+      ),
     );
 
   it("rejects cancellation for tasks that do not support it", async () => {
@@ -315,10 +317,12 @@ describe("runtime-owned operations", () => {
       );
       // Session changes cannot multiply an app's allowance.
       await expect(
-        eden.runtime.services.commands.execute(
-          "integration/work",
-          { value: "other-session" },
-          { ...owner, sessionId: "other-session" },
+        eden.runtime.effects.run(
+          eden.runtime.services.commands.execute(
+            "integration/work",
+            { value: "other-session" },
+            { ...owner, sessionId: "other-session" },
+          ),
         ),
       ).rejects.toThrow("capacity exhausted");
       clock.mockReturnValue(now + operationRetentionMs - 1);
@@ -375,10 +379,12 @@ describe("runtime-owned operations", () => {
       caller: typeof owner | { principal: typeof owner.principal },
       value = "active",
     ) =>
-      eden.runtime.services.commands.execute<OperationHandle>(
-        "integration/work",
-        { value },
-        caller,
+      eden.runtime.effects.run(
+        eden.runtime.services.commands.execute<OperationHandle>(
+          "integration/work",
+          { value },
+          caller,
+        ),
       );
     try {
       let remainingShared = operationQuotaLimits.sharedLimit;
