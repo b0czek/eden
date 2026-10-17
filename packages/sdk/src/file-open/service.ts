@@ -6,7 +6,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { TargetedNotification } from "../controllers/events";
-import { createEvent } from "../events/event";
+import { scopedEvent } from "../events/scoped";
 import {
   DIRECTORY_ASSOCIATION_KEY,
   DIRECTORY_PREFERENCE_KEY,
@@ -45,10 +45,7 @@ export function createFileOpen({
   i18n,
 }: FileOpenDependencies) {
   return Effect.gen(function* () {
-    const opened = yield* Effect.acquireRelease(
-      Effect.sync(() => createEvent<TargetedNotification<FileOpenedEvent>>()),
-      (event) => Effect.sync(event.dispose),
-    );
+    const opened = yield* scopedEvent<TargetedNotification<FileOpenedEvent>>();
 
     function getFileContext(location: FilesystemLocation) {
       return Effect.map(filesystem.inspect(location), (metadata) => {
