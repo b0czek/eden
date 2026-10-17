@@ -8,6 +8,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import { fromPromise } from "../../../src/effects/io";
 import { createFileTransfers } from "../../../src/filesystem/transfers";
 import { decodeLaunchContext } from "../../../src/utils/app-launch-context";
 import { testApp } from "../../support/apps";
@@ -423,20 +424,20 @@ describe("consumer-managed filesystem volumes", () => {
             destination,
             destinationLabel: "home:/operators/one/original.txt",
             overwrite: true,
-            assertSourceActive: async () => {
-              // Disconnect after the original has been staged, before copying starts.
-              if (
-                (await fs.readdir(destinationRoot)).some((name) =>
-                  name.startsWith(".original.txt.eden-transfer-"),
-                )
-              ) {
-                eden.runtime.volumes.unregister("usb");
-              }
-              await sourceLease.assertActive();
-            },
-            assertDestinationActive: async () => {
-              await fs.stat(destinationRoot);
-            },
+            assertSourceActive: () =>
+              Effect.gen(function* () {
+                // Disconnect after the original has been staged, before copying starts.
+                if (
+                  (yield* fromPromise(() => fs.readdir(destinationRoot))).some(
+                    (name) => name.startsWith(".original.txt.eden-transfer-"),
+                  )
+                ) {
+                  eden.runtime.volumes.unregister("usb");
+                }
+                yield* sourceLease.assertActive();
+              }),
+            assertDestinationActive: () =>
+              Effect.asVoid(fromPromise(() => fs.stat(destinationRoot))),
           }),
         ),
       ).rejects.toThrow("unavailable");
@@ -915,7 +916,9 @@ describe("consumer-managed filesystem volumes", () => {
       kind: "removable",
       rootPath: usbRoot,
     });
-    await expect(lease.assertActive()).rejects.toThrow("unavailable");
+    await expect(Effect.runPromise(lease.assertActive())).rejects.toThrow(
+      "unavailable",
+    );
     await fs.rename(usbRoot, `${usbRoot}-removed`);
     await expect(
       execute("fs/exists", {

@@ -42,7 +42,7 @@ it("keeps admitted volume access independent when two runtimes use the same volu
         Effect.gen(function* () {
           const root = yield* a.root("usb");
           if (!root) throw new Error("Registered volume has no root");
-          yield* fromPromise(root.assertActive);
+          yield* root.assertActive();
           return root.rootPath;
         }),
       ),

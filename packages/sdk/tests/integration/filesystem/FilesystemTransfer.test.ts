@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test as nodeTest } from "node:test";
 import * as Effect from "effect/Effect";
+import { fromPromise } from "../../../src/effects/io";
 import { createFileTransfers } from "../../../src/filesystem/transfers";
 
 const test = typeof it === "function" ? it : nodeTest;
@@ -86,16 +87,15 @@ for (const operation of ["copy", "move"] as const) {
             destination,
             destinationLabel: destination,
             overwrite: true,
-            assertSourceActive: async () => {
-              try {
-                await fs.stat(destination);
-              } catch (error) {
-                if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-                  throw new Error("source disconnected");
-                }
-                throw error;
-              }
-            },
+            assertSourceActive: () =>
+              fromPromise(() => fs.stat(destination)).pipe(
+                Effect.asVoid,
+                Effect.mapError((error) =>
+                  (error as NodeJS.ErrnoException).code === "ENOENT"
+                    ? new Error("source disconnected")
+                    : error,
+                ),
+              ),
             reporter: { update() {} },
           }),
         ),

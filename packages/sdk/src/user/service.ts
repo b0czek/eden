@@ -77,12 +77,10 @@ export const createUsers = Effect.fn(function* ({
       role,
       args.grants ?? defaultGrantsForRole(role),
     );
-    const directoryRestriction = yield* fromPromise(() =>
-      ensureDirectoryRestriction(
-        userDirectory,
-        role,
-        args.directoryRestriction,
-      ),
+    const directoryRestriction = yield* ensureDirectoryRestriction(
+      userDirectory,
+      role,
+      args.directoryRestriction,
     );
 
     const user: StoredUser = {
@@ -130,12 +128,10 @@ export const createUsers = Effect.fn(function* ({
     }
 
     if (args.directoryRestriction !== undefined) {
-      const directoryRestriction = yield* fromPromise(() =>
-        ensureDirectoryRestriction(
-          userDirectory,
-          user.role,
-          args.directoryRestriction,
-        ),
+      const directoryRestriction = yield* ensureDirectoryRestriction(
+        userDirectory,
+        user.role,
+        args.directoryRestriction,
       );
       if (directoryRestriction) {
         user.directoryRestriction = directoryRestriction;

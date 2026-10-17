@@ -6,7 +6,8 @@ import { pipeline } from "node:stream/promises";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
+import * as Exit from "effect/Exit";
+import { asError, fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/task";
 
 interface TransferRequest {
@@ -15,8 +16,8 @@ interface TransferRequest {
   destinationLabel: string;
   overwrite: boolean;
   reporter?: OperationReporter;
-  assertSourceActive?: () => Promise<void>;
-  assertDestinationActive?: () => Promise<void>;
+  assertSourceActive?: () => Effect.Effect<void, Error>;
+  assertDestinationActive?: () => Effect.Effect<void, Error>;
 }
 
 interface PreparedTransfer {
@@ -24,8 +25,8 @@ interface PreparedTransfer {
   destination: string;
   destinationExists: boolean;
   reporter?: OperationReporter;
-  assertSourceActive?: () => Promise<void>;
-  assertDestinationActive?: () => Promise<void>;
+  assertSourceActive?: () => Effect.Effect<void, Error>;
+  assertDestinationActive?: () => Effect.Effect<void, Error>;
 }
 
 interface PathReservation {
@@ -52,8 +53,8 @@ export function createFileTransfers() {
         const paths = [
           path.resolve(request.source),
           path.resolve(request.destination),
-          yield* io(() => resolveCanonicalPath(request.source)),
-          yield* io(() => resolveCanonicalPath(request.destination)),
+          yield* resolveCanonicalPath(request.source),
+          yield* resolveCanonicalPath(request.destination),
         ];
         const predecessors = [...reservations].filter((reservation) =>
           reservation.paths.some((reserved) =>
@@ -93,13 +94,10 @@ export function createFileTransfers() {
   }
 
   const copyReserved = Effect.fn(function* (request: TransferRequest) {
-    yield* io(() => assertActive(request));
+    yield* assertActive(request);
     request.reporter?.update("preparing-copy");
     const transfer = yield* prepare(request, "copy");
-    yield* runWithDestinationRollback(
-      transfer,
-      fromPromise((signal) => copyEntry(transfer, signal)),
-    );
+    yield* runWithDestinationRollback(transfer, copyEntry(transfer));
   });
 
   const moveReserved = Effect.fn(function* (request: TransferRequest) {
@@ -109,13 +107,13 @@ export function createFileTransfers() {
     yield* runWithDestinationRollback(
       transfer,
       Effect.gen(function* () {
-        yield* io(() => assertActive(transfer));
+        yield* assertActive(transfer);
         transfer.reporter?.update("moving");
         yield* io(() => fs.rename(transfer.source, transfer.destination)).pipe(
           Effect.catch((error) => {
             if ((error as NodeJS.ErrnoException).code !== "EXDEV")
               return Effect.fail(error);
-            return fromPromise((signal) => copyEntry(transfer, signal)).pipe(
+            return copyEntry(transfer).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
                   copied = true;
@@ -128,7 +126,7 @@ export function createFileTransfers() {
     );
     if (copied) {
       yield* Effect.gen(function* () {
-        yield* io(() => assertActive(transfer));
+        yield* assertActive(transfer);
         transfer.reporter?.update("removing-source");
         yield* io(() =>
           fs.rm(transfer.source, { recursive: true, force: false }),
@@ -151,8 +149,8 @@ export function createFileTransfers() {
   ) {
     const sourceStats = yield* io(() => fs.stat(request.source));
     const canonicalSource = yield* io(() => fs.realpath(request.source));
-    const canonicalDestination = yield* io(() =>
-      resolveCanonicalPath(request.destination),
+    const canonicalDestination = yield* resolveCanonicalPath(
+      request.destination,
     );
     if (canonicalSource === canonicalDestination)
       return yield* Effect.fail(
@@ -171,12 +169,12 @@ export function createFileTransfers() {
       return yield* Effect.fail(
         new Error("Source and destination paths overlap"),
       );
-    const destinationExists = yield* io(() => pathExists(request.destination));
+    const destinationExists = yield* pathExists(request.destination);
     if (destinationExists && !request.overwrite)
       return yield* Effect.fail(
         new Error(`Destination '${request.destinationLabel}' already exists`),
       );
-    yield* io(() => assertActive(request));
+    yield* assertActive(request);
     yield* io(() =>
       fs.mkdir(path.dirname(request.destination), { recursive: true }),
     );
@@ -196,80 +194,79 @@ export function createFileTransfers() {
   ) =>
     Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
-        yield* io(() => assertActive(transfer));
+        yield* assertActive(transfer);
         const backup = transfer.destinationExists
-          ? yield* io(() => stageDestination(transfer.destination))
+          ? yield* stageDestination(transfer.destination)
           : undefined;
-        yield* restore(
-          Effect.andThen(
-            work,
-            io(() => assertActive(transfer)),
-          ),
-        ).pipe(
+        yield* restore(Effect.andThen(work, assertActive(transfer))).pipe(
           Effect.catchCause((cause) =>
-            io(async () => {
+            Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");
-              const rollbackErrors: unknown[] = [];
-              try {
-                await transfer.assertDestinationActive?.();
-                await fs.rm(transfer.destination, {
-                  recursive: true,
-                  force: true,
-                });
-              } catch (cleanupError) {
-                rollbackErrors.push(cleanupError);
-              }
-              if (backup) {
-                try {
-                  await transfer.assertDestinationActive?.();
-                  await fs.rename(backup, transfer.destination);
-                } catch (restoreError) {
-                  rollbackErrors.push(restoreError);
-                }
-              }
-              if (rollbackErrors.length)
-                throw new AggregateError(
-                  [Cause.squash(cause), ...rollbackErrors],
-                  "Filesystem transfer failed and rollback was incomplete",
+              const rollbackErrors: Error[] = [];
+              const attempt = (work: Effect.Effect<unknown, Error>) =>
+                work.pipe(
+                  Effect.catch((error) =>
+                    Effect.sync(() => {
+                      rollbackErrors.push(error);
+                    }),
+                  ),
                 );
-            }).pipe(Effect.andThen(Effect.failCause(cause))),
+              yield* attempt(
+                Effect.gen(function* () {
+                  yield* transfer.assertDestinationActive?.() ?? Effect.void;
+                  yield* io(() =>
+                    fs.rm(transfer.destination, {
+                      recursive: true,
+                      force: true,
+                    }),
+                  );
+                }),
+              );
+              if (backup)
+                yield* attempt(
+                  Effect.gen(function* () {
+                    yield* transfer.assertDestinationActive?.() ?? Effect.void;
+                    yield* io(() => fs.rename(backup, transfer.destination));
+                  }),
+                );
+              if (rollbackErrors.length)
+                return yield* Effect.fail(
+                  new AggregateError(
+                    [Cause.squash(cause), ...rollbackErrors],
+                    "Filesystem transfer failed and rollback was incomplete",
+                  ),
+                );
+              return yield* Effect.failCause(cause);
+            }),
           ),
         );
         if (backup) {
           transfer.reporter?.update("cleaning-up");
-          yield* io(async () => {
-            await transfer.assertDestinationActive?.();
-            await fs.rm(backup, { recursive: true, force: true });
-          });
+          yield* transfer.assertDestinationActive?.() ?? Effect.void;
+          yield* io(() => fs.rm(backup, { recursive: true, force: true }));
         }
       }),
     );
 
-  async function stageDestination(destination: string): Promise<string> {
+  const stageDestination = Effect.fn(function* (destination: string) {
     const backup = path.join(
       path.dirname(destination),
       `.${path.basename(destination)}.eden-transfer-${randomUUID()}`,
     );
-    await fs.rename(destination, backup);
+    yield* io(() => fs.rename(destination, backup));
     return backup;
-  }
+  });
 
-  async function assertActive(
+  const assertActive = Effect.fn(function* (
     transfer: TransferRequest | PreparedTransfer,
-    signal?: AbortSignal,
   ) {
-    signal?.throwIfAborted();
-    await transfer.assertSourceActive?.();
-    await transfer.assertDestinationActive?.();
-    signal?.throwIfAborted();
-  }
+    yield* transfer.assertSourceActive?.() ?? Effect.void;
+    yield* transfer.assertDestinationActive?.() ?? Effect.void;
+  });
 
-  async function copyEntry(
-    transfer: PreparedTransfer,
-    signal: AbortSignal,
-  ): Promise<void> {
+  const copyEntry = Effect.fn(function* (transfer: PreparedTransfer) {
     const { source, destination } = transfer;
-    const sourceStats = await fs.lstat(source);
+    const sourceStats = yield* io(() => fs.lstat(source));
     const total = sourceStats.isFile() ? sourceStats.size : undefined;
     let completed = 0;
     let lastReport = 0;
@@ -279,75 +276,89 @@ export function createFileTransfers() {
     };
     report();
     lastReport = 0;
-    await fs.cp(source, destination, {
-      recursive: true,
-      verbatimSymlinks: true,
-      filter: async (entrySource, entryDestination) => {
-        await assertActive(transfer, signal);
-        if (transfer.reporter) {
-          const stats = await fs.lstat(entrySource);
-          if (stats.isFile()) {
-            // Keep native directory and symlink semantics, but stream regular
-            // files so even a single large file can report transferred bytes.
-            await pipeline(
-              createReadStream(entrySource, { highWaterMark: 1024 * 1024 }),
-              async function* (chunks) {
-                for await (const chunk of chunks) {
-                  yield chunk;
-                  completed += chunk.length;
+    // fs.cp requires Promise callbacks; keep that conversion at this native edge.
+    const runFilter = Effect.runPromiseWith(yield* Effect.context<never>());
+    yield* fromPromise((signal) =>
+      fs.cp(source, destination, {
+        recursive: true,
+        verbatimSymlinks: true,
+        filter: (entrySource, entryDestination) =>
+          runFilter(
+            Effect.gen(function* () {
+              yield* Effect.try({
+                try: () => signal.throwIfAborted(),
+                catch: asError,
+              });
+              yield* assertActive(transfer);
+              if (transfer.reporter) {
+                const stats = yield* io(() => fs.lstat(entrySource));
+                if (stats.isFile()) {
+                  yield* fromPromise(() =>
+                    pipeline(
+                      createReadStream(entrySource, {
+                        highWaterMark: 1024 * 1024,
+                      }),
+                      async function* (chunks) {
+                        for await (const chunk of chunks) {
+                          yield chunk;
+                          completed += chunk.length;
+                          if (Date.now() - lastReport >= 100) report();
+                        }
+                      },
+                      createWriteStream(entryDestination, {
+                        flags: "wx",
+                        mode: stats.mode,
+                      }),
+                      { signal },
+                    ),
+                  );
+                  yield* io(() => fs.chmod(entryDestination, stats.mode));
+                  yield* assertActive(transfer);
+                  yield* Effect.try({
+                    try: () => signal.throwIfAborted(),
+                    catch: asError,
+                  });
                   if (Date.now() - lastReport >= 100) report();
+                  return false;
                 }
-              },
-              createWriteStream(entryDestination, {
-                flags: "wx",
-                mode: stats.mode,
-              }),
-              { signal },
-            );
-            await fs.chmod(entryDestination, stats.mode);
-            await assertActive(transfer, signal);
-            if (Date.now() - lastReport >= 100) report();
-            return false;
-          }
-        }
-        return true;
-      },
-      errorOnExist: true,
-      force: false,
-    });
-    await assertActive(transfer, signal);
+              }
+              return true;
+            }),
+          ),
+        errorOnExist: true,
+        force: false,
+      }),
+    );
+    yield* assertActive(transfer);
     report();
-  }
+  });
 
-  async function pathExists(hostPath: string): Promise<boolean> {
-    try {
-      await fs.lstat(hostPath);
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
-  }
+  const pathExists = (hostPath: string) =>
+    io(() => fs.lstat(hostPath)).pipe(
+      Effect.as(true),
+      Effect.catch((error) =>
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+          ? Effect.succeed(false)
+          : Effect.fail(error),
+      ),
+    );
 
-  async function resolveCanonicalPath(hostPath: string): Promise<string> {
+  const resolveCanonicalPath = Effect.fn(function* (hostPath: string) {
     let existingPath = hostPath;
     const missingSegments: string[] = [];
-
     while (true) {
-      try {
-        return path.resolve(
-          await fs.realpath(existingPath),
-          ...missingSegments,
-        );
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-        const parent = path.dirname(existingPath);
-        if (parent === existingPath) throw error;
-        missingSegments.unshift(path.basename(existingPath));
-        existingPath = parent;
-      }
+      const result = yield* Effect.exit(io(() => fs.realpath(existingPath)));
+      if (Exit.isSuccess(result))
+        return path.resolve(result.value, ...missingSegments);
+      const error = Cause.squash(result.cause);
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+        return yield* Effect.fail(asError(error));
+      const parent = path.dirname(existingPath);
+      if (parent === existingPath) return yield* Effect.fail(asError(error));
+      missingSegments.unshift(path.basename(existingPath));
+      existingPath = parent;
     }
-  }
+  });
 
   function isPathWithin(parentPath: string, candidatePath: string): boolean {
     const relative = path.relative(parentPath, candidatePath);

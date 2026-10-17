@@ -38,7 +38,7 @@ interface VolumeLease {
 
 export interface VolumeRoot {
   rootPath: string;
-  assertActive(): Promise<void>;
+  assertActive(): Effect.Effect<void, Error>;
 }
 
 /** Explicit admission for resources whose lifetime spans several commands. */
@@ -197,7 +197,7 @@ export const createVolumes = Effect.fn(function* () {
               discard: true,
             });
             for (const [volumeId, sibling] of group)
-              yield* io(() => assertMounted(volumeId, sibling));
+              yield* assertMounted(volumeId, sibling);
             reporter.update("host-eject");
             yield* io(operation);
             for (const [volumeId, sibling] of group)
@@ -325,24 +325,23 @@ export const createVolumes = Effect.fn(function* () {
     };
   }
 
-  async function assertMounted(
-    id: string,
-    entry: MountedVolume,
-  ): Promise<void> {
+  const assertMounted = Effect.fn(function* (id: string, entry: MountedVolume) {
     const assertRegistered = () => {
       if (disposed || mounted.get(id) !== entry)
         throw new Error(`Filesystem volume '${id}' is unavailable`);
     };
-    assertRegistered();
-    const stats = await fs.stat(entry.rootPath);
-    assertRegistered();
+    yield* Effect.try({ try: assertRegistered, catch: asError });
+    const stats = yield* io(() => fs.stat(entry.rootPath));
+    yield* Effect.try({ try: assertRegistered, catch: asError });
     if (
       !stats.isDirectory() ||
       stats.dev !== entry.device ||
       stats.ino !== entry.inode
     )
-      throw new Error(`Filesystem volume '${id}' mount has changed`);
-  }
+      yield* Effect.fail(
+        new Error(`Filesystem volume '${id}' mount has changed`),
+      );
+  });
 
   function getRoot(
     id: string,
@@ -363,11 +362,12 @@ export const createVolumes = Effect.fn(function* () {
     assertAccessible();
     return {
       rootPath: entry.rootPath,
-      assertActive: async () => {
-        assertAccessible();
-        await assertMounted(id, entry);
-        assertAccessible();
-      },
+      assertActive: () =>
+        Effect.gen(function* () {
+          yield* Effect.try({ try: assertAccessible, catch: asError });
+          yield* assertMounted(id, entry);
+          yield* Effect.try({ try: assertAccessible, catch: asError });
+        }),
     };
   }
 

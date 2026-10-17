@@ -1,6 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserRole } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import { asError, fromPromise } from "../effects/io";
 
 export function normalizeDirectoryRestriction(
   directoryRestriction: string | null | undefined,
@@ -40,15 +42,20 @@ export function resolveDirectoryRestriction(
   return resolvedDirectory;
 }
 
-export async function ensureDirectoryRestriction(
+export const ensureDirectoryRestriction = Effect.fn(function* (
   userDirectory: string,
   role: UserRole,
   directoryRestriction: string | null | undefined,
-): Promise<string | undefined> {
-  const normalized = normalizeDirectoryRestriction(directoryRestriction);
+) {
+  const normalized = yield* Effect.try({
+    try: () => normalizeDirectoryRestriction(directoryRestriction),
+    catch: asError,
+  });
   if (role === "vendor") {
     if (normalized) {
-      throw new Error("Vendor users always use the userDirectory root");
+      return yield* Effect.fail(
+        new Error("Vendor users always use the userDirectory root"),
+      );
     }
     return undefined;
   }
@@ -59,11 +66,11 @@ export async function ensureDirectoryRestriction(
 
   const root = path.resolve(userDirectory);
   const directory = resolveDirectoryRestriction(root, normalized);
-  await assertExistingPathWithin(root, directory);
-  await fs.mkdir(directory, { recursive: true });
-  await assertExistingPathWithin(root, directory);
+  yield* assertExistingPathWithin(root, directory);
+  yield* fromPromise(() => fs.mkdir(directory, { recursive: true }));
+  yield* assertExistingPathWithin(root, directory);
   return normalized;
-}
+});
 
 export function assertPathWithin(
   rootPath: string,
@@ -80,30 +87,33 @@ export function assertPathWithin(
   }
 }
 
-export async function assertExistingPathWithin(
+export const assertExistingPathWithin = Effect.fn(function* (
   rootPath: string,
   targetPath: string,
-): Promise<void> {
+) {
   const resolvedRoot = path.resolve(rootPath);
   const resolvedTarget = path.resolve(targetPath);
-  assertPathWithin(resolvedRoot, resolvedTarget);
-
-  const realRoot = await fs.realpath(resolvedRoot);
+  yield* Effect.try({
+    try: () => assertPathWithin(resolvedRoot, resolvedTarget),
+    catch: asError,
+  });
+  const realRoot = yield* fromPromise(() => fs.realpath(resolvedRoot));
   const relative = path.relative(resolvedRoot, resolvedTarget);
   let current = resolvedRoot;
-
   for (const component of relative.split(path.sep).filter(Boolean)) {
     current = path.join(current, component);
-    try {
-      await fs.lstat(current);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return;
-      }
-      throw error;
-    }
-
-    const realCurrent = await fs.realpath(current);
-    assertPathWithin(realRoot, realCurrent);
+    const stats = yield* fromPromise(() => fs.lstat(current)).pipe(
+      Effect.catch((error) =>
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+          ? Effect.succeed(undefined)
+          : Effect.fail(error),
+      ),
+    );
+    if (!stats) return;
+    const realCurrent = yield* fromPromise(() => fs.realpath(current));
+    yield* Effect.try({
+      try: () => assertPathWithin(realRoot, realCurrent),
+      catch: asError,
+    });
   }
-}
+});

@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Latch from "effect/Latch";
 import * as Scope from "effect/Scope";
-import { asError } from "../effects/io";
+import { asError, fromPromise } from "../effects/io";
 import type {
   EffectivePrincipal,
   ExecutionContext,
@@ -262,14 +262,16 @@ export const createFileHandles = Effect.fn(function* (
 });
 
 /** Whole-file reads use explicit positions so repeated and concurrent reads start at zero. */
-export async function readOpenedFile(file: FileHandle): Promise<Buffer> {
+export const readOpenedFile = Effect.fn(function* (file: FileHandle) {
   const chunks: Buffer[] = [];
   let position = 0;
   while (true) {
     const buffer = Buffer.allocUnsafe(64 * 1024);
-    const { bytesRead } = await file.read(buffer, 0, buffer.length, position);
+    const { bytesRead } = yield* fromPromise(() =>
+      file.read(buffer, 0, buffer.length, position),
+    );
     if (bytesRead === 0) return Buffer.concat(chunks, position);
     chunks.push(buffer.subarray(0, bytesRead));
     position += bytesRead;
   }
-}
+});

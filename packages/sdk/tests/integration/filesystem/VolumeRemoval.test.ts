@@ -480,11 +480,12 @@ describe("safe volume removal", () => {
           paused = true;
           return {
             rootPath: root.rootPath,
-            assertActive: async () => {
-              admitted.resolve();
-              await resume.promise;
-              await root.assertActive();
-            },
+            assertActive: () =>
+              Effect.gen(function* () {
+                admitted.resolve();
+                yield* Effect.promise(() => resume.promise);
+                yield* root.assertActive();
+              }),
           };
         }),
       );

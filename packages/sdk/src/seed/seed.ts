@@ -109,12 +109,10 @@ const seedUsers = Effect.fn(function* (
 
     const now = Date.now();
     const role = user.role ?? "standard";
-    const directoryRestriction = yield* fromPromise(() =>
-      ensureDirectoryRestriction(
-        userDirectory,
-        role,
-        user.directoryRestriction,
-      ),
+    const directoryRestriction = yield* ensureDirectoryRestriction(
+      userDirectory,
+      role,
+      user.directoryRestriction,
     );
     const storedUser = {
       username: user.username,

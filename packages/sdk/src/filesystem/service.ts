@@ -82,41 +82,44 @@ export const createFilesystem = Effect.fn(function* ({
       ? resolveDirectoryRestriction(baseDir, restriction)
       : baseDir;
   }
-  // Node descriptor callbacks retain their admission across native I/O.
-  async function resolveTargetNode(
+  const resolveTargetNode = Effect.fn(function* (
     address: FilesystemLocation,
     write: boolean,
     mounted: VolumeRoot | undefined,
   ) {
-    requirePrincipal();
-    const info = volumes.get(address.volume);
-    if (write && info.readOnly)
-      throw new Error(`Filesystem volume '${address.volume}' is read-only`);
-    const rootPath = mounted?.rootPath ?? baseDir;
-    const accessPath = mounted?.rootPath ?? getHomeAccessPath();
-    const assertActive = async () => {
-      await mounted?.assertActive();
-    };
-    await assertActive();
-    const hostPath = path.resolve(
-      rootPath,
-      address.path.replace(/^[\\/]+/, ""),
-    );
-    assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
-    assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
-    await assertExistingPathWithin(rootPath, hostPath);
-    if (accessPath !== rootPath)
-      await assertExistingPathWithin(accessPath, hostPath);
-    await assertActive();
-    return { hostPath, rootPath, accessPath, assertActive };
-  }
+    const target = yield* Effect.try({
+      try: () => {
+        requirePrincipal();
+        const info = volumes.get(address.volume);
+        if (write && info.readOnly)
+          throw new Error(`Filesystem volume '${address.volume}' is read-only`);
+        const rootPath = mounted?.rootPath ?? baseDir;
+        const accessPath = mounted?.rootPath ?? getHomeAccessPath();
+        const hostPath = path.resolve(
+          rootPath,
+          address.path.replace(/^[\\/]+/, ""),
+        );
+        assertPathWithin(rootPath, hostPath, `Path '${address.path}'`);
+        assertPathWithin(accessPath, hostPath, `Path '${address.path}'`);
+        return { rootPath, accessPath, hostPath };
+      },
+      catch: asError,
+    });
+    const assertActive = () => mounted?.assertActive() ?? Effect.void;
+    yield* assertActive();
+    yield* assertExistingPathWithin(target.rootPath, target.hostPath);
+    if (target.accessPath !== target.rootPath)
+      yield* assertExistingPathWithin(target.accessPath, target.hostPath);
+    yield* assertActive();
+    return { ...target, assertActive };
+  });
   const resolveTarget = Effect.fn(function* (
     address: FilesystemLocation,
     write = false,
   ) {
     yield* Effect.try({ try: requirePrincipal, catch: asError });
     const root = yield* volumes.root(address.volume);
-    return yield* io(() => resolveTargetNode(address, write, root));
+    return yield* resolveTargetNode(address, write, root);
   });
   function assertNotRoot(target: {
     hostPath: string;
@@ -146,16 +149,16 @@ export const createFilesystem = Effect.fn(function* ({
           return yield* Effect.fail(
             new Error("Filesystem source is not a regular file"),
           );
-        yield* io(target.assertActive);
+        yield* target.assertActive();
         return {
           use: <A, E>(
             operation: (file: fs.FileHandle) => Effect.Effect<A, E>,
           ) =>
             access.effect(
               Effect.gen(function* () {
-                yield* io(target.assertActive);
+                yield* target.assertActive();
                 const result = yield* operation(file);
-                yield* io(target.assertActive);
+                yield* target.assertActive();
                 return result;
               }),
             ),
@@ -213,7 +216,7 @@ export const createFilesystem = Effect.fn(function* ({
       Effect.gen(function* () {
         yield* Effect.try({ try: requirePrincipal, catch: asError });
         const root = yield* volumes.root(volume);
-        if (root) yield* io(root.assertActive);
+        if (root) yield* root.assertActive();
         const rootPath = root?.rootPath ?? baseDir;
         const normalized = path.resolve(absolutePath);
         yield* Effect.try({
@@ -247,11 +250,13 @@ export const createFilesystem = Effect.fn(function* ({
     encoding: BufferEncoding = "utf-8",
   ) =>
     handles.use(source, (file) =>
-      io(async () => (await readOpenedFile(file)).toString(encoding)),
+      readOpenedFile(file).pipe(
+        Effect.map((buffer) => buffer.toString(encoding)),
+      ),
     );
   const readBinaryFile = (source: FilesystemSource) =>
     handles.use(source, (file) =>
-      io(async () => new Uint8Array(await readOpenedFile(file))),
+      readOpenedFile(file).pipe(Effect.map((buffer) => new Uint8Array(buffer))),
     );
   const writeContent = (
     location: FilesystemLocation,
@@ -262,19 +267,15 @@ export const createFilesystem = Effect.fn(function* ({
       [location.volume],
       Effect.gen(function* () {
         const target = yield* resolveTarget(location, true);
-        yield* io(target.assertActive);
+        yield* target.assertActive();
         yield* io(() =>
           fs.mkdir(path.dirname(target.hostPath), { recursive: true }),
         );
-        yield* io(target.assertActive);
-        yield* io(() =>
-          assertExistingPathWithin(target.rootPath, target.hostPath),
-        );
+        yield* target.assertActive();
+        yield* assertExistingPathWithin(target.rootPath, target.hostPath);
         if (target.accessPath !== target.rootPath)
-          yield* io(() =>
-            assertExistingPathWithin(target.accessPath, target.hostPath),
-          );
-        yield* io(target.assertActive);
+          yield* assertExistingPathWithin(target.accessPath, target.hostPath);
+        yield* target.assertActive();
         yield* io(() => fs.writeFile(target.hostPath, content, encoding));
         watcher.invalidate(path.dirname(target.hostPath));
       }),
@@ -300,7 +301,7 @@ export const createFilesystem = Effect.fn(function* ({
               return Effect.fail(error);
             return Effect.gen(function* () {
               const root = yield* volumes.root(location.volume);
-              if (root) yield* io(root.assertActive);
+              if (root) yield* root.assertActive();
               return false;
             });
           }),
@@ -312,7 +313,7 @@ export const createFilesystem = Effect.fn(function* ({
       [location.volume],
       Effect.gen(function* () {
         const target = yield* resolveTarget(location, true);
-        yield* io(target.assertActive);
+        yield* target.assertActive();
         yield* io(() => fs.mkdir(target.hostPath, { recursive: true }));
         watcher.invalidate(path.dirname(target.hostPath));
       }),
@@ -334,37 +335,41 @@ export const createFilesystem = Effect.fn(function* ({
   });
   const search = (location: FilesystemLocation, pattern: string, limit = 10) =>
     withVolume(location, (fullPath) =>
-      io(async () => {
-        try {
-          const entries = await fg(pattern ? `**/*${pattern}*` : "**/*", {
+      Effect.gen(function* () {
+        const entries = yield* io(() =>
+          fg(pattern ? `**/*${pattern}*` : "**/*", {
             cwd: fullPath,
             onlyFiles: false,
             deep: 3,
             suppressErrors: true,
             stats: true,
             followSymbolicLinks: false,
+          }),
+        );
+        const results: SearchResult[] = [];
+        for (const entry of entries) {
+          if (results.length >= limit) break;
+          results.push({
+            location: {
+              volume: location.volume,
+              path:
+                location.path === "/"
+                  ? `/${entry.path}`
+                  : `${location.path}/${entry.path}`,
+            },
+            name: path.basename(entry.path),
+            type: entry.stats?.isDirectory() ? "folder" : "file",
           });
-          const results: SearchResult[] = [];
-          for (const entry of entries) {
-            if (results.length >= limit) break;
-            results.push({
-              location: {
-                volume: location.volume,
-                path:
-                  location.path === "/"
-                    ? `/${entry.path}`
-                    : `${location.path}/${entry.path}`,
-              },
-              name: path.basename(entry.path),
-              type: entry.stats?.isDirectory() ? "folder" : "file",
-            });
-          }
-          return results;
-        } catch (error) {
-          log.error("Search error:", error);
-          return [];
         }
-      }),
+        return results;
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            log.error("Search error:", error);
+            return [] as SearchResult[];
+          }),
+        ),
+      ),
     );
   const remove = (location: FilesystemLocation, reporter?: OperationReporter) =>
     volumes.withVolumes(
@@ -374,7 +379,7 @@ export const createFilesystem = Effect.fn(function* ({
         const target = yield* resolveTarget(location, true);
         yield* Effect.try({ try: () => assertNotRoot(target), catch: asError });
         const stats = yield* io(() => fs.stat(target.hostPath));
-        yield* io(target.assertActive);
+        yield* target.assertActive();
         reporter?.update("deleting");
         yield* io(() =>
           stats.isDirectory()
@@ -460,7 +465,7 @@ export const createFilesystem = Effect.fn(function* ({
           catch: asError,
         });
         const stats = yield* io(() => fs.stat(target.hostPath));
-        yield* io(target.assertActive);
+        yield* target.assertActive();
         return yield* Effect.try({
           try: () => {
             if (!stats.isDirectory())
