@@ -94,6 +94,27 @@ Keep an exception next to the expression it governs and suppress only that
 diagnostic. Native adapters and heterogeneous execution boundaries may need exceptions; domain
 work should compose Effects with its dependencies provided.
 
+## Effect-owned time
+
+Use `TestClock.layer()` with the scoped
+[`createEffectRuntime`](../packages/sdk/tests/support/effect-runtime.ts) fixture
+for service deadlines, retention, debounce and retry tests. The layer installs
+both the clock and its tracking scheduler; providing only a clock does not offer
+the same ordering guarantees for forked sleeps.
+
+Advance time with `TestClock.adjust(Duration.millis(...))`. Check the instant
+before a deadline as well as the deadline itself. Await explicit milestones with
+`Deferred`, fiber completion, or the service's drain method; advancing time does
+not complete native I/O. See the
+[backend deadline tests](../packages/sdk/tests/integration/processes/Backends.test.ts)
+and [operation retention tests](../packages/sdk/src/operations/retention.test.ts).
+
+Operation timestamps and expiry read the Clock captured during acquisition, so
+synchronous admission and completion observers share the service's clock.
+Accepted operations still drain before runtime disposal. Native filesystem
+notification tests can retain real external synchronization, and unrelated Jest
+suites can keep their existing timer setup.
+
 ## Electron setup
 
 Use the [shared host](../packages/sdk/tests/electron/support/host.ts):

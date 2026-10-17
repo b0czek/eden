@@ -5,6 +5,7 @@ import type {
   OperationSubmission,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -61,6 +62,7 @@ export const createOperations = Effect.fn(function* ({
     releaseHandles(sessionId?: string): Effect.Effect<void, Error>;
   };
 }) {
+  const clock = yield* Clock.Clock;
   const changed =
     yield* scopedEvent<
       RoutedNotification<OperationNamespaceEvents["changed"]>
@@ -144,7 +146,7 @@ export const createOperations = Effect.fn(function* ({
         accepting = false;
         runtimeTransition = id;
       }
-      const now = Date.now();
+      const now = clock.currentTimeMillisUnsafe();
       const record: RecordEntry = {
         snapshot: {
           command,
@@ -217,7 +219,10 @@ export const createOperations = Effect.fn(function* ({
     record: RecordEntry,
     task: OperationTask<unknown>,
   ) {
-    update(record, { status: "running", startedAt: Date.now() });
+    update(record, {
+      status: "running",
+      startedAt: clock.currentTimeMillisUnsafe(),
+    });
     if (task.transition) update(record, { phase: "waiting-for-operations" });
     if (record.transitionSessionId) {
       yield* filesystem.releaseHandles(record.transitionSessionId);
@@ -252,16 +257,19 @@ export const createOperations = Effect.fn(function* ({
       if (Exit.isSuccess(exit)) {
         update(record, {
           status: "succeeded",
-          completedAt: Date.now(),
+          completedAt: clock.currentTimeMillisUnsafe(),
           result: exit.value,
         });
       } else if (Cause.hasInterruptsOnly(exit.cause)) {
-        update(record, { status: "cancelled", completedAt: Date.now() });
+        update(record, {
+          status: "cancelled",
+          completedAt: clock.currentTimeMillisUnsafe(),
+        });
       } else {
         const failure = asError(Cause.squash(exit.cause));
         update(record, {
           status: "failed",
-          completedAt: Date.now(),
+          completedAt: clock.currentTimeMillisUnsafe(),
           error: { name: failure.name, message: failure.message },
           ...(task.encodeFailure && !Cause.hasDies(exit.cause)
             ? { response: structuredClone(task.encodeFailure(failure)) }
@@ -292,7 +300,7 @@ export const createOperations = Effect.fn(function* ({
       ...record.snapshot,
       ...patch,
       revision: record.snapshot.revision + 1,
-      updatedAt: Date.now(),
+      updatedAt: clock.currentTimeMillisUnsafe(),
     } as OperationSnapshot;
     publish(record);
   }
@@ -483,7 +491,7 @@ export const createOperations = Effect.fn(function* ({
     yield* drain(execution.get()?.operationId);
   });
   function prune(): void {
-    const now = Date.now();
+    const now = clock.currentTimeMillisUnsafe();
     for (const record of records.values()) {
       const snapshot = record.snapshot;
       if (
