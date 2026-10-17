@@ -110,18 +110,28 @@ describe("EdenRuntime integration", () => {
     expect(await first.execute("i18n/get-locale")).toEqual({ locale: "pl" });
     expect(await second.execute("i18n/get-locale")).toEqual({ locale: "en" });
 
-    await first.runtime.appearance.setWallpaper({
-      type: "custom",
+    await first.runtime.effects.run(
+      first.runtime.appearance.setWallpaper({
+        type: "custom",
+        value: "#112233",
+      }),
+    );
+    await second.runtime.effects.run(
+      second.runtime.appearance.setWallpaper({
+        type: "custom",
+        value: "#445566",
+      }),
+    );
+    expect(
+      await first.runtime.effects.run(first.runtime.appearance.getWallpaper()),
+    ).toMatchObject({
       value: "#112233",
     });
-    await second.runtime.appearance.setWallpaper({
-      type: "custom",
-      value: "#445566",
-    });
-    expect(await first.runtime.appearance.getWallpaper()).toMatchObject({
-      value: "#112233",
-    });
-    expect(await second.runtime.appearance.getWallpaper()).toMatchObject({
+    expect(
+      await second.runtime.effects.run(
+        second.runtime.appearance.getWallpaper(),
+      ),
+    ).toMatchObject({
       value: "#445566",
     });
 
@@ -414,10 +424,12 @@ describe("EdenRuntime integration", () => {
           "changed-theme",
         ),
       );
-      await first.runtime.appearance.setWallpaper({
-        type: "custom",
-        value: "#abcdef",
-      });
+      await first.runtime.effects.run(
+        first.runtime.appearance.setWallpaper({
+          type: "custom",
+          value: "#abcdef",
+        }),
+      );
       await first.dispose();
 
       const second = await createTestEden({ root, config: { seedPath } });
@@ -447,7 +459,11 @@ describe("EdenRuntime integration", () => {
           second.runtime.services.settings.get("restart-app", "theme"),
         ),
       ).toBe("changed-theme");
-      expect(await second.runtime.appearance.getWallpaper()).toMatchObject({
+      expect(
+        await second.runtime.effects.run(
+          second.runtime.appearance.getWallpaper(),
+        ),
+      ).toMatchObject({
         type: "custom",
         value: "#abcdef",
       });

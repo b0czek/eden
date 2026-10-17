@@ -40,15 +40,17 @@ describe("safe volume removal", () => {
   });
 
   const register = (operations: EdenVolumeOptions = {}, readOnly = false) =>
-    eden.runtime.volumes.register(
-      {
-        id: "usb",
-        label: "USB",
-        kind: "removable",
-        rootPath: usbRoot,
-        readOnly,
-      },
-      operations,
+    eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        {
+          id: "usb",
+          label: "USB",
+          kind: "removable",
+          rootPath: usbRoot,
+          readOnly,
+        },
+        operations,
+      ),
     );
   const execute = <T = unknown>(command: string, args: unknown = {}) =>
     eden.complete<T>(command, args, {
@@ -59,12 +61,13 @@ describe("safe volume removal", () => {
   it("drains volume work admitted at acceptance while its task is still queued", async () => {
     let hostContent: string | undefined;
     await register({
-      eject: async () => {
-        hostContent = await fs.readFile(
-          path.join(usbRoot, "accepted.txt"),
-          "utf8",
-        );
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          hostContent = await fs.readFile(
+            path.join(usbRoot, "accepted.txt"),
+            "utf8",
+          );
+        }),
     });
     await fs.writeFile(
       path.join(eden.paths.userDirectory, "source.txt"),
@@ -101,12 +104,13 @@ describe("safe volume removal", () => {
   it("retains queued child admission after the parent volume scope ends", async () => {
     let hostContent: string | undefined;
     await register({
-      eject: async () => {
-        hostContent = await fs.readFile(
-          path.join(usbRoot, "child.txt"),
-          "utf8",
-        );
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          hostContent = await fs.readFile(
+            path.join(usbRoot, "child.txt"),
+            "utf8",
+          );
+        }),
     });
     const runtime = eden.runtime;
     const { filesystem, volumes, execution, operations } = runtime.services;
@@ -151,9 +155,10 @@ describe("safe volume removal", () => {
     await fs.writeFile(source, "source contents");
     let ejected = false;
     await register({
-      eject: async () => {
-        ejected = true;
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          ejected = true;
+        }),
     });
     const copying = deferred();
     const resumeCopy = deferred();
@@ -228,10 +233,11 @@ describe("safe volume removal", () => {
     let handle: fs.FileHandle | undefined;
     let hostCalls = 0;
     await register({
-      eject: async () => {
-        hostCalls++;
-        expect(handle?.fd).toBe(-1);
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          hostCalls++;
+          expect(handle?.fd).toBe(-1);
+        }),
     });
     const open = fs.open.bind(fs);
     jest.spyOn(fs, "open").mockImplementation(async (...args) => {
@@ -293,10 +299,11 @@ describe("safe volume removal", () => {
     let handle: fs.FileHandle | undefined;
     let hostCalls = 0;
     await register({
-      eject: async () => {
-        hostCalls++;
-        expect(handle?.fd).toBe(-1);
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          hostCalls++;
+          expect(handle?.fd).toBe(-1);
+        }),
     });
     const open = fs.open.bind(fs);
     jest.spyOn(fs, "open").mockImplementation(async (...args) => {
@@ -333,9 +340,10 @@ describe("safe volume removal", () => {
   it("reserves eject on acceptance, retains failure, and allows an explicit retry", async () => {
     let busy = true;
     await register({
-      eject: async () => {
-        if (busy) throw new Error("Device is busy");
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          if (busy) throw new Error("Device is busy");
+        }),
     });
     const states: (string | undefined)[] = [];
     const stop = eden.runtime.volumes.onChanged((volumes) =>
@@ -397,11 +405,12 @@ describe("safe volume removal", () => {
     const finished = deferred();
     let calls = 0;
     await register({
-      eject: async () => {
-        calls++;
-        started.resolve();
-        await finished.promise;
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          calls++;
+          started.resolve();
+          await finished.promise;
+        }),
     });
     const inventories: FilesystemVolume[][] = [];
     eden.runtime.volumes.onChanged((volumes) => inventories.push(volumes));
@@ -431,7 +440,9 @@ describe("safe volume removal", () => {
         location: { volume: "usb", path: "/" },
       }),
     ).rejects.toThrow("ejecting");
-    const duplicate = eden.runtime.volumes.eject("usb");
+    const duplicate = eden.runtime.effects.run(
+      eden.runtime.volumes.eject("usb"),
+    );
     await execute("fs/write", {
       location: { volume: "home", path: "/unrelated.txt" },
       content: "works",
@@ -458,12 +469,13 @@ describe("safe volume removal", () => {
       const resume = deferred();
       let hostContent: string | undefined;
       await register({
-        eject: async () => {
-          hostContent = await fs.readFile(
-            path.join(usbRoot, "report.txt"),
-            "utf8",
-          );
-        },
+        eject: () =>
+          Effect.promise(async () => {
+            hostContent = await fs.readFile(
+              path.join(usbRoot, "report.txt"),
+              "utf8",
+            );
+          }),
       });
       await fs.writeFile(
         path.join(eden.paths.userDirectory, "report.txt"),
@@ -502,7 +514,9 @@ describe("safe volume removal", () => {
             },
       );
       await admitted.promise;
-      const removal = eden.runtime.volumes.eject("usb");
+      const removal = eden.runtime.effects.run(
+        eden.runtime.volumes.eject("usb"),
+      );
       await expect(
         execute("fs/stat", {
           location: { volume: "usb", path: "/report.txt" },
@@ -524,12 +538,15 @@ describe("safe volume removal", () => {
       const started = deferred();
       const finished = deferred();
       await register({
-        eject: async () => {
-          started.resolve();
-          await finished.promise;
-        },
+        eject: () =>
+          Effect.promise(async () => {
+            started.resolve();
+            await finished.promise;
+          }),
       });
-      const removal = eden.runtime.volumes.eject("usb");
+      const removal = eden.runtime.effects.run(
+        eden.runtime.volumes.eject("usb"),
+      );
       // Attach the rejection handler before settling the host operation.
       const result =
         outcome === "resolve"
@@ -554,9 +571,10 @@ describe("safe volume removal", () => {
     let ejected = false;
     await register(
       {
-        eject: async () => {
-          ejected = true;
-        },
+        eject: () =>
+          Effect.promise(async () => {
+            ejected = true;
+          }),
       },
       true,
     );
@@ -564,9 +582,10 @@ describe("safe volume removal", () => {
     expect(ejected).toBe(false);
     await register(
       {
-        eject: async () => {
-          ejected = true;
-        },
+        eject: () =>
+          Effect.promise(async () => {
+            ejected = true;
+          }),
       },
       true,
     );
@@ -590,7 +609,7 @@ describe("safe volume removal", () => {
         name: "ValiError",
       });
     eden.runtime.volumes.unregister("usb");
-    await register({ eject: async () => {} });
+    await register({ eject: () => Effect.promise(async () => {}) });
     eden.runtime.services.permissions.registerApp(appId, [
       "fs/read",
       "fs/write",
@@ -622,15 +641,16 @@ describe("safe volume removal", () => {
   it("does not invoke the host operation on a replaced mount", async () => {
     let ejected = false;
     await register({
-      eject: async () => {
-        ejected = true;
-      },
+      eject: () =>
+        Effect.promise(async () => {
+          ejected = true;
+        }),
     });
     await fs.rename(usbRoot, `${usbRoot}-old`);
     await fs.mkdir(usbRoot);
-    await expect(eden.runtime.volumes.eject("usb")).rejects.toThrow(
-      "mount has changed",
-    );
+    await expect(
+      eden.runtime.effects.run(eden.runtime.volumes.eject("usb")),
+    ).rejects.toThrow("mount has changed");
     expect(ejected).toBe(false);
   });
 });

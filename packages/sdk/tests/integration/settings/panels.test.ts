@@ -10,13 +10,17 @@ describe("SettingsPanels integration", () => {
 
   it("runs built-in actions through real domain managers and persistence", async () => {
     eden = await createTestEden();
-    const user = await eden.runtime.users.create({
-      username: "settings-user",
-      name: "Settings User",
-      password: "password",
-      grants: ["preset/appearance/manage", "preset/package/manage"],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "settings-user",
+        name: "Settings User",
+        password: "password",
+        grants: ["preset/appearance/manage", "preset/package/manage"],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
 
     const panels = eden.runtime.services.settingsPanels;
     await eden.runtime.effects.run(
@@ -31,7 +35,9 @@ describe("SettingsPanels integration", () => {
       }),
     );
 
-    expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
+    expect(
+      await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
+    ).toMatchObject({
       id: "midnight",
       value: "#1a1b26",
     });
@@ -50,13 +56,17 @@ describe("SettingsPanels integration", () => {
 
   it("exposes a dynamic host collection through the real settings boundary", async () => {
     eden = await createTestEden();
-    const user = await eden.runtime.users.create({
-      username: "panel-user",
-      name: "Panel User",
-      password: "password",
-      grants: ["panels/devices"],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "panel-user",
+        name: "Panel User",
+        password: "password",
+        grants: ["panels/devices"],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const panels = eden.runtime.services.settingsPanels;
     let items = ["one", "two"];
     const registration = eden.runtime.settings.registerPanel(

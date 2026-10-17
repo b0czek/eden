@@ -11,6 +11,8 @@ export async function registerTestVolume(
 ) {
   const rootPath = path.join(eden.paths.root, input.id);
   await fs.mkdir(rootPath, { recursive: true });
-  await eden.runtime.volumes.register({ ...input, rootPath }, options);
+  await eden.runtime.effects.run(
+    eden.runtime.volumes.register({ ...input, rootPath }, options),
+  );
   return rootPath;
 }

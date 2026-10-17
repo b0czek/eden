@@ -44,7 +44,9 @@ describe.each(["window", "worker"])(
         username: "client",
         name: "Client",
       });
-      await eden.runtime.sessions.login("client", "password");
+      await eden.runtime.effects.run(
+        eden.runtime.sessions.login("client", "password"),
+      );
       await eden.complete("process/launch", { appId });
       const instance = eden.runtime.services.processes.getAppInstance(appId);
       if (!instance)

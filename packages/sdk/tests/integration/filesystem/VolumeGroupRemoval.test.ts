@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { fromPromise } from "../../../src/effects/io";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -51,10 +52,11 @@ describe("grouped volume removal", () => {
         { id, label: id, kind: "removable" },
         {
           ejectGroup: "physical-drive",
-          eject: async () => {
-            hostCalls++;
-            expect(content).toBe("second");
-          },
+          eject: () =>
+            Effect.promise(async () => {
+              hostCalls++;
+              expect(content).toBe("second");
+            }),
         },
       );
       await fs.writeFile(path.join(root, "notes.txt"), id);
@@ -114,16 +116,17 @@ describe("grouped volume removal", () => {
         { id, label: id, kind: "removable" },
         {
           ejectGroup: "physical-drive",
-          eject: async () => {
-            calls++;
-            if (failing) throw new Error("Device busy");
-          },
+          eject: () =>
+            Effect.promise(async () => {
+              calls++;
+              if (failing) throw new Error("Device busy");
+            }),
         },
       );
     }
     const outcomes = await Promise.allSettled([
-      eden.runtime.volumes.eject("first"),
-      eden.runtime.volumes.eject("second"),
+      eden.runtime.effects.run(eden.runtime.volumes.eject("first")),
+      eden.runtime.effects.run(eden.runtime.volumes.eject("second")),
     ]);
     expect(outcomes.map((outcome) => outcome.status)).toEqual([
       "rejected",
@@ -137,7 +140,7 @@ describe("grouped volume removal", () => {
         .map((volume) => volume.state),
     ).toEqual(["ready", "ready"]);
     failing = false;
-    await eden.runtime.volumes.eject("second");
+    await eden.runtime.effects.run(eden.runtime.volumes.eject("second"));
     expect(eden.runtime.volumes.list().map((volume) => volume.id)).toEqual([
       "home",
     ]);

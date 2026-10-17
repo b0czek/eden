@@ -242,7 +242,7 @@ export const composeRuntime = Effect.fn(function* ({
     ),
     (value) => Effect.sync(value.dispose),
   );
-  const sdk = createSdkContext({ execution, effects, operations });
+  const sdk = createSdkContext({ execution, operations });
   const operationsApi = createOperationsSdkController({ operations, sdk });
   const settingsPanels = createSettingsPanels({
     settings,

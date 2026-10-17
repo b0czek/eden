@@ -141,8 +141,9 @@ argument type. Omit it for commands without public arguments. The generated
 client uses the schema's input type; a handler receives its validated output,
 including defaults and transformations. Results are inferred from the handler.
 Result handlers can return ordinary values, Promises, or fully provided Effects.
-The command registry executes Effects through the owning runtime. Controllers
-return work rather than calling `runPromise` themselves.
+The command registry returns one Effect program; native IPC adapters execute it
+through scoped fibers. Controllers return work rather than calling `runPromise`
+themselves.
 
 `permission: "manage"` on an appearance command requires `appearance/manage`.
 Commands run through the existing registry's permission and grant checks.
@@ -196,8 +197,8 @@ an Effect dependency.
 
 ## SDK controllers
 
-SDK controllers return the existing typed method objects, preserving synchronous
-reads, Promise-based work, detached data and idempotent unsubscribe functions.
+SDK controllers return typed method objects with synchronous reads, lazy
+Effect-based work, detached data and idempotent unsubscribe functions.
 They validate inputs before mutating state or submitting retained work. See
 [appearance](../packages/sdk/src/appearance/controller-sdk.ts) for native Effect
 composition and [sessions](../packages/sdk/src/session/controller-sdk.ts) for
@@ -205,8 +206,9 @@ retained host transitions.
 
 The runtime supplies one `SdkContext`. Its `run` method establishes host authority
 with a system principal and no inherited app, renderer or operation identity.
-`effect` interprets fully provided service Effects in that context. `operation`
-submits through the existing operation ledger and awaits completion. SDK event
+`effect` defers validation and provides host authority to a fully provided service
+Effect. `operation` submits through the existing operation ledger when executed
+and awaits completion. Host runners interpret the completed SDK program. SDK event
 callbacks also enter host context and receive detached payloads.
 
 `createControlPlaneApis` composes these domain controllers; it contains no input

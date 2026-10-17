@@ -68,6 +68,8 @@ export function createEdenHost({
 
   return {
     settings: runtime.settings,
+    runPromise: runtime.effects.run,
+    runFork: runtime.effects.fork,
     whenReady: () => runtime.whenReady(),
     dispose,
     get state() {

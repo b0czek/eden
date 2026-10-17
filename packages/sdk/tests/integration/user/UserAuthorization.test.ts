@@ -167,7 +167,9 @@ describe("account command authorization", () => {
         grants: [grant, `apps/launch/${appId}`],
       }),
     );
-    await eden.runtime.sessions.login(standard.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(standard.username, "password"),
+    );
     await eden.complete("process/launch", { appId });
     const processes = eden.runtime.services.processes;
     const instance = processes.getAppInstance(appId);

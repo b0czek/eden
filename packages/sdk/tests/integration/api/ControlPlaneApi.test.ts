@@ -7,6 +7,7 @@ import type {
   UserProfile,
   WallpaperConfig,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { ExecutionContext } from "../../../src/execution/context";
 import { Permissions } from "../../../src/ipc/permissions";
 import { InstalledPackages } from "../../../src/packages/installed";
@@ -18,6 +19,36 @@ describe("control-plane API integration", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+  });
+
+  it("defers host mutations and input validation until their Effects execute", async () => {
+    eden = await createTestEden();
+    const pending = eden.runtime.users.create({
+      username: "lazy",
+      name: "Lazy",
+      password: "password",
+    });
+    expect(await eden.runtime.effects.run(eden.runtime.users.list())).toEqual(
+      [],
+    );
+    const user = await eden.runtime.effects.run(pending);
+    expect(user.username).toBe("lazy");
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.users.list())).map(
+        (user) => user.username,
+      ),
+    ).toEqual(["lazy"]);
+    const invalid = eden.runtime.users.create({
+      username: "bad",
+      name: "Bad",
+      password: 42,
+    } as never);
+    await expect(eden.runtime.effects.run(invalid)).rejects.toThrow();
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.users.list())).map(
+        (user) => user.username,
+      ),
+    ).toEqual(["lazy"]);
   });
 
   it("keeps host eject awaited and drains it before disposing runtime resources", async () => {
@@ -32,25 +63,30 @@ describe("control-plane API integration", () => {
     const completed = new Promise<void>((resolve) => {
       finish = resolve;
     });
-    await eden.runtime.volumes.register(
-      {
-        id: "host-eject",
-        label: "Host eject",
-        kind: "removable",
-        rootPath: drive,
-      },
-      {
-        eject: async () => {
-          begin();
-          await completed;
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        {
+          id: "host-eject",
+          label: "Host eject",
+          kind: "removable",
+          rootPath: drive,
         },
-      },
+        {
+          eject: () =>
+            Effect.promise(async () => {
+              begin();
+              await completed;
+            }),
+        },
+      ),
     );
     const observed: string[] = [];
     const off = eden.runtime.operations.onChanged((snapshot) => {
       if (snapshot.command === "volume/eject") observed.push(snapshot.status);
     });
-    const removal = eden.runtime.volumes.eject("host-eject");
+    const removal = eden.runtime.effects.run(
+      eden.runtime.volumes.eject("host-eject"),
+    );
     expect(observed).toEqual(["queued"]);
     await started;
     const snapshot = eden.runtime.operations
@@ -113,13 +149,17 @@ describe("control-plane API integration", () => {
     });
     eden.runtime.services.installedPackages.register(app);
 
-    const user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: [`apps/launch/${app.id}`],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+        grants: [`apps/launch/${app.id}`],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
 
     const listed = eden.runtime.packages.list();
     expect(listed).toHaveLength(1);
@@ -132,17 +172,21 @@ describe("control-plane API integration", () => {
     const unsubscribe = eden.runtime.sessions.onChanged(({ currentUser }) => {
       changes.push(currentUser);
     });
-    const updated = await eden.runtime.users.update({
-      username: user.username,
-      name: "Renamed",
-    });
+    const updated = await eden.runtime.effects.run(
+      eden.runtime.users.update({
+        username: user.username,
+        name: "Renamed",
+      }),
+    );
     expect(eden.runtime.sessions.current()).toMatchObject({ name: "Renamed" });
     expect(updated).not.toBe(eden.runtime.sessions.current());
 
-    await eden.runtime.sessions.logout();
+    await eden.runtime.effects.run(eden.runtime.sessions.logout());
     unsubscribe();
     unsubscribe();
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     expect(changes).toEqual([
       expect.objectContaining({ username: user.username, name: "Renamed" }),
       null,
@@ -155,24 +199,30 @@ describe("control-plane API integration", () => {
     const before = await eden.runtime.effects.run(
       settings.get("com.eden", "appearance.wallpaper"),
     );
-    const wallpaper = await eden.runtime.appearance.getWallpaper();
+    const wallpaper = await eden.runtime.effects.run(
+      eden.runtime.appearance.getWallpaper(),
+    );
     const changes: unknown[] = [];
     const stop = eden.runtime.appearance.onChanged((value) =>
       changes.push(value),
     );
     try {
       await expect(
-        eden.runtime.appearance.setWallpaper({
-          type: "custom",
-          value: 42,
-        } as unknown as WallpaperConfig),
+        eden.runtime.effects.run(
+          eden.runtime.appearance.setWallpaper({
+            type: "custom",
+            value: 42,
+          } as unknown as WallpaperConfig),
+        ),
       ).rejects.toMatchObject({ name: "ValiError" });
       expect(
         await eden.runtime.effects.run(
           settings.get("com.eden", "appearance.wallpaper"),
         ),
       ).toBe(before);
-      expect(await eden.runtime.appearance.getWallpaper()).toEqual(wallpaper);
+      expect(
+        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
+      ).toEqual(wallpaper);
       expect(changes).toEqual([]);
     } finally {
       stop();
@@ -182,19 +232,25 @@ describe("control-plane API integration", () => {
   it("applies the same association input contract at SDK and EdenAPI boundaries", async () => {
     eden = await createTestEden();
     const selected = { appId: "com.example.selected", kind: "provider" };
-    await eden.runtime.associations.set("provider:test", selected);
+    await eden.runtime.effects.run(
+      eden.runtime.associations.set("provider:test", selected),
+    );
     const invalid = { appId: 42, kind: "provider" };
     await expect(
-      eden.runtime.associations.set(
-        "provider:test",
-        invalid as unknown as AppAssociation,
+      eden.runtime.effects.run(
+        eden.runtime.associations.set(
+          "provider:test",
+          invalid as unknown as AppAssociation,
+        ),
       ),
     ).rejects.toMatchObject({ name: "ValiError" });
     await expect(
       eden.execute("associations/set", { key: "provider:test", ...invalid }),
     ).rejects.toMatchObject({ name: "ValiError" });
     expect(eden.runtime.associations.get("provider:test")).toEqual(selected);
-    await expect(eden.runtime.associations.remove(" ")).rejects.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(eden.runtime.associations.remove(" ")),
+    ).rejects.toMatchObject({
       name: "ValiError",
     });
     expect(() => eden.runtime.associations.list(null as never)).toThrow();
@@ -223,14 +279,20 @@ describe("control-plane API integration", () => {
         },
       );
       expect(contexts).toEqual([{ principal: { kind: "system" } }]);
-      expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
+      expect(
+        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
+      ).toMatchObject({
         value: "#123456",
       });
       const input: WallpaperConfig = { type: "custom", value: "#abcdef" };
-      const update = eden.runtime.appearance.setWallpaper(input);
+      const update = eden.runtime.effects.run(
+        eden.runtime.appearance.setWallpaper(input),
+      );
       input.value = "mutated after submission";
       await update;
-      expect(await eden.runtime.appearance.getWallpaper()).toMatchObject({
+      expect(
+        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
+      ).toMatchObject({
         value: "#abcdef",
       });
     } finally {

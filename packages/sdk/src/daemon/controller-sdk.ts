@@ -16,37 +16,37 @@ export function createDaemonsSdkController({
     action: "start" | "stop" | "restart",
     appId: string,
     phase: string,
-  ) => {
-    const input = v.parse(daemonAppIdSchema, appId);
-    return sdk.operation(`daemon/${action}`, { appId: input }, () =>
-      operationTask((reporter) => {
-        reporter.update(phase);
-        return Effect.map(daemons[action](input), () => ({ success: true }));
-      }),
-    );
-  };
+  ) =>
+    sdk.effect(() => {
+      const input = v.parse(daemonAppIdSchema, appId);
+      return Effect.asVoid(
+        sdk.operation(`daemon/${action}`, { appId: input }, () =>
+          operationTask((reporter) => {
+            reporter.update(phase);
+            return Effect.map(daemons[action](input), () => ({
+              success: true,
+            }));
+          }),
+        ),
+      );
+    });
   return {
-    list: async () => structuredClone(await sdk.effect(daemons.list())),
-    updateDefinition: async (definition) =>
-      sdk.effect(
+    list: () => sdk.effect(() => Effect.map(daemons.list(), structuredClone)),
+    updateDefinition: (definition) =>
+      sdk.effect(() =>
         daemons.updateDefinition(v.parse(daemonDefinitionSchema, definition)),
       ),
-    setEnabled: async (appId, enabled) => {
-      const input = v.parse(
-        v.object({ appId: daemonAppIdSchema, enabled: v.boolean() }),
-        { appId, enabled },
-      );
-      await sdk.effect(daemons.setEnabled(input.appId, input.enabled));
-    },
-    start: async (appId) => {
-      await retained("start", appId, "starting-daemon");
-    },
-    stop: async (appId) => {
-      await retained("stop", appId, "stopping-daemon");
-    },
-    restart: async (appId) => {
-      await retained("restart", appId, "restarting-daemon");
-    },
+    setEnabled: (appId, enabled) =>
+      sdk.effect(() => {
+        const input = v.parse(
+          v.object({ appId: daemonAppIdSchema, enabled: v.boolean() }),
+          { appId, enabled },
+        );
+        return daemons.setEnabled(input.appId, input.enabled);
+      }),
+    start: (appId) => retained("start", appId, "starting-daemon"),
+    stop: (appId) => retained("stop", appId, "stopping-daemon"),
+    restart: (appId) => retained("restart", appId, "restarting-daemon"),
     onChanged: (listener) => {
       v.parse(v.function(), listener);
       return sdk.run(() =>

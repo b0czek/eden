@@ -27,7 +27,9 @@ it("executes a native notification action to replace the busy file picker across
       "notification/display",
       "file-picker/display",
     ]);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const processes = eden.runtime.services.processes;
     const views = eden.runtime.services.views;
     async function launch(appId: string) {

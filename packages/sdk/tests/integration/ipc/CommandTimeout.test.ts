@@ -19,13 +19,17 @@ describe("one bounded IPC deadline", () => {
   let complete!: (value: string) => void;
   beforeEach(async () => {
     eden = await createTestEden();
-    const user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: ["*"],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+        grants: ["*"],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     eden.runtime.services.installedPackages.register(
       testApp(appId, { name: "Deadlines" }),
     );

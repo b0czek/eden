@@ -24,7 +24,7 @@ interface MountedVolume {
   rootPath: string;
   device: number;
   inode: number;
-  eject?: () => Promise<void>;
+  eject?: () => Effect.Effect<void, Error>;
   ejectGroup?: string;
   activeLeases: number;
   idle: Latch.Latch;
@@ -199,7 +199,7 @@ export const createVolumes = Effect.fn(function* () {
             for (const [volumeId, sibling] of group)
               yield* assertMounted(volumeId, sibling);
             reporter.update("host-eject");
-            yield* io(operation);
+            yield* operation();
             for (const [volumeId, sibling] of group)
               if (mounted.get(volumeId) === sibling) unregister(volumeId);
           }).pipe(

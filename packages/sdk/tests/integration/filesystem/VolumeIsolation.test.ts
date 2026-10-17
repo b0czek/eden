@@ -33,7 +33,7 @@ it("keeps admitted volume access independent when two runtimes use the same volu
       kind: "removable" as const,
       rootPath,
     };
-    const eject = jest.fn(async () => undefined);
+    const eject = jest.fn(() => Effect.void);
     await first.run(a.register(input, { eject }));
     await second.run(b.register(input));
     const admitted = a.prepareOperation(["usb"], () =>

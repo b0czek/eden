@@ -46,17 +46,21 @@ describe("daemon operation lifecycle", () => {
       isRestricted: false,
       resolvedGrants: [],
     } as RuntimeAppManifest);
-    const profile = await eden.runtime.users.create({
-      username: "daemon",
-      name: "Daemon",
-      password: "password",
-    });
-    await eden.runtime.daemons.updateDefinition({
-      appId,
-      enabled: false,
-      runAs: { kind: "user", username: profile.username },
-      restart: "never",
-    });
+    const profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "daemon",
+        name: "Daemon",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.updateDefinition({
+        appId,
+        enabled: false,
+        runAs: { kind: "user", username: profile.username },
+        restart: "never",
+      }),
+    );
     const states: string[] = [];
     eden.runtime.services.daemons.changed.on(({ status }) => {
       if (status.appId === appId) states.push(status.state);
@@ -71,7 +75,9 @@ describe("daemon operation lifecycle", () => {
     await expect(
       eden.runtime.effects.run(daemons.wait(start)),
     ).resolves.toEqual({ success: true });
-    expect((await eden.runtime.daemons.list())[0].state).toBe("active");
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0].state,
+    ).toBe("active");
     const restart = await eden.execute<OperationHandle>("daemon/restart", {
       appId,
     });
@@ -100,18 +106,24 @@ describe("daemon operation lifecycle", () => {
     eden.runtime.services.installedPackages.register(
       testApp(appId, { frontend: undefined, backend: { entry: "backend.js" } }),
     );
-    const profile = await eden.runtime.users.create({
-      username: "daemon",
-      name: "Daemon",
-      password: "password",
-    });
-    await eden.runtime.daemons.updateDefinition({
-      appId,
-      enabled: false,
-      runAs: { kind: "user", username: profile.username },
-      restart: "always",
-    });
-    const launching = eden.runtime.daemons.start(appId);
+    const profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "daemon",
+        name: "Daemon",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.updateDefinition({
+        appId,
+        enabled: false,
+        runAs: { kind: "user", username: profile.username },
+        restart: "always",
+      }),
+    );
+    const launching = eden.runtime.effects.run(
+      eden.runtime.daemons.start(appId),
+    );
     const pid = await readyBackend(eden);
     await launching;
 
@@ -132,13 +144,17 @@ describe("daemon operation lifecycle", () => {
         );
       });
     try {
-      const restarting = eden.runtime.daemons.restart(appId);
+      const restarting = eden.runtime.effects.run(
+        eden.runtime.daemons.restart(appId),
+      );
       await queued.promise;
       const nextPid = await readyBackend(eden, pid);
       await restarting;
       resume.release();
       await processed.promise;
-      expect((await eden.runtime.daemons.list())[0]).toMatchObject({
+      expect(
+        (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0],
+      ).toMatchObject({
         state: "active",
         restartCount: 0,
         lastError: undefined,
@@ -153,7 +169,9 @@ describe("daemon operation lifecycle", () => {
       try {
         eden.platform.utilityProcesses.get(nextPid)!.kill();
         await backoff.promise;
-        expect((await eden.runtime.daemons.list())[0]).toMatchObject({
+        expect(
+          (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0],
+        ).toMatchObject({
           state: "backoff",
           restartCount: 1,
         });

@@ -150,14 +150,18 @@ describe("autostart session, settings and process composition", () => {
     const app = testApp("com.example.autostart");
     eden.runtime.services.installedPackages.register(app);
     await setAutostart(eden, app.id);
-    const user = await eden.runtime.users.create({
-      username: "autostart-user",
-      name: "Autostart User",
-      password: "password",
-      grants: [`apps/launch/${app.id}`],
-    });
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "autostart-user",
+        name: "Autostart User",
+        password: "password",
+        grants: [`apps/launch/${app.id}`],
+      }),
+    );
     const started = launched(eden, app.id);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await started;
     expect(
       eden.runtime.services.processes.getAppInstance(app.id),
@@ -177,14 +181,18 @@ describe("autostart session, settings and process composition", () => {
       },
     });
     await s.set(app.id);
-    const user = await eden.runtime.users.create({
-      username: "delayed-user",
-      name: "Delayed User",
-      password: "password",
-      grants: [`apps/launch/${app.id}`],
-    });
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "delayed-user",
+        name: "Delayed User",
+        password: "password",
+        grants: [`apps/launch/${app.id}`],
+      }),
+    );
     s.autostart.onFoundationReady();
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await listStarted.promise;
     let settled = false;
     const shutdown = s.effects.run(s.autostart.shutdown()).then(() => {
@@ -216,14 +224,18 @@ describe("autostart session, settings and process composition", () => {
       },
     });
     await s.set(app.id);
-    const user = await eden.runtime.users.create({
-      username: "starting-user",
-      name: "Starting User",
-      password: "password",
-      grants: [`apps/launch/${app.id}`],
-    });
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "starting-user",
+        name: "Starting User",
+        password: "password",
+        grants: [`apps/launch/${app.id}`],
+      }),
+    );
     s.autostart.onFoundationReady();
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await started.promise;
     let settled = false;
     const shutdown = s.effects.run(s.autostart.shutdown()).then(() => {
@@ -354,19 +366,23 @@ describe("autostart session, settings and process composition", () => {
     await s.set(denied.id);
     await s.set(disabled.id, false);
     await s.set(allowed.id);
-    const user = await eden.runtime.users.create({
-      username: "grant-user",
-      name: "Grant User",
-      password: "password",
-      grants: [
-        `apps/launch/${allowed.id}`,
-        `apps/launch/${headless.id}`,
-        `apps/launch/${disabled.id}`,
-      ],
-    });
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "grant-user",
+        name: "Grant User",
+        password: "password",
+        grants: [
+          `apps/launch/${allowed.id}`,
+          `apps/launch/${headless.id}`,
+          `apps/launch/${disabled.id}`,
+        ],
+      }),
+    );
     s.autostart.onFoundationReady();
     const started = launched(eden, allowed.id);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await started;
     await s.effects.run(s.autostart.shutdown());
     expect(s.processes.getAppInstance(denied.id)).toBeUndefined();

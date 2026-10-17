@@ -22,23 +22,33 @@ describe("package and daemon SDK boundaries", () => {
     );
     expect(() => packages.get(7 as never)).toThrow(v.ValiError);
     expect(() => packages.onChanged(null as never)).toThrow(v.ValiError);
-    await expect(packages.getSize(null as never)).rejects.toThrow(v.ValiError);
-    await expect(packages.uninstall("" as never)).rejects.toThrow(v.ValiError);
-    await expect(packages.inspect("relative.edenite")).rejects.toThrow(
-      v.ValiError,
-    );
-    await expect(packages.install("relative.edenite")).rejects.toThrow(
-      v.ValiError,
-    );
+    await expect(
+      eden.runtime.effects.run(packages.getSize(null as never)),
+    ).rejects.toThrow(v.ValiError);
+    await expect(
+      eden.runtime.effects.run(packages.uninstall("" as never)),
+    ).rejects.toThrow(v.ValiError);
+    await expect(
+      eden.runtime.effects.run(packages.inspect("relative.edenite")),
+    ).rejects.toThrow(v.ValiError);
+    await expect(
+      eden.runtime.effects.run(packages.install("relative.edenite")),
+    ).rejects.toThrow(v.ValiError);
     const missing = path.join(eden.paths.root, "missing.edenite");
     await expect(
-      packages.install(missing, { replace: "false" } as never),
+      eden.runtime.effects.run(
+        packages.install(missing, { replace: "false" } as never),
+      ),
     ).rejects.toThrow(v.ValiError);
     expect(eden.runtime.operations.list()).toEqual([]);
-    await expect(packages.inspect(missing)).resolves.toMatchObject({
+    await expect(
+      eden.runtime.effects.run(packages.inspect(missing)),
+    ).resolves.toMatchObject({
       success: false,
     });
-    await expect(packages.install(missing)).rejects.toThrow("File not found:");
+    await expect(
+      eden.runtime.effects.run(packages.install(missing)),
+    ).rejects.toThrow("File not found:");
     expect(eden.runtime.operations.list()).toEqual([
       expect.objectContaining({ command: "package/install", status: "failed" }),
     ]);
@@ -59,7 +69,9 @@ describe("package and daemon SDK boundaries", () => {
       runAs: null,
       restart: "never",
     };
-    await eden.runtime.daemons.updateDefinition(definition);
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.updateDefinition(definition),
+    );
     const invalidDefinitions = [
       { ...definition, enabled: "false" },
       { ...definition, restart: "sometimes" },
@@ -68,23 +80,29 @@ describe("package and daemon SDK boundaries", () => {
     ];
     for (const invalid of invalidDefinitions)
       await expect(
-        eden.runtime.daemons.updateDefinition(invalid as never),
+        eden.runtime.effects.run(
+          eden.runtime.daemons.updateDefinition(invalid as never),
+        ),
       ).rejects.toThrow(v.ValiError);
     await expect(
-      eden.runtime.daemons.setEnabled(appId, "false" as never),
+      eden.runtime.effects.run(
+        eden.runtime.daemons.setEnabled(appId, "false" as never),
+      ),
     ).rejects.toThrow(v.ValiError);
     for (const invoke of [
-      () => eden.runtime.daemons.start(""),
-      () => eden.runtime.daemons.stop(undefined as never),
-      () => eden.runtime.daemons.restart(5 as never),
+      () => eden.runtime.effects.run(eden.runtime.daemons.start("")),
+      () =>
+        eden.runtime.effects.run(eden.runtime.daemons.stop(undefined as never)),
+      () => eden.runtime.effects.run(eden.runtime.daemons.restart(5 as never)),
     ])
       await expect(invoke()).rejects.toThrow(v.ValiError);
     expect(() => eden.runtime.daemons.onChanged({} as never)).toThrow(
       v.ValiError,
     );
-    expect((await eden.runtime.daemons.list())[0].definition).toEqual(
-      definition,
-    );
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition,
+    ).toEqual(definition);
     expect(eden.runtime.operations.list()).toEqual([]);
   });
 
@@ -98,12 +116,14 @@ describe("package and daemon SDK boundaries", () => {
         backend: { entry: "backend.js" },
       }),
     );
-    const user = await eden.runtime.users.create({
-      username: "worker",
-      name: "Worker",
-      password: "password",
-      grants: ["*"],
-    });
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "worker",
+        name: "Worker",
+        password: "password",
+        grants: ["*"],
+      }),
+    );
     eden.runtime.services.permissions.registerApp(management, [
       "daemon/manage",
     ]);
@@ -127,17 +147,22 @@ describe("package and daemon SDK boundaries", () => {
       { appId: management, principal: { kind: "user", profile: user } },
     );
     expect(contexts).toEqual([{ principal: { kind: "system" } }]);
-    expect((await eden.runtime.daemons.list())[0]).toMatchObject({
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0],
+    ).toMatchObject({
       name: appId,
       definition: { enabled: false },
     });
     off();
     off();
-    await eden.runtime.daemons.setEnabled(appId, true);
-    expect(contexts).toHaveLength(1);
-    expect((await eden.runtime.daemons.list())[0].definition.enabled).toBe(
-      true,
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.setEnabled(appId, true),
     );
+    expect(contexts).toHaveLength(1);
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition.enabled,
+    ).toBe(true);
   });
 
   it("delivers detached package reload events with host authority and preserves callback removal", async () => {
@@ -174,7 +199,7 @@ describe("package and daemon SDK boundaries", () => {
     );
     off();
     off();
-    await eden.runtime.packages.reload(appId);
+    await eden.runtime.effects.run(eden.runtime.packages.reload(appId));
     expect(contexts).toHaveLength(1);
   });
 
@@ -207,13 +232,17 @@ describe("package and daemon SDK boundaries", () => {
       "daemon/manage",
       "settings/panels",
     ]);
-    const standard = await eden.runtime.users.create({
-      username: "standard",
-      name: "Standard",
-      password: "password",
-      grants: ["preset/daemon/manage"],
-    });
-    const vendor = await eden.runtime.users.get("vendor");
+    const standard = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "standard",
+        name: "Standard",
+        password: "password",
+        grants: ["preset/daemon/manage"],
+      }),
+    );
+    const vendor = await eden.runtime.effects.run(
+      eden.runtime.users.get("vendor"),
+    );
     if (!vendor) throw new Error("Seeded vendor is missing");
     const definition: DaemonDefinition = {
       appId,
@@ -233,10 +262,16 @@ describe("package and daemon SDK boundaries", () => {
     await expect(appUpdate(standard)).rejects.toThrow(
       "Only a vendor can assign a vendor daemon principal",
     );
-    expect((await eden.runtime.daemons.list())[0].definition.runAs).toBeNull();
-    const unchangedDefinition = (await eden.runtime.daemons.list())[0]
-      .definition;
-    await eden.runtime.sessions.login(standard.username, "password");
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition.runAs,
+    ).toBeNull();
+    const unchangedDefinition = (
+      await eden.runtime.effects.run(eden.runtime.daemons.list())
+    )[0].definition;
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(standard.username, "password"),
+    );
     await expect(
       eden.execute(
         "settings/action",
@@ -254,22 +289,29 @@ describe("package and daemon SDK boundaries", () => {
       success: false,
       error: { code: "action_failed" },
     });
-    expect((await eden.runtime.daemons.list())[0].definition).toEqual(
-      unchangedDefinition,
-    );
-    await eden.runtime.sessions.logout();
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition,
+    ).toEqual(unchangedDefinition);
+    await eden.runtime.effects.run(eden.runtime.sessions.logout());
     await expect(appUpdate(vendor)).resolves.toEqual({ success: true });
-    expect((await eden.runtime.daemons.list())[0].definition).toEqual(
-      definition,
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition,
+    ).toEqual(definition);
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.updateDefinition({ ...definition, runAs: null }),
     );
-    await eden.runtime.daemons.updateDefinition({ ...definition, runAs: null });
     expect(eden.runtime.services.execution.get()).toBeUndefined();
     expect(eden.runtime.sessions.current()).toBeNull();
     await expect(
-      eden.runtime.daemons.updateDefinition(definition),
+      eden.runtime.effects.run(
+        eden.runtime.daemons.updateDefinition(definition),
+      ),
     ).resolves.toBeUndefined();
-    expect((await eden.runtime.daemons.list())[0].definition).toEqual(
-      definition,
-    );
+    expect(
+      (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0]
+        .definition,
+    ).toEqual(definition);
   });
 });

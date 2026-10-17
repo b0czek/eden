@@ -12,7 +12,9 @@ it("delivers through real notification controllers only to the display and origi
     const { user } = await createTestCaller(eden, providerApp, [
       "notification/display",
     ]);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const packages = eden.runtime.services.installedPackages;
     const permissions = eden.runtime.services.permissions;
     const processes = eden.runtime.services.processes;

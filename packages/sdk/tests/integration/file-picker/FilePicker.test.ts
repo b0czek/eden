@@ -372,7 +372,9 @@ describe("file picker composition and request lifecycle", () => {
       ).rejects.toThrow("Selected volume is read-only");
       s.volumes.unregister("archive");
       await s.run(
-        s.volumes.register(registration, { eject: async () => undefined }),
+        s.volumes.register(registration, {
+          eject: () => Effect.promise(async () => undefined),
+        }),
       );
       const eject = s.volumes.prepareEject("archive");
       await expect(

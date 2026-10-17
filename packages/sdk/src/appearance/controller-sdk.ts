@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenAppearanceApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
@@ -12,13 +13,13 @@ export function createAppearanceSdkController({
   sdk: SdkContext;
 }): EdenAppearanceApi {
   return {
-    getWallpaper: async () =>
-      structuredClone(await sdk.effect(appearance.getWallpaper())),
+    getWallpaper: () =>
+      sdk.effect(() => Effect.map(appearance.getWallpaper(), structuredClone)),
     getPresets: () => sdk.run(() => structuredClone(appearance.getPresets())),
-    setWallpaper: async (input) => {
-      const config = v.parse(wallpaperConfigSchema, input);
-      await sdk.effect(appearance.setWallpaper(config));
-    },
+    setWallpaper: (input) =>
+      sdk.effect(() =>
+        appearance.setWallpaper(v.parse(wallpaperConfigSchema, input)),
+      ),
     onChanged: (listener) => {
       v.parse(v.function(), listener);
       return sdk.run(() =>

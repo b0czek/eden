@@ -13,6 +13,7 @@ import type {
   WallpaperConfig,
   WallpaperPreset,
 } from "@edenapp/types";
+import type * as Effect from "effect/Effect";
 
 export type EdenUnsubscribe = () => void;
 
@@ -51,27 +52,27 @@ export interface EdenPackageInfo {
 export interface EdenPackagesApi {
   list(options?: EdenPackageListOptions): InstalledPackageManifest[];
   get(packageId: string): InstalledPackageInfo | undefined;
-  getIcon(packageId: string): Promise<string | undefined>;
-  getSize(packageId: string): Promise<number | undefined>;
-  inspect(sourcePath: string): Promise<EdenPackageInfo>;
+  getIcon(packageId: string): Effect.Effect<string | undefined, Error>;
+  getSize(packageId: string): Effect.Effect<number | undefined, Error>;
+  inspect(sourcePath: string): Effect.Effect<EdenPackageInfo, Error>;
   install(
     sourcePath: string,
     options?: { replace?: boolean },
-  ): Promise<InstalledPackageManifest>;
-  uninstall(packageId: string): Promise<boolean>;
-  reload(packageId: string): Promise<void>;
-  isHotReloadEnabled(packageId: string): Promise<boolean>;
-  toggleHotReload(packageId: string): Promise<boolean>;
+  ): Effect.Effect<InstalledPackageManifest, Error>;
+  uninstall(packageId: string): Effect.Effect<boolean, Error>;
+  reload(packageId: string): Effect.Effect<void, Error>;
+  isHotReloadEnabled(packageId: string): Effect.Effect<boolean, Error>;
+  toggleHotReload(packageId: string): Effect.Effect<boolean, Error>;
   onChanged(listener: (change: EdenPackageChange) => void): EdenUnsubscribe;
 }
 
 export interface EdenDaemonsApi {
-  list(): Promise<DaemonStatus[]>;
-  updateDefinition(definition: DaemonDefinition): Promise<void>;
-  setEnabled(appId: string, enabled: boolean): Promise<void>;
-  start(appId: string): Promise<void>;
-  stop(appId: string): Promise<void>;
-  restart(appId: string): Promise<void>;
+  list(): Effect.Effect<DaemonStatus[], Error>;
+  updateDefinition(definition: DaemonDefinition): Effect.Effect<void, Error>;
+  setEnabled(appId: string, enabled: boolean): Effect.Effect<void, Error>;
+  start(appId: string): Effect.Effect<void, Error>;
+  stop(appId: string): Effect.Effect<void, Error>;
+  restart(appId: string): Effect.Effect<void, Error>;
   onChanged(listener: (status: DaemonStatus) => void): EdenUnsubscribe;
 }
 
@@ -93,14 +94,14 @@ export interface EdenUpdateUserInput {
 }
 
 export interface EdenUsersApi {
-  list(): Promise<UserProfile[]>;
-  get(username: string): Promise<UserProfile | null>;
-  create(input: EdenCreateUserInput): Promise<UserProfile>;
-  update(input: EdenUpdateUserInput): Promise<UserProfile>;
-  delete(username: string): Promise<void>;
-  setPassword(username: string, password: string): Promise<void>;
+  list(): Effect.Effect<UserProfile[], Error>;
+  get(username: string): Effect.Effect<UserProfile | null, Error>;
+  create(input: EdenCreateUserInput): Effect.Effect<UserProfile, Error>;
+  update(input: EdenUpdateUserInput): Effect.Effect<UserProfile, Error>;
+  delete(username: string): Effect.Effect<void, Error>;
+  setPassword(username: string, password: string): Effect.Effect<void, Error>;
   getDefaultUsername(): string | null;
-  setDefaultUsername(username: string | null): Promise<void>;
+  setDefaultUsername(username: string | null): Effect.Effect<void, Error>;
 }
 
 export interface EdenSessionChange {
@@ -111,8 +112,8 @@ export interface EdenSessionChange {
 
 export interface EdenSessionsApi {
   current(): UserProfile | null;
-  login(username: string, password: string): Promise<UserProfile>;
-  logout(): Promise<void>;
+  login(username: string, password: string): Effect.Effect<UserProfile, Error>;
+  logout(): Effect.Effect<void, Error>;
   onChanged(listener: (change: EdenSessionChange) => void): EdenUnsubscribe;
 }
 
@@ -122,9 +123,9 @@ export interface EdenWallpaperPresets {
 }
 
 export interface EdenAppearanceApi {
-  getWallpaper(): Promise<WallpaperPreset>;
+  getWallpaper(): Effect.Effect<WallpaperPreset, Error>;
   getPresets(): EdenWallpaperPresets;
-  setWallpaper(config: WallpaperConfig): Promise<void>;
+  setWallpaper(config: WallpaperConfig): Effect.Effect<void, Error>;
   onChanged(listener: (wallpaper: WallpaperPreset) => void): EdenUnsubscribe;
 }
 
@@ -135,8 +136,8 @@ export interface EdenAssociationListOptions {
 export interface EdenAssociationsApi {
   get(key: string): AppAssociation | undefined;
   list(options?: EdenAssociationListOptions): Record<string, AppAssociation>;
-  set(key: string, association: AppAssociation): Promise<void>;
-  remove(key: string): Promise<void>;
+  set(key: string, association: AppAssociation): Effect.Effect<void, Error>;
+  remove(key: string): Effect.Effect<void, Error>;
 }
 
 /** Host operations for a consumer-managed mounted directory. */
@@ -144,15 +145,15 @@ export interface EdenVolumeOptions {
   /** Volumes sharing this key drain and leave the runtime as one removal. */
   ejectGroup?: string;
   /** Resolve only after the OS has finished safely ejecting the device. */
-  eject?: () => Promise<void>;
+  eject?: () => Effect.Effect<void, Error>;
 }
 
 export interface EdenVolumesApi {
   register(
     input: FilesystemVolumeRegistration,
     options?: EdenVolumeOptions,
-  ): Promise<FilesystemVolume>;
-  eject(id: string): Promise<void>;
+  ): Effect.Effect<FilesystemVolume, Error>;
+  eject(id: string): Effect.Effect<void, Error>;
   unregister(id: string): boolean;
   list(): FilesystemVolume[];
   onChanged(listener: (volumes: FilesystemVolume[]) => void): EdenUnsubscribe;

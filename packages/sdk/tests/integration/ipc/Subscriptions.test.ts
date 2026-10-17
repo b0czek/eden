@@ -59,7 +59,9 @@ describe("client subscriptions across renderer IPC", () => {
       { username: "observer", name: "Observer" },
     );
     owner = caller;
-    await eden.runtime.sessions.login(profile.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(profile.username, "password"),
+    );
     await eden.complete("process/launch", { appId });
     const instance = eden.runtime.services.processes.getAppInstance(appId)!;
     const contents = eden.runtime.services.views.getViewInfo(instance.viewId)!
@@ -116,12 +118,14 @@ describe("client subscriptions across renderer IPC", () => {
   const change = async (id: string) => {
     const rootPath = path.join(eden.paths.root, id);
     await fs.mkdir(rootPath);
-    await eden.runtime.volumes.register({
-      id,
-      label: id,
-      kind: "local",
-      rootPath,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id,
+        label: id,
+        kind: "local",
+        rootPath,
+      }),
+    );
   };
 
   function work(name: string) {
@@ -224,7 +228,9 @@ describe("client subscriptions across renderer IPC", () => {
         owner,
       ),
     ).rejects.toThrow();
-    expect(await eden.runtime.appearance.getWallpaper()).toEqual(expected);
+    expect(
+      await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
+    ).toEqual(expected);
     api.unsubscribe("appearance/wallpaper-changed", listener);
     stop();
   });

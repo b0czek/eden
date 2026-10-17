@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as v from "valibot";
+import type { EdenVolumeOptions } from "../api/control-plane";
 
 export const volumeIdSchema = v.pipe(v.string(), v.nonEmpty());
 export const volumeEjectArgsSchema = v.object({ volume: volumeIdSchema });
@@ -42,7 +43,9 @@ export const volumeOptionsSchema = v.optional(
         ),
       ),
       eject: v.optional(
-        v.custom<() => Promise<void>>((value) => typeof value === "function"),
+        v.custom<NonNullable<EdenVolumeOptions["eject"]>>(
+          (value) => typeof value === "function",
+        ),
       ),
     }),
     v.check(

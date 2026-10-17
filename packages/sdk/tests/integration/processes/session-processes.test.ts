@@ -22,13 +22,17 @@ describe("session process lifecycle", () => {
   let processes: Processes;
   beforeEach(async () => {
     eden = await createTestEden();
-    await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: ["*"],
-    });
-    await eden.runtime.sessions.login("operator", "password");
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+        grants: ["*"],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login("operator", "password"),
+    );
     processes = eden.runtime.services.processes;
   });
   afterEach(async () => {

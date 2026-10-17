@@ -23,7 +23,9 @@ it("delivers a controller notification only to selected subscribed views and rel
     const ids = ["com.example.first", "com.example.second"];
     for (const id of ids) registry.register(testApp(id));
     const { user } = await createTestCaller(eden, ids[0], []);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const views = eden.runtime.services.views;
     const bridge = eden.runtime.services.ipc;
     bridge.registerController(

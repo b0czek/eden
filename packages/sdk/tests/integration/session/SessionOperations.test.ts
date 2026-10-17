@@ -23,7 +23,9 @@ describe("session operation transactions", () => {
       "session.controller",
       ["session/manage"],
     );
-    await eden.runtime.sessions.login(profile.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(profile.username, "password"),
+    );
     const session = eden.runtime.services.sessionContext;
     const sessionId = session.getSessionId();
     const caller = { ...owner, sessionId };
@@ -79,11 +81,13 @@ describe("session operation transactions", () => {
         },
       },
     });
-    await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+      }),
+    );
     const caller = {
       appId: "session.daemon",
       principal: { kind: "system" as const },
@@ -134,11 +138,13 @@ describe("session operation transactions", () => {
 
   it("retains failed authentication as a typed response and allows a subsequent submission", async () => {
     eden = await createTestEden();
-    await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+      }),
+    );
     const sessions = eden.runtime.services.operations;
     const handle = await eden.execute<OperationHandle>("session/login", {
       username: "operator",

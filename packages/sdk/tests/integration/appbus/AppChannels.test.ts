@@ -14,7 +14,9 @@ async function scenario() {
   const client = "app.channel-client";
   const denied = "app.channel-denied";
   const { user } = await createTestCaller(eden, provider, ["appbus/expose"]);
-  await eden.runtime.sessions.login(user.username, "password");
+  await eden.runtime.effects.run(
+    eden.runtime.sessions.login(user.username, "password"),
+  );
   const packages = eden.runtime.services.installedPackages;
   const permissions = eden.runtime.services.permissions;
   const processes = eden.runtime.services.processes;

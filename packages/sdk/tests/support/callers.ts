@@ -8,13 +8,15 @@ export async function createTestCaller(
   permissions: string[],
   userInput: Partial<EdenCreateUserInput> = {},
 ) {
-  const user = await eden.runtime.users.create({
-    username: "operator",
-    name: "Operator",
-    password: "password",
-    grants: ["*"],
-    ...userInput,
-  });
+  const user = await eden.runtime.effects.run(
+    eden.runtime.users.create({
+      username: "operator",
+      name: "Operator",
+      password: "password",
+      grants: ["*"],
+      ...userInput,
+    }),
+  );
   eden.runtime.services.permissions.registerApp(appId, permissions);
   return {
     user,

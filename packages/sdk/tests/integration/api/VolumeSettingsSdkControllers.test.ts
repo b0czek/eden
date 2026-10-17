@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SettingsPanelResponse } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -35,7 +36,7 @@ describe("volume and settings SDK controllers", () => {
       { ...registration, supportsWatch: "true" },
     ]) {
       await expect(
-        eden.runtime.volumes.register(input as never),
+        eden.runtime.effects.run(eden.runtime.volumes.register(input as never)),
       ).rejects.toThrow(v.ValiError);
     }
     for (const options of [
@@ -44,14 +45,18 @@ describe("volume and settings SDK controllers", () => {
       { eject: true },
       { ejectGroup: {} },
       { ejectGroup: "group-without-callback" },
-      { ejectGroup: " ", eject: async () => undefined },
+      { ejectGroup: " ", eject: () => Effect.promise(async () => undefined) },
     ]) {
       await expect(
-        eden.runtime.volumes.register(registration, options as never),
+        eden.runtime.effects.run(
+          eden.runtime.volumes.register(registration, options as never),
+        ),
       ).rejects.toThrow(v.ValiError);
     }
     for (const id of [undefined, null, 42, {}, ""]) {
-      await expect(eden.runtime.volumes.eject(id as never)).rejects.toThrow();
+      await expect(
+        eden.runtime.effects.run(eden.runtime.volumes.eject(id as never)),
+      ).rejects.toThrow();
       expect(() => eden.runtime.volumes.unregister(id as never)).toThrow();
     }
     expect(eden.runtime.volumes.list()).toEqual(original);
@@ -67,9 +72,11 @@ describe("volume and settings SDK controllers", () => {
     const options = {
       ejectGroup: "physical-device",
       calls: 0,
-      async eject() {
-        callbackOwner = this;
-        this.calls++;
+      eject() {
+        return Effect.sync(() => {
+          callbackOwner = this;
+          this.calls++;
+        });
       },
     };
     const registration = {
@@ -78,14 +85,21 @@ describe("volume and settings SDK controllers", () => {
       kind: "removable" as const,
       rootPath,
     };
-    const pending = eden.runtime.volumes.register(registration, options);
+    const pending = eden.runtime.effects.run(
+      eden.runtime.volumes.register(registration, options),
+    );
     options.ejectGroup = "changed-after-registration";
     registration.label = "Changed after registration";
     const first = await pending;
     first.label = "Changed result";
-    await eden.runtime.volumes.register(
-      { ...registration, id: "partition-two", label: "Two" },
-      { ejectGroup: "physical-device", eject: async () => undefined },
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        { ...registration, id: "partition-two", label: "Two" },
+        {
+          ejectGroup: "physical-device",
+          eject: () => Effect.promise(async () => undefined),
+        },
+      ),
     );
     expect(
       eden.runtime.volumes
@@ -95,7 +109,7 @@ describe("volume and settings SDK controllers", () => {
     const removeListener = eden.runtime.volumes.onChanged((volumes) => {
       for (const volume of volumes) volume.label = "Changed by observer";
     });
-    await eden.runtime.volumes.eject("partition-one");
+    await eden.runtime.effects.run(eden.runtime.volumes.eject("partition-one"));
     removeListener();
     removeListener();
     expect(callbackOwner).toBe(options);
@@ -175,13 +189,17 @@ describe("volume and settings SDK controllers", () => {
     );
     definition.title.en = "Changed after registration";
     await eden.start();
-    const user = await eden.runtime.users.create({
-      username: "sdk-panel-user",
-      name: "SDK panel user",
-      password: "password",
-      grants: [],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "sdk-panel-user",
+        name: "SDK panel user",
+        password: "password",
+        grants: [],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const panels = eden.runtime.services.settingsPanels;
     expect(() => registration.setVisible("true" as never)).toThrow();
     expect(

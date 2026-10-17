@@ -32,12 +32,13 @@ export function createAssociationsSdkController({
           ),
         ),
       ),
-    set: async (key, input) => {
-      const validKey = v.parse(associationKeySchema, key);
-      const association = v.parse(appAssociationSchema, input);
-      await sdk.effect(associations.set(validKey, association));
-    },
-    remove: async (key) =>
-      sdk.effect(associations.remove(v.parse(associationKeySchema, key))),
+    set: (key, input) =>
+      sdk.effect(() => {
+        const validKey = v.parse(associationKeySchema, key);
+        const association = v.parse(appAssociationSchema, input);
+        return associations.set(validKey, association);
+      }),
+    remove: (key) =>
+      sdk.effect(() => associations.remove(v.parse(associationKeySchema, key))),
   };
 }

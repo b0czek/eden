@@ -2,4 +2,4 @@
 "@edenapp/sdk": minor
 ---
 
-Create Electron hosts with `createEden(config)` instead of `new Eden(config)`. The returned host exposes `dispose()` for explicit shutdown alongside its existing readiness and control APIs.
+Create Electron hosts with `createEden(config)`. Asynchronous host APIs return lazy Effects that compose before execution through `eden.runPromise` or `eden.runFork`; `dispose()` explicitly shuts down the host. Sandboxed apps keep the Promise-based Eden client.

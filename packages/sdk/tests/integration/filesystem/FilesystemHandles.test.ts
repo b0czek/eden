@@ -6,6 +6,7 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import type { CommandCallerContext } from "../../../src/execution/context";
@@ -49,16 +50,19 @@ describe("file handle access and lifetime", () => {
       "fs/read",
       "volume/*",
     ]);
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     caller = { ...owner, sessionId: "file-session" };
     ejected = false;
     root = await registerTestVolume(
       eden,
       { id: "usb", label: "USB", kind: "removable" },
       {
-        eject: async () => {
-          ejected = true;
-        },
+        eject: () =>
+          Effect.promise(async () => {
+            ejected = true;
+          }),
       },
     );
     await fs.writeFile(path.join(root, "part.txt"), "original");
@@ -164,7 +168,7 @@ describe("file handle access and lifetime", () => {
         fiber.interruptUnsafe();
         if ("handleId" in source)
           closing = execute<void>("fs/close", { handle: source });
-        removing = eden.runtime.volumes.eject("usb");
+        removing = eden.runtime.effects.run(eden.runtime.volumes.eject("usb"));
         await tick();
         expect(ejected).toBe(false);
         expect(fiber.pollUnsafe()).toBeUndefined();
@@ -189,12 +193,14 @@ describe("file handle access and lifetime", () => {
 
   it("binds handle access and close to the opening app, account, and session", async () => {
     const handle = await execute<FilesystemHandle>("fs/open", { location });
-    const otherUser = await eden.runtime.users.create({
-      username: "other",
-      name: "Other",
-      password: "password",
-      grants: ["*"],
-    });
+    const otherUser = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "other",
+        name: "Other",
+        password: "password",
+        grants: ["*"],
+      }),
+    );
     eden.runtime.services.permissions.registerApp("com.example.other", [
       "fs/read",
     ]);
@@ -262,12 +268,14 @@ describe("file handle access and lifetime", () => {
   it("rejects handle reads after physical removal instead of using a reconnected volume", async () => {
     const handle = await execute<FilesystemHandle>("fs/open", { location });
     eden.runtime.volumes.unregister("usb");
-    await eden.runtime.volumes.register({
-      id: "usb",
-      label: "Reconnected",
-      kind: "removable",
-      rootPath: root,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "usb",
+        label: "Reconnected",
+        kind: "removable",
+        rootPath: root,
+      }),
+    );
     await expect(execute("fs/read", { location: handle })).rejects.toThrow(
       /unavailable/,
     );
@@ -374,7 +382,7 @@ describe("file handle access and lifetime", () => {
         caller,
       );
       if (entry === "operation") await eden.complete("session/logout");
-      else await eden.runtime.sessions.logout();
+      else await eden.runtime.effects.run(eden.runtime.sessions.logout());
       await eden.runtime.effects.run(
         eden.runtime.services.operations.wait(eject, caller),
       );
@@ -390,11 +398,13 @@ describe("file handle access and lifetime", () => {
     "releases session handles before switching users drains an eject via %s",
     async (entry) => {
       caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
-      await eden.runtime.users.create({
-        username: "other",
-        name: "Other",
-        password: "password",
-      });
+      await eden.runtime.effects.run(
+        eden.runtime.users.create({
+          username: "other",
+          name: "Other",
+          password: "password",
+        }),
+      );
       await launchOwner(true);
       await execute("fs/open", { location });
       const eject = await eden.execute<OperationHandle>(
@@ -407,7 +417,10 @@ describe("file handle access and lifetime", () => {
           username: "other",
           password: "password",
         });
-      else await eden.runtime.sessions.login("other", "password");
+      else
+        await eden.runtime.effects.run(
+          eden.runtime.sessions.login("other", "password"),
+        );
       await eden.runtime.effects.run(
         eden.runtime.services.operations.wait(eject, caller),
       );
@@ -456,14 +469,16 @@ describe("file handle access and lifetime", () => {
       { location },
       runtimeOwner,
     );
-    await eden.runtime.sessions.logout();
+    await eden.runtime.effects.run(eden.runtime.sessions.logout());
     await expect(
       execute("fs/read", { location: sessionHandle }),
     ).rejects.toThrow(/unavailable/);
     expect(
       await execute("fs/read", { location: runtimeHandle }, runtimeOwner),
     ).toBe("original");
-    await eden.runtime.sessions.login("operator", "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login("operator", "password"),
+    );
     caller.sessionId = eden.runtime.services.sessionContext.getSessionId();
     const nextHandle = await execute<FilesystemHandle>("fs/open", { location });
     expect(await execute("fs/read", { location: nextHandle })).toBe("original");

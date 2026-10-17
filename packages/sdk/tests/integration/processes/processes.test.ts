@@ -33,13 +33,17 @@ describe("Processes integration", () => {
     eden.runtime.services.installedPackages.register(
       testApp(appId, { name: "Self exit" }),
     );
-    const profile = await eden.runtime.users.create({
-      username: "exiting",
-      name: "Exiting",
-      password: "password",
-      grants: [`apps/launch/${appId}`],
-    });
-    await eden.runtime.sessions.login(profile.username, "password");
+    const profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "exiting",
+        name: "Exiting",
+        password: "password",
+        grants: [`apps/launch/${appId}`],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(profile.username, "password"),
+    );
     await eden.complete("process/launch", { appId });
     const processes = eden.runtime.services.processes;
     const instance = processes.getAppInstance(appId)!;
@@ -74,18 +78,24 @@ describe("Processes integration", () => {
     eden.runtime.services.permissions.registerApp("com.example.controller", [
       "process/manage",
     ]);
-    const alice = await eden.runtime.users.create({
-      username: "alice",
-      name: "Alice",
-      password: "password",
-      grants: [`apps/launch/${target.id}`],
-    });
-    const bob = await eden.runtime.users.create({
-      username: "bob",
-      name: "Bob",
-      password: "password",
-    });
-    await eden.runtime.sessions.login(alice.username, "password");
+    const alice = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "alice",
+        name: "Alice",
+        password: "password",
+        grants: [`apps/launch/${target.id}`],
+      }),
+    );
+    const bob = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "bob",
+        name: "Bob",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(alice.username, "password"),
+    );
 
     await eden.complete(
       "process/launch",
@@ -121,13 +131,17 @@ describe("Processes integration", () => {
     eden.runtime.services.permissions.registerApp("com.example.controller", [
       "process/manage",
     ]);
-    const user = await eden.runtime.users.create({
-      username: "operator",
-      name: "Operator",
-      password: "password",
-      grants: [`apps/launch/${target.id}`],
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "operator",
+        name: "Operator",
+        password: "password",
+        grants: [`apps/launch/${target.id}`],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
 
     const processes = eden.runtime.services.processes;
     const source = path.join(eden.paths.root, "replacement-source");
@@ -149,7 +163,7 @@ describe("Processes integration", () => {
     );
     const initial = await bundle({ appDirectory: source, outputPath: archive });
     if (!initial.success) throw new Error(initial.error);
-    await eden.runtime.packages.install(archive);
+    await eden.runtime.effects.run(eden.runtime.packages.install(archive));
     await fs.writeFile(
       path.join(source, "manifest.json"),
       JSON.stringify({ ...manifest, version: "2.0.0" }),
@@ -173,9 +187,11 @@ describe("Processes integration", () => {
         await extractionGate;
         return extract(options);
       });
-    const replacement = eden.runtime.packages.install(archive, {
-      replace: true,
-    });
+    const replacement = eden.runtime.effects.run(
+      eden.runtime.packages.install(archive, {
+        replace: true,
+      }),
+    );
     try {
       await extracting;
       expect(eden.runtime.services.catalog.getApp(target.id)?.version).toBe(

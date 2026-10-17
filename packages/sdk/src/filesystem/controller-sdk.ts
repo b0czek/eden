@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenVolumesApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
@@ -17,24 +18,24 @@ export function createVolumesSdkController({
   sdk: SdkContext;
 }): EdenVolumesApi {
   return {
-    register: async (input, options) =>
-      sdk.run(async () => {
+    register: (input, options) =>
+      sdk.effect(() => {
         const registration = v.parse(
           volumeRegistrationSchema,
           structuredClone(input),
         );
         const parsedOptions = v.parse(volumeOptionsSchema, options);
-        // Retain the callback's original owner while snapshotting grouping metadata.
         const preparedOptions = {
           ...parsedOptions,
           eject: parsedOptions.eject?.bind(options),
         };
-        return structuredClone(
-          await sdk.effect(volumes.register(registration, preparedOptions)),
+        return Effect.map(
+          volumes.register(registration, preparedOptions),
+          structuredClone,
         );
       }),
-    eject: async (id) =>
-      sdk.run(() => {
+    eject: (id) =>
+      sdk.effect(() => {
         const args = v.parse(volumeEjectArgsSchema, { volume: id });
         return sdk.operation("volume/eject", args, () =>
           volumes.prepareEject(args.volume),

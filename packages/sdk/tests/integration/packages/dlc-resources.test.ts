@@ -9,6 +9,7 @@ import type {
   OperationHandle,
   UserProfile,
 } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import type { EdenPackageChange } from "../../../src/api";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -77,22 +78,29 @@ describe("DLC package lifecycle", () => {
       "index.html": "<html>archive lease</html>",
     });
     let hostSawInstalled = false;
-    await eden.runtime.volumes.register(
-      {
-        id: "archive-source",
-        label: "Archive source",
-        kind: "removable",
-        rootPath: driveRoot,
-      },
-      {
-        eject: async () => {
-          hostSawInstalled =
-            (await fs.readFile(
-              path.join(eden.paths.appsDirectory, manifest.id, "index.html"),
-              "utf8",
-            )) === "<html>archive lease</html>";
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        {
+          id: "archive-source",
+          label: "Archive source",
+          kind: "removable",
+          rootPath: driveRoot,
         },
-      },
+        {
+          eject: () =>
+            Effect.promise(async () => {
+              hostSawInstalled =
+                (await fs.readFile(
+                  path.join(
+                    eden.paths.appsDirectory,
+                    manifest.id,
+                    "index.html",
+                  ),
+                  "utf8",
+                )) === "<html>archive lease</html>";
+            }),
+        },
+      ),
     );
     const resources = eden.runtime.services.operations;
     let archiveReadStarted!: () => void;
@@ -113,7 +121,9 @@ describe("DLC package lifecycle", () => {
       caller,
     );
     await reading;
-    const removal = eden.runtime.volumes.eject("archive-source");
+    const removal = eden.runtime.effects.run(
+      eden.runtime.volumes.eject("archive-source"),
+    );
     expect(hostSawInstalled).toBe(false);
     expect(
       eden.runtime.volumes
@@ -243,17 +253,19 @@ describe("DLC package lifecycle", () => {
       "index.html": "<html></html>",
     });
     const hostPath = path.join(driveRoot, path.basename(archive));
-    await eden.runtime.volumes.register({
-      id: "usb",
-      label: "USB",
-      kind: "removable",
-      rootPath: driveRoot,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "usb",
+        label: "USB",
+        kind: "removable",
+        rootPath: driveRoot,
+      }),
+    );
     const location = { volume: "usb", path: archive };
     const caller = { principal: { kind: "user" as const, profile: vendor } };
 
     await expect(
-      eden.runtime.packages.inspect(hostPath),
+      eden.runtime.effects.run(eden.runtime.packages.inspect(hostPath)),
     ).resolves.toMatchObject({
       success: true,
       manifest: { id: manifest.id },
@@ -266,11 +278,13 @@ describe("DLC package lifecycle", () => {
     ).rejects.toThrow("requires volume and path");
 
     await expect(
-      eden.runtime.packages.install(hostPath),
+      eden.runtime.effects.run(eden.runtime.packages.install(hostPath)),
     ).resolves.toMatchObject({
       id: manifest.id,
     });
-    await eden.runtime.packages.uninstall(manifest.id);
+    await eden.runtime.effects.run(
+      eden.runtime.packages.uninstall(manifest.id),
+    );
     await expect(
       eden.complete("package/install", { source: location }, caller),
     ).resolves.toMatchObject({ id: manifest.id });
@@ -589,7 +603,7 @@ describe("DLC package lifecycle", () => {
     const unsubscribe = eden.runtime.packages.onChanged((change) =>
       changes.push(change),
     );
-    await eden.runtime.packages.uninstall(host.id);
+    await eden.runtime.effects.run(eden.runtime.packages.uninstall(host.id));
     unsubscribe();
     stopTrackingUninstallSettings();
     expect(uninstallSettingsChanges).toEqual(["catalog", "catalog", "catalog"]);
@@ -709,19 +723,27 @@ describe("DLC package lifecycle", () => {
       { principal: { kind: "user", profile: vendor } },
     );
     await expect(
-      eden.runtime.packages.isHotReloadEnabled(compatible.id),
+      eden.runtime.effects.run(
+        eden.runtime.packages.isHotReloadEnabled(compatible.id),
+      ),
     ).rejects.toThrow("is not an installed app");
     await expect(
-      eden.runtime.packages.toggleHotReload(compatible.id),
+      eden.runtime.effects.run(
+        eden.runtime.packages.toggleHotReload(compatible.id),
+      ),
     ).rejects.toThrow("is not an installed app");
 
-    await eden.runtime.users.create({
-      username: "runner",
-      name: "Runner",
-      role: "standard",
-      password: "password",
-    });
-    await eden.runtime.sessions.login("runner", "password");
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "runner",
+        name: "Runner",
+        role: "standard",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login("runner", "password"),
+    );
     await eden.complete("process/launch", { appId: host.id });
     await expect(
       eden.complete("package/uninstall", { packageId: host.id }),
@@ -905,11 +927,11 @@ describe("DLC package lifecycle", () => {
     });
     expect(eden.runtime.services.catalog.getPath(dlc.id)).toBe(dlcRoot);
     await expect(
-      eden.runtime.packages.getSize(dlc.id),
+      eden.runtime.effects.run(eden.runtime.packages.getSize(dlc.id)),
     ).resolves.toBeGreaterThan(0);
-    await expect(eden.runtime.packages.getIcon(dlc.id)).resolves.toMatch(
-      /^data:image\/svg\+xml;base64,/,
-    );
+    await expect(
+      eden.runtime.effects.run(eden.runtime.packages.getIcon(dlc.id)),
+    ).resolves.toMatch(/^data:image\/svg\+xml;base64,/);
     await expect(
       eden.execute<InstalledPackageInfo>(
         "package/self",

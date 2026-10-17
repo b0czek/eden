@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenPackagesApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
@@ -36,34 +37,32 @@ export function createPackagesSdkController({
           packages.getInstalledPackageInfo(v.parse(packageIdSchema, packageId)),
         ),
       ),
-    getIcon: async (packageId) =>
-      sdk.run(() =>
-        sdk.effect(
-          packages.getPackageIcon(v.parse(packageIdSchema, packageId)),
+    getIcon: (packageId) =>
+      sdk.effect(() =>
+        packages.getPackageIcon(v.parse(packageIdSchema, packageId)),
+      ),
+    getSize: (packageId) =>
+      sdk.effect(() =>
+        packages.getPackageSize(v.parse(packageIdSchema, packageId)),
+      ),
+    inspect: (sourcePath) =>
+      sdk.effect(() =>
+        Effect.map(
+          packages.getPackageInfoFromHostPath(
+            v.parse(packageHostPathSchema, sourcePath),
+          ),
+          clone,
         ),
       ),
-    getSize: async (packageId) =>
-      sdk.run(() =>
-        sdk.effect(
-          packages.getPackageSize(v.parse(packageIdSchema, packageId)),
-        ),
-      ),
-    inspect: async (sourcePath) =>
-      sdk.run(async () => {
-        const input = v.parse(packageHostPathSchema, sourcePath);
-        return clone(
-          await sdk.effect(packages.getPackageInfoFromHostPath(input)),
-        );
-      }),
-    install: async (sourcePath, options) =>
-      sdk.run(async () => {
+    install: (sourcePath, options) =>
+      sdk.effect(() => {
         const input = v.parse(packageHostPathSchema, sourcePath);
         const { replace } = v.parse(
           v.optional(packageInstallOptionsSchema, {}),
           options,
         );
-        return clone(
-          await sdk.operation(
+        return Effect.map(
+          sdk.operation(
             "package/install",
             { sourcePath: input, replace: replace === true },
             () =>
@@ -75,10 +74,11 @@ export function createPackagesSdkController({
                 ),
               ),
           ),
+          clone,
         );
       }),
-    uninstall: async (packageId) =>
-      sdk.run(() => {
+    uninstall: (packageId) =>
+      sdk.effect(() => {
         const input = v.parse(packageIdSchema, packageId);
         return sdk.operation("package/uninstall", { packageId: input }, () =>
           operationTask((reporter) =>
@@ -86,21 +86,17 @@ export function createPackagesSdkController({
           ),
         );
       }),
-    reload: async (packageId) =>
-      sdk.run(() =>
-        sdk.effect(packages.reloadPackage(v.parse(packageIdSchema, packageId))),
+    reload: (packageId) =>
+      sdk.effect(() =>
+        packages.reloadPackage(v.parse(packageIdSchema, packageId)),
       ),
-    isHotReloadEnabled: async (packageId) =>
-      sdk.run(() =>
-        sdk.effect(
-          packages.isHotReloadEnabled(v.parse(packageIdSchema, packageId)),
-        ),
+    isHotReloadEnabled: (packageId) =>
+      sdk.effect(() =>
+        packages.isHotReloadEnabled(v.parse(packageIdSchema, packageId)),
       ),
-    toggleHotReload: async (packageId) =>
-      sdk.run(() =>
-        sdk.effect(
-          packages.toggleHotReload(v.parse(packageIdSchema, packageId)),
-        ),
+    toggleHotReload: (packageId) =>
+      sdk.effect(() =>
+        packages.toggleHotReload(v.parse(packageIdSchema, packageId)),
       ),
     onChanged: (listener) =>
       sdk.run(() => {

@@ -19,31 +19,32 @@ export function createSessionsSdkController({
         const user = sessions.getCurrentUser();
         return user ? structuredClone(user) : null;
       }),
-    login: async (username, password) => {
-      const args = v.parse(sessionLoginSchema, { username, password });
-      const result = await sdk.operation(
-        "session/login",
-        { username: args.username },
-        () =>
+    login: (username, password) =>
+      sdk.effect(() => {
+        const args = v.parse(sessionLoginSchema, { username, password });
+        return Effect.map(
+          sdk.operation("session/login", { username: args.username }, () =>
+            operationTask(
+              () =>
+                Effect.map(
+                  sessions.login(args.username, args.password),
+                  (user) => ({ success: true, user }),
+                ),
+              { transition: "session" },
+            ),
+          ),
+          (result) => structuredClone(result.user),
+        );
+      }),
+    logout: () =>
+      Effect.asVoid(
+        sdk.operation("session/logout", {}, () =>
           operationTask(
-            () =>
-              Effect.map(
-                sessions.login(args.username, args.password),
-                (user) => ({ success: true, user }),
-              ),
+            () => Effect.map(sessions.logout(), () => ({ success: true })),
             { transition: "session" },
           ),
-      );
-      return structuredClone(result.user);
-    },
-    logout: async () => {
-      await sdk.operation("session/logout", {}, () =>
-        operationTask(
-          () => Effect.map(sessions.logout(), () => ({ success: true })),
-          { transition: "session" },
         ),
-      );
-    },
+      ),
     onChanged: (listener) => {
       v.parse(v.function(), listener);
       return sdk.run(() =>

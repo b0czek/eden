@@ -16,12 +16,16 @@ describe("file opening integration", () => {
       fileHandlers: [{ name: "Directories", directories: true }],
     });
     eden.runtime.services.installedPackages.register(filesApp);
-    const user = await eden.runtime.users.create({
-      username: "files-user",
-      name: "Files User",
-      password: "password",
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "files-user",
+        name: "Files User",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await eden.execute("fs/mkdir", {
       location: { path: "/Documents", volume: "home" },
     });
@@ -72,12 +76,16 @@ describe("file opening integration", () => {
     registry.register(editor);
     registry.register(highlighter);
 
-    const user = await eden.runtime.users.create({
-      username: "editor-user",
-      name: "Editor User",
-      password: "password",
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "editor-user",
+        name: "Editor User",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     await eden.execute("fs/write", {
       location: { path: "/request.http", volume: "home" },
       content: "GET https://example.test",
@@ -131,12 +139,16 @@ describe("file opening integration", () => {
     });
     registry.register(first);
     registry.register(preferred);
-    const user = await eden.runtime.users.create({
-      username: "localized-editor",
-      name: "Localized Editor",
-      password: "password",
-    });
-    await eden.runtime.sessions.login(user.username, "password");
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "localized-editor",
+        name: "Localized Editor",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     const location = { volume: "home", path: "/notes.txt" };
     await eden.execute("fs/write", { location, content: "Document contents" });
     await eden.execute("settings/set/su", {

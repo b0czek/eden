@@ -18,7 +18,7 @@ registration.invalidate();
 await eden.whenReady();
 
 const packages = eden.packages.list({ showHidden: true });
-const daemons = await eden.daemons.list();
+const daemons = await eden.runPromise(eden.daemons.list());
 ```
 
 ## Lifecycle
@@ -66,7 +66,22 @@ unsubscribe(); // safe
 ```
 
 Local event listeners are notifications and are not awaited transactionally.
-Operations whose failure must affect the caller remain explicit async methods.
+Async domain methods return lazy Effects. Constructing one does not validate
+inputs, admit an operation, or start I/O. Execute work through the owning host:
+
+```ts
+import * as Effect from "effect/Effect";
+
+await eden.runPromise(Effect.gen(function* () {
+  const user = yield* eden.users.create({ name: "Operator", password: "secret" });
+  yield* eden.users.setDefaultUsername(user.username);
+}));
+```
+
+`eden.runFork(work)` starts owned background work and returns its fiber. Runtime
+shutdown interrupts and awaits owned work after the explicit operation drain.
+Lifecycle methods (`whenReady` and `dispose`) remain Promise execution boundaries.
+The sandboxed `@edenapp/client` keeps its Promise API.
 
 ## Trust and permissions
 
@@ -77,7 +92,7 @@ preload bridge or exposed through a renderer-selected method name.
 SDK methods and change callbacks execute with host authority independently of
 any app caller active in the surrounding main-process code. Inputs are validated
 at the SDK controller boundary before mutation or operation admission. Malformed
-arguments reject Promise-based methods or throw from synchronous methods;
+arguments fail asynchronous Effects during execution or throw from synchronous methods;
 runtime failures retain the method's existing error and operation behavior.
 See [Controllers and domain events](controllers.md#sdk-controllers) for boundary
 ownership and schema sharing.

@@ -34,7 +34,9 @@ describe("consumer-managed filesystem volumes", () => {
     ({ user } = await createTestCaller(eden, appId, ["fs/*", "volume/*"], {
       directoryRestriction: "operators/one",
     }));
-    await eden.runtime.sessions.login(user.username, "password");
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
     usbRoot = await registerTestVolume(eden, {
       id: "usb",
       label: "Thumb drive",
@@ -75,12 +77,14 @@ describe("consumer-managed filesystem volumes", () => {
     );
     const mount = path.join(eden.paths.root, "network");
     await fs.mkdir(mount);
-    await eden.runtime.volumes.register({
-      id: "network",
-      label: "Mounted share",
-      kind: "network",
-      rootPath: mount,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "network",
+        label: "Mounted share",
+        kind: "network",
+        rootPath: mount,
+      }),
+    );
     const volumes = await execute<FilesystemVolume[]>("volume/list");
     expect(volumes.map((volume) => volume.id)).toEqual([
       "home",
@@ -131,7 +135,7 @@ describe("consumer-managed filesystem volumes", () => {
     ["volume/list", {}],
     ["volume/eject", { volume: "usb" }],
   ])("requires an execution principal for %s", async (command, args) => {
-    await eden.runtime.sessions.logout();
+    await eden.runtime.effects.run(eden.runtime.sessions.logout());
     await expect(eden.execute(command, args)).rejects.toThrow(
       "Caller has no volume execution principal",
     );
@@ -149,13 +153,15 @@ describe("consumer-managed filesystem volumes", () => {
       location: { volume: "usb", path: "/report.txt" },
       content: "shared",
     });
-    const second = await eden.runtime.users.create({
-      username: "second",
-      name: "Second",
-      password: "password",
-      directoryRestriction: "operators/two",
-      grants: ["*"],
-    });
+    const second = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "second",
+        name: "Second",
+        password: "password",
+        directoryRestriction: "operators/two",
+        grants: ["*"],
+      }),
+    );
     await expect(
       eden.complete(
         "fs/read",
@@ -279,29 +285,35 @@ describe("consumer-managed filesystem volumes", () => {
       execute("fs/delete", { location: { volume: "usb", path: "/" } }),
     ).rejects.toThrow("volume root");
     await expect(
-      eden.runtime.volumes.register({
-        id: "home",
-        label: "Home",
-        kind: "local",
-        rootPath: usbRoot,
-      }),
+      eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "home",
+          label: "Home",
+          kind: "local",
+          rootPath: usbRoot,
+        }),
+      ),
     ).rejects.toThrow("cannot be 'home'");
     await expect(
-      eden.runtime.volumes.register({
-        id: "usb",
-        label: "Duplicate",
-        kind: "local",
-        rootPath: usbRoot,
-      }),
+      eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "usb",
+          label: "Duplicate",
+          kind: "local",
+          rootPath: usbRoot,
+        }),
+      ),
     ).rejects.toThrow("already registered");
     const missingRoot = path.join(eden.paths.root, "missing-mount");
     await expect(
-      eden.runtime.volumes.register({
-        id: "missing",
-        label: "Missing",
-        kind: "local",
-        rootPath: missingRoot,
-      }),
+      eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "missing",
+          label: "Missing",
+          kind: "local",
+          rootPath: missingRoot,
+        }),
+      ),
     ).rejects.toThrow();
     await expect(fs.stat(missingRoot)).rejects.toMatchObject({
       code: "ENOENT",
@@ -327,13 +339,15 @@ describe("consumer-managed filesystem volumes", () => {
     const root = path.join(eden.paths.root, "readonly");
     await fs.mkdir(root);
     await fs.writeFile(path.join(root, "report.txt"), "read-only source");
-    await eden.runtime.volumes.register({
-      id: "readonly",
-      label: "Read-only",
-      kind: "local",
-      rootPath: root,
-      readOnly: true,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "readonly",
+        label: "Read-only",
+        kind: "local",
+        rootPath: root,
+        readOnly: true,
+      }),
+    );
     const source = { volume: "readonly", path: "/report.txt" };
     const destination = { volume: "home", path: "/operators/one/report.txt" };
     await execute("fs/cp", { from: source, to: destination });
@@ -747,26 +761,31 @@ describe("consumer-managed filesystem volumes", () => {
     const hostEntered = new Promise<void>((resolve) => {
       enteredHost = resolve;
     });
-    await eden.runtime.volumes.register(
-      {
-        id: "usb",
-        label: "Thumb drive",
-        kind: "removable",
-        rootPath: usbRoot,
-      },
-      {
-        eject: () =>
-          new Promise<void>((_resolve, reject) => {
-            rejectRemoval = reject;
-            enteredHost();
-          }),
-      },
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        {
+          id: "usb",
+          label: "Thumb drive",
+          kind: "removable",
+          rootPath: usbRoot,
+        },
+        {
+          eject: () =>
+            Effect.promise(
+              () =>
+                new Promise<void>((_resolve, reject) => {
+                  rejectRemoval = reject;
+                  enteredHost();
+                }),
+            ),
+        },
+      ),
     );
     const pending = (await invoke(appId, "file-picker/open", {
       mode: "open",
       initialLocation: usb,
     })) as { requestId: string };
-    const removal = eden.runtime.volumes.eject("usb");
+    const removal = eden.runtime.effects.run(eden.runtime.volumes.eject("usb"));
     await hostEntered;
     await expect(resolve(pending.requestId, [usb])).rejects.toThrow(
       "being removed",
@@ -777,13 +796,15 @@ describe("consumer-managed filesystem volumes", () => {
       success: true,
     });
 
-    await eden.runtime.volumes.register({
-      id: "readonly",
-      label: "Read-only drive",
-      kind: "removable",
-      rootPath: usbRoot,
-      readOnly: true,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "readonly",
+        label: "Read-only drive",
+        kind: "removable",
+        rootPath: usbRoot,
+        readOnly: true,
+      }),
+    );
     const readonly = { volume: "readonly", path: "/" };
     const read = (await invoke(appId, "file-picker/open", {
       mode: "open",
@@ -810,12 +831,14 @@ describe("consumer-managed filesystem volumes", () => {
       path.join(process.cwd(), ".eden-volume-test-"),
     );
     try {
-      await eden.runtime.volumes.register({
-        id: "other-device",
-        label: "Other filesystem",
-        kind: "local",
-        rootPath: otherRoot,
-      });
+      await eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "other-device",
+          label: "Other filesystem",
+          kind: "local",
+          rootPath: otherRoot,
+        }),
+      );
       const source = {
         volume: "home",
         path: "/operators/one/cross-device/report.txt",
@@ -867,12 +890,14 @@ describe("consumer-managed filesystem volumes", () => {
         "operators/one/locked",
       );
       try {
-        await eden.runtime.volumes.register({
-          id: "other-device",
-          label: "Other filesystem",
-          kind: "local",
-          rootPath: otherRoot,
-        });
+        await eden.runtime.effects.run(
+          eden.runtime.volumes.register({
+            id: "other-device",
+            label: "Other filesystem",
+            kind: "local",
+            rootPath: otherRoot,
+          }),
+        );
         const source = {
           volume: "home",
           path: "/operators/one/locked/report.txt",
@@ -910,12 +935,14 @@ describe("consumer-managed filesystem volumes", () => {
         location: { volume: "usb", path: "/report.txt" },
       }),
     ).rejects.toThrow("unavailable");
-    await eden.runtime.volumes.register({
-      id: "usb",
-      label: "Reconnected",
-      kind: "removable",
-      rootPath: usbRoot,
-    });
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register({
+        id: "usb",
+        label: "Reconnected",
+        kind: "removable",
+        rootPath: usbRoot,
+      }),
+    );
     await expect(Effect.runPromise(lease.assertActive())).rejects.toThrow(
       "unavailable",
     );
@@ -979,21 +1006,24 @@ describe("consumer-managed filesystem volumes", () => {
       await invoke("event/subscribe", { eventName: "volume/changed" });
       if (removal === "eject") {
         eden.runtime.volumes.unregister("usb");
-        await eden.runtime.volumes.register(
-          {
-            id: "usb",
-            label: "USB",
-            kind: "removable",
-            rootPath: usbRoot,
-          },
-          {
-            eject: async () => {
-              // Native watches are released before the host's OS removal starts.
-              await expect(
-                invoke("fs/unwatch", { watchId: result.watchId }),
-              ).rejects.toThrow("not owned");
+        await eden.runtime.effects.run(
+          eden.runtime.volumes.register(
+            {
+              id: "usb",
+              label: "USB",
+              kind: "removable",
+              rootPath: usbRoot,
             },
-          },
+            {
+              eject: () =>
+                Effect.promise(async () => {
+                  // Native watches are released before the host's OS removal starts.
+                  await expect(
+                    invoke("fs/unwatch", { watchId: result.watchId }),
+                  ).rejects.toThrow("not owned");
+                }),
+            },
+          ),
         );
       }
       const result = (await invoke("fs/watch", {
@@ -1019,12 +1049,14 @@ describe("consumer-managed filesystem volumes", () => {
       await expect(
         invoke("fs/unwatch", { watchId: result.watchId }),
       ).rejects.toThrow("not owned");
-      await eden.runtime.volumes.register({
-        id: "usb",
-        label: "Mounted network share",
-        kind: "network",
-        rootPath: usbRoot,
-      });
+      await eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "usb",
+          label: "Mounted network share",
+          kind: "network",
+          rootPath: usbRoot,
+        }),
+      );
       await expect(
         invoke("fs/readdir", { location: { volume: "usb", path: "/" } }),
       ).resolves.toEqual([]);

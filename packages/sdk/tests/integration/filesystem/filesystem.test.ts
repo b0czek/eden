@@ -29,13 +29,17 @@ describe("Filesystem native watch integration", () => {
       "fs/read",
       "fs/write",
     ]);
-    profile = await eden.runtime.users.create({
-      username: "filesystem-watch-user",
-      name: "Filesystem Watch User",
-      password: "password",
-      grants: [`apps/launch/${appId}`, `apps/launch/${otherAppId}`],
-    });
-    await eden.runtime.sessions.login(profile.username, "password");
+    profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "filesystem-watch-user",
+        name: "Filesystem Watch User",
+        password: "password",
+        grants: [`apps/launch/${appId}`, `apps/launch/${otherAppId}`],
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(profile.username, "password"),
+    );
     await eden.complete("process/launch", { appId });
     const instance = eden.runtime.services.processes.getAppInstance(appId);
     if (!instance) throw new Error("Filesystem test app was not launched");
@@ -249,11 +253,13 @@ describe("Filesystem integration", () => {
 
   it("enforces command permissions while using the real isolated root", async () => {
     eden = await createTestEden();
-    const profile = await eden.runtime.users.create({
-      username: "filesystem-user",
-      name: "Filesystem User",
-      password: "password",
-    });
+    const profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "filesystem-user",
+        name: "Filesystem User",
+        password: "password",
+      }),
+    );
     const permissions = eden.runtime.services.permissions;
     permissions.registerApp("authorized-app", ["fs/write", "fs/read"]);
     permissions.registerApp("unauthorized-app", ["fs/read"]);
