@@ -723,14 +723,14 @@ export const createPackages = Effect.fn(function* ({
       try: () => requireInstalledApp(packageId),
       catch: asError,
     });
-    return yield* fromPromise(() => readHotReloadEnabled(packageId, config));
+    return yield* readHotReloadEnabled(packageId, config);
   });
   const toggleHotReload = Effect.fn(function* (packageId: string) {
     yield* Effect.try({
       try: () => requireInstalledApp(packageId),
       catch: asError,
     });
-    return yield* fromPromise(() => updateHotReload(packageId, config));
+    return yield* updateHotReload(packageId, config);
   });
   function requireInstalledApp(packageId: string): RuntimeAppManifest {
     const manifest = getInstalledPackage(packageId);

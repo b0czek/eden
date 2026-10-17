@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import {
   HOT_RELOAD_PROTOCOL_VERSION,
   loadHotReloadAppsState,
@@ -31,7 +32,9 @@ describe("development source state", () => {
       }),
     );
 
-    await expect(loadHotReloadAppsState(config)).resolves.toEqual({
+    await expect(
+      Effect.runPromise(loadHotReloadAppsState(config)),
+    ).resolves.toEqual({
       protocolVersion: HOT_RELOAD_PROTOCOL_VERSION,
       apps: [
         { id: "com.example.dev", sourcePath: "/source", launchOnStart: true },
@@ -45,7 +48,9 @@ describe("development source state", () => {
       JSON.stringify({ protocolVersion: 999, apps: [] }),
     );
 
-    await expect(loadHotReloadAppsState(config)).resolves.toEqual({
+    await expect(
+      Effect.runPromise(loadHotReloadAppsState(config)),
+    ).resolves.toEqual({
       protocolVersion: HOT_RELOAD_PROTOCOL_VERSION,
       apps: [],
     });

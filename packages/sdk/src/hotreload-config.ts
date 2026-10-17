@@ -5,9 +5,12 @@
  * consumer project, not inside the installed SDK package.
  */
 
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import { asError, fromPromise } from "./effects/io";
 
 export interface HotReloadEnabledState {
   apps: string[];
@@ -70,123 +73,129 @@ export function getHotReloadAppsPath(config?: EdenConfig): string {
   return path.join(getHotReloadStateDirectory(config), APPS_FILE);
 }
 
-export async function loadHotReloadAppsState(
-  config?: EdenConfig,
-): Promise<HotReloadAppsState> {
-  try {
-    const parsed = JSON.parse(
-      await fs.readFile(getHotReloadAppsPath(config), "utf-8"),
-    ) as Partial<HotReloadAppsState>;
-    if (
-      parsed.protocolVersion !== HOT_RELOAD_PROTOCOL_VERSION ||
-      !Array.isArray(parsed.apps)
-    ) {
-      return { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] };
-    }
-    return {
-      protocolVersion: HOT_RELOAD_PROTOCOL_VERSION,
-      apps: parsed.apps.filter(
-        (entry) =>
-          !!entry &&
-          typeof entry.id === "string" &&
-          typeof entry.sourcePath === "string" &&
-          typeof entry.launchOnStart === "boolean",
-      ),
-    };
-  } catch {
-    return { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] };
-  }
+function readState<A>(
+  filePath: string,
+  decode: (value: unknown) => A,
+  fallback: A,
+) {
+  return fromPromise(() => fs.readFile(filePath, "utf-8")).pipe(
+    Effect.flatMap((content) =>
+      Effect.try({ try: () => decode(JSON.parse(content)), catch: asError }),
+    ),
+    Effect.catch(() => Effect.succeed(fallback)),
+  );
 }
 
-export async function loadHotReloadEnabledState(
-  config?: EdenConfig,
-): Promise<HotReloadEnabledState> {
-  try {
-    const content = await fs.readFile(getHotReloadEnabledPath(config), "utf-8");
-    const parsed = JSON.parse(content) as Partial<HotReloadEnabledState>;
-    return { apps: Array.isArray(parsed.apps) ? parsed.apps : [] };
-  } catch {
-    return { apps: [] };
-  }
+export function loadHotReloadAppsState(config?: EdenConfig) {
+  return readState(
+    getHotReloadAppsPath(config),
+    (value): HotReloadAppsState => {
+      const parsed = value as Partial<HotReloadAppsState>;
+      if (
+        parsed.protocolVersion !== HOT_RELOAD_PROTOCOL_VERSION ||
+        !Array.isArray(parsed.apps)
+      )
+        return { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] };
+      return {
+        protocolVersion: HOT_RELOAD_PROTOCOL_VERSION,
+        apps: parsed.apps.filter(
+          (entry) =>
+            !!entry &&
+            typeof entry.id === "string" &&
+            typeof entry.sourcePath === "string" &&
+            typeof entry.launchOnStart === "boolean",
+        ),
+      };
+    },
+    { protocolVersion: HOT_RELOAD_PROTOCOL_VERSION, apps: [] },
+  );
 }
 
-export async function saveHotReloadEnabledState(
+export function loadHotReloadEnabledState(config?: EdenConfig) {
+  return readState(
+    getHotReloadEnabledPath(config),
+    (value): HotReloadEnabledState => {
+      const parsed = value as Partial<HotReloadEnabledState>;
+      return { apps: Array.isArray(parsed.apps) ? parsed.apps : [] };
+    },
+    { apps: [] },
+  );
+}
+
+export function saveHotReloadEnabledState(
   state: HotReloadEnabledState,
   config?: EdenConfig,
-): Promise<void> {
-  await writeJsonAtomic(getHotReloadEnabledPath(config), {
+) {
+  return writeJsonAtomic(getHotReloadEnabledPath(config), {
     apps: [...new Set(state.apps)].sort(),
   });
 }
 
-export async function loadHotReloadServerState(
-  config?: EdenConfig,
-): Promise<HotReloadServerState> {
-  try {
-    const content = await fs.readFile(getHotReloadServersPath(config), "utf-8");
-    const parsed = JSON.parse(content) as Partial<HotReloadServerState>;
-    return {
-      apps:
-        parsed.apps &&
-        typeof parsed.apps === "object" &&
-        !Array.isArray(parsed.apps)
-          ? parsed.apps
-          : {},
-    };
-  } catch {
-    return { apps: {} };
-  }
+export function loadHotReloadServerState(config?: EdenConfig) {
+  return readState(
+    getHotReloadServersPath(config),
+    (value): HotReloadServerState => {
+      const parsed = value as Partial<HotReloadServerState>;
+      return {
+        apps:
+          parsed.apps &&
+          typeof parsed.apps === "object" &&
+          !Array.isArray(parsed.apps)
+            ? parsed.apps
+            : {},
+      };
+    },
+    { apps: {} },
+  );
 }
 
-export async function getHotReloadDevUrl(
+export const getHotReloadDevUrl = Effect.fn(function* (
   appId: string,
   config?: EdenConfig,
-): Promise<string | undefined> {
-  const state = await loadHotReloadServerState(config);
+) {
+  const state = yield* loadHotReloadServerState(config);
   const appState = state.apps[appId];
-  if (appState?.status === "ready" && appState.url) {
-    return appState.url;
-  }
-  return undefined;
-}
+  return appState?.status === "ready" && appState.url
+    ? appState.url
+    : undefined;
+});
 
-export async function isHotReloadEnabled(
+export const isHotReloadEnabled = Effect.fn(function* (
   appId: string,
   config?: EdenConfig,
-): Promise<boolean> {
-  const state = await loadHotReloadEnabledState(config);
+) {
+  const state = yield* loadHotReloadEnabledState(config);
   return state.apps.includes(appId);
-}
+});
 
-export async function toggleHotReload(
+export const toggleHotReload = Effect.fn(function* (
   appId: string,
   config?: EdenConfig,
-): Promise<boolean> {
-  const state = await loadHotReloadEnabledState(config);
+) {
+  const state = yield* loadHotReloadEnabledState(config);
   const enabledApps = new Set(state.apps);
+  const enabled = !enabledApps.has(appId);
+  if (enabled) enabledApps.add(appId);
+  else enabledApps.delete(appId);
+  yield* saveHotReloadEnabledState({ apps: [...enabledApps] }, config);
+  return enabled;
+});
 
-  if (enabledApps.has(appId)) {
-    enabledApps.delete(appId);
-    await saveHotReloadEnabledState({ apps: Array.from(enabledApps) }, config);
-    return false;
-  }
+export const getHotReloadApps = Effect.fn(function* (config?: EdenConfig) {
+  return (yield* loadHotReloadEnabledState(config)).apps;
+});
 
-  enabledApps.add(appId);
-  await saveHotReloadEnabledState({ apps: Array.from(enabledApps) }, config);
-  return true;
-}
-
-export async function getHotReloadApps(config?: EdenConfig): Promise<string[]> {
-  const state = await loadHotReloadEnabledState(config);
-  return state.apps;
-}
-
-async function writeJsonAtomic(
-  filePath: string,
-  value: unknown,
-): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.tmp`;
-  await fs.writeFile(tempPath, JSON.stringify(value, null, 2), "utf-8");
-  await fs.rename(tempPath, filePath);
-}
+const writeJsonAtomic = Effect.fn(function* (filePath: string, value: unknown) {
+  yield* fromPromise(() =>
+    fs.mkdir(path.dirname(filePath), { recursive: true }),
+  );
+  const tempPath = yield* Effect.acquireRelease(
+    Effect.sync(() => `${filePath}.${randomUUID()}.tmp`),
+    (temporary) =>
+      fromPromise(() => fs.rm(temporary, { force: true })).pipe(Effect.orDie),
+  );
+  yield* fromPromise(() =>
+    fs.writeFile(tempPath, JSON.stringify(value, null, 2), "utf-8"),
+  );
+  yield* fromPromise(() => fs.rename(tempPath, filePath));
+}, Effect.scoped);

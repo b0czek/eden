@@ -35,9 +35,7 @@ export function createPackageManifests(config: EdenConfig) {
     if (!isHotReloadConfigured(config) || !manifest.frontend?.entry) {
       return manifest;
     }
-    const devUrl = yield* fromPromise(() =>
-      getHotReloadDevUrl(manifest.id, config),
-    );
+    const devUrl = yield* getHotReloadDevUrl(manifest.id, config);
     if (!devUrl) {
       return manifest;
     }

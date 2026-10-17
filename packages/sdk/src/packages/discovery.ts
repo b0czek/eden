@@ -30,7 +30,7 @@ export function createPackageDiscovery({
   const loadDevelopmentApps = Effect.fn(function* (
     prebuiltDlcIds: ReadonlySet<string>,
   ) {
-    const state = yield* fromPromise(() => loadHotReloadAppsState(config));
+    const state = yield* loadHotReloadAppsState(config);
     for (const entry of state.apps) {
       yield* Effect.catch(
         Effect.gen(function* () {

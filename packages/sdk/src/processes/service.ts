@@ -155,7 +155,7 @@ export const createProcesses = Effect.fn(function* ({
     Queue.offerUnsafe(pending, handleHotReloadStateChanged);
   });
   const handleHotReloadStateChanged = Effect.fn(function* () {
-    const state = yield* fromPromise(() => loadHotReloadServerState(_config));
+    const state = yield* loadHotReloadServerState(_config);
     const appIds = new Set([
       ..._hotReloadStates.keys(),
       ...Object.keys(state.apps),

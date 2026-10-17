@@ -7,10 +7,6 @@ export function createDevelopmentAutostart(
   config: EdenConfig,
 ): DevelopmentAutostart {
   return {
-    apps: Effect.tryPromise({
-      try: async () => (await loadHotReloadAppsState(config)).apps,
-      catch: (error) =>
-        error instanceof Error ? error : new Error(String(error)),
-    }),
+    apps: Effect.map(loadHotReloadAppsState(config), (state) => state.apps),
   };
 }
