@@ -2,6 +2,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Queue from "effect/Queue";
+import { listen } from "../events/scoped";
 import { log } from "../logging";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import type { AutostartDependencies } from "./ports";
@@ -130,19 +131,17 @@ export function createAutostart({
       }),
     );
 
-    const unsubscribe = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        sessions.changed.on(({ currentUser, previousUsername }) => {
-          if (
-            disposed ||
-            !ready ||
-            (currentUser?.username ?? null) === previousUsername
-          )
-            return;
-          Queue.offerUnsafe(pending, currentUser ? "session" : "login");
-        }),
-      ),
-      (stop) => Effect.sync(stop),
+    const unsubscribe = yield* listen(
+      sessions.changed,
+      ({ currentUser, previousUsername }) => {
+        if (
+          disposed ||
+          !ready ||
+          (currentUser?.username ?? null) === previousUsername
+        )
+          return;
+        Queue.offerUnsafe(pending, currentUser ? "session" : "login");
+      },
     );
 
     function onFoundationReady() {
