@@ -82,6 +82,7 @@ export const createViews = Effect.fn(function* ({
     yield* scopedEvent<TargetedNotification<ViewsEvents["mode-changed"]>>();
   const _windows = windows;
   let _views: Map<number, ViewInfo> = new Map();
+  const _viewsByWebContentsId = new Map<number, ViewInfo>();
   let _mainWindow: PlatformWindow | null = null;
   let _tiling: Tiling;
   let _floatingWindows: FloatingWindows;
@@ -278,6 +279,7 @@ export const createViews = Effect.fn(function* ({
 
       // Store view info
       _views.set(viewId, viewInfo);
+      _viewsByWebContentsId.set(viewInfo.view.webContents.id, viewInfo);
       attachFocusTracking(viewId, viewInfo);
 
       // Apply current interface scale to the new view
@@ -341,6 +343,7 @@ export const createViews = Effect.fn(function* ({
     if (!viewInfo) {
       throw new Error(`View ${viewId} not found`);
     }
+    const webContentsId = viewInfo.view.webContents.id;
 
     try {
       _tiling.restoreExpansionForView(viewId);
@@ -355,10 +358,11 @@ export const createViews = Effect.fn(function* ({
 
       // Remove from tracking map
       if (_views.delete(viewId)) {
+        _viewsByWebContentsId.delete(webContentsId);
         viewRemoved.emit({
           viewId,
           appId: viewInfo.appId,
-          webContentsId: viewInfo.view.webContents.id,
+          webContentsId,
         });
       }
 
@@ -375,10 +379,11 @@ export const createViews = Effect.fn(function* ({
       log.error(`Failed to remove view ${viewId}:`, errorMessage);
       // Still remove from tracking even if removal failed
       if (_views.delete(viewId)) {
+        _viewsByWebContentsId.delete(webContentsId);
         viewRemoved.emit({
           viewId,
           appId: viewInfo.appId,
-          webContentsId: viewInfo.view.webContents.id,
+          webContentsId,
         });
       }
       throw new Error(`Failed to remove view: ${errorMessage}`);
@@ -463,21 +468,11 @@ export const createViews = Effect.fn(function* ({
   }
 
   function getAppIdByWebContentsId(webContentsId: number): string | undefined {
-    for (const [, info] of _views.entries()) {
-      if (info.view.webContents.id === webContentsId) {
-        return info.appId;
-      }
-    }
-    return undefined;
+    return _viewsByWebContentsId.get(webContentsId)?.appId;
   }
 
   function getViewIdByWebContentsId(webContentsId: number): number | undefined {
-    for (const [viewId, info] of _views.entries()) {
-      if (info.view.webContents.id === webContentsId) {
-        return viewId;
-      }
-    }
-    return undefined;
+    return _viewsByWebContentsId.get(webContentsId)?.id;
   }
 
   function getAllViews(): [number, ViewInfo][] {
@@ -569,7 +564,9 @@ export const createViews = Effect.fn(function* ({
     if (!isWindowAlive(_mainWindow)) return;
 
     // Clean up any destroyed views first
-    cleanupDestroyedViews(_views);
+    for (const info of cleanupDestroyedViews(_views)) {
+      _viewsByWebContentsId.delete(info.view.webContents.id);
+    }
 
     try {
       const appViews = Array.from(_views.values()).filter(
@@ -787,6 +784,7 @@ export const createViews = Effect.fn(function* ({
       }
     }
     _views.clear();
+    _viewsByWebContentsId.clear();
     _mainWindow = null;
   }
   yield* Effect.addFinalizer(() => Effect.sync(dispose));

@@ -141,24 +141,26 @@ export function destroyView(
 
 /**
  * Remove all destroyed views from a view map.
- * Returns the number of views cleaned up.
+ * Returns the removed views so their owner can release associated state.
  */
-export function cleanupDestroyedViews(views: Map<number, ViewInfo>): number {
-  const destroyedIds: number[] = [];
+export function cleanupDestroyedViews(
+  views: Map<number, ViewInfo>,
+): ViewInfo[] {
+  const destroyedViews: ViewInfo[] = [];
 
-  for (const [viewId, info] of views.entries()) {
+  for (const info of views.values()) {
     if (!isViewAlive(info.view)) {
-      destroyedIds.push(viewId);
+      destroyedViews.push(info);
     }
   }
 
-  for (const id of destroyedIds) {
-    views.delete(id);
+  for (const info of destroyedViews) {
+    views.delete(info.id);
   }
 
-  if (destroyedIds.length > 0) {
-    log.info(`Cleaned up ${destroyedIds.length} destroyed views`);
+  if (destroyedViews.length > 0) {
+    log.info(`Cleaned up ${destroyedViews.length} destroyed views`);
   }
 
-  return destroyedIds.length;
+  return destroyedViews;
 }
