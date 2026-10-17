@@ -4,12 +4,12 @@ import * as path from "node:path";
 import * as Effect from "effect/Effect";
 import { createAppearance } from "../../../src/appearance/service";
 import { createAppearanceSettings } from "../../../src/appearance/settings-adapter";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createI18n } from "../../../src/i18n/service";
 import { createI18nSettings } from "../../../src/i18n/settings";
 import type { SettingsStorage } from "../../../src/settings/ports";
 import { createSettings } from "../../../src/settings/service";
 import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 function settingsFactory(storage: SettingsStorage) {
   return createSettings({

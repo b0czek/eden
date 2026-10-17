@@ -1,5 +1,5 @@
 import type { AppInstance, AppManifest } from "@edenapp/types";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
 import { createProcessMetrics } from "./metrics";
 

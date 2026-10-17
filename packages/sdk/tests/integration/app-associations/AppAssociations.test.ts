@@ -4,11 +4,11 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import { createJsonFileAssociationStorage } from "../../../src/app-associations/json-file";
 import { createAppAssociations } from "../../../src/app-associations/service";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createExecutionContext } from "../../../src/execution/context";
 import { createPackageCatalog } from "../../../src/packages/catalog";
 import { createInstalledPackages } from "../../../src/packages/installed";
 import { testApp } from "../../support/apps";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 const vendor: UserProfile = {
   username: "vendor",

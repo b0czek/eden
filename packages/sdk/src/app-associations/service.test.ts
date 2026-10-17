@@ -2,7 +2,7 @@ import type { AppAssociationStore } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import type { AppAssociationStorage } from "./ports";
 import { createAppAssociations } from "./service";
 

@@ -1,12 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createFloatingWindows } from "../../../src/views/floating-windows";
 import { createViewRendering } from "../../../src/views/rendering";
 import { createTiling } from "../../../src/views/tiling";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
+import { createEffectRuntime } from "../../support/effect-runtime";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 
 it("continues rendering later views when an earlier view closes during CSS injection", async () => {

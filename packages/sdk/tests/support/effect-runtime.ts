@@ -14,7 +14,7 @@ const ServiceLifetime = Context.Service<ServiceLifetime>(
   "eden/ServiceLifetime",
 );
 
-/** One execution boundary and resource owner for an Eden runtime's Effect services. */
+/** Scoped fixture ownership for tests that acquire standalone services. */
 export function createEffectRuntime() {
   const runtime = ManagedRuntime.make(
     Layer.effect(

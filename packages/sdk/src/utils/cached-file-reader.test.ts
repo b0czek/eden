@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createCachedFileReader } from "./cached-file-reader";
 
 describe("cached asset reads", () => {

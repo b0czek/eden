@@ -1,7 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
+import { fromPromise } from "../effects/io";
 import { createNotifications } from "./service";
 
 const provider = { appId: "app.toaster", webContentsId: 100 };
@@ -119,9 +120,10 @@ it("routes renderer actions and dismissals to the source and discards dismissed 
         "info",
         [{ id: "details", label: "Details" }],
         {
-          force: () => {
-            callbackRuns++;
-          },
+          force: () =>
+            Effect.sync(() => {
+              callbackRuns++;
+            }),
         },
         editor,
       ),
@@ -182,7 +184,7 @@ it("rejects actions and dismissals from another view or a dead display provider"
   }
 });
 
-it("drains accepted Promise callbacks before disposing their service scope", async () => {
+it("settles native action I/O before disposing its service scope", async () => {
   const { runtime, notifications } = await scenario();
   let finish!: () => void;
   let started!: () => void;
@@ -197,11 +199,12 @@ it("drains accepted Promise callbacks before disposing their service scope", asy
     notifications.added.on(() => {});
     const notification = await runtime.run(
       notifications.pushNotification("Title", "Message", 0, "info", undefined, {
-        work: async () => {
-          started();
-          await pending;
-          completed = true;
-        },
+        work: () =>
+          fromPromise(async () => {
+            started();
+            await pending;
+            completed = true;
+          }),
       }),
     );
     const action = runtime.run(

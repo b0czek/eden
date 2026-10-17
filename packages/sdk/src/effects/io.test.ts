@@ -2,8 +2,8 @@ import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import { gate, tick } from "../../tests/support/async";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { fromPromise } from "./io";
-import { createEffectRuntime } from "./runtime";
 
 it("aborts native I/O on interruption and waits for it to settle before releasing ownership", async () => {
   const runtime = createEffectRuntime();

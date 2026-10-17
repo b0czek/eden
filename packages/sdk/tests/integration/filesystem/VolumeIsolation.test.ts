@@ -2,13 +2,12 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../../../src/effects/io";
+import { createVolumes } from "../../../src/filesystem/volumes";
+import type { OperationTask } from "../../../src/operations/task";
 import {
   createEffectRuntime,
   type EffectRuntime,
-} from "../../../src/effects/runtime";
-import { createVolumes } from "../../../src/filesystem/volumes";
-import type { OperationTask } from "../../../src/operations/task";
+} from "../../support/effect-runtime";
 
 function runTask<A>(
   runtime: EffectRuntime,

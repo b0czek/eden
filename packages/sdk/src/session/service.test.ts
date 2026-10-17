@@ -1,8 +1,11 @@
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { gate } from "../../tests/support/async";
+import {
+  createEffectRuntime,
+  type EffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { fromPromise } from "../effects/io";
-import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
 import { createExecutionContext } from "../execution/context";
 import { createOperations, type Operations } from "../operations/service";
 import { createSessionContext, type SessionContext } from "./context";

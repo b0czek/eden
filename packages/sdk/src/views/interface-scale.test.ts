@@ -1,6 +1,6 @@
 import type { AppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createEvent } from "../events/event";
 import { createInterfaceScale } from "./interface-scale";
 import type { ViewInfo, ViewType } from "./types";

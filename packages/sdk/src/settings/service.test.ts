@@ -1,6 +1,6 @@
 import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createSettings } from "./service";
 
 const ownerSettings: SettingsCategory[] = [

@@ -11,7 +11,6 @@ import type {
 import * as Effect from "effect/Effect";
 import { createAppAssociations } from "../../../src/app-associations/service";
 import type { TargetedNotification } from "../../../src/controllers/events";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
 import { createExecutionContext } from "../../../src/execution/context";
 import { createFilePickerProcesses } from "../../../src/file-picker/adapters";
@@ -23,6 +22,7 @@ import { createPermissions } from "../../../src/ipc/permissions";
 import { createPackageCatalog } from "../../../src/packages/catalog";
 import { createInstalledPackages } from "../../../src/packages/installed";
 import { testApp } from "../../support/apps";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 const provider = { appId: "com.example.picker", webContentsId: 100 };
 const opener = { appId: "com.example.editor", webContentsId: 200 };

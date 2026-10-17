@@ -1,6 +1,6 @@
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createEvent } from "../events/event";
 import type { Bounds, PlatformWindow, WindowingPort } from "../platform/ports";
 import { createViews, type Views } from "./service";

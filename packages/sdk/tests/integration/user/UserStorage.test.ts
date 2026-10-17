@@ -2,9 +2,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createUserStorage, type UserStorage } from "../../../src/user/storage";
 import type { StoredUser } from "../../../src/user/types";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 function user(username: string): StoredUser {
   return {

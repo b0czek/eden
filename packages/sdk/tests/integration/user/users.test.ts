@@ -1,12 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { createUsers, type Users } from "../../../src/user/service";
+import { createUserStorage } from "../../../src/user/storage";
 import {
   createEffectRuntime,
   type EffectRuntime,
-} from "../../../src/effects/runtime";
-import { createUsers, type Users } from "../../../src/user/service";
-import { createUserStorage } from "../../../src/user/storage";
+} from "../../support/effect-runtime";
 
 describe("Users accounts", () => {
   let appsDirectory: string;

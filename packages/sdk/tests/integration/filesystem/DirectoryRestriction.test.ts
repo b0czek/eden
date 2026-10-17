@@ -2,10 +2,6 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
-import {
-  createEffectRuntime,
-  type EffectRuntime,
-} from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
 import type { ExecutionContext } from "../../../src/execution";
 import {
@@ -13,6 +9,10 @@ import {
   type Filesystem,
 } from "../../../src/filesystem/service";
 import { createVolumes } from "../../../src/filesystem/volumes";
+import {
+  createEffectRuntime,
+  type EffectRuntime,
+} from "../../support/effect-runtime";
 
 describe("Filesystem shared addresses and folder restrictions", () => {
   let root: string;

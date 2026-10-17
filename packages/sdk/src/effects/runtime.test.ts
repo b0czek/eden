@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createExecutionContext } from "../execution/context";
-import { createEffectRuntime } from "./runtime";
 
 describe("Effect runtime ownership", () => {
   it("owns acquired resources until disposal and rolls back a failed acquisition", async () => {

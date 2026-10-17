@@ -1,4 +1,7 @@
 import * as path from "node:path";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Scope from "effect/Scope";
 import type { EdenConfig } from "./api/config";
 import { log } from "./logging";
 import { createElectronPlatform } from "./platform/electron";
@@ -39,32 +42,52 @@ export function createEdenHost({
   application: ApplicationLifecyclePort;
 }) {
   let disposal: Promise<void> | undefined;
-  const unsubscribe = [
-    application.on("window-all-closed", () => application.quit()),
-    application.on("activate", () => runtime.activate()),
-    application.on("quit-requested", () => {
-      void dispose()
-        .finally(() => application.completeQuit())
-        .catch((error) => {
-          log.error("Failed to dispose Eden before quitting:", error);
-        });
-    }),
-  ];
+  const scope = Scope.makeUnsafe("sequential");
 
   function dispose(): Promise<void> {
-    disposal ??= (async () => {
-      for (const stop of unsubscribe) stop();
-      await runtime.dispose();
-    })();
+    disposal ??= Effect.runPromise(
+      Scope.close(scope, Exit.void).pipe(
+        Effect.ensuring(Effect.promise(() => runtime.dispose())),
+      ),
+    );
     return disposal;
   }
 
-  void application
-    .whenReady()
-    .then(() => {
-      if (!disposal) return runtime.start();
-    })
-    .catch(() => undefined);
+  Effect.runSync(
+    Scope.provide(
+      Effect.gen(function* () {
+        const on = (
+          event: Parameters<ApplicationLifecyclePort["on"]>[0],
+          listener: () => void,
+        ) =>
+          Effect.acquireRelease(
+            Effect.sync(() => application.on(event, listener)),
+            (stop) => Effect.sync(stop),
+          );
+        yield* on("window-all-closed", () => application.quit());
+        yield* on("activate", () => runtime.activate());
+        yield* on("quit-requested", () => {
+          void dispose()
+            .finally(() => application.completeQuit())
+            .catch((error) => {
+              log.error("Failed to dispose Eden before quitting:", error);
+            });
+        });
+        yield* Effect.forkScoped(
+          // Application readiness owns no native resources and can be abandoned on shutdown.
+          Effect.promise(() => application.whenReady()).pipe(
+            Effect.andThen(
+              Effect.suspend(() =>
+                disposal ? Effect.void : Effect.promise(() => runtime.start()),
+              ),
+            ),
+            Effect.catchCause(() => Effect.void),
+          ),
+        );
+      }),
+      scope,
+    ),
+  );
 
   return {
     settings: runtime.settings,

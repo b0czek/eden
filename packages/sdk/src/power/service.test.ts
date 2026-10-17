@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../effects/runtime";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import { createPowerHost } from "./adapters";
 import { createPowerController } from "./controller-edenapi";
 import { createPower } from "./service";

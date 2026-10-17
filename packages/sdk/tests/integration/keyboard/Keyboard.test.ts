@@ -3,7 +3,6 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { EdenKeyboardState, ViewBounds } from "@edenapp/types";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { createEvent } from "../../../src/events/event";
 import { createKeyboardAssets } from "../../../src/keyboard/assets";
 import type { KeyboardViews } from "../../../src/keyboard/ports";
@@ -14,6 +13,7 @@ import { createSettings } from "../../../src/settings/service";
 import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
 import type { ViewInfo } from "../../../src/views/types";
 import { testApp } from "../../support/apps";
+import { createEffectRuntime } from "../../support/effect-runtime";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 
 const resources: Array<() => Promise<void>> = [];

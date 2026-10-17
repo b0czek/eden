@@ -207,9 +207,18 @@ describe("EdenRuntime integration", () => {
       platform: { failWindowCreation: startupFailure },
     });
     active.push(eden);
-    await eden.runtime.effects.acquire(
-      Effect.addFinalizer(() => Effect.die(new Error("resource close failed"))),
-    );
+    const createPackages = packageService.createPackages;
+    const acquisition = jest
+      .spyOn(packageService, "createPackages")
+      .mockImplementation((dependencies) =>
+        Effect.gen(function* () {
+          const packages = yield* createPackages(dependencies);
+          yield* Effect.addFinalizer(() =>
+            Effect.die(new Error("resource close failed")),
+          );
+          return packages;
+        }),
+      );
     const windows = eden.platform.windows;
     const createWindow = windows.createWindow.bind(windows);
     windows.createWindow = (options) => {
@@ -225,8 +234,12 @@ describe("EdenRuntime integration", () => {
     };
 
     const readiness = eden.runtime.whenReady();
-    await expect(eden.start()).rejects.toBe(startupFailure);
-    await expect(readiness).rejects.toBe(startupFailure);
+    try {
+      await expect(eden.start()).rejects.toBe(startupFailure);
+      await expect(readiness).rejects.toBe(startupFailure);
+    } finally {
+      acquisition.mockRestore();
+    }
 
     expect(eden.runtime.state).toBe("failed");
     expect(eden.platform.activeResourceCount).toBe(0);

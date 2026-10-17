@@ -259,39 +259,23 @@ preserves that scope so only authorized subscribers receive them.
 
 ## Composition and generation
 
-One [Effect runtime](../packages/sdk/src/effects/runtime.ts) belongs to each Eden
-runtime. Its `acquire` method constructs a scoped service; `run` executes a fully
-provided Effect and returns a Promise. Use these methods only at composition,
-IPC, and host-facing integration boundaries. Its `fork` method starts an owned
-fiber; disposal interrupts and awaits these fibers before releasing service
-resources:
+The desktop graph is acquired and initialized by one scoped Effect program,
+exposed as a single `Desktop` service through a Layer. `ManagedRuntime` owns
+that Layer, its resources, and work started by the host runners. Domain
+factories retain explicit dependencies; each domain does not need its own tag.
+See the [runtime boundary](../packages/sdk/src/runtime/runtime.ts).
 
-```ts
-const effects = createEffectRuntime();
-const appearance = await effects.acquire(
-  createAppearance({ settings: createAppearanceSettings(settings) }),
-);
+Startup retains its fiber, and readiness follows its exit. Shutdown interrupts
+pending startup and preserves native I/O settlement. After successful startup,
+shutdown closes operation admission, drains accepted work, and stops processes
+before disposing the managed graph. Failed acquisition releases partial resources
+and preserves the startup error even when cleanup fails.
 
-ipcBridge.registerController(createAppearanceController(appearance));
-await effects.run(appearance.initialize());
-
-// During owner shutdown:
-await effects.dispose();
-```
-
-`forkScoped` retains an acquisition program's fiber while keeping successful
-resources owned by the runtime. Desktop startup uses it to acquire and initialize
-the graph in one Effect program. Readiness follows the startup fiber's exit;
-shutdown interrupts pending startup and runs admission closure, draining, and
-process shutdown before releasing the graph. Native I/O still settles before
-its resources are released.
-
-The managed runtime owns a child scope for each acquisition. Failed acquisition
-closes its child scope immediately; successful acquisitions stay owned until
-runtime disposal closes their resources. Composition supplies adapters and
-preserves startup ordering: appearance initializes after settings and sessions
-are ready. Host and IPC boundaries execute service Effects while preserving
-their existing Promise APIs.
+Host execution uses `eden.runPromise` or `eden.runFork`. Native IPC and protocol
+adapters own their callback fibers in their acquisition scopes. Services compose
+Effects and receive no outer runtime runner. Test fixtures can acquire standalone
+services through their own scoped helper without adding an acquisition API to
+the desktop runtime.
 
 The desktop [composition program](../packages/sdk/src/runtime/composition.ts)
 acquires the complete service graph in one scope. Dependencies are constructed

@@ -6,7 +6,6 @@ import * as Effect from "effect/Effect";
 import { createDevelopmentAutostart } from "../../../src/autostart/development";
 import { createAutostartProcesses } from "../../../src/autostart/processes";
 import { createAutostart } from "../../../src/autostart/service";
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import type { ExecutionContext } from "../../../src/execution/context";
 import type { InstalledPackages } from "../../../src/packages/installed";
 import type { Processes } from "../../../src/processes/service";
@@ -17,6 +16,7 @@ import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storag
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 const vendor: UserProfile = {
   username: "setup",

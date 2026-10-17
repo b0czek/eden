@@ -1,6 +1,9 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime, type EffectRuntime } from "../effects/runtime";
+import {
+  createEffectRuntime,
+  type EffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { createDaemons, type Daemons } from "./service";
 
 const manifest = {

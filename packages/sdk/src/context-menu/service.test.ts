@@ -1,6 +1,6 @@
 import type { ContextMenuOpenEvent, ContextMenuResult } from "@edenapp/types";
+import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import type { TargetedNotification } from "../controllers/events";
-import { createEffectRuntime } from "../effects/runtime";
 import type { ContextMenuViews } from "./ports";
 import { createContextMenu } from "./service";
 

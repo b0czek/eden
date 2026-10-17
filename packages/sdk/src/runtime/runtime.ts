@@ -1,14 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 import type { EdenLifecycleState } from "../api";
 import type { EdenConfig } from "../api/config";
 import { resolveBrandingName } from "../branding";
-import { createEffectRuntime } from "../effects/runtime";
+import { asError } from "../effects/io";
 import { log } from "../logging";
 import type { EdenPlatform } from "../platform/ports";
 import { seedDatabase } from "../seed";
@@ -17,6 +20,8 @@ import { createPanelRegistry } from "../settings/panel-registry";
 import { composeRuntime, type RuntimeBundle } from "./composition";
 
 export type { RuntimeServices } from "./composition";
+
+const Desktop = Context.Service<RuntimeBundle>("eden/Desktop");
 
 export interface EdenRuntimePaths {
   appsDirectory: string;
@@ -40,7 +45,6 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   fs.mkdirSync(paths.appsDirectory, { recursive: true });
   fs.mkdirSync(paths.userDirectory, { recursive: true });
   resolveBrandingName(config.branding);
-  const effects = createEffectRuntime();
   const registrations = createPanelRegistry();
   const settings = createSettingsSdkController({ panels: registrations });
   let state: EdenLifecycleState = "created";
@@ -52,21 +56,20 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     Deferred.await(launched).pipe(
       Effect.flatMap(Fiber.join),
       Effect.catchCause((cause) =>
-        Effect.fail(
-          Cause.hasInterruptsOnly(cause)
+        Effect.gen(function* () {
+          const error = Cause.hasInterruptsOnly(cause)
             ? new Error("Eden runtime startup aborted by shutdown")
-            : Cause.squash(cause),
-        ),
+            : Cause.squash(cause);
+          if (state === "starting") {
+            state = "failed";
+            log.error("Eden failed to start", error);
+          }
+          yield* Effect.promise(release);
+          return yield* Effect.fail(error);
+        }),
       ),
     ),
-  ).catch(async (error) => {
-    if (state === "starting") {
-      state = "failed";
-      log.error("Eden failed to start", error);
-    }
-    await release();
-    throw error;
-  });
+  );
   void readyPromise.catch(() => undefined);
   function requireBundle() {
     if (!bundle)
@@ -107,7 +110,22 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
       state = "ready";
       log.info("Eden ready!");
     }).pipe(Effect.onError(() => desktop.shutdown()));
+    return desktop;
   });
+  const managed = ManagedRuntime.make(Layer.effect(Desktop, initialize()));
+  const effects = {
+    run<A, E>(work: Effect.Effect<A, E>): Promise<A> {
+      if (state === "created")
+        return Promise.reject(new Error("Eden is not ready"));
+      return managed.runPromise(work).catch((error) => {
+        throw asError(error);
+      });
+    },
+    fork<A, E>(work: Effect.Effect<A, E>) {
+      if (state === "created") throw new Error("Eden is not ready");
+      return managed.runFork(work);
+    },
+  };
 
   function start() {
     if (state === "starting" || state === "ready") return readyPromise;
@@ -116,7 +134,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
         new Error(`Cannot start Eden runtime from ${state} state`),
       );
     state = "starting";
-    const fiber = effects.forkScoped(initialize());
+    const fiber = managed.runFork(Effect.asVoid(Desktop));
     startup = fiber;
     Deferred.doneUnsafe(launched, Effect.succeed(fiber));
     return readyPromise;
@@ -128,7 +146,6 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
         if (startup) {
           yield* Fiber.interrupt(startup);
           const exit = yield* Fiber.await(startup);
-          // Failed or interrupted acquisition already shut down and closed its scope.
           if (Exit.isSuccess(exit) && bundle) yield* bundle.shutdown();
         }
       }).pipe(
@@ -138,7 +155,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
           ),
         ),
         Effect.ensuring(
-          Effect.promise(() => effects.dispose()).pipe(
+          managed.disposeEffect.pipe(
             Effect.catchCause((cause) =>
               Effect.sync(() =>
                 log.error(

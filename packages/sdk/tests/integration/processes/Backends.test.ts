@@ -1,6 +1,6 @@
-import { createEffectRuntime } from "../../../src/effects/runtime";
 import { type Backends, createBackends } from "../../../src/processes/backends";
 import { testApp } from "../../support/apps";
+import { createEffectRuntime } from "../../support/effect-runtime";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 
 describe("backend readiness and termination", () => {

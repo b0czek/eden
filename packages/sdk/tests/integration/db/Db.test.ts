@@ -5,10 +5,9 @@ import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
 import Keyv from "keyv";
 import { createDb, createSqliteDbStorage } from "../../../src/db";
-import { createEffectRuntime } from "../../../src/effects/runtime";
-import { Permissions } from "../../../src/ipc/permissions";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
+import { createEffectRuntime } from "../../support/effect-runtime";
 
 it("isolates app namespaces using trusted callers and gates cross-app commands", async () => {
   const eden = await createTestEden();
