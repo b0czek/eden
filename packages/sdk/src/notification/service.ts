@@ -15,9 +15,7 @@ import type { NotificationCaller, NotificationViews } from "./ports";
 
 export type NotificationActionCallbacks = Record<
   string,
-  (
-    notification: Notification,
-  ) => void | Promise<void> | Effect.Effect<unknown, Error>
+  (notification: Notification) => Effect.Effect<unknown, Error>
 >;
 
 interface ActiveNotification {
@@ -151,16 +149,9 @@ export function createNotifications({ views }: { views: NotificationViews }) {
         if (callback && active) {
           const work = Effect.uninterruptibleMask((restore) =>
             Effect.gen(function* () {
-              const result = yield* Effect.try({
-                try: () => callback(active.notification),
-                catch: asError,
-              });
-              if (Effect.isEffect(result)) yield* restore(result);
-              else if (result)
-                yield* Effect.tryPromise({
-                  try: () => result,
-                  catch: asError,
-                });
+              yield* restore(
+                Effect.suspend(() => callback(active.notification)),
+              );
               // Failed callbacks remain retryable; completed callbacks are one-shot.
               delete active.callbacks?.[actionId];
             }),
