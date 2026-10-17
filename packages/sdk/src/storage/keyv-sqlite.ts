@@ -46,7 +46,7 @@ export const openKeyvSqlite = Effect.fn(function* ({
 
   return {
     read: (key: string) => perform(() => keyv.get(key)),
-    write: (key: string, value: string) =>
+    write: (key: string, value: unknown) =>
       perform(async () => {
         await keyv.set(key, value);
       }),

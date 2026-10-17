@@ -1,9 +1,7 @@
 import * as path from "node:path";
-import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
-import Keyv from "keyv";
-import { fromPromise } from "../effects/io";
-import { log } from "../logging";
+import * as Semaphore from "effect/Semaphore";
+import { openKeyvSqlite } from "../storage/keyv-sqlite";
 import type { StoredUser } from "./types";
 
 const USERS_INDEX_KEY = "users:index";
@@ -14,18 +12,15 @@ export const createUserStorage = Effect.fn(function* ({
 }: {
   appsDirectory: string;
 }) {
-  let keyv: Keyv;
-
-  const dbPath = path.join(appsDirectory, "users.db");
-  const sqlite = new KeyvSqlite(`sqlite://${dbPath}`);
-  keyv = new Keyv({ store: sqlite });
-  keyv.on("error", (err) => {
-    log.error("Database error:", err);
+  const connection = yield* openKeyvSqlite({
+    dbPath: path.join(appsDirectory, "users.db"),
+    label: "user storage",
+    closedMessage: "User storage closed",
   });
-  log.info(`Initialized user storage at ${dbPath}`);
+  const mutations = yield* Semaphore.make(1);
   const getDefaultUsername = Effect.fn(
     function* getDefaultUsername(): Effect.fn.Return<string | null, Error> {
-      const stored = yield* fromPromise(() => keyv.get(DEFAULT_USER_KEY));
+      const stored = yield* connection.read(DEFAULT_USER_KEY);
       if (typeof stored === "string" && stored.length > 0) {
         return stored;
       }
@@ -36,16 +31,16 @@ export const createUserStorage = Effect.fn(function* ({
     username: string | null,
   ): Effect.fn.Return<void, Error> {
     if (username) {
-      yield* fromPromise(() => keyv.set(DEFAULT_USER_KEY, username));
+      yield* connection.write(DEFAULT_USER_KEY, username);
       return;
     }
-    yield* fromPromise(() => keyv.delete(DEFAULT_USER_KEY));
+    yield* connection.remove(DEFAULT_USER_KEY);
   });
   const getUserIndex = Effect.fn(function* getUserIndex(): Effect.fn.Return<
     string[],
     Error
   > {
-    const value = yield* fromPromise(() => keyv.get(USERS_INDEX_KEY));
+    const value = yield* connection.read(USERS_INDEX_KEY);
     if (Array.isArray(value)) {
       return value as string[];
     }
@@ -62,7 +57,7 @@ export const createUserStorage = Effect.fn(function* ({
   const getUserRecord = Effect.fn(function* getUserRecord(
     username: string,
   ): Effect.fn.Return<StoredUser | null, Error> {
-    const value = yield* fromPromise(() => keyv.get(getUserKey(username)));
+    const value = yield* connection.read(getUserKey(username));
     if (!value) return null;
     if (typeof value === "string") {
       try {
@@ -73,29 +68,30 @@ export const createUserStorage = Effect.fn(function* ({
     }
     return normalizeStoredUser(value as StoredUser);
   });
-  const saveUserRecord = Effect.fn(function* saveUserRecord(
-    user: StoredUser,
-  ): Effect.fn.Return<void, Error> {
-    yield* fromPromise(() => keyv.set(getUserKey(user.username), user));
-    const ids = yield* getUserIndex();
-    if (!ids.includes(user.username)) {
-      ids.push(user.username);
-      yield* setUserIndex(ids);
-    }
-  });
-  const deleteUserRecord = Effect.fn(function* deleteUserRecord(
-    username: string,
-  ): Effect.fn.Return<void, Error> {
-    yield* fromPromise(() => keyv.delete(getUserKey(username)));
-    const ids = yield* getUserIndex();
-    const next = ids.filter((item) => item !== username);
-    yield* setUserIndex(next);
-  });
-  const setUserIndex = Effect.fn(function* setUserIndex(
-    ids: string[],
-  ): Effect.fn.Return<void, Error> {
-    yield* fromPromise(() => keyv.set(USERS_INDEX_KEY, ids));
-  });
+  function saveUserRecord(user: StoredUser) {
+    return mutations.withPermit(
+      Effect.gen(function* () {
+        yield* connection.write(getUserKey(user.username), user);
+        const ids = yield* getUserIndex();
+        if (!ids.includes(user.username)) {
+          ids.push(user.username);
+          yield* connection.write(USERS_INDEX_KEY, ids);
+        }
+      }).pipe(Effect.uninterruptible),
+    );
+  }
+  function deleteUserRecord(username: string) {
+    return mutations.withPermit(
+      Effect.gen(function* () {
+        yield* connection.remove(getUserKey(username));
+        const ids = yield* getUserIndex();
+        yield* connection.write(
+          USERS_INDEX_KEY,
+          ids.filter((item) => item !== username),
+        );
+      }).pipe(Effect.uninterruptible),
+    );
+  }
   function getUserKey(username: string): string {
     return `user:${username}`;
   }
@@ -105,10 +101,6 @@ export const createUserStorage = Effect.fn(function* ({
     }
     return user;
   }
-  const dispose = Effect.fn(function* dispose(): Effect.fn.Return<void, Error> {
-    yield* fromPromise(() => keyv.disconnect());
-  });
-  yield* Effect.addFinalizer(() => dispose().pipe(Effect.orDie));
   return {
     getDefaultUsername,
     setDefaultUsername,
