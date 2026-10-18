@@ -4,8 +4,8 @@ import * as path from "node:path";
 import type { FilesystemChangeKind } from "@edenapp/types";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import type * as Fiber from "effect/Fiber";
-import * as FiberSet from "effect/FiberSet";
+import * as FiberMap from "effect/FiberMap";
+import * as Option from "effect/Option";
 import type { Event } from "../events/event";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
@@ -13,7 +13,6 @@ import { log } from "../logging";
 interface DirectoryWatch {
   watcher: FSWatcher;
   watchIds: Set<string>;
-  debounce?: Fiber.Fiber<void>;
 }
 
 interface ViewWatch {
@@ -34,7 +33,8 @@ interface FilesystemWatchesOptions {
 export const createFilesystemWatches = Effect.fn(function* (
   options: FilesystemWatchesOptions,
 ) {
-  const forkDebounce = yield* FiberSet.makeRuntime<never, void, never>();
+  const debounces = yield* FiberMap.make<string, void, never>();
+  const forkDebounce = yield* FiberMap.runtime(debounces)<never>();
   const directoryWatches = new Map<string, DirectoryWatch>();
   const viewWatches = new Map<string, ViewWatch>();
 
@@ -92,7 +92,6 @@ export const createFilesystemWatches = Effect.fn(function* (
 
   function dispose(): void {
     for (const directoryWatch of directoryWatches.values()) {
-      directoryWatch.debounce?.interruptUnsafe();
       directoryWatch.watcher.close();
     }
     directoryWatches.clear();
@@ -111,12 +110,11 @@ export const createFilesystemWatches = Effect.fn(function* (
   function scheduleChange(hostPath: string, kind: FilesystemChangeKind): void {
     const directoryWatch = directoryWatches.get(hostPath);
     if (!directoryWatch) return;
-    directoryWatch.debounce?.interruptUnsafe();
-    directoryWatch.debounce = forkDebounce(
+    forkDebounce(
+      hostPath,
       Effect.sleep(Duration.millis(100)).pipe(
         Effect.andThen(
           Effect.sync(() => {
-            directoryWatch.debounce = undefined;
             for (const watchId of directoryWatch.watchIds) {
               const ownedWatch = viewWatches.get(watchId);
               if (ownedWatch) {
@@ -137,7 +135,8 @@ export const createFilesystemWatches = Effect.fn(function* (
     if (!directoryWatch) return;
     directoryWatch.watchIds.delete(watchId);
     if (directoryWatch.watchIds.size === 0) {
-      directoryWatch.debounce?.interruptUnsafe();
+      const debounce = FiberMap.getUnsafe(debounces, ownedWatch.hostPath);
+      if (Option.isSome(debounce)) debounce.value.interruptUnsafe();
       directoryWatch.watcher.close();
       directoryWatches.delete(ownedWatch.hostPath);
     }

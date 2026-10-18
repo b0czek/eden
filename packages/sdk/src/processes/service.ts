@@ -15,8 +15,7 @@ import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import type * as Fiber from "effect/Fiber";
-import * as FiberSet from "effect/FiberSet";
+import * as FiberHandle from "effect/FiberHandle";
 import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
@@ -122,8 +121,8 @@ export const createProcesses = Effect.fn(function* ({
   let _hotReloadStates = new Map<string, string>();
   let _hotReloadWatcher: fs.FSWatcher | undefined;
 
-  const forkHotReload = yield* FiberSet.makeRuntime<never, void, never>();
-  let _hotReloadDebounceTimer: Fiber.Fiber<void> | undefined;
+  const hotReloadDebounce = yield* FiberHandle.make<void, never>();
+  const forkHotReload = yield* FiberHandle.runtime(hotReloadDebounce)<never>();
   let _shuttingDown = false;
   const _backends = backends;
   const _views = views;
@@ -169,8 +168,7 @@ export const createProcesses = Effect.fn(function* ({
         return;
       if (filename && filename.toString() !== path.basename(serversPath))
         return;
-      _hotReloadDebounceTimer?.interruptUnsafe();
-      _hotReloadDebounceTimer = forkHotReload(
+      forkHotReload(
         Effect.sleep(
           Duration.millis(Math.max(config.hotReload?.debounce ?? 300, 50)),
         ).pipe(
@@ -555,9 +553,7 @@ export const createProcesses = Effect.fn(function* ({
     _shuttingDown = true;
 
     _hotReloadWatcher?.close();
-    if (_hotReloadDebounceTimer) {
-      _hotReloadDebounceTimer.interruptUnsafe();
-    }
+    yield* FiberHandle.clear(hotReloadDebounce);
 
     const runningAppIds = Array.from(instances.keys());
 
@@ -586,10 +582,6 @@ export const createProcesses = Effect.fn(function* ({
     _shuttingDown = true;
     _hotReloadWatcher?.close();
     _hotReloadWatcher = undefined;
-    if (_hotReloadDebounceTimer) {
-      _hotReloadDebounceTimer.interruptUnsafe();
-      _hotReloadDebounceTimer = undefined;
-    }
     instances.clear();
     admission.clear();
     _hotReloadStates.clear();
