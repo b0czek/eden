@@ -22,6 +22,11 @@ interface CachedMetricsSample {
   appMetrics: PlatformProcessMetric[];
 }
 
+const createPendingSample = () => ({
+  result: Deferred.makeUnsafe<CachedMetricsSample, Error>(),
+  readers: 0,
+});
+
 const METRICS_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_METRICS_POLLING_TIMEOUT_MS = 1000;
 const MAX_METRICS_POLLING_TIMEOUT_MS = 10000;
@@ -41,9 +46,7 @@ export const createProcessMetrics = Effect.fn(function* (
   let _getRunningApps: (showHidden?: boolean) => AppInstance[];
   let _processMetrics: ProcessMetricsPort;
   let _metricsSampler: Fiber.Fiber<void> | null = null;
-  const pendingSamples = new Set<
-    Deferred.Deferred<CachedMetricsSample, Error>
-  >();
+  let firstSample = createPendingSample();
   let _metricsSamplerKeepAliveUntil = 0;
   let _latestMetricsSample: CachedMetricsSample | null = null;
 
@@ -81,12 +84,12 @@ export const createProcessMetrics = Effect.fn(function* (
       );
     }
 
-    const waiting = yield* Deferred.make<CachedMetricsSample, Error>();
-    pendingSamples.add(waiting);
-    const sample = yield* Deferred.await(waiting).pipe(
+    const waiting = firstSample;
+    waiting.readers++;
+    const sample = yield* Deferred.await(waiting.result).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          pendingSamples.delete(waiting);
+          waiting.readers--;
         }),
       ),
     );
@@ -100,6 +103,7 @@ export const createProcessMetrics = Effect.fn(function* (
   function ensureMetricsSampler(waitForAccurateCpu: boolean): void {
     if (_metricsSampler) return;
 
+    firstSample = createPendingSample();
     if (waitForAccurateCpu) {
       // Prime Electron's CPU sampler so the next interval-based sample is useful.
       _processMetrics.getAppMetrics();
@@ -127,7 +131,8 @@ export const createProcessMetrics = Effect.fn(function* (
 
   function collectMetricsSample(): void {
     if (
-      pendingSamples.size === 0 &&
+      (firstSample.readers === 0 ||
+        Deferred.isDoneUnsafe(firstSample.result)) &&
       Date.now() >= _metricsSamplerKeepAliveUntil
     ) {
       stopMetricsSampler();
@@ -135,21 +140,17 @@ export const createProcessMetrics = Effect.fn(function* (
     }
 
     try {
-      const { appMetrics, sampledAt } = captureMetricsSample();
-
-      for (const waiting of pendingSamples) {
-        Deferred.doneUnsafe(waiting, Effect.succeed({ appMetrics, sampledAt }));
-      }
-      pendingSamples.clear();
+      Deferred.doneUnsafe(
+        firstSample.result,
+        Effect.succeed(captureMetricsSample()),
+      );
     } catch (error) {
       const failure =
         error instanceof Error
           ? error
           : new Error(`Failed to collect process metrics: ${String(error)}`);
 
-      for (const waiting of pendingSamples)
-        Deferred.doneUnsafe(waiting, Effect.fail(failure));
-      pendingSamples.clear();
+      Deferred.doneUnsafe(firstSample.result, Effect.fail(failure));
       stopMetricsSampler();
     }
   }
@@ -337,17 +338,11 @@ export const createProcessMetrics = Effect.fn(function* (
   }
 
   function dispose(): void {
-    if (_metricsSampler) {
-      _metricsSampler.interruptUnsafe();
-      _metricsSampler = null;
-    }
-    for (const waiting of pendingSamples)
-      Deferred.doneUnsafe(
-        waiting,
-        Effect.fail(new Error("Eden runtime disposed")),
-      );
-    pendingSamples.clear();
-    _latestMetricsSample = null;
+    stopMetricsSampler();
+    Deferred.doneUnsafe(
+      firstSample.result,
+      Effect.fail(new Error("Eden runtime disposed")),
+    );
   }
   yield* Effect.addFinalizer(() => Effect.sync(dispose));
   return { getMetrics };

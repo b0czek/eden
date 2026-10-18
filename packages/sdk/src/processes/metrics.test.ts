@@ -1,4 +1,6 @@
 import type { AppInstance, AppManifest } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
 import { createProcessMetrics } from "./metrics";
@@ -83,6 +85,8 @@ const createMetricsFixture = async (deps: {
   );
   return {
     ...metrics,
+    forkMetrics: (...args: Parameters<typeof metrics.getMetrics>) =>
+      runtime.fork(metrics.getMetrics(...args)),
     getMetrics: (...args: Parameters<typeof metrics.getMetrics>) =>
       runtime.run(metrics.getMetrics(...args)),
   };
@@ -289,5 +293,73 @@ describe("ProcessMetrics", () => {
 
     await jest.advanceTimersByTimeAsync(1000);
     expect(getAppMetrics).toHaveBeenCalledTimes(2);
+  });
+
+  const createEmptyMetrics = () =>
+    createMetricsFixture({
+      backends: { getBackend: () => undefined },
+      views: { getView: () => undefined },
+      getRunningApps: () => [],
+    });
+
+  it("shares the first sample without letting an interrupted reader cancel other readers", async () => {
+    getAppMetrics.mockReturnValue([]);
+    const metrics = await createEmptyMetrics();
+    const interrupted = metrics.forkMetrics();
+    const first = metrics.getMetrics();
+    const second = metrics.getMetrics();
+    let settled = false;
+    const samples = Promise.all([first, second]).then((values) => {
+      settled = true;
+      return values;
+    });
+
+    await Effect.runPromise(Fiber.interrupt(interrupted));
+    await jest.advanceTimersByTimeAsync(999);
+    expect(settled).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    const [left, right] = await samples;
+    expect(left).toEqual(right);
+    expect(left.apps).toEqual([]);
+    expect(getAppMetrics).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops an idle sampler after every waiting reader is interrupted and starts a fresh sample", async () => {
+    getAppMetrics.mockReturnValue([]);
+    const metrics = await createEmptyMetrics();
+    const interrupted = metrics.forkMetrics();
+    await Effect.runPromise(Fiber.interrupt(interrupted));
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(getAppMetrics).toHaveBeenCalledTimes(1);
+
+    const next = metrics.getMetrics();
+    await jest.advanceTimersByTimeAsync(1000);
+    await expect(next).resolves.toMatchObject({ apps: [] });
+    expect(getAppMetrics).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails all waiting readers when sampling fails and lets the next request retry", async () => {
+    getAppMetrics
+      .mockReturnValueOnce([])
+      .mockImplementationOnce(() => {
+        throw new Error("Metrics unavailable");
+      })
+      .mockReturnValue([]);
+    const metrics = await createEmptyMetrics();
+    const first = expect(metrics.getMetrics()).rejects.toThrow(
+      "Metrics unavailable",
+    );
+    const second = expect(metrics.getMetrics()).rejects.toThrow(
+      "Metrics unavailable",
+    );
+
+    await jest.advanceTimersByTimeAsync(1000);
+    await Promise.all([first, second]);
+
+    const next = metrics.getMetrics();
+    await jest.advanceTimersByTimeAsync(1000);
+    await expect(next).resolves.toMatchObject({ apps: [] });
+    expect(getAppMetrics).toHaveBeenCalledTimes(4);
   });
 });
