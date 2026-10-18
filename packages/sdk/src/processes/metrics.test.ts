@@ -1,6 +1,8 @@
 import type { AppInstance, AppManifest } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as TestClock from "effect/testing/TestClock";
 import { createEffectRuntime } from "../../tests/support/effect-runtime";
 import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
 import { createProcessMetrics } from "./metrics";
@@ -73,7 +75,7 @@ const createMetricsFixture = async (deps: {
   views: ViewsLike;
   getRunningApps: MetricsDependencies["getRunningApps"];
 }) => {
-  const runtime = createEffectRuntime();
+  const runtime = createEffectRuntime(TestClock.layer());
   runtimes.push(runtime);
   const metrics = await runtime.acquire(
     createProcessMetrics({
@@ -87,6 +89,8 @@ const createMetricsFixture = async (deps: {
     ...metrics,
     forkMetrics: (...args: Parameters<typeof metrics.getMetrics>) =>
       runtime.fork(metrics.getMetrics(...args)),
+    advance: (milliseconds: number) =>
+      runtime.run(TestClock.adjust(Duration.millis(milliseconds))),
     getMetrics: (...args: Parameters<typeof metrics.getMetrics>) =>
       runtime.run(metrics.getMetrics(...args)),
   };
@@ -94,13 +98,11 @@ const createMetricsFixture = async (deps: {
 
 describe("ProcessMetrics", () => {
   beforeEach(() => {
-    jest.useFakeTimers({ doNotFake: ["queueMicrotask", "setImmediate"] });
     getAppMetrics.mockReset();
   });
 
   afterEach(async () => {
     await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
-    jest.useRealTimers();
   });
 
   it("uses a fixed main-process sampling cadence and lets callers extend sampler keepalive", async () => {
@@ -206,11 +208,12 @@ describe("ProcessMetrics", () => {
 
     const visibleOnlyPromise = metrics.getMetrics(false, 3000);
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     const visibleOnly = await visibleOnlyPromise;
 
     expect(getAppMetrics).toHaveBeenCalledTimes(2);
     expect(visibleOnly.apps).toHaveLength(1);
+    expect(visibleOnly.sampledAt).toBe("1970-01-01T00:00:01.000Z");
     expect(visibleOnly.apps[0]).toMatchObject({
       instance: { manifest: { id: "com.eden.visible" } },
       totalCPUPercent: 10,
@@ -241,13 +244,14 @@ describe("ProcessMetrics", () => {
       overallMemoryWorkingSetSize: 7400,
     });
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     expect(getAppMetrics).toHaveBeenCalledTimes(3);
 
     const includingHidden = await metrics.getMetrics(true, 3000);
 
     expect(getAppMetrics).toHaveBeenCalledTimes(3);
     expect(includingHidden.apps).toHaveLength(2);
+    expect(includingHidden.sampledAt).toBe("1970-01-01T00:00:02.000Z");
     expect(
       includingHidden.apps.map((entry) => entry.instance.manifest.id),
     ).toEqual(["com.eden.hidden", "com.eden.visible"]);
@@ -262,6 +266,11 @@ describe("ProcessMetrics", () => {
       { pid: 998, name: "Alpha Process" },
       { pid: 999, name: "Zulu Process" },
     ]);
+    await metrics.advance(2999);
+    expect(getAppMetrics).toHaveBeenCalledTimes(5);
+    await metrics.advance(1);
+    await metrics.advance(1000);
+    expect(getAppMetrics).toHaveBeenCalledTimes(5);
   });
 
   it("can return an immediate cold-start sample without waiting for the first CPU interval", async () => {
@@ -283,6 +292,7 @@ describe("ProcessMetrics", () => {
 
     const snapshot = await metrics.getMetrics(false, 3000, false);
 
+    expect(snapshot.sampledAt).toBe("1970-01-01T00:00:00.000Z");
     expect(getAppMetrics).toHaveBeenCalledTimes(1);
     expect(snapshot.apps).toHaveLength(1);
     expect(snapshot.apps[0]).toMatchObject({
@@ -291,7 +301,7 @@ describe("ProcessMetrics", () => {
       renderer: { pid: 111, category: "renderer" },
     });
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     expect(getAppMetrics).toHaveBeenCalledTimes(2);
   });
 
@@ -315,9 +325,9 @@ describe("ProcessMetrics", () => {
     });
 
     await Effect.runPromise(Fiber.interrupt(interrupted));
-    await jest.advanceTimersByTimeAsync(999);
+    await metrics.advance(999);
     expect(settled).toBe(false);
-    await jest.advanceTimersByTimeAsync(1);
+    await metrics.advance(1);
     const [left, right] = await samples;
     expect(left).toEqual(right);
     expect(left.apps).toEqual([]);
@@ -330,11 +340,11 @@ describe("ProcessMetrics", () => {
     const interrupted = metrics.forkMetrics();
     await Effect.runPromise(Fiber.interrupt(interrupted));
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     expect(getAppMetrics).toHaveBeenCalledTimes(1);
 
     const next = metrics.getMetrics();
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     await expect(next).resolves.toMatchObject({ apps: [] });
     expect(getAppMetrics).toHaveBeenCalledTimes(3);
   });
@@ -354,11 +364,11 @@ describe("ProcessMetrics", () => {
       "Metrics unavailable",
     );
 
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     await Promise.all([first, second]);
 
     const next = metrics.getMetrics();
-    await jest.advanceTimersByTimeAsync(1000);
+    await metrics.advance(1000);
     await expect(next).resolves.toMatchObject({ apps: [] });
     expect(getAppMetrics).toHaveBeenCalledTimes(4);
   });

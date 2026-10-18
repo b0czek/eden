@@ -5,6 +5,7 @@ import type {
   ExecutionPrincipal,
   UserProfile,
 } from "@edenapp/types";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -38,6 +39,7 @@ export const createDaemons = Effect.fn(function* ({
   settings: Pick<Settings, "list" | "get" | "set" | "delete">;
   users: Pick<Users, "getUser">;
 }) {
+  const clock = yield* Clock.Clock;
   const scope = yield* Effect.scope;
   const changed = yield* scopedEvent<{ status: DaemonStatus }>();
   const loaded = new Map<string, DaemonDefinition>();
@@ -371,7 +373,7 @@ export const createDaemons = Effect.fn(function* ({
         state: "backoff",
         restartCount: count,
         lastError: `Exited with code ${code}`,
-        nextRestartAt: Date.now() + delay,
+        nextRestartAt: clock.currentTimeMillisUnsafe() + delay,
       },
       generation,
     );

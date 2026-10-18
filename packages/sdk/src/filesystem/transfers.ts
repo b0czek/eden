@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -265,6 +266,7 @@ export function createFileTransfers() {
   });
 
   const copyEntry = Effect.fn(function* (transfer: PreparedTransfer) {
+    const clock = yield* Clock.Clock;
     const { source, destination } = transfer;
     const sourceStats = yield* io(() => fs.lstat(source));
     const total = sourceStats.isFile() ? sourceStats.size : undefined;
@@ -272,10 +274,10 @@ export function createFileTransfers() {
     let lastReport = 0;
     const report = () => {
       transfer.reporter?.update("copying", { completed, total, unit: "bytes" });
-      lastReport = Date.now();
+      lastReport = clock.currentTimeMillisUnsafe();
     };
     report();
-    lastReport = 0;
+    lastReport = Number.NEGATIVE_INFINITY;
     // fs.cp requires Promise callbacks; keep that conversion at this native edge.
     // @eden-effect-next-line domain-interpreter -- Native fs.cp filters require Promises; fs.cp awaits them before the volume lease releases.
     const runFilter = Effect.runPromiseWith(yield* Effect.context<never>());
@@ -303,7 +305,11 @@ export function createFileTransfers() {
                         for await (const chunk of chunks) {
                           yield chunk;
                           completed += chunk.length;
-                          if (Date.now() - lastReport >= 100) report();
+                          if (
+                            clock.currentTimeMillisUnsafe() - lastReport >=
+                            100
+                          )
+                            report();
                         }
                       },
                       createWriteStream(entryDestination, {
@@ -319,7 +325,8 @@ export function createFileTransfers() {
                     try: () => signal.throwIfAborted(),
                     catch: asError,
                   });
-                  if (Date.now() - lastReport >= 100) report();
+                  if (clock.currentTimeMillisUnsafe() - lastReport >= 100)
+                    report();
                   return false;
                 }
               }

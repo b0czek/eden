@@ -1,5 +1,7 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as TestClock from "effect/testing/TestClock";
 import {
   createEffectRuntime,
   type EffectRuntime,
@@ -28,7 +30,7 @@ describe("Daemons", () => {
   beforeEach(async () => {
     definitions.clear();
     catalogAvailable = true;
-    effects = createEffectRuntime();
+    effects = createEffectRuntime(TestClock.layer());
     processes = {
       launchDaemon: jest.fn().mockReturnValue(
         Effect.succeed({
@@ -174,6 +176,7 @@ describe("Daemons", () => {
         restart: "always",
       }),
     );
+    await effects.run(TestClock.adjust(Duration.seconds(5)));
     await effects.run(daemons.start(manifest.id));
 
     await effects.run(daemons.processStopped(manifest.id));
@@ -181,6 +184,15 @@ describe("Daemons", () => {
     expect((await effects.run(daemons.list()))[0]).toMatchObject({
       state: "backoff",
       restartCount: 1,
+      nextRestartAt: 6000,
+    });
+    await effects.run(TestClock.adjust(Duration.millis(999)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+    await effects.run(TestClock.adjust(Duration.millis(1)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(2);
+    expect((await effects.run(daemons.list()))[0]).toMatchObject({
+      state: "active",
+      nextRestartAt: undefined,
     });
     await effects.run(daemons.shutdown());
   });

@@ -4,6 +4,7 @@ import type {
   EdenProcessMetric,
   ProcessMetricsSnapshot,
 } from "@edenapp/types";
+import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -40,6 +41,7 @@ interface ProcessMetricsDeps {
 export const createProcessMetrics = Effect.fn(function* (
   deps: ProcessMetricsDeps,
 ) {
+  const clock = yield* Clock.Clock;
   const forkSampler = yield* FiberSet.makeRuntime<never, void, never>();
   let _backends: Pick<Backends, "getBackend">;
   let _views: Pick<Views, "getView">;
@@ -125,7 +127,7 @@ export const createProcessMetrics = Effect.fn(function* (
   function extendMetricsSamplerKeepAlive(timeoutMs: number): void {
     _metricsSamplerKeepAliveUntil = Math.max(
       _metricsSamplerKeepAliveUntil,
-      Date.now() + timeoutMs,
+      clock.currentTimeMillisUnsafe() + timeoutMs,
     );
   }
 
@@ -133,7 +135,7 @@ export const createProcessMetrics = Effect.fn(function* (
     if (
       (firstSample.readers === 0 ||
         Deferred.isDoneUnsafe(firstSample.result)) &&
-      Date.now() >= _metricsSamplerKeepAliveUntil
+      clock.currentTimeMillisUnsafe() >= _metricsSamplerKeepAliveUntil
     ) {
       stopMetricsSampler();
       return;
@@ -157,7 +159,7 @@ export const createProcessMetrics = Effect.fn(function* (
 
   function captureMetricsSample(): CachedMetricsSample {
     const appMetrics = _processMetrics.getAppMetrics();
-    const sampledAt = new Date().toISOString();
+    const sampledAt = new Date(clock.currentTimeMillisUnsafe()).toISOString();
     const sample = { sampledAt, appMetrics };
     _latestMetricsSample = sample;
     return sample;

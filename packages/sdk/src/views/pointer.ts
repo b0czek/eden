@@ -1,3 +1,4 @@
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
@@ -17,6 +18,7 @@ export const createPointerTracking = Effect.fn(function* (
   display: Pick<DisplayPort, "getCursorScreenPoint">,
   updateInterval: number = 8,
 ) {
+  const clock = yield* Clock.Clock;
   const forkPolling = yield* FiberSet.makeRuntime<never, void, never>();
   let _subscribers: Map<string, MouseUpdateCallback> = new Map();
   let _interval: Fiber.Fiber<void> | null = null;
@@ -61,12 +63,12 @@ export const createPointerTracking = Effect.fn(function* (
   function start(): void {
     if (_interval) return;
 
-    _lastUpdateTime = Date.now();
+    _lastUpdateTime = clock.currentTimeMillisUnsafe();
     _lastPosition = getCurrentPosition();
 
     _interval = forkPolling(
       Effect.sync(() => {
-        const now = Date.now();
+        const now = clock.currentTimeMillisUnsafe();
         const deltaTime = now - _lastUpdateTime;
         _lastUpdateTime = now;
 
