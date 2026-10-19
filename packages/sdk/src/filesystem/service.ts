@@ -221,7 +221,9 @@ export const createFilesystem = Effect.fn(function* ({
   ): Effect.Effect<A, E | Error> {
     return volumes.withVolumes(
       [location.volume],
-      Effect.flatMap(resolvePath(location), operation),
+      Effect.flatMap(resolveTarget(location), (target) =>
+        operation(target.hostPath),
+      ),
     );
   }
   const toMaskedPath = Effect.fn(function* (
