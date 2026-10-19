@@ -436,41 +436,6 @@ export const createOperations = Effect.fn(function* ({
       );
     });
   }
-  function withRuntimeTransition<A, E>(
-    work: Effect.Effect<A, E>,
-  ): Effect.Effect<A, E | Error> {
-    return Effect.suspend(() => {
-      const operationId = execution.get()?.operationId;
-      if (runtimeTransition)
-        return runtimeTransition === operationId
-          ? work
-          : Effect.fail(
-              new Error("A runtime transition is already in progress"),
-            );
-      if (!accepting)
-        return Effect.fail(new Error("Runtime operations are draining"));
-      const reservation = operationId ?? randomUUID();
-      runtimeTransition = reservation;
-      accepting = false;
-      return Effect.gen(function* () {
-        yield* filesystem.releaseHandles();
-        yield* drain(operationId);
-        return yield* work;
-      }).pipe(
-        Effect.onError(() =>
-          Effect.sync(() => {
-            accepting = !shuttingDown;
-          }),
-        ),
-        Effect.ensuring(
-          Effect.sync(() => {
-            if (runtimeTransition === reservation)
-              runtimeTransition = undefined;
-          }),
-        ),
-      );
-    });
-  }
   function drain(excludeId?: string) {
     return Effect.suspend(() =>
       Effect.asVoid(
@@ -530,7 +495,6 @@ export const createOperations = Effect.fn(function* ({
     inspectAll,
     drainSession,
     withSessionTransition,
-    withRuntimeTransition,
     drain,
     closeAdmission,
     shutdown,
