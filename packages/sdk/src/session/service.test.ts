@@ -8,6 +8,7 @@ import {
   type EffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { fromPromise } from "../effects/io";
+import { createEvent, type Event } from "../events/event";
 import { createExecutionContext } from "../execution/context";
 import { createOperations, type Operations } from "../operations/service";
 import { createSessionContext, type SessionContext } from "./context";
@@ -27,6 +28,7 @@ describe("Sessions", () => {
   const bob = createUser("bob");
   let context: SessionContext;
   let users: {
+    changed: Event<UserProfile>;
     authenticate: jest.Mock;
     getDefaultUser: jest.Mock;
   };
@@ -39,6 +41,7 @@ describe("Sessions", () => {
   beforeEach(async () => {
     context = createSessionContext();
     users = {
+      changed: createEvent<UserProfile>(),
       authenticate: jest.fn(),
       getDefaultUser: jest.fn().mockReturnValue(Effect.succeed(null)),
     };

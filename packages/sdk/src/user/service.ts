@@ -4,6 +4,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { fromPromise } from "../effects/io";
+import { scopedEvent } from "../events/scoped";
 import { hashPassword, verifyPassword } from "./auth";
 import {
   ensureDirectoryRestriction,
@@ -22,6 +23,7 @@ export const createUsers = Effect.fn(function* ({
   userDirectory: string;
   restrictedApps: ReadonlySet<string>;
 }) {
+  const changed = yield* scopedEvent<UserProfile>();
   let defaultUsername: string | null = null;
   const initialization = yield* Effect.cachedWithTTL(
     Effect.gen(function* () {
@@ -93,8 +95,7 @@ export const createUsers = Effect.fn(function* ({
       passwordSalt,
     };
 
-    yield* store.saveUserRecord(user);
-    return toPublicUser(user);
+    return yield* saveUser(user);
   });
   const updateUser = Effect.fn(function* updateUser(args: {
     username: string;
@@ -144,9 +145,7 @@ export const createUsers = Effect.fn(function* ({
 
     user.updatedAt = Date.now();
 
-    yield* store.saveUserRecord(user);
-
-    return toPublicUser(user);
+    return yield* saveUser(user);
   });
   const deleteUser = Effect.fn(function* deleteUser(
     username: string,
@@ -167,8 +166,7 @@ export const createUsers = Effect.fn(function* ({
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
-    yield* store.saveUserRecord(user);
-    return toPublicUser(user);
+    return yield* saveUser(user);
   });
   const changePassword = Effect.fn(function* changePassword(
     username: string,
@@ -189,8 +187,7 @@ export const createUsers = Effect.fn(function* ({
     user.passwordHash = passwordHash;
     user.passwordSalt = passwordSalt;
     user.updatedAt = Date.now();
-    yield* store.saveUserRecord(user);
-    return toPublicUser(user);
+    return yield* saveUser(user);
   });
   const authenticate = Effect.fn(function* authenticate(
     username: string,
@@ -260,6 +257,16 @@ export const createUsers = Effect.fn(function* ({
       updatedAt: user.updatedAt,
     };
   }
+  function saveUser(user: StoredUser) {
+    return Effect.uninterruptible(
+      Effect.gen(function* () {
+        yield* store.saveUserRecord(user);
+        const profile = toPublicUser(user);
+        changed.emit(profile);
+        return profile;
+      }),
+    );
+  }
   const getDefaultUser = Effect.fn(function* getDefaultUser(): Effect.fn.Return<
     UserProfile | null,
     Error
@@ -294,6 +301,7 @@ export const createUsers = Effect.fn(function* ({
   }
 
   return {
+    changed,
     initialize: () => initialization,
     listUsers,
     getUser,

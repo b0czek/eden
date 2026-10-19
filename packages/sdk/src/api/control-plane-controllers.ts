@@ -58,7 +58,7 @@ export function createControlPlaneApis({
   return {
     packages: createPackagesSdkController({ packages, sdk }),
     daemons: createDaemonsSdkController({ daemons, sdk }),
-    users: createUsersSdkController({ users, sessions, sdk }),
+    users: createUsersSdkController({ users, sdk }),
     sessions: createSessionsSdkController({ sessions, sdk }),
     appearance: createAppearanceSdkController({ appearance, sdk }),
     associations: createAssociationsSdkController({ associations, sdk }),

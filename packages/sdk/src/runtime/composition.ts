@@ -444,7 +444,6 @@ export const composeRuntime = Effect.fn(function* ({
     createProcessController(processes, execution),
     createUserController({
       users,
-      sessions,
       execution,
       grants,
     }),

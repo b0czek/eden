@@ -2,7 +2,7 @@ import type { UserProfile } from "@edenapp/types";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { scopedEvent } from "../events/scoped";
+import { listen, scopedEvent } from "../events/scoped";
 import type { Operations } from "../operations/service";
 import type { Users } from "../user/service";
 import type { SessionContext } from "./context";
@@ -19,7 +19,7 @@ export const createSessions = Effect.fn(function* ({
   operations,
   processes,
 }: {
-  users: Pick<Users, "getDefaultUser" | "authenticate">;
+  users: Pick<Users, "getDefaultUser" | "authenticate" | "changed">;
   context: SessionContext;
   operations: Pick<Operations, "withSessionTransition">;
   processes: { stopSessionApps(sessionId: string): Effect.Effect<void, Error> };
@@ -84,11 +84,11 @@ export const createSessions = Effect.fn(function* ({
       reason: "system",
     });
   }
+  yield* listen(users.changed, synchronizeUser);
   return {
     initialize: () => initialization,
     login,
     logout,
-    synchronizeUser,
     getCurrentUser: context.getCurrentUser,
     changed,
   };

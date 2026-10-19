@@ -2,7 +2,6 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import type { ExecutionContext } from "../execution/context";
-import type { Sessions } from "../session/service";
 import type { GrantCatalog } from "./grant-catalog";
 import {
   createUserSchema,
@@ -16,12 +15,10 @@ import type { Users } from "./service";
 
 export function createUserController({
   users,
-  sessions,
   execution,
   grants,
 }: {
   users: Users;
-  sessions: Sessions;
   execution: ExecutionContext;
   grants: GrantCatalog;
 }) {
@@ -54,10 +51,7 @@ export function createUserController({
         input: updateUserSchema,
         handle: (args) => {
           assertVendor();
-          return Effect.map(users.updateUser(args), (user) => {
-            sessions.synchronizeUser(user);
-            return { user };
-          });
+          return Effect.map(users.updateUser(args), (user) => ({ user }));
         },
       }),
       delete: command({
@@ -76,10 +70,10 @@ export function createUserController({
         input: setUserPasswordSchema,
         handle: ({ username, password }) => {
           assertVendor();
-          return Effect.map(users.setPassword(username, password), (user) => {
-            sessions.synchronizeUser(user);
-            return { success: true } as { success: boolean };
-          });
+          return Effect.map(
+            users.setPassword(username, password),
+            (): { success: boolean } => ({ success: true }),
+          );
         },
       }),
       "change-password": command({
@@ -93,12 +87,11 @@ export function createUserController({
             const principal = execution.getPrincipal();
             if (principal?.kind !== "user")
               return yield* Effect.fail(new Error("No active user session"));
-            const user = yield* users.changePassword(
+            yield* users.changePassword(
               principal.profile.username,
               currentPassword,
               newPassword,
             );
-            sessions.synchronizeUser(user);
             return { success: true } as { success: boolean; error?: string };
           }).pipe(
             Effect.catch((error) =>
