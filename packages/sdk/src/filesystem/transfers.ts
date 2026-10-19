@@ -203,16 +203,7 @@ export function createFileTransfers() {
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");
-              const rollbackErrors: Error[] = [];
-              const attempt = (work: Effect.Effect<unknown, Error>) =>
-                work.pipe(
-                  Effect.catch((error) =>
-                    Effect.sync(() => {
-                      rollbackErrors.push(error);
-                    }),
-                  ),
-                );
-              yield* attempt(
+              const rollback = [
                 Effect.gen(function* () {
                   yield* transfer.assertDestinationActive?.() ?? Effect.void;
                   yield* io(() =>
@@ -222,14 +213,18 @@ export function createFileTransfers() {
                     }),
                   );
                 }),
-              );
+              ];
               if (backup)
-                yield* attempt(
+                rollback.push(
                   Effect.gen(function* () {
                     yield* transfer.assertDestinationActive?.() ?? Effect.void;
                     yield* io(() => fs.rename(backup, transfer.destination));
                   }),
                 );
+              const [, rollbackErrors] = yield* Effect.partition(
+                rollback,
+                (step) => step,
+              );
               if (rollbackErrors.length)
                 return yield* Effect.fail(
                   new AggregateError(
