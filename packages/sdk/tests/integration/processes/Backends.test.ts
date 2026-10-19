@@ -35,7 +35,7 @@ describe("backend readiness and termination", () => {
     await effects.dispose();
   });
 
-  async function start() {
+  async function start(id = appId) {
     const spawned =
       Deferred.makeUnsafe<ReturnType<typeof platform.utilityProcesses.fork>>();
     const original = platform.utilityProcesses.fork.bind(
@@ -50,8 +50,8 @@ describe("backend readiness and termination", () => {
       });
     const starting = effects.acquire(
       backends.createBackend(
-        appId,
-        testApp(appId, {
+        id,
+        testApp(id, {
           frontend: undefined,
           backend: { entry: "backend.js" },
         }),
@@ -61,12 +61,25 @@ describe("backend readiness and termination", () => {
     await effects.run(Deferred.await(spawned));
     fork.mockRestore();
     await effects.run(TestClock.adjust(Duration.zero));
-    const pid = backends.getBackend(appId)?.pid;
+    const pid = backends.getBackend(id)?.pid;
     if (pid === undefined) throw new Error("Backend was not started");
     const backend = platform.utilityProcesses.get(pid);
     if (!backend) throw new Error("Native backend was not started");
     return { starting, backend };
   }
+
+  it("terminates every running backend through bulk shutdown", async () => {
+    for (const id of [appId, "com.example.second-backend"]) {
+      const { starting, backend } = await start(id);
+      backend.emit("message", { type: "backend-ready" });
+      await starting;
+    }
+    const stopping = effects.run(backends.terminateAll());
+    await effects.run(TestClock.adjust(Duration.millis(500)));
+    await stopping;
+    expect(backends.getRunningBackends()).toEqual([]);
+    expect(platform.utilityProcesses.activeCount).toBe(0);
+  });
 
   it("kills a backend that never becomes ready and releases its admission", async () => {
     const { starting, backend } = await start();

@@ -317,7 +317,7 @@ export const createBackends = Effect.fn(function* ({
   }
 
   const terminateAll = () =>
-    Effect.forEach([..._backends.keys()], terminateBackend, {
+    Effect.forEach([..._backends.keys()], (appId) => terminateBackend(appId), {
       concurrency: "unbounded",
       discard: true,
     });
