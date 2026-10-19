@@ -124,15 +124,19 @@ export const createDaemons = Effect.fn(function* ({
       };
     });
   });
-  const emitStatus = Effect.fn(function* (
-    appId: string,
-    runtime?: DaemonRuntime,
-  ) {
-    if (runtime !== undefined && !isCurrent(appId, runtime)) return;
-    const status = (yield* list()).find((entry) => entry.appId === appId);
-    if (status && (runtime === undefined || isCurrent(appId, runtime)))
-      changed.emit({ status });
-  });
+  const emitStatus = (appId: string, runtime?: DaemonRuntime) =>
+    Effect.gen(function* () {
+      if (runtime !== undefined && !isCurrent(appId, runtime)) return;
+      const status = (yield* list()).find((entry) => entry.appId === appId);
+      if (status && (runtime === undefined || isCurrent(appId, runtime)))
+        changed.emit({ status });
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          log.warn(`Failed to report daemon status for ${appId}:`, error),
+        ),
+      ),
+    );
   const setRuntime = Effect.fn(function* (
     appId: string,
     state: DaemonState,

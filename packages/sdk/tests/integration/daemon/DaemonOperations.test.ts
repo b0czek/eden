@@ -31,6 +31,41 @@ describe("daemon operation lifecycle", () => {
     await eden.dispose();
   });
 
+  it("keeps a daemon supervised when status persistence reads fail", async () => {
+    eden = await createTestEden();
+    const appId = "com.example.reporting-daemon";
+    eden.runtime.services.installedPackages.register(
+      testApp(appId, { frontend: undefined, backend: { entry: "backend.js" } }),
+    );
+    const profile = await eden.runtime.effects.run(
+      eden.runtime.users.create({ name: "Daemon", password: "password" }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.daemons.updateDefinition({
+        appId,
+        enabled: false,
+        runAs: { kind: "user", username: profile.username },
+        restart: "always",
+      }),
+    );
+    const reads = jest
+      .spyOn(eden.runtime.services.settings, "list")
+      .mockReturnValue(Effect.fail(new Error("settings unavailable")));
+    try {
+      const starting = eden.runtime.effects.run(
+        eden.runtime.daemons.start(appId),
+      );
+      const pid = await readyBackend(eden);
+      await starting;
+      const backend = eden.platform.utilityProcesses.get(pid);
+      if (!backend) throw new Error("Daemon backend did not start");
+      backend.kill();
+      expect(await readyBackend(eden, pid)).not.toBe(pid);
+    } finally {
+      reads.mockRestore();
+    }
+  });
+
   it("retains start, restart, and stop completion across real daemon and process managers", async () => {
     eden = await createTestEden();
     const appId = "com.example.operation-daemon";
