@@ -1,6 +1,10 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
 import {
   createEffectRuntime,
@@ -74,6 +78,26 @@ describe("Daemons", () => {
     );
   });
   afterEach(() => effects.dispose());
+
+  async function configure(restart: "never" | "always" = "always") {
+    const operator: UserProfile = {
+      username: "operator",
+      name: "Operator",
+      role: "standard",
+      grants: [],
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    getUser.mockReturnValue(Effect.succeed(operator));
+    const definition = {
+      appId: manifest.id,
+      enabled: false,
+      runAs: { kind: "user" as const, username: operator.username },
+      restart,
+    };
+    await effects.run(daemons.updateDefinition(definition));
+    return definition;
+  }
 
   it("discovers backend-only apps as disabled unassigned daemons", async () => {
     await effects.run(daemons.initialize());
@@ -235,6 +259,88 @@ describe("Daemons", () => {
       restartCount: 0,
     });
   });
+
+  it("retains an adopted process exit while its launch notification is queued", async () => {
+    await configure();
+    const adoption = daemons.processLaunched(manifest.id, "system");
+    const exit = daemons.processExited(manifest.id, 1);
+    await effects.run(adoption);
+    await effects.run(exit);
+    expect((await effects.run(daemons.list()))[0]).toMatchObject({
+      state: "backoff",
+      restartCount: 1,
+    });
+    await effects.run(TestClock.adjust(Duration.seconds(1)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses saved restart-policy edits for the next exit of a running daemon", async () => {
+    const definition = await configure();
+    await effects.run(daemons.start(manifest.id));
+    await effects.run(
+      daemons.updateDefinition({ ...definition, restart: "never" }),
+    );
+    await effects.run(daemons.processExited(manifest.id, 1));
+    expect((await effects.run(daemons.list()))[0]).toMatchObject({
+      state: "failed",
+      restartCount: 0,
+    });
+    await effects.run(TestClock.adjust(Duration.seconds(30)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["stop", "shutdown"] as const)(
+    "cancels a pending retry during daemon %s",
+    async (action) => {
+      await configure();
+      await effects.run(daemons.start(manifest.id));
+      await effects.run(daemons.processExited(manifest.id, 1));
+      if (action === "stop") await effects.run(daemons.stop(manifest.id));
+      else await effects.run(daemons.shutdown());
+      await effects.run(TestClock.adjust(Duration.seconds(31)));
+      expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+      if (action === "stop")
+        expect((await effects.run(daemons.list()))[0]).toMatchObject({
+          state: "inactive",
+          restartCount: 0,
+        });
+    },
+  );
+
+  it("awaits interrupted startup cleanup before daemon shutdown completes", async () => {
+    await configure();
+    const starting = Deferred.makeUnsafe<void>();
+    const cleaning = Deferred.makeUnsafe<void>();
+    const cleaned = Deferred.makeUnsafe<void>();
+    processes.launchDaemon.mockReturnValue(
+      Effect.gen(function* () {
+        yield* Effect.addFinalizer(() =>
+          Effect.andThen(
+            Deferred.succeed(cleaning, undefined),
+            Deferred.await(cleaned),
+          ),
+        );
+        yield* Deferred.succeed(starting, undefined);
+        yield* Effect.never;
+      }).pipe(Effect.scoped),
+    );
+    const launch = effects.fork(daemons.start(manifest.id));
+    await effects.run(Deferred.await(starting));
+    const shutdown = effects.fork(daemons.shutdown());
+    await effects.run(Deferred.await(cleaning));
+    try {
+      expect(shutdown.pollUnsafe()).toBeUndefined();
+    } finally {
+      await effects.run(Deferred.succeed(cleaned, undefined));
+    }
+    await effects.run(Fiber.join(shutdown));
+    const exit = await effects.run(Fiber.await(launch));
+    expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+      true,
+    );
+    await effects.run(TestClock.adjust(Duration.seconds(31)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+  });
   it("removes daemon configuration and pending supervision after its package leaves the catalog", async () => {
     const operator: UserProfile = {
       username: "operator",
@@ -263,6 +369,8 @@ describe("Daemons", () => {
     catalogAvailable = false;
     await effects.run(daemons.packageUninstalled(manifest.id));
     expect(definitions.has(`com.eden:daemon.${manifest.id}`)).toBe(false);
+    await effects.run(TestClock.adjust(Duration.seconds(31)));
+    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
     catalogAvailable = true;
     expect((await effects.run(daemons.list()))[0]).toMatchObject({
       state: "inactive",

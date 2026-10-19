@@ -92,13 +92,14 @@ describe("grouped volume removal", () => {
         caller(),
       ),
     ).rejects.toThrow("ejecting");
+    const ejected = eden.runtime.effects.run(operations.wait(eject, caller()));
     const disposed = eden.dispose();
     try {
       await new Promise<void>((resolve) => setImmediate(resolve));
       expect(hostCalls).toBe(0);
       finish.resolve();
       await reading;
-      await eden.runtime.effects.run(operations.wait(eject, caller()));
+      await ejected;
       await disposed;
       expect(hostCalls).toBe(1);
     } finally {

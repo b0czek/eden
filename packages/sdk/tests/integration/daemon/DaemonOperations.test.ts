@@ -100,7 +100,7 @@ describe("daemon operation lifecycle", () => {
     expect(states).toContain("active");
     expect(states.at(-1)).toBe("inactive");
   });
-  it("ignores a delayed stop from the previous instance and keeps the replacement supervised", async () => {
+  it("keeps replacements supervised across delayed stop notifications and process reloads", async () => {
     eden = await createTestEden();
     const appId = "com.example.queued-daemon";
     eden.runtime.services.installedPackages.register(
@@ -161,13 +161,19 @@ describe("daemon operation lifecycle", () => {
       });
       expect(nextPid).not.toBe(pid);
 
+      const reloading = eden.runtime.effects.run(
+        eden.runtime.services.processes.reloadApp(appId),
+      );
+      const reloadedPid = await readyBackend(eden, nextPid);
+      await reloading;
+
       const backoff = gate();
       const off = daemons.changed.on(({ status }) => {
         if (status.appId === appId && status.state === "backoff")
           backoff.release();
       });
       try {
-        eden.platform.utilityProcesses.get(nextPid)!.kill();
+        eden.platform.utilityProcesses.get(reloadedPid)!.kill();
         await backoff.promise;
         expect(
           (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0],
