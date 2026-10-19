@@ -11,6 +11,12 @@ export interface UserProfile {
   updatedAt: number;
 }
 
+export interface SessionChange {
+  currentUser: UserProfile | null;
+  previousUsername: string | null;
+  reason: "login" | "logout" | "system";
+}
+
 export interface EdenUserConfig {
   username: string;
   name: string;

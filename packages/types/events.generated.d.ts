@@ -103,7 +103,7 @@ export interface ProcessEvents {
  * SessionEvents - Events for the "session" namespace
  */
 export interface SessionEvents {
-  "session/changed": SessionChange;
+  "session/changed": import("./index").SessionChange;
 }
 
 /**

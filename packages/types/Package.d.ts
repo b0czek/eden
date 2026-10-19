@@ -1,5 +1,6 @@
 import type {
   InstalledPackageManifest,
+  PackageManifest,
   RuntimeAppManifest,
   RuntimeDlcManifest,
 } from "./AppManifest";
@@ -15,6 +16,14 @@ export interface DlcResource {
 export interface InstalledPackageInfo {
   manifest: InstalledPackageManifest;
   dlcs: DlcResource[];
+}
+
+/** Result of inspecting an .edenite package before installation. */
+export interface PackageInfo {
+  success: boolean;
+  manifest?: PackageManifest;
+  preview?: PackageOperationPreview;
+  error?: string;
 }
 
 /** Runtime installation preview returned when inspecting an .edenite package. */

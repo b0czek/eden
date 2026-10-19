@@ -2,18 +2,23 @@ import type {
   AppAssociation,
   DaemonDefinition,
   DaemonStatus,
+  PackageInfo as EdenPackageInfo,
+  SessionChange as EdenSessionChange,
   FilesystemVolume,
   FilesystemVolumeRegistration,
   InstalledPackageInfo,
   InstalledPackageManifest,
-  PackageManifest,
-  PackageOperationPreview,
   UserProfile,
   UserRole,
   WallpaperConfig,
   WallpaperPreset,
 } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
+
+export type {
+  PackageInfo as EdenPackageInfo,
+  SessionChange as EdenSessionChange,
+} from "@edenapp/types";
 
 export type EdenUnsubscribe = () => void;
 
@@ -41,13 +46,6 @@ export type EdenPackageChange =
       packageId: string;
       hostAppId: string;
     };
-
-export interface EdenPackageInfo {
-  success: boolean;
-  manifest?: PackageManifest;
-  preview?: PackageOperationPreview;
-  error?: string;
-}
 
 export interface EdenPackagesApi {
   list(options?: EdenPackageListOptions): InstalledPackageManifest[];
@@ -102,12 +100,6 @@ export interface EdenUsersApi {
   setPassword(username: string, password: string): Effect.Effect<void, Error>;
   getDefaultUsername(): string | null;
   setDefaultUsername(username: string | null): Effect.Effect<void, Error>;
-}
-
-export interface EdenSessionChange {
-  currentUser: UserProfile | null;
-  previousUsername: string | null;
-  reason: "login" | "logout" | "system";
 }
 
 export interface EdenSessionsApi {

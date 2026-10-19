@@ -1,4 +1,4 @@
-import type { UserProfile } from "@edenapp/types";
+import type { SessionChange, UserProfile } from "@edenapp/types";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -6,12 +6,6 @@ import { listen, scopedEvent } from "../events/scoped";
 import type { Operations } from "../operations/service";
 import type { Users } from "../user/service";
 import type { SessionContext } from "./context";
-
-export interface SessionChange {
-  currentUser: UserProfile | null;
-  previousUsername: string | null;
-  reason: "login" | "logout" | "system";
-}
 
 export const createSessions = Effect.fn(function* ({
   users,

@@ -1,9 +1,49 @@
 import * as path from "node:path";
-import { Project } from "ts-morph";
+import {
+  ModuleKind,
+  ModuleResolutionKind,
+  Project,
+  ScriptTarget,
+} from "ts-morph";
 import { generateClientCode } from "./client";
 import { generateCommandsCode, groupCommandsByNamespace } from "./commands";
 import { extractControllers } from "./controllers";
 import { generateEventsCode, groupEventsByNamespace } from "./events";
+
+it("compiles the published command and event declarations with strict consumer checking", () => {
+  const project = new Project({
+    compilerOptions: {
+      strict: true,
+      skipLibCheck: false,
+      noEmit: true,
+      types: [],
+      target: ScriptTarget.ES2022,
+      module: ModuleKind.NodeNext,
+      moduleResolution: ModuleResolutionKind.NodeNext,
+    },
+  });
+  const directory = path.join(__dirname, "../../../types");
+  project.addSourceFileAtPath(path.join(directory, "index.d.ts"));
+  project.createSourceFile(
+    path.join(directory, "consumer.fixture.ts"),
+    `
+    import type { CommandResponse, EventData } from "./index";
+    const info: CommandResponse<"package/get-info"> = { success: true };
+    const change: EventData<"session/changed"> = {
+      currentUser: null, previousUsername: null, reason: "logout",
+    };
+    // @ts-expect-error package inspection success is boolean
+    const invalidInfo: CommandResponse<"package/get-info"> = { success: "yes" };
+    // @ts-expect-error session reasons retain their declared union
+    const invalidChange: EventData<"session/changed"> = { ...change, reason: "unknown" };
+  `,
+  );
+  expect(
+    project
+      .getPreEmitDiagnostics()
+      .map((diagnostic) => diagnostic.getMessageText()),
+  ).toEqual([]);
+});
 
 it("extracts schema inputs, inferred results, operations, and event payloads from controller values", () => {
   const project = new Project({

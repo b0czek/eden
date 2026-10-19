@@ -8,12 +8,12 @@ import type {
   FilesystemLocation,
   InstalledPackageInfo,
   InstalledPackageManifest,
+  PackageInfo,
   PackageManifest,
   RuntimeAppManifest,
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { EdenPackageInfo } from "../api/control-plane";
 import { asError, fromPromise } from "../effects/io";
 import { scopedEvent } from "../events/scoped";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
@@ -139,7 +139,7 @@ export const createPackages = Effect.fn(function* ({
   });
   const getPackageInfo: (
     location: FilesystemLocation,
-  ) => Effect.Effect<EdenPackageInfo, Error> = Effect.fn(function* (
+  ) => Effect.Effect<PackageInfo, Error> = Effect.fn(function* (
     location: FilesystemLocation,
   ) {
     return yield* Effect.catch(
@@ -156,7 +156,7 @@ export const createPackages = Effect.fn(function* ({
   });
   const getPackageInfoFromHostPath: (
     hostPath: string,
-  ) => Effect.Effect<EdenPackageInfo, Error> = Effect.fn(function* (
+  ) => Effect.Effect<PackageInfo, Error> = Effect.fn(function* (
     hostPath: string,
   ) {
     return yield* Effect.catch(

@@ -658,7 +658,7 @@ export interface PackageCommands {
   "package/get-info": {
     mode: "result";
     args: { location: { volume: string; path: string; }; };
-    response: EdenPackageInfo;
+    response: import("./index").PackageInfo;
   };
   "package/get-size": {
     mode: "result";
