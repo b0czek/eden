@@ -1,5 +1,7 @@
 import type { UserProfile } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { scopedEvent } from "../events/scoped";
 import type { Operations } from "../operations/service";
 import type { Users } from "../user/service";
@@ -23,7 +25,6 @@ export const createSessions = Effect.fn(function* ({
   processes: { stopSessionApps(sessionId: string): Effect.Effect<void, Error> };
 }) {
   const changed = yield* scopedEvent<SessionChange>();
-  let initialized = false;
   let transitionInProgress = false;
   const transitionTo = Effect.fn(function* (
     user: UserProfile | null,
@@ -57,12 +58,14 @@ export const createSessions = Effect.fn(function* ({
       );
     });
   }
-  const initialize = Effect.fn(function* () {
-    if (initialized) return;
-    const defaultUser = yield* users.getDefaultUser();
-    if (defaultUser) yield* runTransition(transitionTo(defaultUser, "system"));
-    initialized = true;
-  });
+  const initialization = yield* Effect.cachedWithTTL(
+    Effect.gen(function* () {
+      const defaultUser = yield* users.getDefaultUser();
+      if (defaultUser)
+        yield* runTransition(transitionTo(defaultUser, "system"));
+    }),
+    (exit) => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero),
+  );
   const login = (username: string, password: string) =>
     runTransition(
       Effect.gen(function* () {
@@ -82,7 +85,7 @@ export const createSessions = Effect.fn(function* ({
     });
   }
   return {
-    initialize,
+    initialize: () => initialization,
     login,
     logout,
     synchronizeUser,

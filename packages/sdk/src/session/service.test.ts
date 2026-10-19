@@ -1,5 +1,7 @@
 import type { UserProfile } from "@edenapp/types";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import { gate } from "../../tests/support/async";
 import {
   createEffectRuntime,
@@ -132,5 +134,31 @@ describe("Sessions", () => {
       previousUsername: null,
       reason: "system",
     });
+  });
+
+  it("waits for the same default-session transition across concurrent initialization calls", async () => {
+    const stopping = Deferred.makeUnsafe<void>();
+    const stopped = Deferred.makeUnsafe<void>();
+    users.getDefaultUser.mockReturnValue(Effect.succeed(alice));
+    processes.stopSessionApps.mockReturnValue(
+      Effect.andThen(
+        Deferred.succeed(stopping, undefined),
+        Deferred.await(stopped),
+      ),
+    );
+    const first = effects.fork(sessions.initialize());
+    await effects.run(Deferred.await(stopping));
+    const second = effects.fork(sessions.initialize());
+    try {
+      expect(second.pollUnsafe()).toBeUndefined();
+      expect(sessions.getCurrentUser()).toBeNull();
+    } finally {
+      await effects.run(Deferred.succeed(stopped, undefined));
+    }
+    await effects.run(Fiber.join(first));
+    await effects.run(Fiber.join(second));
+    await effects.run(sessions.initialize());
+    expect(sessions.getCurrentUser()).toEqual(alice);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

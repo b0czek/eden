@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { UserProfile, UserRole } from "@edenapp/types";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { fromPromise } from "../effects/io";
 import { hashPassword, verifyPassword } from "./auth";
 import {
@@ -20,17 +22,13 @@ export const createUsers = Effect.fn(function* ({
   userDirectory: string;
   restrictedApps: ReadonlySet<string>;
 }) {
-  let initialized = false;
   let defaultUsername: string | null = null;
-  const initialize = Effect.fn(function* initialize(): Effect.fn.Return<
-    void,
-    Error
-  > {
-    if (initialized) return;
-    initialized = true;
-
-    yield* loadDefaultUsername();
-  });
+  const initialization = yield* Effect.cachedWithTTL(
+    Effect.gen(function* () {
+      defaultUsername = yield* store.getDefaultUsername();
+    }),
+    (exit) => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero),
+  );
   const listUsers = Effect.fn(function* listUsers(): Effect.fn.Return<
     UserProfile[],
     Error
@@ -262,11 +260,6 @@ export const createUsers = Effect.fn(function* ({
       updatedAt: user.updatedAt,
     };
   }
-  const loadDefaultUsername = Effect.fn(
-    function* loadDefaultUsername(): Effect.fn.Return<void, Error> {
-      defaultUsername = yield* store.getDefaultUsername();
-    },
-  );
   const getDefaultUser = Effect.fn(function* getDefaultUser(): Effect.fn.Return<
     UserProfile | null,
     Error
@@ -301,7 +294,7 @@ export const createUsers = Effect.fn(function* ({
   }
 
   return {
-    initialize,
+    initialize: () => initialization,
     listUsers,
     getUser,
     createUser,

@@ -34,21 +34,16 @@ export function createAppAssociations({
 }: AppAssociationsDependencies) {
   return Effect.gen(function* () {
     let associations = new Map<string, AppAssociation>();
-    let initialized = false;
     const mutations = yield* Semaphore.make(1);
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         associations.clear();
-        initialized = false;
       }),
     );
 
-    function initialize() {
-      return Effect.gen(function* () {
-        if (initialized) return;
-        initialized = true;
-
+    const initialization = yield* Effect.cached(
+      Effect.gen(function* () {
         const content = yield* Effect.match(storage.read(), {
           onFailure: () => undefined,
           onSuccess: (value) => value,
@@ -70,8 +65,8 @@ export function createAppAssociations({
         } catch {
           associations = new Map();
         }
-      });
-    }
+      }),
+    );
 
     function get(key: string): AppAssociation | undefined {
       const association = associations.get(key);
@@ -145,7 +140,14 @@ export function createAppAssociations({
       return result;
     }
 
-    return { initialize, get, resolve, set, remove, list };
+    return {
+      initialize: () => initialization,
+      get,
+      resolve,
+      set,
+      remove,
+      list,
+    };
   });
 }
 
