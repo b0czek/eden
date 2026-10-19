@@ -46,6 +46,72 @@ describe("app instance ownership", () => {
     return native;
   }
 
+  it("cleans up an exited app while another app's uninstall cleanup is pending", async () => {
+    const {
+      backends,
+      execution,
+      processes,
+      packages,
+      installedPackages,
+      runtimeContexts,
+    } = eden.runtime.services;
+    const closing = gate();
+    const finish = gate();
+    const exited = gate();
+    const create = backends.createBackend;
+    const pause = jest
+      .spyOn(backends, "createBackend")
+      .mockImplementation((...args) =>
+        Effect.gen(function* () {
+          const result = yield* create(...args);
+          yield* Effect.addFinalizer(() =>
+            Effect.promise(() => {
+              closing.release();
+              return finish.promise;
+            }),
+          );
+          return result;
+        }),
+      );
+    const secondId = "com.example.independent-exit";
+    const off = processes.exited.on(({ appId: id }) => {
+      if (id === secondId) exited.release();
+    });
+    try {
+      const first = eden.runtime.effects.run(launch());
+      (await backend()).emit("message", { type: "backend-ready" });
+      await first;
+      pause.mockRestore();
+      installedPackages.register(
+        testApp(secondId, { backend: { entry: "backend.js" } }),
+      );
+      const second = eden.runtime.effects.run(
+        execution.provide(processes.launchApp(secondId), {
+          principal: { kind: "user", profile },
+        }),
+      );
+      await tick();
+      const native = backends.getBackend(secondId);
+      if (!native?.pid) throw new Error("Second backend did not start");
+      const secondBackend = eden.platform.utilityProcesses.get(native.pid);
+      if (!secondBackend)
+        throw new Error("Second native backend did not start");
+      secondBackend.emit("message", { type: "backend-ready" });
+      await second;
+
+      packages.uninstalled.emit({ kind: "app", packageId: appId });
+      await closing.promise;
+      secondBackend.kill();
+      await exited.promise;
+      expect(processes.getAppInstance(secondId)).toBeUndefined();
+      expect(runtimeContexts.get(secondId)).toBeUndefined();
+    } finally {
+      finish.release();
+      pause.mockRestore();
+      off();
+    }
+  });
+
   it("releases a ready backend, partially configured view, and identity when frontend setup fails", async () => {
     const baseline = eden.platform.activeResourceCount;
     const failure = new Error("Frontend logger unavailable");

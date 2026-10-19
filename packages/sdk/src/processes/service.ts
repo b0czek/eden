@@ -16,7 +16,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FiberHandle from "effect/FiberHandle";
-import * as Queue from "effect/Queue";
+import * as FiberSet from "effect/FiberSet";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import { type AppChannelLifecycle } from "../appbus/ports";
@@ -96,8 +96,25 @@ export const createProcesses = Effect.fn(function* ({
   const reloading = yield* scopedEvent<ProcessNamespaceEvents["reloading"]>();
   const processError = yield* scopedEvent<ProcessNamespaceEvents["error"]>();
   const exited = yield* scopedEvent<ProcessNamespaceEvents["exited"]>();
-  const pending =
-    yield* Queue.unbounded<() => Effect.Effect<unknown, unknown>>();
+  const forkLifecycle = yield* FiberSet.makeRuntime<never, void, never>();
+  const hotReload = yield* Semaphore.make(1);
+  function runLifecycle(work: Effect.Effect<unknown, unknown>) {
+    forkLifecycle(
+      work.pipe(
+        Effect.asVoid,
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause).pipe(Effect.orDie)
+            : Effect.sync(() =>
+                log.error(
+                  "Process lifecycle task failed:",
+                  Cause.squash(cause),
+                ),
+              ),
+        ),
+      ),
+    );
+  }
   const processScope = yield* Effect.scope;
   const instances = new Map<string, InstanceRecord>();
   const admission = new Map<string, Semaphore.Semaphore>();
@@ -156,7 +173,7 @@ export const createProcesses = Effect.fn(function* ({
   });
   yield* listen(packages.uninstalled, (change) => {
     if (change.kind === "app" && instances.has(change.packageId))
-      Queue.offerUnsafe(pending, () => stopApp(change.packageId));
+      runLifecycle(stopApp(change.packageId));
   });
   const setupHotReloadWatcher = Effect.fn(function* () {
     if (!isHotReloadConfigured(config)) return;
@@ -174,40 +191,43 @@ export const createProcesses = Effect.fn(function* ({
         ).pipe(
           Effect.andThen(
             Effect.sync(() => {
-              Queue.offerUnsafe(pending, handleHotReloadStateChanged);
+              runLifecycle(handleHotReloadStateChanged());
             }),
           ),
         ),
       );
     });
-    Queue.offerUnsafe(pending, handleHotReloadStateChanged);
+    runLifecycle(handleHotReloadStateChanged());
   });
-  const handleHotReloadStateChanged = Effect.fn(function* () {
-    const state = yield* loadHotReloadServerState(_config);
-    const appIds = new Set([
-      ..._hotReloadStates.keys(),
-      ...Object.keys(state.apps),
-    ]);
-    const nextStates = new Map<string, string>();
+  const handleHotReloadStateChanged = Effect.fn(
+    function* () {
+      const state = yield* loadHotReloadServerState(_config);
+      const appIds = new Set([
+        ..._hotReloadStates.keys(),
+        ...Object.keys(state.apps),
+      ]);
+      const nextStates = new Map<string, string>();
 
-    for (const appId of appIds) {
-      const appState = state.apps[appId];
-      nextStates.set(
-        appId,
-        `${appState?.status}:${appState?.url}:${appState?.revision ?? 0}`,
+      for (const appId of appIds) {
+        const appState = state.apps[appId];
+        nextStates.set(
+          appId,
+          `${appState?.status}:${appState?.url}:${appState?.revision ?? 0}`,
+        );
+      }
+
+      const changedAppIds = Array.from(appIds).filter(
+        (appId) => _hotReloadStates.get(appId) !== nextStates.get(appId),
       );
-    }
 
-    const changedAppIds = Array.from(appIds).filter(
-      (appId) => _hotReloadStates.get(appId) !== nextStates.get(appId),
-    );
+      _hotReloadStates = nextStates;
 
-    _hotReloadStates = nextStates;
-
-    for (const appId of changedAppIds) {
-      yield* refreshHotReloadApp(appId);
-    }
-  });
+      for (const appId of changedAppIds) {
+        yield* refreshHotReloadApp(appId);
+      }
+    },
+    (work) => hotReload.withPermit(work),
+  );
 
   const refreshHotReloadApp = Effect.fn(function* (appId: string) {
     const refreshed = yield* _packages.reloadPackage(appId).pipe(
@@ -537,7 +557,7 @@ export const createProcesses = Effect.fn(function* ({
     routing.removeBackendSubscriptions(appId);
     const record = instances.get(appId);
     if (!record || record.backend !== backend || record.closing) return;
-    Queue.offerUnsafe(pending, () =>
+    runLifecycle(
       withApp(
         appId,
         Effect.gen(function* () {
@@ -660,24 +680,6 @@ export const createProcesses = Effect.fn(function* ({
   function isLoginApp(appId: string): boolean {
     return !!_loginAppId && appId === _loginAppId;
   }
-  yield* Effect.forkScoped(
-    Effect.forever(
-      Effect.flatMap(Queue.take(pending), (work) =>
-        work().pipe(
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.sync(() =>
-                  log.error(
-                    "Process lifecycle task failed:",
-                    Cause.squash(cause),
-                  ),
-                ),
-          ),
-        ),
-      ),
-    ),
-  );
   yield* Effect.addFinalizer(() =>
     shutdown().pipe(
       Effect.catchCause((cause) =>
