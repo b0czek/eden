@@ -6,7 +6,7 @@ import type {
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import * as Queue from "effect/Queue";
+import * as FiberSet from "effect/FiberSet";
 import { fromPromise } from "../effects/io";
 import { log } from "../logging";
 import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
@@ -22,7 +22,7 @@ export const createViewRendering = Effect.fn(function* (
   floatingWindows: FloatingWindows,
   windows: WindowingPort,
 ) {
-  const pending = yield* Queue.unbounded<Effect.Effect<unknown, Error>>();
+  const forkInjection = yield* FiberSet.makeRuntime<never, void, never>();
   let _nextOverlayZIndex = Z_LAYERS.OVERLAY_MIN;
   let _nextViewId = 1;
   const _fileReader = yield* createCachedFileReader();
@@ -306,18 +306,15 @@ export const createViewRendering = Effect.fn(function* (
 
       // Setup injections after view is loaded
       view.webContents.on("did-finish-load", () => {
-        // Inject the Eden CSS first (based on mode)
-        const cssMode = getCSSInjectionMode(windowConfig);
-        if (cssMode !== "none") {
-          Queue.offerUnsafe(pending, injectEdenCSS(view, cssMode));
-        }
-
-        if (shouldInjectAppFrame(windowConfig)) {
-          Queue.offerUnsafe(
-            pending,
-            Effect.suspend(() => {
-              if (view.webContents.isDestroyed()) return Effect.succeed(false);
-              return injectAppFrame(
+        forkInjection(
+          Effect.gen(function* () {
+            const cssMode = getCSSInjectionMode(windowConfig);
+            if (cssMode !== "none") yield* injectEdenCSS(view, cssMode);
+            if (
+              shouldInjectAppFrame(windowConfig) &&
+              !view.webContents.isDestroyed()
+            )
+              yield* injectAppFrame(
                 view,
                 appId,
                 manifest.name,
@@ -325,9 +322,16 @@ export const createViewRendering = Effect.fn(function* (
                 windowConfig,
                 view.getBounds(),
               );
-            }),
-          );
-        }
+          }).pipe(
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause)
+                ? Effect.failCause(cause)
+                : Effect.sync(() =>
+                    log.error("View injection failed:", Cause.squash(cause)),
+                  ),
+            ),
+          ),
+        );
       });
 
       // Return view info
@@ -359,20 +363,6 @@ export const createViewRendering = Effect.fn(function* (
     }
   }
 
-  yield* Effect.forkScoped(
-    Effect.forever(
-      Queue.take(pending).pipe(
-        Effect.flatMap((work) => work),
-        Effect.catchCause((cause) =>
-          Cause.hasInterruptsOnly(cause)
-            ? Effect.failCause(cause)
-            : Effect.sync(() =>
-                log.error("View injection failed:", Cause.squash(cause)),
-              ),
-        ),
-      ),
-    ),
-  );
   return {
     isRemoteEntry,
     shouldInjectAppFrame,
