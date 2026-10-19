@@ -18,6 +18,31 @@ async function fixture(run: (root: string) => Promise<void>) {
   }
 }
 
+test("a committed rename preserves moved content when the source becomes unavailable", async () => {
+  await fixture(async (root) => {
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    await fs.writeFile(source, "moved content");
+    await fs.writeFile(destination, "old content");
+    await Effect.runPromise(
+      createFileTransfers().move({
+        source,
+        destination,
+        destinationLabel: destination,
+        overwrite: true,
+        assertSourceActive: () =>
+          fromPromise(() => fs.access(source)).pipe(
+            Effect.asVoid,
+            Effect.mapError(() => new Error("source disconnected")),
+          ),
+      }),
+    );
+    assert.equal(await fs.readFile(destination, "utf8"), "moved content");
+    await assert.rejects(fs.stat(source), { code: "ENOENT" });
+    assert.deepEqual([...(await fs.readdir(root))], ["destination"]);
+  });
+});
+
 for (const operation of ["copy", "move"] as const) {
   test(`concurrent ${operation} without overwrite preserves the winning destination`, async () => {
     await fixture(async (root) => {

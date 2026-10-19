@@ -105,6 +105,7 @@ export function createFileTransfers() {
     request.reporter?.update("preparing-move");
     const transfer = yield* prepare(request, "move");
     let copied = false;
+    // Finish a committed rename and its backup cleanup before interruption.
     yield* runWithDestinationRollback(
       transfer,
       Effect.gen(function* () {
@@ -124,7 +125,7 @@ export function createFileTransfers() {
           }),
         );
       }),
-    );
+    ).pipe(Effect.uninterruptible);
     if (copied) {
       yield* Effect.gen(function* () {
         yield* assertActive(transfer);
@@ -199,7 +200,7 @@ export function createFileTransfers() {
         const backup = transfer.destinationExists
           ? yield* stageDestination(transfer.destination)
           : undefined;
-        yield* restore(Effect.andThen(work, assertActive(transfer))).pipe(
+        yield* restore(work).pipe(
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");
