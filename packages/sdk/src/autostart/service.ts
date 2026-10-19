@@ -2,13 +2,14 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Queue from "effect/Queue";
+import * as Stream from "effect/Stream";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import type { AutostartDependencies } from "./ports";
 
 const AUTOSTART_PREFIX = "autostart.";
-type Launch = "development" | "session" | "login" | "stop";
+type Launch = "development" | "session" | "login";
 
 /** Serialize startup and committed-session launches within one owned lifetime. */
 export function createAutostart({
@@ -22,7 +23,7 @@ export function createAutostart({
   return Effect.gen(function* () {
     let ready = false;
     let disposed = false;
-    const pending = yield* Queue.unbounded<Launch>();
+    const pending = yield* Queue.unbounded<Launch, Cause.Done>();
 
     function launchDevelopmentApps() {
       return Effect.gen(function* () {
@@ -106,18 +107,16 @@ export function createAutostart({
     }
 
     const worker = yield* Effect.forkScoped(
-      Effect.gen(function* () {
-        while (true) {
-          const launch = yield* Queue.take(pending);
-          if (launch === "stop") return;
-          if (disposed) continue;
+      Stream.runForEach(Stream.fromQueue(pending), (launch) =>
+        Effect.suspend(() => {
+          if (disposed) return Effect.void;
           const task =
             launch === "development"
               ? launchDevelopmentApps()
               : launch === "session"
                 ? launchSessionApps()
                 : launchLoginApp();
-          yield* Effect.catchCause(task, (cause) =>
+          return Effect.catchCause(task, (cause) =>
             Cause.hasInterruptsOnly(cause)
               ? Effect.failCause(cause)
               : Effect.sync(() =>
@@ -127,8 +126,8 @@ export function createAutostart({
                   ),
                 ),
           );
-        }
-      }),
+        }),
+      ),
     );
 
     const unsubscribe = yield* listen(
@@ -157,7 +156,7 @@ export function createAutostart({
           disposed = true;
           ready = false;
           unsubscribe();
-          Queue.offerUnsafe(pending, "stop");
+          yield* Queue.end(pending);
         }
         yield* Fiber.join(worker);
       }).pipe(Effect.uninterruptible);
