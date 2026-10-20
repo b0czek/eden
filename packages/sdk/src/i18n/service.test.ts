@@ -1,9 +1,17 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { createEvent } from "../events/event";
-import { createI18n } from "./service";
+import { StorageReadError } from "../storage/errors";
+import { I18n, I18nLive, I18nSettings } from "./service";
 import { createI18nSettings } from "./settings";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("i18n service ownership", () => {
   it("releases its settings subscription without disconnecting another instance", () => {
@@ -18,15 +26,19 @@ describe("i18n service ownership", () => {
     };
     const firstScope = Scope.makeUnsafe();
     const secondScope = Scope.makeUnsafe();
-    const first = Effect.runSync(
+    const first = serviceEffects.acquireSync(
       Scope.provide(
-        createI18n({ settings: createI18nSettings(settings) }),
+        buildService(I18n, I18nLive).pipe(
+          Effect.provideService(I18nSettings, createI18nSettings(settings)),
+        ),
         firstScope,
       ),
     );
-    const second = Effect.runSync(
+    const second = serviceEffects.acquireSync(
       Scope.provide(
-        createI18n({ settings: createI18nSettings(settings) }),
+        buildService(I18n, I18nLive).pipe(
+          Effect.provideService(I18nSettings, createI18nSettings(settings)),
+        ),
         secondScope,
       ),
     );
@@ -62,12 +74,12 @@ describe("i18n service ownership", () => {
     const exit = await Effect.runPromiseExit(
       Effect.scoped(
         Effect.gen(function* () {
-          yield* createI18n({
-            settings: {
+          yield* buildService(I18n, I18nLive).pipe(
+            Effect.provideService(I18nSettings, {
               readLocale: () => Effect.succeed(undefined),
               localeChanged: changed,
-            },
-          });
+            }),
+          );
           expect(changed.hasListeners()).toBe(true);
           return yield* Effect.fail(failure);
         }),
@@ -82,7 +94,7 @@ describe("i18n service ownership", () => {
 describe("i18n persisted settings", () => {
   it("reads the saved locale lazily, defaults missing values, and preserves read failures", async () => {
     let locale: string | undefined;
-    let readFailure: Error | undefined;
+    let readFailure: StorageReadError | undefined;
     const reads: string[][] = [];
     const settings = createI18nSettings({
       get: (appId, key) =>
@@ -98,7 +110,9 @@ describe("i18n persisted settings", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const i18n = yield* createI18n({ settings });
+          const i18n = yield* buildService(I18n, I18nLive).pipe(
+            Effect.provideService(I18nSettings, settings),
+          );
           const read = i18n.getLocale();
           expect(reads).toEqual([]);
           expect(yield* read).toBe("en");
@@ -109,12 +123,21 @@ describe("i18n persisted settings", () => {
             ["com.eden", "general.locale"],
           ]);
 
-          readFailure = new Error("Settings unavailable");
+          readFailure = new StorageReadError({
+            resource: "settings",
+            operation: "read",
+            keys: ["general.locale"],
+            cause: new Error("Settings unavailable"),
+          });
           const error = yield* Effect.match(i18n.getLocale(), {
             onFailure: (failure) => failure,
             onSuccess: () => undefined,
           });
           expect(error).toBe(readFailure);
+
+          readFailure = undefined;
+          locale = "en";
+          expect(yield* read).toBe("en");
         }),
       ),
     );
@@ -131,12 +154,15 @@ describe("i18n persisted settings", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const i18n = yield* createI18n({
-            settings: createI18nSettings({
-              get: () => Effect.succeed(undefined),
-              changed,
-            }),
-          });
+          const i18n = yield* buildService(I18n, I18nLive).pipe(
+            Effect.provideService(
+              I18nSettings,
+              createI18nSettings({
+                get: () => Effect.succeed(undefined),
+                changed,
+              }),
+            ),
+          );
           i18n.localeChanged.on(({ locale }) => {
             locales.push(locale);
           });
