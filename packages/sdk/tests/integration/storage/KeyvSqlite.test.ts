@@ -5,6 +5,7 @@ import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
 import {
   StorageClosedError,
+  type StorageFailure,
   StorageOpenError,
   StorageReadError,
   StorageRemoveError,
@@ -66,7 +67,14 @@ it("distinguishes native read, write and removal failures from missing data and 
 
     maintenance = new KeyvSqlite(`sqlite://${resource}`);
     await maintenance.query("DROP TABLE keyv");
-    const attempts = [
+    const attempts: {
+      work: Effect.Effect<unknown, StorageFailure>;
+      error:
+        | typeof StorageReadError
+        | typeof StorageWriteError
+        | typeof StorageRemoveError;
+      context: object;
+    }[] = [
       {
         work: storage.read("saved"),
         error: StorageReadError,
