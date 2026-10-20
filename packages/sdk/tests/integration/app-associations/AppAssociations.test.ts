@@ -2,13 +2,38 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createJsonFileAssociationStorage } from "../../../src/app-associations/json-file";
-import { createAppAssociations } from "../../../src/app-associations/service";
-import { createExecutionContext } from "../../../src/execution/context";
-import { createPackageCatalog } from "../../../src/packages/catalog";
-import { createInstalledPackages } from "../../../src/packages/installed";
+import { AppAssociationStorage } from "../../../src/app-associations/ports";
+import {
+  AppAssociations,
+  AppAssociationsLive,
+} from "../../../src/app-associations/service";
+import {
+  ExecutionContext,
+  ExecutionContextLive,
+} from "../../../src/execution/context";
+import {
+  PackageCatalog,
+  PackageCatalogLive,
+} from "../../../src/packages/catalog";
+import {
+  InstalledPackages,
+  InstalledPackagesLive,
+} from "../../../src/packages/installed";
+import {
+  AppsDirectory,
+  DistPath,
+  RuntimeConfig,
+} from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const vendor: UserProfile = {
   username: "vendor",
@@ -34,20 +59,31 @@ describe("app associations persistence and catalog integration", () => {
     const storePath = path.join(userDirectory, "app-associations.json");
     if (content !== undefined) await fs.writeFile(storePath, content);
 
-    const registry = createInstalledPackages();
-    const execution = createExecutionContext({ config: {} });
-    const catalog = createPackageCatalog({
-      registry,
-      executionContext: execution,
-      appsDirectory: userDirectory,
-      distPath: userDirectory,
-    });
+    const registry = serviceEffects.acquireSync(
+      buildService(InstalledPackages, InstalledPackagesLive),
+    );
+    const execution = serviceEffects.acquireSync(
+      buildService(ExecutionContext, ExecutionContextLive).pipe(
+        Effect.provideService(RuntimeConfig, {}),
+      ),
+    );
+    const catalog = serviceEffects.acquireSync(
+      buildService(PackageCatalog, PackageCatalogLive).pipe(
+        Effect.provideService(InstalledPackages, registry),
+        Effect.provideService(ExecutionContext, execution),
+        Effect.provideService(AppsDirectory, userDirectory),
+        Effect.provideService(DistPath, userDirectory),
+      ),
+    );
     const open = async () => {
       const service = await runtime.acquire(
-        createAppAssociations({
-          catalog,
-          storage: createJsonFileAssociationStorage(userDirectory),
-        }),
+        buildService(AppAssociations, AppAssociationsLive).pipe(
+          Effect.provideService(PackageCatalog, catalog),
+          Effect.provideService(
+            AppAssociationStorage,
+            createJsonFileAssociationStorage(userDirectory),
+          ),
+        ),
       );
       await runtime.run(service.initialize());
       return service;
@@ -73,8 +109,14 @@ describe("app associations persistence and catalog integration", () => {
   });
 
   it("loads a missing store as empty state", async () => {
-    const { associations } = await createAssociations();
+    const { associations, runtime, storePath } = await createAssociations();
     expect(associations.list()).toEqual({});
+    const storage = createJsonFileAssociationStorage(path.dirname(storePath));
+    await expect(runtime.run(storage.read())).rejects.toMatchObject({
+      _tag: "AppAssociationStorageReadError",
+      path: storePath,
+      cause: { code: "ENOENT" },
+    });
   });
 
   it("persists set, get, remove, and list operations across service instances", async () => {
@@ -239,7 +281,11 @@ describe("app associations persistence and catalog integration", () => {
           kind: "provider",
         }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      _tag: "AppAssociationStorageWriteError",
+      path: storePath,
+      cause: { code: "EISDIR" },
+    });
     expect(associations.get("selected")).toEqual(committed);
   });
 

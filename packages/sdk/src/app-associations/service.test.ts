@@ -2,23 +2,47 @@ import type { AppAssociationStore } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import type { AppAssociationStorage } from "./ports";
-import { createAppAssociations } from "./service";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { PackageCatalog, PackageCatalogLive } from "../packages/catalog";
+import {
+  InstalledPackages,
+  InstalledPackagesLive,
+} from "../packages/installed";
+import { AppsDirectory, DistPath, RuntimeConfig } from "../runtime/inputs";
+import { AppAssociationStorageWriteError } from "./errors";
+import { AppAssociationStorage } from "./ports";
+import { AppAssociations, AppAssociationsLive } from "./service";
 
 const runtimes: ReturnType<typeof createEffectRuntime>[] = [];
 
 async function createAssociations(storage: AppAssociationStorage) {
   const runtime = createEffectRuntime();
   runtimes.push(runtime);
+  const registry = runtime.acquireSync(
+    buildService(InstalledPackages, InstalledPackagesLive),
+  );
+  const execution = runtime.acquireSync(
+    buildService(ExecutionContext, ExecutionContextLive).pipe(
+      Effect.provideService(RuntimeConfig, {}),
+    ),
+  );
+  const catalog = runtime.acquireSync(
+    buildService(PackageCatalog, PackageCatalogLive).pipe(
+      Effect.provideService(InstalledPackages, registry),
+      Effect.provideService(ExecutionContext, execution),
+      Effect.provideService(AppsDirectory, "/unused"),
+      Effect.provideService(DistPath, "/unused"),
+    ),
+  );
   const associations = await runtime.acquire(
-    createAppAssociations({
-      storage,
-      catalog: {
-        getLaunchableApp: () => undefined,
-        listApps: () => [],
-      },
-    }),
+    buildService(AppAssociations, AppAssociationsLive).pipe(
+      Effect.provideService(PackageCatalog, catalog),
+      Effect.provideService(AppAssociationStorage, storage),
+    ),
   );
   await runtime.run(associations.initialize());
   return { runtime, associations };
@@ -84,7 +108,10 @@ it.each(["set", "remove"] as const)(
     };
     let persisted = JSON.stringify(store);
     let failWrite = true;
-    const failure = new Error("Association storage is unavailable");
+    const failure = new AppAssociationStorageWriteError({
+      path: "/unavailable/app-associations.json",
+      cause: new Error("Association storage is unavailable"),
+    });
     const { runtime, associations } = await createAssociations({
       read: () => Effect.succeed(persisted),
       write: (content) =>

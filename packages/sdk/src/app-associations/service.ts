@@ -3,20 +3,39 @@ import type {
   AppAssociationStore,
   RuntimeAppManifest,
 } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import * as v from "valibot";
 import { log } from "../logging";
-import type { AppAssociationCatalog, AppAssociationStorage } from "./ports";
+import { PackageCatalog } from "../packages/catalog";
+import type { AppAssociationStorageWriteError } from "./errors";
+import { AppAssociationStorage } from "./ports";
 import { appAssociationSchema } from "./schemas";
+
+export interface AppAssociations {
+  initialize: () => Effect.Effect<void>;
+  get: (key: string) => AppAssociation | undefined;
+  resolve: (
+    key: string,
+    matches: (app: RuntimeAppManifest) => boolean,
+  ) => AppAssociation[];
+  set: (
+    key: string,
+    association: AppAssociation,
+  ) => Effect.Effect<void, AppAssociationStorageWriteError>;
+  remove: (key: string) => Effect.Effect<void, AppAssociationStorageWriteError>;
+  list: (options?: AppAssociationListOptions) => Record<string, AppAssociation>;
+}
+
+export const AppAssociations = Context.Service<
+  "eden/AppAssociations",
+  AppAssociations
+>("eden/AppAssociations");
 
 export interface AppAssociationListOptions {
   kindPrefix?: string;
-}
-
-interface AppAssociationsDependencies {
-  catalog: AppAssociationCatalog;
-  storage: AppAssociationStorage;
 }
 
 function isValidStoredAssociation(
@@ -28,11 +47,11 @@ function isValidStoredAssociation(
   return valid;
 }
 
-export function createAppAssociations({
-  catalog,
-  storage,
-}: AppAssociationsDependencies) {
-  return Effect.gen(function* () {
+export const AppAssociationsLive = Layer.effect(
+  AppAssociations,
+  Effect.gen(function* () {
+    const catalog = yield* PackageCatalog;
+    const storage = yield* AppAssociationStorage;
     let associations = new Map<string, AppAssociation>();
     const mutations = yield* Semaphore.make(1);
 
@@ -95,17 +114,13 @@ export function createAppAssociations({
       return mutations.withPermit(
         Effect.gen(function* () {
           const next = new Map(associations);
-          const content = yield* Effect.try({
-            try: () => {
-              mutate(next);
-              const store: AppAssociationStore = {
-                version: 1,
-                associations: Object.fromEntries(next),
-              };
-              return `${JSON.stringify(store, null, 2)}\n`;
-            },
-            catch: (error) =>
-              error instanceof Error ? error : new Error(String(error)),
+          const content = yield* Effect.sync(() => {
+            mutate(next);
+            const store: AppAssociationStore = {
+              version: 1,
+              associations: Object.fromEntries(next),
+            };
+            return `${JSON.stringify(store, null, 2)}\n`;
           });
           yield* storage.write(content);
           associations = next;
@@ -148,9 +163,5 @@ export function createAppAssociations({
       remove,
       list,
     };
-  });
-}
-
-export type AppAssociations = Effect.Success<
-  ReturnType<typeof createAppAssociations>
->;
+  }),
+);

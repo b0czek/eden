@@ -1,12 +1,15 @@
-import type { RuntimeAppManifest } from "@edenapp/types";
+import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
-
-export interface AppAssociationCatalog {
-  getLaunchableApp(appId: string): RuntimeAppManifest | undefined;
-  listApps(options: { showHidden: boolean }): RuntimeAppManifest[];
-}
+import type {
+  AppAssociationStorageReadError,
+  AppAssociationStorageWriteError,
+} from "./errors";
 
 export interface AppAssociationStorage {
-  read(): Effect.Effect<string, Error>;
-  write(content: string): Effect.Effect<void, Error>;
+  read(): Effect.Effect<string, AppAssociationStorageReadError>;
+  write(content: string): Effect.Effect<void, AppAssociationStorageWriteError>;
 }
+export const AppAssociationStorage = Context.Service<
+  "eden/AppAssociationStorage",
+  AppAssociationStorage
+>("eden/AppAssociationStorage");
