@@ -16,7 +16,7 @@ type ResultSuccess<Result> =
       : Result;
 
 type CommandSuccess<Result, Mode extends CommandMode> = Mode extends "operation"
-  ? Result extends OperationTask<infer Completion>
+  ? Result extends OperationTask<infer Completion, infer _Error>
     ? Completion
     : never
   : ResultSuccess<Result>;
@@ -103,29 +103,33 @@ export function command(
   };
 }
 
-interface OperationOptions<Args, Result> {
+interface OperationOptions<Args, Result, E = unknown> {
   permission?: string;
   transition?: OperationTask<Result>["transition"];
   cancellable?: boolean;
-  encodeFailure?: (error: unknown) => NoInfer<Result>;
+  encodeFailure?: (error: NoInfer<E>) => NoInfer<Result>;
   prepare: (
     args: Args,
     caller: CommandCallerContext,
-  ) => OperationTask<Result>["run"];
+  ) => OperationTask<Result, E>["run"];
 }
 
 /** Validate and prepare synchronously; the operation runtime executes retained work. */
-export function operation<Schema extends v.GenericSchema, Result>(
-  options: OperationOptions<v.InferOutput<Schema>, Result> & { input: Schema },
+export function operation<Schema extends v.GenericSchema, Result, E = unknown>(
+  options: OperationOptions<v.InferOutput<Schema>, Result, E> & {
+    input: Schema;
+  },
 ): Command<
   v.InferInput<Schema>,
-  OperationTask<Result>,
+  OperationTask<Result, E>,
   "operation",
   v.InferOutput<Schema>
 >;
-export function operation<Result>(
-  options: OperationOptions<Record<string, never>, Result> & { input?: never },
-): Command<Record<string, never>, OperationTask<Result>, "operation">;
+export function operation<Result, E = unknown>(
+  options: OperationOptions<Record<string, never>, Result, E> & {
+    input?: never;
+  },
+): Command<Record<string, never>, OperationTask<Result, E>, "operation">;
 export function operation(
   options: OperationOptions<never, unknown> & { input?: v.GenericSchema },
 ): ControllerCommand {

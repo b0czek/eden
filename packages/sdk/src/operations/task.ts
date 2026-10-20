@@ -6,19 +6,19 @@ export interface OperationReporter {
 }
 
 /** Prepared synchronously; execution belongs to the runtime after acceptance. */
-export interface OperationTask<R> {
-  run(reporter: OperationReporter): Effect.Effect<R, unknown>;
+export interface OperationTask<R, E = unknown> {
+  run(reporter: OperationReporter): Effect.Effect<R, E>;
   /** Release synchronous admission even if cancellation precedes execution. */
   release?: () => void;
   /** Public response encoding supplied by the controller; execution still fails. */
-  encodeFailure?: (error: unknown) => R;
+  encodeFailure?(error: E): R;
   cancellable?: boolean;
   transition?: "session" | "runtime";
 }
 
-export function operationTask<R>(
-  run: OperationTask<R>["run"],
-  options: Omit<OperationTask<R>, "run"> = {},
-): OperationTask<R> {
+export function operationTask<R, E = unknown>(
+  run: OperationTask<R, E>["run"],
+  options: Omit<OperationTask<R, E>, "run"> = {},
+): OperationTask<R, E> {
   return { run, ...options };
 }

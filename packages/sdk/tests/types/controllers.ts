@@ -1,6 +1,7 @@
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import { command } from "../../src/controllers/controller";
+import { command, operation } from "../../src/controllers/controller";
 
 command({ handle: () => 42 });
 command({ handle: async () => "value" });
@@ -26,3 +27,20 @@ command({
 });
 // @ts-expect-error Promise results with schemas must also be fully provided.
 command({ input: v.object({}), handle: async () => Effect.scope });
+
+// Operation encoders receive the workflow's declared failures.
+class DeviceUnavailable extends Data.TaggedError("DeviceUnavailable")<{
+  readonly device: string;
+}> {}
+operation({
+  prepare: () => () =>
+    Effect.fail(new DeviceUnavailable({ device: "motor" })).pipe(
+      Effect.as({ available: true, device: "motor" }),
+    ),
+  encodeFailure: (error) => ({ available: false, device: error.device }),
+});
+operation({
+  prepare: () => () => Effect.fail(new DeviceUnavailable({ device: "motor" })),
+  // @ts-expect-error The workflow does not fail with this unrelated error type.
+  encodeFailure: (_error: { readonly _tag: "UnrelatedFailure" }) => undefined,
+});
