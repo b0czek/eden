@@ -21,9 +21,9 @@ export function createFileOpenController(
   fileOpen: FileOpen,
   operations: FileOpenOperations,
 ) {
-  function publicOpen(
-    task: OperationTask<{ appId: string }>,
-  ): OperationTask<FileOpenResult> {
+  function publicOpen<E>(
+    task: OperationTask<{ appId: string }, E>,
+  ): OperationTask<FileOpenResult, E> {
     return {
       ...task,
       run: (reporter) =>

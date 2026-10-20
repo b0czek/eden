@@ -1,6 +1,8 @@
 import * as path from "node:path";
 import type { FileHandlerConfig, RuntimeAppManifest } from "@edenapp/types";
-import type { FileOpenCatalog } from "./ports";
+import type { PackageCatalog } from "../packages/catalog";
+
+type HandlerCatalog = Pick<PackageCatalog, "listApps" | "dlcsForHost">;
 
 export const DIRECTORY_PREFERENCE_KEY = "directory";
 export const DIRECTORY_ASSOCIATION_KEY = "file:directory";
@@ -53,7 +55,7 @@ export function getExtension(filePath: string): string {
 }
 
 export function getInstalledFileHandlers(
-  packageCatalog: FileOpenCatalog,
+  packageCatalog: HandlerCatalog,
 ): Array<{
   app: RuntimeAppManifest;
   handler: FileHandlerConfig;
@@ -112,7 +114,7 @@ export function getMimeMatchScore(
 }
 
 export function getMatchingHandlers(
-  packageCatalog: FileOpenCatalog,
+  packageCatalog: HandlerCatalog,
   criteria: {
     extension?: string;
     mimeType?: string;

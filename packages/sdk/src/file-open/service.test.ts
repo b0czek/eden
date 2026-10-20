@@ -2,9 +2,31 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { testApp } from "../../tests/support/apps";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import type { FileOpenFilesystem, FileOpenProcesses } from "./ports";
-import { createFileOpen } from "./service";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { AppAssociations } from "../app-associations/service";
+import { I18n } from "../i18n/service";
+import { PackageCatalog } from "../packages/catalog";
+import { ProcessLaunchRejected } from "../processes/errors";
+import { Views } from "../views/service";
+import { FileMetadataFailed } from "./errors";
+import { FileOpenFilesystem, FileOpenProcesses } from "./ports";
+import { FileOpen, FileOpenLive } from "./service";
+
+/** Fail immediately if a test starts using an unconfigured collaborator method. */
+function collaborator<S extends object>(methods: Partial<S>): S {
+  return new Proxy(methods, {
+    get(target, property, receiver) {
+      if (!Reflect.has(target, property))
+        throw new Error(
+          `Unconfigured collaborator member: ${String(property)}`,
+        );
+      return Reflect.get(target, property, receiver);
+    },
+  }) as S;
+}
 
 const location = { volume: "home", path: "/document.txt" };
 const editor = testApp("test.editor", {
@@ -28,61 +50,79 @@ describe("file opening failures", () => {
 
   const acquire = (apps = [editor]) =>
     effects.acquire(
-      createFileOpen({
-        associations: {
+      buildService(FileOpen, FileOpenLive).pipe(
+        Effect.provideService(AppAssociations, {
           get: () => undefined,
           list: () => ({}),
           set: () => Effect.void,
           remove: () => Effect.void,
-        },
-        catalog: {
-          listApps: () => apps,
-          getApp: (id) => apps.find((app) => app.id === id),
-          dlcsForHost: () => [],
-        },
-        filesystem,
-        processes,
-        views: {
-          getViewsByAppId: () => [],
-          showView: () => {},
-          focusView: () => {},
-        },
-        i18n: { getLocale: () => Effect.succeed("en") },
-      }),
+          initialize: () => Effect.void,
+          resolve: () => [],
+        }),
+        Effect.provideService(
+          PackageCatalog,
+          collaborator<PackageCatalog>({
+            listApps: () => apps,
+            getApp: (id: string) => apps.find((app) => app.id === id),
+            dlcsForHost: () => [],
+          }),
+        ),
+        Effect.provideService(FileOpenProcesses, processes),
+        Effect.provideService(
+          Views,
+          collaborator<Views>({
+            getViewsByAppId: () => [],
+            showView: () => {},
+            focusView: () => {},
+          }),
+        ),
+        Effect.provideService(FileOpenFilesystem, filesystem),
+        Effect.provideService(
+          I18n,
+          collaborator<I18n>({
+            getLocale: () => Effect.succeed("en"),
+          }),
+        ),
+      ),
     );
 
   it("fails when no handler or explicitly selected app is installed", async () => {
     const service = await acquire([]);
     await expect(effects.run(service.openFile(location))).rejects.toMatchObject(
       {
-        _tag: "FileOpenFailure",
+        _tag: "FileHandlerUnavailable",
         message: "No handler found for extension .txt",
       },
     );
     await expect(
       effects.run(service.openFileWith(location, editor.id)),
     ).rejects.toMatchObject({
-      _tag: "FileOpenFailure",
+      _tag: "FileHandlerUnavailable",
       message: "App test.editor is not installed",
     });
   });
 
   it("keeps metadata and launch failures in the expected failure channel", async () => {
-    filesystem.inspect = () => Effect.fail(new Error("Cannot read file"));
-    processes.launch = () => Effect.fail(new Error("Backend not ready"));
+    const native = new Error("Cannot read file");
+    const metadata = new FileMetadataFailed({
+      location,
+      cause: native,
+      message: native.message,
+    });
+    const launch = new ProcessLaunchRejected({
+      appId: editor.id,
+      reason: "shutting-down",
+      message: "Backend not ready",
+    });
+    filesystem.inspect = () => Effect.fail(metadata);
+    processes.launch = () => Effect.fail(launch);
     const service = await acquire();
-    await expect(effects.run(service.openFile(location))).rejects.toMatchObject(
-      {
-        _tag: "FileOpenFailure",
-        message: "Cannot read file",
-      },
+    await expect(effects.run(service.openFile(location))).rejects.toBe(
+      metadata,
     );
     await expect(
       effects.run(service.openFileWith(location, editor.id)),
-    ).rejects.toMatchObject({
-      _tag: "FileOpenFailure",
-      message: "Backend not ready",
-    });
+    ).rejects.toBe(launch);
   });
 
   it.each(["openFile", "openFileWith"] as const)(

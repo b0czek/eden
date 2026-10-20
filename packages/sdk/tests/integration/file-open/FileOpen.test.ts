@@ -68,6 +68,39 @@ describe("file opening integration", () => {
     }
   });
 
+  it("retains native metadata context through the operation and encodes its public failure", async () => {
+    eden = await createTestEden();
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "missing-file",
+        name: "Missing File",
+        password: "password",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.sessions.login(user.username, "password"),
+    );
+    const location = { volume: "home", path: "/missing.txt" };
+    const handle = await eden.execute<OperationHandle>("file/open", {
+      location,
+    });
+    const operations = eden.runtime.services.operations;
+    const caller = {
+      sessionId: eden.runtime.services.sessionContext.getSessionId(),
+    };
+    await expect(
+      eden.runtime.effects.run(operations.wait(handle, caller)),
+    ).rejects.toMatchObject({
+      _tag: "FileMetadataFailed",
+      location,
+      cause: { code: "ENOENT" },
+    });
+    expect(operations.get(handle, caller)).toMatchObject({
+      status: "failed",
+      response: { success: false, error: expect.stringContaining("ENOENT") },
+    });
+  });
+
   it("persists associations through commands and reports compatibility data", async () => {
     eden = await createTestEden();
     const filesApp = testApp("com.eden.files", {

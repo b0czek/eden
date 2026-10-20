@@ -3,9 +3,22 @@ import type {
   FileOpenedEvent,
   FilesystemLocation,
 } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import { AppAssociations } from "../app-associations/service";
 import type { TargetedNotification } from "../controllers/events";
+import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
+import { I18n } from "../i18n/service";
+import { PackageCatalog } from "../packages/catalog";
+import { Views } from "../views/service";
+import {
+  FileHandlerUnavailable,
+  type FileInspectionError,
+  type FileOpenError,
+  FileTypeUnknown,
+} from "./errors";
 import {
   DIRECTORY_ASSOCIATION_KEY,
   DIRECTORY_PREFERENCE_KEY,
@@ -17,37 +30,49 @@ import {
   getMimePreferenceKey,
   getPublicPreferenceKey,
 } from "./handlers";
-import type {
-  FileOpenAssociations,
-  FileOpenCatalog,
-  FileOpenFilesystem,
-  FileOpenI18n,
-  FileOpenProcesses,
-  FileOpenViews,
-} from "./ports";
+import { FileOpenFilesystem, FileOpenProcesses } from "./ports";
 
-/** Expected failures remain in the error channel; thrown defects are not converted. */
-const fileOpenFailure = (message: string) =>
-  Object.assign(new Error(message), { _tag: "FileOpenFailure" as const });
-
-interface FileOpenDependencies {
-  associations: FileOpenAssociations;
-  catalog: FileOpenCatalog;
-  processes: FileOpenProcesses;
-  views: FileOpenViews;
-  filesystem: FileOpenFilesystem;
-  i18n: FileOpenI18n;
+export interface FileOpen {
+  opened: Event<TargetedNotification<FileOpenedEvent>>;
+  getHandlerForPath: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<string | undefined, FileInspectionError>;
+  setDefaultHandler: (
+    location: FilesystemLocation,
+    appId: string,
+  ) => Effect.Effect<void, Error>;
+  removeDefaultHandler: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<void, Error>;
+  getSupportedHandlers: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<FileHandlerInfo[], Error>;
+  getAllAssociations: () => Record<
+    string,
+    { default: string | undefined; userOverride: string | undefined }
+  >;
+  openFile: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<{ appId: string }, FileOpenError>;
+  openFileWith: (
+    location: FilesystemLocation,
+    appId: string,
+  ) => Effect.Effect<{ appId: string }, FileOpenError>;
 }
 
-export function createFileOpen({
-  associations,
-  catalog,
-  processes,
-  views,
-  filesystem,
-  i18n,
-}: FileOpenDependencies) {
-  return Effect.gen(function* () {
+export const FileOpen = Context.Service<"eden/FileOpen", FileOpen>(
+  "eden/FileOpen",
+);
+
+export const FileOpenLive = Layer.effect(
+  FileOpen,
+  Effect.gen(function* () {
+    const associations = yield* AppAssociations;
+    const catalog = yield* PackageCatalog;
+    const processes = yield* FileOpenProcesses;
+    const views = yield* Views;
+    const filesystem = yield* FileOpenFilesystem;
+    const i18n = yield* I18n;
     const opened = yield* scopedEvent<TargetedNotification<FileOpenedEvent>>();
 
     function getFileContext(location: FilesystemLocation) {
@@ -97,7 +122,10 @@ export function createFileOpen({
         const preferenceKey = context.preferenceKeys[0];
         if (!preferenceKey)
           return yield* Effect.fail(
-            new Error(`Unable to determine file type for ${location}`),
+            new FileTypeUnknown({
+              location: { ...location },
+              message: `Unable to determine file type for ${location.path}`,
+            }),
           );
         for (const key of context.preferenceKeys)
           yield* associations.remove(key);
@@ -207,14 +235,14 @@ export function createFileOpen({
     }
 
     const openFile = Effect.fn(function* (location: FilesystemLocation) {
-      const context = yield* getFileContext(location).pipe(
-        Effect.mapError((error) => fileOpenFailure(error.message)),
-      );
+      const context = yield* getFileContext(location);
       const appId = resolveHandler(context);
       if (!appId)
         return yield* Effect.fail(
-          fileOpenFailure(
-            `No handler found for ${
+          new FileHandlerUnavailable({
+            location: { ...location },
+            reason: "no-handler",
+            message: `No handler found for ${
               context.isDirectory
                 ? "directories"
                 : context.mimeType
@@ -223,15 +251,18 @@ export function createFileOpen({
                     ? `extension .${context.extension}`
                     : "this file"
             }`,
-          ),
+          }),
         );
       if (!catalog.getApp(appId))
         return yield* Effect.fail(
-          fileOpenFailure(`Handler app ${appId} is not installed`),
+          new FileHandlerUnavailable({
+            location: { ...location },
+            appId,
+            reason: "not-installed",
+            message: `Handler app ${appId} is not installed`,
+          }),
         );
-      yield* launchOrNotify(location, appId, context.isDirectory).pipe(
-        Effect.mapError((error) => fileOpenFailure(error.message)),
-      );
+      yield* launchOrNotify(location, appId, context.isDirectory);
       return { appId };
     });
 
@@ -239,16 +270,17 @@ export function createFileOpen({
       location: FilesystemLocation,
       appId: string,
     ) {
-      const isDirectory = yield* filesystem
-        .isDirectory(location)
-        .pipe(Effect.mapError((error) => fileOpenFailure(error.message)));
+      const isDirectory = yield* filesystem.isDirectory(location);
       if (!catalog.getApp(appId))
         return yield* Effect.fail(
-          fileOpenFailure(`App ${appId} is not installed`),
+          new FileHandlerUnavailable({
+            location: { ...location },
+            appId,
+            reason: "not-installed",
+            message: `App ${appId} is not installed`,
+          }),
         );
-      yield* launchOrNotify(location, appId, isDirectory).pipe(
-        Effect.mapError((error) => fileOpenFailure(error.message)),
-      );
+      yield* launchOrNotify(location, appId, isDirectory);
       return { appId };
     });
 
@@ -262,7 +294,5 @@ export function createFileOpen({
       openFile,
       openFileWith,
     };
-  });
-}
-
-export type FileOpen = Effect.Success<ReturnType<typeof createFileOpen>>;
+  }),
+);

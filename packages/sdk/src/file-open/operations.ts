@@ -1,11 +1,11 @@
 import type { FilesystemLocation } from "@edenapp/types";
-import type { FileOpenOperationBoundary } from "./ports";
+import type { Filesystem } from "../filesystem/service";
 import type { FileOpen } from "./service";
 
 /** Prepare volume admission synchronously; the operation runtime owns execution. */
 export function createFileOpenOperations(
   fileOpen: FileOpen,
-  boundary: FileOpenOperationBoundary,
+  boundary: Pick<Filesystem, "prepareVolumeOperation">,
 ) {
   return {
     prepareOpen(location: FilesystemLocation, appId?: string) {

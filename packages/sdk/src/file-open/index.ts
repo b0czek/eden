@@ -5,4 +5,4 @@ export {
   type FileOpenOperations,
 } from "./operations";
 export { createFileOpenProcesses } from "./processes";
-export { createFileOpen, type FileOpen } from "./service";
+export { FileOpen, FileOpenLive } from "./service";

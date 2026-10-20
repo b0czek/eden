@@ -3,9 +3,10 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { WASMagic } from "wasmagic";
-import { fromPromise } from "../effects/io";
+import { asError, fromPromise } from "../effects/io";
 import type { Filesystem } from "../filesystem";
 import { log } from "../logging";
+import { FileMetadataFailed } from "./errors";
 import { normalizeMimeType } from "./handlers";
 import type { FileOpenFilesystem } from "./ports";
 
@@ -46,7 +47,15 @@ export const createFileOpenFilesystem = Effect.fn(function* (
     inspect: (location) =>
       filesystem.withVolume(location, (fullPath) =>
         Effect.gen(function* () {
-          const stats = yield* fromPromise(() => fs.stat(fullPath));
+          const stats = yield* fromPromise(
+            () => fs.stat(fullPath),
+            (cause) =>
+              new FileMetadataFailed({
+                location: { ...location },
+                cause,
+                message: asError(cause).message,
+              }),
+          );
           const isDirectory = stats.isDirectory();
           return {
             isDirectory,
@@ -56,9 +65,15 @@ export const createFileOpenFilesystem = Effect.fn(function* (
       ),
     isDirectory: (location) =>
       filesystem.withVolume(location, (fullPath) =>
-        fromPromise(() => fs.stat(fullPath)).pipe(
-          Effect.map((stat) => stat.isDirectory()),
-        ),
+        fromPromise(
+          () => fs.stat(fullPath),
+          (cause) =>
+            new FileMetadataFailed({
+              location: { ...location },
+              cause,
+              message: asError(cause).message,
+            }),
+        ).pipe(Effect.map((stat) => stat.isDirectory())),
       ),
   } satisfies FileOpenFilesystem;
 });
