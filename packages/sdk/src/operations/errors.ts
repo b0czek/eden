@@ -55,3 +55,7 @@ export type OperationAdmissionFailure =
   | OperationAdmissionClosed
   | OperationCapacityExhausted
   | SessionTransitionInProgress;
+
+export type HostOperationFailure =
+  | OperationAdmissionFailure
+  | OperationCancelled;

@@ -26,10 +26,12 @@ import {
 import { Filesystem } from "../filesystem/service";
 import { SessionContext } from "../session/context";
 import {
+  type HostOperationFailure,
   InvalidOperationRequestKey,
   OperationAdmissionClosed,
   type OperationAdmissionFailure,
   OperationCancelled,
+  OperationCapacityExhausted,
   OperationNotCancellable,
   OperationNotFound,
   OperationRequestConflict,
@@ -48,14 +50,11 @@ export interface Operations {
     prepare: () => OperationTask<unknown>,
     submission?: OperationSubmission,
   ) => OperationHandle;
-  runHost: <R, E>(
+  runHost: <R, E, P>(
     command: string,
     args: unknown,
-    prepare: () => OperationTask<R, E>,
-  ) => Effect.Effect<
-    R,
-    E | OperationAdmissionFailure | OperationCancelled | Error
-  >;
+    prepare: Effect.Effect<OperationTask<R, E>, P>,
+  ) => Effect.Effect<R, E | P | HostOperationFailure>;
   /** Throws OperationNotFound when the handle is absent or inaccessible. */
   get: (
     handle: OperationHandle,
@@ -276,35 +275,40 @@ export const OperationsLive = Layer.effect(
         }
       }
     }
-    function runHost<R, E>(
+    function runHost<R, E, P>(
       command: string,
       args: unknown,
-      prepare: () => OperationTask<R, E>,
-    ): Effect.Effect<R, E | Error> {
-      return Effect.gen(function* () {
-        const context: CommandCallerContext = {
-          principal: { kind: "system" },
-          sessionId: session.getSessionId(),
-        };
-        const handle = yield* Effect.try({
-          try: () => submit(command, args, context, prepare),
-          catch: (error) => {
-            // Tagged synchronous admission rejections cross the preparation
-            // boundary unchanged. Plain throws are programming defects.
-            if (
-              error instanceof Error &&
-              "_tag" in error &&
-              typeof error._tag === "string"
-            )
-              return error;
-            throw error;
-          },
-        });
-        // This handle was just submitted from this exact task, so its retained
-        // result/failure types are known despite the heterogeneous ledger.
-        // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- This newly admitted host handle belongs to the typed task above; the shared ledger erases heterogeneous results.
-        return yield* wait(handle, context) as Effect.Effect<R, E | Error>;
-      });
+      prepare: Effect.Effect<OperationTask<R, E>, P>,
+    ): Effect.Effect<R, E | P | HostOperationFailure> {
+      return Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          const context: CommandCallerContext = {
+            principal: { kind: "system" },
+            sessionId: session.getSessionId(),
+          };
+          const task = yield* restore(prepare);
+          const handle = yield* Effect.try({
+            try: () => submit(command, args, context, () => task),
+            catch: (error) => {
+              if (
+                error instanceof InvalidOperationRequestKey ||
+                error instanceof OperationRequestConflict ||
+                error instanceof OperationAdmissionClosed ||
+                error instanceof OperationCapacityExhausted ||
+                error instanceof SessionTransitionInProgress
+              )
+                return error;
+              throw error;
+            },
+          }).pipe(Effect.onError(() => Effect.sync(() => task.release?.())));
+          // This handle was just submitted from this exact task, so its retained
+          // result/failure types are known despite the heterogeneous ledger.
+          return yield* restore(
+            // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- This newly admitted host handle belongs to the typed task above; the shared ledger erases heterogeneous results.
+            wait(handle, context) as Effect.Effect<R, E | OperationCancelled>,
+          );
+        }),
+      );
     }
     const execute = Effect.fn(function* (
       record: RecordEntry,

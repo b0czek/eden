@@ -275,6 +275,13 @@ Effect. `operation` submits through the existing operation ledger when executed
 and awaits completion. Host runners interpret the completed SDK program. SDK event
 callbacks also enter host context and receive detached payloads.
 
+Host operation preparation is a lazy Effect with its own typed rejection channel.
+After preparation succeeds, admission and reservation cleanup are coordinated
+without interruption. Rejected admission releases the prepared task's reservation;
+accepted work retains its resources until its execution fiber settles.
+SDK boundaries adapt Valibot input errors while preserving service failure types.
+Unexpected exceptions constructing a workflow remain defects.
+
 `createControlPlaneApis` composes these domain controllers; it contains no input
 validation or domain workflow. The
 [main-process API](main-process-api.md) owns the public host trust contract.

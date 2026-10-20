@@ -21,17 +21,21 @@ export function createDaemonsSdkController({
     sdk.effect(() => {
       const input = v.parse(daemonAppIdSchema, appId);
       return Effect.asVoid(
-        sdk.operation(`daemon/${action}`, { appId: input }, () =>
-          operationTask((reporter) => {
-            reporter.update(phase);
-            const work: Effect.Effect<
-              void,
-              DaemonLaunchError | DaemonStopError
-            > = daemons[action](input);
-            return Effect.map(work, () => ({
-              success: true,
-            }));
-          }),
+        sdk.operation(
+          `daemon/${action}`,
+          { appId: input },
+          Effect.sync(() =>
+            operationTask((reporter) => {
+              reporter.update(phase);
+              const work: Effect.Effect<
+                void,
+                DaemonLaunchError | DaemonStopError
+              > = daemons[action](input);
+              return Effect.map(work, () => ({
+                success: true,
+              }));
+            }),
+          ),
         ),
       );
     });

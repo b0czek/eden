@@ -23,14 +23,18 @@ export function createSessionsSdkController({
       sdk.effect(() => {
         const args = v.parse(sessionLoginSchema, { username, password });
         return Effect.map(
-          sdk.operation("session/login", { username: args.username }, () =>
-            operationTask(
-              () =>
-                Effect.map(
-                  sessions.login(args.username, args.password),
-                  (user) => ({ success: true, user }),
-                ),
-              { transition: "session" },
+          sdk.operation(
+            "session/login",
+            { username: args.username },
+            Effect.sync(() =>
+              operationTask(
+                () =>
+                  Effect.map(
+                    sessions.login(args.username, args.password),
+                    (user) => ({ success: true, user }),
+                  ),
+                { transition: "session" },
+              ),
             ),
           ),
           (result) => structuredClone(result.user),
@@ -38,10 +42,14 @@ export function createSessionsSdkController({
       }),
     logout: () =>
       Effect.asVoid(
-        sdk.operation("session/logout", {}, () =>
-          operationTask(
-            () => Effect.map(sessions.logout(), () => ({ success: true })),
-            { transition: "session" },
+        sdk.operation(
+          "session/logout",
+          {},
+          Effect.sync(() =>
+            operationTask(
+              () => Effect.map(sessions.logout(), () => ({ success: true })),
+              { transition: "session" },
+            ),
           ),
         ),
       ),

@@ -11,6 +11,41 @@ afterEach(async () => {
 });
 
 describe("volume and settings SDK controllers", () => {
+  it("releases prepared volume removal when host operation admission is closed", async () => {
+    eden = await createTestEden();
+    const rootPath = path.join(eden.paths.root, "unaccepted-volume");
+    await fs.mkdir(rootPath);
+    let ejected = false;
+    await eden.runtime.effects.run(
+      eden.runtime.volumes.register(
+        {
+          id: "unaccepted",
+          label: "Unaccepted",
+          kind: "removable",
+          rootPath,
+        },
+        {
+          eject: () =>
+            Effect.sync(() => {
+              ejected = true;
+            }),
+        },
+      ),
+    );
+    eden.runtime.services.operations.closeAdmission();
+    const failure = await eden.runtime.effects.run(
+      Effect.flip(eden.runtime.volumes.eject("unaccepted")),
+    );
+    expect(failure).toMatchObject({ _tag: "OperationAdmissionClosed" });
+    expect(eden.runtime.volumes.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "unaccepted", state: "ready" }),
+      ]),
+    );
+    expect(eden.runtime.operations.list()).toEqual([]);
+    expect(ejected).toBe(false);
+  });
+
   it("rejects malformed volume inputs before changing mounted state or accepting an operation", async () => {
     eden = await createTestEden();
     const rootPath = path.join(eden.paths.root, "host-volume");

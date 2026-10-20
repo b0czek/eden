@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenVolumesApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
+import { VolumeEjectRejected, VolumeUnavailable } from "./errors";
 import {
   volumeEjectArgsSchema,
   volumeIdSchema,
@@ -20,10 +21,7 @@ export function createVolumesSdkController({
   return {
     register: (input, options) =>
       sdk.effect(() => {
-        const registration = v.parse(
-          volumeRegistrationSchema,
-          structuredClone(input),
-        );
+        const registration = v.parse(volumeRegistrationSchema, input);
         const parsedOptions = v.parse(volumeOptionsSchema, options);
         const preparedOptions = {
           ...parsedOptions,
@@ -37,8 +35,20 @@ export function createVolumesSdkController({
     eject: (id) =>
       sdk.effect(() => {
         const args = v.parse(volumeEjectArgsSchema, { volume: id });
-        return sdk.operation("volume/eject", args, () =>
-          volumes.prepareEject(args.volume),
+        return sdk.operation(
+          "volume/eject",
+          args,
+          Effect.try({
+            try: () => volumes.prepareEject(args.volume),
+            catch: (cause) => {
+              if (
+                cause instanceof VolumeUnavailable ||
+                cause instanceof VolumeEjectRejected
+              )
+                return cause;
+              throw cause;
+            },
+          }),
         );
       }),
     unregister: (id) =>

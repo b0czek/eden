@@ -88,16 +88,12 @@ describe("operation retention and admission capacity", () => {
       ),
     );
 
-  it("preserves tagged host preparation rejections without accepting work", async () => {
+  it("preserves typed host preparation rejections without accepting work", async () => {
     const rejection = new OperationAdmissionClosed({
       sessionId: "closing-session",
     });
     const exit = await effects.run(
-      Effect.exit(
-        operations.runHost("host/work", {}, () => {
-          throw rejection;
-        }),
-      ),
+      Effect.exit(operations.runHost("host/work", {}, Effect.fail(rejection))),
     );
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
@@ -112,9 +108,13 @@ describe("operation retention and admission capacity", () => {
     const defect = new Error("Invalid preparation state");
     const exit = await effects.run(
       Effect.exit(
-        operations.runHost("host/work", {}, () => {
-          throw defect;
-        }),
+        operations.runHost(
+          "host/work",
+          {},
+          Effect.sync(() => {
+            throw defect;
+          }),
+        ),
       ),
     );
     expect(Exit.isFailure(exit)).toBe(true);

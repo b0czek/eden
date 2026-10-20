@@ -14,6 +14,43 @@ import type {
   WallpaperPreset,
 } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
+import type { GenericSchema, ValiError } from "valibot";
+import type { AppAssociationStorageWriteError } from "../app-associations/errors";
+import type {
+  DaemonDefinitionReadError,
+  DaemonLaunchError,
+  DaemonStopError,
+  DaemonUpdateError,
+} from "../daemon/errors";
+import type {
+  VolumeEjectError,
+  VolumeRegistrationError,
+} from "../filesystem/errors";
+import type { HostOperationFailure } from "../operations/errors";
+import type {
+  PackageArchiveInstallError,
+  PackageDevelopmentFailure,
+  PackageRejected,
+  PackageRemovalError,
+} from "../packages/errors";
+import type { LoginFailure, SessionTransitionFailure } from "../session/errors";
+import type { SettingValueError } from "../settings/errors";
+import type { StorageWriteFailure } from "../storage/errors";
+import type {
+  CreateUserFailure,
+  DeleteUserFailure,
+  SetDefaultUserFailure,
+  SetPasswordFailure,
+  UpdateUserFailure,
+  UserRecordReadFailure,
+} from "../user/errors";
+
+export type EdenInputError = ValiError<GenericSchema>;
+export type EdenDaemonOperationFailure =
+  | EdenInputError
+  | HostOperationFailure
+  | DaemonLaunchError
+  | DaemonStopError;
 
 export type {
   PackageInfo as EdenPackageInfo,
@@ -50,27 +87,52 @@ export type EdenPackageChange =
 export interface EdenPackagesApi {
   list(options?: EdenPackageListOptions): InstalledPackageManifest[];
   get(packageId: string): InstalledPackageInfo | undefined;
-  getIcon(packageId: string): Effect.Effect<string | undefined, Error>;
-  getSize(packageId: string): Effect.Effect<number | undefined, Error>;
-  inspect(sourcePath: string): Effect.Effect<EdenPackageInfo, Error>;
+  getIcon(packageId: string): Effect.Effect<string | undefined, EdenInputError>;
+  getSize(packageId: string): Effect.Effect<number | undefined, EdenInputError>;
+  inspect(sourcePath: string): Effect.Effect<EdenPackageInfo, EdenInputError>;
   install(
     sourcePath: string,
     options?: { replace?: boolean },
-  ): Effect.Effect<InstalledPackageManifest, Error>;
-  uninstall(packageId: string): Effect.Effect<boolean, Error>;
-  reload(packageId: string): Effect.Effect<void, Error>;
-  isHotReloadEnabled(packageId: string): Effect.Effect<boolean, Error>;
-  toggleHotReload(packageId: string): Effect.Effect<boolean, Error>;
+  ): Effect.Effect<
+    InstalledPackageManifest,
+    EdenInputError | HostOperationFailure | PackageArchiveInstallError
+  >;
+  uninstall(
+    packageId: string,
+  ): Effect.Effect<
+    boolean,
+    EdenInputError | HostOperationFailure | PackageRemovalError
+  >;
+  reload(
+    packageId: string,
+  ): Effect.Effect<void, EdenInputError | PackageDevelopmentFailure>;
+  isHotReloadEnabled(
+    packageId: string,
+  ): Effect.Effect<boolean, EdenInputError | PackageRejected>;
+  toggleHotReload(
+    packageId: string,
+  ): Effect.Effect<boolean, EdenInputError | PackageDevelopmentFailure>;
   onChanged(listener: (change: EdenPackageChange) => void): EdenUnsubscribe;
 }
 
 export interface EdenDaemonsApi {
-  list(): Effect.Effect<DaemonStatus[], Error>;
-  updateDefinition(definition: DaemonDefinition): Effect.Effect<void, Error>;
-  setEnabled(appId: string, enabled: boolean): Effect.Effect<void, Error>;
-  start(appId: string): Effect.Effect<void, Error>;
-  stop(appId: string): Effect.Effect<void, Error>;
-  restart(appId: string): Effect.Effect<void, Error>;
+  list(): Effect.Effect<
+    DaemonStatus[],
+    EdenInputError | DaemonDefinitionReadError
+  >;
+  updateDefinition(
+    definition: DaemonDefinition,
+  ): Effect.Effect<void, EdenInputError | DaemonUpdateError>;
+  setEnabled(
+    appId: string,
+    enabled: boolean,
+  ): Effect.Effect<
+    void,
+    EdenInputError | DaemonUpdateError | DaemonDefinitionReadError
+  >;
+  start(appId: string): Effect.Effect<void, EdenDaemonOperationFailure>;
+  stop(appId: string): Effect.Effect<void, EdenDaemonOperationFailure>;
+  restart(appId: string): Effect.Effect<void, EdenDaemonOperationFailure>;
   onChanged(listener: (status: DaemonStatus) => void): EdenUnsubscribe;
 }
 
@@ -92,20 +154,42 @@ export interface EdenUpdateUserInput {
 }
 
 export interface EdenUsersApi {
-  list(): Effect.Effect<UserProfile[], Error>;
-  get(username: string): Effect.Effect<UserProfile | null, Error>;
-  create(input: EdenCreateUserInput): Effect.Effect<UserProfile, Error>;
-  update(input: EdenUpdateUserInput): Effect.Effect<UserProfile, Error>;
-  delete(username: string): Effect.Effect<void, Error>;
-  setPassword(username: string, password: string): Effect.Effect<void, Error>;
+  list(): Effect.Effect<UserProfile[], EdenInputError | UserRecordReadFailure>;
+  get(
+    username: string,
+  ): Effect.Effect<UserProfile | null, EdenInputError | UserRecordReadFailure>;
+  create(
+    input: EdenCreateUserInput,
+  ): Effect.Effect<UserProfile, EdenInputError | CreateUserFailure>;
+  update(
+    input: EdenUpdateUserInput,
+  ): Effect.Effect<UserProfile, EdenInputError | UpdateUserFailure>;
+  delete(
+    username: string,
+  ): Effect.Effect<void, EdenInputError | DeleteUserFailure>;
+  setPassword(
+    username: string,
+    password: string,
+  ): Effect.Effect<void, EdenInputError | SetPasswordFailure>;
   getDefaultUsername(): string | null;
-  setDefaultUsername(username: string | null): Effect.Effect<void, Error>;
+  setDefaultUsername(
+    username: string | null,
+  ): Effect.Effect<void, EdenInputError | SetDefaultUserFailure>;
 }
 
 export interface EdenSessionsApi {
   current(): UserProfile | null;
-  login(username: string, password: string): Effect.Effect<UserProfile, Error>;
-  logout(): Effect.Effect<void, Error>;
+  login(
+    username: string,
+    password: string,
+  ): Effect.Effect<
+    UserProfile,
+    EdenInputError | HostOperationFailure | LoginFailure
+  >;
+  logout(): Effect.Effect<
+    void,
+    EdenInputError | HostOperationFailure | SessionTransitionFailure
+  >;
   onChanged(listener: (change: EdenSessionChange) => void): EdenUnsubscribe;
 }
 
@@ -115,9 +199,14 @@ export interface EdenWallpaperPresets {
 }
 
 export interface EdenAppearanceApi {
-  getWallpaper(): Effect.Effect<WallpaperPreset, Error>;
+  getWallpaper(): Effect.Effect<WallpaperPreset, EdenInputError>;
   getPresets(): EdenWallpaperPresets;
-  setWallpaper(config: WallpaperConfig): Effect.Effect<void, Error>;
+  setWallpaper(
+    config: WallpaperConfig,
+  ): Effect.Effect<
+    void,
+    EdenInputError | StorageWriteFailure | SettingValueError
+  >;
   onChanged(listener: (wallpaper: WallpaperPreset) => void): EdenUnsubscribe;
 }
 
@@ -128,8 +217,13 @@ export interface EdenAssociationListOptions {
 export interface EdenAssociationsApi {
   get(key: string): AppAssociation | undefined;
   list(options?: EdenAssociationListOptions): Record<string, AppAssociation>;
-  set(key: string, association: AppAssociation): Effect.Effect<void, Error>;
-  remove(key: string): Effect.Effect<void, Error>;
+  set(
+    key: string,
+    association: AppAssociation,
+  ): Effect.Effect<void, EdenInputError | AppAssociationStorageWriteError>;
+  remove(
+    key: string,
+  ): Effect.Effect<void, EdenInputError | AppAssociationStorageWriteError>;
 }
 
 /** Host operations for a consumer-managed mounted directory. */
@@ -144,8 +238,13 @@ export interface EdenVolumesApi {
   register(
     input: FilesystemVolumeRegistration,
     options?: EdenVolumeOptions,
-  ): Effect.Effect<FilesystemVolume, Error>;
-  eject(id: string): Effect.Effect<void, Error>;
+  ): Effect.Effect<FilesystemVolume, EdenInputError | VolumeRegistrationError>;
+  eject(
+    id: string,
+  ): Effect.Effect<
+    void,
+    EdenInputError | HostOperationFailure | VolumeEjectError
+  >;
   unregister(id: string): boolean;
   list(): FilesystemVolume[];
   onChanged(listener: (volumes: FilesystemVolume[]) => void): EdenUnsubscribe;

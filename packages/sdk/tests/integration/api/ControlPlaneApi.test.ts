@@ -7,7 +7,9 @@ import type {
   UserProfile,
   WallpaperConfig,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { ExecutionContext } from "../../../src/execution/context";
 import { Permissions } from "../../../src/ipc/permissions";
 import { InstalledPackages } from "../../../src/packages/installed";
@@ -107,6 +109,59 @@ describe("control-plane API integration", () => {
     expect(observed.at(-1)).toBe("succeeded");
     expect(eden.platform.activeResourceCount).toBe(0);
     off();
+  });
+
+  it("preserves domain failure tags for typed host recovery", async () => {
+    eden = await createTestEden();
+    const input = {
+      username: "operator",
+      name: "Operator",
+      password: "password",
+    };
+    await eden.runtime.effects.run(eden.runtime.users.create(input));
+    const recovered = await eden.runtime.effects.run(
+      eden.runtime.users
+        .create(input)
+        .pipe(
+          Effect.catchTag("UserAlreadyExistsError", (failure) =>
+            Effect.succeed({ existing: failure.username }),
+          ),
+        ),
+    );
+    expect(recovered).toEqual({ existing: "operator" });
+    expect(
+      await eden.runtime.effects.run(eden.runtime.users.list()),
+    ).toHaveLength(1);
+  });
+
+  it("keeps unexpected SDK workflow construction exceptions as defects", async () => {
+    eden = await createTestEden();
+    const defect = new Error("Broken volume registration implementation");
+    const registration = jest
+      .spyOn(eden.runtime.services.volumes, "register")
+      .mockImplementation(() => {
+        throw defect;
+      });
+    try {
+      const exit = await eden.runtime.effects.run(
+        Effect.exit(
+          eden.runtime.volumes.register({
+            id: "external",
+            label: "External",
+            kind: "removable",
+            rootPath: eden.paths.root,
+          }),
+        ),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        expect(Cause.hasDies(exit.cause)).toBe(true);
+        expect(Cause.hasFails(exit.cause)).toBe(false);
+        expect(Cause.squash(exit.cause)).toBe(defect);
+      }
+    } finally {
+      registration.mockRestore();
+    }
   });
 
   it("lists trusted package inventory without a user session", async () => {

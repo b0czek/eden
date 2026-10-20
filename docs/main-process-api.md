@@ -94,6 +94,9 @@ any app caller active in the surrounding main-process code. Inputs are validated
 at the SDK controller boundary before mutation or operation admission. Malformed
 arguments fail asynchronous Effects during execution or throw from synchronous methods;
 runtime failures retain the method's existing error and operation behavior.
+Async methods expose their domain failures in the Effect error channel, so host
+programs can recover using `Effect.catchTag`. Invalid inputs fail with Valibot
+errors; unexpected programming exceptions remain defects.
 See [Controllers and domain events](controllers.md#sdk-controllers) for boundary
 ownership and schema sharing.
 

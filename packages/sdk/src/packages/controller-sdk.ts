@@ -65,7 +65,7 @@ export function createPackagesSdkController({
           sdk.operation(
             "package/install",
             { sourcePath: input, replace: replace === true },
-            () =>
+            Effect.sync(() =>
               operationTask((reporter) =>
                 packages.installPackageFromHostPath(
                   input,
@@ -73,6 +73,7 @@ export function createPackagesSdkController({
                   reporter,
                 ),
               ),
+            ),
           ),
           clone,
         );
@@ -80,9 +81,13 @@ export function createPackagesSdkController({
     uninstall: (packageId) =>
       sdk.effect(() => {
         const input = v.parse(packageIdSchema, packageId);
-        return sdk.operation("package/uninstall", { packageId: input }, () =>
-          operationTask((reporter) =>
-            packages.uninstallPackage(input, reporter),
+        return sdk.operation(
+          "package/uninstall",
+          { packageId: input },
+          Effect.sync(() =>
+            operationTask((reporter) =>
+              packages.uninstallPackage(input, reporter),
+            ),
           ),
         );
       }),
