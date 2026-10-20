@@ -1,18 +1,39 @@
-import type { UserProfile } from "@edenapp/types";
+import type {
+  AppInstance,
+  FilesystemChangeKind,
+  UserProfile,
+} from "@edenapp/types";
+import type { TargetedNotification } from "../controllers/events";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import { Filesystem } from "../filesystem/service";
+import { Processes } from "../processes/service";
+import { Users } from "../user/service";
+import { InvalidUserPasswordError } from "../user/errors";
+import { SessionProcessesStopFailed } from "../processes/errors";
+import { SessionTransitionInProgress } from "../operations/errors";
 import { gate } from "../../tests/support/async";
 import {
+  buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { fromPromise } from "../effects/io";
 import { createEvent, type Event } from "../events/event";
-import { createExecutionContext } from "../execution/context";
-import { createOperations, type Operations } from "../operations/service";
-import { createSessionContext, type SessionContext } from "./context";
-import { createSessions, type Sessions } from "./service";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { Operations, OperationsLive } from "../operations/service";
+import { RuntimeConfig } from "../runtime/inputs";
+import { SessionContext, SessionContextLive } from "./context";
+import { Sessions, SessionsLive } from "./service";
+
+function unexpectedDependencyUse(): never {
+  throw new Error("Unexpected dependency use in session fixture");
+}
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const createUser = (username: string): UserProfile => ({
   username,
@@ -39,7 +60,9 @@ describe("Sessions", () => {
   let effects: EffectRuntime;
 
   beforeEach(async () => {
-    context = createSessionContext();
+    context = serviceEffects.acquireSync(
+      buildService(SessionContext, SessionContextLive),
+    );
     users = {
       changed: createEvent<UserProfile>(),
       authenticate: jest.fn(),
@@ -51,19 +74,59 @@ describe("Sessions", () => {
     notify = jest.fn();
     effects = createEffectRuntime();
     operations = await effects.acquire(
-      createOperations({
-        execution: createExecutionContext({ config: {} }),
-        session: context,
-        filesystem: { releaseHandles: () => Effect.void },
-      }),
+      buildService(Operations, OperationsLive).pipe(
+        Effect.provideService(
+          ExecutionContext,
+          serviceEffects.acquireSync(
+            buildService(ExecutionContext, ExecutionContextLive).pipe(
+              Effect.provideService(RuntimeConfig, {}),
+            ),
+          ),
+        ),
+        Effect.provideService(SessionContext, context),
+        Effect.provide(
+          Layer.mock(Filesystem, {
+            releaseHandles: () => Effect.void,
+            getBaseDir: unexpectedDependencyUse,
+            changed:
+              createEvent<
+                TargetedNotification<{
+                  watchId: string;
+                  kind: FilesystemChangeKind;
+                }>
+              >(),
+            accessScope: unexpectedDependencyUse,
+            prepareVolumeOperation: unexpectedDependencyUse,
+            unwatch: unexpectedDependencyUse,
+          }),
+        ),
+      ),
     );
     sessions = await effects.acquire(
-      createSessions({
-        users,
-        processes,
-        context,
-        operations,
-      }),
+      buildService(Sessions, SessionsLive).pipe(
+        Effect.provide(
+          Layer.mock(Users, {
+            ...users,
+            getDefaultUsername: unexpectedDependencyUse,
+          }),
+        ),
+        Effect.provideService(SessionContext, context),
+        Effect.provideService(Operations, operations),
+        Effect.provide(
+          Layer.mock(Processes, {
+            ...processes,
+            launched: createEvent<{ instance: AppInstance }>(),
+            stopped: createEvent<{ appId: string }>(),
+            reloading: createEvent<{ appId: string }>(),
+            error: createEvent<{ appId: string; error: unknown }>(),
+            exited: createEvent<{ appId: string; code: number }>(),
+            assertCanLaunch: unexpectedDependencyUse,
+            getRunningApps: unexpectedDependencyUse,
+            getAppInstance: unexpectedDependencyUse,
+            getInstalledManifest: unexpectedDependencyUse,
+          }),
+        ),
+      ),
     );
     sessions.changed.on(notify);
   });
@@ -75,12 +138,21 @@ describe("Sessions", () => {
   it("does not stop apps or change identity when authentication fails", async () => {
     context.setCurrentUser(alice);
     users.authenticate.mockReturnValue(
-      Effect.fail(new Error("Invalid credentials")),
+      Effect.fail(
+        new InvalidUserPasswordError({
+          username: "bob",
+          purpose: "authenticate",
+        }),
+      ),
     );
 
-    await expect(effects.run(sessions.login("bob", "wrong"))).rejects.toThrow(
-      "Invalid credentials",
-    );
+    await expect(
+      effects.run(sessions.login("bob", "wrong")),
+    ).rejects.toMatchObject({
+      _tag: "InvalidUserPasswordError",
+      username: "bob",
+      purpose: "authenticate",
+    });
     expect(processes.stopSessionApps).not.toHaveBeenCalled();
     expect(sessions.getCurrentUser()?.username).toBe("alice");
     expect(notify).not.toHaveBeenCalled();
@@ -90,12 +162,22 @@ describe("Sessions", () => {
     context.setCurrentUser(alice);
     users.authenticate.mockReturnValue(Effect.succeed(bob));
     processes.stopSessionApps.mockReturnValue(
-      Effect.fail(new Error("shutdown failed")),
+      Effect.fail(
+        new SessionProcessesStopFailed({
+          sessionId: context.getSessionId(),
+          cause: new AggregateError([]),
+          message: "shutdown failed",
+        }),
+      ),
     );
 
     await expect(
       effects.run(sessions.login("bob", "password")),
-    ).rejects.toThrow("shutdown failed");
+    ).rejects.toMatchObject({
+      _tag: "SessionProcessesStopFailed",
+      sessionId: context.getSessionId(),
+      message: "shutdown failed",
+    });
     expect(sessions.getCurrentUser()?.username).toBe("alice");
     expect(notify).not.toHaveBeenCalled();
   });
@@ -107,8 +189,8 @@ describe("Sessions", () => {
     );
 
     const login = effects.run(sessions.login("alice", "password"));
-    await expect(effects.run(sessions.logout())).rejects.toThrow(
-      "A session transition is already in progress",
+    await expect(effects.run(sessions.logout())).rejects.toBeInstanceOf(
+      SessionTransitionInProgress,
     );
     authentication.release(alice);
     await login;

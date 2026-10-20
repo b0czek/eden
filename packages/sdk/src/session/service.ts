@@ -1,90 +1,113 @@
 import type { SessionChange, UserProfile } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
-import type { Operations } from "../operations/service";
-import type { Users } from "../user/service";
-import type { SessionContext } from "./context";
+import { SessionTransitionInProgress } from "../operations/errors";
+import { Operations } from "../operations/service";
+import { Processes } from "../processes/service";
+import { Users } from "../user/service";
+import type {
+  InitializeSessionFailure,
+  LoginFailure,
+  SessionTransitionFailure,
+} from "./errors";
+import { SessionContext } from "./context";
 
-export const createSessions = Effect.fn(function* ({
-  users,
-  context,
-  operations,
-  processes,
-}: {
-  users: Pick<Users, "getDefaultUser" | "authenticate" | "changed">;
-  context: SessionContext;
-  operations: Pick<Operations, "withSessionTransition">;
-  processes: { stopSessionApps(sessionId: string): Effect.Effect<void, Error> };
-}) {
-  const changed = yield* scopedEvent<SessionChange>();
-  let transitionInProgress = false;
-  const transitionTo = Effect.fn(function* (
-    user: UserProfile | null,
-    reason: SessionChange["reason"],
-  ) {
-    const previousUsername = context.getCurrentUser()?.username ?? null;
-    const nextUsername = user?.username ?? null;
-    if (previousUsername !== nextUsername) {
-      yield* processes.stopSessionApps(context.getSessionId());
-      context.beginSession(user);
-    } else context.setCurrentUser(user);
-    changed.emit({
-      currentUser: context.getCurrentUser(),
-      previousUsername,
-      reason,
+export interface Sessions {
+  initialize: () => Effect.Effect<void, InitializeSessionFailure>;
+  login: (
+    username: string,
+    password: string,
+  ) => Effect.Effect<UserProfile, LoginFailure>;
+  logout: () => Effect.Effect<void, SessionTransitionFailure>;
+  getCurrentUser: () => UserProfile | null;
+  changed: Event<SessionChange>;
+}
+
+export const Sessions = Context.Service<"eden/Sessions", Sessions>(
+  "eden/Sessions",
+);
+
+export const SessionsLive = Layer.effect(
+  Sessions,
+  Effect.gen(function* () {
+    const users = yield* Users;
+    const context = yield* SessionContext;
+    const operations = yield* Operations;
+    const processes = yield* Processes;
+    const changed = yield* scopedEvent<SessionChange>();
+    let transitionInProgress = false;
+    const transitionTo = Effect.fn(function* (
+      user: UserProfile | null,
+      reason: SessionChange["reason"],
+    ) {
+      const previousUsername = context.getCurrentUser()?.username ?? null;
+      const nextUsername = user?.username ?? null;
+      if (previousUsername !== nextUsername) {
+        yield* processes.stopSessionApps(context.getSessionId());
+        context.beginSession(user);
+      } else context.setCurrentUser(user);
+      changed.emit({
+        currentUser: context.getCurrentUser(),
+        previousUsername,
+        reason,
+      });
     });
-  });
-  function runTransition<A>(work: Effect.Effect<A, Error>) {
-    return Effect.suspend(() => {
-      if (transitionInProgress)
-        return Effect.fail(
-          new Error("A session transition is already in progress"),
+    function runTransition<A, E>(work: Effect.Effect<A, E>) {
+      return Effect.suspend(() => {
+        if (transitionInProgress)
+          return Effect.fail(
+            new SessionTransitionInProgress({
+              sessionId: context.getSessionId(),
+            }),
+          );
+        transitionInProgress = true;
+        return operations.withSessionTransition(work).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              transitionInProgress = false;
+            }),
+          ),
         );
-      transitionInProgress = true;
-      return operations.withSessionTransition(work).pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            transitionInProgress = false;
-          }),
-        ),
-      );
-    });
-  }
-  const initialization = yield* Effect.cachedWithTTL(
-    Effect.gen(function* () {
-      const defaultUser = yield* users.getDefaultUser();
-      if (defaultUser)
-        yield* runTransition(transitionTo(defaultUser, "system"));
-    }),
-    (exit) => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero),
-  );
-  const login = (username: string, password: string) =>
-    runTransition(
+      });
+    }
+    const initialization = yield* Effect.cachedWithTTL(
       Effect.gen(function* () {
-        const user = yield* users.authenticate(username, password);
-        yield* transitionTo(user, "login");
-        return user;
+        const defaultUser = yield* users.getDefaultUser();
+        if (defaultUser)
+          yield* runTransition(transitionTo(defaultUser, "system"));
       }),
+      (exit) => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero),
     );
-  const logout = () => runTransition(transitionTo(null, "logout"));
-  function synchronizeUser(user: UserProfile) {
-    if (context.getCurrentUser()?.username !== user.username) return;
-    context.setCurrentUser(user);
-    changed.emit({
-      currentUser: context.getCurrentUser(),
-      previousUsername: user.username,
-      reason: "system",
-    });
-  }
-  yield* listen(users.changed, synchronizeUser);
-  return {
-    initialize: () => initialization,
-    login,
-    logout,
-    getCurrentUser: context.getCurrentUser,
-    changed,
-  };
-});
-export type Sessions = Effect.Success<ReturnType<typeof createSessions>>;
+    const login = (username: string, password: string) =>
+      runTransition(
+        Effect.gen(function* () {
+          const user = yield* users.authenticate(username, password);
+          yield* transitionTo(user, "login");
+          return user;
+        }),
+      );
+    const logout = () => runTransition(transitionTo(null, "logout"));
+    function synchronizeUser(user: UserProfile) {
+      if (context.getCurrentUser()?.username !== user.username) return;
+      context.setCurrentUser(user);
+      changed.emit({
+        currentUser: context.getCurrentUser(),
+        previousUsername: user.username,
+        reason: "system",
+      });
+    }
+    yield* listen(users.changed, synchronizeUser);
+    return {
+      initialize: () => initialization,
+      login,
+      logout,
+      getCurrentUser: context.getCurrentUser,
+      changed,
+    };
+  }),
+);

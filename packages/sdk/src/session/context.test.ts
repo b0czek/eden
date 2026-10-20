@@ -1,5 +1,12 @@
 import type { UserProfile } from "@edenapp/types";
-import { createSessionContext } from "./context";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { SessionContext, SessionContextLive } from "./context";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const user: UserProfile = {
   username: "operator",
@@ -12,7 +19,9 @@ const user: UserProfile = {
 
 describe("SessionContext", () => {
   it("stores the active user defensively", () => {
-    const context = createSessionContext();
+    const context = serviceEffects.acquireSync(
+      buildService(SessionContext, SessionContextLive),
+    );
     context.setCurrentUser(user);
 
     const returned = context.getCurrentUser();
@@ -22,7 +31,9 @@ describe("SessionContext", () => {
   });
 
   it("creates a new session identity when a session begins", () => {
-    const context = createSessionContext();
+    const context = serviceEffects.acquireSync(
+      buildService(SessionContext, SessionContextLive),
+    );
     const previousSessionId = context.getSessionId();
 
     context.beginSession(user);
