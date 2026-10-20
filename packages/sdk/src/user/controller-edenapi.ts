@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import type { ExecutionContext } from "../execution/context";
+import { UserAuthorityError } from "./errors";
 import type { GrantCatalog } from "./grant-catalog";
 import {
   createUserSchema,
@@ -23,7 +24,8 @@ export function createUserController({
   grants: GrantCatalog;
 }) {
   function assertVendor() {
-    if (!execution.isVendor()) throw new Error("Vendor account required");
+    if (!execution.isVendor())
+      throw new UserAuthorityError({ requirement: "vendor" });
   }
   return defineController("user", {
     commands: {
@@ -86,7 +88,9 @@ export function createUserController({
           Effect.gen(function* () {
             const principal = execution.getPrincipal();
             if (principal?.kind !== "user")
-              return yield* Effect.fail(new Error("No active user session"));
+              return yield* Effect.fail(
+                new UserAuthorityError({ requirement: "active-session" }),
+              );
             yield* users.changePassword(
               principal.profile.username,
               currentPassword,

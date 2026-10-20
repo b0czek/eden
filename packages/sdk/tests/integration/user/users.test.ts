@@ -1,9 +1,16 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createUsers, type Users } from "../../../src/user/service";
-import { createUserStorage } from "../../../src/user/storage";
+import * as Effect from "effect/Effect";
+import { AppsDirectory, UserDirectory } from "../../../src/runtime/inputs";
 import {
+  Users,
+  UsersLive,
+  UsersRestrictedApps,
+} from "../../../src/user/service";
+import { UserStorage, UserStorageLive } from "../../../src/user/storage";
+import {
+  buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../support/effect-runtime";
@@ -20,9 +27,17 @@ describe("Users accounts", () => {
       path.join(os.tmpdir(), "eden-users-home-"),
     );
     effects = createEffectRuntime();
-    const store = await effects.acquire(createUserStorage({ appsDirectory }));
+    const store = await effects.acquire(
+      buildService(UserStorage, UserStorageLive).pipe(
+        Effect.provideService(AppsDirectory, appsDirectory),
+      ),
+    );
     users = await effects.acquire(
-      createUsers({ store, userDirectory, restrictedApps: new Set() }),
+      buildService(Users, UsersLive).pipe(
+        Effect.provideService(UserStorage, store),
+        Effect.provideService(UserDirectory, userDirectory),
+        Effect.provideService(UsersRestrictedApps, new Set()),
+      ),
     );
     await effects.run(users.initialize());
   });

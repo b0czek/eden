@@ -1,5 +1,16 @@
 import type { RuntimeAppManifest, UserGrantOption } from "@edenapp/types";
-import { createGrantCatalog } from "./grant-catalog";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { PackageCatalog } from "../packages/catalog";
+import { SettingsPanels } from "../settings/panels/service";
+import { GrantCatalog, GrantCatalogLive } from "./grant-catalog";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const app = {
   id: "com.example.app",
@@ -41,10 +52,19 @@ describe("GrantCatalog", () => {
         label: "Runtime panel",
       },
     ];
-    const catalog = createGrantCatalog({
-      packageCatalog: { allApps: () => [app] },
-      settingsPanels: { listGrantOptions: () => panelOptions },
-    });
+    const catalog = serviceEffects.acquireSync(
+      buildService(GrantCatalog, GrantCatalogLive).pipe(
+        Effect.provide(
+          Layer.mock(PackageCatalog, { ...catalogReads, allApps: () => [app] }),
+        ),
+        Effect.provide(
+          Layer.mock(SettingsPanels, {
+            ...panelReads,
+            listGrantOptions: () => panelOptions,
+          }),
+        ),
+      ),
+    );
 
     expect(catalog.getOptions().options).toEqual(
       expect.arrayContaining([
@@ -73,10 +93,19 @@ describe("GrantCatalog", () => {
 
   it("coalesces runtime catalog invalidations", async () => {
     const notify = jest.fn();
-    const catalog = createGrantCatalog({
-      packageCatalog: { allApps: () => [] },
-      settingsPanels: { listGrantOptions: () => [] },
-    });
+    const catalog = serviceEffects.acquireSync(
+      buildService(GrantCatalog, GrantCatalogLive).pipe(
+        Effect.provide(
+          Layer.mock(PackageCatalog, { ...catalogReads, allApps: () => [] }),
+        ),
+        Effect.provide(
+          Layer.mock(SettingsPanels, {
+            ...panelReads,
+            listGrantOptions: () => [],
+          }),
+        ),
+      ),
+    );
     catalog.changed.on(notify);
     catalog.invalidate();
     catalog.invalidate();
@@ -90,3 +119,42 @@ describe("GrantCatalog", () => {
     });
   });
 });
+
+function unused(): never {
+  throw new Error("Unexpected collaborator operation");
+}
+const unusedEvent = {
+  on: unused,
+  emit: unused,
+  dispose: unused,
+  hasListeners: unused,
+};
+const catalogReads = {
+  dlcDirectory: "/unused",
+  get: unused,
+  has: unused,
+  all: unused,
+  getApp: unused,
+  hasApp: unused,
+  prebuiltApps: unused,
+  installedApps: unused,
+  developmentApps: unused,
+  listApps: unused,
+  getLaunchableApp: unused,
+  getDlc: unused,
+  hasDlc: unused,
+  allDlcs: unused,
+  dlcsForHost: unused,
+  getPath: unused,
+};
+const panelReads = {
+  registerPanel: unused,
+  registerBuiltinPanel: unused,
+  synchronizeManifestPanels: unused,
+  registerGeneratedBuiltinCategory: unused,
+  dispose: unused,
+  changed: unusedEvent,
+  synchronizeManifestPanel: unused,
+  removeManifestPanel: unused,
+  invalidate: unused,
+};

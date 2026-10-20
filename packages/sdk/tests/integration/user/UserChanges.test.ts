@@ -4,15 +4,39 @@ import * as path from "node:path";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import { createSdkContext } from "../../../src/api/sdk-context";
-import { createExecutionContext } from "../../../src/execution/context";
-import { createOperations } from "../../../src/operations/service";
-import { createSessionContext } from "../../../src/session/context";
-import { createSessions } from "../../../src/session/service";
+import {
+  ExecutionContext,
+  ExecutionContextLive,
+} from "../../../src/execution/context";
+import { Filesystem } from "../../../src/filesystem/service";
+import { Operations, OperationsLive } from "../../../src/operations/service";
+import { Processes } from "../../../src/processes/service";
+import {
+  AppsDirectory,
+  RuntimeConfig,
+  UserDirectory,
+} from "../../../src/runtime/inputs";
+import {
+  SessionContext,
+  SessionContextLive,
+} from "../../../src/session/context";
+import { Sessions, SessionsLive } from "../../../src/session/service";
 import { createUsersSdkController } from "../../../src/user/controller-sdk";
-import { createUsers } from "../../../src/user/service";
-import { createUserStorage } from "../../../src/user/storage";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  Users,
+  UsersLive,
+  UsersRestrictedApps,
+} from "../../../src/user/service";
+import { UserStorage, UserStorageLive } from "../../../src/user/storage";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 it("refreshes active grants after a committed user update even when its caller is interrupted", async () => {
   const directory = await fs.mkdtemp(
@@ -23,7 +47,9 @@ it("refreshes active grants after a committed user update even when its caller i
   const settled = Deferred.makeUnsafe<void>();
   try {
     const store = await effects.acquire(
-      createUserStorage({ appsDirectory: directory }),
+      buildService(UserStorage, UserStorageLive).pipe(
+        Effect.provideService(AppsDirectory, directory),
+      ),
     );
     const profile = {
       username: "operator",
@@ -37,10 +63,8 @@ it("refreshes active grants after a committed user update even when its caller i
       store.saveUserRecord({ ...profile, passwordHash: "", passwordSalt: "" }),
     );
     const users = await effects.acquire(
-      createUsers({
-        userDirectory: directory,
-        restrictedApps: new Set(),
-        store: {
+      buildService(Users, UsersLive).pipe(
+        Effect.provideService(UserStorage, {
           ...store,
           saveUserRecord: (user) =>
             Effect.gen(function* () {
@@ -48,26 +72,56 @@ it("refreshes active grants after a committed user update even when its caller i
               yield* Deferred.succeed(committed, undefined);
               yield* Deferred.await(settled);
             }).pipe(Effect.uninterruptible),
-        },
-      }),
+        }),
+        Effect.provideService(UserDirectory, directory),
+        Effect.provideService(UsersRestrictedApps, new Set()),
+      ),
     );
-    const context = createSessionContext();
+    const context = serviceEffects.acquireSync(
+      buildService(SessionContext, SessionContextLive),
+    );
     context.beginSession(profile);
-    const execution = createExecutionContext({ config: {} });
+    const execution = serviceEffects.acquireSync(
+      buildService(ExecutionContext, ExecutionContextLive).pipe(
+        Effect.provideService(RuntimeConfig, {}),
+      ),
+    );
     const operations = await effects.acquire(
-      createOperations({
-        execution,
-        session: context,
-        filesystem: { releaseHandles: () => Effect.void },
-      }),
+      buildService(Operations, OperationsLive).pipe(
+        Effect.provideService(ExecutionContext, execution),
+        Effect.provideService(SessionContext, context),
+        Effect.provide(
+          Layer.mock(Filesystem, {
+            getBaseDir: unused,
+            changed: unusedEvent,
+            accessScope: unused,
+            prepareVolumeOperation: unused,
+            unwatch: unused,
+            releaseHandles: () => Effect.void,
+          }),
+        ),
+      ),
     );
     const sessions = await effects.acquire(
-      createSessions({
-        users,
-        context,
-        operations,
-        processes: { stopSessionApps: () => Effect.void },
-      }),
+      buildService(Sessions, SessionsLive).pipe(
+        Effect.provideService(Users, users),
+        Effect.provideService(SessionContext, context),
+        Effect.provideService(Operations, operations),
+        Effect.provide(
+          Layer.mock(Processes, {
+            launched: unusedEvent,
+            stopped: unusedEvent,
+            reloading: unusedEvent,
+            error: unusedEvent,
+            exited: unusedEvent,
+            assertCanLaunch: unused,
+            getRunningApps: unused,
+            getAppInstance: unused,
+            getInstalledManifest: unused,
+            stopSessionApps: () => Effect.void,
+          }),
+        ),
+      ),
     );
     const api = createUsersSdkController({
       users,
@@ -91,3 +145,13 @@ it("refreshes active grants after a committed user update even when its caller i
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+function unused(): never {
+  throw new Error("Unexpected collaborator operation");
+}
+const unusedEvent = {
+  on: unused,
+  emit: unused,
+  dispose: unused,
+  hasListeners: unused,
+};
