@@ -12,6 +12,7 @@ import { log } from "../logging";
 import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
 import { encodeLaunchContext } from "../utils/app-launch-context";
 import { createCachedFileReader } from "../utils/cached-file-reader";
+import { callViewNative } from "./errors";
 import type { FloatingWindows } from "./floating-windows";
 import { createView as createPlatformView } from "./lifecycle";
 import type { Tiling } from "./tiling";
@@ -277,6 +278,7 @@ export const createViewRendering = Effect.fn(function* (
         }),
       },
       _windows,
+      { appId, viewId },
     );
 
     try {
@@ -285,7 +287,9 @@ export const createViewRendering = Effect.fn(function* (
       );
 
       // Set bounds
-      view.setBounds(viewBounds);
+      callViewNative("set-bounds", { id: viewId, appId }, () =>
+        view.setBounds(viewBounds),
+      );
 
       // Strip embedding headers if enabled
       if (manifest.frontend?.allowEmbedding) {

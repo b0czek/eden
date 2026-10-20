@@ -1,4 +1,4 @@
-import type { AppManifest } from "@edenapp/types";
+import type { AppManifest, ViewBounds, WindowSize } from "@edenapp/types";
 import type { Bounds, PlatformView } from "../platform/ports";
 
 export type ViewMode = "floating" | "tiled";
@@ -60,4 +60,25 @@ export function compareOverlayViews(a: ViewInfo, b: ViewInfo): number {
   if (zIndexDifference !== 0) return zIndexDifference;
 
   return a.id - b.id;
+}
+
+/**
+ * View lifecycle notifications.
+ */
+export interface ViewsEvents {
+  "view-removed": { viewId: number; appId: string; webContentsId: number };
+  "bounds-updated": ViewBounds;
+  "interface-scale-changed": { scale: number };
+  "view-loaded": { viewId: number; appId: string; overlay: boolean };
+  "view-load-failed": {
+    viewId: number;
+    appId: string;
+    errorCode: number;
+    errorDescription: string;
+  };
+  "mode-changed": { mode: "floating" | "tiled"; bounds: ViewBounds };
+  "global-bounds-changed": {
+    workspaceBounds: ViewBounds;
+    windowSize: WindowSize;
+  };
 }

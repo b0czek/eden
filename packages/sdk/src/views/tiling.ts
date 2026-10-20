@@ -17,7 +17,7 @@ export function createTiling(
 ) {
   let _config: TilingConfig;
   let _workspaceBounds: Bounds;
-  let _expandedTiles = new Map<number, number>();
+  const _expandedTiles = new Map<number, number>();
   const _getInterfaceScale = getInterfaceScale;
 
   _config = config;
@@ -139,7 +139,9 @@ export function createTiling(
     return boundsByViewId;
   }
 
-  function getVisibleTiledViews(views: Map<number, ViewInfo>): ViewInfo[] {
+  function getVisibleTiledViews(
+    views: ReadonlyMap<number, ViewInfo>,
+  ): ViewInfo[] {
     return getSortedVisibleTiledViews(
       Array.from(views.values()).filter(
         (view) =>
@@ -148,7 +150,7 @@ export function createTiling(
     );
   }
 
-  function getBaseLayout(views: Map<number, ViewInfo>): {
+  function getBaseLayout(views: ReadonlyMap<number, ViewInfo>): {
     visibleViews: ViewInfo[];
     boundsByViewId: Map<number, Bounds>;
   } {
@@ -301,7 +303,7 @@ export function createTiling(
 
   function getTileLayoutState(
     viewId: number,
-    views: Map<number, ViewInfo>,
+    views: ReadonlyMap<number, ViewInfo>,
   ): TileLayoutState {
     const source = views.get(viewId);
     if (!source || !isEnabled() || source.mode !== "tiled" || !source.visible) {
@@ -352,7 +354,7 @@ export function createTiling(
   function swapTile(
     viewId: number,
     direction: TileLayoutDirection,
-    views: Map<number, ViewInfo>,
+    views: ReadonlyMap<number, ViewInfo>,
   ): boolean {
     const source = views.get(viewId);
     if (
@@ -381,7 +383,7 @@ export function createTiling(
   function expandTile(
     viewId: number,
     direction: TileLayoutDirection,
-    views: Map<number, ViewInfo>,
+    views: ReadonlyMap<number, ViewInfo>,
   ): boolean {
     const source = views.get(viewId);
     if (
@@ -514,7 +516,7 @@ export function createTiling(
   }
 
   function resolveTiledVisibilityChanges(
-    views: Map<number, ViewInfo>,
+    views: ReadonlyMap<number, ViewInfo>,
     options: {
       preferredViewId?: number;
       excludedViewId?: number;
@@ -666,7 +668,7 @@ export function createTiling(
       .length;
   }
 
-  function recalculateTiledViews(views: Map<number, ViewInfo>): void {
+  function recalculateTiledViews(views: ReadonlyMap<number, ViewInfo>): void {
     if (!isEnabled()) return;
 
     const { visibleViews, boundsByViewId } = getBaseLayout(views);

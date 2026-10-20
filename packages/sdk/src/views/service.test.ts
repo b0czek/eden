@@ -1,11 +1,23 @@
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { testApp } from "../../tests/support/apps";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { InMemoryPlatform } from "../../tests/support/InMemoryPlatform";
 import { createEvent } from "../events/event";
-import type { Bounds, PlatformWindow, WindowingPort } from "../platform/ports";
-import { createViews, type Views } from "./service";
+import type { Bounds, PlatformWindow } from "../platform/ports";
+import { WindowingPort } from "../platform/ports/types";
+import { DistPath, RuntimeConfig } from "../runtime/inputs";
+import {
+  TileActionUnavailable,
+  ViewModeUnsupported,
+  ViewNativeFailure,
+  ViewUnavailable,
+} from "./errors";
+import { ViewsSettings } from "./ports";
+import { Views, ViewsLive } from "./service";
 import type { ViewInfo, ViewMode } from "./types";
 
 const HIDDEN_BOUNDS: Bounds = { x: 0, y: 0, width: 0, height: 0 };
@@ -18,14 +30,14 @@ async function createViewsFixture(tiling: TilingConfig): Promise<Views> {
   const effects = createEffectRuntime();
   cleanups.unshift(() => effects.dispose());
   const views = await effects.acquire(
-    createViews({
-      config: { tiling } as EdenConfig,
-      distPath: "/tmp",
-      settings: {
+    buildService(Views, ViewsLive).pipe(
+      Effect.provideService(RuntimeConfig, { tiling } as EdenConfig),
+      Effect.provideService(DistPath, "/tmp"),
+      Effect.provideService(ViewsSettings, {
         get: () => Effect.succeed(undefined),
-        changed: createEvent(),
-      },
-      windows: {
+        changed: createEvent<{ appId: string; key: string; value: string }>(),
+      }),
+      Effect.provideService(WindowingPort, {
         createView: () => ({
           setBounds: jest.fn(),
           getBounds: () => HIDDEN_BOUNDS,
@@ -42,8 +54,8 @@ async function createViewsFixture(tiling: TilingConfig): Promise<Views> {
         createWindow: jest.fn(),
         attachWebContentsLogger: jest.fn(),
         getWebContentsById: jest.fn(),
-      } as unknown as WindowingPort,
-    }),
+      } as unknown as WindowingPort),
+    ),
   );
   views.setMainWindow({
     isDestroyed: () => false,
@@ -194,15 +206,17 @@ describe("web contents lookup lifecycle", () => {
     cleanups.unshift(() => effects.dispose());
     platform = new InMemoryPlatform("/tmp");
     views = await effects.acquire(
-      createViews({
-        config: { tiling: { mode: "none", gap: 0, padding: 0 } },
-        distPath: "/tmp",
-        settings: {
+      buildService(Views, ViewsLive).pipe(
+        Effect.provideService(RuntimeConfig, {
+          tiling: { mode: "none", gap: 0, padding: 0 },
+        }),
+        Effect.provideService(DistPath, "/tmp"),
+        Effect.provideService(ViewsSettings, {
           get: () => Effect.succeed(undefined),
-          changed: createEvent(),
-        },
-        windows: platform.windows,
-      }),
+          changed: createEvent<{ appId: string; key: string; value: string }>(),
+        }),
+        Effect.provideService(WindowingPort, platform.windows),
+      ),
     );
     views.setMainWindow(platform.windows.createWindow({}));
   });
@@ -224,6 +238,80 @@ describe("web contents lookup lifecycle", () => {
     );
     return { viewId, contents: views.getViewInfo(viewId)!.view.webContents };
   }
+
+  it("rejects missing or destroyed renderers synchronously without changing surviving views", () => {
+    const surviving = create("app.surviving");
+    expect(() => views.showView(-1)).toThrow(ViewUnavailable);
+    expect(() => views.showView(-1)).toThrow(
+      expect.objectContaining({ viewId: -1, reason: "missing" }),
+    );
+    const destroyed = create("app.destroyed");
+    destroyed.contents.close();
+    expect(() => views.setViewBounds(destroyed.viewId, HIDDEN_BOUNDS)).toThrow(
+      expect.objectContaining({
+        _tag: "ViewUnavailable",
+        viewId: destroyed.viewId,
+        reason: "destroyed",
+        appId: "app.destroyed",
+      }),
+    );
+    expect(views.getView(surviving.viewId)?.webContents.isDestroyed()).toBe(
+      false,
+    );
+  });
+
+  it("rejects unsupported modes and unavailable tile actions before changing presentation", () => {
+    const view = create("app.floating");
+    const before = { ...views.getViewInfo(view.viewId)!.bounds };
+    expect(() => views.setViewMode(view.viewId, "tiled")).toThrow(
+      ViewModeUnsupported,
+    );
+    expect(views.getViewInfo(view.viewId)).toMatchObject({
+      mode: "floating",
+      bounds: before,
+    });
+    expect(() => views.swapTiledView(view.viewId, "left")).toThrow(
+      TileActionUnavailable,
+    );
+    expect(() => views.expandTiledView(view.viewId, "right")).toThrow(
+      expect.objectContaining({
+        _tag: "TileActionUnavailable",
+        viewId: view.viewId,
+        action: "expand",
+        direction: "right",
+      }),
+    );
+  });
+
+  it("retains native bounds failures with view context and does not publish success", () => {
+    const view = create("app.bounds");
+    const cause = new Error("Native bounds rejected");
+    const updates: unknown[] = [];
+    views.boundsUpdated.on((event) => {
+      updates.push(event);
+    });
+    jest
+      .spyOn(views.getView(view.viewId)!, "setBounds")
+      .mockImplementationOnce(() => {
+        throw cause;
+      });
+    expect(() =>
+      views.setViewBounds(
+        view.viewId,
+        { x: 10, y: 20, width: 500, height: 300 },
+        { notify: true },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        _tag: "ViewNativeFailure",
+        operation: "set-bounds",
+        viewId: view.viewId,
+        appId: "app.bounds",
+        cause,
+      }),
+    );
+    expect(updates).toEqual([]);
+  });
 
   it("resolves distinct views, including views of the same app, and forgets removed callers", () => {
     const first = create("app.first");
@@ -291,7 +379,14 @@ describe("web contents lookup lifecycle", () => {
         return view;
       });
 
-    expect(() => create("app.failed")).toThrow("Focus tracking failed");
+    expect(() => create("app.failed")).toThrow(
+      expect.objectContaining({
+        _tag: "ViewNativeFailure",
+        operation: "register",
+        appId: "app.failed",
+        cause: expect.objectContaining({ message: "Focus tracking failed" }),
+      }),
+    );
     const failed = platform.windows.views.at(-1)!;
     expect(failed.webContents.isDestroyed()).toBe(true);
     expect(
@@ -313,7 +408,7 @@ describe("web contents lookup lifecycle", () => {
         throw new Error("Close failed");
       });
     try {
-      expect(() => views.removeView(view.viewId)).toThrow("Close failed");
+      expect(() => views.removeView(view.viewId)).toThrow(ViewNativeFailure);
       expect(views.getAppIdByWebContentsId(view.contents.id)).toBeUndefined();
       expect(views.getViewIdByWebContentsId(view.contents.id)).toBeUndefined();
     } finally {

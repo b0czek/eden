@@ -4,6 +4,7 @@ import type {
   PlatformWindow,
   WindowingPort,
 } from "../platform/ports";
+import { ViewNativeFailure, ViewUnavailable } from "./errors";
 import type { ViewCreationOptions, ViewInfo } from "./types";
 /**
  * Check if a WebContentsView exists and is valid.
@@ -39,16 +40,20 @@ export function isWindowAlive(
  */
 export function requireView(
   viewId: number,
-  views: Map<number, ViewInfo>,
+  views: ReadonlyMap<number, ViewInfo>,
 ): ViewInfo {
   const viewInfo = views.get(viewId);
 
   if (!viewInfo) {
-    throw new Error(`View ${viewId} not found`);
+    throw new ViewUnavailable({ viewId, reason: "missing" });
   }
 
   if (!isViewAlive(viewInfo.view)) {
-    throw new Error(`View ${viewId} is destroyed`);
+    throw new ViewUnavailable({
+      viewId,
+      appId: viewInfo.appId,
+      reason: "destroyed",
+    });
   }
 
   return viewInfo;
@@ -60,18 +65,18 @@ export function requireView(
  */
 export function requireViewByAppId(
   appId: string,
-  views: Map<number, ViewInfo>,
+  views: ReadonlyMap<number, ViewInfo>,
 ): { viewId: number; viewInfo: ViewInfo } {
   for (const [viewId, info] of views.entries()) {
     if (info.appId === appId) {
       if (!isViewAlive(info.view)) {
-        throw new Error(`View for app ${appId} is destroyed`);
+        throw new ViewUnavailable({ viewId, appId, reason: "destroyed" });
       }
       return { viewId, viewInfo: info };
     }
   }
 
-  throw new Error(`No view found for app ${appId}`);
+  throw new ViewUnavailable({ appId, reason: "missing" });
 }
 
 /**
@@ -80,6 +85,7 @@ export function requireViewByAppId(
 export function createView(
   options: ViewCreationOptions,
   windows: WindowingPort,
+  context: { appId: string; viewId: number },
 ): PlatformView {
   const {
     preloadScript,
@@ -88,19 +94,23 @@ export function createView(
     additionalArguments = [],
   } = options;
 
-  return windows.createView({
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: false,
-      preload: preloadScript,
-      transparent,
-      backgroundThrottling,
-      scrollBounce: false,
-      spellcheck: false,
-      additionalArguments,
-    },
-  });
+  try {
+    return windows.createView({
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+        preload: preloadScript,
+        transparent,
+        backgroundThrottling,
+        scrollBounce: false,
+        spellcheck: false,
+        additionalArguments,
+      },
+    });
+  } catch (cause) {
+    throw new ViewNativeFailure({ operation: "create", ...context, cause });
+  }
 }
 
 /**
@@ -135,7 +145,12 @@ export function destroyView(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error("Failed to destroy view:", errorMessage);
-    throw new Error(`Failed to destroy view: ${errorMessage}`);
+    throw new ViewNativeFailure({
+      operation: "destroy",
+      viewId: viewInfo.id,
+      appId: viewInfo.appId,
+      cause: error,
+    });
   }
 }
 

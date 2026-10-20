@@ -1,831 +1,203 @@
 import type {
   AppManifest,
-  EdenConfig,
   FilesystemLocation,
   TileLayoutDirection,
   TileLayoutState,
   ViewBounds,
   WindowSize,
 } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import type { TargetedNotification } from "../controllers/events";
+import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
+import type { Bounds, PlatformView, PlatformWindow } from "../platform/ports";
+import { WindowingPort } from "../platform/ports/types";
+import { DistPath, RuntimeConfig } from "../runtime/inputs";
+import { createViewLayout, type ViewLayout } from "./coordination";
+import { createViewDevTools } from "./devtools";
+import { createFloatingWindows } from "./floating-windows";
+import { createInterfaceScale } from "./interface-scale";
+import { ViewsSettings } from "./ports";
+import { createViewPresentation } from "./presentation";
+import { createViewRegistry, type ViewRegistry } from "./registry";
+import { createViewRendering } from "./rendering";
+import { createTiling } from "./tiling";
+import type { ViewInfo, ViewMode, ViewsEvents } from "./types";
 
-import { log } from "../logging";
-import {
-  type Bounds,
-  type PlatformView,
-  type PlatformWindow,
-  type WindowingPort,
-} from "../platform/ports";
-import type { Settings } from "../settings/service";
-import { createViewDevTools, type ViewDevTools } from "./devtools";
-import {
-  createFloatingWindows,
-  type FloatingWindows,
-} from "./floating-windows";
-import { createInterfaceScale, type InterfaceScale } from "./interface-scale";
-import {
-  cleanupDestroyedViews,
-  destroyView,
-  isViewAlive,
-  isWindowAlive,
-  requireView,
-} from "./lifecycle";
-import { createViewPresentation, type ViewPresentation } from "./presentation";
-import { createViewRendering, type ViewRendering } from "./rendering";
-import { createTiling, type Tiling } from "./tiling";
-import { compareOverlayViews, type ViewInfo, type ViewMode } from "./types";
-
-/**
- * View lifecycle notifications.
- */
-export interface ViewsEvents {
-  "view-removed": { viewId: number; appId: string; webContentsId: number };
-  "bounds-updated": ViewBounds;
-  "interface-scale-changed": { scale: number };
-  "view-loaded": { viewId: number; appId: string; overlay: boolean };
-  "view-load-failed": {
-    viewId: number;
-    appId: string;
-    errorCode: number;
-    errorDescription: string;
-  };
-  "mode-changed": { mode: "floating" | "tiled"; bounds: ViewBounds };
-  "global-bounds-changed": {
-    workspaceBounds: ViewBounds;
-    windowSize: WindowSize;
-  };
-}
-export interface ViewsDependencies {
-  config: EdenConfig;
-  distPath: string;
-  settings: Pick<Settings, "get" | "changed">;
-  windows: WindowingPort;
-}
-
-export const createViews = Effect.fn(function* ({
-  config,
-  distPath,
-  settings,
-  windows,
-}: ViewsDependencies) {
-  const viewRemoved = yield* scopedEvent<ViewsEvents["view-removed"]>();
-  const viewLoaded = yield* scopedEvent<ViewsEvents["view-loaded"]>();
-  const viewLoadFailed = yield* scopedEvent<ViewsEvents["view-load-failed"]>();
-  const interfaceScaleChanged =
-    yield* scopedEvent<ViewsEvents["interface-scale-changed"]>();
-  const globalBoundsChanged =
-    yield* scopedEvent<ViewsEvents["global-bounds-changed"]>();
-  const boundsUpdated = yield* scopedEvent<TargetedNotification<ViewBounds>>();
-  const modeChanged =
-    yield* scopedEvent<TargetedNotification<ViewsEvents["mode-changed"]>>();
-  const _windows = windows;
-  let _views: Map<number, ViewInfo> = new Map();
-  const _viewsByWebContentsId = new Map<number, ViewInfo>();
-  let _mainWindow: PlatformWindow | null = null;
-  let _tiling: Tiling;
-  let _floatingWindows: FloatingWindows;
-  let _presentation: ViewPresentation;
-  let _rendering: ViewRendering;
-  let _devtools: ViewDevTools;
-  let _interfaceScale: InterfaceScale;
-  let _windowSize: WindowSize = { width: 800, height: 600 };
-
-  // Initialize specialized modules
-  const tilingConfig = config.tiling || { mode: "none", gap: 0, padding: 0 };
-  const getViews = () => _views.values();
-
-  _devtools = createViewDevTools();
-  _presentation = createViewPresentation();
-  _interfaceScale = yield* createInterfaceScale(
-    settings,
-    getViews,
-    (scale, previousScale) => handleInterfaceScaleChanged(scale, previousScale),
-  );
-  _tiling = createTiling(tilingConfig, undefined, () =>
-    _interfaceScale.getScale(),
-  );
-
-  _floatingWindows = createFloatingWindows(
-    () => _tiling.getWorkspaceBounds(),
-    getViews,
-    () => _interfaceScale.getScale(),
-  );
-
-  // Use consumer's dist path for runtime assets
-  _rendering = yield* createViewRendering(
-    distPath,
-    _tiling,
-    _floatingWindows,
-    _windows,
-  );
-
-  function markViewFocused(viewInfo: ViewInfo): void {
-    viewInfo.lastFocusedAt = Date.now();
-  }
-
-  function handleInterfaceScaleChanged(
-    scale: number,
-    previousScale: number,
-  ): void {
-    interfaceScaleChanged.emit({ scale });
-
-    if (scale === previousScale || !_floatingWindows) {
-      return;
-    }
-
-    const ratio = scale / previousScale;
-    for (const viewInfo of _views.values()) {
-      const automaticallyScaled =
-        viewInfo.manifest.window?.scaling === "auto" ||
-        (viewInfo.viewType === "app" &&
-          viewInfo.manifest.window?.scaling !== "manual");
-      if (viewInfo.mode !== "floating" || !automaticallyScaled) {
-        continue;
-      }
-
-      const scaledBounds = {
-        ...viewInfo.bounds,
-        width: Math.round(viewInfo.bounds.width * ratio),
-        height: Math.round(viewInfo.bounds.height * ratio),
-      };
-      const finalBounds =
-        viewInfo.viewType === "overlay"
-          ? scaledBounds
-          : _floatingWindows.applyWindowConstraints(
-              scaledBounds,
-              viewInfo.manifest.window,
-            );
-      viewInfo.bounds = finalBounds;
-      if (viewInfo.visible) {
-        applyPresentedBounds(viewInfo, finalBounds);
-      }
-    }
-
-    syncTiledLayout();
-  }
-
-  function attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
-    viewInfo.view.webContents.on("focus", () => {
-      const trackedView = _views.get(viewId);
-      if (!trackedView) return;
-      markViewFocused(trackedView);
-    });
-  }
-
-  function setMainWindow(window: PlatformWindow): void {
-    _mainWindow = window;
-  }
-
-  function updateGlobalBounds(
-    bounds: ViewBounds,
-    windowSize: WindowSize,
-  ): void {
-    setWorkspaceBounds(bounds);
-    setWindowSize(windowSize);
-    globalBoundsChanged.emit({
-      workspaceBounds: bounds,
-      windowSize,
-    });
-  }
-
-  function setWorkspaceBounds(bounds: Bounds): void {
-    _tiling.setWorkspaceBounds(bounds);
-    if (_tiling.isEnabled()) {
-      const visibilityChanged = syncTiledLayout();
-      if (visibilityChanged) {
-        reorderViewLayers();
-      }
-    }
-  }
-
-  function syncTiledLayout(
-    options: { preferredViewId?: number; excludedViewId?: number } = {},
-  ): boolean {
-    const { toHide, toShow } = _tiling.resolveTiledVisibilityChanges(
-      _views,
-      options,
-    );
-
-    let visibilityChanged = false;
-
-    for (const viewId of toHide) {
-      const viewInfo = _views.get(viewId);
-      if (!viewInfo?.visible) continue;
-
-      _tiling.restoreExpansionForView(viewId);
-      viewInfo.visible = false;
-      viewInfo.bounds = { x: 0, y: 0, width: 0, height: 0 };
-
-      if (!viewInfo.view.webContents.isDestroyed()) {
-        viewInfo.view.setBounds(viewInfo.bounds);
-      }
-
-      visibilityChanged = true;
-    }
-
-    for (const viewId of toShow) {
-      const viewInfo = _views.get(viewId);
-      if (!viewInfo || viewInfo.visible) continue;
-
-      viewInfo.visible = true;
-      visibilityChanged = true;
-    }
-
-    _tiling.recalculateTiledViews(_views);
-    reapplyPresentedBounds();
-    return visibilityChanged;
-  }
-
-  function setWindowSize(windowSize: WindowSize): void {
-    _windowSize = windowSize;
-  }
-
-  function getWindowSize(): WindowSize {
-    return _windowSize;
-  }
-
-  function createView(
+/** Mutations reject synchronously with the contextual tagged errors in errors.ts. */
+export interface Views {
+  initialize: () => Effect.Effect<void>;
+  viewRemoved: Event<ViewsEvents["view-removed"]>;
+  viewLoaded: Event<ViewsEvents["view-loaded"]>;
+  viewLoadFailed: Event<ViewsEvents["view-load-failed"]>;
+  interfaceScaleChanged: Event<ViewsEvents["interface-scale-changed"]>;
+  globalBoundsChanged: Event<ViewsEvents["global-bounds-changed"]>;
+  boundsUpdated: Event<TargetedNotification<ViewBounds>>;
+  modeChanged: Event<TargetedNotification<ViewsEvents["mode-changed"]>>;
+  setMainWindow: (window: PlatformWindow) => void;
+  updateGlobalBounds: (bounds: ViewBounds, windowSize: WindowSize) => void;
+  setWorkspaceBounds: (bounds: Bounds) => void;
+  setWindowSize: (windowSize: WindowSize) => void;
+  getWindowSize: () => WindowSize;
+  /** @throws MainWindowUnavailable, ViewNativeFailure. Missing frontend is a caller defect. */
+  createView: (
     appId: string,
     manifest: AppManifest,
     installPath: string,
     bounds: Bounds | undefined,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): number {
-    if (!isWindowAlive(_mainWindow)) {
-      throw new Error("Main window not set. Call setMainWindow first.");
-    }
-
-    const viewInfo = _rendering.createView(
-      appId,
-      manifest,
-      installPath,
-      bounds,
-      _views.values(),
-      launchArgs,
-      launchFile,
-    );
-
-    try {
-      const viewId = viewInfo.id;
-
-      _windows.attachWebContentsLogger(viewInfo.view.webContents, {
-        appId,
-        viewId,
-        source: viewInfo.viewType === "overlay" ? "overlay" : "app",
-      });
-
-      // Store view info
-      _views.set(viewId, viewInfo);
-      _viewsByWebContentsId.set(viewInfo.view.webContents.id, viewInfo);
-      attachFocusTracking(viewId, viewInfo);
-
-      // Apply current interface scale to the new view
-      _interfaceScale.applyToView(viewInfo);
-
-      // Register DevTools shortcut on this view
-      _devtools.registerShortcut(viewInfo.view);
-
-      // Re-apply zoom after page finishes loading (content load can reset zoom)
-      viewInfo.view.webContents.on("did-finish-load", () => {
-        _interfaceScale.applyToView(viewInfo);
-      });
-
-      // Electron event listener for view load failure
-      viewInfo.view.webContents.on(
-        "did-fail-load",
-        (_event, errorCode: number, errorDescription: string) => {
-          log.error(`View load failed for ${appId}:`, errorDescription);
-          viewLoadFailed.emit({
-            viewId: viewInfo.id,
-            appId,
-            errorCode,
-            errorDescription,
-          });
-        },
-      );
-
-      // Notify listeners that the view has been loaded
-      viewLoaded.emit({
-        viewId: viewInfo.id,
-        appId,
-        overlay: viewInfo.viewType === "overlay",
-      });
-
-      // Recalculate all tiles if using tiling and this is a tiled view
-      if (viewInfo.mode === "tiled" && _tiling.isEnabled()) {
-        syncTiledLayout({ preferredViewId: viewId });
-      }
-
-      // Add to main window's contentView and maintain proper layering
-      reorderViewLayers();
-
-      return viewId;
-    } catch (error) {
-      try {
-        if (_views.has(viewInfo.id)) removeView(viewInfo.id);
-        else destroyView(viewInfo, _mainWindow);
-      } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          `Failed to create and release view for ${appId}`,
-          { cause: error },
-        );
-      }
-      throw error;
-    }
-  }
-
-  function removeView(viewId: number): void {
-    const viewInfo = _views.get(viewId);
-    if (!viewInfo) {
-      throw new Error(`View ${viewId} not found`);
-    }
-    const webContentsId = viewInfo.view.webContents.id;
-
-    try {
-      _tiling.restoreExpansionForView(viewId);
-
-      // Close DevTools if open
-      _devtools.closeDevToolsForView(viewInfo.view);
-
-      // Destroy the view safely
-      destroyView(viewInfo, _mainWindow);
-
-      // Clean up all event subscriptions for this view
-
-      // Remove from tracking map
-      if (_views.delete(viewId)) {
-        _viewsByWebContentsId.delete(webContentsId);
-        viewRemoved.emit({
-          viewId,
-          appId: viewInfo.appId,
-          webContentsId,
-        });
-      }
-
-      // Recalculate tiles if using tiling and this was an app view
-      if (viewInfo.viewType === "app" && _tiling.isEnabled()) {
-        const visibilityChanged = syncTiledLayout();
-        if (visibilityChanged) {
-          reorderViewLayers();
-        }
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      log.error(`Failed to remove view ${viewId}:`, errorMessage);
-      // Still remove from tracking even if removal failed
-      if (_views.delete(viewId)) {
-        _viewsByWebContentsId.delete(webContentsId);
-        viewRemoved.emit({
-          viewId,
-          appId: viewInfo.appId,
-          webContentsId,
-        });
-      }
-      throw new Error(`Failed to remove view: ${errorMessage}`);
-    }
-  }
-
-  function setViewBounds(
+  ) => number;
+  /** @throws ViewUnavailable or ViewNativeFailure; indexes are released on failure. */
+  removeView: (viewId: number) => void;
+  /** @throws ViewUnavailable or ViewNativeFailure. */
+  setViewBounds: (
     viewId: number,
     bounds: Bounds,
-    options: { notify?: boolean } = {},
-  ): void {
-    const viewInfo = requireView(viewId, _views);
-    applyViewBounds(viewId, viewInfo, bounds);
-
-    if (options.notify) {
-      boundsUpdated.emit({ viewIds: [viewId], payload: bounds });
-    }
-  }
-
-  function applyViewBounds(
-    viewId: number,
-    viewInfo: ViewInfo,
-    bounds: Bounds,
-  ): void {
-    // If this is an overlay view, set bounds directly without constraints
-    if (viewInfo.viewType === "overlay") {
-      try {
-        viewInfo.view.setBounds(bounds);
-        viewInfo.bounds = bounds;
-        return;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to set overlay bounds: ${errorMessage}`);
-      }
-    }
-
-    // If this is a tiled view, ignore individual bounds updates
-    if (viewInfo.mode === "tiled") {
-      log.info(`Ignoring individual bounds update for tiled view ${viewId}`);
-      return;
-    }
-
-    // For floating views, allow bounds updates
-    if (!viewInfo.visible) {
-      viewInfo.bounds = bounds;
-      return;
-    }
-
-    try {
-      const windowConfig = viewInfo.manifest.window;
-      const finalBounds = _floatingWindows.applyWindowConstraints(
-        bounds,
-        windowConfig,
-        windowConfig?.scaling !== "manual",
-      );
-      viewInfo.bounds = finalBounds;
-      applyPresentedBounds(viewInfo, finalBounds);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to set bounds: ${errorMessage}`);
-    }
-  }
-
-  function getView(viewId: number): PlatformView | undefined {
-    return _views.get(viewId)?.view;
-  }
-
-  function getViewInfo(viewId: number): ViewInfo | undefined {
-    return _views.get(viewId);
-  }
-
-  function getViewsByAppId(appId: string): number[] {
-    const viewIds: number[] = [];
-    for (const [viewId, info] of _views.entries()) {
-      if (info.appId === appId) {
-        viewIds.push(viewId);
-      }
-    }
-    return viewIds;
-  }
-
-  function getAppIdByWebContentsId(webContentsId: number): string | undefined {
-    return _viewsByWebContentsId.get(webContentsId)?.appId;
-  }
-
-  function getViewIdByWebContentsId(webContentsId: number): number | undefined {
-    return _viewsByWebContentsId.get(webContentsId)?.id;
-  }
-
-  function getAllViews(): [number, ViewInfo][] {
-    return Array.from(_views.entries());
-  }
-
-  function getTileLayoutState(viewId: number): TileLayoutState {
-    requireView(viewId, _views);
-    return _tiling.getTileLayoutState(viewId, _views);
-  }
-
-  function swapTiledView(
+    options?: { notify?: boolean },
+  ) => void;
+  getView: (viewId: number) => PlatformView | undefined;
+  getViewInfo: (viewId: number) => ViewInfo | undefined;
+  getViewsByAppId: (appId: string) => number[];
+  getAppIdByWebContentsId: (webContentsId: number) => string | undefined;
+  getViewIdByWebContentsId: (webContentsId: number) => number | undefined;
+  getAllViews: () => [number, ViewInfo][];
+  getTileLayoutState: (viewId: number) => TileLayoutState;
+  /** @throws TileActionUnavailable, ViewUnavailable, or ViewNativeFailure. */
+  swapTiledView: (
     viewId: number,
     direction: TileLayoutDirection,
-  ): TileLayoutState {
-    if (!_tiling.swapTile(viewId, direction, _views)) {
-      throw new Error(`No tiled window is available to swap ${direction}`);
-    }
-    syncTiledLayout();
-    reorderViewLayers();
-    return getTileLayoutState(viewId);
-  }
-
-  function expandTiledView(
+  ) => TileLayoutState;
+  /** @throws TileActionUnavailable, ViewUnavailable, or ViewNativeFailure. */
+  expandTiledView: (
     viewId: number,
     direction: TileLayoutDirection,
-  ): TileLayoutState {
-    if (!_tiling.expandTile(viewId, direction, _views)) {
-      throw new Error(`The tiled window cannot expand ${direction}`);
-    }
-    syncTiledLayout();
-    reorderViewLayers();
-    return getTileLayoutState(viewId);
-  }
+  ) => TileLayoutState;
+  showView: (viewId: number) => void;
+  focusView: (viewId: number) => void;
+  hideView: (viewId: number) => void;
+  sendToView: (viewId: number, channel: string, ...args: unknown[]) => boolean;
+  sendToMainWindow: (channel: string, ...args: unknown[]) => boolean;
+  getActiveViews: () => number[];
+  /** @throws ViewUnavailable, ViewModeUnsupported, or ViewNativeFailure. */
+  setViewMode: (viewId: number, targetMode?: ViewMode) => void;
+  getCurrentScale: () => number;
+  setInterfaceScale: (scale: number) => void;
+  setKeyboardPresentationLift: (lift: number) => void;
+  getKeyboardPresentationLift: () => number;
+}
 
-  function showView(viewId: number): void {
-    const viewInfo = requireView(viewId, _views);
+export const Views = Context.Service<"eden/Views", Views>("eden/Views");
 
-    try {
-      _tiling.restoreExpansionForView(viewId);
-      viewInfo.requestedVisible = true;
-      viewInfo.visible = true;
-
-      if (viewInfo.mode === "tiled") {
-        syncTiledLayout({ preferredViewId: viewId });
-        reorderViewLayers();
-      } else {
-        viewInfo.zIndex = _floatingWindows.getNextZIndex();
-        reorderViewLayers();
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to show view: ${errorMessage}`);
-    }
-  }
-
-  function focusView(viewId: number): void {
-    const viewInfo = requireView(viewId, _views);
-    if (viewInfo.view.webContents.isDestroyed()) return;
-    viewInfo.view.webContents.focus();
-  }
-
-  function hideView(viewId: number): void {
-    const viewInfo = requireView(viewId, _views);
-
-    try {
-      _tiling.restoreExpansionForView(viewId);
-      viewInfo.requestedVisible = false;
-      viewInfo.visible = false;
-      viewInfo.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-
-      if (viewInfo.mode === "tiled") {
-        const visibilityChanged = syncTiledLayout({
-          excludedViewId: viewId,
-        });
-        if (visibilityChanged) {
-          reorderViewLayers();
-        }
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to hide view: ${errorMessage}`);
-    }
-  }
-
-  function reorderViewLayers(): void {
-    if (!isWindowAlive(_mainWindow)) return;
-
-    // Clean up any destroyed views first
-    for (const info of cleanupDestroyedViews(_views)) {
-      _viewsByWebContentsId.delete(info.view.webContents.id);
-    }
-
-    try {
-      const appViews = Array.from(_views.values()).filter(
-        (v) => v.viewType === "app",
-      );
-
-      const tiledViews = appViews
-        .filter((v) => v.mode === "tiled" && v.visible)
-        .sort((a, b) => (a.tileIndex || 0) - (b.tileIndex || 0));
-
-      const floatingAppViews = _floatingWindows
-        .getOrderedFloatingViews()
-        .filter((v) => v.visible);
-
-      const overlayViews = Array.from(_views.values())
-        .filter((v) => v.viewType === "overlay" && v.visible)
-        .sort(compareOverlayViews);
-
-      // Remove all views
-      for (const info of _views.values()) {
-        if (isViewAlive(info.view)) {
-          _mainWindow.contentView.removeChildView(info.view);
-        }
-      }
-
-      // Add back in order: tiled (bottom), floating apps (middle), overlays (top)
-      for (const info of tiledViews) {
-        if (isViewAlive(info.view)) {
-          _mainWindow.contentView.addChildView(info.view);
-          applyPresentedBounds(info);
-        }
-      }
-
-      for (const info of floatingAppViews) {
-        if (isViewAlive(info.view)) {
-          _mainWindow.contentView.addChildView(info.view);
-          applyPresentedBounds(info);
-        }
-      }
-
-      for (const info of overlayViews) {
-        if (isViewAlive(info.view)) {
-          _mainWindow.contentView.addChildView(info.view);
-          applyPresentedBounds(info);
-        }
-      }
-    } catch (error) {
-      log.error("Failed to reorder view layers:", error);
-    }
-  }
-
-  function sendToView(
-    viewId: number,
-    channel: string,
-    ...args: unknown[]
-  ): boolean {
-    try {
-      const viewInfo = requireView(viewId, _views);
-      viewInfo.view.webContents.send(channel, ...args);
-      return true;
-    } catch (error) {
-      log.error(`Failed to send message to view ${viewId}:`, error);
-      return false;
-    }
-  }
-
-  function sendToMainWindow(channel: string, ...args: unknown[]): boolean {
-    if (_mainWindow && !_mainWindow.isDestroyed()) {
-      try {
-        _mainWindow.webContents.send(channel, ...args);
-        return true;
-      } catch (error) {
-        log.error(`Failed to send to main window:`, error);
-        return false;
-      }
-    }
-    return false;
-  }
-
-  function getActiveViews(): number[] {
-    return Array.from(_views.keys());
-  }
-
-  function setViewMode(viewId: number, targetMode?: ViewMode): void {
-    const viewInfo = requireView(viewId, _views);
-    const manifest = viewInfo.manifest;
-    const windowConfig = manifest.window;
-
-    // Determine target mode
-    const newMode: ViewMode =
-      targetMode || (viewInfo.mode === "floating" ? "tiled" : "floating");
-
-    // Check if the app supports this mode
-    if (windowConfig?.mode) {
-      if (windowConfig.mode === "floating" && newMode === "tiled") {
-        throw new Error(`App ${viewInfo.appId} only supports floating mode`);
-      }
-      if (windowConfig.mode === "tiled" && newMode === "floating") {
-        throw new Error(`App ${viewInfo.appId} only supports tiled mode`);
-      }
-    }
-
-    // If already in target mode, do nothing
-    if (viewInfo.mode === newMode) {
-      return;
-    }
-
-    log.info(
-      `Switching view ${viewId} from ${viewInfo.mode} to ${newMode} mode`,
+export const ViewsLive = Layer.effect(
+  Views,
+  Effect.gen(function* () {
+    const config = yield* RuntimeConfig;
+    const distPath = yield* DistPath;
+    const settings = yield* ViewsSettings;
+    const windows = yield* WindowingPort;
+    const viewRemoved = yield* scopedEvent<ViewsEvents["view-removed"]>();
+    const viewLoaded = yield* scopedEvent<ViewsEvents["view-loaded"]>();
+    const viewLoadFailed =
+      yield* scopedEvent<ViewsEvents["view-load-failed"]>();
+    const interfaceScaleChanged =
+      yield* scopedEvent<ViewsEvents["interface-scale-changed"]>();
+    const globalBoundsChanged =
+      yield* scopedEvent<ViewsEvents["global-bounds-changed"]>();
+    const boundsUpdated =
+      yield* scopedEvent<TargetedNotification<ViewBounds>>();
+    const modeChanged =
+      yield* scopedEvent<TargetedNotification<ViewsEvents["mode-changed"]>>();
+    let registry: ViewRegistry | undefined;
+    let layout: ViewLayout | undefined;
+    const getViews = () => registry?.views.values() ?? [];
+    const devtools = createViewDevTools();
+    const presentation = createViewPresentation();
+    const interfaceScale = yield* createInterfaceScale(
+      settings,
+      getViews,
+      (scale, previousScale) => {
+        if (layout) layout.handleInterfaceScaleChanged(scale, previousScale);
+        else interfaceScaleChanged.emit({ scale });
+      },
     );
-
-    try {
-      if (newMode === "floating") {
-        _tiling.restoreExpansionForView(viewId);
-        viewInfo.tileIndex = undefined;
-        const floatingBounds =
-          _floatingWindows.calculateInitialBounds(windowConfig);
-        viewInfo.bounds = floatingBounds;
-        viewInfo.zIndex = _floatingWindows.getNextZIndex();
-        viewInfo.mode = "floating";
-        applyPresentedBounds(viewInfo, floatingBounds);
-
-        if (_tiling.isEnabled()) {
-          syncTiledLayout();
-        }
-
-        reorderViewLayers();
-        modeChanged.emit({
-          viewIds: [viewId],
-          payload: {
-            mode: "floating",
-            bounds: floatingBounds,
-          },
-        });
-      } else {
-        viewInfo.zIndex = undefined;
-
-        if (_tiling.isEnabled()) {
-          viewInfo.tileIndex = _tiling.getNextTileIndex(_views.values());
-          viewInfo.mode = "tiled";
-          syncTiledLayout({ preferredViewId: viewId });
-          reorderViewLayers();
-          modeChanged.emit({
-            viewIds: [viewId],
-            payload: {
-              mode: "tiled",
-              bounds: viewInfo.bounds,
-            },
-          });
-        } else {
-          const bounds = { ..._tiling.getWorkspaceBounds() };
-          viewInfo.bounds = bounds;
-          viewInfo.mode = "tiled";
-          applyPresentedBounds(viewInfo, bounds);
-          reorderViewLayers();
-          modeChanged.emit({
-            viewIds: [viewId],
-            payload: {
-              mode: "tiled",
-              bounds,
-            },
-          });
-        }
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to switch mode: ${errorMessage}`);
-    }
-  }
-
-  function getCurrentScale(): number {
-    return _interfaceScale.getScale();
-  }
-
-  function setInterfaceScale(scale: number): void {
-    _interfaceScale.setScale(scale);
-  }
-
-  function setKeyboardPresentationLift(lift: number): void {
-    if (!_presentation.setViewLift(lift)) {
-      return;
-    }
-
-    reapplyPresentedBounds();
-  }
-
-  function getKeyboardPresentationLift(): number {
-    return _presentation.getViewLift();
-  }
-
-  function applyPresentedBounds(
-    viewInfo: ViewInfo,
-    bounds = viewInfo.bounds,
-  ): void {
-    viewInfo.view.setBounds(_presentation.applyToBounds(bounds));
-  }
-
-  function reapplyPresentedBounds(): void {
-    for (const info of _views.values()) {
-      if (!info.visible || !isViewAlive(info.view)) {
-        continue;
-      }
-
-      applyPresentedBounds(info);
-    }
-  }
-
-  function dispose(): void {
-    for (const info of _views.values()) {
-      try {
-        destroyView(info, _mainWindow);
-      } catch (error) {
-        log.warn(`Failed to destroy view ${info.id} during disposal:`, error);
-      }
-    }
-    _views.clear();
-    _viewsByWebContentsId.clear();
-    _mainWindow = null;
-  }
-  yield* Effect.addFinalizer(() => Effect.sync(dispose));
-  return {
-    initialize: _interfaceScale.initialize,
-    viewRemoved,
-    viewLoaded,
-    viewLoadFailed,
-    interfaceScaleChanged,
-    globalBoundsChanged,
-    boundsUpdated,
-    modeChanged,
-    setMainWindow,
-    updateGlobalBounds,
-    setWorkspaceBounds,
-    setWindowSize,
-    getWindowSize,
-    createView,
-    removeView,
-    setViewBounds,
-    getView,
-    getViewInfo,
-    getViewsByAppId,
-    getAppIdByWebContentsId,
-    getViewIdByWebContentsId,
-    getAllViews,
-    getTileLayoutState,
-    swapTiledView,
-    expandTiledView,
-    showView,
-    focusView,
-    hideView,
-    sendToView,
-    sendToMainWindow,
-    getActiveViews,
-    setViewMode,
-    getCurrentScale,
-    setInterfaceScale,
-    setKeyboardPresentationLift,
-    getKeyboardPresentationLift,
-  };
-});
-
-export type Views = Effect.Success<ReturnType<typeof createViews>>;
+    const tiling = createTiling(
+      config.tiling || { mode: "none", gap: 0, padding: 0 },
+      undefined,
+      interfaceScale.getScale,
+    );
+    const floatingWindows = createFloatingWindows(
+      () => tiling.getWorkspaceBounds(),
+      getViews,
+      interfaceScale.getScale,
+    );
+    const rendering = yield* createViewRendering(
+      distPath,
+      tiling,
+      floatingWindows,
+      windows,
+    );
+    const nativeViews = createViewRegistry(
+      windows,
+      rendering,
+      interfaceScale,
+      devtools,
+      { viewRemoved, viewLoaded, viewLoadFailed },
+    );
+    registry = nativeViews;
+    const coordination = createViewLayout(
+      nativeViews,
+      tiling,
+      floatingWindows,
+      presentation,
+      {
+        interfaceScaleChanged,
+        globalBoundsChanged,
+        boundsUpdated,
+        modeChanged,
+      },
+    );
+    layout = coordination;
+    yield* Effect.addFinalizer(() => Effect.sync(nativeViews.dispose));
+    return {
+      setMainWindow: nativeViews.setMainWindow,
+      updateGlobalBounds: coordination.updateGlobalBounds,
+      setWorkspaceBounds: coordination.setWorkspaceBounds,
+      setWindowSize: coordination.setWindowSize,
+      getWindowSize: coordination.getWindowSize,
+      setViewBounds: coordination.setViewBounds,
+      getView: nativeViews.getView,
+      getViewInfo: nativeViews.getViewInfo,
+      getViewsByAppId: nativeViews.getViewsByAppId,
+      getAppIdByWebContentsId: nativeViews.getAppIdByWebContentsId,
+      getViewIdByWebContentsId: nativeViews.getViewIdByWebContentsId,
+      getAllViews: nativeViews.getAllViews,
+      getTileLayoutState: coordination.getTileLayoutState,
+      swapTiledView: coordination.swapTiledView,
+      expandTiledView: coordination.expandTiledView,
+      showView: coordination.showView,
+      focusView: nativeViews.focusView,
+      hideView: coordination.hideView,
+      sendToView: nativeViews.sendToView,
+      sendToMainWindow: nativeViews.sendToMainWindow,
+      getActiveViews: nativeViews.getActiveViews,
+      setViewMode: coordination.setViewMode,
+      setKeyboardPresentationLift: coordination.setKeyboardPresentationLift,
+      getKeyboardPresentationLift: coordination.getKeyboardPresentationLift,
+      initialize: interfaceScale.initialize,
+      viewRemoved,
+      viewLoaded,
+      viewLoadFailed,
+      interfaceScaleChanged,
+      globalBoundsChanged,
+      boundsUpdated,
+      modeChanged,
+      createView: (...args) => nativeViews.createView(coordination, ...args),
+      removeView: (viewId) => nativeViews.removeView(coordination, viewId),
+      getCurrentScale: interfaceScale.getScale,
+      setInterfaceScale: interfaceScale.setScale,
+    } satisfies Views;
+  }).pipe(Effect.tap((value) => value.initialize())),
+);
