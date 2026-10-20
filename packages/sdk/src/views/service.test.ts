@@ -1,5 +1,6 @@
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { testApp } from "../../tests/support/apps";
 import {
   buildService,
@@ -10,15 +11,27 @@ import { createEvent } from "../events/event";
 import type { Bounds, PlatformWindow } from "../platform/ports";
 import { WindowingPort } from "../platform/ports/types";
 import { DistPath, RuntimeConfig } from "../runtime/inputs";
+import { Settings } from "../settings/service";
 import {
   TileActionUnavailable,
   ViewModeUnsupported,
   ViewNativeFailure,
   ViewUnavailable,
 } from "./errors";
-import { ViewsSettings } from "./ports";
 import { Views, ViewsLive } from "./service";
 import type { ViewInfo, ViewMode } from "./types";
+
+const unexpectedSettingsUse = (): never => {
+  throw new Error("Unexpected Settings dependency");
+};
+const settingsChecks = {
+  canRead: unexpectedSettingsUse,
+  assertReadableBy: unexpectedSettingsUse,
+  resolveGrantKey: unexpectedSettingsUse,
+  assertAccess: unexpectedSettingsUse,
+  filterAllowedKeys: unexpectedSettingsUse,
+  filterSchemaByGrants: unexpectedSettingsUse,
+};
 
 const HIDDEN_BOUNDS: Bounds = { x: 0, y: 0, width: 0, height: 0 };
 const cleanups: (() => Promise<void>)[] = [];
@@ -33,10 +46,13 @@ async function createViewsFixture(tiling: TilingConfig): Promise<Views> {
     buildService(Views, ViewsLive).pipe(
       Effect.provideService(RuntimeConfig, { tiling } as EdenConfig),
       Effect.provideService(DistPath, "/tmp"),
-      Effect.provideService(ViewsSettings, {
-        get: () => Effect.succeed(undefined),
-        changed: createEvent<{ appId: string; key: string; value: string }>(),
-      }),
+      Effect.provide(
+        Layer.mock(Settings, {
+          ...settingsChecks,
+          get: () => Effect.succeed(undefined),
+          changed: createEvent<{ appId: string; key: string; value: string }>(),
+        }),
+      ),
       Effect.provideService(WindowingPort, {
         createView: () => ({
           setBounds: jest.fn(),
@@ -211,10 +227,17 @@ describe("web contents lookup lifecycle", () => {
           tiling: { mode: "none", gap: 0, padding: 0 },
         }),
         Effect.provideService(DistPath, "/tmp"),
-        Effect.provideService(ViewsSettings, {
-          get: () => Effect.succeed(undefined),
-          changed: createEvent<{ appId: string; key: string; value: string }>(),
-        }),
+        Effect.provide(
+          Layer.mock(Settings, {
+            ...settingsChecks,
+            get: () => Effect.succeed(undefined),
+            changed: createEvent<{
+              appId: string;
+              key: string;
+              value: string;
+            }>(),
+          }),
+        ),
         Effect.provideService(WindowingPort, platform.windows),
       ),
     );

@@ -23,18 +23,18 @@ import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/context";
+import { Filesystem } from "../filesystem/service";
 import { SessionContext } from "../session/context";
 import {
   InvalidOperationRequestKey,
-  type OperationAdmissionFailure,
   OperationAdmissionClosed,
+  type OperationAdmissionFailure,
   OperationCancelled,
   OperationNotCancellable,
   OperationNotFound,
   OperationRequestConflict,
   SessionTransitionInProgress,
 } from "./errors";
-import { OperationsFilesystem } from "./ports";
 import { createOperationQuota } from "./quota";
 import type { OperationTask } from "./task";
 
@@ -73,7 +73,10 @@ export interface Operations {
   drainSession: (sessionId: string, excludeId?: string) => Effect.Effect<void>;
   withSessionTransition: <A, E>(
     work: Effect.Effect<A, E>,
-  ) => Effect.Effect<A, E | Error>;
+  ) => Effect.Effect<
+    A,
+    E | OperationAdmissionClosed | SessionTransitionInProgress
+  >;
   drain: (excludeId?: string) => Effect.Effect<void>;
   closeAdmission: () => void;
   shutdown: () => Effect.Effect<void>;
@@ -116,7 +119,7 @@ export const OperationsLive = Layer.effect(
   Effect.gen(function* () {
     const execution = yield* ExecutionContext;
     const session = yield* SessionContext;
-    const filesystem = yield* OperationsFilesystem;
+    const filesystem = yield* Filesystem;
     const clock = yield* Clock.Clock;
     const changed =
       yield* scopedEvent<
@@ -499,8 +502,15 @@ export const OperationsLive = Layer.effect(
     }
     function withSessionTransition<A, E>(
       work: Effect.Effect<A, E>,
-    ): Effect.Effect<A, E | Error> {
-      return Effect.suspend(() => {
+    ): Effect.Effect<
+      A,
+      E | OperationAdmissionClosed | SessionTransitionInProgress
+    > {
+      return Effect.suspend<
+        A,
+        E | OperationAdmissionClosed | SessionTransitionInProgress,
+        never
+      >(() => {
         const sessionId = session.getSessionId();
         const operationId = execution.get()?.operationId;
         const reserved = closedSessions.get(sessionId);

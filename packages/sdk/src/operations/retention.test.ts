@@ -4,20 +4,26 @@ import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as TestClock from "effect/testing/TestClock";
 import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
+import { createEvent } from "../events/event";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { Filesystem } from "../filesystem/service";
 import { RuntimeConfig } from "../runtime/inputs";
 import { SessionContext, SessionContextLive } from "../session/context";
 import { OperationAdmissionClosed } from "./errors";
-import { OperationsFilesystem } from "./ports";
 import { operationQuotaLimits } from "./quota";
 import { Operations, OperationsLive, operationRetentionMs } from "./service";
 import { type OperationTask, operationTask } from "./task";
+
+const unexpectedFilesystemUse = (): never => {
+  throw new Error("Unexpected Filesystem dependency");
+};
 
 const serviceEffects = createEffectRuntime();
 afterAll(() => serviceEffects.dispose());
@@ -45,9 +51,16 @@ describe("operation retention and admission capacity", () => {
             buildService(SessionContext, SessionContextLive),
           ),
         ),
-        Effect.provideService(OperationsFilesystem, {
-          releaseHandles: () => Effect.void,
-        }),
+        Effect.provide(
+          Layer.mock(Filesystem, {
+            getBaseDir: unexpectedFilesystemUse,
+            changed: createEvent(),
+            accessScope: unexpectedFilesystemUse,
+            prepareVolumeOperation: unexpectedFilesystemUse,
+            unwatch: unexpectedFilesystemUse,
+            releaseHandles: () => Effect.void,
+          }),
+        ),
       ),
     );
   });

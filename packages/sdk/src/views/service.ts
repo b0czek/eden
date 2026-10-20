@@ -15,11 +15,11 @@ import { scopedEvent } from "../events/scoped";
 import type { Bounds, PlatformView, PlatformWindow } from "../platform/ports";
 import { WindowingPort } from "../platform/ports/types";
 import { DistPath, RuntimeConfig } from "../runtime/inputs";
+import { Settings } from "../settings/service";
 import { createViewLayout, type ViewLayout } from "./coordination";
 import { createViewDevTools } from "./devtools";
 import { createFloatingWindows } from "./floating-windows";
 import { createInterfaceScale } from "./interface-scale";
-import { ViewsSettings } from "./ports";
 import { createViewPresentation } from "./presentation";
 import { createViewRegistry, type ViewRegistry } from "./registry";
 import { createViewRendering } from "./rendering";
@@ -96,7 +96,7 @@ export const ViewsLive = Layer.effect(
   Effect.gen(function* () {
     const config = yield* RuntimeConfig;
     const distPath = yield* DistPath;
-    const settings = yield* ViewsSettings;
+    const settings = yield* Settings;
     const windows = yield* WindowingPort;
     const viewRemoved = yield* scopedEvent<ViewsEvents["view-removed"]>();
     const viewLoaded = yield* scopedEvent<ViewsEvents["view-loaded"]>();
