@@ -4,6 +4,7 @@ import type { AppAssociationStorageWriteError } from "../app-associations/errors
 import type { FilesystemPathError } from "../filesystem/errors";
 import type { ProcessLaunchError } from "../processes/errors";
 import type { StorageReadFailure } from "../storage/errors";
+import type { ViewMutationError } from "../views/errors";
 
 export class FileMetadataFailed extends Data.TaggedError("FileMetadataFailed")<{
   location: FilesystemLocation;
@@ -29,7 +30,8 @@ export type FileInspectionError = FilesystemPathError | FileMetadataFailed;
 export type FileOpenError =
   | FileInspectionError
   | FileHandlerUnavailable
-  | ProcessLaunchError;
+  | ProcessLaunchError
+  | ViewMutationError;
 
 export type FilePreferenceWriteError =
   | FileInspectionError

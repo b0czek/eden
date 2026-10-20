@@ -43,12 +43,12 @@ export interface ViewRegistry
     | "getAppIdByWebContentsId"
     | "getViewIdByWebContentsId"
     | "getAllViews"
-    | "focusView"
     | "sendToView"
     | "sendToMainWindow"
     | "getActiveViews"
   > {
   readonly views: ReadonlyMap<number, ViewInfo>;
+  focusView(viewId: number): void;
   getMainWindow(): PlatformWindow | null;
   createView(
     layout: ViewLifecycleLayout,
@@ -201,48 +201,38 @@ export function createViewRegistry(
     }
     const webContentsId = viewInfo.view.webContents.id;
 
+    const failures: unknown[] = [];
     try {
       layout.restoreExpansionForView(viewId);
-
-      // Close DevTools if open
       _devtools.closeDevToolsForView(viewInfo.view);
-
-      // Destroy the view safely
-      destroyView(viewInfo, _mainWindow);
-
-      // Clean up all event subscriptions for this view
-
-      // Remove from tracking map
-      if (_views.delete(viewId)) {
-        _viewsByWebContentsId.delete(webContentsId);
-        viewRemoved.emit({
-          viewId,
-          appId: viewInfo.appId,
-          webContentsId,
-        });
-      }
-
-      // Recalculate tiles if using tiling and this was an app view
-      if (viewInfo.viewType === "app" && layout.isTilingEnabled()) {
-        const visibilityChanged = layout.syncTiledLayout();
-        if (visibilityChanged) {
-          layout.reorderViewLayers();
-        }
-      }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      log.error(`Failed to remove view ${viewId}:`, errorMessage);
-      // Still remove from tracking even if removal failed
-      if (_views.delete(viewId)) {
-        _viewsByWebContentsId.delete(webContentsId);
-        viewRemoved.emit({
-          viewId,
-          appId: viewInfo.appId,
-          webContentsId,
-        });
+      failures.push(error);
+    }
+    try {
+      destroyView(viewInfo, _mainWindow);
+    } catch (error) {
+      failures.push(error);
+      try {
+        if (!viewInfo.view.webContents.isDestroyed())
+          callViewNative("destroy", viewInfo, () =>
+            viewInfo.view.webContents.close(),
+          );
+      } catch (cleanupError) {
+        failures.push(cleanupError);
       }
-      throw error;
+    }
+    if (_views.delete(viewId)) {
+      _viewsByWebContentsId.delete(webContentsId);
+      viewRemoved.emit({ viewId, appId: viewInfo.appId, webContentsId });
+    }
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1)
+      throw new AggregateError(failures, `Failed to release view ${viewId}`, {
+        cause: failures[0],
+      });
+    if (viewInfo.viewType === "app" && layout.isTilingEnabled()) {
+      const visibilityChanged = layout.syncTiledLayout();
+      if (visibilityChanged) layout.reorderViewLayers();
     }
   }
 

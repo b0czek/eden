@@ -30,24 +30,29 @@ export function createViewController(
   }
   function visibility(appId: string, visible: boolean) {
     const id = viewId(appId);
-    if (visible) views.showView(id);
-    else views.hideView(id);
-    return success();
+    return Effect.map(
+      visible ? views.showView(id) : views.hideView(id),
+      success,
+    );
   }
   function focus(appId: string) {
     const id = viewId(appId);
-    views.showView(id);
-    views.focusView(id);
-    return success();
+    return Effect.as(
+      Effect.andThen(views.showView(id), views.focusView(id)),
+      success(),
+    );
   }
   return defineController("view", {
     commands: {
       "update-bounds": command({
         input: v.object({ bounds: viewBoundsSchema }),
-        handle: ({ bounds }, caller) => {
-          views.setViewBounds(viewId(ownApp(caller)), bounds, { notify: true });
-          return success();
-        },
+        handle: ({ bounds }, caller) =>
+          Effect.map(
+            views.setViewBounds(viewId(ownApp(caller)), bounds, {
+              notify: true,
+            }),
+            success,
+          ),
       }),
       "update-view-bounds": command({
         permission: "manage",
@@ -55,10 +60,8 @@ export function createViewController(
           appId: appIdSchema.entries.appId,
           bounds: viewBoundsSchema,
         }),
-        handle: ({ appId, bounds }) => {
-          views.setViewBounds(viewId(appId), bounds);
-          return success();
-        },
+        handle: ({ appId, bounds }) =>
+          Effect.map(views.setViewBounds(viewId(appId), bounds), success),
       }),
       "set-visibility": command({
         input: v.object({ visible: v.boolean() }),
@@ -91,18 +94,14 @@ export function createViewController(
       }),
       "toggle-mode": command({
         input: v.object({ mode: modeSchema }),
-        handle: ({ mode }, caller) => {
-          views.setViewMode(viewId(ownApp(caller)), mode);
-          return success();
-        },
+        handle: ({ mode }, caller) =>
+          Effect.map(views.setViewMode(viewId(ownApp(caller)), mode), success),
       }),
       "toggle-view-mode": command({
         permission: "manage",
         input: v.object({ appId: appIdSchema.entries.appId, mode: modeSchema }),
-        handle: ({ appId, mode }) => {
-          views.setViewMode(viewId(appId), mode);
-          return success();
-        },
+        handle: ({ appId, mode }) =>
+          Effect.map(views.setViewMode(viewId(appId), mode), success),
       }),
       "tile-layout-state": command({
         handle: (_, caller) => views.getTileLayoutState(viewId(ownApp(caller))),
@@ -192,3 +191,4 @@ export function createViewController(
     },
   });
 }
+import * as Effect from "effect/Effect";

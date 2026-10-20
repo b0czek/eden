@@ -441,16 +441,18 @@ describe("DLC package lifecycle", () => {
     const inspectorAppId = "com.example.inspector";
     const permissions = eden.runtime.services.permissions;
     const views = eden.runtime.services.views;
-    const inspectorViewId = views.createView(
-      inspectorAppId,
-      {
-        id: inspectorAppId,
-        name: "Package Inspector",
-        version: "1.0.0",
-        frontend: { entry: "index.html" },
-      },
-      root,
-      undefined,
+    const inspectorViewId = await eden.runtime.effects.run(
+      views.createView(
+        inspectorAppId,
+        {
+          id: inspectorAppId,
+          name: "Package Inspector",
+          version: "1.0.0",
+          frontend: { entry: "index.html" },
+        },
+        root,
+        undefined,
+      ),
     );
     const inspectorWebContentsId =
       views.getViewInfo(inspectorViewId)?.view.webContents.id;
@@ -515,7 +517,7 @@ describe("DLC package lifecycle", () => {
         webContentsId: inspectorWebContentsId,
       }),
     ).resolves.toMatchObject({ status: 200 });
-    views.removeView(inspectorViewId);
+    await eden.runtime.effects.run(views.removeView(inspectorViewId));
     await expect(
       eden.platform.requestResource("eden-dlc", {
         url: inspectedModuleUrl,

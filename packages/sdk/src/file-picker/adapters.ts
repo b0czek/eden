@@ -63,19 +63,17 @@ export function createFilePickerViews(
         : undefined;
     },
     reveal: (id) =>
-      Effect.try({
-        try: () => {
-          views.showView(id);
-          views.focusView(id);
-        },
-        catch: (cause) =>
-          new FilePickerIoFailed({
-            operation: "reveal-provider",
-            viewId: id,
-            message: cause instanceof Error ? cause.message : String(cause),
-            cause,
-          }),
-      }),
+      Effect.andThen(views.showView(id), views.focusView(id)).pipe(
+        Effect.mapError(
+          (cause) =>
+            new FilePickerIoFailed({
+              operation: "reveal-provider",
+              viewId: id,
+              message: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
+        ),
+      ),
   };
 }
 

@@ -336,7 +336,7 @@ describe("file handle access and lifetime", () => {
       { location },
       owner,
     );
-    views.removeView(instance.viewId);
+    await eden.runtime.effects.run(views.removeView(instance.viewId));
     await expect(
       execute("fs/read", { location: handle }, owner),
     ).rejects.toThrow(/unavailable/);

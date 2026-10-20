@@ -7,11 +7,6 @@ import type {
 import * as Effect from "effect/Effect";
 import type { AppChannelLifecycle } from "../appbus/ports";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
-import {
-  callViewNative,
-  MainWindowUnavailable,
-  ViewNativeFailure,
-} from "../views/errors";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
 import { BackendStartupFailed } from "./errors";
@@ -73,39 +68,20 @@ export const acquireAppInstance = Effect.fn(function* (
     : undefined;
   const viewId = manifest.frontend?.entry
     ? yield* Effect.acquireRelease(
-        Effect.try({
-          try: () =>
-            views.createView(
-              appId,
-              manifest,
-              installPath,
-              bounds,
-              launchArgs,
-              launchFile,
-            ),
-          catch: (cause) => cause,
-        }).pipe(
-          Effect.catch((cause) =>
-            cause instanceof MainWindowUnavailable ||
-            cause instanceof ViewNativeFailure
-              ? Effect.fail(cause)
-              : Effect.die(cause),
-          ),
+        views.createView(
+          appId,
+          manifest,
+          installPath,
+          bounds,
+          launchArgs,
+          launchFile,
         ),
         (id) =>
-          Effect.sync(() => {
-            const view = views.getViewInfo(id)?.view;
-            if (!view) return;
-            try {
-              views.removeView(id);
-            } finally {
-              // Native ownership survives failures in view bookkeeping or layout cleanup.
-              if (!view.webContents.isDestroyed())
-                callViewNative("destroy", { id, appId }, () =>
-                  view.webContents.close(),
-                );
-            }
-          }),
+          Effect.suspend(() =>
+            views.getViewInfo(id)
+              ? views.removeView(id).pipe(Effect.orDie)
+              : Effect.void,
+          ),
       )
     : -1;
   if (backend && backends.getBackend(appId) !== backend)

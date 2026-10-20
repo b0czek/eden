@@ -18,6 +18,17 @@ import { DistPath, RuntimeConfig } from "../runtime/inputs";
 import { Settings } from "../settings/service";
 import { createViewLayout, type ViewLayout } from "./coordination";
 import { createViewDevTools } from "./devtools";
+import {
+  MainWindowUnavailable,
+  TileActionUnavailable,
+  ViewModeUnsupported,
+  ViewNativeFailure,
+  viewMutationFailure,
+  type ViewCreateError,
+  type ViewMutationError,
+  type ViewModeError,
+  type ViewTileError,
+} from "./errors";
 import { createFloatingWindows } from "./floating-windows";
 import { createInterfaceScale } from "./interface-scale";
 import { createViewPresentation } from "./presentation";
@@ -26,7 +37,7 @@ import { createViewRendering } from "./rendering";
 import { createTiling } from "./tiling";
 import type { ViewInfo, ViewMode, ViewsEvents } from "./types";
 
-/** Mutations reject synchronously with the contextual tagged errors in errors.ts. */
+/** Native setup and presentation hooks are synchronous; workflows return lazy Effects. */
 export interface Views {
   initialize: () => Effect.Effect<void>;
   viewRemoved: Event<ViewsEvents["view-removed"]>;
@@ -41,7 +52,6 @@ export interface Views {
   setWorkspaceBounds: (bounds: Bounds) => void;
   setWindowSize: (windowSize: WindowSize) => void;
   getWindowSize: () => WindowSize;
-  /** @throws MainWindowUnavailable, ViewNativeFailure. Missing frontend is a caller defect. */
   createView: (
     appId: string,
     manifest: AppManifest,
@@ -49,15 +59,14 @@ export interface Views {
     bounds: Bounds | undefined,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ) => number;
-  /** @throws ViewUnavailable or ViewNativeFailure; indexes are released on failure. */
-  removeView: (viewId: number) => void;
-  /** @throws ViewUnavailable or ViewNativeFailure. */
+  ) => Effect.Effect<number, ViewCreateError>;
+  /** Releases native ownership and indexes even when layout cleanup fails. */
+  removeView: (viewId: number) => Effect.Effect<void, ViewMutationError>;
   setViewBounds: (
     viewId: number,
     bounds: Bounds,
     options?: { notify?: boolean },
-  ) => void;
+  ) => Effect.Effect<void, ViewMutationError>;
   getView: (viewId: number) => PlatformView | undefined;
   getViewInfo: (viewId: number) => ViewInfo | undefined;
   getViewsByAppId: (appId: string) => number[];
@@ -65,24 +74,24 @@ export interface Views {
   getViewIdByWebContentsId: (webContentsId: number) => number | undefined;
   getAllViews: () => [number, ViewInfo][];
   getTileLayoutState: (viewId: number) => TileLayoutState;
-  /** @throws TileActionUnavailable, ViewUnavailable, or ViewNativeFailure. */
   swapTiledView: (
     viewId: number,
     direction: TileLayoutDirection,
-  ) => TileLayoutState;
-  /** @throws TileActionUnavailable, ViewUnavailable, or ViewNativeFailure. */
+  ) => Effect.Effect<TileLayoutState, ViewTileError>;
   expandTiledView: (
     viewId: number,
     direction: TileLayoutDirection,
-  ) => TileLayoutState;
-  showView: (viewId: number) => void;
-  focusView: (viewId: number) => void;
-  hideView: (viewId: number) => void;
+  ) => Effect.Effect<TileLayoutState, ViewTileError>;
+  showView: (viewId: number) => Effect.Effect<void, ViewMutationError>;
+  focusView: (viewId: number) => Effect.Effect<void, ViewMutationError>;
+  hideView: (viewId: number) => Effect.Effect<void, ViewMutationError>;
   sendToView: (viewId: number, channel: string, ...args: unknown[]) => boolean;
   sendToMainWindow: (channel: string, ...args: unknown[]) => boolean;
   getActiveViews: () => number[];
-  /** @throws ViewUnavailable, ViewModeUnsupported, or ViewNativeFailure. */
-  setViewMode: (viewId: number, targetMode?: ViewMode) => void;
+  setViewMode: (
+    viewId: number,
+    targetMode?: ViewMode,
+  ) => Effect.Effect<void, ViewModeError>;
   getCurrentScale: () => number;
   setInterfaceScale: (scale: number) => void;
   setKeyboardPresentationLift: (lift: number) => void;
@@ -167,7 +176,11 @@ export const ViewsLive = Layer.effect(
       setWorkspaceBounds: coordination.setWorkspaceBounds,
       setWindowSize: coordination.setWindowSize,
       getWindowSize: coordination.getWindowSize,
-      setViewBounds: coordination.setViewBounds,
+      setViewBounds: (...args) =>
+        Effect.try({
+          try: () => coordination.setViewBounds(...args),
+          catch: viewMutationFailure,
+        }),
       getView: nativeViews.getView,
       getViewInfo: nativeViews.getViewInfo,
       getViewsByAppId: nativeViews.getViewsByAppId,
@@ -175,15 +188,48 @@ export const ViewsLive = Layer.effect(
       getViewIdByWebContentsId: nativeViews.getViewIdByWebContentsId,
       getAllViews: nativeViews.getAllViews,
       getTileLayoutState: coordination.getTileLayoutState,
-      swapTiledView: coordination.swapTiledView,
-      expandTiledView: coordination.expandTiledView,
-      showView: coordination.showView,
-      focusView: nativeViews.focusView,
-      hideView: coordination.hideView,
+      swapTiledView: (...args) =>
+        Effect.try({
+          try: () => coordination.swapTiledView(...args),
+          catch: (cause) =>
+            cause instanceof TileActionUnavailable
+              ? cause
+              : viewMutationFailure(cause),
+        }),
+      expandTiledView: (...args) =>
+        Effect.try({
+          try: () => coordination.expandTiledView(...args),
+          catch: (cause) =>
+            cause instanceof TileActionUnavailable
+              ? cause
+              : viewMutationFailure(cause),
+        }),
+      showView: (id) =>
+        Effect.try({
+          try: () => coordination.showView(id),
+          catch: viewMutationFailure,
+        }),
+      focusView: (id) =>
+        Effect.try({
+          try: () => nativeViews.focusView(id),
+          catch: viewMutationFailure,
+        }),
+      hideView: (id) =>
+        Effect.try({
+          try: () => coordination.hideView(id),
+          catch: viewMutationFailure,
+        }),
       sendToView: nativeViews.sendToView,
       sendToMainWindow: nativeViews.sendToMainWindow,
       getActiveViews: nativeViews.getActiveViews,
-      setViewMode: coordination.setViewMode,
+      setViewMode: (...args) =>
+        Effect.try({
+          try: () => coordination.setViewMode(...args),
+          catch: (cause) =>
+            cause instanceof ViewModeUnsupported
+              ? cause
+              : viewMutationFailure(cause),
+        }),
       setKeyboardPresentationLift: coordination.setKeyboardPresentationLift,
       getKeyboardPresentationLift: coordination.getKeyboardPresentationLift,
       initialize: interfaceScale.initialize,
@@ -194,8 +240,23 @@ export const ViewsLive = Layer.effect(
       globalBoundsChanged,
       boundsUpdated,
       modeChanged,
-      createView: (...args) => nativeViews.createView(coordination, ...args),
-      removeView: (viewId) => nativeViews.removeView(coordination, viewId),
+      createView: (...args) =>
+        Effect.try({
+          try: () => nativeViews.createView(coordination, ...args),
+          catch: (cause) => {
+            if (
+              cause instanceof MainWindowUnavailable ||
+              cause instanceof ViewNativeFailure
+            )
+              return cause;
+            throw cause;
+          },
+        }),
+      removeView: (viewId) =>
+        Effect.try({
+          try: () => nativeViews.removeView(coordination, viewId),
+          catch: viewMutationFailure,
+        }),
       getCurrentScale: interfaceScale.getScale,
       setInterfaceScale: interfaceScale.setScale,
     } satisfies Views;

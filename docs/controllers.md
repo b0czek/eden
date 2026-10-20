@@ -44,6 +44,12 @@ dependencies, connects scoped events, and exposes the explicit contract. Nested
 capabilities, such as Settings panels, keep their contracts, behavior, and
 controllers together below their domain.
 
+View creation, removal, bounds, visibility, focus, mode and tile mutations return
+lazy Effects with view-owned failure types. Native setup and presentation hooks
+remain synchronous. The view registry owns destruction, including cleanup after
+native failures; process scopes release views through the service. Pointer callbacks
+submit bounds work through their acquisition scope's fibers.
+
 Within a Layer, acquire dependencies first, establish state and its cleanup,
 define workflows, connect scoped subscriptions, and return the public methods.
 Register cleanup next to acquisition. Keep stateless rules outside the Layer and

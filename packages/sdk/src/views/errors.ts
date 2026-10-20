@@ -2,7 +2,7 @@ import type { TileLayoutDirection } from "@edenapp/types";
 import * as Data from "effect/Data";
 import type { ViewMode } from "./types";
 
-/** Synchronous admission rejection: the requested renderer no longer exists. */
+/** The requested renderer no longer exists. */
 export class ViewUnavailable extends Data.TaggedError("ViewUnavailable")<{
   viewId?: number;
   appId?: string;
@@ -64,6 +64,17 @@ export class ViewNativeFailure extends Data.TaggedError("ViewNativeFailure")<{
       this.cause instanceof Error ? this.cause.message : String(this.cause);
     return `Failed to ${this.operation} view${this.viewId === undefined ? "" : ` ${this.viewId}`}: ${detail}`;
   }
+}
+
+export type ViewCreateError = MainWindowUnavailable | ViewNativeFailure;
+export type ViewMutationError = ViewUnavailable | ViewNativeFailure;
+export type ViewModeError = ViewMutationError | ViewModeUnsupported;
+export type ViewTileError = ViewMutationError | TileActionUnavailable;
+
+export function viewMutationFailure(cause: unknown): ViewMutationError {
+  if (cause instanceof ViewUnavailable || cause instanceof ViewNativeFailure)
+    return cause;
+  throw cause;
 }
 
 export function callViewNative<A>(

@@ -1,5 +1,7 @@
 import type { ViewBounds } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import * as Cause from "effect/Cause";
+import * as FiberSet from "effect/FiberSet";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
 import { createPointerTracking } from "./pointer";
@@ -14,6 +16,7 @@ export const createViewInteractions = Effect.fn(function* (
   display: DisplayPort,
 ) {
   const _pointer = yield* createPointerTracking(display, 8);
+  const runBoundsUpdate = yield* FiberSet.makeRuntime<never, void, never>();
   let _dragState: {
     appId: string;
     startX: number;
@@ -71,7 +74,19 @@ export const createViewInteractions = Effect.fn(function* (
         height: _dragState.startBounds.height,
       };
 
-      _views.setViewBounds(viewId, newBounds, { notify: true });
+      runBoundsUpdate(
+        _views
+          .setViewBounds(viewId, newBounds, { notify: true })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause)
+                ? Effect.failCause(cause).pipe(Effect.orDie)
+                : Effect.sync(() =>
+                    log.error("Failed to drag view:", Cause.squash(cause)),
+                  ),
+            ),
+          ),
+      );
     });
   }
   function endDragForApp(appId?: string) {
@@ -144,7 +159,19 @@ export const createViewInteractions = Effect.fn(function* (
         _resizeState.constraints,
       );
 
-      _views.setViewBounds(viewId, newBounds, { notify: true });
+      runBoundsUpdate(
+        _views
+          .setViewBounds(viewId, newBounds, { notify: true })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause)
+                ? Effect.failCause(cause).pipe(Effect.orDie)
+                : Effect.sync(() =>
+                    log.error("Failed to resize view:", Cause.squash(cause)),
+                  ),
+            ),
+          ),
+      );
     });
   }
   function endResizeForApp(appId?: string) {

@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
+import type { Views } from "../../src/views/service";
 import { APP_ID } from "./support/fixtures";
 import { isProcessAlive, useElectronHost } from "./support/host";
 
@@ -65,7 +66,7 @@ test.describe
                 execute(command: string, args: unknown): Promise<unknown>;
                 runtime: {
                   services: {
-                    views: { createView(...args: unknown[]): number };
+                    views: Pick<Views, "createView">;
                     backends: {
                       getBackend(id: string): { pid?: number } | undefined;
                     };

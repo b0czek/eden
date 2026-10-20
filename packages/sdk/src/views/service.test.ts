@@ -96,7 +96,9 @@ function addView(
     overlay: options.viewType === "overlay",
     window: { mode, scaling: options.scaling },
   } as AppManifest;
-  const id = views.createView(manifest.id, manifest, "/apps/example", bounds);
+  const id = Effect.runSync(
+    views.createView(manifest.id, manifest, "/apps/example", bounds),
+  );
   const info = views.getViewInfo(id)!;
   return { info, setBounds: info.view.setBounds as jest.Mock };
 }
@@ -169,14 +171,14 @@ describe("Views visibility", () => {
     const originalBounds = { x: 120, y: 80, width: 640, height: 480 };
     const { info, setBounds } = addView(views, "floating", originalBounds);
 
-    views.hideView(info.id);
+    Effect.runSync(views.hideView(info.id));
 
     expect(setBounds).toHaveBeenLastCalledWith(HIDDEN_BOUNDS);
     expect(info.bounds).toEqual(originalBounds);
     expect(info.requestedVisible).toBe(false);
     expect(info.visible).toBe(false);
 
-    views.showView(info.id);
+    Effect.runSync(views.showView(info.id));
 
     expect(setBounds).toHaveBeenLastCalledWith(originalBounds);
     expect(info.bounds).toEqual(originalBounds);
@@ -199,10 +201,10 @@ describe("Views visibility", () => {
       height: 300,
     });
 
-    views.hideView(info.id);
+    Effect.runSync(views.hideView(info.id));
     expect(setBounds).toHaveBeenLastCalledWith(HIDDEN_BOUNDS);
 
-    views.showView(info.id);
+    Effect.runSync(views.showView(info.id));
 
     const workspaceBounds = { x: 0, y: 0, width: 800, height: 600 };
     expect(setBounds).toHaveBeenLastCalledWith(workspaceBounds);
@@ -253,24 +255,43 @@ describe("web contents lookup lifecycle", () => {
         injections: { css: "none", appFrame: false },
       },
     });
-    const viewId = views.createView(
-      appId,
-      manifest,
-      "/apps/example",
-      undefined,
+    const viewId = Effect.runSync(
+      views.createView(appId, manifest, "/apps/example", undefined),
     );
     return { viewId, contents: views.getViewInfo(viewId)!.view.webContents };
   }
 
-  it("rejects missing or destroyed renderers synchronously without changing surviving views", () => {
+  it("defers native view creation and removal until their Effects execute", async () => {
+    const manifest = testApp("app.lazy");
+    const creation = views.createView(
+      manifest.id,
+      manifest,
+      "/apps/example",
+      undefined,
+    );
+    expect(views.getAllViews()).toEqual([]);
+    expect(platform.windows.views).toHaveLength(0);
+    const id = await effects.run(creation);
+    const contents = views.getView(id)!.webContents;
+    const removal = views.removeView(id);
+    expect(contents.isDestroyed()).toBe(false);
+    expect(views.getView(id)).toBeDefined();
+    await effects.run(removal);
+    expect(contents.isDestroyed()).toBe(true);
+    expect(views.getView(id)).toBeUndefined();
+  });
+
+  it("rejects missing or destroyed renderers without changing surviving views", () => {
     const surviving = create("app.surviving");
-    expect(() => views.showView(-1)).toThrow(ViewUnavailable);
-    expect(() => views.showView(-1)).toThrow(
+    expect(() => Effect.runSync(views.showView(-1))).toThrow(ViewUnavailable);
+    expect(() => Effect.runSync(views.showView(-1))).toThrow(
       expect.objectContaining({ viewId: -1, reason: "missing" }),
     );
     const destroyed = create("app.destroyed");
     destroyed.contents.close();
-    expect(() => views.setViewBounds(destroyed.viewId, HIDDEN_BOUNDS)).toThrow(
+    expect(() =>
+      Effect.runSync(views.setViewBounds(destroyed.viewId, HIDDEN_BOUNDS)),
+    ).toThrow(
       expect.objectContaining({
         _tag: "ViewUnavailable",
         viewId: destroyed.viewId,
@@ -286,17 +307,19 @@ describe("web contents lookup lifecycle", () => {
   it("rejects unsupported modes and unavailable tile actions before changing presentation", () => {
     const view = create("app.floating");
     const before = { ...views.getViewInfo(view.viewId)!.bounds };
-    expect(() => views.setViewMode(view.viewId, "tiled")).toThrow(
-      ViewModeUnsupported,
-    );
+    expect(() =>
+      Effect.runSync(views.setViewMode(view.viewId, "tiled")),
+    ).toThrow(ViewModeUnsupported);
     expect(views.getViewInfo(view.viewId)).toMatchObject({
       mode: "floating",
       bounds: before,
     });
-    expect(() => views.swapTiledView(view.viewId, "left")).toThrow(
-      TileActionUnavailable,
-    );
-    expect(() => views.expandTiledView(view.viewId, "right")).toThrow(
+    expect(() =>
+      Effect.runSync(views.swapTiledView(view.viewId, "left")),
+    ).toThrow(TileActionUnavailable);
+    expect(() =>
+      Effect.runSync(views.expandTiledView(view.viewId, "right")),
+    ).toThrow(
       expect.objectContaining({
         _tag: "TileActionUnavailable",
         viewId: view.viewId,
@@ -319,10 +342,12 @@ describe("web contents lookup lifecycle", () => {
         throw cause;
       });
     expect(() =>
-      views.setViewBounds(
-        view.viewId,
-        { x: 10, y: 20, width: 500, height: 300 },
-        { notify: true },
+      Effect.runSync(
+        views.setViewBounds(
+          view.viewId,
+          { x: 10, y: 20, width: 500, height: 300 },
+          { notify: true },
+        ),
       ),
     ).toThrow(
       expect.objectContaining({
@@ -355,7 +380,7 @@ describe("web contents lookup lifecycle", () => {
     expect(views.getAppIdByWebContentsId(-1)).toBeUndefined();
     expect(views.getViewIdByWebContentsId(-1)).toBeUndefined();
 
-    views.removeView(second.viewId);
+    Effect.runSync(views.removeView(second.viewId));
     const replacement = create("app.shared");
     expect(views.getAppIdByWebContentsId(second.contents.id)).toBeUndefined();
     expect(views.getViewIdByWebContentsId(second.contents.id)).toBeUndefined();
@@ -373,7 +398,7 @@ describe("web contents lookup lifecycle", () => {
     const surviving = create("app.surviving");
     closed.contents.close();
 
-    views.showView(surviving.viewId);
+    Effect.runSync(views.showView(surviving.viewId));
 
     expect(views.getViewInfo(closed.viewId)).toBeUndefined();
     expect(views.getAppIdByWebContentsId(closed.contents.id)).toBeUndefined();
@@ -431,7 +456,10 @@ describe("web contents lookup lifecycle", () => {
         throw new Error("Close failed");
       });
     try {
-      expect(() => views.removeView(view.viewId)).toThrow(ViewNativeFailure);
+      expect(() => Effect.runSync(views.removeView(view.viewId))).toThrow(
+        ViewNativeFailure,
+      );
+      expect(view.contents.isDestroyed()).toBe(true);
       expect(views.getAppIdByWebContentsId(view.contents.id)).toBeUndefined();
       expect(views.getViewIdByWebContentsId(view.contents.id)).toBeUndefined();
     } finally {

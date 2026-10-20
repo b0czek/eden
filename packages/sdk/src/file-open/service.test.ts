@@ -72,8 +72,8 @@ describe("file opening failures", () => {
           Views,
           collaborator<Views>({
             getViewsByAppId: () => [],
-            showView: () => {},
-            focusView: () => {},
+            showView: () => Effect.void,
+            focusView: () => Effect.void,
           }),
         ),
         Effect.provideService(FileOpenFilesystem, filesystem),

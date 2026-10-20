@@ -1,5 +1,5 @@
 import * as Data from "effect/Data";
-import type { MainWindowUnavailable, ViewNativeFailure } from "../views/errors";
+import type { ViewCreateError } from "../views/errors";
 
 /** Synchronous admission and launch invariants owned by processes. */
 export class ProcessLaunchRejected extends Data.TaggedError(
@@ -74,8 +74,7 @@ export type BackendTerminateError =
   | BackendTerminationTimedOut;
 export type ProcessLaunchError =
   | ProcessLaunchRejected
-  | MainWindowUnavailable
-  | ViewNativeFailure
+  | ViewCreateError
   | BackendCreateError;
 
 export class ProcessStopFailed extends Data.TaggedError("ProcessStopFailed")<{

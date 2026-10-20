@@ -227,8 +227,8 @@ export const FileOpenLive = Layer.effect(
         }
         const focusViewId = views.getViewsByAppId(appId).at(-1);
         if (focusViewId !== undefined) {
-          views.showView(focusViewId);
-          views.focusView(focusViewId);
+          yield* views.showView(focusViewId);
+          yield* views.focusView(focusViewId);
         }
         opened.emit({
           viewIds: views.getViewsByAppId(appId),
