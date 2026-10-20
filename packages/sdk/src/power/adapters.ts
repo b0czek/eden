@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import type { EdenPowerProvider } from "../api/config";
-import type { PowerHost } from "./service";
+import type { PowerHost } from "./ports";
 
 export function createPowerHost(
   provider?: EdenPowerProvider,
