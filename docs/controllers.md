@@ -2,50 +2,98 @@
 
 Each domain keeps its public boundaries beside its implementation:
 `controller-edenapi.ts` exposes sandboxed app commands and events, while
-`controller-sdk.ts` exposes trusted main-process SDK methods. Factories receive
-their dependencies explicitly; services own domain behavior and state. The
+`controller-sdk.ts` exposes trusted main-process SDK methods. Services acquire
+their dependencies through Effect and own domain behavior and state. The
 runtime composes the controllers and registers the EdenAPI command contracts.
 
 ## Services
 
-Use classless factory functions for domain services. Pass dependencies explicitly,
-keep instance state in closures, and return the operations and events consumers need.
-Introduce a Layer only when it solves a demonstrated composition or ownership
-problem.
+Declare an explicit service interface, its same-named `Context.Service` key,
+and a `Layer.effect` implementation, in that order. The interface owns the
+supported operations, events, and failure types. Check implementations against
+that contract; infer types within private helpers where useful.
 
-Factories acquire resources in an Effect scope; I/O methods return Effects that
-describe work without starting it. Infer the service type from the factory's
-successful result:
+Layer implementations acquire dependencies with `yield*`, keep instance state
+in closures, and register resource cleanup in their Effect scope. I/O methods
+return Effects that describe work without starting it. Keep each port key beside
+its contract. Layers declare requirements without selecting dependency
+implementations. Acquire an existing collaborator key directly when its capability
+fits. Introduce a separate domain port for meaningful isolation or adaptation;
+avoid keys that merely rename an existing service.
 
-```ts
-import * as Effect from "effect/Effect";
+Assembly modules such as `runtime.ts` bind domain ports to collaborating services
+or platform adapters and register API controllers. Keep these modules where they
+perform actual integration. Private assembly helpers do not need service keys.
 
-export type I18n = Effect.Success<ReturnType<typeof createI18n>>;
-```
+Keep a domain's contracts and implementation together. A small domain needs only
+`service.ts` and its API controllers. Extract files when they own a distinct
+responsibility:
 
-Keep single-service domains in `service.ts`, beside their controllers. Larger
-domains keep cohesive services in focused adjacent modules. Stateless
-domain rules and data use ordinary functions, such as wallpaper resolution in
-[appearance/presets.ts](../packages/sdk/src/appearance/presets.ts). Service
-closures own instance state and resource lifetimes.
+- `types.ts` holds shared domain values and event payloads.
+- `errors.ts` owns named expected failures and operation-specific failure unions.
+- `ports.ts` holds meaningful external capability contracts and their keys.
+- Named implementation modules own substantial rules, workflows, or resources.
+- `runtime.ts` adapts collaborating capabilities and registers the API.
 
-Name services for the capabilities they expose: `Processes` from
-`createProcesses`, `Volumes` from `createVolumes`, and `SettingsPanels` from
-`createSettingsPanels`. Use lowercase filenames such as `service.ts`,
-`volumes.ts`, and `panel-service.ts`. Reserve `controller` for API boundaries;
-view behavior lives in modules such as `tiling.ts` and `rendering.ts`.
+Do not add empty files to match a template. Keep private helpers ordinary
+functions. Give mutable state and native resources one owner: the Views
+[registry](../packages/sdk/src/views/registry.ts) owns native view lifetime,
+while [coordination](../packages/sdk/src/views/coordination.ts) owns layout and
+presentation. Their [service](../packages/sdk/src/views/service.ts) acquires
+dependencies, connects scoped events, and exposes the explicit contract. Nested
+capabilities, such as Settings panels, keep their contracts, behavior, and
+controllers together below their domain.
+
+Within a Layer, acquire dependencies first, establish state and its cleanup,
+define workflows, connect scoped subscriptions, and return the public methods.
+Register cleanup next to acquisition. Keep stateless rules outside the Layer and
+avoid duplicating state in an extracted helper.
+
+Name service interfaces and keys for their capabilities: `Processes`, `Volumes`,
+and `SettingsPanels`. Name their implementations `ProcessesLive`, `VolumesLive`,
+and `SettingsPanelsLive`. Use lowercase filenames such as `service.ts` and
+`volumes.ts`. Reserve `controller` for API boundaries; view behavior lives in
+modules such as `tiling.ts` and `rendering.ts`.
+
+### Expected failures
+
+Use domain-owned `Data.TaggedError` classes for failures callers can distinguish
+and act on. Include relevant identifiers and retain the original `cause` when
+adapting native or dependency failures. Each operation declares its actual
+failure union; there is no global catch-all domain error. Successful refusal or
+absence remains a value where that is the public contract.
+
+Translate failures where their meaning changes. Native Promise boundaries can
+use `fromPromise(evaluate, onError)` to produce a tagged failure while preserving
+interruption and native cleanup settlement. Compose existing Effect failures
+directly, or use `Effect.mapError` when a domain needs additional context. Do not
+catch an entire workflow merely to rename every failure. Pure programming
+mistakes remain defects, and cancellation remains interruption.
+
+Synchronous reads and admission checks keep their timing. A synchronous check
+may throw a documented tagged rejection when it must reject before operation
+acceptance. Do not catch arbitrary thrown exceptions into an expected error
+channel. Controllers preserve their public response shapes and encode typed
+operation failures at the API boundary. Defects are not ordinary encoded
+responses. Domain errors retain their structured data through execution; only
+the transport boundary chooses the wire representation.
 
 Dependencies describe domain capabilities using fully provided Effects for I/O.
-Keep small contracts beside the factory; use `ports.ts` when the set of contracts
-benefits from its own module:
+Keep small contracts beside the implementation; use `ports.ts` when the set of
+contracts benefits from its own module:
 
 ```ts
 import type { WallpaperConfig } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
+import type { StorageReadFailure, StorageWriteFailure } from "../storage/errors";
+import type { SettingValueError } from "../settings/errors";
 
 export interface AppearanceSettings {
-  readWallpaper(): Effect.Effect<string | undefined, Error>;
-  saveWallpaper(config: WallpaperConfig): Effect.Effect<void, Error>;
+  readWallpaper(): Effect.Effect<string | undefined, StorageReadFailure>;
+  saveWallpaper(config: WallpaperConfig): Effect.Effect<
+    void,
+    StorageWriteFailure | SettingValueError
+  >;
 }
 ```
 
@@ -57,8 +105,7 @@ translate persistence keys and notifications while composing the settings
 service's Effects directly. Adapters for native Promise APIs defer work with
 `fromPromise`, which forwards interruption through an `AbortSignal` and awaits
 native cleanup. Converted services compose Effects without an intermediate
-Promise or interpreter. Services receive neither a dependency container nor a
-concrete settings implementation.
+Promise or interpreter. Services acquire their narrow port keys through Effect.
 
 Controllers validate external inputs before passing domain values to services.
 Share input schemas between EdenAPI and SDK controllers where their contracts
@@ -73,30 +120,42 @@ Persistence readers use those same domain schemas before passing stored data to
 services; runtime checks depend on current state rather than repeating shape checks.
 
 Register cleanup when acquiring a resource. For example, i18n acquires its local
-event source and upstream subscription within the factory's scope:
+event source and upstream subscription within its acquisition scope, yielding
+the local `I18nSettings` port key:
 
 ```ts
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
+import type { StorageReadFailure } from "../storage/errors";
 
-interface I18nDependencies {
-  settings: I18nSettings;
+export interface I18n {
+  getLocale(): Effect.Effect<string, StorageReadFailure>;
+  localeChanged: Event<{ locale: string }>;
 }
 
-export const createI18n = Effect.fn(function* ({ settings }: I18nDependencies) {
-  const localeChanged = yield* scopedEvent<{ locale: string }>();
-  yield* listen(settings.localeChanged, localeChanged.emit);
+export const I18n = Context.Service<"eden/I18n", I18n>("eden/I18n");
 
-  const getLocale = Effect.fn(function* () {
-    return (yield* settings.readLocale()) || "en";
-  });
+export const I18nLive = Layer.effect(
+  I18n,
+  Effect.gen(function* () {
+    const settings = yield* I18nSettings;
+    const localeChanged = yield* scopedEvent<{ locale: string }>();
+    const getLocale = Effect.fn(function* () {
+      return (yield* settings.readLocale()) || "en";
+    });
 
-  return { getLocale, localeChanged };
-});
+    yield* listen(settings.localeChanged, localeChanged.emit);
+    return { getLocale, localeChanged };
+  }),
+);
 ```
 
-`Effect.fn` keeps workflow construction lazy and infers its result, failures and
-requirements. `scopedEvent` acquires a local event source and clears its listeners
+`Effect.gen` describes Layer acquisition. `Effect.fn` keeps individual workflows
+lazy and infers their internal result, failures, and requirements. `scopedEvent`
+acquires a local event source and clears its listeners
 when the scope closes. `listen` registers a listener and removes it on scope close.
 Both helpers use the shared event primitives and standard Effect resource ownership.
 
@@ -109,8 +168,9 @@ publishing notifications.
 Use explicit `Duration` values for Effect waits and expiry: `Duration.seconds(5)`,
 `Duration.millis(delayMs)`, `Duration.zero`, or `Duration.infinity`.
 
-Factory acquisition may require `Scope.Scope`. Effects returned by service
-methods must have their dependencies provided, with no outstanding requirements
+Service acquisition may require its dependency keys and `Scope.Scope`. Effects
+returned by service methods must have their dependencies provided, with no
+outstanding requirements
 (the third `Effect.Effect` type parameter is `never`). Services compose those
 Effects with `yield*`, `Effect.map`, or other Effect operators; they do not run
 their own interpreter or register commands.
@@ -263,11 +323,34 @@ preserves that scope so only authorized subscribers receive them.
 
 ## Composition and generation
 
-The desktop graph is acquired and initialized by one scoped Effect program,
-exposed as a single `Desktop` service through a Layer. `ManagedRuntime` owns
-that Layer, its resources, and work started by the host runners. Domain
-factories retain explicit dependencies; each domain does not need its own tag.
-See the [runtime boundary](../packages/sdk/src/runtime/runtime.ts).
+The desktop graph is assembled from domain Layers selected by the
+[composition root](../packages/sdk/src/runtime/composition.ts). Each service's
+Layer implementation acquires its declared dependencies. The composition root
+selects
+implementations and connects dependencies with `Layer.provide` and
+`Layer.provideMerge`. Domain integration modules import collaborating service keys,
+not their live Layers. Keep mutable state inside acquisition, never in the Layer
+definition's module scope. Service operations have no outstanding requirements.
+
+Persistence Layers acquire ready storage capabilities and own their connection
+cleanup. Consumers yield the storage key and use its operations directly; they
+do not open or manage the underlying connection.
+
+Domains also own lazy API registration programs in their integration modules. After
+the
+service graph is acquired, the composition root runs these programs to assemble
+domain controllers and register them with the shared IPC transport. Desktop
+integrations and lifecycle operations consume service keys directly. The
+`runtime.services` object is an inspection projection for host and test callers;
+do not use it as a dependency container for runtime assembly.
+
+`RuntimeEnvironment` supplies host configuration, paths, platform ports and
+pre-start settings registrations to assembly modules. Seeding finishes before
+the domain graph is acquired. The assembled `Desktop` publishes controllers and
+connects lifecycle integrations before ordered initialization begins.
+`ManagedRuntime` owns the graph, its resources, readiness, and work started by
+the host runners. See the
+[runtime boundary](../packages/sdk/src/runtime/runtime.ts).
 
 Startup retains its fiber, and readiness follows its exit. Shutdown interrupts
 pending startup and preserves native I/O settlement. After successful startup,
@@ -281,13 +364,13 @@ Effects and receive no outer runtime runner. Test fixtures can acquire standalon
 services through their own scoped helper without adding an acquisition API to
 the desktop runtime.
 
-The desktop [composition program](../packages/sdk/src/runtime/composition.ts)
-acquires the complete service graph in one scope. Dependencies are constructed
-before their consumers; synchronous resource owners register disposal with
-`Effect.acquireRelease` alongside construction. Shutdown explicitly closes
-operation admission, drains accepted work, and stops processes before closing
-the scope. Host settings registrations have a separate synchronous owner so
-registration does not require starting the desktop services.
+Layer dependencies determine acquisition order; resource owners register cleanup
+with `Effect.acquireRelease` alongside construction. Ordered
+[initialization and shutdown](../packages/sdk/src/runtime/lifecycle.ts) are
+separate from graph construction. Shutdown explicitly closes operation
+admission, drains accepted work, and stops processes before disposing the graph.
+Host settings registrations have a separate synchronous owner so registration
+does not require starting the desktop services.
 
 Controllers register their commands and selected event sources with one execution
 registry. A command name has one owner; registering a duplicate is an error.

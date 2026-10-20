@@ -3,28 +3,28 @@ import type {
   FilesystemChangeKind,
   UserProfile,
 } from "@edenapp/types";
-import type { TargetedNotification } from "../controllers/events";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
-import { Filesystem } from "../filesystem/service";
-import { Processes } from "../processes/service";
-import { Users } from "../user/service";
-import { InvalidUserPasswordError } from "../user/errors";
-import { SessionProcessesStopFailed } from "../processes/errors";
-import { SessionTransitionInProgress } from "../operations/errors";
 import { gate } from "../../tests/support/async";
 import {
   buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../tests/support/effect-runtime";
+import type { TargetedNotification } from "../controllers/events";
 import { fromPromise } from "../effects/io";
 import { createEvent, type Event } from "../events/event";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { Filesystem } from "../filesystem/service";
+import { SessionTransitionInProgress } from "../operations/errors";
 import { Operations, OperationsLive } from "../operations/service";
+import { SessionProcessesStopFailed } from "../processes/errors";
+import { Processes } from "../processes/service";
 import { RuntimeConfig } from "../runtime/inputs";
+import { InvalidUserPasswordError } from "../user/errors";
+import { Users } from "../user/service";
 import { SessionContext, SessionContextLive } from "./context";
 import { Sessions, SessionsLive } from "./service";
 

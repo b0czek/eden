@@ -85,3 +85,7 @@ export const createFoundationWindow = Effect.fn(function* ({
   });
   return { open, isOpen: () => mainWindow !== null };
 });
+
+export type FoundationWindow = Effect.Success<
+  ReturnType<typeof createFoundationWindow>
+>;

@@ -302,6 +302,7 @@ export const OperationsLive = Layer.effect(
         });
         // This handle was just submitted from this exact task, so its retained
         // result/failure types are known despite the heterogeneous ledger.
+        // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- This newly admitted host handle belongs to the typed task above; the shared ledger erases heterogeneous results.
         return yield* wait(handle, context) as Effect.Effect<R, E | Error>;
       });
     }

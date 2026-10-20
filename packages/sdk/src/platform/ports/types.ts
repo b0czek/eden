@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import type { LogContext } from "../../logging";
 
 export interface Bounds {
@@ -186,6 +187,10 @@ export interface WindowingPort {
   ): void;
   getWebContentsById(id: number): PlatformWebContents | undefined;
 }
+export const WindowingPort = Context.Service<
+  "eden/WindowingPort",
+  WindowingPort
+>("eden/WindowingPort");
 
 export interface RendererIpcEvent {
   sender: { id: number };
@@ -206,6 +211,10 @@ export interface RendererIpcPort {
   removeHandler(channel: string): void;
   removeAllListeners(channel: string): void;
 }
+export const RendererIpcPort = Context.Service<
+  "eden/RendererIpcPort",
+  RendererIpcPort
+>("eden/RendererIpcPort");
 
 export interface PlatformUtilityProcess {
   readonly pid: number;
@@ -246,6 +255,10 @@ export interface UtilityProcessPort {
     port2: PlatformMessagePort;
   };
 }
+export const UtilityProcessPort = Context.Service<
+  "eden/UtilityProcessPort",
+  UtilityProcessPort
+>("eden/UtilityProcessPort");
 
 export interface AppChannelPort {
   createMessageChannel(): {
@@ -263,6 +276,9 @@ export interface DisplayPort {
   getCursorScreenPoint(): { x: number; y: number };
   getDisplayMatching(bounds: Bounds): PlatformDisplay;
 }
+export const DisplayPort = Context.Service<"eden/DisplayPort", DisplayPort>(
+  "eden/DisplayPort",
+);
 
 export interface PlatformProcessMetric {
   pid: number;
@@ -285,6 +301,10 @@ export interface PlatformProcessMetric {
 export interface ProcessMetricsPort {
   getAppMetrics(): PlatformProcessMetric[];
 }
+export const ProcessMetricsPort = Context.Service<
+  "eden/ProcessMetricsPort",
+  ProcessMetricsPort
+>("eden/ProcessMetricsPort");
 
 export interface ShortcutPort {
   register(accelerator: string, callback: () => void): boolean;

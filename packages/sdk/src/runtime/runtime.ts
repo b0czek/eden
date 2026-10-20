@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import * as path from "node:path";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -13,27 +12,19 @@ import type { EdenConfig } from "../api/config";
 import { resolveBrandingName } from "../branding";
 import { asError } from "../effects/io";
 import { log } from "../logging";
-import type { EdenPlatform } from "../platform/ports";
-import { seedDatabase } from "../seed";
 import { createSettingsSdkController } from "../settings/controller-sdk";
-import { createPanelRegistry } from "../settings/panel-registry";
-import { composeRuntime, type RuntimeBundle } from "./composition";
+import { createPanelRegistry } from "../settings/panels/registry";
+import { createDesktopLayer } from "./composition";
+import { Desktop, type RuntimeBundle } from "./desktop";
+import type { EdenRuntimeOptions } from "./environment";
 
-export type { RuntimeServices } from "./composition";
+export type { EdenRuntimeOptions, EdenRuntimePaths } from "./environment";
+export type { RuntimeServices } from "./services";
 
-const Desktop = Context.Service<RuntimeBundle>("eden/Desktop");
+const ReadyDesktop = Context.Service<"eden/ReadyDesktop", RuntimeBundle>(
+  "eden/ReadyDesktop",
+);
 
-export interface EdenRuntimePaths {
-  appsDirectory: string;
-  userDirectory: string;
-  distPath: string;
-  appPath: string;
-}
-export interface EdenRuntimeOptions {
-  config?: EdenConfig;
-  paths: EdenRuntimePaths;
-  platform: EdenPlatform;
-}
 /** Lifecycle boundary; all started services belong to one acquired scope. */
 export function createEdenRuntime(options: EdenRuntimeOptions) {
   const config: EdenConfig = {
@@ -85,36 +76,21 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     return bundle.controlPlane;
   }
   const initialize = Effect.fn(function* () {
-    log.info("Eden starting...");
-    yield* seedDatabase(
-      paths.appsDirectory,
-      config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
-      paths.userDirectory,
-    );
-    const desktop = yield* composeRuntime({
-      config,
-      paths,
-      platform,
-      registrations,
-    });
+    const desktop = yield* Desktop;
     bundle = desktop;
-    yield* Effect.gen(function* () {
-      const { services, appearance, associations } = desktop;
-      yield* services.users.initialize();
-      yield* services.packages.initialize();
-      services.settingsPanels.synchronizeManifestPanels();
-      yield* services.daemons.initialize();
-      yield* services.sessions.initialize();
-      yield* appearance.initialize();
-      yield* associations.initialize();
-      yield* desktop.foundation.open();
-      state = "ready";
-      log.info("Eden ready!");
-    }).pipe(Effect.onError(() => desktop.shutdown()));
+    yield* desktop.initialize().pipe(Effect.onError(() => desktop.shutdown()));
+    state = "ready";
+    log.info("Eden ready!");
     return desktop;
   });
   // @eden-effect-next-line domain-interpreter -- The composition root owns the desktop Layer and every host execution.
-  const managed = ManagedRuntime.make(Layer.effect(Desktop, initialize()));
+  const managed = ManagedRuntime.make(
+    Layer.effect(ReadyDesktop, initialize()).pipe(
+      Layer.provide(
+        createDesktopLayer({ config, paths, platform, registrations }),
+      ),
+    ),
+  );
   const effects = {
     run<A, E>(work: Effect.Effect<A, E>): Promise<A> {
       if (state === "created")
@@ -136,7 +112,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
         new Error(`Cannot start Eden runtime from ${state} state`),
       );
     state = "starting";
-    const fiber = managed.runFork(Effect.asVoid(Desktop));
+    const fiber = managed.runFork(Effect.asVoid(ReadyDesktop));
     startup = fiber;
     Deferred.doneUnsafe(launched, Effect.succeed(fiber));
     return readyPromise;
@@ -182,7 +158,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
         Effect.fail(new Error("Eden runtime disposed before startup")),
       );
     state = "stopping";
-    bundle?.services.operations.closeAdmission();
+    bundle?.closeAdmission();
     return release().then(() => {
       state = "stopped";
     });

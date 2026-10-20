@@ -10,12 +10,12 @@ import { SessionTransitionInProgress } from "../operations/errors";
 import { Operations } from "../operations/service";
 import { Processes } from "../processes/service";
 import { Users } from "../user/service";
+import { SessionContext } from "./context";
 import type {
   InitializeSessionFailure,
   LoginFailure,
   SessionTransitionFailure,
 } from "./errors";
-import { SessionContext } from "./context";
 
 export interface Sessions {
   initialize: () => Effect.Effect<void, InitializeSessionFailure>;

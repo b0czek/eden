@@ -4,8 +4,10 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { command, defineController } from "../../../src/controllers/controller";
-import * as packageService from "../../../src/packages/service";
+import * as desktopComposition from "../../../src/runtime/composition";
+import { Desktop } from "../../../src/runtime/desktop";
 import { hashPassword } from "../../../src/user/auth";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -202,23 +204,26 @@ describe("EdenRuntime integration", () => {
 
   it("preserves the startup failure and finishes disposal when a scoped finalizer fails", async () => {
     const startupFailure = new Error("foundation window unavailable");
+    const createDesktopLayer = desktopComposition.createDesktopLayer;
+    const acquisition = jest
+      .spyOn(desktopComposition, "createDesktopLayer")
+      .mockImplementation((environment) =>
+        Layer.effect(
+          Desktop,
+          Effect.gen(function* () {
+            const desktop = yield* Desktop;
+            yield* Effect.addFinalizer(() =>
+              Effect.die(new Error("resource close failed")),
+            );
+            return desktop;
+          }),
+        ).pipe(Layer.provide(createDesktopLayer(environment))),
+      );
     const eden = await createTestEden({
       autoStart: false,
       platform: { failWindowCreation: startupFailure },
     });
     active.push(eden);
-    const createPackages = packageService.createPackages;
-    const acquisition = jest
-      .spyOn(packageService, "createPackages")
-      .mockImplementation((dependencies) =>
-        Effect.gen(function* () {
-          const packages = yield* createPackages(dependencies);
-          yield* Effect.addFinalizer(() =>
-            Effect.die(new Error("resource close failed")),
-          );
-          return packages;
-        }),
-      );
     const windows = eden.platform.windows;
     const createWindow = windows.createWindow.bind(windows);
     windows.createWindow = (options) => {
@@ -296,25 +301,28 @@ describe("EdenRuntime integration", () => {
     const entered = gate();
     const proceed = Deferred.makeUnsafe<void>();
     let interrupted = false;
-    const createPackages = packageService.createPackages;
+    const createDesktopLayer = desktopComposition.createDesktopLayer;
     const factory = jest
-      .spyOn(packageService, "createPackages")
-      .mockImplementation((dependencies) =>
-        Effect.map(createPackages(dependencies), (packages) => ({
-          ...packages,
-          initialize: () =>
-            Effect.gen(function* () {
-              entered.release();
-              yield* Deferred.await(proceed);
-              yield* packages.initialize();
-            }).pipe(
-              Effect.onInterrupt(() =>
-                Effect.sync(() => {
-                  interrupted = true;
-                }),
+      .spyOn(desktopComposition, "createDesktopLayer")
+      .mockImplementation((environment) =>
+        Layer.effect(
+          Desktop,
+          Effect.map(Desktop, (desktop) => ({
+            ...desktop,
+            initialize: () =>
+              Effect.gen(function* () {
+                entered.release();
+                yield* Deferred.await(proceed);
+                yield* desktop.initialize();
+              }).pipe(
+                Effect.onInterrupt(() =>
+                  Effect.sync(() => {
+                    interrupted = true;
+                  }),
+                ),
               ),
-            ),
-        })),
+          })),
+        ).pipe(Layer.provide(createDesktopLayer(environment))),
       );
     const eden = await createTestEden({ autoStart: false });
     active.push(eden);

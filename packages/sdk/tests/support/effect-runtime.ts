@@ -14,6 +14,14 @@ const ServiceLifetime = Context.Service<ServiceLifetime>(
   "eden/ServiceLifetime",
 );
 
+/** Build a service Layer in the fixture's retained acquisition scope. */
+export function buildService<I, S, E, R>(
+  key: Context.Key<I, S>,
+  layer: Layer.Layer<I, E, R>,
+): Effect.Effect<S, E, R | Scope.Scope> {
+  return Effect.map(Layer.build(layer), (context) => Context.get(context, key));
+}
+
 /** Scoped fixture ownership for tests that acquire standalone services. */
 export function createEffectRuntime(
   ambientServices: Layer.Layer<never> = Layer.empty,
@@ -57,6 +65,11 @@ export function createEffectRuntime(
     return runtime.runPromise(own(factory));
   }
 
+  function acquireSync<A, E>(factory: Effect.Effect<A, E, Scope.Scope>): A {
+    if (disposal) throw new Error("Eden Effect runtime disposed");
+    return runtime.runSync(own(factory));
+  }
+
   /** Retain an acquisition program's fiber and own its resources until disposal. */
   function forkScoped<A, E>(
     factory: Effect.Effect<A, E, Scope.Scope>,
@@ -70,7 +83,7 @@ export function createEffectRuntime(
     return disposal;
   }
 
-  return { run, fork, acquire, forkScoped, dispose };
+  return { run, fork, acquire, acquireSync, forkScoped, dispose };
 }
 
 export type EffectRuntime = ReturnType<typeof createEffectRuntime>;
