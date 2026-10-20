@@ -320,12 +320,8 @@ export const PackagesLive = Layer.effect(
         dlcs: dlcResources.list(manifest.id, webContentsId),
       };
     }
-    const getPackageIcon = Effect.fn(function* (packageId: string) {
-      return yield* catalog.getIcon(packageId);
-    });
-    const getPackageSize = Effect.fn(function* (packageId: string) {
-      return yield* catalog.getSize(packageId);
-    });
+    const getPackageIcon = catalog.getIcon;
+    const getPackageSize = catalog.getSize;
     function prepareInstallPackage(
       location: FilesystemLocation,
       replacementConfirmed: boolean = false,

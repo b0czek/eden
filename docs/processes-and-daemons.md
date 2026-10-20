@@ -23,6 +23,7 @@ A launch publishes its running instance after backend readiness and frontend
 creation succeed. Its child scope owns execution identity, backend, and view;
 failed or interrupted startup releases them before another launch can proceed.
 Stop, reload, and native exit release the resources of that particular instance.
+Session teardown attempts every selected app before reporting cleanup failures.
 
 `Daemons` owns daemon policy:
 
@@ -133,6 +134,8 @@ A daemon definition contains:
 
 Definitions are stored in the Eden settings namespace and adopted immediately
 when saved. There is no separate “reload definitions” phase.
+Status notifications use the currently adopted definition and runtime state, so
+reporting a process change does not depend on settings storage being available.
 
 - `enabled` controls launch during the next Eden boot. Toggling it does not
   implicitly start or stop the current process.

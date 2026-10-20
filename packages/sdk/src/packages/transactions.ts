@@ -19,10 +19,10 @@ import {
 
 export interface PackageTransactions {
   initialize: () => Effect.Effect<void, PackageTransactionFailure>;
-  runExclusive: <A, E>(
-    operation: () => Effect.Effect<A, E>,
+  runExclusive: <A, E, R>(
+    operation: Effect.Effect<A, E, R>,
     reporter?: OperationReporter,
-  ) => Effect.Effect<A, E>;
+  ) => Effect.Effect<A, E, R>;
   execute: <E = never>(
     operations: PackageOperation<E>[],
     reporter?: OperationReporter | undefined,
@@ -102,15 +102,13 @@ export const PackageTransactionsLive = Layer.effect(
         );
       }
     });
-    function runExclusive<A, E>(
-      operation: () => Effect.Effect<A, E>,
+    function runExclusive<A, E, R>(
+      operation: Effect.Effect<A, E, R>,
       reporter?: OperationReporter,
     ) {
       return Effect.suspend(() => {
         reporter?.update("waiting-for-package-lock");
-        return mutationLock.withPermit(
-          Effect.uninterruptible(Effect.suspend(operation)),
-        );
+        return mutationLock.withPermit(Effect.uninterruptible(operation));
       });
     }
     const execute = Effect.fn(function* <E = never>(

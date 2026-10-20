@@ -66,13 +66,12 @@ export function createPackageMutations({
     const rawManifest = info.manifest;
     yield* assertPackageIdAvailable(rawManifest.id);
     return yield* operations.runExclusive(
-      () =>
-        installPackageExclusive(
-          edenitePath,
-          rawManifest,
-          replacementConfirmed,
-          reporter,
-        ),
+      installPackageExclusive(
+        edenitePath,
+        rawManifest,
+        replacementConfirmed,
+        reporter,
+      ),
       reporter,
     );
   });
@@ -104,15 +103,14 @@ export function createPackageMutations({
       const existing = catalog.getDlc(rawManifest.id);
       return yield* runWithHostsChanging(
         [host.id, ...(existing ? [existing.hostAppId] : [])],
-        () =>
-          installDlc(
-            edenitePath,
-            rawManifest,
-            host,
-            existing,
-            replacementConfirmed,
-            reporter,
-          ),
+        installDlc(
+          edenitePath,
+          rawManifest,
+          host,
+          existing,
+          replacementConfirmed,
+          reporter,
+        ),
       );
     }
     if (catalog.hasDlc(rawManifest.id)) {
@@ -125,7 +123,8 @@ export function createPackageMutations({
       );
     }
     const existing = catalog.getApp(rawManifest.id);
-    return yield* runWithHostsChanging([rawManifest.id], () =>
+    return yield* runWithHostsChanging(
+      [rawManifest.id],
       installApp(
         edenitePath,
         rawManifest,
@@ -223,7 +222,7 @@ export function createPackageMutations({
     reporter?: OperationReporter,
   ) {
     return yield* operations.runExclusive(
-      () => uninstallPackageExclusive(packageId, reporter),
+      uninstallPackageExclusive(packageId, reporter),
       reporter,
     );
   });
@@ -233,7 +232,8 @@ export function createPackageMutations({
   ) {
     const dlc = catalog.getDlc(packageId);
     if (dlc) {
-      return yield* runWithHostsChanging([dlc.hostAppId], () =>
+      return yield* runWithHostsChanging(
+        [dlc.hostAppId],
         uninstallDlc(dlc, reporter),
       );
     }
@@ -241,7 +241,8 @@ export function createPackageMutations({
     if (!manifest) {
       return false;
     }
-    return yield* runWithHostsChanging([manifest.id], () =>
+    return yield* runWithHostsChanging(
+      [manifest.id],
       uninstallApp(manifest, reporter),
     );
   });
@@ -405,18 +406,16 @@ export function createPackageMutations({
     }
     return Effect.void;
   }
-  const runWithHostsChanging = Effect.fn(function* <T, E>(
+  const runWithHostsChanging = Effect.fn(function* <T, E, R>(
     appIds: Iterable<string>,
-    operation: () => Effect.Effect<T, E>,
+    operation: Effect.Effect<T, E, R>,
   ) {
     const ids = [...new Set(appIds)];
     for (const appId of ids) {
       changingHostIds.set(appId, (changingHostIds.get(appId) ?? 0) + 1);
     }
     return yield* Effect.ensuring(
-      Effect.gen(function* () {
-        return yield* operation();
-      }),
+      operation,
       Effect.sync(() => {
         for (const appId of ids) {
           const depth = changingHostIds.get(appId);

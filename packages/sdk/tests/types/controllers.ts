@@ -2,6 +2,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, operation } from "../../src/controllers/controller";
+import { operationTask } from "../../src/operations/task";
 
 command({ handle: () => 42 });
 command({ handle: async () => "value" });
@@ -9,6 +10,23 @@ command({ handle: () => Effect.succeed(42) });
 command({ handle: () => Effect.scoped(Effect.scope) });
 command({ handle: async () => Effect.succeed(42) });
 command({ handle: () => Effect.fail(new Error("expected")) });
+command({
+  mode: "operation",
+  handle: () => operationTask(() => Effect.succeed(42)),
+});
+// @ts-expect-error Operations must synchronously return a prepared task.
+command({ mode: "operation", handle: () => 42 });
+command({
+  mode: "operation",
+  // @ts-expect-error Operation preparation cannot return a Promise.
+  handle: async () => operationTask(() => Effect.succeed(42)),
+});
+command({
+  mode: "operation",
+  input: v.object({}),
+  // @ts-expect-error Operation preparation cannot return a lazy Effect.
+  handle: () => Effect.succeed(operationTask(() => Effect.void)),
+});
 command({
   input: v.object({ value: v.number() }),
   handle: ({ value }) => Effect.succeed(value),

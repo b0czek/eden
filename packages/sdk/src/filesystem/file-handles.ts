@@ -42,7 +42,7 @@ interface HandleEntry {
   owner?: HandleOwner;
   retained: boolean;
   scope: Scope.Closeable;
-  opened: Deferred.Deferred<OpenedFilesystemFile, FilesystemFileError>;
+  file?: OpenedFilesystemFile;
   closed: Deferred.Deferred<void>;
   idle: Latch.Latch;
   active: number;
@@ -77,7 +77,6 @@ export const createFileHandles = Effect.fn(function* (
       owner,
       retained: owner !== undefined,
       scope: Scope.makeUnsafe(),
-      opened: Deferred.makeUnsafe(),
       closed: Deferred.makeUnsafe(),
       idle: Latch.makeUnsafe(),
       active: 1,
@@ -105,20 +104,17 @@ export const createFileHandles = Effect.fn(function* (
           catch: handleRejection,
         });
         return yield* restore(
-          Deferred.into(
-            Scope.provide(openFile(location, mode, true), entry.scope),
-            entry.opened,
-          ).pipe(
-            Effect.andThen(Deferred.await(entry.opened)),
-            Effect.flatMap(() =>
-              entry.closing
+          Scope.provide(openFile(location, mode, true), entry.scope).pipe(
+            Effect.flatMap((file) => {
+              entry.file = file;
+              return entry.closing
                 ? Effect.fail(
                     new FilesystemHandleRejected({
                       message: "Filesystem handle owner has closed",
                     }),
                   )
-                : Effect.succeed({ handleId: id }),
-            ),
+                : Effect.succeed({ handleId: id });
+            }),
           ),
         ).pipe(
           Effect.ensuring(releaseUse(entry)),
@@ -154,24 +150,22 @@ export const createFileHandles = Effect.fn(function* (
             ),
           );
         }
-        const entry = yield* Effect.try({
+        const { entry, file } = yield* Effect.try({
           try: () => {
             if (disposed)
               throw new FilesystemHandleRejected({
                 message: "Filesystem handles are closed",
               });
-            const entry = requireHandle(source);
-            entry.active++;
-            entry.idle.closeUnsafe();
-            return entry;
+            const handle = requireHandle(source);
+            handle.entry.active++;
+            handle.entry.idle.closeUnsafe();
+            return handle;
           },
           catch: handleRejection,
         });
-        return yield* restore(
-          Effect.flatMap(Deferred.await(entry.opened), (opened) =>
-            opened.use(operation),
-          ),
-        ).pipe(Effect.ensuring(releaseUse(entry)));
+        return yield* restore(file.use(operation)).pipe(
+          Effect.ensuring(releaseUse(entry)),
+        );
       }),
     );
   }
@@ -179,7 +173,7 @@ export const createFileHandles = Effect.fn(function* (
   const close = (handle: FilesystemHandle) =>
     Effect.flatMap(
       Effect.try({ try: () => requireHandle(handle), catch: handleRejection }),
-      (entry) => closeEntry(handle.handleId, entry),
+      ({ entry }) => closeEntry(handle.handleId, entry),
     );
 
   function closeOwner(owner: {
@@ -263,12 +257,14 @@ export const createFileHandles = Effect.fn(function* (
     };
   }
 
-  function requireHandle(handle: FilesystemHandle): HandleEntry {
+  function requireHandle(handle: FilesystemHandle) {
     const caller = requireCaller();
     const entry = handles.get(handle.handleId);
+    const file = entry?.file;
     const owner = entry?.retained && !entry.closing ? entry.owner : undefined;
     if (
       !entry ||
+      !file ||
       !owner ||
       caller.appId !== owner.appId ||
       caller.sessionId !== owner.sessionId ||
@@ -279,7 +275,7 @@ export const createFileHandles = Effect.fn(function* (
         handleId: handle.handleId,
         message: "Filesystem handle is unavailable to this caller",
       });
-    return entry;
+    return { entry, file };
   }
   yield* Effect.addFinalizer(dispose);
   return { open, use, close, closeOwner, dispose };

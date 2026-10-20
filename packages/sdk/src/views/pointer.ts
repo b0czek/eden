@@ -1,8 +1,8 @@
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import type * as Fiber from "effect/Fiber";
-import * as FiberSet from "effect/FiberSet";
+import * as FiberHandle from "effect/FiberHandle";
+import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import { log } from "../logging";
 import type { DisplayPort } from "../platform/ports";
@@ -19,22 +19,18 @@ export const createPointerTracking = Effect.fn(function* (
   updateInterval: number = 8,
 ) {
   const clock = yield* Clock.Clock;
-  const forkPolling = yield* FiberSet.makeRuntime<never, void, never>();
-  let _subscribers: Map<string, MouseUpdateCallback> = new Map();
-  let _interval: Fiber.Fiber<void> | null = null;
+  const polling = yield* FiberHandle.make<void, never>();
+  const forkPolling = yield* FiberHandle.runtime(polling)<never>();
+  const _subscribers = new Map<string, MouseUpdateCallback>();
   let _lastUpdateTime: number = 0;
   let _lastPosition: { x: number; y: number } = { x: 0, y: 0 };
-  let _updateInterval: number;
-  const _display = display;
-
-  _updateInterval = updateInterval;
 
   function subscribe(id: string, callback: MouseUpdateCallback): void {
-    // Add subscriber
+    const wasEmpty = _subscribers.size === 0;
     _subscribers.set(id, callback);
 
     // Start tracking if this is the first subscriber
-    if (_subscribers.size === 1) {
+    if (wasEmpty) {
       start();
     }
   }
@@ -49,11 +45,11 @@ export const createPointerTracking = Effect.fn(function* (
   }
 
   function getCurrentPosition(): { x: number; y: number } {
-    return _display.getCursorScreenPoint();
+    return display.getCursorScreenPoint();
   }
 
   function isTracking(): boolean {
-    return _interval !== null;
+    return _subscribers.size > 0;
   }
 
   function getSubscriberCount(): number {
@@ -61,12 +57,10 @@ export const createPointerTracking = Effect.fn(function* (
   }
 
   function start(): void {
-    if (_interval) return;
-
     _lastUpdateTime = clock.currentTimeMillisUnsafe();
     _lastPosition = getCurrentPosition();
 
-    _interval = forkPolling(
+    forkPolling(
       Effect.sync(() => {
         const now = clock.currentTimeMillisUnsafe();
         const deltaTime = now - _lastUpdateTime;
@@ -93,17 +87,15 @@ export const createPointerTracking = Effect.fn(function* (
           }
         }
       }).pipe(
-        Effect.schedule(Schedule.spaced(Duration.millis(_updateInterval))),
+        Effect.schedule(Schedule.spaced(Duration.millis(updateInterval))),
         Effect.asVoid,
       ),
     );
   }
 
   function stop(): void {
-    if (_interval) {
-      _interval.interruptUnsafe();
-      _interval = null;
-    }
+    const fiber = FiberHandle.getUnsafe(polling);
+    if (Option.isSome(fiber)) fiber.value.interruptUnsafe();
   }
 
   function dispose(): void {

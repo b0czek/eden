@@ -50,10 +50,10 @@ export interface Volumes {
     ids: string[],
     run: (reporter: OperationReporter) => Effect.Effect<R, E>,
   ) => OperationTask<R, E | VolumeUnavailable>;
-  withVolumes: <A, E>(
+  withVolumes: <A, E, R>(
     ids: string[],
-    work: Effect.Effect<A, E>,
-  ) => Effect.Effect<A, E | VolumeUnavailable>;
+    work: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | VolumeUnavailable, R>;
   // @eden-effect-next-line unresolved-requirements -- Lease acquisition belongs to the caller-owned descriptor or operation scope.
   lease: (
     ids: string[],
@@ -432,10 +432,10 @@ export const VolumesLive = Layer.effect(
       );
     }
 
-    function withVolumes<A, E>(
+    function withVolumes<A, E, R>(
       ids: string[],
-      work: Effect.Effect<A, E>,
-    ): Effect.Effect<A, E | VolumeUnavailable> {
+      work: Effect.Effect<A, E, R>,
+    ): Effect.Effect<A, E | VolumeUnavailable, R> {
       return Effect.scoped(
         Effect.flatMap(lease(ids), (access) => access.effect(work)),
       );

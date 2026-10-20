@@ -201,7 +201,7 @@ describe("PackageTransactions", () => {
     const order: string[] = [];
 
     const first = Effect.runPromise(
-      coordinator.runExclusive(() =>
+      coordinator.runExclusive(
         Effect.gen(function* () {
           order.push("first filesystem swap");
           firstStarted();
@@ -212,7 +212,7 @@ describe("PackageTransactions", () => {
     );
     await started;
     const second = Effect.runPromise(
-      coordinator.runExclusive(() =>
+      coordinator.runExclusive(
         Effect.sync(() => {
           order.push("second filesystem swap");
         }),

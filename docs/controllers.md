@@ -75,6 +75,9 @@ interruption and native cleanup settlement. Compose existing Effect failures
 directly, or use `Effect.mapError` when a domain needs additional context. Do not
 catch an entire workflow merely to rename every failure. Pure programming
 mistakes remain defects, and cancellation remains interruption.
+Recovery and cleanup may fail alongside cancellation or defects. Preserve the
+combined causes so callers can distinguish ordinary cancellation from incomplete
+recovery.
 
 Synchronous reads and admission checks keep their timing. A synchronous check
 may throw a documented tagged rejection when it must reject before operation
@@ -175,11 +178,13 @@ Use explicit `Duration` values for Effect waits and expiry: `Duration.seconds(5)
 `Duration.millis(delayMs)`, `Duration.zero`, or `Duration.infinity`.
 
 Service acquisition may require its dependency keys and `Scope.Scope`. Effects
-returned by service methods must have their dependencies provided, with no
-outstanding requirements
-(the third `Effect.Effect` type parameter is `never`). Services compose those
-Effects with `yield*`, `Effect.map`, or other Effect operators; they do not run
-their own interpreter or register commands.
+returned by ordinary service methods must have their dependencies provided, with
+no outstanding requirements (the third `Effect.Effect` type parameter is `never`).
+Services compose those Effects with `yield*`, `Effect.map`, or other Effect
+operators; they do not run their own interpreter or register commands.
+
+Generic combinators preserve their caller's environment requirements while
+capturing their own infrastructure dependencies.
 
 ## Commands
 
@@ -242,6 +247,7 @@ work that declares `cancellable: true` is cancelled by fiber interruption.
 
 Commands may also declare `mode: "operation"` and return an `OperationTask`
 directly, for example when a filesystem capability prepares resource admission.
+Operation-mode handlers must return that task synchronously.
 
 `OperationTask.run` returns only Effect. Adapt native Promise producers before
 passing them into the task. A task that reserves resources during synchronous
@@ -250,8 +256,11 @@ execution also releases that reservation.
 
 Execution and completion belong to an owned fiber. Cancellation interrupts that
 fiber, and terminal status is published after its finalizers complete. Draining
-awaits fiber exits, including failed or cancelled work. The transport queues its
-acceptance response before the execution fiber can run domain work.
+awaits fiber exits, including failed or cancelled work. Reservation release and
+failure encoding run inside that fiber; failures in either produce a terminal
+failed snapshot and fail internal waits, preserving the original work's cause.
+The transport queues its acceptance response before the execution fiber can run
+domain work.
 
 For commands with a typed public failure response, supply `encodeFailure` at the
 controller boundary. The execution fiber and internal waits still fail; only the

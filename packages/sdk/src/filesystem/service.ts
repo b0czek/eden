@@ -70,10 +70,10 @@ export interface Filesystem {
     ids: string[],
     run: (reporter: OperationReporter) => Effect.Effect<R, E>,
   ) => OperationTask<R, E | VolumeUnavailable>;
-  withVolume: <A, E>(
+  withVolume: <A, E, R>(
     location: FilesystemLocation,
-    operation: (hostPath: string) => Effect.Effect<A, E>,
-  ) => Effect.Effect<A, E | FilesystemPathError>;
+    operation: (hostPath: string) => Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | FilesystemPathError, R>;
   toMaskedPath: (
     absolutePath: string,
     volume: string,
@@ -383,10 +383,10 @@ export const FilesystemLive = Layer.effect(
       requirePrincipal();
       return volumes.prepareOperation(ids, run);
     }
-    function withVolume<A, E>(
+    function withVolume<A, E, R>(
       location: FilesystemLocation,
-      operation: (hostPath: string) => Effect.Effect<A, E>,
-    ): Effect.Effect<A, E | FilesystemPathError> {
+      operation: (hostPath: string) => Effect.Effect<A, E, R>,
+    ): Effect.Effect<A, E | FilesystemPathError, R> {
       return volumes.withVolumes(
         [location.volume],
         Effect.flatMap(resolveTarget(location), (target) =>

@@ -2,6 +2,7 @@ import type {
   DaemonDefinition,
   DaemonStatus,
   ExecutionPrincipal,
+  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
@@ -159,45 +160,46 @@ export const DaemonsLive = Layer.effect(
       }
       return result;
     });
+    function buildStatus(
+      manifest: RuntimeAppManifest,
+      definition = loaded.get(manifest.id) ?? defaultDefinition(manifest.id),
+    ): DaemonStatus {
+      const state = getRuntime(manifest.id);
+      const instance = processes.getAppInstance(manifest.id);
+      return {
+        appId: manifest.id,
+        name: manifest.name,
+        definition,
+        state: instance ? "active" : state.state,
+        restartRequired:
+          !!instance && !samePrincipal(instance.principal, definition.runAs),
+        instanceId: instance?.instanceId,
+        restartCount: state.restartCount,
+        lastError: state.lastError,
+        nextRestartAt: state.nextRestartAt,
+      };
+    }
     const list = Effect.fn(function* (): Effect.fn.Return<
       DaemonStatus[],
       DaemonDefinitionReadError
     > {
       const persisted = yield* readPersisted();
-      return daemonApps().map((manifest) => {
-        const definition =
+      return daemonApps().map((manifest) =>
+        buildStatus(
+          manifest,
           persisted.get(manifest.id) ??
-          loaded.get(manifest.id) ??
-          defaultDefinition(manifest.id);
-        const state = getRuntime(manifest.id);
-        const instance = processes.getAppInstance(manifest.id);
-        return {
-          appId: manifest.id,
-          name: manifest.name,
-          definition,
-          state: instance ? "active" : state.state,
-          restartRequired:
-            !!instance && !samePrincipal(instance.principal, definition.runAs),
-          instanceId: instance?.instanceId,
-          restartCount: state.restartCount,
-          lastError: state.lastError,
-          nextRestartAt: state.nextRestartAt,
-        };
-      });
-    });
-    const emitStatus = (appId: string, runtime?: DaemonRuntime) =>
-      Effect.gen(function* () {
-        if (runtime !== undefined && !isCurrent(appId, runtime)) return;
-        const status = (yield* list()).find((entry) => entry.appId === appId);
-        if (status && (runtime === undefined || isCurrent(appId, runtime)))
-          changed.emit({ status });
-      }).pipe(
-        Effect.catch((error) =>
-          Effect.sync(() =>
-            log.warn(`Failed to report daemon status for ${appId}:`, error),
-          ),
+            loaded.get(manifest.id) ??
+            defaultDefinition(manifest.id),
         ),
       );
+    });
+    const emitStatus = (appId: string, runtime?: DaemonRuntime) =>
+      Effect.sync(() => {
+        if (runtime !== undefined && !isCurrent(appId, runtime)) return;
+        const manifest = catalog.getApp(appId);
+        if (manifest?.backend?.entry && !manifest.frontend?.entry)
+          changed.emit({ status: buildStatus(manifest) });
+      });
     const setRuntime = Effect.fn(function* (
       appId: string,
       state: DaemonState,
@@ -281,8 +283,7 @@ export const DaemonsLive = Layer.effect(
       const updated = { ...definition, enabled };
       yield* validateDefinition(updated);
       yield* persist(updated);
-      const previous = loaded.get(appId);
-      if (previous) loaded.set(appId, { ...previous, enabled });
+      loaded.set(appId, updated);
       yield* emitStatus(appId);
     });
     function prepareSupervisor(

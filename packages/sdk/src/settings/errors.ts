@@ -21,7 +21,7 @@ export class SettingDefaultMissingError extends Data.TaggedError(
   }
 }
 
-/** Synchronous access checks throw this failure before admitting work. */
+/** Expected rejection from synchronous setting access checks. */
 export class SettingAccessError extends Data.TaggedError("SettingAccessError")<{
   readonly appId: string;
   readonly key: string;
@@ -43,4 +43,9 @@ export class SettingsCallerIdentityError extends Data.TaggedError(
   override get message() {
     return "Settings access requires a caller app identity";
   }
+}
+
+export function settingAccessRejection(cause: unknown): SettingAccessError {
+  if (cause instanceof SettingAccessError) return cause;
+  throw cause;
 }

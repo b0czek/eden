@@ -241,6 +241,9 @@ export const OperationsLive = Layer.effect(
               Effect.andThen(
                 afterResponse,
                 Effect.suspend(() => execute(record, prepared)),
+              ).pipe(
+                Effect.ensuring(Effect.sync(() => prepared.release?.())),
+                Effect.onExit((exit) => complete(record, prepared, exit)),
               ),
               capturedContext,
             ),
@@ -251,7 +254,6 @@ export const OperationsLive = Layer.effect(
         records.set(id, record);
         retained = true;
         if (record.requestKey) requests.set(record.requestKey, id);
-        record.fiber.addObserver((exit) => complete(record, prepared, exit));
         publish(record);
         return { command, id };
       } finally {
@@ -345,55 +347,78 @@ export const OperationsLive = Layer.effect(
       task: OperationTask<unknown>,
       exit: Exit.Exit<unknown, unknown>,
     ) {
-      try {
-        task.release?.();
-        if (Exit.isSuccess(exit)) {
-          update(record, {
-            status: "succeeded",
-            completedAt: clock.currentTimeMillisUnsafe(),
-            result: exit.value,
-          });
-        } else if (Cause.hasInterruptsOnly(exit.cause)) {
-          update(record, {
-            status: "cancelled",
-            completedAt: clock.currentTimeMillisUnsafe(),
-          });
-        } else {
-          const failure = asError(Cause.squash(exit.cause));
-          const typedFailure = Cause.findErrorOption(exit.cause);
-          const encodable =
-            !Cause.hasDies(exit.cause) && !Cause.hasInterrupts(exit.cause);
+      return Effect.sync(() => {
+        try {
+          if (Exit.isSuccess(exit)) {
+            update(record, {
+              status: "succeeded",
+              completedAt: clock.currentTimeMillisUnsafe(),
+              result: exit.value,
+            });
+          } else if (Cause.hasInterruptsOnly(exit.cause)) {
+            update(record, {
+              status: "cancelled",
+              completedAt: clock.currentTimeMillisUnsafe(),
+            });
+          } else {
+            const failures = exit.cause.reasons.flatMap((reason) =>
+              Cause.isFailReason(reason)
+                ? [asError(reason.error)]
+                : Cause.isDieReason(reason)
+                  ? [asError(reason.defect)]
+                  : [],
+            );
+            const failure =
+              failures.length === 1
+                ? failures[0]
+                : new AggregateError(
+                    failures,
+                    failures.map((error) => error.message).join("; "),
+                  );
+            const typedFailure = Cause.findErrorOption(exit.cause);
+            const encodable =
+              !Cause.hasDies(exit.cause) && !Cause.hasInterrupts(exit.cause);
+            update(record, {
+              status: "failed",
+              completedAt: clock.currentTimeMillisUnsafe(),
+              error: { name: failure.name, message: failure.message },
+              ...(task.encodeFailure && encodable && Option.isSome(typedFailure)
+                ? {
+                    response: structuredClone(
+                      task.encodeFailure(typedFailure.value),
+                    ),
+                  }
+                : {}),
+            });
+          }
+        } catch (error) {
+          const failure = asError(error);
           update(record, {
             status: "failed",
             completedAt: clock.currentTimeMillisUnsafe(),
             error: { name: failure.name, message: failure.message },
-            ...(task.encodeFailure && encodable && Option.isSome(typedFailure)
-              ? {
-                  response: structuredClone(
-                    task.encodeFailure(typedFailure.value),
-                  ),
-                }
-              : {}),
           });
+          throw error;
+        } finally {
+          if (
+            task.transition === "session" &&
+            closedSessions.get(record.transitionSessionId!) ===
+              record.snapshot.id
+          )
+            closedSessions.delete(record.transitionSessionId!);
+          if (
+            task.transition === "runtime" &&
+            runtimeTransition === record.snapshot.id
+          ) {
+            runtimeTransition = undefined;
+            accepting =
+              (record.snapshot.status === "failed" ||
+                record.snapshot.status === "cancelled") &&
+              !shuttingDown;
+          }
+          prune();
         }
-      } finally {
-        if (
-          task.transition === "session" &&
-          closedSessions.get(record.transitionSessionId!) === record.snapshot.id
-        )
-          closedSessions.delete(record.transitionSessionId!);
-        if (
-          task.transition === "runtime" &&
-          runtimeTransition === record.snapshot.id
-        ) {
-          runtimeTransition = undefined;
-          accepting =
-            (record.snapshot.status === "failed" ||
-              record.snapshot.status === "cancelled") &&
-            !shuttingDown;
-        }
-        prune();
-      }
+      });
     }
     function update(record: RecordEntry, patch: Record<string, unknown>): void {
       record.snapshot = {

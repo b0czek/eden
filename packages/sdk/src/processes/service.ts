@@ -643,30 +643,32 @@ export const ProcessesLive = Layer.effect(
           ]) => owner.kind === "session" && owner.sessionId === sessionId,
         )
         .map(([appId]) => appId);
-      const errors: ProcessStopError[] = [];
+      const failures: Cause.Cause<ProcessStopError>[] = [];
       for (const appId of running) {
-        yield* withApp(
-          appId,
-          Effect.suspend(() =>
-            instances.has(appId) ? stopInstance(appId) : Effect.void,
+        const exit = yield* Effect.exit(
+          withApp(
+            appId,
+            Effect.suspend(() =>
+              instances.has(appId) ? stopInstance(appId) : Effect.void,
+            ),
           ),
-        ).pipe(
-          Effect.catch((error) =>
-            Effect.sync(() => {
-              errors.push(error);
-            }),
-          ),
+        );
+        if (Exit.isFailure(exit)) failures.push(exit.cause);
+      }
+      if (failures.length) {
+        const cause = failures.reduce(Cause.combine);
+        const failure = new SessionProcessesStopFailed({
+          sessionId,
+          cause: new AggregateError(failures.map(Cause.squash)),
+          message: "Failed to stop all session apps",
+        });
+        return yield* Effect.failCause(
+          Cause.hasDies(cause) || Cause.hasInterrupts(cause)
+            ? Cause.map(cause, () => failure)
+            : Cause.fail(failure),
         );
       }
-      if (errors.length)
-        return yield* Effect.fail(
-          new SessionProcessesStopFailed({
-            sessionId,
-            cause: new AggregateError(errors),
-            message: "Failed to stop all session apps",
-          }),
-        );
-    });
+    }, Effect.uninterruptible);
 
     function isLoginApp(appId: string): boolean {
       return !!loginAppId && appId === loginAppId;

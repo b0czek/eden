@@ -1,4 +1,8 @@
-import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
+import type {
+  DaemonStatus,
+  OperationHandle,
+  RuntimeAppManifest,
+} from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { StorageClosedError } from "../../../src/storage/errors";
 import { testApp } from "../../support/apps";
@@ -60,17 +64,31 @@ describe("daemon operation lifecycle", () => {
           }),
         ),
       );
+    const statuses: DaemonStatus[] = [];
+    const off = eden.runtime.services.daemons.changed.on(({ status }) => {
+      if (status.appId === appId) statuses.push(status);
+    });
     try {
       const starting = eden.runtime.effects.run(
         eden.runtime.daemons.start(appId),
       );
       const pid = await readyBackend(eden);
       await starting;
+      expect(statuses.at(-1)).toMatchObject({
+        appId,
+        state: "active",
+        definition: {
+          runAs: { username: profile.username },
+          restart: "always",
+        },
+      });
       const backend = eden.platform.utilityProcesses.get(pid);
       if (!backend) throw new Error("Daemon backend did not start");
       backend.kill();
       expect(await readyBackend(eden, pid)).not.toBe(pid);
+      expect(statuses.some((status) => status.state === "backoff")).toBe(true);
     } finally {
+      off();
       reads.mockRestore();
     }
   });

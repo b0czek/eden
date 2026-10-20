@@ -1,5 +1,53 @@
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import { SettingAccessError } from "../../../src/settings/errors";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
+
+it("keeps denied cross-namespace reads and superuser setting mutations in the expected failure channel", async () => {
+  const eden = await createTestEden();
+  try {
+    const { caller } = await createTestCaller(
+      eden,
+      "restricted.app",
+      ["settings/rw", "settings/superuser"],
+      { grants: [] },
+    );
+    const commands = [
+      "settings/get",
+      "settings/get/su",
+      "settings/set/su",
+      "settings/reset/su",
+    ];
+    for (const command of commands) {
+      const exit = await eden.runtime.effects.run(
+        Effect.exit(
+          eden.runtime.services.commands.execute(
+            command,
+            { appId: "other.app", key: "private", value: "changed" },
+            caller,
+          ),
+        ),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        expect(Cause.hasDies(exit.cause)).toBe(false);
+        const errors = exit.cause.reasons
+          .filter(Cause.isFailReason)
+          .map((reason) => reason.error);
+        expect(errors).toEqual([expect.any(SettingAccessError)]);
+      }
+    }
+    expect(
+      await eden.runtime.effects.run(
+        eden.runtime.services.settings.get("other.app", "private"),
+      ),
+    ).toBeUndefined();
+  } finally {
+    await eden.dispose();
+  }
+});
 
 it("routes settings commands by trusted caller and gates cross-namespace access", async () => {
   const eden = await createTestEden();

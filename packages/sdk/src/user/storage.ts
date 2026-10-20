@@ -48,37 +48,27 @@ export const UserStorageLive = Layer.effect(
       closedMessage: "User storage closed",
     });
     const mutations = yield* Semaphore.make(1);
-    const getDefaultUsername = Effect.fn(
-      function* getDefaultUsername(): Effect.fn.Return<
-        string | null,
-        UserRecordReadFailure
-      > {
-        const stored = yield* connection.read(DEFAULT_USER_KEY);
-        if (typeof stored === "string" && stored.length > 0) {
-          return stored;
-        }
-        return null;
-      },
-    );
+    const getDefaultUsername = Effect.fn(function* getDefaultUsername() {
+      const stored = yield* connection.read(DEFAULT_USER_KEY);
+      if (typeof stored === "string" && stored.length > 0) {
+        return stored;
+      }
+      return null;
+    });
     const setDefaultUsername = Effect.fn(function* setDefaultUsername(
       username: string | null,
-    ): Effect.fn.Return<void, UserDefaultWriteFailure> {
+    ) {
       if (username) {
         yield* connection.write(DEFAULT_USER_KEY, username);
         return;
       }
       yield* connection.remove(DEFAULT_USER_KEY);
     });
-    const getUserIndex = Effect.fn(function* getUserIndex(): Effect.fn.Return<
-      string[],
-      UserRecordReadFailure
-    > {
+    const getUserIndex = Effect.fn(function* getUserIndex() {
       const value = yield* connection.read(USERS_INDEX_KEY);
       return readUserIndex(value);
     });
-    const getUserRecord = Effect.fn(function* getUserRecord(
-      username: string,
-    ): Effect.fn.Return<StoredUser | null, UserRecordReadFailure> {
+    const getUserRecord = Effect.fn(function* getUserRecord(username: string) {
       const value = yield* connection.read(getUserKey(username));
       return readStoredUser(value);
     });

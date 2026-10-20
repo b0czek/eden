@@ -58,7 +58,12 @@ interface CommandOptions<Args, Result, Mode extends CommandMode> {
   handle: (
     args: Args,
     caller: CommandCallerContext,
-  ) => Result & ProvidedResult<Result>;
+  ) => Result &
+    (Mode extends "operation"
+      ? Result extends OperationTask<infer _Completion, infer _Error>
+        ? Result
+        : never
+      : ProvidedResult<Result>);
 }
 
 export function command<

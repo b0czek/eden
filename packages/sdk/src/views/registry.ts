@@ -12,6 +12,7 @@ import type { ViewDevTools } from "./devtools";
 import {
   callViewNative,
   MainWindowUnavailable,
+  ViewNativeFailure,
   ViewUnavailable,
 } from "./errors";
 import type { InterfaceScale } from "./interface-scale";
@@ -226,10 +227,23 @@ export function createViewRegistry(
       viewRemoved.emit({ viewId, appId: viewInfo.appId, webContentsId });
     }
     if (failures.length === 1) throw failures[0];
-    if (failures.length > 1)
-      throw new AggregateError(failures, `Failed to release view ${viewId}`, {
-        cause: failures[0],
-      });
+    if (failures.length > 1) {
+      const cause = new AggregateError(
+        failures,
+        `Failed to release view ${viewId}`,
+        {
+          cause: failures[0],
+        },
+      );
+      throw failures.every((failure) => failure instanceof ViewNativeFailure)
+        ? new ViewNativeFailure({
+            operation: "destroy",
+            viewId,
+            appId: viewInfo.appId,
+            cause,
+          })
+        : cause;
+    }
     if (viewInfo.viewType === "app" && layout.isTilingEnabled()) {
       const visibilityChanged = layout.syncTiledLayout();
       if (visibilityChanged) layout.reorderViewLayers();

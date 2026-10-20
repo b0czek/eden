@@ -8,7 +8,7 @@ import {
   namespacedKeyArgsSchema,
 } from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/context";
-import { SettingsCallerIdentityError } from "./errors";
+import { SettingsCallerIdentityError, settingAccessRejection } from "./errors";
 import type { Settings } from "./service";
 
 function callerNamespace(caller: CommandCallerContext) {
@@ -37,7 +37,11 @@ export function createSettingsController(settings: Settings) {
           Effect.gen(function* () {
             const readerAppId = yield* callerNamespace(caller);
             const ownerAppId = appId ?? readerAppId;
-            settings.assertReadableBy(ownerAppId, key, readerAppId);
+            yield* Effect.try({
+              try: () =>
+                settings.assertReadableBy(ownerAppId, key, readerAppId),
+              catch: settingAccessRejection,
+            });
             const value = yield* settings.get(ownerAppId, key);
             return { value };
           }),
@@ -93,7 +97,10 @@ export function createSettingsController(settings: Settings) {
         permission: "superuser",
         handle: ({ appId, key }) =>
           Effect.gen(function* () {
-            settings.assertAccess(appId, key);
+            yield* Effect.try({
+              try: () => settings.assertAccess(appId, key),
+              catch: settingAccessRejection,
+            });
             const value = yield* settings.get(appId, key);
             return { value };
           }),
@@ -108,7 +115,10 @@ export function createSettingsController(settings: Settings) {
         permission: "superuser",
         handle: ({ appId, key, value }) =>
           Effect.gen(function* () {
-            settings.assertAccess(appId, key);
+            yield* Effect.try({
+              try: () => settings.assertAccess(appId, key),
+              catch: settingAccessRejection,
+            });
             yield* settings.set(appId, key, value);
             return { success: true } as { success: boolean };
           }),
@@ -145,7 +155,10 @@ export function createSettingsController(settings: Settings) {
         permission: "superuser",
         handle: ({ appId, key, schema }) =>
           Effect.gen(function* () {
-            settings.assertAccess(appId, key);
+            yield* Effect.try({
+              try: () => settings.assertAccess(appId, key),
+              catch: settingAccessRejection,
+            });
             yield* settings.reset(appId, key, schema);
             return { success: true } as { success: boolean };
           }),

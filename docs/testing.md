@@ -128,7 +128,7 @@ not complete native I/O. See the
 and [operation retention tests](../packages/sdk/src/operations/retention.test.ts).
 
 Operation timestamps and expiry read the Clock captured during acquisition, so
-synchronous admission and completion observers share the service's clock.
+synchronous admission and completion finalizers share the service's clock.
 Accepted operations still drain before runtime disposal. Native filesystem
 notification tests can retain real external synchronization, and unrelated Jest
 suites can keep their existing timer setup.

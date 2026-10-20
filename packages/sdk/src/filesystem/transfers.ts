@@ -7,6 +7,7 @@ import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Result from "effect/Result";
 import { fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/task";
@@ -270,27 +271,35 @@ export function createFileTransfers() {
                     );
                   }),
                 );
-              const [, rollbackErrors] = yield* Effect.partition(
-                rollback,
-                (step) => step,
+              const rollbackExits = yield* Effect.forEach(rollback, (step) =>
+                Effect.exit(step),
               );
-              if (
-                rollbackErrors.length &&
-                !Cause.hasDies(cause) &&
-                !Cause.hasInterrupts(cause)
-              )
-                return yield* Effect.fail(
-                  new FilesystemTransferIncomplete({
-                    source: transfer.source,
-                    destination: transfer.destination,
-                    message:
-                      "Filesystem transfer failed and rollback was incomplete",
-                    cause: new AggregateError([
-                      Cause.squash(cause),
-                      ...rollbackErrors,
-                    ]),
-                  }),
+              const rollbackFailures = rollbackExits.filter(Exit.isFailure);
+              if (rollbackFailures.length) {
+                const rollbackCause = rollbackFailures
+                  .map((exit) => exit.cause)
+                  .reduce(Cause.combine);
+                const incomplete = new FilesystemTransferIncomplete({
+                  source: transfer.source,
+                  destination: transfer.destination,
+                  message: `Filesystem transfer failed and rollback was incomplete${backup ? `. Recovery files retained at ${backup}` : ""}`,
+                  cause: new AggregateError([
+                    Cause.squash(cause),
+                    ...rollbackFailures.map((exit) => Cause.squash(exit.cause)),
+                  ]),
+                });
+                return yield* Effect.failCause(
+                  Cause.hasDies(cause) ||
+                    Cause.hasInterrupts(cause) ||
+                    Cause.hasDies(rollbackCause) ||
+                    Cause.hasInterrupts(rollbackCause)
+                    ? Cause.combine(
+                        cause,
+                        Cause.combine(rollbackCause, Cause.fail(incomplete)),
+                      )
+                    : Cause.fail(incomplete),
                 );
+              }
               return yield* Effect.failCause(cause);
             }),
           ),
