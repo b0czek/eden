@@ -1,3 +1,3 @@
 export { createContextMenuController } from "./controller-edenapi";
-export { type ContextMenu, createContextMenu } from "./service";
+export { ContextMenu, ContextMenuLive } from "./service";
 export { createContextMenuViews } from "./views";

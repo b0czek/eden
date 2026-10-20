@@ -1,8 +1,12 @@
 import type { ContextMenuOpenEvent, ContextMenuResult } from "@edenapp/types";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
+import * as Effect from "effect/Effect";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import type { TargetedNotification } from "../controllers/events";
-import type { ContextMenuViews } from "./ports";
-import { createContextMenu } from "./service";
+import { ContextMenuViews } from "./ports";
+import { ContextMenu, ContextMenuLive } from "./service";
 
 async function scenario() {
   const runtime = createEffectRuntime();
@@ -39,10 +43,14 @@ async function scenario() {
         [200, 20],
         [201, 21],
       ]).get(id),
-    get: (id) => viewState.get(id),
+    get: (id) => Effect.sync(() => viewState.get(id)),
     windowSize: () => ({ width: 1024, height: 768 }),
   };
-  const menu = await runtime.acquire(createContextMenu({ views }));
+  const menu = await runtime.acquire(
+    buildService(ContextMenu, ContextMenuLive).pipe(
+      Effect.provideService(ContextMenuViews, views),
+    ),
+  );
   const opened: TargetedNotification<{ menu: ContextMenuOpenEvent }>[] = [];
   const closed: TargetedNotification<ContextMenuResult>[] = [];
   menu.opened.on((event) => {
