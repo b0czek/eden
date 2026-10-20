@@ -161,6 +161,7 @@ describe("EventRouting", () => {
         value: "en",
       }),
     ).toBe(false);
+    expect(views.sendToView).not.toHaveBeenCalled();
 
     routing.subscribe(2, "settings/changed");
     views.sendToView.mockReturnValue(true);
@@ -175,6 +176,17 @@ describe("EventRouting", () => {
       type: "settings/changed",
       payload: { appId: "app.one", key: "general.locale", value: "en" },
     });
+    expect(views.sendToView).toHaveBeenCalledTimes(1);
+
+    routing.unsubscribe(2, "settings/changed");
+    expect(
+      routing.notifyView(2, "settings/changed", {
+        appId: "app.one",
+        key: "general.locale",
+        value: "en",
+      }),
+    ).toBe(false);
+    expect(views.sendToView).toHaveBeenCalledTimes(1);
   });
 
   it("cleans up subscriptions for views and backends", () => {

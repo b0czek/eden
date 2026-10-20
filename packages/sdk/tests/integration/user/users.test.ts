@@ -65,7 +65,7 @@ describe("Users accounts", () => {
     await expect(fs.readFile(marker, "utf-8")).resolves.toBe("keep");
   });
 
-  it("authenticates stored credentials without establishing a session", async () => {
+  it("authenticates stored credentials and rejects an incorrect password", async () => {
     await effects.run(
       users.createUser({
         username: "alice",

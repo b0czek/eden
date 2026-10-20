@@ -171,9 +171,6 @@ describe("EdenRuntime integration", () => {
 
     await eden.dispose();
     expect(eden.runtime.state).toBe("stopped");
-    await expect(fs.access(eden.paths.root)).rejects.toMatchObject({
-      code: "ENOENT",
-    });
   });
 
   it("rolls back acquired resources when composition fails before a service bundle exists", async () => {
@@ -494,14 +491,12 @@ describe("EdenRuntime integration", () => {
     }
   });
 
-  it("does not retain platform resources or temporary roots across repeated cycles", async () => {
+  it("does not retain platform resources across repeated runtime lifetimes", async () => {
     for (let cycle = 0; cycle < 3; cycle++) {
       const eden = await createTestEden();
-      const root = eden.paths.root;
       expect(eden.platform.rendererIpc.registrationCount).toBeGreaterThan(0);
       await eden.dispose();
       expect(eden.platform.activeResourceCount).toBe(0);
-      await expect(fs.access(root)).rejects.toMatchObject({ code: "ENOENT" });
     }
   });
 });

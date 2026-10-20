@@ -22,7 +22,12 @@ const createController = async (
 ) => {
   const changed = createEvent<SettingsChanged>();
   const settings = {
-    get: jest.fn(() => Effect.succeed(initialScale ?? undefined)),
+    get: (appId: string, key: string) =>
+      Effect.succeed(
+        appId === "com.eden" && key === "general.interfaceScale"
+          ? (initialScale ?? undefined)
+          : undefined,
+      ),
     changed,
   };
 

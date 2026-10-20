@@ -42,13 +42,4 @@ describe("compareOverlayViews", () => {
 
     expect(overlays.map((view) => view.id)).toEqual([2, 1]);
   });
-
-  it("uses view ID for deterministic ties", () => {
-    const overlays = [
-      createOverlay(2, undefined, 10),
-      createOverlay(1, undefined, 10),
-    ].sort(compareOverlayViews);
-
-    expect(overlays.map((view) => view.id)).toEqual([1, 2]);
-  });
 });

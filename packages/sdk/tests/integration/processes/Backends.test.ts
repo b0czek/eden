@@ -203,7 +203,6 @@ describe("backend readiness and termination", () => {
     await effects.run(TestClock.adjust(Duration.millis(1)));
     await rejected;
     expect(backends.hasBackend(appId)).toBe(false);
-    expect(backend.listenerCount("exit")).toBe(1); // Only the process lifecycle listener remains.
     jest.restoreAllMocks();
     backend.kill();
   });

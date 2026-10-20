@@ -4,7 +4,7 @@ import * as path from "node:path";
 import type { AppManifest, DlcManifest } from "@edenapp/types";
 import * as tar from "tar";
 import * as bundler from "./bundler";
-import { ZstdCodecCompressor } from "./compression";
+import { DEFAULT_COMPRESSOR, ZstdCodecCompressor } from "./compression";
 
 async function rewriteArchiveMetadata(
   archive: string,
@@ -440,51 +440,63 @@ describe("bundler module", () => {
       await expect(fs.access(outputPath)).rejects.toThrow();
     });
 
-    it("should respect compression level", async () => {
-      const outputPath1 = path.join(tempDir, "test-level-1.edenite");
-      const outputPath22 = path.join(tempDir, "test-level-22.edenite");
+    it.each([1, 22])(
+      "uses compression level %i and preserves the packaged contents",
+      async (compressionLevel) => {
+        const compress = jest.spyOn(
+          DEFAULT_COMPRESSOR,
+          "compressFileStreaming",
+        );
+        const outputPath = path.join(tempDir, "compressed.edenite");
+        const extractPath = path.join(tempDir, "extracted");
+        try {
+          const result = await bundler.bundle({
+            appDirectory: sampleAppPath,
+            outputPath,
+            compressionLevel,
+          });
 
-      const result1 = await bundler.bundle({
-        appDirectory: sampleAppPath,
-        outputPath: outputPath1,
-        compressionLevel: 1,
-        verbose: false,
-      });
+          expect(result.success).toBe(true);
+          expect(compress).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.any(String),
+            compressionLevel,
+          );
+          await expect(
+            bundler.extract({
+              edenitePath: outputPath,
+              outputDirectory: extractPath,
+            }),
+          ).resolves.toMatchObject({ success: true });
+          expect(
+            await fs.readFile(path.join(extractPath, "index.html")),
+          ).toEqual(await fs.readFile(path.join(sampleAppPath, "index.html")));
+        } finally {
+          compress.mockRestore();
+        }
+      },
+      30000,
+    );
 
-      const result22 = await bundler.bundle({
-        appDirectory: sampleAppPath,
-        outputPath: outputPath22,
-        compressionLevel: 22,
-        verbose: false,
-      });
-
-      expect(result1.success).toBe(true);
-      expect(result22.success).toBe(true);
-
-      // Level 22 should produce smaller file
-      const size1 = (await fs.stat(outputPath1)).size;
-      const size22 = (await fs.stat(outputPath22)).size;
-      expect(size22).toBeLessThan(size1);
-    }, 30000);
-
-    it("should bundle files specified in include directive", async () => {
-      // 1. Setup temp app directory
+    it("includes an explicitly selected source file while excluding other source files", async () => {
       const tempAppPath = path.join(tempDir, "app-with-include");
       await fs.cp(sampleAppPath, tempAppPath, { recursive: true });
-
-      // 2. Add an extra file to include
-      const extraFilePath = path.join(tempAppPath, "extra-data.txt");
-      await fs.writeFile(extraFilePath, "This file should be included");
-
-      // 3. Update manifest to include it
+      await fs.mkdir(path.join(tempAppPath, "src"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempAppPath, "src", "extra-data.txt"),
+        "This file should be included",
+      );
+      await fs.writeFile(
+        path.join(tempAppPath, "src", "excluded.txt"),
+        "This file should stay excluded",
+      );
       const manifestPath = path.join(tempAppPath, "manifest.json");
       const manifestContent = JSON.parse(
         await fs.readFile(manifestPath, "utf-8"),
       );
-      manifestContent.include = ["extra-data.txt"];
+      manifestContent.include = ["src/extra-data.txt"];
       await fs.writeFile(manifestPath, JSON.stringify(manifestContent));
 
-      // 4. Bundle
       const outputPath = path.join(tempDir, "include-test.edenite");
       const result = await bundler.bundle({
         appDirectory: tempAppPath,
@@ -494,23 +506,20 @@ describe("bundler module", () => {
 
       expect(result.success).toBe(true);
 
-      // 5. Extract and verify
       const extractPath = path.join(tempDir, "extracted-include");
-      await bundler.extract({
-        edenitePath: outputPath,
-        outputDirectory: extractPath,
-        verbose: false,
-      });
-
-      const extractedExtraFile = path.join(extractPath, "extra-data.txt");
-      const exists = await fs
-        .access(extractedExtraFile)
-        .then(() => true)
-        .catch(() => false);
-
-      expect(exists).toBe(true);
-      const content = await fs.readFile(extractedExtraFile, "utf-8");
-      expect(content).toBe("This file should be included");
+      await expect(
+        bundler.extract({
+          edenitePath: outputPath,
+          outputDirectory: extractPath,
+          verbose: false,
+        }),
+      ).resolves.toMatchObject({ success: true });
+      await expect(
+        fs.readFile(path.join(extractPath, "src", "extra-data.txt"), "utf-8"),
+      ).resolves.toBe("This file should be included");
+      await expect(
+        fs.stat(path.join(extractPath, "src", "excluded.txt")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
     });
   });
 

@@ -58,8 +58,9 @@ describe("SettingsPanels manifest panels", () => {
     expect(settings.get).toHaveBeenCalledWith("com.example.app", "visible");
   });
 
-  it("allows vendor users to see every generated field", async () => {
-    const { panels, catalog } = harness(user([], { role: "vendor" }));
+  it("loads an ungranted field and its value for vendor users", async () => {
+    const { panels, settings, catalog } = harness(user([], { role: "vendor" }));
+    settings.get.mockReturnValue(Effect.succeed("private-value"));
     catalog.allApps.mockReturnValue([
       {
         kind: "app",
@@ -83,6 +84,27 @@ describe("SettingsPanels manifest panels", () => {
 
     panels.synchronizeManifestPanels();
     expect(await Effect.runPromise(panels.listPanels())).toHaveLength(1);
+    const response = await Effect.runPromise(
+      panels.loadPanel("app.com.example.app"),
+    );
+    expect(response.panel).toMatchObject({
+      renderer: "generic",
+      view: {
+        sections: [
+          {
+            id: "general",
+            nodes: [
+              {
+                kind: "input",
+                input: "text",
+                label: "Private",
+                value: "private-value",
+              },
+            ],
+          },
+        ],
+      },
+    });
   });
 
   it("skips invalid app panels without interrupting catalog synchronization", async () => {
