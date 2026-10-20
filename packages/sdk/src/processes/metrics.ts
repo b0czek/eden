@@ -8,9 +8,8 @@ import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import type * as Fiber from "effect/Fiber";
-import * as FiberSet from "effect/FiberSet";
-import * as Schedule from "effect/Schedule";
+import * as FiberHandle from "effect/FiberHandle";
+import * as Option from "effect/Option";
 import type {
   PlatformProcessMetric,
   ProcessMetricsPort,
@@ -60,8 +59,7 @@ export const createProcessMetrics = Effect.fn(function* ({
   processMetrics,
 }: ProcessMetricsDeps) {
   const clock = yield* Clock.Clock;
-  const forkSampler = yield* FiberSet.makeRuntime<never, void, never>();
-  let _metricsSampler: Fiber.Fiber<void> | null = null;
+  const sampler = yield* FiberHandle.make<void>();
   let firstSample = createPendingSample();
   let _metricsSamplerKeepAliveUntil = 0;
   let _latestMetricsSample: CachedMetricsSample | null = null;
@@ -76,10 +74,7 @@ export const createProcessMetrics = Effect.fn(function* ({
       Math.min(MAX_METRICS_POLLING_TIMEOUT_MS, pollingTimeoutMs),
     );
     extendMetricsSamplerKeepAlive(normalizedTimeout);
-    yield* Effect.try({
-      try: () => ensureMetricsSampler(waitForAccurateCpu),
-      catch: metricsFailure,
-    });
+    yield* ensureMetricsSampler(waitForAccurateCpu);
 
     if (_latestMetricsSample) {
       return buildMetricsSnapshot(
@@ -117,27 +112,54 @@ export const createProcessMetrics = Effect.fn(function* ({
     );
   });
 
-  function ensureMetricsSampler(waitForAccurateCpu: boolean): void {
-    if (_metricsSampler) return;
+  const ensureMetricsSampler = Effect.fn(function* (
+    waitForAccurateCpu: boolean,
+  ) {
+    if (Option.isSome(yield* FiberHandle.get(sampler))) return;
 
     firstSample = createPendingSample();
-    if (waitForAccurateCpu) {
-      // Prime Electron's CPU sampler so the next interval-based sample is useful.
-      processMetrics.getAppMetrics();
-      _latestMetricsSample = null;
-    } else {
-      captureMetricsSample();
-    }
-
-    _metricsSampler = forkSampler(
-      Effect.sync(collectMetricsSample).pipe(
-        Effect.schedule(
-          Schedule.spaced(Duration.millis(METRICS_SAMPLE_INTERVAL_MS)),
+    yield* Effect.try({
+      try: () => {
+        if (waitForAccurateCpu) {
+          // Prime Electron's CPU sampler so the next interval-based sample is useful.
+          processMetrics.getAppMetrics();
+          _latestMetricsSample = null;
+        } else {
+          captureMetricsSample();
+        }
+      },
+      catch: metricsFailure,
+    });
+    const waiting = firstSample;
+    yield* FiberHandle.run(
+      sampler,
+      Effect.gen(function* () {
+        while (true) {
+          yield* Effect.sleep(Duration.millis(METRICS_SAMPLE_INTERVAL_MS));
+          if (
+            (waiting.readers === 0 || Deferred.isDoneUnsafe(waiting.result)) &&
+            clock.currentTimeMillisUnsafe() >= _metricsSamplerKeepAliveUntil
+          )
+            return;
+          const sample = yield* Effect.try({
+            try: captureMetricsSample,
+            catch: metricsFailure,
+          });
+          yield* Deferred.succeed(waiting.result, sample);
+        }
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.asVoid(Deferred.fail(waiting.result, error)),
         ),
-        Effect.asVoid,
+        Effect.ensuring(
+          Effect.sync(() => {
+            _metricsSamplerKeepAliveUntil = 0;
+            _latestMetricsSample = null;
+          }),
+        ),
       ),
     );
-  }
+  });
 
   function extendMetricsSamplerKeepAlive(timeoutMs: number): void {
     _metricsSamplerKeepAliveUntil = Math.max(
@@ -146,43 +168,12 @@ export const createProcessMetrics = Effect.fn(function* ({
     );
   }
 
-  function collectMetricsSample(): void {
-    if (
-      (firstSample.readers === 0 ||
-        Deferred.isDoneUnsafe(firstSample.result)) &&
-      clock.currentTimeMillisUnsafe() >= _metricsSamplerKeepAliveUntil
-    ) {
-      stopMetricsSampler();
-      return;
-    }
-
-    try {
-      Deferred.doneUnsafe(
-        firstSample.result,
-        Effect.succeed(captureMetricsSample()),
-      );
-    } catch (error) {
-      const failure = metricsFailure(error);
-
-      Deferred.doneUnsafe(firstSample.result, Effect.fail(failure));
-      stopMetricsSampler();
-    }
-  }
-
   function captureMetricsSample(): CachedMetricsSample {
     const appMetrics = processMetrics.getAppMetrics();
     const sampledAt = new Date(clock.currentTimeMillisUnsafe()).toISOString();
     const sample = { sampledAt, appMetrics };
     _latestMetricsSample = sample;
     return sample;
-  }
-
-  function stopMetricsSampler(): void {
-    if (!_metricsSampler) return;
-    _metricsSampler.interruptUnsafe();
-    _metricsSampler = null;
-    _metricsSamplerKeepAliveUntil = 0;
-    _latestMetricsSample = null;
   }
 
   function buildMetricsSnapshot(
@@ -352,7 +343,6 @@ export const createProcessMetrics = Effect.fn(function* ({
   }
 
   function dispose(): void {
-    stopMetricsSampler();
     Deferred.doneUnsafe(
       firstSample.result,
       Effect.fail(
