@@ -6,7 +6,6 @@ export {
   SettingsPanelsLive,
 } from "./panels/service";
 export {
-  type SettingsAuthorization,
   type SettingsCatalog,
   SettingsStorage,
 } from "./ports";

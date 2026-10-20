@@ -15,7 +15,7 @@ import * as FiberSet from "effect/FiberSet";
 import * as Layer from "effect/Layer";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
-import { AppChannelLifecycle } from "../appbus/ports";
+import { AppChannels } from "../appbus/service";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
@@ -102,7 +102,7 @@ export const ProcessesLive = Layer.effect(
     const views = yield* Views;
     const packageCatalog = yield* PackageCatalog;
     const packages = yield* Packages;
-    const channels = yield* AppChannelLifecycle;
+    const channels = yield* AppChannels;
     const sessionContext = yield* SessionContext;
     const executionContext = yield* ExecutionContext;
     const config = yield* RuntimeConfig;

@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
+import { ExecutionContext } from "../execution/context";
 import { log } from "../logging";
 import type {
   StorageClosedError,
@@ -17,11 +18,7 @@ import {
   SettingDefaultMissingError,
   SettingValueError,
 } from "./errors";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "./ports";
+import { SettingsCatalog, SettingsStorage } from "./ports";
 import { EDEN_SETTINGS_SCHEMA } from "./schema";
 
 export interface Settings {
@@ -76,7 +73,7 @@ export const SettingsLive = Layer.effect(
   Effect.gen(function* () {
     const connection = yield* SettingsStorage;
     const catalog = yield* SettingsCatalog;
-    const authorization = yield* SettingsAuthorization;
+    const authorization = yield* ExecutionContext;
     const changed = yield* scopedEvent<{
       appId: string;
       key: string;

@@ -8,7 +8,7 @@ import {
 } from "../app-associations/runtime";
 import { AppAssociationsLive } from "../app-associations/service";
 import {
-  AppChannelsPortsLive,
+  AppChannelTransportLive,
   registerAppChannelsApi,
 } from "../appbus/runtime";
 import { AppChannelsLive } from "../appbus/service";
@@ -80,7 +80,10 @@ import {
 import { PowerHostLive, registerPowerApi } from "../power/runtime";
 import { PowerLive } from "../power/service";
 import { BackendsLive } from "../processes/backends";
-import { ProcessesPortsLive, registerProcessesApi } from "../processes/runtime";
+import {
+  ProcessesRoutingLive,
+  registerProcessesApi,
+} from "../processes/runtime";
 import { ProcessesLive } from "../processes/service";
 import { seedDatabase } from "../seed";
 import { SessionContextLive } from "../session/context";
@@ -89,7 +92,7 @@ import { SessionsLive } from "../session/service";
 import { PanelRegistryService } from "../settings/panels/registry";
 import { registerSettingsPanelsApi } from "../settings/panels/runtime";
 import { SettingsPanelsLive } from "../settings/panels/service";
-import { registerSettingsApi, SettingsPortsLive } from "../settings/runtime";
+import { registerSettingsApi, SettingsCatalogLive } from "../settings/runtime";
 import { SettingsLive } from "../settings/service";
 import { SqliteSettingsStorageLive } from "../settings/sqlite-storage";
 import { registerSystemApi } from "../system/runtime";
@@ -120,12 +123,12 @@ const ServicesLive = Layer.mergeAll(
     FileOpenLive.pipe(Layer.provide(FileOpenPortsLive)),
     KeyboardLive.pipe(Layer.provide(KeyboardPortsLive)),
   ]),
-  Layer.provideMerge(ProcessesLive.pipe(Layer.provide(ProcessesPortsLive))),
+  Layer.provideMerge(ProcessesLive.pipe(Layer.provide(ProcessesRoutingLive))),
   Layer.provideMerge(IpcTransportLive),
   Layer.provideMerge([
     CommandsLive,
     PackagesLive,
-    AppChannelsLive.pipe(Layer.provide(AppChannelsPortsLive)),
+    AppChannelsLive.pipe(Layer.provide(AppChannelTransportLive)),
   ]),
   Layer.provideMerge([OperationsLive, BackendsLive]),
   Layer.provideMerge([
@@ -144,7 +147,7 @@ const ServicesLive = Layer.mergeAll(
   ]),
   Layer.provideMerge(
     SettingsLive.pipe(
-      Layer.provide([SettingsPortsLive, SqliteSettingsStorageLive]),
+      Layer.provide([SettingsCatalogLive, SqliteSettingsStorageLive]),
     ),
   ),
   Layer.provideMerge([RuntimeContextsLive, PackageCatalogLive]),

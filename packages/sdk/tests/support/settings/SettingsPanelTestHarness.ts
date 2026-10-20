@@ -15,12 +15,9 @@ import {
   SettingsPanels,
   SettingsPanelsLive,
 } from "../../../src/settings/panels/service";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "../../../src/settings/ports";
+import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
 import { Settings, SettingsLive } from "../../../src/settings/service";
+import { createTestExecutionContext } from "../callers";
 import { buildService, createEffectRuntime } from "../effect-runtime";
 import { panelUser } from "./panels";
 
@@ -36,7 +33,10 @@ export function createSettingsPanelHarness(
   const storedValues = new Map<string, string>();
   const realSettings = serviceEffects.acquireSync(
     buildService(Settings, SettingsLive).pipe(
-      Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+      Effect.provideServiceEffect(
+        ExecutionContext,
+        createTestExecutionContext(() => true),
+      ),
       Effect.provideService(SettingsCatalog, {
         getAppSettings: () => undefined,
       }),

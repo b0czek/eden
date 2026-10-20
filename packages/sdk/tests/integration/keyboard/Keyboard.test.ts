@@ -9,6 +9,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { createEvent } from "../../../src/events/event";
+import { ExecutionContext } from "../../../src/execution/context";
 import { createKeyboardAssets } from "../../../src/keyboard/assets";
 import { KeyboardAssets, KeyboardViews } from "../../../src/keyboard/ports";
 import { Keyboard, KeyboardLive } from "../../../src/keyboard/service";
@@ -21,15 +22,12 @@ import {
 import { Processes } from "../../../src/processes/service";
 import { AppsDirectory } from "../../../src/runtime/inputs";
 import { EDEN_SETTINGS_APP_ID } from "../../../src/settings/constants";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "../../../src/settings/ports";
+import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
 import { Settings, SettingsLive } from "../../../src/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import type { ViewInfo } from "../../../src/views/types";
 import { testApp } from "../../support/apps";
+import { createTestExecutionContext } from "../../support/callers";
 import {
   buildService,
   createEffectRuntime,
@@ -81,7 +79,10 @@ async function createScenario(
       Effect.provideService(SettingsCatalog, {
         getAppSettings: () => undefined,
       }),
-      Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+      Effect.provideServiceEffect(
+        ExecutionContext,
+        createTestExecutionContext(() => true),
+      ),
     ),
   );
   for (const [key, value] of Object.entries(initial))

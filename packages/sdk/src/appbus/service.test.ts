@@ -6,9 +6,20 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
+import { Backends } from "../processes/backends";
 import { AppChannelFailure, AppServiceAlreadyRegistered } from "./errors";
-import { AppChannelBackends, AppChannelTransport } from "./ports";
+import { AppChannelTransport } from "./ports";
 import { AppChannels, AppChannelsLive } from "./service";
+
+function dependency<T>(methods: Partial<T>): T {
+  return new Proxy(methods as T & object, {
+    get(target, key, receiver) {
+      if (!(key in target))
+        throw new Error(`Unexpected dependency access: ${String(key)}`);
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
 
 async function fixture(
   createMessageChannel: AppChannelTransport["createMessageChannel"],
@@ -26,11 +37,14 @@ async function fixture(
           }),
         ),
         Layer.provide(
-          Layer.succeed(AppChannelBackends, {
-            hasBackend,
-            sendPortToBackend: () => true,
-            sendMessage: () => true,
-          }),
+          Layer.succeed(
+            Backends,
+            dependency<Backends>({
+              hasBackend,
+              sendPortToBackend: () => true,
+              sendMessage: () => true,
+            }),
+          ),
         ),
       ),
     ),

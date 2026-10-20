@@ -16,17 +16,15 @@ import {
   AutostartLoginAppId,
 } from "../../../src/autostart/service";
 import { fromPromise } from "../../../src/effects/io";
+import { ExecutionContext } from "../../../src/execution/context";
 import { AppsDirectory } from "../../../src/runtime/inputs";
 import { Sessions } from "../../../src/session/service";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "../../../src/settings/ports";
+import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
 import { Settings, SettingsLive } from "../../../src/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
+import { createTestExecutionContext } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import {
   buildService,
@@ -106,7 +104,10 @@ async function scopedAutostart(
       Effect.provideService(SettingsCatalog, {
         getAppSettings: () => undefined,
       }),
-      Effect.provideService(SettingsAuthorization, { hasGrant: () => false }),
+      Effect.provideServiceEffect(
+        ExecutionContext,
+        createTestExecutionContext(() => false),
+      ),
     ),
   );
   const processes = eden.runtime.services.processes;

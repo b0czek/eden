@@ -31,11 +31,3 @@ export const SettingsCatalog = Context.Service<
   "eden/SettingsCatalog",
   SettingsCatalog
 >("eden/SettingsCatalog");
-
-export interface SettingsAuthorization {
-  hasGrant(grant: string): boolean;
-}
-export const SettingsAuthorization = Context.Service<
-  "eden/SettingsAuthorization",
-  SettingsAuthorization
->("eden/SettingsAuthorization");

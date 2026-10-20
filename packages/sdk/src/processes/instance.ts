@@ -5,7 +5,7 @@ import type {
   FilesystemLocation,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { AppChannelLifecycle } from "../appbus/ports";
+import type { AppChannels } from "../appbus/service";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
@@ -41,7 +41,7 @@ export const acquireAppInstance = Effect.fn(function* (
     backends: Backends;
     views: Views;
     contexts: RuntimeContexts;
-    channels: AppChannelLifecycle;
+    channels: Pick<AppChannels, "unregisterAllServices">;
   },
 ) {
   yield* Effect.acquireRelease(

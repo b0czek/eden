@@ -7,8 +7,9 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { log } from "../logging";
+import { Backends } from "../processes/backends";
 import { AppChannelFailure, AppServiceAlreadyRegistered } from "./errors";
-import { AppChannelBackends, AppChannelTransport } from "./ports";
+import { AppChannelTransport } from "./ports";
 
 export interface AppChannels {
   registerService: (
@@ -27,6 +28,7 @@ export interface AppChannels {
     targetAppId: string,
     serviceName: string,
   ) => Effect.Effect<ConnectResult, AppChannelFailure>;
+  /** Synchronous teardown removes registrations before views and backends. */
   unregisterAllServices: (appId: string) => number;
   listServices: () => ServiceInfo[];
   getServicesByApp: (appId: string) => ServiceInfo[];
@@ -40,7 +42,7 @@ export const AppChannelsLive = Layer.effect(
   AppChannels,
   Effect.gen(function* () {
     const channels = yield* AppChannelTransport;
-    const backends = yield* AppChannelBackends;
+    const backends = yield* Backends;
     const services = new Map<string, RegisteredService>();
     const connections = new Map<
       string,

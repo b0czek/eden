@@ -6,16 +6,14 @@ import type * as Scope from "effect/Scope";
 import { AppearanceSettings } from "../../../src/appearance/ports";
 import { Appearance, AppearanceLive } from "../../../src/appearance/service";
 import { createAppearanceSettings } from "../../../src/appearance/settings-adapter";
+import { ExecutionContext } from "../../../src/execution/context";
 import { I18n, I18nLive, I18nSettings } from "../../../src/i18n/service";
 import { createI18nSettings } from "../../../src/i18n/settings";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "../../../src/settings/ports";
+import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
 import { Settings, SettingsLive } from "../../../src/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
+import { createTestExecutionContext } from "../../support/callers";
 import {
   buildService,
   createEffectRuntime,
@@ -27,7 +25,10 @@ function settingsFactory(
   return buildService(Settings, SettingsLive).pipe(
     Effect.provideServiceEffect(SettingsStorage, storage),
     Effect.provideService(SettingsCatalog, { getAppSettings: () => undefined }),
-    Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+    Effect.provideServiceEffect(
+      ExecutionContext,
+      createTestExecutionContext(() => true),
+    ),
   );
 }
 
@@ -48,11 +49,14 @@ it("keeps a missing first SQLite value aligned with its default in bulk reads", 
         Effect.provideService(SettingsCatalog, {
           getAppSettings: () => undefined,
         }),
-        Effect.provideService(SettingsAuthorization, {
-          hasGrant: (grant) =>
-            grant === "settings/com.eden/general.locale" ||
-            grant === "settings/com.eden/general.interfaceScale",
-        }),
+        Effect.provideServiceEffect(
+          ExecutionContext,
+          createTestExecutionContext(
+            (grant) =>
+              grant === "settings/com.eden/general.locale" ||
+              grant === "settings/com.eden/general.interfaceScale",
+          ),
+        ),
       ),
     );
     await effects.run(

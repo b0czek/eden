@@ -1,15 +1,13 @@
 import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import { createTestExecutionContext } from "../../tests/support/callers";
 import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
+import { ExecutionContext } from "../execution/context";
 import { SettingAccessError } from "./errors";
-import {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsStorage,
-} from "./ports";
+import { SettingsCatalog, SettingsStorage } from "./ports";
 import { Settings, SettingsLive } from "./service";
 
 const ownerSettings: SettingsCategory[] = [
@@ -57,9 +55,12 @@ async function acquireSettings(
         getAppSettings: (appId) =>
           appId === "app.owner" ? ownerSettings : undefined,
       }),
-      Effect.provideService(SettingsAuthorization, {
-        hasGrant: typeof grants === "function" ? grants : () => grants,
-      }),
+      Effect.provideServiceEffect(
+        ExecutionContext,
+        createTestExecutionContext(
+          typeof grants === "function" ? grants : () => grants,
+        ),
+      ),
     ),
   );
 }
