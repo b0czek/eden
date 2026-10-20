@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-/** Eden's explicit factories are not covered by Context-service diagnostics. */
+/** Check method boundaries for domain service keys and standalone factories. */
 export function checkEffectBoundaries(program) {
   const checker = program.getTypeChecker();
   const diagnostics = [];
@@ -153,7 +153,7 @@ export function checkEffectBoundaries(program) {
             memberType,
             ts.SignatureKind.Call,
           );
-          // Follow capabilities defined here; imported services are checked at their own factory.
+          // Follow capabilities defined here; imported services are checked at their own key or factory.
           if (
             !signatures.length &&
             !effectChannel(memberType, "_R", location)
@@ -190,13 +190,18 @@ export function checkEffectBoundaries(program) {
     for (const exported of moduleSymbol
       ? checker.getExportsOfModule(moduleSymbol)
       : []) {
-      if (!/^create[A-Z]/.test(exported.name)) continue;
       const target =
         exported.flags & ts.SymbolFlags.Alias
           ? checker.getAliasedSymbol(exported)
           : exported;
       const at = target.valueDeclaration;
       if (!at || at.getSourceFile() !== source) continue;
+      const type = checker.getTypeOfSymbolAtLocation(target, at);
+      if (checker.getPropertyOfType(type, "~effect/Context/Service")) {
+        const shape = effectChannel(type, "_A", at);
+        if (shape) checkFactory(shape, at, exported.name);
+      }
+      if (!/^create[A-Z]/.test(exported.name)) continue;
       for (const signature of checker.getSignaturesOfType(
         checker.getTypeOfSymbolAtLocation(target, at),
         ts.SignatureKind.Call,

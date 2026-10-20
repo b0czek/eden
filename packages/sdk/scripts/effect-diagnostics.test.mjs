@@ -130,6 +130,44 @@ test("SDK Effect diagnostics enforce correctness without rejecting scoped factor
   );
 
   await t.test(
+    "rejects individual service method requirements while allowing acquisition and generic combinators",
+    async () => {
+      const result = await check(
+        `
+      import * as Context from "effect/Context";
+      import * as Effect from "effect/Effect";
+      import * as Layer from "effect/Layer";
+      interface Worker {
+        ready(): Effect.Effect<void>;
+        leaked(): Effect.Effect<unknown, never, "dependency">;
+        preserve<A, E, R>(work: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>;
+      }
+      export const Worker = Context.Service<"Worker", Worker>("Worker");
+      export const WorkerLive = Layer.effect(Worker, Effect.gen(function* () {
+        yield* Effect.scope;
+        return { ready: () => Effect.void, leaked: () => Effect.void, preserve: (work) => work };
+      }));
+    `,
+        true,
+      );
+      assert.equal(result.status, 1, result.output);
+      assert.ok(
+        result.output.includes("Worker.leaked requires"),
+        result.output,
+      );
+      assert.ok(
+        !result.output.includes("Worker.ready requires"),
+        result.output,
+      );
+      assert.ok(
+        !result.output.includes("Worker.preserve requires"),
+        result.output,
+      );
+      assert.ok(!result.output.includes("WorkerLive requires"), result.output);
+    },
+  );
+
+  await t.test(
     "rejects raw interpreters and detached fibers through aliases and computed access",
     async () => {
       const result = await check(

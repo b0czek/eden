@@ -84,12 +84,15 @@ terminal audit:
 pnpm --filter @edenapp/sdk exec effect-language-service diagnostics --project tsconfig.json --format text --severity error,warning
 ```
 
-Eden's boundary check inspects the methods and Effect-valued properties returned
-by exported `create...` factories, including nested capabilities defined in the
-factory module and Promise-wrapped results. Imported services are checked at their
-own factories. Acquisition
-may require a scope; ordinary service methods must have their requirements
-provided. Generic combinators may preserve the caller's requirement parameter.
+Eden's boundary check inspects exported `Context.Service` contracts and the
+methods and Effect-valued properties returned by standalone `create...` factories,
+including nested capabilities defined in the same module and Promise-wrapped
+results. Imported services are checked at their own keys or factories. Layer
+acquisition may require dependencies and a scope; ordinary service methods must
+have their requirements provided. A capability that intentionally acquires a
+resource in its caller's scope documents that ownership beside the method with
+a narrow exception. Generic combinators may preserve the caller's requirement
+parameter.
 Raw `Effect.run*` references, new `ManagedRuntime` instances, and `forkDetach`
 require explicit boundary or ownership decisions. Scoped forks and FiberSets
 remain supported. These checks catch specific construction patterns; they do not
