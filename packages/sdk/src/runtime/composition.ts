@@ -77,7 +77,7 @@ import {
   UtilityProcessPort,
   WindowingPort,
 } from "../platform/ports/types";
-import { PowerPortsLive, registerPowerApi } from "../power/runtime";
+import { PowerHostLive, registerPowerApi } from "../power/runtime";
 import { PowerLive } from "../power/service";
 import { BackendsLive } from "../processes/backends";
 import { ProcessesPortsLive, registerProcessesApi } from "../processes/runtime";
@@ -111,7 +111,7 @@ import {
 /** Wire implementations once; domain Layers declare only their requirements. */
 const ServicesLive = Layer.mergeAll(
   AutostartLive.pipe(Layer.provide(AutostartPortsLive)),
-  PowerLive.pipe(Layer.provide(PowerPortsLive)),
+  PowerLive.pipe(Layer.provide(PowerHostLive)),
   FilePickerLive.pipe(Layer.provide(FilePickerPortsLive)),
 ).pipe(
   Layer.provideMerge([

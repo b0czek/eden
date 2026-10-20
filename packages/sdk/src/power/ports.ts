@@ -13,16 +13,3 @@ export const PowerHost = Context.Service<
   "eden/PowerHost",
   PowerHost | undefined
 >("eden/PowerHost");
-
-export interface PowerShutdown {
-  shutdown(): Effect.Effect<void, Error>;
-}
-
-export const PowerDaemons = Context.Service<"eden/PowerDaemons", PowerShutdown>(
-  "eden/PowerDaemons",
-);
-
-export const PowerProcesses = Context.Service<
-  "eden/PowerProcesses",
-  PowerShutdown
->("eden/PowerProcesses");

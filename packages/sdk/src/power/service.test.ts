@@ -5,11 +5,23 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
+import { Daemons } from "../daemon/service";
+import { Processes } from "../processes/service";
 import { createPowerHost } from "./adapters";
 import { createPowerController } from "./controller-edenapi";
 import { PowerDisposed, PowerPending, PowerUnavailable } from "./errors";
-import { PowerDaemons, PowerHost, PowerProcesses } from "./ports";
+import { PowerHost } from "./ports";
 import { Power, PowerLive } from "./service";
+
+function dependency<T>(methods: Partial<T>): T {
+  return new Proxy(methods as T & object, {
+    get(target, key, receiver) {
+      if (!(key in target))
+        throw new Error(`Unexpected dependency access: ${String(key)}`);
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
 
 it("rejects unavailable operations synchronously before a retained task is created", async () => {
   const runtime = createEffectRuntime();
@@ -17,8 +29,14 @@ it("rejects unavailable operations synchronously before a retained task is creat
     const power = await runtime.acquire(
       buildService(Power, PowerLive).pipe(
         Effect.provideService(PowerHost, undefined),
-        Effect.provideService(PowerDaemons, { shutdown: () => Effect.void }),
-        Effect.provideService(PowerProcesses, { shutdown: () => Effect.void }),
+        Effect.provideService(
+          Daemons,
+          dependency<Daemons>({ shutdown: () => Effect.void }),
+        ),
+        Effect.provideService(
+          Processes,
+          dependency<Processes>({ shutdown: () => Effect.void }),
+        ),
       ),
     );
     const controller = createPowerController(power);
@@ -59,19 +77,25 @@ it("drains an accepted host handoff before scope teardown and preserves provider
     const power = await runtime.acquire(
       buildService(Power, PowerLive).pipe(
         Effect.provideService(PowerHost, createPowerHost(provider)),
-        Effect.provideService(PowerDaemons, {
-          shutdown: () =>
-            Effect.sync(() => {
-              daemonStopped = true;
-            }),
-        }),
-        Effect.provideService(PowerProcesses, {
-          shutdown: () =>
-            Effect.sync(() => {
-              expect(daemonStopped).toBe(true);
-              processesStopped = true;
-            }),
-        }),
+        Effect.provideService(
+          Daemons,
+          dependency<Daemons>({
+            shutdown: () =>
+              Effect.sync(() => {
+                daemonStopped = true;
+              }),
+          }),
+        ),
+        Effect.provideService(
+          Processes,
+          dependency<Processes>({
+            shutdown: () =>
+              Effect.sync(() => {
+                expect(daemonStopped).toBe(true);
+                processesStopped = true;
+              }),
+          }),
+        ),
       ),
     );
     expect(power.getCapabilities()).toEqual({ poweroff: true, reboot: false });
@@ -105,40 +129,53 @@ it("drains an accepted host handoff before scope teardown and preserves provider
 });
 
 it.each(["daemons", "processes", "host"] as const)(
-  "identifies %s failure with its cause and allows retry",
+  "preserves %s failure semantics and allows retry",
   async (participant) => {
     const runtime = createEffectRuntime();
     const cause = new Error("Power transition refused");
     let failing = true;
-    const step = (owner: typeof participant) =>
-      failing && owner === participant ? Effect.fail(cause) : Effect.void;
+    const shutdown = (owner: "daemons" | "processes") =>
+      failing && owner === participant ? Effect.die(cause) : Effect.void;
     try {
       const power = await runtime.acquire(
         buildService(Power, PowerLive).pipe(
           Effect.provideService(PowerHost, {
             getCapabilities: () => ({ poweroff: true, reboot: false }),
-            perform: () => step("host"),
+            perform: () =>
+              failing && participant === "host"
+                ? Effect.fail(cause)
+                : Effect.void,
           }),
-          Effect.provideService(PowerDaemons, {
-            shutdown: () => step("daemons"),
-          }),
-          Effect.provideService(PowerProcesses, {
-            shutdown: () => step("processes"),
-          }),
+          Effect.provideService(
+            Daemons,
+            dependency<Daemons>({ shutdown: () => shutdown("daemons") }),
+          ),
+          Effect.provideService(
+            Processes,
+            dependency<Processes>({ shutdown: () => shutdown("processes") }),
+          ),
         ),
       );
-      const failure = await runtime.run(
-        Effect.flip(power.power({ action: "poweroff" })),
+      const exit = await runtime.run(
+        Effect.exit(power.power({ action: "poweroff" })),
       );
-      expect(failure).toMatchObject({
-        _tag:
-          participant === "host" ? "PowerHandoffFailed" : "PowerShutdownFailed",
-        action: "poweroff",
-        cause,
-        message: cause.message,
-        ...(participant === "host" ? {} : { participant }),
-      });
-      expect("cause" in failure && failure.cause).toBe(cause);
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        expect(Cause.hasDies(exit.cause)).toBe(participant !== "host");
+        expect(Cause.hasFails(exit.cause)).toBe(participant === "host");
+        const failure = Cause.squash(exit.cause);
+        if (participant === "host") {
+          expect(failure).toMatchObject({
+            _tag: "PowerHandoffFailed",
+            action: "poweroff",
+            cause,
+            message: cause.message,
+          });
+          expect((failure as { cause: unknown }).cause).toBe(cause);
+        } else {
+          expect(failure).toBe(cause);
+        }
+      }
       failing = false;
       await expect(
         runtime.run(power.power({ action: "poweroff" })),
@@ -161,8 +198,14 @@ it("keeps unexpected host capability exceptions out of recoverable power failure
           },
           perform: () => Effect.void,
         }),
-        Effect.provideService(PowerDaemons, { shutdown: () => Effect.void }),
-        Effect.provideService(PowerProcesses, { shutdown: () => Effect.void }),
+        Effect.provideService(
+          Daemons,
+          dependency<Daemons>({ shutdown: () => Effect.void }),
+        ),
+        Effect.provideService(
+          Processes,
+          dependency<Processes>({ shutdown: () => Effect.void }),
+        ),
       ),
     );
     const exit = await runtime.run(

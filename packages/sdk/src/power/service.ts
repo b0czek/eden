@@ -2,16 +2,17 @@ import type { EdenPowerCapabilities } from "@edenapp/types";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { Daemons } from "../daemon/service";
 import type { OperationReporter } from "../operations/task";
+import { Processes } from "../processes/service";
 import {
   PowerDisposed,
   type PowerError,
   PowerHandoffFailed,
   PowerPending,
-  PowerShutdownFailed,
   PowerUnavailable,
 } from "./errors";
-import { PowerDaemons, PowerHost, PowerProcesses } from "./ports";
+import { PowerHost } from "./ports";
 import type { PowerAction } from "./types";
 
 export interface Power {
@@ -30,8 +31,8 @@ export const PowerLive = Layer.effect(
   Power,
   Effect.gen(function* () {
     const host = yield* PowerHost;
-    const daemons = yield* PowerDaemons;
-    const processes = yield* PowerProcesses;
+    const daemons = yield* Daemons;
+    const processes = yield* Processes;
     let pending = false;
     let disposed = false;
     yield* Effect.addFinalizer(() =>
@@ -60,26 +61,8 @@ export const PowerLive = Layer.effect(
       reporter?: OperationReporter,
     ) {
       reporter?.update("preparing-host-handoff");
-      yield* daemons.shutdown().pipe(
-        Effect.mapError(
-          (cause) =>
-            new PowerShutdownFailed({
-              action,
-              participant: "daemons",
-              cause,
-            }),
-        ),
-      );
-      yield* processes.shutdown().pipe(
-        Effect.mapError(
-          (cause) =>
-            new PowerShutdownFailed({
-              action,
-              participant: "processes",
-              cause,
-            }),
-        ),
-      );
+      yield* daemons.shutdown();
+      yield* processes.shutdown();
       reporter?.update("host-handoff");
       yield* activeHost
         .perform(action)

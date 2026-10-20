@@ -6,9 +6,8 @@ export {
   type PowerError,
   PowerHandoffFailed,
   PowerPending,
-  PowerShutdownFailed,
   PowerUnavailable,
 } from "./errors";
-export type { PowerHost, PowerShutdown } from "./ports";
+export type { PowerHost } from "./ports";
 export { Power, PowerLive } from "./service";
 export type { PowerAction } from "./types";

@@ -20,18 +20,6 @@ export class PowerUnavailable extends Data.TaggedError("PowerUnavailable")<{
   }
 }
 
-export class PowerShutdownFailed extends Data.TaggedError(
-  "PowerShutdownFailed",
-)<{
-  readonly action: PowerAction;
-  readonly participant: "daemons" | "processes";
-  readonly cause: Error;
-}> {
-  override get message() {
-    return this.cause.message;
-  }
-}
-
 export class PowerHandoffFailed extends Data.TaggedError("PowerHandoffFailed")<{
   readonly action: PowerAction;
   readonly cause: Error;
@@ -45,7 +33,4 @@ export type PowerAdmissionError =
   | PowerDisposed
   | PowerPending
   | PowerUnavailable;
-export type PowerError =
-  | PowerAdmissionError
-  | PowerShutdownFailed
-  | PowerHandoffFailed;
+export type PowerError = PowerAdmissionError | PowerHandoffFailed;
