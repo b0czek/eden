@@ -49,6 +49,21 @@ For Electron, append a filename to select a suite or use `--project=sdk` /
 `--project=apps`. On headless Linux, prefix the command with
 `xvfb-run --auto-servernum`.
 
+## Eden API throughput
+
+After building the SDK, run `pnpm --filter @edenapp/sdk benchmark:edenapi`.
+On headless Linux, prefix the command with `xvfb-run -a`.
+
+The benchmark uses a temporary Electron profile and a renderer app calling
+`edenAPI.shellCommand` against an empty, synchronous controller command. It
+includes the context bridge, Electron IPC, caller resolution, command validation,
+and response handling. Each concurrency level (1, 8, 32, 128) warms up before five
+one-second samples; JSON output includes every sample and median requests per
+second. Compare repeated runs on the same machine without concurrent builds or
+tests. These measurements describe the empty endpoint, not domain I/O capacity.
+Pass `--async` to benchmark an immediately resolving Effect Promise instead,
+exercising pending response handling without native I/O.
+
 ## Effect diagnostics
 
 The SDK's `tsconfig.json` configures `@effect/language-service` for editor

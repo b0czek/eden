@@ -42,7 +42,7 @@ import type { Views } from "../views/service";
 import type { Backends } from "./backends";
 import { type AppRuntime, acquireAppInstance } from "./instance";
 
-import { createProcessMetrics, type ProcessMetrics } from "./metrics";
+import { createProcessMetrics } from "./metrics";
 
 /**
  * Events emitted by the Processes
@@ -133,28 +133,16 @@ export const createProcesses = Effect.fn(function* ({
     return Scope.close(record.scope, exit);
   }
 
-  let _processMetrics: ProcessMetrics;
-  let _loginAppId: string | undefined;
   let _hotReloadStates = new Map<string, string>();
-  let _hotReloadWatcher: fs.FSWatcher | undefined;
 
   const hotReloadDebounce = yield* FiberHandle.make<void, never>();
   const forkHotReload = yield* FiberHandle.runtime(hotReloadDebounce)<never>();
   let _shuttingDown = false;
-  const _backends = backends;
-  const _views = views;
-  const _packageCatalog = packageCatalog;
-  const _packages = packages;
-  const _channels = channels;
-  const _sessionContext = sessionContext;
-  const _executionContext = executionContext;
-  const _config = config;
-  const _runtimeContexts = runtimeContexts;
 
-  _loginAppId = _config.loginAppId;
-  _processMetrics = yield* createProcessMetrics({
-    backends: _backends,
-    views: _views,
+  const loginAppId = config.loginAppId;
+  const metrics = yield* createProcessMetrics({
+    backends,
+    views,
     getRunningApps: (showHidden) => getRunningApps(showHidden),
     processMetrics,
   });
@@ -180,28 +168,36 @@ export const createProcesses = Effect.fn(function* ({
     const serversPath = getHotReloadServersPath(config);
     const stateDirectory = path.dirname(serversPath);
     yield* fromPromise(() => fsp.mkdir(stateDirectory, { recursive: true }));
-    _hotReloadWatcher = fs.watch(stateDirectory, (eventType, filename) => {
-      if (_shuttingDown || (eventType !== "rename" && eventType !== "change"))
-        return;
-      if (filename && filename.toString() !== path.basename(serversPath))
-        return;
-      forkHotReload(
-        Effect.sleep(
-          Duration.millis(Math.max(config.hotReload?.debounce ?? 300, 50)),
-        ).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              runLifecycle(handleHotReloadStateChanged());
-            }),
-          ),
-        ),
-      );
-    });
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        fs.watch(stateDirectory, (eventType, filename) => {
+          if (
+            _shuttingDown ||
+            (eventType !== "rename" && eventType !== "change")
+          )
+            return;
+          if (filename && filename.toString() !== path.basename(serversPath))
+            return;
+          forkHotReload(
+            Effect.sleep(
+              Duration.millis(Math.max(config.hotReload?.debounce ?? 300, 50)),
+            ).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  runLifecycle(handleHotReloadStateChanged());
+                }),
+              ),
+            ),
+          );
+        }),
+      ),
+      (watcher) => Effect.sync(() => watcher.close()),
+    );
     runLifecycle(handleHotReloadStateChanged());
   });
   const handleHotReloadStateChanged = Effect.fn(
     function* () {
-      const state = yield* loadHotReloadServerState(_config);
+      const state = yield* loadHotReloadServerState(config);
       const appIds = new Set([
         ..._hotReloadStates.keys(),
         ...Object.keys(state.apps),
@@ -230,7 +226,7 @@ export const createProcesses = Effect.fn(function* ({
   );
 
   const refreshHotReloadApp = Effect.fn(function* (appId: string) {
-    const refreshed = yield* _packages.reloadPackage(appId).pipe(
+    const refreshed = yield* packages.reloadPackage(appId).pipe(
       Effect.match({
         onSuccess: () => true,
         onFailure: (error) => {
@@ -259,11 +255,11 @@ export const createProcesses = Effect.fn(function* ({
 
   function assertCanLaunch(appId: string): void {
     const developmentApp =
-      _config.development && _packageCatalog.getApp(appId)?.isDevelopment;
+      config.development && packageCatalog.getApp(appId)?.isDevelopment;
     if (
       !developmentApp &&
       !isLoginApp(appId) &&
-      !_executionContext.canLaunchApp(appId)
+      !executionContext.canLaunchApp(appId)
     ) {
       throw new Error(`User cannot launch app ${appId}`);
     }
@@ -277,7 +273,7 @@ export const createProcesses = Effect.fn(function* ({
   ): Effect.fn.Return<LaunchResult, Error> {
     yield* Effect.try({ try: () => assertCanLaunch(appId), catch: asError });
 
-    const currentUser = _sessionContext.getCurrentUser();
+    const currentUser = sessionContext.getCurrentUser();
     return yield* launchAppInternal(
       appId,
       bounds,
@@ -285,7 +281,7 @@ export const createProcesses = Effect.fn(function* ({
       {
         owner: {
           kind: "session",
-          sessionId: _sessionContext.getSessionId(),
+          sessionId: sessionContext.getSessionId(),
           username: currentUser?.username ?? null,
         },
         principal: currentUser
@@ -303,7 +299,7 @@ export const createProcesses = Effect.fn(function* ({
     principal: ExecutionPrincipal,
     profile?: UserProfile,
   ): Effect.fn.Return<LaunchResult, Error> {
-    const manifest = _packages.getAppForLaunch(appId);
+    const manifest = packages.getAppForLaunch(appId);
     if (!manifest?.backend?.entry || manifest.frontend?.entry) {
       return yield* Effect.fail(
         asError(new Error(`App ${appId} is not a backend-only daemon`)),
@@ -323,7 +319,7 @@ export const createProcesses = Effect.fn(function* ({
     runtime?: AppRuntime,
     launchFile?: FilesystemLocation,
   ): Effect.fn.Return<LaunchResult, Error> {
-    const manifest = _packages.getAppForLaunch(appId);
+    const manifest = packages.getAppForLaunch(appId);
     if (!manifest) {
       return yield* Effect.fail(
         asError(new Error(`App ${appId} is not installed`)),
@@ -349,18 +345,18 @@ export const createProcesses = Effect.fn(function* ({
     }
 
     // Get the correct install path
-    const installPath = _packageCatalog.getPath(appId);
+    const installPath = packageCatalog.getPath(appId);
     if (!installPath) {
       return yield* Effect.fail(
         asError(new Error(`App path not found for ${appId}`)),
       );
     }
 
-    const currentUser = _sessionContext.getCurrentUser();
+    const currentUser = sessionContext.getCurrentUser();
     const resolvedRuntime: AppRuntime = runtime ?? {
       owner: {
         kind: "session" as const,
-        sessionId: _sessionContext.getSessionId(),
+        sessionId: sessionContext.getSessionId(),
         username: currentUser?.username ?? null,
       },
       principal: currentUser
@@ -402,10 +398,10 @@ export const createProcesses = Effect.fn(function* ({
                   launchFile,
                 },
                 {
-                  backends: _backends,
-                  views: _views,
-                  contexts: _runtimeContexts,
-                  channels: _channels,
+                  backends,
+                  views,
+                  contexts: runtimeContexts,
+                  channels,
                 },
               );
               if (_shuttingDown)
@@ -520,7 +516,7 @@ export const createProcesses = Effect.fn(function* ({
   }
 
   function getInstalledManifest(appId: string) {
-    return _packageCatalog.getApp(appId);
+    return packageCatalog.getApp(appId);
   }
 
   const getMetrics = Effect.fn(function* (
@@ -528,7 +524,7 @@ export const createProcesses = Effect.fn(function* ({
     pollingTimeoutMs?: number,
     waitForAccurateCpu: boolean = true,
   ): Effect.fn.Return<ProcessMetricsSnapshot, Error> {
-    return yield* _processMetrics.getMetrics(
+    return yield* metrics.getMetrics(
       showHidden,
       pollingTimeoutMs,
       waitForAccurateCpu,
@@ -572,7 +568,6 @@ export const createProcesses = Effect.fn(function* ({
   const shutdown = Effect.fn(function* () {
     _shuttingDown = true;
 
-    _hotReloadWatcher?.close();
     yield* FiberHandle.clear(hotReloadDebounce);
 
     const runningAppIds = Array.from(instances.keys());
@@ -600,8 +595,6 @@ export const createProcesses = Effect.fn(function* ({
 
   function dispose(): void {
     _shuttingDown = true;
-    _hotReloadWatcher?.close();
-    _hotReloadWatcher = undefined;
     instances.clear();
     admission.clear();
     _hotReloadStates.clear();
@@ -616,7 +609,7 @@ export const createProcesses = Effect.fn(function* ({
       }
 
       // Save the current view bounds
-      const viewInfo = _views.getViewInfo(instance.viewId);
+      const viewInfo = views.getViewInfo(instance.viewId);
       const bounds = viewInfo ? viewInfo.view.getBounds() : undefined;
 
       log.info(`Reloading app ${appId}...`);
@@ -624,7 +617,7 @@ export const createProcesses = Effect.fn(function* ({
       // A hot-reload watcher runs outside the request's AsyncLocalStorage
       // context. Preserve the running process identity before stopApp removes it
       // so relaunch does not depend on ambient user authorization state.
-      const runtime = _runtimeContexts.get(appId);
+      const runtime = runtimeContexts.get(appId);
 
       if (instance.owner.kind === "system") reloading.emit({ appId });
       yield* stopInstance(appId);
@@ -640,7 +633,7 @@ export const createProcesses = Effect.fn(function* ({
   );
 
   const stopSessionApps = Effect.fn(function* (
-    sessionId = _sessionContext.getSessionId(),
+    sessionId = sessionContext.getSessionId(),
   ): Effect.fn.Return<void, Error> {
     const running = [...instances.entries()]
       .filter(
@@ -678,7 +671,7 @@ export const createProcesses = Effect.fn(function* ({
   });
 
   function isLoginApp(appId: string): boolean {
-    return !!_loginAppId && appId === _loginAppId;
+    return !!loginAppId && appId === loginAppId;
   }
   yield* Effect.addFinalizer(() =>
     shutdown().pipe(

@@ -7,8 +7,8 @@ import type {
 } from "@edenapp/types";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import type * as Fiber from "effect/Fiber";
-import * as FiberSet from "effect/FiberSet";
+import * as FiberHandle from "effect/FiberHandle";
+import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import type { DisplayPort } from "../platform/ports";
 import { effectivePlacement } from "./placement";
@@ -47,12 +47,11 @@ export function createKeyboardDrag({
 }: DragDependencies) {
   return Effect.gen(function* () {
     let current: KeyboardDragState | null = null;
-    const forkPolling = yield* FiberSet.makeRuntime<never, void, never>();
-    let polling: Fiber.Fiber<void> | undefined;
+    const polling = yield* FiberHandle.make<void, never>();
+    const forkPolling = yield* FiberHandle.runtime(polling)<never>();
 
     function end() {
-      polling?.interruptUnsafe();
-      polling = undefined;
+      Option.getOrUndefined(FiberHandle.getUnsafe(polling))?.interruptUnsafe();
       const bounds = overlay.bounds();
       if (current && bounds) state.floatingBounds = bounds;
       current = null;
@@ -118,7 +117,7 @@ export function createKeyboardDrag({
         current = { input: payload.input, startPoint, startBounds: bounds };
         if (payload.input === "system-cursor") {
           let lastPosition = display.getCursorScreenPoint();
-          polling = forkPolling(
+          forkPolling(
             Effect.sync(() => {
               const position = display.getCursorScreenPoint();
               if (

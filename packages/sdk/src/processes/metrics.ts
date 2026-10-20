@@ -38,24 +38,18 @@ interface ProcessMetricsDeps {
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   processMetrics: ProcessMetricsPort;
 }
-export const createProcessMetrics = Effect.fn(function* (
-  deps: ProcessMetricsDeps,
-) {
+export const createProcessMetrics = Effect.fn(function* ({
+  backends,
+  views,
+  getRunningApps,
+  processMetrics,
+}: ProcessMetricsDeps) {
   const clock = yield* Clock.Clock;
   const forkSampler = yield* FiberSet.makeRuntime<never, void, never>();
-  let _backends: Pick<Backends, "getBackend">;
-  let _views: Pick<Views, "getView">;
-  let _getRunningApps: (showHidden?: boolean) => AppInstance[];
-  let _processMetrics: ProcessMetricsPort;
   let _metricsSampler: Fiber.Fiber<void> | null = null;
   let firstSample = createPendingSample();
   let _metricsSamplerKeepAliveUntil = 0;
   let _latestMetricsSample: CachedMetricsSample | null = null;
-
-  _backends = deps.backends;
-  _views = deps.views;
-  _getRunningApps = deps.getRunningApps;
-  _processMetrics = deps.processMetrics;
 
   const getMetrics = Effect.fn(function* (
     showHidden: boolean = false,
@@ -108,7 +102,7 @@ export const createProcessMetrics = Effect.fn(function* (
     firstSample = createPendingSample();
     if (waitForAccurateCpu) {
       // Prime Electron's CPU sampler so the next interval-based sample is useful.
-      _processMetrics.getAppMetrics();
+      processMetrics.getAppMetrics();
       _latestMetricsSample = null;
     } else {
       captureMetricsSample();
@@ -158,7 +152,7 @@ export const createProcessMetrics = Effect.fn(function* (
   }
 
   function captureMetricsSample(): CachedMetricsSample {
-    const appMetrics = _processMetrics.getAppMetrics();
+    const appMetrics = processMetrics.getAppMetrics();
     const sampledAt = new Date(clock.currentTimeMillisUnsafe()).toISOString();
     const sample = { sampledAt, appMetrics };
     _latestMetricsSample = sample;
@@ -183,10 +177,10 @@ export const createProcessMetrics = Effect.fn(function* (
     );
     const matchedPids = new Set<number>();
     const visibleAppIds = new Set(
-      _getRunningApps(showHidden).map((instance) => instance.manifest.id),
+      getRunningApps(showHidden).map((instance) => instance.manifest.id),
     );
 
-    const apps = _getRunningApps(true)
+    const apps = getRunningApps(true)
       .map((instance) => {
         const rendererMetric = resolveRendererMetric(instance, metricsByPid);
         const backendMetric = resolveBackendMetric(instance, metricsByPid);
@@ -279,7 +273,7 @@ export const createProcessMetrics = Effect.fn(function* (
   ): EdenProcessMetric | undefined {
     if (instance.viewId === -1) return undefined;
 
-    const view = _views.getView(instance.viewId);
+    const view = views.getView(instance.viewId);
     if (!view || view.webContents.isDestroyed()) return undefined;
 
     const rendererPid = view.webContents.getOSProcessId();
@@ -298,7 +292,7 @@ export const createProcessMetrics = Effect.fn(function* (
     instance: AppInstance,
     metricsByPid: Map<number, PlatformProcessMetric>,
   ): EdenProcessMetric | undefined {
-    const backendPid = _backends.getBackend(instance.manifest.id)?.pid;
+    const backendPid = backends.getBackend(instance.manifest.id)?.pid;
     if (!backendPid || backendPid <= 0) return undefined;
 
     const metric = metricsByPid.get(backendPid);

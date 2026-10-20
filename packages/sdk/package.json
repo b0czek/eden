@@ -37,6 +37,7 @@
     "test:integration:node": "jest --runInBand --silent --testPathPatterns=tests/integration/",
     "pretest:integration:electron": "pnpm run build:electron-test-dependencies && pnpm run build",
     "test:integration:electron": "playwright test -c tests/electron/playwright.config.ts",
+    "benchmark:edenapi": "ts-node scripts/benchmark-edenapi.ts",
     "build:client": "pnpm run codegen && pnpm --filter @edenapp/client run build",
     "test:codegen": "jest --runInBand --config scripts/codegen/jest.config.cjs",
     "check:effects": "node scripts/check-effect-boundaries.mjs && effect-language-service diagnostics --project tsconfig.json --format text --severity error",
