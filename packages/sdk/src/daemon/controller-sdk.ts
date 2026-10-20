@@ -3,6 +3,7 @@ import * as v from "valibot";
 import type { EdenDaemonsApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
 import { operationTask } from "../operations/task";
+import type { DaemonLaunchError, DaemonStopError } from "./errors";
 import { daemonAppIdSchema, daemonDefinitionSchema } from "./schemas";
 import type { Daemons } from "./service";
 export function createDaemonsSdkController({
@@ -23,7 +24,11 @@ export function createDaemonsSdkController({
         sdk.operation(`daemon/${action}`, { appId: input }, () =>
           operationTask((reporter) => {
             reporter.update(phase);
-            return Effect.map(daemons[action](input), () => ({
+            const work: Effect.Effect<
+              void,
+              DaemonLaunchError | DaemonStopError
+            > = daemons[action](input);
+            return Effect.map(work, () => ({
               success: true,
             }));
           }),

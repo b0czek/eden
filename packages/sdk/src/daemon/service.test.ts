@@ -7,10 +7,26 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
 import {
+  buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../tests/support/effect-runtime";
-import { createDaemons, type Daemons } from "./service";
+import { PackageCatalog } from "../packages/catalog";
+import { Processes } from "../processes/service";
+import { Settings } from "../settings/service";
+import type { UserRecordReadFailure } from "../user/errors";
+import { Users } from "../user/service";
+import { Daemons, DaemonsLive } from "./service";
+
+function dependency<T>(methods: Partial<T>): T {
+  return new Proxy(methods as T & object, {
+    get(target, key, receiver) {
+      if (!(key in target))
+        throw new Error(`Unexpected dependency access: ${String(key)}`);
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
 
 const manifest = {
   id: "com.example.daemon",
@@ -27,7 +43,10 @@ describe("Daemons", () => {
     getAppInstance: jest.Mock;
   };
   let daemons: Daemons;
-  let getUser: jest.Mock<Effect.Effect<UserProfile | null, Error>, [string]>;
+  let getUser: jest.Mock<
+    Effect.Effect<UserProfile | null, UserRecordReadFailure>,
+    [string]
+  >;
   let effects: EffectRuntime;
   let catalogAvailable: boolean;
 
@@ -48,33 +67,39 @@ describe("Daemons", () => {
     };
     getUser = jest.fn().mockReturnValue(Effect.succeed(null));
     daemons = await effects.acquire(
-      createDaemons({
-        catalog: {
-          allApps: () => (catalogAvailable ? [manifest] : []),
-          getApp: (appId) =>
-            catalogAvailable && appId === manifest.id ? manifest : undefined,
-        },
-        processes,
-        settings: {
-          list: (appId) =>
-            Effect.sync(() =>
-              [...definitions.keys()]
-                .filter((key) => key.startsWith(`${appId}:`))
-                .map((key) => key.slice(appId.length + 1)),
-            ),
-          get: (appId, key) =>
-            Effect.sync(() => definitions.get(`${appId}:${key}`)),
-          set: (appId, key, value) =>
-            Effect.sync(() => {
-              definitions.set(`${appId}:${key}`, value);
-            }),
-          delete: (appId, key) =>
-            Effect.sync(() => {
-              definitions.delete(`${appId}:${key}`);
-            }),
-        },
-        users: { getUser },
-      }),
+      buildService(Daemons, DaemonsLive).pipe(
+        Effect.provideService(
+          PackageCatalog,
+          dependency<PackageCatalog>({
+            allApps: () => (catalogAvailable ? [manifest] : []),
+            getApp: (appId) =>
+              catalogAvailable && appId === manifest.id ? manifest : undefined,
+          }),
+        ),
+        Effect.provideService(Processes, dependency<Processes>(processes)),
+        Effect.provideService(
+          Settings,
+          dependency<Settings>({
+            list: (appId) =>
+              Effect.sync(() =>
+                [...definitions.keys()]
+                  .filter((key) => key.startsWith(`${appId}:`))
+                  .map((key) => key.slice(appId.length + 1)),
+              ),
+            get: (appId, key) =>
+              Effect.sync(() => definitions.get(`${appId}:${key}`)),
+            set: (appId, key, value) =>
+              Effect.sync(() => {
+                definitions.set(`${appId}:${key}`, value);
+              }),
+            delete: (appId, key) =>
+              Effect.sync(() => {
+                definitions.delete(`${appId}:${key}`);
+              }),
+          }),
+        ),
+        Effect.provideService(Users, dependency<Users>({ getUser })),
+      ),
     );
   });
   afterEach(() => effects.dispose());
@@ -176,9 +201,12 @@ describe("Daemons", () => {
     await expect(
       effects.run(daemons.setEnabled(manifest.id, true)),
     ).rejects.toThrow("requires a runAs account");
-    await expect(effects.run(daemons.start(manifest.id))).rejects.toThrow(
-      "requires a runAs account",
-    );
+    await expect(
+      effects.run(Effect.flip(daemons.start(manifest.id))),
+    ).resolves.toMatchObject({
+      _tag: "DaemonPrincipalRequiredError",
+      appId: manifest.id,
+    });
   });
 
   it("applies restart policy when process/stop terminates a supervised daemon", async () => {

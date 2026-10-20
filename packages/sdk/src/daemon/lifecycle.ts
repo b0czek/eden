@@ -5,6 +5,7 @@ import { listen } from "../events/scoped";
 import { log } from "../logging";
 import type { Packages } from "../packages/service";
 import type { Processes } from "../processes/service";
+import type { DaemonDefinitionRemoveError, DaemonLaunchError } from "./errors";
 import type { Daemons } from "./service";
 
 /** Serialize supervision notifications within the runtime's lifecycle scope. */
@@ -13,8 +14,13 @@ export const connectDaemonLifecycle = Effect.fn(function* (
   processes: Processes,
   packages: Packages,
 ) {
-  const pending = yield* Queue.unbounded<Effect.Effect<void, Error>>();
-  const enqueue = (work: Effect.Effect<void, Error>) => {
+  const pending =
+    yield* Queue.unbounded<
+      Effect.Effect<void, DaemonLaunchError | DaemonDefinitionRemoveError>
+    >();
+  const enqueue = (
+    work: Effect.Effect<void, DaemonLaunchError | DaemonDefinitionRemoveError>,
+  ) => {
     Queue.offerUnsafe(pending, work);
   };
   yield* listen(processes.exited, ({ appId, code }) =>

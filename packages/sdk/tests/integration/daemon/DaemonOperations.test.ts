@@ -1,6 +1,6 @@
 import type { OperationHandle, RuntimeAppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../../../src/effects/io";
+import { StorageClosedError } from "../../../src/storage/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -50,7 +50,16 @@ describe("daemon operation lifecycle", () => {
     );
     const reads = jest
       .spyOn(eden.runtime.services.settings, "list")
-      .mockReturnValue(Effect.fail(new Error("settings unavailable")));
+      .mockReturnValue(
+        Effect.fail(
+          new StorageClosedError({
+            resource: "settings",
+            operation: "keys",
+            keys: [],
+            message: "settings unavailable",
+          }),
+        ),
+      );
     try {
       const starting = eden.runtime.effects.run(
         eden.runtime.daemons.start(appId),
@@ -173,7 +182,7 @@ describe("daemon operation lifecycle", () => {
         const notification = stopped(id);
         if (id !== appId) return notification;
         queued.release();
-        return fromPromise(() => resume.promise).pipe(
+        return Effect.promise(() => resume.promise).pipe(
           Effect.andThen(notification),
           Effect.ensuring(Effect.sync(() => processed.release())),
         );

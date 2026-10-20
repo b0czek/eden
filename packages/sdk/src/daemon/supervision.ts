@@ -14,13 +14,13 @@ export interface DaemonState {
   nextRestartAt?: number;
 }
 
-const attempt = () => ({
+const attempt = <E>() => ({
   exited: Deferred.makeUnsafe<number>(),
-  settled: Deferred.makeUnsafe<void, Error>(),
+  settled: Deferred.makeUnsafe<void, E>(),
 });
 
 /** One workflow owns launch, exit waiting, backoff, and stability for a daemon. */
-export function createDaemonSupervisor({
+export function createDaemonSupervisor<E extends Error>({
   clock,
   launch,
   adopted = false,
@@ -31,16 +31,16 @@ export function createDaemonSupervisor({
   setState,
 }: {
   clock: Clock.Clock;
-  launch: Effect.Effect<void, Error>;
+  launch: Effect.Effect<void, E>;
   adopted?: boolean;
   retryInitialFailure?: boolean;
   isCurrent(): boolean;
   restartPolicy(): DaemonDefinition["restart"];
   initialRestartCount?: number;
-  setState(state: DaemonState): Effect.Effect<void, Error>;
-}) {
-  const ready = Deferred.makeUnsafe<void, Error>();
-  let pending = attempt();
+  setState(state: DaemonState): Effect.Effect<void>;
+}): DaemonSupervisor<E> {
+  const ready = Deferred.makeUnsafe<void, E>();
+  let pending = attempt<E>();
   const run = Effect.gen(function* () {
     let first = true;
     let restartCount = initialRestartCount;
@@ -69,7 +69,7 @@ export function createDaemonSupervisor({
       if (!isCurrent()) return false;
       const initial = first;
       first = false;
-      if (!initial) pending = attempt();
+      if (!initial) pending = attempt<E>();
       const current = pending;
       const code = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -165,4 +165,8 @@ export function createDaemonSupervisor({
   return { run, ready: Deferred.await(ready), terminated };
 }
 
-export type DaemonSupervisor = ReturnType<typeof createDaemonSupervisor>;
+export interface DaemonSupervisor<E> {
+  readonly run: Effect.Effect<void>;
+  readonly ready: Effect.Effect<void, E>;
+  terminated(code: number): Effect.Effect<void, E>;
+}
