@@ -14,9 +14,12 @@ import { I18n } from "../i18n/service";
 import { PackageCatalog } from "../packages/catalog";
 import { Views } from "../views/service";
 import {
+  type FileHandlerQueryError,
   FileHandlerUnavailable,
   type FileInspectionError,
   type FileOpenError,
+  type FilePreferenceSetError,
+  type FilePreferenceWriteError,
   FileTypeUnknown,
 } from "./errors";
 import {
@@ -40,13 +43,13 @@ export interface FileOpen {
   setDefaultHandler: (
     location: FilesystemLocation,
     appId: string,
-  ) => Effect.Effect<void, Error>;
+  ) => Effect.Effect<void, FilePreferenceSetError>;
   removeDefaultHandler: (
     location: FilesystemLocation,
-  ) => Effect.Effect<void, Error>;
+  ) => Effect.Effect<void, FilePreferenceWriteError>;
   getSupportedHandlers: (
     location: FilesystemLocation,
-  ) => Effect.Effect<FileHandlerInfo[], Error>;
+  ) => Effect.Effect<FileHandlerInfo[], FileHandlerQueryError>;
   getAllAssociations: () => Record<
     string,
     { default: string | undefined; userOverride: string | undefined }
@@ -116,7 +119,7 @@ export const FileOpenLive = Layer.effect(
     function setDefaultHandler(
       location: FilesystemLocation,
       appId: string,
-    ): Effect.Effect<void, Error> {
+    ): Effect.Effect<void, FilePreferenceSetError> {
       return Effect.gen(function* () {
         const context = yield* getFileContext(location);
         const preferenceKey = context.preferenceKeys[0];

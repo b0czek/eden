@@ -1,7 +1,9 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import * as Data from "effect/Data";
+import type { AppAssociationStorageWriteError } from "../app-associations/errors";
 import type { FilesystemPathError } from "../filesystem/errors";
 import type { ProcessLaunchError } from "../processes/errors";
+import type { StorageReadFailure } from "../storage/errors";
 
 export class FileMetadataFailed extends Data.TaggedError("FileMetadataFailed")<{
   location: FilesystemLocation;
@@ -28,3 +30,9 @@ export type FileOpenError =
   | FileInspectionError
   | FileHandlerUnavailable
   | ProcessLaunchError;
+
+export type FilePreferenceWriteError =
+  | FileInspectionError
+  | AppAssociationStorageWriteError;
+export type FilePreferenceSetError = FilePreferenceWriteError | FileTypeUnknown;
+export type FileHandlerQueryError = FileInspectionError | StorageReadFailure;
