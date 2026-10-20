@@ -1,4 +1,4 @@
 export { createFilesystemBrandingAssets } from "./assets";
 export { createBrandingController } from "./controller-edenapi";
 export type { BrandingAssets } from "./ports";
-export { type Branding, createBranding, resolveBrandingName } from "./service";
+export { Branding, BrandingLive, resolveBrandingName } from "./service";

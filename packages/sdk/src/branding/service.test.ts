@@ -3,9 +3,18 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { log } from "../logging";
 import { createFilesystemBrandingAssets } from "./assets";
-import { createBranding, resolveBrandingName } from "./service";
+import { InvalidBrandingName } from "./errors";
+import { BrandingAssets, BrandingConfig } from "./ports";
+import { Branding, BrandingLive, resolveBrandingName } from "./service";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("branding", () => {
   let appPath: string;
@@ -20,11 +29,14 @@ describe("branding", () => {
   });
 
   const createService = (config: EdenConfig = {}) =>
-    Effect.runPromise(
-      createBranding({
-        branding: config.branding,
-        assets: createFilesystemBrandingAssets(appPath),
-      }),
+    serviceEffects.acquire(
+      buildService(Branding, BrandingLive).pipe(
+        Effect.provideService(BrandingConfig, config.branding),
+        Effect.provideService(
+          BrandingAssets,
+          createFilesystemBrandingAssets(appPath),
+        ),
+      ),
     );
 
   it("preserves the default Eden identity", async () => {
@@ -36,18 +48,21 @@ describe("branding", () => {
   });
 
   it("loads a renderer-safe logo and window icon when acquisition executes", async () => {
-    const acquisition = createBranding({
-      branding: {
+    const acquisition = buildService(Branding, BrandingLive).pipe(
+      Effect.provideService(BrandingConfig, {
         name: "  Acme Workspace  ",
         logoPath: "assets/logo.svg",
         iconPath: "assets/icon.png",
-      },
-      assets: createFilesystemBrandingAssets(appPath),
-    });
+      }),
+      Effect.provideService(
+        BrandingAssets,
+        createFilesystemBrandingAssets(appPath),
+      ),
+    );
     fs.mkdirSync(path.join(appPath, "assets"));
     fs.writeFileSync(path.join(appPath, "assets", "logo.svg"), "<svg />");
     fs.writeFileSync(path.join(appPath, "assets", "icon.png"), "png");
-    const branding = await Effect.runPromise(acquisition);
+    const branding = await serviceEffects.acquire(acquisition);
 
     expect(branding.getInfo()).toEqual({
       name: "Acme Workspace",
@@ -105,10 +120,33 @@ describe("branding", () => {
 
   it("rejects an empty configured product name", async () => {
     expect(() => resolveBrandingName({ name: "   " })).toThrow(
-      "branding.name must be a non-empty string",
+      InvalidBrandingName,
     );
-    await expect(createService({ branding: { name: "   " } })).rejects.toThrow(
-      "branding.name must be a non-empty string",
+    await expect(
+      createService({ branding: { name: "   " } }),
+    ).rejects.toMatchObject({
+      _tag: "InvalidBrandingName",
+      configuredName: "   ",
+      message: "branding.name must be a non-empty string",
+    });
+  });
+
+  it("omits a logo that becomes unreadable after its file check", async () => {
+    const warn = jest.spyOn(log, "warn").mockImplementation(() => undefined);
+    fs.writeFileSync(path.join(appPath, "logo.svg"), "<svg />");
+    const failure = Object.assign(new Error("Permission denied"), {
+      code: "EACCES",
+    });
+    jest.spyOn(fs.promises, "readFile").mockRejectedValueOnce(failure);
+
+    const branding = await createService({
+      branding: { name: "Acme", logoPath: "logo.svg" },
+    });
+
+    expect(branding.getInfo()).toEqual({ name: "Acme" });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to read branding logo"),
+      failure,
     );
   });
 });

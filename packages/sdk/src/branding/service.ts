@@ -1,25 +1,39 @@
 import type { EdenBrandingConfig, EdenBrandingInfo } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import type { BrandingAssets } from "./ports";
+import * as Layer from "effect/Layer";
+import { InvalidBrandingName } from "./errors";
+import { BrandingAssets, BrandingConfig } from "./ports";
 
-interface BrandingDependencies {
-  branding?: EdenBrandingConfig;
-  assets: BrandingAssets;
+export interface Branding {
+  getInfo: () => EdenBrandingInfo;
+  getWindowIconPath: () => string | undefined;
+  getWindowTitle: (configuredTitle?: string) => string;
 }
 
+export const Branding = Context.Service<"eden/Branding", Branding>(
+  "eden/Branding",
+);
+
+/** Throws InvalidBrandingName before runtime startup when configuration is invalid. */
 export function resolveBrandingName(branding?: EdenBrandingConfig): string {
   if (!branding) return "Eden";
   const name = branding.name?.trim();
-  if (!name) throw new Error("branding.name must be a non-empty string");
+  if (!name) throw new InvalidBrandingName({ configuredName: branding.name });
   return name;
 }
 
-export function createBranding({ branding, assets }: BrandingDependencies) {
-  return Effect.gen(function* () {
+export const BrandingLive = Layer.effect(
+  Branding,
+  Effect.gen(function* () {
+    const branding = yield* BrandingConfig;
+    const assets = yield* BrandingAssets;
     const name = yield* Effect.try({
       try: () => resolveBrandingName(branding),
-      catch: (error) =>
-        error instanceof Error ? error : new Error(String(error)),
+      catch: (error) => {
+        if (error instanceof InvalidBrandingName) return error;
+        throw error;
+      },
     });
     const info: EdenBrandingInfo = { name };
     let windowIconPath: string | undefined;
@@ -41,7 +55,5 @@ export function createBranding({ branding, assets }: BrandingDependencies) {
     }
 
     return { getInfo, getWindowIconPath, getWindowTitle };
-  });
-}
-
-export type Branding = Effect.Success<ReturnType<typeof createBranding>>;
+  }),
+);
