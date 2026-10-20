@@ -1,10 +1,44 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { log } from "../logging";
-import type { DbStorage } from "./ports";
+import type {
+  StorageClosedError,
+  StorageReadFailure,
+  StorageRemoveFailure,
+  StorageWriteFailure,
+} from "../storage/errors";
+import { DbInvalidValueError } from "./errors";
+import { DbStorage } from "./ports";
 
-export function createDb(storage: DbStorage) {
-  return Effect.gen(function* () {
-    const connection = yield* storage.open;
+export interface Db {
+  get: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<string | undefined, StorageReadFailure>;
+  set: (
+    appId: string,
+    key: string,
+    value: string,
+  ) => Effect.Effect<void, StorageWriteFailure | DbInvalidValueError>;
+  delete: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<boolean, StorageRemoveFailure>;
+  clear: (appId: string) => Effect.Effect<void, StorageRemoveFailure>;
+  list: (appId: string) => Effect.Effect<string[], StorageClosedError>;
+  has: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<boolean, StorageReadFailure>;
+}
+
+export const Db = Context.Service<"eden/Db", Db>("eden/Db");
+
+export const DbLive = Layer.effect(
+  Db,
+  Effect.gen(function* () {
+    const connection = yield* DbStorage;
 
     function get(appId: string, key: string) {
       return Effect.map(connection.read(`${appId}:${key}`), (value) => {
@@ -19,11 +53,15 @@ export function createDb(storage: DbStorage) {
     }
 
     function set(appId: string, key: string, value: string) {
-      return Effect.suspend(() =>
+      return Effect.suspend<
+        void,
+        StorageWriteFailure | DbInvalidValueError,
+        never
+      >(() =>
         typeof value === "string"
           ? connection.write(`${appId}:${key}`, value)
           : Effect.fail(
-              new Error(`Value must be a string, got ${typeof value}`),
+              new DbInvalidValueError({ appId, key, valueType: typeof value }),
             ),
       );
     }
@@ -64,7 +102,5 @@ export function createDb(storage: DbStorage) {
     }
 
     return { get, set, delete: remove, clear, list, has };
-  });
-}
-
-export type Db = Effect.Success<ReturnType<typeof createDb>>;
+  }),
+);

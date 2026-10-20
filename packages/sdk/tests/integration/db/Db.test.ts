@@ -4,10 +4,17 @@ import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
 import Keyv from "keyv";
-import { createDb, createSqliteDbStorage } from "../../../src/db";
+import { DbStorage } from "../../../src/db/ports";
+import { Db, DbLive } from "../../../src/db/service";
+import { SqliteDbStorageLive } from "../../../src/db/sqlite-storage";
+import { AppsDirectory } from "../../../src/runtime/inputs";
+import { StorageClosedError } from "../../../src/storage/errors";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
 
 it("isolates app namespaces using trusted callers and gates cross-app commands", async () => {
   const eden = await createTestEden();
@@ -108,7 +115,14 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
   const first = createEffectRuntime();
   const second = createEffectRuntime();
   try {
-    const acquisition = createDb(createSqliteDbStorage({ appsDirectory }));
+    const acquisition = buildService(Db, DbLive).pipe(
+      Effect.provideServiceEffect(
+        DbStorage,
+        buildService(DbStorage, SqliteDbStorageLive).pipe(
+          Effect.provideService(AppsDirectory, appsDirectory),
+        ),
+      ),
+    );
     expect(await fs.readdir(appsDirectory)).toEqual([]);
     const db = await first.acquire(acquisition);
     expect(await first.run(db.get("app.first", "pending"))).toBeUndefined();
@@ -122,7 +136,14 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
     expect(disposal.status).toBe("fulfilled");
 
     const reopened = await second.acquire(
-      createDb(createSqliteDbStorage({ appsDirectory })),
+      buildService(Db, DbLive).pipe(
+        Effect.provideServiceEffect(
+          DbStorage,
+          buildService(DbStorage, SqliteDbStorageLive).pipe(
+            Effect.provideService(AppsDirectory, appsDirectory),
+          ),
+        ),
+      ),
     );
     expect(await second.run(reopened.get("app.first", "pending"))).toBe(
       "saved",
@@ -130,9 +151,16 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
     expect(
       await second.run(reopened.get("app.second", "pending")),
     ).toBeUndefined();
-    await expect(
-      Effect.runPromise(db.get("app.first", "pending")),
-    ).rejects.toThrow("Database connection closed");
+    const closed = await Effect.runPromise(
+      Effect.flip(db.get("app.first", "pending")),
+    );
+    expect(closed).toBeInstanceOf(StorageClosedError);
+    expect(closed).toMatchObject({
+      resource: path.join(appsDirectory, "storage.db"),
+      operation: "read",
+      keys: ["app.first:pending"],
+      message: "Database connection closed",
+    });
   } finally {
     await first.dispose();
     await second.dispose();
@@ -152,7 +180,14 @@ it("reads legacy non-string values and keeps listing permissive when SQLite iter
       await legacy.disconnect();
     }
     const db = await runtime.acquire(
-      createDb(createSqliteDbStorage({ appsDirectory })),
+      buildService(Db, DbLive).pipe(
+        Effect.provideServiceEffect(
+          DbStorage,
+          buildService(DbStorage, SqliteDbStorageLive).pipe(
+            Effect.provideService(AppsDirectory, appsDirectory),
+          ),
+        ),
+      ),
     );
     expect(await runtime.run(db.get("app.first", "legacy"))).toBe("42");
 

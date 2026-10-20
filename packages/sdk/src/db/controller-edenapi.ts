@@ -7,12 +7,13 @@ import {
   namespacedKeyArgsSchema,
 } from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/context";
+import { DbCallerIdentityRequiredError } from "./errors";
 import type { Db } from "./service";
 
 function callerNamespace(caller: CommandCallerContext) {
   return caller.appId
     ? Effect.succeed(caller.appId)
-    : Effect.fail(new Error("Database access requires a caller app identity"));
+    : Effect.fail(new DbCallerIdentityRequiredError());
 }
 
 export function createDbController(db: Db) {
