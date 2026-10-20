@@ -2,17 +2,26 @@ import type { EdenKeyboardPlacementMode, ViewBounds } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { scopedEvent } from "../events/scoped";
 import type { PlatformWindow, WindowingPort } from "../platform/ports";
+import { KeyboardNativeFailure } from "./errors";
 import { defaultContentBounds } from "./placement";
 import type { KeyboardAssets } from "./ports";
 
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
-const native = <A>(work: () => A) => Effect.try({ try: work, catch: asError });
+const native = <A>(
+  operation: KeyboardNativeFailure["operation"],
+  work: () => A,
+) =>
+  Effect.try({
+    try: work,
+    catch: (cause) => new KeyboardNativeFailure({ operation, cause }),
+  });
 
 interface OverlayDependencies {
   windows: Pick<WindowingPort, "createWindow">;
   assets: KeyboardAssets;
-  schedule(work: Effect.Effect<void, Error>, label: string): void;
+  schedule(
+    work: Effect.Effect<void, KeyboardNativeFailure>,
+    label: string,
+  ): void;
 }
 
 /** Own the native overlay and every listener attached to either native window. */
@@ -47,7 +56,7 @@ export function createKeyboardOverlay({
     }
 
     function setMainWindow(window: PlatformWindow) {
-      return native(() => {
+      return native("attach-main-window", () => {
         mainListeners?.();
         mainWindow = window;
         const onBounds = () => mainBoundsChanged.emit();
@@ -74,7 +83,7 @@ export function createKeyboardOverlay({
         const existing = get();
         if (existing) return existing;
         if (!(yield* assets.available)) return undefined;
-        return yield* native(() => {
+        return yield* native("create-overlay", () => {
           const window = windows.createWindow({
             parent,
             show: false,
@@ -126,7 +135,11 @@ export function createKeyboardOverlay({
           schedule(
             Effect.tryPromise({
               try: () => window.loadFile(frontendPath),
-              catch: asError,
+              catch: (cause) =>
+                new KeyboardNativeFailure({
+                  operation: "load-frontend",
+                  cause,
+                }),
             }).pipe(Effect.uninterruptible),
             "Failed to load keyboard window frontend:",
           );
@@ -141,28 +154,28 @@ export function createKeyboardOverlay({
       mainWindow?.getContentBounds() ?? defaultContentBounds();
     const isSender = (id: number) => id === get()?.webContents.id;
     const scale = (value: number) =>
-      native(() => {
+      native("set-scale", () => {
         get()?.webContents.setZoomFactor(value);
       });
     const position = (value: ViewBounds) =>
-      native(() => {
+      native("set-bounds", () => {
         get()?.setBounds(value);
       });
     const movable = (value: boolean) =>
-      native(() => {
+      native("set-movable", () => {
         get()?.setMovable(value);
       });
     const show = () =>
-      native(() => {
+      native("show", () => {
         const window = get();
         if (window && !window.isVisible()) window.showInactive();
       });
     const hide = () =>
-      native(() => {
+      native("hide", () => {
         get()?.hide();
       });
     const send = (channel: string, value: unknown) =>
-      native(() => {
+      native("send-state", () => {
         get()?.webContents.send(channel, value);
       });
 

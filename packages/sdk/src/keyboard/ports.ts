@@ -1,12 +1,7 @@
 import type { ViewBounds } from "@edenapp/types";
+import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { Event } from "../events/event";
-import type {
-  DisplayPort,
-  RendererIpcPort,
-  WindowingPort,
-} from "../platform/ports";
-import type { Settings } from "../settings/service";
 
 export interface KeyboardViews {
   resolve(webContentsId: number): { appId: string; viewId: number } | undefined;
@@ -18,23 +13,17 @@ export interface KeyboardViews {
   setPresentationLift(lift: number): void;
   boundsChanged: Pick<Event<{ workspaceBounds: ViewBounds }>, "on">;
 }
-
-export interface KeyboardProcesses {
-  stopped: Pick<Event<{ appId: string }>, "on">;
-}
+export const KeyboardViews = Context.Service<
+  "eden/KeyboardViews",
+  KeyboardViews
+>("eden/KeyboardViews");
 
 export interface KeyboardAssets {
   readonly frontendPath: string;
   readonly preloadPath: string;
   readonly available: Effect.Effect<boolean>;
 }
-
-export interface KeyboardDependencies {
-  assets: KeyboardAssets;
-  settings: Pick<Settings, "get" | "changed">;
-  views: KeyboardViews;
-  processes: KeyboardProcesses;
-  windows: Pick<WindowingPort, "createWindow">;
-  rendererIpc: RendererIpcPort;
-  display: DisplayPort;
-}
+export const KeyboardAssets = Context.Service<
+  "eden/KeyboardAssets",
+  KeyboardAssets
+>("eden/KeyboardAssets");

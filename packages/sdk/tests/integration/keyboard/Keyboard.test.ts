@@ -2,19 +2,43 @@ import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { EdenKeyboardState, ViewBounds } from "@edenapp/types";
+import type {
+  AppInstance,
+  EdenKeyboardState,
+  ViewBounds,
+} from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createEvent } from "../../../src/events/event";
 import { createKeyboardAssets } from "../../../src/keyboard/assets";
-import type { KeyboardViews } from "../../../src/keyboard/ports";
-import { createKeyboard } from "../../../src/keyboard/service";
+import { KeyboardAssets, KeyboardViews } from "../../../src/keyboard/ports";
+import { Keyboard, KeyboardLive } from "../../../src/keyboard/service";
 import { createKeyboardViews } from "../../../src/keyboard/views";
+import {
+  DisplayPort,
+  RendererIpcPort,
+  WindowingPort,
+} from "../../../src/platform/ports/types";
+import { Processes } from "../../../src/processes/service";
+import { AppsDirectory } from "../../../src/runtime/inputs";
 import { EDEN_SETTINGS_APP_ID } from "../../../src/settings/constants";
-import { createSettings } from "../../../src/settings/service";
-import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
+import {
+  SettingsAuthorization,
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/settings/ports";
+import { Settings, SettingsLive } from "../../../src/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import type { ViewInfo } from "../../../src/views/types";
 import { testApp } from "../../support/apps";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
+
+function unusedProcessMethod(): never {
+  throw new Error("Keyboard must only observe process stop notifications");
+}
 
 const resources: Array<() => Promise<void>> = [];
 
@@ -47,34 +71,62 @@ async function createScenario(
     "",
   );
   const settings = await runtime.acquire(
-    createSettings({
-      storage: createSqliteSettingsStorage({ appsDirectory: directory }),
-      catalog: { getAppSettings: () => undefined },
-      authorization: { hasGrant: () => true },
-    }),
+    buildService(Settings, SettingsLive).pipe(
+      Effect.provideServiceEffect(
+        SettingsStorage,
+        buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+          Effect.provideService(AppsDirectory, directory),
+        ),
+      ),
+      Effect.provideService(SettingsCatalog, {
+        getAppSettings: () => undefined,
+      }),
+      Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+    ),
   );
   for (const [key, value] of Object.entries(initial))
     await runtime.run(settings.set(EDEN_SETTINGS_APP_ID, key, value));
   beforeWindow?.(platform);
   const keyboard = await runtime.acquire(
-    createKeyboard({
-      assets: createKeyboardAssets(directory),
-      settings,
-      views: views ?? {
-        resolve: () => undefined,
-        get: () => undefined,
-        list: () => [],
-        send: () => true,
-        setPresentationLift: (value) => {
-          lift = value;
+    buildService(Keyboard, KeyboardLive).pipe(
+      Effect.provideService(KeyboardAssets, createKeyboardAssets(directory)),
+      Effect.provideService(Settings, settings),
+      Effect.provideService(
+        KeyboardViews,
+        views ?? {
+          resolve: () => undefined,
+          get: () => undefined,
+          list: () => [],
+          send: () => true,
+          setPresentationLift: (value) => {
+            lift = value;
+          },
+          boundsChanged,
         },
-        boundsChanged,
-      },
-      processes: { stopped },
-      windows: platform.windows,
-      rendererIpc: platform.rendererIpc,
-      display: platform.display,
-    }),
+      ),
+      Effect.provideService(Processes, {
+        stopped,
+        launched: createEvent<{ instance: AppInstance }>(),
+        reloading: createEvent<{ appId: string }>(),
+        error: createEvent<{ appId: string; error: unknown }>(),
+        exited: createEvent<{ appId: string; code: number }>(),
+        assertCanLaunch: unusedProcessMethod,
+        launchApp: unusedProcessMethod,
+        launchDaemon: unusedProcessMethod,
+        ensureAppRunning: unusedProcessMethod,
+        stopApp: unusedProcessMethod,
+        getRunningApps: unusedProcessMethod,
+        getAppInstance: unusedProcessMethod,
+        getInstalledManifest: unusedProcessMethod,
+        getMetrics: unusedProcessMethod,
+        shutdown: unusedProcessMethod,
+        reloadApp: unusedProcessMethod,
+        stopSessionApps: unusedProcessMethod,
+      }),
+      Effect.provideService(WindowingPort, platform.windows),
+      Effect.provideService(RendererIpcPort, platform.rendererIpc),
+      Effect.provideService(DisplayPort, platform.display),
+    ),
   );
   await runtime.run(keyboard.initialize());
   const mainWindow = platform.windows.createWindow({
@@ -249,6 +301,49 @@ describe("keyboard settings and native lifetime", () => {
       target.webContents.close();
       nativeEvents.removeAllListeners();
     }
+  });
+
+  it("preserves native failure details when attaching the main window", async () => {
+    const s = await createScenario();
+    const cause = new Error("Native window listener registration failed");
+    s.mainWindow.on = () => {
+      throw cause;
+    };
+    const failure = await s.runtime.run(
+      Effect.flip(s.keyboard.setMainWindow(s.mainWindow)),
+    );
+    expect(failure).toMatchObject({
+      _tag: "KeyboardNativeFailure",
+      operation: "attach-main-window",
+      message: cause.message,
+    });
+    expect(failure.cause).toBe(cause);
+  });
+
+  it("rejects renderer actions and drag control from outside the keyboard window", async () => {
+    const s = await createScenario();
+    for (const [channel, payload, message] of [
+      [
+        "send-action",
+        { type: "insertText", text: "untrusted" },
+        "Only the keyboard window can dispatch keyboard actions",
+      ],
+      [
+        "start-drag",
+        { input: "system-cursor", point: { x: 0, y: 0, space: "screen" } },
+        "Only the keyboard window can start keyboard drag",
+      ],
+      ["end-drag", undefined, "Only the keyboard window can end keyboard drag"],
+    ] as const) {
+      await expect(
+        s.platform.rendererIpc.invoke(
+          `eden-keyboard:${channel}`,
+          s.mainWindow.webContents.id,
+          payload,
+        ),
+      ).rejects.toThrow(message);
+    }
+    expect(await s.state()).toMatchObject({ visible: false });
   });
 
   it("drains an uncancellable native renderer load before destroying its overlay", async () => {

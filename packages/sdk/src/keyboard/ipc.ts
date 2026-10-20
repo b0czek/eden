@@ -9,28 +9,42 @@ import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
 import { log } from "../logging";
 import type { RendererIpcPort } from "../platform/ports";
+import type { KeyboardNativeFailure, KeyboardSenderRejected } from "./errors";
 import { keyboardChannels as channel } from "./protocol";
 
 interface KeyboardRequests {
   focus(
     sender: number,
     payload: EdenKeyboardFocusState | undefined,
-  ): Effect.Effect<void, Error>;
-  show(): Effect.Effect<{ success: boolean }, Error>;
+  ): Effect.Effect<void, KeyboardNativeFailure>;
+  show(): Effect.Effect<{ success: boolean }, KeyboardNativeFailure>;
   action(
     sender: number,
     payload: EdenKeyboardAction | undefined,
-  ): Effect.Effect<{ success: boolean }, Error>;
-  hide(sender: number): Effect.Effect<{ success: boolean }, Error>;
+  ): Effect.Effect<
+    { success: boolean },
+    KeyboardNativeFailure | KeyboardSenderRejected
+  >;
+  hide(
+    sender: number,
+  ): Effect.Effect<{ success: boolean }, KeyboardNativeFailure>;
   startDrag(
     sender: number,
     payload: EdenKeyboardStartDragRequest | undefined,
-  ): Effect.Effect<{ success: boolean }, Error>;
+  ): Effect.Effect<
+    { success: boolean },
+    KeyboardNativeFailure | KeyboardSenderRejected
+  >;
   updateDrag(
     sender: number,
     payload: EdenKeyboardUpdateDragRequest | undefined,
-  ): Effect.Effect<void, Error>;
-  endDrag(sender: number): Effect.Effect<{ success: boolean }, Error>;
+  ): Effect.Effect<void, KeyboardNativeFailure>;
+  endDrag(
+    sender: number,
+  ): Effect.Effect<
+    { success: boolean },
+    KeyboardNativeFailure | KeyboardSenderRejected
+  >;
   state(): EdenKeyboardState;
 }
 
@@ -40,7 +54,11 @@ export function bindKeyboardIpc(
   requests: KeyboardRequests,
 ) {
   return Effect.gen(function* () {
-    const run = yield* FiberSet.makeRuntimePromise<never, unknown, Error>();
+    const run = yield* FiberSet.makeRuntimePromise<
+      never,
+      unknown,
+      KeyboardNativeFailure | KeyboardSenderRejected
+    >();
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         for (const name of [

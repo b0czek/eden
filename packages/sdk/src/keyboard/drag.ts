@@ -11,6 +11,7 @@ import * as FiberHandle from "effect/FiberHandle";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import type { DisplayPort } from "../platform/ports";
+import { type KeyboardNativeFailure, KeyboardSenderRejected } from "./errors";
 import { effectivePlacement } from "./placement";
 import type { KeyboardDragState, KeyboardState } from "./state";
 import type { KeyboardOverlay } from "./window";
@@ -19,7 +20,10 @@ interface DragDependencies {
   state: KeyboardState;
   overlay: KeyboardOverlay;
   display: DisplayPort;
-  schedule(work: Effect.Effect<void, Error>, label: string): void;
+  schedule(
+    work: Effect.Effect<void, KeyboardNativeFailure>,
+    label: string,
+  ): void;
 }
 
 function isValidDragInput(input: unknown): input is EdenKeyboardDragInput {
@@ -101,7 +105,7 @@ export function createKeyboardDrag({
       return Effect.gen(function* () {
         if (!overlay.isSender(sender))
           return yield* Effect.fail(
-            new Error("Only the keyboard window can start keyboard drag"),
+            new KeyboardSenderRejected({ sender, operation: "start-drag" }),
           );
         const bounds = overlay.bounds();
         if (
@@ -162,7 +166,7 @@ export function createKeyboardDrag({
       return Effect.gen(function* () {
         if (!overlay.isSender(sender))
           return yield* Effect.fail(
-            new Error("Only the keyboard window can end keyboard drag"),
+            new KeyboardSenderRejected({ sender, operation: "end-drag" }),
           );
         end();
         return { success: true };

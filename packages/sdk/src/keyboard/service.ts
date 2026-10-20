@@ -3,13 +3,23 @@ import type {
   EdenKeyboardFocusState,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
 import type { PlatformWindow } from "../platform/ports";
+import {
+  DisplayPort,
+  RendererIpcPort,
+  WindowingPort,
+} from "../platform/ports/types";
+import { Processes } from "../processes/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
+import { Settings } from "../settings/service";
 import { createKeyboardDrag } from "./drag";
+import { type KeyboardNativeFailure, KeyboardSenderRejected } from "./errors";
 import { bindKeyboardIpc } from "./ipc";
 import {
   effectivePlacement,
@@ -17,7 +27,7 @@ import {
   keyboardState,
   workspaceLift,
 } from "./placement";
-import type { KeyboardDependencies } from "./ports";
+import { KeyboardAssets, KeyboardViews } from "./ports";
 import { keyboardChannels as channel } from "./protocol";
 import {
   defaultKeyboardPreferences,
@@ -29,21 +39,27 @@ import {
 import type { KeyboardState } from "./state";
 import { createKeyboardOverlay } from "./window";
 
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
-const attempt = <A>(work: () => A) => Effect.try({ try: work, catch: asError });
+export interface Keyboard {
+  initialize: () => Effect.Effect<void>;
+  setMainWindow: (
+    window: PlatformWindow,
+  ) => Effect.Effect<void, KeyboardNativeFailure>;
+}
 
-/** Coordinate focus policy, native presentation, and native Settings Effects. */
-export function createKeyboard({
-  assets,
-  settings,
-  views,
-  processes,
-  windows,
-  rendererIpc,
-  display,
-}: KeyboardDependencies) {
-  return Effect.gen(function* () {
+export const Keyboard = Context.Service<"eden/Keyboard", Keyboard>(
+  "eden/Keyboard",
+);
+
+export const KeyboardLive = Layer.effect(
+  Keyboard,
+  Effect.gen(function* () {
+    const assets = yield* KeyboardAssets;
+    const settings = yield* Settings;
+    const views = yield* KeyboardViews;
+    const processes = yield* Processes;
+    const windows = yield* WindowingPort;
+    const rendererIpc = yield* RendererIpcPort;
+    const display = yield* DisplayPort;
     const state: KeyboardState = {
       preferences: defaultKeyboardPreferences(),
       workspaceBounds: null,
@@ -55,10 +71,13 @@ export function createKeyboard({
     };
     let disposed = false;
     const pending = yield* Queue.unbounded<{
-      work: Effect.Effect<void, Error>;
+      work: Effect.Effect<void, KeyboardNativeFailure>;
       label: string;
     }>();
-    function schedule(work: Effect.Effect<void, Error>, label: string) {
+    function schedule(
+      work: Effect.Effect<void, KeyboardNativeFailure>,
+      label: string,
+    ) {
       if (!disposed) Queue.offerUnsafe(pending, { work, label });
     }
     const overlay = yield* createKeyboardOverlay({ windows, assets, schedule });
@@ -89,7 +108,7 @@ export function createKeyboard({
       return Effect.gen(function* () {
         const value = currentState();
         yield* overlay.send(channel.stateChanged, value);
-        yield* attempt(() => {
+        yield* Effect.sync(() => {
           for (const viewId of views.list())
             views.send(viewId, channel.stateChanged, value);
         });
@@ -97,7 +116,7 @@ export function createKeyboard({
     }
 
     function updateWorkspacePresentation() {
-      return attempt(() =>
+      return Effect.sync(() =>
         views.setPresentationLift(
           workspaceLift(
             state,
@@ -202,7 +221,10 @@ export function createKeyboard({
         if (!action) return { success: false };
         if (!overlay.isSender(sender))
           return yield* Effect.fail(
-            new Error("Only the keyboard window can dispatch keyboard actions"),
+            new KeyboardSenderRejected({
+              sender,
+              operation: "dispatch-actions",
+            }),
           );
         const target = state.currentTarget;
         if (!target) return { success: false };
@@ -211,7 +233,7 @@ export function createKeyboard({
           yield* hideKeyboard();
           return { success: false };
         }
-        const sent = yield* attempt(() =>
+        const sent = yield* Effect.sync(() =>
           views.send(target.viewId, channel.applyAction, action),
         );
         if (!sent) {
@@ -250,7 +272,7 @@ export function createKeyboard({
     function settingChanged(
       key: string,
       value: string,
-    ): Effect.Effect<void, Error> {
+    ): Effect.Effect<void, KeyboardNativeFailure> {
       const preferences = state.preferences;
       if (key === KEYBOARD_SETTINGS.placementMode) {
         const next = parsePlacementMode(value);
@@ -382,7 +404,5 @@ export function createKeyboard({
     );
 
     return { initialize, setMainWindow };
-  });
-}
-
-export type Keyboard = Effect.Success<ReturnType<typeof createKeyboard>>;
+  }).pipe(Effect.tap((value) => value.initialize())),
+);
