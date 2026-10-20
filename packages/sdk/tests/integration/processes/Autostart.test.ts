@@ -4,19 +4,35 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { createDevelopmentAutostart } from "../../../src/autostart/development";
+import {
+  AutostartProcesses,
+  AutostartSessions,
+  DevelopmentAutostart,
+} from "../../../src/autostart/ports";
 import { createAutostartProcesses } from "../../../src/autostart/processes";
-import { createAutostart } from "../../../src/autostart/service";
-import type { ExecutionContext } from "../../../src/execution/context";
-import type { InstalledPackages } from "../../../src/packages/installed";
-import type { Processes } from "../../../src/processes/service";
-import type { SessionContext } from "../../../src/session/context";
-import type { Sessions } from "../../../src/session/service";
-import { createSettings } from "../../../src/settings/service";
-import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
+import {
+  Autostart,
+  AutostartDevelopment,
+  AutostartLive,
+  AutostartLoginAppId,
+  AutostartSettings,
+} from "../../../src/autostart/service";
+import { fromPromise } from "../../../src/effects/io";
+import { AppsDirectory } from "../../../src/runtime/inputs";
+import {
+  SettingsAuthorization,
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/settings/ports";
+import { Settings, SettingsLive } from "../../../src/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
 
 const vendor: UserProfile = {
   username: "setup",
@@ -71,27 +87,28 @@ async function scopedAutostart(
     await effects.dispose();
     await fs.rm(directory, { recursive: true, force: true });
   });
-  const storage = createSqliteSettingsStorage({ appsDirectory: directory });
+  const storage = buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+    Effect.provideService(AppsDirectory, directory),
+  );
   const settings = await effects.acquire(
-    createSettings({
-      storage: {
-        open: Effect.map(storage.open, (connection) => ({
+    buildService(Settings, SettingsLive).pipe(
+      Effect.provideServiceEffect(
+        SettingsStorage,
+        Effect.map(storage, (connection) => ({
           ...connection,
           keys: () =>
             Effect.gen(function* () {
               if (options.beforeList)
-                yield* Effect.tryPromise({
-                  try: options.beforeList,
-                  catch: (error) =>
-                    error instanceof Error ? error : new Error(String(error)),
-                });
+                yield* fromPromise(options.beforeList).pipe(Effect.orDie);
               return yield* connection.keys();
             }),
         })),
-      },
-      catalog: { getAppSettings: () => undefined },
-      authorization: { hasGrant: () => false },
-    }),
+      ),
+      Effect.provideService(SettingsCatalog, {
+        getAppSettings: () => undefined,
+      }),
+      Effect.provideService(SettingsAuthorization, { hasGrant: () => false }),
+    ),
   );
   const processes = eden.runtime.services.processes;
   const autostartProcesses = createAutostartProcesses(
@@ -100,12 +117,9 @@ async function scopedAutostart(
       getInstalledManifest: (appId) => processes.getInstalledManifest(appId),
       launchApp: (appId, bounds, launchArgs, location) =>
         Effect.gen(function* () {
-          if (options.beforeLaunch)
-            yield* Effect.tryPromise({
-              try: () => options.beforeLaunch!(appId),
-              catch: (error) =>
-                error instanceof Error ? error : new Error(String(error)),
-            });
+          const beforeLaunch = options.beforeLaunch;
+          if (beforeLaunch)
+            yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
           return yield* processes.launchApp(
             appId,
             bounds,
@@ -119,19 +133,22 @@ async function scopedAutostart(
   const sessionContext = eden.runtime.services.sessionContext;
   const sessions = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
-    createAutostart({
-      development: options.development ?? false,
-      loginAppId: options.loginAppId,
-      settings,
-      processes: autostartProcesses,
-      sessions: {
+    buildService(Autostart, AutostartLive).pipe(
+      Effect.provideService(AutostartDevelopment, options.development ?? false),
+      Effect.provideService(AutostartLoginAppId, options.loginAppId),
+      Effect.provideService(AutostartSettings, settings),
+      Effect.provideService(AutostartSessions, {
         currentUser: () => sessionContext.getCurrentUser(),
         changed: { on: (listener) => sessions.changed.on(listener) },
-      },
-      developmentApps: createDevelopmentAutostart({
-        hotReload: { stateDirectory: options.stateDirectory },
       }),
-    }),
+      Effect.provideService(AutostartProcesses, autostartProcesses),
+      Effect.provideService(
+        DevelopmentAutostart,
+        createDevelopmentAutostart({
+          hotReload: { stateDirectory: options.stateDirectory },
+        }),
+      ),
+    ),
   );
   const set = (appId: string, enabled = true) =>
     effects.run(

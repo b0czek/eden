@@ -2,6 +2,7 @@ import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import type { WindowingPort } from "../../../src/platform/ports";
+import { ViewNativeFailure } from "../../../src/views/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -127,7 +128,11 @@ describe("app instance ownership", () => {
       .run(launch())
       .catch((error: unknown) => error);
     (await backend()).emit("message", { type: "backend-ready" });
-    expect(await starting).toBe(failure);
+    const failed = await starting;
+    expect(failed).toMatchObject({ _tag: "ViewNativeFailure", appId });
+    if (!(failed instanceof ViewNativeFailure))
+      throw new Error("Expected native view failure");
+    expect(failed.cause).toBe(failure);
     expect(eden.platform.utilityProcesses.activeCount).toBe(0);
     expect(eden.platform.activeResourceCount).toBe(baseline);
     expect(

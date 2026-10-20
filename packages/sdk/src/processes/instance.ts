@@ -2,23 +2,21 @@ import { randomUUID } from "node:crypto";
 import type {
   AppInstance,
   AppManifest,
-  ExecutionPrincipal,
   FilesystemLocation,
-  ProcessOwner,
-  UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { AppChannelLifecycle } from "../appbus/ports";
-import { asError } from "../effects/io";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
+import {
+  callViewNative,
+  MainWindowUnavailable,
+  ViewNativeFailure,
+} from "../views/errors";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
+import { BackendStartupFailed } from "./errors";
 
-export interface AppRuntime {
-  owner: ProcessOwner;
-  principal: ExecutionPrincipal;
-  profile?: UserProfile;
-}
+import type { AppRuntime } from "./types";
 
 /** One scope owns a launch's identity, appbus services, backend, and view. */
 export const acquireAppInstance = Effect.fn(function* (
@@ -85,8 +83,15 @@ export const acquireAppInstance = Effect.fn(function* (
               launchArgs,
               launchFile,
             ),
-          catch: asError,
-        }),
+          catch: (cause) => cause,
+        }).pipe(
+          Effect.catch((cause) =>
+            cause instanceof MainWindowUnavailable ||
+            cause instanceof ViewNativeFailure
+              ? Effect.fail(cause)
+              : Effect.die(cause),
+          ),
+        ),
         (id) =>
           Effect.sync(() => {
             const view = views.getViewInfo(id)?.view;
@@ -95,14 +100,21 @@ export const acquireAppInstance = Effect.fn(function* (
               views.removeView(id);
             } finally {
               // Native ownership survives failures in view bookkeeping or layout cleanup.
-              if (!view.webContents.isDestroyed()) view.webContents.close();
+              if (!view.webContents.isDestroyed())
+                callViewNative("destroy", { id, appId }, () =>
+                  view.webContents.close(),
+                );
             }
           }),
       )
     : -1;
   if (backend && backends.getBackend(appId) !== backend)
     return yield* Effect.fail(
-      new Error(`Backend ${appId} exited during startup`),
+      new BackendStartupFailed({
+        appId,
+        reason: "exited",
+        message: `Backend ${appId} exited during startup`,
+      }),
     );
   const instance: AppInstance = {
     manifest,

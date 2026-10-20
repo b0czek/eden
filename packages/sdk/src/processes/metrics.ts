@@ -18,15 +18,30 @@ import type {
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
 
+import {
+  type ProcessMetricsError,
+  ProcessMetricsFailed,
+  ProcessMetricsStopped,
+} from "./errors";
+
 interface CachedMetricsSample {
   sampledAt: string;
   appMetrics: PlatformProcessMetric[];
 }
 
 const createPendingSample = () => ({
-  result: Deferred.makeUnsafe<CachedMetricsSample, Error>(),
+  result: Deferred.makeUnsafe<CachedMetricsSample, ProcessMetricsError>(),
   readers: 0,
 });
+
+const metricsFailure = (cause: unknown) =>
+  new ProcessMetricsFailed({
+    cause,
+    message:
+      cause instanceof Error
+        ? cause.message
+        : `Failed to collect process metrics: ${String(cause)}`,
+  });
 
 const METRICS_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_METRICS_POLLING_TIMEOUT_MS = 1000;
@@ -61,7 +76,10 @@ export const createProcessMetrics = Effect.fn(function* ({
       Math.min(MAX_METRICS_POLLING_TIMEOUT_MS, pollingTimeoutMs),
     );
     extendMetricsSamplerKeepAlive(normalizedTimeout);
-    ensureMetricsSampler(waitForAccurateCpu);
+    yield* Effect.try({
+      try: () => ensureMetricsSampler(waitForAccurateCpu),
+      catch: metricsFailure,
+    });
 
     if (_latestMetricsSample) {
       return buildMetricsSnapshot(
@@ -72,7 +90,10 @@ export const createProcessMetrics = Effect.fn(function* ({
     }
 
     if (!waitForAccurateCpu) {
-      const immediateSample = captureMetricsSample();
+      const immediateSample = yield* Effect.try({
+        try: captureMetricsSample,
+        catch: metricsFailure,
+      });
       return buildMetricsSnapshot(
         immediateSample.appMetrics,
         immediateSample.sampledAt,
@@ -141,10 +162,7 @@ export const createProcessMetrics = Effect.fn(function* ({
         Effect.succeed(captureMetricsSample()),
       );
     } catch (error) {
-      const failure =
-        error instanceof Error
-          ? error
-          : new Error(`Failed to collect process metrics: ${String(error)}`);
+      const failure = metricsFailure(error);
 
       Deferred.doneUnsafe(firstSample.result, Effect.fail(failure));
       stopMetricsSampler();
@@ -337,7 +355,9 @@ export const createProcessMetrics = Effect.fn(function* ({
     stopMetricsSampler();
     Deferred.doneUnsafe(
       firstSample.result,
-      Effect.fail(new Error("Eden runtime disposed")),
+      Effect.fail(
+        new ProcessMetricsStopped({ message: "Eden runtime disposed" }),
+      ),
     );
   }
   yield* Effect.addFinalizer(() => Effect.sync(dispose));

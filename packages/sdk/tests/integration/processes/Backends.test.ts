@@ -1,10 +1,20 @@
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
-import { type Backends, createBackends } from "../../../src/processes/backends";
+import { DlcResources } from "../../../src/packages/dlc-resources";
+import { UtilityProcessPort } from "../../../src/platform/ports/types";
+import { Backends, BackendsLive } from "../../../src/processes/backends";
+import { BackendIoFailed } from "../../../src/processes/errors";
+import { DistPath } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
 import { InMemoryPlatform } from "../../support/InMemoryPlatform";
 
 describe("backend readiness and termination", () => {
@@ -17,14 +27,15 @@ describe("backend readiness and termination", () => {
     effects = createEffectRuntime(TestClock.layer());
     platform = new InMemoryPlatform("/tmp/eden-backend-waits");
     backends = await effects.acquire(
-      createBackends({
-        distPath: "/dist",
-        utilityProcesses: platform.utilityProcesses,
-        dlcResources: {
+      buildService(Backends, BackendsLive).pipe(
+        Effect.provideService(DistPath, "/dist"),
+        Effect.provideService(UtilityProcessPort, platform.utilityProcesses),
+        Effect.provideService(DlcResources, {
+          list: () => [],
           createBackendBinding: () => ({ capability: "token", roots: {} }),
           revokeBackend: () => {},
-        },
-      }),
+        }),
+      ),
     );
   });
 
@@ -130,6 +141,52 @@ describe("backend readiness and termination", () => {
     await effects.run(TestClock.adjust(Duration.millis(500)));
     expect(platform.utilityProcesses.activeCount).toBe(0);
     expect(backends.hasBackend(appId)).toBe(false);
+    backend.kill();
+  });
+
+  it("retains backend ownership until native exit when termination is interrupted", async () => {
+    const { starting, backend } = await start();
+    backend.emit("message", { type: "backend-ready" });
+    await starting;
+    const stopping = effects.fork(backends.terminateBackend(appId));
+    await effects.run(TestClock.adjust(Duration.zero));
+    stopping.interruptUnsafe();
+    await effects.run(TestClock.adjust(Duration.millis(499)));
+    expect(backends.getBackend(appId)).toBe(backend);
+    expect(platform.utilityProcesses.activeCount).toBe(1);
+    expect(stopping.pollUnsafe()).toBeUndefined();
+    await effects.run(TestClock.adjust(Duration.millis(1)));
+    const exit = await effects.run(Fiber.await(stopping));
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(backends.hasBackend(appId)).toBe(false);
+    expect(platform.utilityProcesses.activeCount).toBe(0);
+  });
+
+  it("waits for killed process exit before reporting a shutdown channel failure", async () => {
+    const { starting, backend } = await start();
+    backend.emit("message", { type: "backend-ready" });
+    await starting;
+    const failure = new Error("closed channel");
+    jest.spyOn(backend, "postMessage").mockImplementation(() => {
+      throw failure;
+    });
+    const kill = jest.spyOn(backend, "kill").mockReturnValue(true);
+    const stopping = effects.fork(backends.terminateBackend(appId));
+    await effects.run(TestClock.adjust(Duration.zero));
+    expect(backends.getBackend(appId)).toBe(backend);
+    expect(stopping.pollUnsafe()).toBeUndefined();
+    backend.emit("exit", 0);
+    const exit = await effects.run(Fiber.await(stopping));
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const error = Cause.squash(exit.cause);
+      expect(error).toBeInstanceOf(BackendIoFailed);
+      if (!(error instanceof BackendIoFailed))
+        throw new Error("Expected backend I/O failure");
+      expect(error.cause).toBe(failure);
+    }
+    expect(backends.hasBackend(appId)).toBe(false);
+    kill.mockRestore();
     backend.kill();
   });
 
