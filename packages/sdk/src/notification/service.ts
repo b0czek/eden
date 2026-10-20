@@ -3,20 +3,56 @@ import type {
   NotificationAction,
   NotificationType,
 } from "@edenapp/types";
+import * as Clock from "effect/Clock";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import type {
   RoutedNotification,
   TargetedNotification,
 } from "../controllers/events";
+import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
-import type { NotificationCaller, NotificationViews } from "./ports";
+import { NotificationCallerRejected, NotificationsClosed } from "./errors";
+import { NotificationViews } from "./ports";
+import type { NotificationActionCallbacks, NotificationCaller } from "./types";
 
-export type NotificationActionCallbacks = Record<
-  string,
-  (notification: Notification) => Effect.Effect<unknown, Error>
->;
+export interface Notifications {
+  /** Synchronously throws NotificationsClosed or NotificationCallerRejected. */
+  registerDisplayProvider: (caller: NotificationCaller) => { success: boolean };
+  pushNotification: (
+    title: string,
+    message: string,
+    timeout?: number,
+    type?: NotificationType,
+    actions?: NotificationAction[],
+    callbacks?: NotificationActionCallbacks,
+    caller?: NotificationCaller,
+  ) => Effect.Effect<Notification, NotificationsClosed>;
+  /** Provider rejections and host callback failures; callback errors remain unchanged. */
+  handleActionClicked: (
+    notificationId: string,
+    actionId: string,
+    caller?: NotificationCaller,
+  ) => Effect.Effect<{ success: boolean }, Error>;
+  /** Synchronously throws NotificationsClosed or NotificationCallerRejected. */
+  handleDismissed: (
+    notificationId: string,
+    caller?: NotificationCaller,
+  ) => { success: boolean };
+  added: Event<TargetedNotification<{ notification: Notification }>>;
+  removed: Event<TargetedNotification<{ id: string }>>;
+  actionClicked: Event<
+    RoutedNotification<{ notificationId: string; actionId: string }>
+  >;
+}
+
+export const Notifications = Context.Service<
+  "eden/Notifications",
+  Notifications
+>("eden/Notifications");
 
 interface ActiveNotification {
   notification: Notification;
@@ -24,11 +60,11 @@ interface ActiveNotification {
   callbacks?: NotificationActionCallbacks;
 }
 
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
-
-export function createNotifications({ views }: { views: NotificationViews }) {
-  return Effect.gen(function* () {
+export const NotificationsLive = Layer.effect(
+  Notifications,
+  Effect.gen(function* () {
+    const views = yield* NotificationViews;
+    const clock = yield* Clock.Clock;
     let idCounter = 0;
     let provider: { appId: string; viewId: number } | undefined;
     let disposed = false;
@@ -52,7 +88,8 @@ export function createNotifications({ views }: { views: NotificationViews }) {
     const scope = yield* Effect.scope;
 
     function assertOpen() {
-      if (disposed) throw new Error("Notifications disposed");
+      if (disposed)
+        throw new NotificationsClosed({ message: "Notifications disposed" });
     }
 
     function resolveViewId(webContentsId?: number) {
@@ -68,17 +105,23 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       return provider && views.isAlive(provider.viewId) ? provider : undefined;
     }
 
-    function assertProvider(caller: NotificationCaller, action: string) {
-      assertOpen();
+    function providerRejection(
+      caller: NotificationCaller,
+      action: "actions" | "dismissals",
+    ) {
+      if (disposed)
+        return new NotificationsClosed({ message: "Notifications disposed" });
       const current = getProvider();
       if (
         !current ||
         !caller.appId ||
         resolveViewId(caller.webContentsId) !== current.viewId
       )
-        throw new Error(
-          `Only the notification display provider can report ${action}`,
-        );
+        return new NotificationCallerRejected({
+          operation: action,
+          ...caller,
+          message: `Only the notification display provider can report ${action}`,
+        });
     }
 
     function registerDisplayProvider(caller: NotificationCaller): {
@@ -87,7 +130,11 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       assertOpen();
       const viewId = resolveViewId(caller.webContentsId);
       if (viewId === undefined || !caller.appId)
-        throw new Error("Notification display provider must be a valid view");
+        throw new NotificationCallerRejected({
+          operation: "register-display",
+          ...caller,
+          message: "Notification display provider must be a valid view",
+        });
       provider = { appId: caller.appId, viewId };
       log.info(`Notification display provider registered: ${caller.appId}`);
       return { success: true };
@@ -102,17 +149,21 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       callbacks?: NotificationActionCallbacks,
       caller?: NotificationCaller,
     ) {
-      return Effect.try({
-        try: () => {
-          assertOpen();
-          const id = `notif-${Date.now()}-${++idCounter}`;
+      return Effect.suspend(() => {
+        if (disposed)
+          return Effect.fail(
+            new NotificationsClosed({ message: "Notifications disposed" }),
+          );
+        return Effect.sync(() => {
+          const createdAt = clock.currentTimeMillisUnsafe();
+          const id = `notif-${createdAt}-${++idCounter}`;
           const sourceViewId = resolveViewId(caller?.webContentsId);
           const notification: Notification = {
             id,
             title,
             message,
             timeout: timeout > 0 ? timeout : undefined,
-            createdAt: Date.now(),
+            createdAt,
             type,
             actions,
           };
@@ -129,8 +180,7 @@ export function createNotifications({ views }: { views: NotificationViews }) {
             });
           log.info(`Notification pushed: "${title}" (${id}, type: ${type})`);
           return notification;
-        },
-        catch: asError,
+        });
       });
     }
 
@@ -138,12 +188,10 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       notificationId: string,
       actionId: string,
       caller: NotificationCaller = {},
-    ) {
+    ): Effect.Effect<{ success: boolean }, Error> {
       return Effect.gen(function* () {
-        yield* Effect.try({
-          try: () => assertProvider(caller, "actions"),
-          catch: asError,
-        });
+        const rejection = providerRejection(caller, "actions");
+        if (rejection) return yield* Effect.fail(rejection);
         const active = activeNotifications.get(notificationId);
         const callback = active?.callbacks?.[actionId];
         if (callback && active) {
@@ -167,7 +215,7 @@ export function createNotifications({ views }: { views: NotificationViews }) {
                 : [active.sourceViewId],
           });
         }
-        return { success: true } as { success: boolean };
+        return { success: true };
       });
     }
 
@@ -175,7 +223,8 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       notificationId: string,
       caller: NotificationCaller = {},
     ): { success: boolean } {
-      assertProvider(caller, "dismissals");
+      const rejection = providerRejection(caller, "dismissals");
+      if (rejection) throw rejection;
       const active = activeNotifications.get(notificationId);
       if (!active) return { success: false };
       activeNotifications.delete(notificationId);
@@ -195,10 +244,6 @@ export function createNotifications({ views }: { views: NotificationViews }) {
       added,
       removed,
       actionClicked,
-    };
-  });
-}
-
-export type Notifications = Effect.Success<
-  ReturnType<typeof createNotifications>
->;
+    } satisfies Notifications;
+  }),
+);

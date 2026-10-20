@@ -1,9 +1,14 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { fromPromise } from "../effects/io";
-import { createNotifications } from "./service";
+import { NotificationCallerRejected, NotificationsClosed } from "./errors";
+import { NotificationViews } from "./ports";
+import { Notifications, NotificationsLive } from "./service";
 
 const provider = { appId: "app.toaster", webContentsId: 100 };
 const editor = { appId: "app.editor", webContentsId: 200 };
@@ -11,16 +16,17 @@ const editor = { appId: "app.editor", webContentsId: 200 };
 async function scenario() {
   const runtime = createEffectRuntime();
   const liveViews = new Set([10, 20]);
+  const views = {
+    resolve: (id?: number) => (id === 100 ? 10 : id === 200 ? 20 : undefined),
+    isAlive: (id: number) => liveViews.has(id),
+  };
   const notifications = await runtime.acquire(
-    createNotifications({
-      views: {
-        resolve: (id) => (id === 100 ? 10 : id === 200 ? 20 : undefined),
-        isAlive: (id) => liveViews.has(id),
-      },
-    }),
+    buildService(Notifications, NotificationsLive).pipe(
+      Effect.provideService(NotificationViews, views),
+    ),
   );
   notifications.registerDisplayProvider(provider);
-  return { runtime, notifications, liveViews };
+  return { runtime, notifications, liveViews, views };
 }
 
 it("creates notification data and display delivery only when the Effect executes", async () => {
@@ -166,10 +172,16 @@ it("rejects actions and dismissals from another view or a dead display provider"
       runtime.run(
         notifications.handleActionClicked(notification.id, "open", editor),
       ),
-    ).rejects.toThrow("Only the notification display provider");
+    ).rejects.toMatchObject({
+      _tag: "NotificationCallerRejected",
+      operation: "actions",
+      appId: editor.appId,
+      webContentsId: editor.webContentsId,
+      message: "Only the notification display provider can report actions",
+    });
     expect(() =>
       notifications.handleDismissed(notification.id, editor),
-    ).toThrow("Only the notification display provider");
+    ).toThrow(NotificationCallerRejected);
     liveViews.delete(10);
     await expect(
       runtime.run(
@@ -224,13 +236,59 @@ it("settles native action I/O before disposing its service scope", async () => {
   }
 });
 
+it("rejects invalid registration and use after disposal without accepting notifications", async () => {
+  const { runtime, notifications } = await scenario();
+  try {
+    expect(() =>
+      notifications.registerDisplayProvider({ appId: "missing" }),
+    ).toThrow(NotificationCallerRejected);
+    const pending = notifications.pushNotification("Title", "Message");
+    await runtime.dispose();
+    expect(() => notifications.registerDisplayProvider(provider)).toThrow(
+      NotificationsClosed,
+    );
+    expect(() => notifications.handleDismissed("missing", provider)).toThrow(
+      NotificationsClosed,
+    );
+    await expect(Effect.runPromise(pending)).rejects.toThrow(
+      "Notifications disposed",
+    );
+    await expect(
+      Effect.runPromise(
+        notifications.handleActionClicked("missing", "open", provider),
+      ),
+    ).rejects.toThrow("Notifications disposed");
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it("keeps unexpected view adapter exceptions out of the recoverable failure channel", async () => {
+  const { runtime, notifications, views } = await scenario();
+  const defect = new Error("Broken view registry invariant");
+  views.isAlive = () => {
+    throw defect;
+  };
+  try {
+    const exit = await runtime.run(
+      Effect.exit(notifications.pushNotification("Title", "Message")),
+    );
+    expect(exit).toEqual(Exit.die(defect));
+  } finally {
+    await runtime.dispose();
+  }
+});
+
 it("interrupts a native callback when its service scope closes independently of its caller", async () => {
   const scope = Scope.makeUnsafe();
   const notifications = await Effect.runPromise(
     Scope.provide(
-      createNotifications({
-        views: { resolve: () => 10, isAlive: () => true },
-      }),
+      buildService(Notifications, NotificationsLive).pipe(
+        Effect.provideService(NotificationViews, {
+          resolve: () => 10,
+          isAlive: () => true,
+        }),
+      ),
       scope,
     ),
   );
