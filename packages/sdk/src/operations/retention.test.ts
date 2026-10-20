@@ -1,18 +1,26 @@
 import type { OperationHandle } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import * as TestClock from "effect/testing/TestClock";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import { createExecutionContext } from "../execution/context";
-import { createSessionContext } from "../session/context";
-import { operationQuotaLimits } from "./quota";
 import {
-  createOperations,
-  type Operations,
-  operationRetentionMs,
-} from "./service";
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { RuntimeConfig } from "../runtime/inputs";
+import { SessionContext, SessionContextLive } from "../session/context";
+import { OperationAdmissionClosed } from "./errors";
+import { OperationsFilesystem } from "./ports";
+import { operationQuotaLimits } from "./quota";
+import { Operations, OperationsLive, operationRetentionMs } from "./service";
 import { type OperationTask, operationTask } from "./task";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("operation retention and admission capacity", () => {
   let effects: ReturnType<typeof createEffectRuntime>;
@@ -22,11 +30,25 @@ describe("operation retention and admission capacity", () => {
   beforeEach(async () => {
     effects = createEffectRuntime(TestClock.layer());
     operations = await effects.acquire(
-      createOperations({
-        execution: createExecutionContext({ config: {} }),
-        session: createSessionContext(),
-        filesystem: { releaseHandles: () => Effect.void },
-      }),
+      buildService(Operations, OperationsLive).pipe(
+        Effect.provideService(
+          ExecutionContext,
+          serviceEffects.acquireSync(
+            buildService(ExecutionContext, ExecutionContextLive).pipe(
+              Effect.provideService(RuntimeConfig, {}),
+            ),
+          ),
+        ),
+        Effect.provideService(
+          SessionContext,
+          serviceEffects.acquireSync(
+            buildService(SessionContext, SessionContextLive),
+          ),
+        ),
+        Effect.provideService(OperationsFilesystem, {
+          releaseHandles: () => Effect.void,
+        }),
+      ),
     );
   });
   afterEach(() => effects.dispose());
@@ -45,6 +67,43 @@ describe("operation retention and admission capacity", () => {
         ),
       ),
     );
+
+  it("preserves tagged host preparation rejections without accepting work", async () => {
+    const rejection = new OperationAdmissionClosed({
+      sessionId: "closing-session",
+    });
+    const exit = await effects.run(
+      Effect.exit(
+        operations.runHost("host/work", {}, () => {
+          throw rejection;
+        }),
+      ),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failure = Cause.findErrorOption(exit.cause);
+      expect(Option.isSome(failure) && failure.value).toBe(rejection);
+      expect(Cause.hasDies(exit.cause)).toBe(false);
+    }
+    expect(operations.inspectAll()).toEqual([]);
+  });
+
+  it("keeps unexpected host preparation throws as defects", async () => {
+    const defect = new Error("Invalid preparation state");
+    const exit = await effects.run(
+      Effect.exit(
+        operations.runHost("host/work", {}, () => {
+          throw defect;
+        }),
+      ),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      expect(Cause.hasDies(exit.cause)).toBe(true);
+      expect(Cause.hasFails(exit.cause)).toBe(false);
+    }
+    expect(operations.inspectAll()).toEqual([]);
+  });
 
   it("timestamps admission, execution and completion with the service clock", async () => {
     const started = Deferred.makeUnsafe<void>();
@@ -100,7 +159,11 @@ describe("operation retention and admission capacity", () => {
         handles.push(handle);
         await effects.run(operations.wait(handle, owner));
       }
-      await expect(submit("rejected")).rejects.toThrow("capacity exhausted");
+      await expect(submit("rejected")).rejects.toMatchObject({
+        _tag: "OperationCapacityExhausted",
+        appId: owner.appId,
+        capacity: "caller",
+      });
       expect(preparations).toBe(operationQuotaLimits.perAppLimit);
       expect(await submit("active", "active-key")).toEqual(active);
       expect(await submit("1", "key-1")).toEqual(handles[0]);

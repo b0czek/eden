@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
@@ -11,7 +12,7 @@ import { ExecutionContext } from "../../../src/execution/context";
 import { RuntimeContexts } from "../../../src/execution/runtime-contexts";
 import { Commands, IpcTransport, Permissions } from "../../../src/ipc";
 import { operationQuotaLimits } from "../../../src/operations/quota";
-import { type Operations } from "../../../src/operations/service";
+import type { Operations } from "../../../src/operations/service";
 import {
   type OperationReporter,
   type OperationTask,
@@ -270,6 +271,57 @@ describe("runtime-owned operations", () => {
         status: "succeeded",
         result,
       });
+    },
+  );
+
+  it.each(["unavailable", { code: "unavailable", retryAfter: 15 }, undefined])(
+    "encodes the original typed failure in the public snapshot: %p",
+    async (failure) => {
+      register(() =>
+        operationTask(() => Effect.fail(failure), {
+          encodeFailure: (error) => ({ retry: error }),
+        }),
+      );
+      const handle = await submit();
+      const exit = await eden.runtime.effects.run(
+        Effect.exit(operations.wait(handle, owner)),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      expect(operations.get(handle, owner)).toMatchObject({
+        status: "failed",
+        response: { retry: failure },
+      });
+    },
+  );
+
+  it.each([
+    [Cause.die(new Error("defect")), "failed"],
+    [
+      Cause.combine(
+        Cause.fail("unavailable"),
+        Cause.die(new Error("cleanup defect")),
+      ),
+      "failed",
+    ],
+    [Cause.combine(Cause.fail("unavailable"), Cause.interrupt()), "failed"],
+    [Cause.interrupt(), "cancelled"],
+  ] as const)(
+    "does not encode defects or interrupted causes: %p",
+    async (cause, status) => {
+      register(() =>
+        operationTask(() => Effect.failCause(cause), {
+          cancellable: true,
+          encodeFailure: () => ({ retry: true }),
+        }),
+      );
+      const handle = await submit();
+      const exit = await eden.runtime.effects.run(
+        Effect.exit(operations.wait(handle, owner)),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      const snapshot = operations.get(handle, owner);
+      expect(snapshot.status).toBe(status);
+      expect(snapshot).not.toHaveProperty("response");
     },
   );
 

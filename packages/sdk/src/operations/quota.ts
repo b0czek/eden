@@ -1,3 +1,5 @@
+import { OperationCapacityExhausted } from "./errors";
+
 export const operationQuotaLimits = Object.freeze({
   reservedPerApp: 32,
   perAppLimit: 128,
@@ -5,20 +7,16 @@ export const operationQuotaLimits = Object.freeze({
 });
 const { reservedPerApp, perAppLimit, sharedLimit } = operationQuotaLimits;
 export function createOperationQuota() {
-  let usage = new Map<string | undefined, number>();
+  const usage = new Map<string | undefined, number>();
   let sharedUsage = 0;
 
   function reserve(appId: string | undefined): void {
     const count = usage.get(appId) ?? 0;
     if (count >= perAppLimit)
-      throw new Error(
-        "Operation capacity exhausted for this caller; retry after records expire",
-      );
+      throw new OperationCapacityExhausted({ appId, capacity: "caller" });
     if (count >= reservedPerApp) {
       if (sharedUsage >= sharedLimit)
-        throw new Error(
-          "Shared operation capacity exhausted; retry after records expire",
-        );
+        throw new OperationCapacityExhausted({ appId, capacity: "shared" });
       sharedUsage++;
     }
     usage.set(appId, count + 1);
