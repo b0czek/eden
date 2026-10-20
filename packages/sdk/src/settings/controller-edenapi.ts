@@ -8,12 +8,13 @@ import {
   namespacedKeyArgsSchema,
 } from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/context";
+import { SettingsCallerIdentityError } from "./errors";
 import type { Settings } from "./service";
 
 function callerNamespace(caller: CommandCallerContext) {
   return caller.appId
     ? Effect.succeed(caller.appId)
-    : Effect.fail(new Error("Settings access requires a caller app identity"));
+    : Effect.fail(new SettingsCallerIdentityError());
 }
 
 const resetSchema = v.optional(v.custom<SettingsCategory[]>(Array.isArray));

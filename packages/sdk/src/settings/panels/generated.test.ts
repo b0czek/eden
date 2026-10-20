@@ -1,9 +1,8 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { testApp } from "../../tests/support/apps";
-import { panelUser as user } from "../../tests/support/settings/panels";
-import { createSettingsPanelHarness as harness } from "../../tests/support/settings/SettingsPanelTestHarness";
-import { fromPromise } from "../effects/io";
+import { testApp } from "../../../tests/support/apps";
+import { panelUser as user } from "../../../tests/support/settings/panels";
+import { createSettingsPanelHarness as harness } from "../../../tests/support/settings/SettingsPanelTestHarness";
 
 describe("SettingsPanels manifest panels", () => {
   it("normalizes one app panel and reads only setting-granted keys", async () => {
@@ -25,7 +24,7 @@ describe("SettingsPanels manifest panels", () => {
     });
     catalog.allApps.mockReturnValue([manifest]);
     settings.get.mockImplementation((_appId: string, key: string) =>
-      fromPromise(async () => `${key}-value`),
+      Effect.succeed(`${key}-value`),
     );
 
     panels.synchronizeManifestPanels();

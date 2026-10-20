@@ -1,16 +1,15 @@
 export { EDEN_SETTINGS_APP_ID } from "./constants";
 export { createSettingsController } from "./controller-edenapi";
+export { registerBuiltinSettingsPanels } from "./panels/builtin/registration";
 export {
-  createSettingsPanels,
-  type SettingsPanels,
-} from "./panel-service";
-export { registerBuiltinSettingsPanels } from "./panels";
-export type {
-  SettingsAuthorization,
-  SettingsCatalog,
-  SettingsConnection,
+  SettingsPanels,
+  SettingsPanelsLive,
+} from "./panels/service";
+export {
+  type SettingsAuthorization,
+  type SettingsCatalog,
   SettingsStorage,
 } from "./ports";
 export { EDEN_SETTINGS_SCHEMA } from "./schema";
-export { createSettings, type Settings } from "./service";
-export { createSqliteSettingsStorage } from "./sqlite-storage";
+export { Settings, SettingsLive } from "./service";
+export { SqliteSettingsStorageLive } from "./sqlite-storage";

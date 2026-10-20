@@ -10,32 +10,27 @@ import type {
   SettingsPanelView,
 } from "@edenapp/types";
 import * as v from "valibot";
-import type { InternalSettingsPanelProvider } from "./panel-record";
+import {
+  SettingsPanelValidationError,
+  SettingsPanelViewValidationError,
+} from "./errors";
+import type { InternalSettingsPanelProvider } from "./types";
 
 export type InternalPanelDefinition = SettingsPanelDefinition;
 export interface ValidationFailure {
   path: string;
   message: string;
 }
-const panelViewValidationError = Symbol("SettingsPanelViewValidationError");
-export type SettingsPanelViewValidationError = Error & {
-  readonly path: string;
-  readonly [panelViewValidationError]: true;
-};
-
 export function invalidPanelView(
   path: string,
 ): SettingsPanelViewValidationError {
-  return Object.assign(new Error(`Invalid settings panel view at ${path}`), {
-    path,
-    [panelViewValidationError]: true as const,
-  });
+  return new SettingsPanelViewValidationError({ path });
 }
 
 export function isSettingsPanelViewValidationError(
   error: unknown,
 ): error is SettingsPanelViewValidationError {
-  return error instanceof Error && panelViewValidationError in error;
+  return error instanceof SettingsPanelViewValidationError;
 }
 
 const PANEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
@@ -310,13 +305,20 @@ export function cloneRendererValue<T>(value: T): T {
       return item;
     if (typeof item === "number") {
       if (!Number.isFinite(item))
-        throw new Error(`Non-finite number at ${path}`);
+        throw new SettingsPanelValidationError({
+          message: `Non-finite number at ${path}`,
+        });
       return item;
     }
     if (item === undefined) return undefined;
     if (typeof item !== "object")
-      throw new Error(`Non-serializable value at ${path}`);
-    if (seen.has(item)) throw new Error(`Cyclic value at ${path}`);
+      throw new SettingsPanelValidationError({
+        message: `Non-serializable value at ${path}`,
+      });
+    if (seen.has(item))
+      throw new SettingsPanelValidationError({
+        message: `Cyclic value at ${path}`,
+      });
     seen.add(item);
     if (Array.isArray(item)) {
       const result = item.map((child, index) =>
@@ -327,7 +329,9 @@ export function cloneRendererValue<T>(value: T): T {
     }
     const prototype = Object.getPrototypeOf(item);
     if (prototype !== Object.prototype && prototype !== null)
-      throw new Error(`Non-plain object at ${path}`);
+      throw new SettingsPanelValidationError({
+        message: `Non-plain object at ${path}`,
+      });
     const result: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(item)) {
       const copied = clone(child, `${path}.${key}`);
@@ -360,12 +364,16 @@ const validateRules = (
       rules.maxLength !== undefined &&
       rules.minLength > rules.maxLength)
   )
-    throw new Error(`Invalid validation rules at ${path}`);
+    throw new SettingsPanelValidationError({
+      message: `Invalid validation rules at ${path}`,
+    });
   if (rules.pattern) {
     try {
       new RegExp(rules.pattern);
     } catch {
-      throw new Error(`Invalid validation pattern at ${path}.pattern`);
+      throw new SettingsPanelValidationError({
+        message: `Invalid validation pattern at ${path}.pattern`,
+      });
     }
   }
 };
@@ -388,7 +396,9 @@ const validateSchema = (
       (schema.enum.length === 0 ||
         new Set(schema.enum).size !== schema.enum.length)
     )
-      throw new Error(`Invalid action schema at ${path}.enum`);
+      throw new SettingsPanelValidationError({
+        message: `Invalid action schema at ${path}.enum`,
+      });
   } else if (schema.type === "number") {
     validateRules({ min: schema.min, max: schema.max }, path);
     if (
@@ -396,7 +406,9 @@ const validateSchema = (
       (schema.enum.length === 0 ||
         new Set(schema.enum).size !== schema.enum.length)
     )
-      throw new Error(`Invalid action schema at ${path}.enum`);
+      throw new SettingsPanelValidationError({
+        message: `Invalid action schema at ${path}.enum`,
+      });
   } else if (schema.type === "array" && schema.items)
     validateSchema(schema.items, `${path}[]`);
   else if (schema.type === "object")
@@ -411,19 +423,21 @@ export function cloneAndValidatePanelDefinition(
   const parsed = v.safeParse(panelDefinition, cloned);
   if (!parsed.success) {
     const path = issuePath(parsed.issues);
-    throw new Error(
-      `Invalid settings panel definition${path ? ` at ${path}` : ""}`,
-    );
+    throw new SettingsPanelValidationError({
+      message: `Invalid settings panel definition${path ? ` at ${path}` : ""}`,
+    });
   }
   const ids = new Set<string>();
   for (const action of cloned.actions ?? []) {
     if (ids.has(action.id))
-      throw new Error(`Duplicate settings panel action "${action.id}"`);
+      throw new SettingsPanelValidationError({
+        message: `Duplicate settings panel action "${action.id}"`,
+      });
     ids.add(action.id);
     if (action.grant && !action.label)
-      throw new Error(
-        `Action "${action.id}" requires a label when it declares a grant`,
-      );
+      throw new SettingsPanelValidationError({
+        message: `Action "${action.id}" requires a label when it declares a grant`,
+      });
     if (action.params)
       validateSchema(action.params, `actions.${action.id}.params`);
     if (action.value)
@@ -439,24 +453,32 @@ export function validatePanelProvider(
   provider: InternalSettingsPanelProvider,
 ): void {
   if (!provider || typeof provider.load !== "function")
-    throw new Error("Settings panel provider requires a load function");
+    throw new SettingsPanelValidationError({
+      message: "Settings panel provider requires a load function",
+    });
   if (
     provider.actions !== undefined &&
     (provider.actions === null ||
       typeof provider.actions !== "object" ||
       Array.isArray(provider.actions))
   )
-    throw new Error("Settings panel provider actions must be an object");
+    throw new SettingsPanelValidationError({
+      message: "Settings panel provider actions must be an object",
+    });
   for (const action of definition.actions ?? [])
     if (typeof provider.actions?.[action.id] !== "function")
-      throw new Error(
-        `Settings panel provider is missing action "${action.id}"`,
-      );
+      throw new SettingsPanelValidationError({
+        message: `Settings panel provider is missing action "${action.id}"`,
+      });
   for (const [id, handler] of Object.entries(provider.actions ?? {})) {
     if (typeof handler !== "function")
-      throw new Error(`Settings panel action "${id}" must be a function`);
+      throw new SettingsPanelValidationError({
+        message: `Settings panel action "${id}" must be a function`,
+      });
     if (!definition.actions?.some((action) => action.id === id))
-      throw new Error(`Settings panel provider has undeclared action "${id}"`);
+      throw new SettingsPanelValidationError({
+        message: `Settings panel provider has undeclared action "${id}"`,
+      });
   }
 }
 

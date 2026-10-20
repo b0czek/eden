@@ -68,7 +68,6 @@ describe("SettingsPanels integration", () => {
     await eden.runtime.effects.run(
       eden.runtime.sessions.login(user.username, "password"),
     );
-    const panels = eden.runtime.services.settingsPanels;
     let items = ["one", "two"];
     const registration = eden.runtime.settings.registerPanel(
       {

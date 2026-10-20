@@ -1,9 +1,31 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createExecutionContext } from "../../../src/execution/context";
-import type { SessionContext } from "../../../src/session/context";
-import { createSettingsPanels } from "../../../src/settings/panel-service";
+import {
+  ExecutionContext,
+  ExecutionContextLive,
+} from "../../../src/execution/context";
+import { PackageCatalog } from "../../../src/packages/catalog";
+import { RuntimeConfig } from "../../../src/runtime/inputs";
+import { SessionContext } from "../../../src/session/context";
+import {
+  createPanelRegistry,
+  PanelRegistryService,
+} from "../../../src/settings/panels/registry";
+import {
+  SettingsPanels,
+  SettingsPanelsLive,
+} from "../../../src/settings/panels/service";
+import {
+  SettingsAuthorization,
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/settings/ports";
+import { Settings, SettingsLive } from "../../../src/settings/service";
+import { buildService, createEffectRuntime } from "../effect-runtime";
 import { panelUser } from "./panels";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 export function createSettingsPanelHarness(
   initialUser = panelUser(["panels/network"]),
@@ -11,33 +33,85 @@ export function createSettingsPanelHarness(
   let currentUser: UserProfile | null = initialUser;
   let sessionId = "session-1";
   const notify = jest.fn();
-  const settings = {
-    get: jest.fn<Effect.Effect<string | undefined, Error>, [string, string]>(
-      () => Effect.succeed(undefined),
+  const storedValues = new Map<string, string>();
+  const realSettings = serviceEffects.acquireSync(
+    buildService(Settings, SettingsLive).pipe(
+      Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+      Effect.provideService(SettingsCatalog, {
+        getAppSettings: () => undefined,
+      }),
+      Effect.provideService(SettingsStorage, {
+        read: (key) => Effect.sync(() => storedValues.get(key)),
+        readMany: (keys) =>
+          Effect.sync(() => keys.map((key) => storedValues.get(key))),
+        write: (key, value) =>
+          Effect.sync(() => {
+            storedValues.set(key, value);
+          }),
+        remove: (key) =>
+          Effect.sync(() => {
+            storedValues.delete(key);
+          }),
+        keys: () => Effect.sync(() => [...storedValues.keys()]),
+      }),
     ),
-    set: jest.fn<Effect.Effect<void, Error>, [string, string, string]>(
+  );
+  const settings = {
+    ...realSettings,
+    get: jest.fn<ReturnType<Settings["get"]>, [string, string]>(() =>
+      Effect.succeed(undefined),
+    ),
+    set: jest.fn<ReturnType<Settings["set"]>, [string, string, string]>(
       () => Effect.void,
     ),
   };
+  const unexpectedCatalogAccess = (): never => {
+    throw new Error("Unexpected catalog access in panel fixture");
+  };
   const catalog = {
+    dlcDirectory: "",
+    get: unexpectedCatalogAccess,
+    has: unexpectedCatalogAccess,
+    all: unexpectedCatalogAccess,
+    getApp: unexpectedCatalogAccess,
+    hasApp: unexpectedCatalogAccess,
+    prebuiltApps: unexpectedCatalogAccess,
+    installedApps: unexpectedCatalogAccess,
+    developmentApps: unexpectedCatalogAccess,
+    listApps: unexpectedCatalogAccess,
+    getLaunchableApp: unexpectedCatalogAccess,
+    getDlc: unexpectedCatalogAccess,
+    hasDlc: unexpectedCatalogAccess,
+    allDlcs: unexpectedCatalogAccess,
+    dlcsForHost: unexpectedCatalogAccess,
+    getPath: unexpectedCatalogAccess,
+    getSize: unexpectedCatalogAccess,
+    resolveContainedDlcPath: unexpectedCatalogAccess,
     allApps: jest.fn<RuntimeAppManifest[], []>(() => []),
     getIcon: jest.fn<Effect.Effect<string | undefined>, [string]>(() =>
       Effect.succeed(undefined),
     ),
   };
-  const execution = createExecutionContext({ config: {} });
-  const panels = createSettingsPanels({
-    settings,
-    packageCatalog: catalog,
-    sessionContext: {
-      getCurrentUser: () =>
-        currentUser
-          ? { ...currentUser, grants: [...currentUser.grants] }
-          : null,
-      getSessionId: () => sessionId,
-    } as SessionContext,
-    executionContext: execution,
-  });
+  const execution = serviceEffects.acquireSync(
+    buildService(ExecutionContext, ExecutionContextLive).pipe(
+      Effect.provideService(RuntimeConfig, {}),
+    ),
+  );
+  const panels = serviceEffects.acquireSync(
+    buildService(SettingsPanels, SettingsPanelsLive).pipe(
+      Effect.provideService(Settings, settings),
+      Effect.provideService(PackageCatalog, catalog),
+      Effect.provideService(SessionContext, {
+        getCurrentUser: () =>
+          currentUser
+            ? { ...currentUser, grants: [...currentUser.grants] }
+            : null,
+        getSessionId: () => sessionId,
+      } as SessionContext),
+      Effect.provideService(ExecutionContext, execution),
+      Effect.provideService(PanelRegistryService, createPanelRegistry()),
+    ),
+  );
   panels.changed.on(notify);
   return {
     panels,

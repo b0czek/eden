@@ -4,8 +4,8 @@ import type { EdenSettingsApi } from "../api/settings";
 import {
   cloneAndValidatePanelDefinition,
   validatePanelProvider,
-} from "./panel-codec";
-import type { PanelRegistry } from "./panel-registry";
+} from "./panels/codec";
+import type { PanelRegistry } from "./panels/registry";
 
 const registrationOptionsSchema = v.optional(
   v.object({

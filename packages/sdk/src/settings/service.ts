@@ -1,28 +1,82 @@
 import type { SettingsCategory } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { log } from "../logging";
-import { EDEN_SETTINGS_APP_ID } from "./constants";
 import type {
+  StorageClosedError,
+  StorageReadFailure,
+  StorageRemoveFailure,
+  StorageWriteFailure,
+} from "../storage/errors";
+import { EDEN_SETTINGS_APP_ID } from "./constants";
+import {
+  SettingAccessError,
+  SettingDefaultMissingError,
+  SettingValueError,
+} from "./errors";
+import {
   SettingsAuthorization,
   SettingsCatalog,
   SettingsStorage,
 } from "./ports";
 import { EDEN_SETTINGS_SCHEMA } from "./schema";
 
-interface SettingsDependencies {
-  storage: SettingsStorage;
-  catalog: SettingsCatalog;
-  authorization: SettingsAuthorization;
+export interface Settings {
+  get: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<string | undefined, StorageReadFailure>;
+  set: (
+    appId: string,
+    key: string,
+    value: string,
+  ) => Effect.Effect<void, StorageWriteFailure | SettingValueError>;
+  delete: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<void, StorageRemoveFailure>;
+  list: (
+    appId: string,
+    showRestricted?: boolean,
+  ) => Effect.Effect<string[], StorageClosedError>;
+  getAll: (
+    appId: string,
+    showRestricted?: boolean,
+  ) => Effect.Effect<Record<string, string>, StorageReadFailure>;
+  reset: (
+    appId: string,
+    key: string,
+    schema?: SettingsCategory[],
+  ) => Effect.Effect<
+    undefined,
+    StorageWriteFailure | SettingValueError | SettingDefaultMissingError
+  >;
+  canRead: (ownerAppId: string, key: string, readerAppId: string) => boolean;
+  assertReadableBy: (
+    ownerAppId: string,
+    key: string,
+    readerAppId: string,
+  ) => void;
+  resolveGrantKey: (appId: string, settingKey: string) => string;
+  assertAccess: (appId: string, key: string) => void;
+  filterAllowedKeys: (appId: string, keys: string[]) => string[];
+  filterSchemaByGrants: (categories: SettingsCategory[]) => SettingsCategory[];
+  changed: Event<{ appId: string; key: string; value: string }>;
 }
 
-export function createSettings({
-  storage,
-  catalog,
-  authorization,
-}: SettingsDependencies) {
-  return Effect.gen(function* () {
-    const connection = yield* storage.open;
+export const Settings = Context.Service<"eden/Settings", Settings>(
+  "eden/Settings",
+);
+
+export const SettingsLive = Layer.effect(
+  Settings,
+  Effect.gen(function* () {
+    const connection = yield* SettingsStorage;
+    const catalog = yield* SettingsCatalog;
+    const authorization = yield* SettingsAuthorization;
     const changed = yield* scopedEvent<{
       appId: string;
       key: string;
@@ -63,14 +117,14 @@ export function createSettings({
       appId: string,
       key: string,
       value: string,
-    ): Effect.Effect<void, Error> {
+    ): Effect.Effect<void, StorageWriteFailure | SettingValueError> {
       // Persistence cannot be aborted once SQLite has accepted the write.
       // Publish the completed write before honoring interruption.
       return Effect.uninterruptible(
         Effect.gen(function* () {
           if (typeof value !== "string")
             return yield* Effect.fail(
-              new Error(`Value must be a string, got ${typeof value}`),
+              new SettingValueError({ appId, key, valueType: typeof value }),
             );
           yield* connection.write(`${appId}:${key}`, value);
           changed.emit({ appId, key, value });
@@ -128,9 +182,7 @@ export function createSettings({
           .find((candidate) => candidate.key === key);
         if (setting?.defaultValue === undefined)
           return yield* Effect.fail(
-            new Error(
-              `Cannot reset key "${key}": no default value found in schema`,
-            ),
+            new SettingDefaultMissingError({ appId, key }),
           );
         yield* set(appId, key, setting.defaultValue);
       });
@@ -156,11 +208,19 @@ export function createSettings({
     ): void {
       if (ownerAppId === readerAppId) return;
       if (!getSettingDefinition(ownerAppId, key))
-        throw new Error(
-          `Setting "${key}" does not exist for app "${ownerAppId}"`,
-        );
+        throw new SettingAccessError({
+          appId: ownerAppId,
+          key,
+          readerAppId,
+          reason: "missing",
+        });
       if (!canRead(ownerAppId, key, readerAppId))
-        throw new Error("Caller is not allowed to read this setting");
+        throw new SettingAccessError({
+          appId: ownerAppId,
+          key,
+          readerAppId,
+          reason: "reader",
+        });
       assertAccess(ownerAppId, key);
     }
 
@@ -176,7 +236,7 @@ export function createSettings({
 
     function assertAccess(appId: string, key: string): void {
       if (!canAccessSetting(appId, resolveGrantKey(appId, key)))
-        throw new Error("User does not have grant to access this setting");
+        throw new SettingAccessError({ appId, key, reason: "grant" });
     }
 
     function filterAllowedKeys(appId: string, keys: string[]): string[] {
@@ -220,7 +280,5 @@ export function createSettings({
       filterSchemaByGrants,
       changed,
     };
-  });
-}
-
-export type Settings = Effect.Success<ReturnType<typeof createSettings>>;
+  }),
+);

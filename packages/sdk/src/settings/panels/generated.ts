@@ -9,13 +9,13 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import type { Settings } from "../service";
 import {
   cloneAndValidatePanelView,
   cloneRendererValue,
   type InternalPanelDefinition,
-} from "./panel-codec";
-import type { InternalSettingsPanelProvider } from "./panel-record";
-import type { Settings } from "./service";
+} from "./codec";
+import type { InternalSettingsPanelProvider } from "./types";
 
 export interface GeneratedPanelOwner {
   id: string;

@@ -5,8 +5,8 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import { wallpaperConfigSchema } from "../../appearance/schemas";
-import { cloneRendererValue } from "../panel-codec";
+import { wallpaperConfigSchema } from "../../../appearance/schemas";
+import { cloneRendererValue } from "../codec";
 import type { BuiltinPanelModule } from "./types";
 
 export const appearanceSettingsCategory = {

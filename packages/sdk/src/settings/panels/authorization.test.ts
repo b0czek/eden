@@ -1,17 +1,16 @@
-import * as Effect from "effect/Effect";
 import {
   panelDefinition,
   panelUser,
-} from "../../tests/support/settings/panels";
-import { fromPromise } from "../effects/io";
+} from "../../../tests/support/settings/panels";
+import { fromPromise } from "../../effects/io";
 import {
   actionAuthorization,
   applyActionAuthorization,
   canOpenPanel,
   collectPanelGrantOptions,
   hasUserGrant,
-} from "./panel-authorization";
-import type { SettingsPanelRecord } from "./panel-record";
+} from "./authorization";
+import type { SettingsPanelRecord } from "./types";
 
 const record = (
   overrides: Partial<SettingsPanelRecord> = {},

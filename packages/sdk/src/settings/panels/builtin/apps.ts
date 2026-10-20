@@ -4,8 +4,8 @@ import type {
   SettingsPanelValue,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { EDEN_SETTINGS_APP_ID } from "../constants";
-import { cloneRendererValue } from "../panel-codec";
+import { EDEN_SETTINGS_APP_ID } from "../../constants";
+import { cloneRendererValue } from "../codec";
 import type { BuiltinPanelModule, BuiltinSettingsDependencies } from "./types";
 
 export const appsSettingsCategory = {

@@ -4,7 +4,7 @@ import { listen } from "../events/scoped";
 import type { Packages } from "../packages/service";
 import type { Sessions } from "../session/service";
 import type { GrantCatalog } from "../user/grant-catalog";
-import type { SettingsPanels } from "./panel-service";
+import type { SettingsPanels } from "./panels/service";
 export const connectSettingsLifecycle = Effect.fn(function* (
   panels: SettingsPanels,
   sessions: Sessions,

@@ -6,9 +6,9 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import { authorizeDaemonDefinition } from "../../daemon/authorization";
-import { daemonDefinitionSchema } from "../../daemon/schemas";
-import { cloneRendererValue } from "../panel-codec";
+import { authorizeDaemonDefinition } from "../../../daemon/authorization";
+import { daemonDefinitionSchema } from "../../../daemon/schemas";
+import { cloneRendererValue } from "../codec";
 import type { BuiltinPanelModule } from "./types";
 
 export const daemonsSettingsCategory = {

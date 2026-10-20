@@ -1,7 +1,7 @@
 import type { SettingsPanelActionInvocation } from "@edenapp/types";
 import * as v from "valibot";
-import { command, defineController } from "../controllers/controller";
-import type { SettingsPanels } from "./panel-service";
+import { command, defineController } from "../../controllers/controller";
+import type { SettingsPanels } from "./service";
 export function createSettingsPanelsController(panels: SettingsPanels) {
   return defineController("settings", {
     commands: {

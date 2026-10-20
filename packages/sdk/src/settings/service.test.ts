@@ -1,7 +1,16 @@
 import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import { createSettings } from "./service";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { SettingAccessError } from "./errors";
+import {
+  SettingsAuthorization,
+  SettingsCatalog,
+  SettingsStorage,
+} from "./ports";
+import { Settings, SettingsLive } from "./service";
 
 const ownerSettings: SettingsCategory[] = [
   {
@@ -26,9 +35,10 @@ async function acquireSettings(
   values = new Map<string, unknown>(),
 ) {
   return runtime.acquire(
-    createSettings({
-      storage: {
-        open: Effect.succeed({
+    buildService(Settings, SettingsLive).pipe(
+      Effect.provideServiceEffect(
+        SettingsStorage,
+        Effect.succeed({
           read: (key) => Effect.sync(() => values.get(key)),
           readMany: (keys) =>
             Effect.sync(() => keys.map((key) => values.get(key))),
@@ -42,15 +52,15 @@ async function acquireSettings(
             }),
           keys: () => Effect.sync(() => [...values.keys()]),
         }),
-      },
-      catalog: {
+      ),
+      Effect.provideService(SettingsCatalog, {
         getAppSettings: (appId) =>
           appId === "app.owner" ? ownerSettings : undefined,
-      },
-      authorization: {
+      }),
+      Effect.provideService(SettingsAuthorization, {
         hasGrant: typeof grants === "function" ? grants : () => grants,
-      },
-    }),
+      }),
+    ),
   );
 }
 
@@ -70,14 +80,55 @@ describe("settings shared reads", () => {
     const settings = await acquireSettings(runtime);
     expect(() =>
       settings.assertReadableBy("app.owner", "private", "app.reader"),
-    ).toThrow("not allowed");
+    ).toThrow(
+      new SettingAccessError({
+        appId: "app.owner",
+        key: "private",
+        readerAppId: "app.reader",
+        reason: "reader",
+      }),
+    );
     expect(() =>
       settings.assertReadableBy("app.owner", "missing", "app.reader"),
-    ).toThrow("does not exist");
+    ).toThrow(
+      new SettingAccessError({
+        appId: "app.owner",
+        key: "missing",
+        readerAppId: "app.reader",
+        reason: "missing",
+      }),
+    );
     const restricted = await acquireSettings(runtime, false);
     expect(() =>
       restricted.assertReadableBy("app.owner", "shared", "app.reader"),
     ).toThrow("User does not have grant");
+  });
+
+  it("rejects reset without a default without changing the stored value", async () => {
+    const settings = await acquireSettings(
+      runtime,
+      true,
+      new Map([["app.owner:private", "preserved"]]),
+    );
+    const changes: string[] = [];
+    settings.changed.on(({ value }) => {
+      changes.push(value);
+    });
+    const result = await runtime.run(
+      Effect.result(settings.reset("app.owner", "private", ownerSettings)),
+    );
+    expect(result).toMatchObject({
+      _tag: "Failure",
+      failure: {
+        _tag: "SettingDefaultMissingError",
+        appId: "app.owner",
+        key: "private",
+      },
+    });
+    await expect(
+      runtime.run(settings.get("app.owner", "private")),
+    ).resolves.toBe("preserved");
+    expect(changes).toEqual([]);
   });
 
   it("returns a declared default when no app value is stored", async () => {

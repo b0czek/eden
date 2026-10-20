@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect";
 import {
   panelDefinition as definition,
   panelUser as user,
-} from "../../tests/support/settings/panels";
-import { createSettingsPanelHarness as harness } from "../../tests/support/settings/SettingsPanelTestHarness";
-import { fromPromise } from "../effects/io";
+} from "../../../tests/support/settings/panels";
+import { createSettingsPanelHarness as harness } from "../../../tests/support/settings/SettingsPanelTestHarness";
+import { fromPromise } from "../../effects/io";
 
 const emptyProvider = () => ({
   load: () => fromPromise(async () => ({ sections: [] })),

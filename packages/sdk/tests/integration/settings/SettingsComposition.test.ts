@@ -2,21 +2,33 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { createAppearance } from "../../../src/appearance/service";
+import type * as Scope from "effect/Scope";
+import { AppearanceSettings } from "../../../src/appearance/ports";
+import { Appearance, AppearanceLive } from "../../../src/appearance/service";
 import { createAppearanceSettings } from "../../../src/appearance/settings-adapter";
-import { createI18n } from "../../../src/i18n/service";
+import { I18n, I18nLive, I18nSettings } from "../../../src/i18n/service";
 import { createI18nSettings } from "../../../src/i18n/settings";
-import type { SettingsStorage } from "../../../src/settings/ports";
-import { createSettings } from "../../../src/settings/service";
-import { createSqliteSettingsStorage } from "../../../src/settings/sqlite-storage";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import { AppsDirectory } from "../../../src/runtime/inputs";
+import {
+  SettingsAuthorization,
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/settings/ports";
+import { Settings, SettingsLive } from "../../../src/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
 
-function settingsFactory(storage: SettingsStorage) {
-  return createSettings({
-    storage,
-    catalog: { getAppSettings: () => undefined },
-    authorization: { hasGrant: () => true },
-  });
+function settingsFactory(
+  storage: Effect.Effect<SettingsStorage, Error, Scope.Scope>,
+) {
+  return buildService(Settings, SettingsLive).pipe(
+    Effect.provideServiceEffect(SettingsStorage, storage),
+    Effect.provideService(SettingsCatalog, { getAppSettings: () => undefined }),
+    Effect.provideService(SettingsAuthorization, { hasGrant: () => true }),
+  );
 }
 
 it("keeps a missing first SQLite value aligned with its default in bulk reads", async () => {
@@ -26,15 +38,22 @@ it("keeps a missing first SQLite value aligned with its default in bulk reads", 
   const effects = createEffectRuntime();
   try {
     const settings = await effects.acquire(
-      createSettings({
-        storage: createSqliteSettingsStorage({ appsDirectory }),
-        catalog: { getAppSettings: () => undefined },
-        authorization: {
+      buildService(Settings, SettingsLive).pipe(
+        Effect.provideServiceEffect(
+          SettingsStorage,
+          buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+            Effect.provideService(AppsDirectory, appsDirectory),
+          ),
+        ),
+        Effect.provideService(SettingsCatalog, {
+          getAppSettings: () => undefined,
+        }),
+        Effect.provideService(SettingsAuthorization, {
           hasGrant: (grant) =>
             grant === "settings/com.eden/general.locale" ||
             grant === "settings/com.eden/general.interfaceScale",
-        },
-      }),
+        }),
+      ),
     );
     await effects.run(
       settings.set("com.eden", "general.interfaceScale", "1.5"),
@@ -57,13 +76,24 @@ it("composes persisted settings with locale notifications and appearance state a
   const second = createEffectRuntime();
   try {
     const settings = await first.acquire(
-      settingsFactory(createSqliteSettingsStorage({ appsDirectory })),
+      settingsFactory(
+        buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+          Effect.provideService(AppsDirectory, appsDirectory),
+        ),
+      ),
     );
     const i18n = await first.acquire(
-      createI18n({ settings: createI18nSettings(settings) }),
+      buildService(I18n, I18nLive).pipe(
+        Effect.provideService(I18nSettings, createI18nSettings(settings)),
+      ),
     );
     const appearance = await first.acquire(
-      createAppearance({ settings: createAppearanceSettings(settings) }),
+      buildService(Appearance, AppearanceLive).pipe(
+        Effect.provideService(
+          AppearanceSettings,
+          createAppearanceSettings(settings),
+        ),
+      ),
     );
     await first.run(appearance.initialize());
     expect(await first.run(i18n.getLocale())).toBe("en");
@@ -95,13 +125,24 @@ it("composes persisted settings with locale notifications and appearance state a
     expect(appearance.wallpaperChanged.hasListeners()).toBe(false);
 
     const reopened = await second.acquire(
-      settingsFactory(createSqliteSettingsStorage({ appsDirectory })),
+      settingsFactory(
+        buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+          Effect.provideService(AppsDirectory, appsDirectory),
+        ),
+      ),
     );
     const nextI18n = await second.acquire(
-      createI18n({ settings: createI18nSettings(reopened) }),
+      buildService(I18n, I18nLive).pipe(
+        Effect.provideService(I18nSettings, createI18nSettings(reopened)),
+      ),
     );
     const nextAppearance = await second.acquire(
-      createAppearance({ settings: createAppearanceSettings(reopened) }),
+      buildService(Appearance, AppearanceLive).pipe(
+        Effect.provideService(
+          AppearanceSettings,
+          createAppearanceSettings(reopened),
+        ),
+      ),
     );
     await second.run(nextAppearance.initialize());
     expect(await second.run(nextI18n.getLocale())).toBe("pl");
@@ -129,9 +170,11 @@ it("finishes a pending appearance commit and its notifications before closing se
   const started = new Promise<void>((resolve) => {
     writeStarted = resolve;
   });
-  const sqlite = createSqliteSettingsStorage({ appsDirectory });
-  const delayed: SettingsStorage = {
-    open: Effect.map(sqlite.open, (connection) => ({
+  const sqlite = buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
+    Effect.provideService(AppsDirectory, appsDirectory),
+  );
+  const delayed: Effect.Effect<SettingsStorage, Error, Scope.Scope> =
+    Effect.map(sqlite, (connection) => ({
       ...connection,
       write: (key, value) =>
         Effect.gen(function* () {
@@ -139,12 +182,16 @@ it("finishes a pending appearance commit and its notifications before closing se
           yield* Effect.promise(() => pending);
           yield* connection.write(key, value);
         }),
-    })),
-  };
+    }));
   try {
     const settings = await first.acquire(settingsFactory(delayed));
     const appearance = await first.acquire(
-      createAppearance({ settings: createAppearanceSettings(settings) }),
+      buildService(Appearance, AppearanceLive).pipe(
+        Effect.provideService(
+          AppearanceSettings,
+          createAppearanceSettings(settings),
+        ),
+      ),
     );
     const commits: string[] = [];
     settings.changed.on(({ key }) => {
@@ -165,7 +212,12 @@ it("finishes a pending appearance commit and its notifications before closing se
     expect(commits).toEqual(["appearance.wallpaper", "aurora"]);
     const reopened = await second.acquire(settingsFactory(sqlite));
     const nextAppearance = await second.acquire(
-      createAppearance({ settings: createAppearanceSettings(reopened) }),
+      buildService(Appearance, AppearanceLive).pipe(
+        Effect.provideService(
+          AppearanceSettings,
+          createAppearanceSettings(reopened),
+        ),
+      ),
     );
     await second.run(nextAppearance.initialize());
     expect((await second.run(nextAppearance.getWallpaper())).id).toBe("aurora");

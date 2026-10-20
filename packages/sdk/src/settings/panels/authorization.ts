@@ -5,10 +5,10 @@ import type {
   UserGrantOption,
   UserProfile,
 } from "@edenapp/types";
-import { matchesGrants } from "../user/grants";
-import { settingGrant } from "./generated-panel";
-import { cloneRendererValue } from "./panel-codec";
-import type { SettingsPanelRecord } from "./panel-record";
+import { matchesGrants } from "../../user/grants";
+import { cloneRendererValue } from "./codec";
+import { settingGrant } from "./generated";
+import type { SettingsPanelRecord } from "./types";
 
 export const hasUserGrant = (user: UserProfile, grant: string): boolean =>
   user.role === "vendor" || matchesGrants(user.grants, grant);

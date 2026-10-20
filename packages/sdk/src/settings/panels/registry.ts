@@ -4,17 +4,16 @@ import type {
   SettingsPanelRegistration,
   SettingsPanelRegistrationOptions,
 } from "@edenapp/types";
-import { createEvent } from "../events/event";
-import {
-  cloneRendererValue,
-  type InternalPanelDefinition,
-} from "./panel-codec";
+import * as Context from "effect/Context";
+import { createEvent, type Event } from "../../events/event";
+import { cloneRendererValue, type InternalPanelDefinition } from "./codec";
+import { SettingsPanelRegistrationError } from "./errors";
 import type {
   InternalSettingsPanelProvider,
   PanelRenderer,
   PanelSource,
   SettingsPanelRecord,
-} from "./panel-record";
+} from "./types";
 
 export interface SettingsPanelEvents {
   "panels-changed": {
@@ -23,9 +22,33 @@ export interface SettingsPanelEvents {
     panelId?: string;
   };
 }
+export interface PanelRegistry {
+  panels: Map<string, SettingsPanelRecord>;
+  changed: Event<SettingsPanelEvents["panels-changed"]>;
+  register(
+    definition: InternalPanelDefinition,
+    provider: InternalSettingsPanelProvider,
+    source: PanelSource,
+    renderer: PanelRenderer,
+    ownerAppId?: string,
+    generatedSettings?: SettingsCategory[],
+    visible?: boolean,
+  ): SettingsPanelRegistration;
+  registerPanel(
+    definition: SettingsPanelDefinition,
+    provider: InternalSettingsPanelProvider,
+    options?: SettingsPanelRegistrationOptions,
+  ): SettingsPanelRegistration;
+  dispose(): void;
+}
+
+export const PanelRegistryService = Context.Service<
+  "eden/PanelRegistryService",
+  PanelRegistry
+>("eden/PanelRegistryService");
 
 /** Synchronous host registrations have a lifetime independent of service startup. */
-export function createPanelRegistry() {
+export function createPanelRegistry(): PanelRegistry {
   const changed = createEvent<SettingsPanelEvents["panels-changed"]>();
   const panels = new Map<string, SettingsPanelRecord>();
   let disposed = false;
@@ -35,9 +58,10 @@ export function createPanelRegistry() {
     options: SettingsPanelRegistrationOptions = {},
   ): SettingsPanelRegistration {
     if (definition.id.startsWith("eden.") || definition.id.startsWith("app.")) {
-      throw new Error(
-        `Panel ID "${definition.id}" uses an Eden-reserved prefix`,
-      );
+      throw new SettingsPanelRegistrationError({
+        panelId: definition.id,
+        message: `Panel ID "${definition.id}" uses an Eden-reserved prefix`,
+      });
     }
     return register(
       definition,
@@ -58,18 +82,29 @@ export function createPanelRegistry() {
     generatedSettings?: SettingsCategory[],
     visible = true,
   ): SettingsPanelRegistration {
-    if (disposed) throw new Error("Settings panel registrations are closed");
+    if (disposed)
+      throw new SettingsPanelRegistrationError({
+        panelId: definition.id,
+        message: "Settings panel registrations are closed",
+      });
     const cloned = cloneRendererValue(definition);
     if (panels.has(cloned.id)) {
-      throw new Error(`Settings panel "${cloned.id}" is already registered`);
+      throw new SettingsPanelRegistrationError({
+        panelId: definition.id,
+        message: `Settings panel "${cloned.id}" is already registered`,
+      });
     }
     if (cloned.parentId === cloned.id) {
-      throw new Error(`Settings panel "${cloned.id}" cannot be its own parent`);
+      throw new SettingsPanelRegistrationError({
+        panelId: definition.id,
+        message: `Settings panel "${cloned.id}" cannot be its own parent`,
+      });
     }
     if (cloned.parentId && !panels.has(cloned.parentId)) {
-      throw new Error(
-        `Parent settings panel "${cloned.parentId}" must be registered first`,
-      );
+      throw new SettingsPanelRegistrationError({
+        panelId: definition.id,
+        message: `Parent settings panel "${cloned.parentId}" must be registered first`,
+      });
     }
     if (cloned.parentId) {
       const parent = panels.get(cloned.parentId);
@@ -81,9 +116,10 @@ export function createPanelRegistry() {
             parent.source === "application" &&
             ownerAppId === parent.ownerAppId));
       if (!sameDomain)
-        throw new Error(
-          `Settings panel "${cloned.id}" must share its parent's ownership domain`,
-        );
+        throw new SettingsPanelRegistrationError({
+          panelId: definition.id,
+          message: `Settings panel "${cloned.id}" must share its parent's ownership domain`,
+        });
     }
     const trustedProvider: InternalSettingsPanelProvider = Object.freeze({
       load: provider.load.bind(provider),
@@ -121,9 +157,10 @@ export function createPanelRegistry() {
         (record) => record.definition.parentId === cloned.id,
       );
       if (child) {
-        throw new Error(
-          `Settings panel "${cloned.id}" cannot be unregistered while child panel "${child.definition.id}" remains registered`,
-        );
+        throw new SettingsPanelRegistrationError({
+          panelId: definition.id,
+          message: `Settings panel "${cloned.id}" cannot be unregistered while child panel "${child.definition.id}" remains registered`,
+        });
       }
       active = false;
       panels.delete(cloned.id);
@@ -133,11 +170,17 @@ export function createPanelRegistry() {
       panelId: cloned.id,
       invalidate: () => {
         if (!active) {
-          throw new Error(`Settings panel "${cloned.id}" is unregistered`);
+          throw new SettingsPanelRegistrationError({
+            panelId: definition.id,
+            message: `Settings panel "${cloned.id}" is unregistered`,
+          });
         }
         const record = panels.get(cloned.id);
         if (!record || record.token !== token) {
-          throw new Error(`Settings panel "${cloned.id}" is stale`);
+          throw new SettingsPanelRegistrationError({
+            panelId: definition.id,
+            message: `Settings panel "${cloned.id}" is stale`,
+          });
         }
         changed.emit({
           reason: "state",
@@ -146,11 +189,17 @@ export function createPanelRegistry() {
       },
       setVisible: (nextVisible: boolean) => {
         if (!active) {
-          throw new Error(`Settings panel "${cloned.id}" is unregistered`);
+          throw new SettingsPanelRegistrationError({
+            panelId: definition.id,
+            message: `Settings panel "${cloned.id}" is unregistered`,
+          });
         }
         const record = panels.get(cloned.id);
         if (!record || record.token !== token) {
-          throw new Error(`Settings panel "${cloned.id}" is stale`);
+          throw new SettingsPanelRegistrationError({
+            panelId: definition.id,
+            message: `Settings panel "${cloned.id}" is stale`,
+          });
         }
         if (record.visible === nextVisible) return;
         record.visible = nextVisible;
@@ -171,4 +220,3 @@ export function createPanelRegistry() {
     },
   };
 }
-export type PanelRegistry = ReturnType<typeof createPanelRegistry>;
