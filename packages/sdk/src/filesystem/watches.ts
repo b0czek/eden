@@ -10,6 +10,8 @@ import type { Event } from "../events/event";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
 
+import { FilesystemIoFailed, FilesystemWatchRejected } from "./errors";
+
 interface DirectoryWatch {
   watcher: FSWatcher;
   watchIds: Set<string>;
@@ -49,9 +51,19 @@ export const createFilesystemWatches = Effect.fn(function* (
     let directoryWatch = directoryWatches.get(hostPath);
     if (!directoryWatch) {
       const watchIds = new Set<string>();
-      const watcher = watchNative(hostPath, { persistent: false }, () => {
-        scheduleChange(hostPath, "change");
-      });
+      let watcher: FSWatcher;
+      try {
+        watcher = watchNative(hostPath, { persistent: false }, () => {
+          scheduleChange(hostPath, "change");
+        });
+      } catch (cause) {
+        throw new FilesystemIoFailed({
+          operation: "watch",
+          path: hostPath,
+          cause,
+          message: `Cannot watch filesystem path '${hostPath}'`,
+        });
+      }
       directoryWatch = { watcher, watchIds };
       watcher.on("error", (error) => {
         log.warn(`Filesystem watch failed for ${hostPath}:`, error);
@@ -73,7 +85,10 @@ export const createFilesystemWatches = Effect.fn(function* (
     const viewId = resolveCallerView(callerWebContentsId);
     const ownedWatch = viewWatches.get(watchId);
     if (!ownedWatch || ownedWatch.viewId !== viewId) {
-      throw new Error("Filesystem watch is not owned by the calling view");
+      throw new FilesystemWatchRejected({
+        watchId,
+        message: "Filesystem watch is not owned by the calling view",
+      });
     }
     removeWatch(watchId);
   }
@@ -100,10 +115,15 @@ export const createFilesystemWatches = Effect.fn(function* (
 
   function resolveCallerView(callerWebContentsId: number | undefined): number {
     if (callerWebContentsId === undefined) {
-      throw new Error("Filesystem watches are only available to app views");
+      throw new FilesystemWatchRejected({
+        message: "Filesystem watches are only available to app views",
+      });
     }
     const viewId = options.resolveViewId(callerWebContentsId);
-    if (viewId === undefined) throw new Error("Calling view was not found");
+    if (viewId === undefined)
+      throw new FilesystemWatchRejected({
+        message: "Calling view was not found",
+      });
     return viewId;
   }
 

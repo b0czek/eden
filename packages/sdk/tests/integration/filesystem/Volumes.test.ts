@@ -303,7 +303,10 @@ describe("consumer-managed filesystem volumes", () => {
           rootPath: usbRoot,
         }),
       ),
-    ).rejects.toThrow("already registered");
+    ).rejects.toMatchObject({
+      _tag: "VolumeRegistrationRejected",
+      volume: "usb",
+    });
     const missingRoot = path.join(eden.paths.root, "missing-mount");
     await expect(
       eden.runtime.effects.run(
@@ -314,7 +317,13 @@ describe("consumer-managed filesystem volumes", () => {
           rootPath: missingRoot,
         }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      _tag: "VolumeIoFailed",
+      volume: "missing",
+      operation: "register",
+      path: missingRoot,
+      cause: expect.objectContaining({ code: "ENOENT" }),
+    });
     await expect(fs.stat(missingRoot)).rejects.toMatchObject({
       code: "ENOENT",
     });

@@ -11,16 +11,23 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Latch from "effect/Latch";
 import * as Scope from "effect/Scope";
-import { asError, fromPromise } from "../effects/io";
+import { fromPromise } from "../effects/io";
 import type {
   EffectivePrincipal,
   ExecutionContext,
 } from "../execution/context";
 
+import {
+  type FilesystemFileError,
+  FilesystemHandleRejected,
+  FilesystemIoFailed,
+  handleRejection,
+} from "./errors";
+
 export interface OpenedFilesystemFile {
   use<A, E>(
     operation: (file: FileHandle) => Effect.Effect<A, E>,
-  ): Effect.Effect<A, E | Error>;
+  ): Effect.Effect<A, E | FilesystemFileError>;
 }
 
 interface HandleOwner {
@@ -35,7 +42,7 @@ interface HandleEntry {
   owner?: HandleOwner;
   retained: boolean;
   scope: Scope.Closeable;
-  opened: Deferred.Deferred<OpenedFilesystemFile, Error>;
+  opened: Deferred.Deferred<OpenedFilesystemFile, FilesystemFileError>;
   closed: Deferred.Deferred<void>;
   idle: Latch.Latch;
   active: number;
@@ -49,7 +56,7 @@ export const createFileHandles = Effect.fn(function* (
     location: FilesystemLocation,
     mode: FilesystemOpenMode,
     retained: boolean,
-  ) => Effect.Effect<OpenedFilesystemFile, Error, Scope.Scope>,
+  ) => Effect.Effect<OpenedFilesystemFile, FilesystemFileError, Scope.Scope>,
 ) {
   const handles = new Map<string, HandleEntry>();
   let retained = 0;
@@ -57,9 +64,14 @@ export const createFileHandles = Effect.fn(function* (
 
   // Include opening and closing handles until their scopes have actually closed.
   function admit(owner?: HandleOwner): [string, HandleEntry] {
-    if (disposed) throw new Error("Filesystem handles are closed");
+    if (disposed)
+      throw new FilesystemHandleRejected({
+        message: "Filesystem handles are closed",
+      });
     if (owner && retained >= 1024)
-      throw new Error("Too many open filesystem handles");
+      throw new FilesystemHandleRejected({
+        message: "Too many open filesystem handles",
+      });
     const id = randomUUID();
     const entry: HandleEntry = {
       owner,
@@ -85,12 +97,12 @@ export const createFileHandles = Effect.fn(function* (
   const open = Effect.fn(function* (
     location: FilesystemLocation,
     mode: FilesystemOpenMode = "read",
-  ): Effect.fn.Return<FilesystemHandle, Error> {
+  ): Effect.fn.Return<FilesystemHandle, FilesystemFileError> {
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         const [id, entry] = yield* Effect.try({
           try: () => admit(requireCaller()),
-          catch: asError,
+          catch: handleRejection,
         });
         return yield* restore(
           Deferred.into(
@@ -100,7 +112,11 @@ export const createFileHandles = Effect.fn(function* (
             Effect.andThen(Deferred.await(entry.opened)),
             Effect.flatMap(() =>
               entry.closing
-                ? Effect.fail(new Error("Filesystem handle owner has closed"))
+                ? Effect.fail(
+                    new FilesystemHandleRejected({
+                      message: "Filesystem handle owner has closed",
+                    }),
+                  )
                 : Effect.succeed({ handleId: id }),
             ),
           ),
@@ -117,13 +133,13 @@ export const createFileHandles = Effect.fn(function* (
   function use<A, E>(
     source: FilesystemSource,
     operation: (file: FileHandle) => Effect.Effect<A, E>,
-  ): Effect.Effect<A, E | Error> {
+  ): Effect.Effect<A, E | FilesystemFileError> {
     return Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         if (!("handleId" in source)) {
           const [id, entry] = yield* Effect.try({
             try: () => admit(),
-            catch: asError,
+            catch: handleRejection,
           });
           return yield* restore(
             Scope.provide(
@@ -140,13 +156,16 @@ export const createFileHandles = Effect.fn(function* (
         }
         const entry = yield* Effect.try({
           try: () => {
-            if (disposed) throw new Error("Filesystem handles are closed");
+            if (disposed)
+              throw new FilesystemHandleRejected({
+                message: "Filesystem handles are closed",
+              });
             const entry = requireHandle(source);
             entry.active++;
             entry.idle.closeUnsafe();
             return entry;
           },
-          catch: asError,
+          catch: handleRejection,
         });
         return yield* restore(
           Effect.flatMap(Deferred.await(entry.opened), (opened) =>
@@ -159,7 +178,7 @@ export const createFileHandles = Effect.fn(function* (
 
   const close = (handle: FilesystemHandle) =>
     Effect.flatMap(
-      Effect.try({ try: () => requireHandle(handle), catch: asError }),
+      Effect.try({ try: () => requireHandle(handle), catch: handleRejection }),
       (entry) => closeEntry(handle.handleId, entry),
     );
 
@@ -229,7 +248,9 @@ export const createFileHandles = Effect.fn(function* (
   function requireCaller(): HandleOwner {
     const caller = execution.get();
     if (!caller?.appId || !caller.principal)
-      throw new Error("Caller has no filesystem app authority");
+      throw new FilesystemHandleRejected({
+        message: "Caller has no filesystem app authority",
+      });
     return {
       appId: caller.appId,
       sessionId: caller.sessionId,
@@ -254,7 +275,10 @@ export const createFileHandles = Effect.fn(function* (
       caller.principalKind !== owner.principalKind ||
       caller.username !== owner.username
     )
-      throw new Error("Filesystem handle is unavailable to this caller");
+      throw new FilesystemHandleRejected({
+        handleId: handle.handleId,
+        message: "Filesystem handle is unavailable to this caller",
+      });
     return entry;
   }
   yield* Effect.addFinalizer(dispose);
@@ -267,8 +291,15 @@ export const readOpenedFile = Effect.fn(function* (file: FileHandle) {
   let position = 0;
   while (true) {
     const buffer = Buffer.allocUnsafe(64 * 1024);
-    const { bytesRead } = yield* fromPromise(() =>
-      file.read(buffer, 0, buffer.length, position),
+    const { bytesRead } = yield* fromPromise(
+      () => file.read(buffer, 0, buffer.length, position),
+      (cause) =>
+        new FilesystemIoFailed({
+          operation: "read",
+          descriptor: file.fd,
+          cause,
+          message: `Filesystem read failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+        }),
     );
     if (bytesRead === 0) return Buffer.concat(chunks, position);
     chunks.push(buffer.subarray(0, bytesRead));

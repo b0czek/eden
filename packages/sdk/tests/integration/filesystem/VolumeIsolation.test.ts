@@ -2,9 +2,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { createVolumes } from "../../../src/filesystem/volumes";
+import { Volumes, VolumesLive } from "../../../src/filesystem/volumes";
 import type { OperationTask } from "../../../src/operations/task";
 import {
+  buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../support/effect-runtime";
@@ -24,8 +25,8 @@ it("keeps admitted volume access independent when two runtimes use the same volu
     path.join(os.tmpdir(), "eden-volume-isolation-"),
   );
   try {
-    const a = await first.acquire(createVolumes());
-    const b = await second.acquire(createVolumes());
+    const a = await first.acquire(buildService(Volumes, VolumesLive));
+    const b = await second.acquire(buildService(Volumes, VolumesLive));
     const input = {
       id: "usb",
       label: "USB",

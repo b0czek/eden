@@ -7,9 +7,19 @@ import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import { asError, fromPromise } from "../effects/io";
+import * as Result from "effect/Result";
+import { fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/task";
+import {
+  FilesystemAccessDenied,
+  FilesystemIoFailed,
+  type FilesystemPathError,
+  type FilesystemTransferError,
+  FilesystemTransferIncomplete,
+  FilesystemTransferRejected,
+  VolumeIoFailed,
+  VolumeUnavailable,
+} from "./errors";
 
 interface TransferRequest {
   source: string;
@@ -37,8 +47,17 @@ interface PathReservation {
 
 export function createFileTransfers() {
   const reservations = new Set<PathReservation>();
-  const io = <A>(run: () => Promise<A>) =>
-    fromPromise(run).pipe(Effect.uninterruptible);
+  const nativeError = (operation: string, cause: unknown) =>
+    new FilesystemIoFailed({
+      operation,
+      path: (cause as NodeJS.ErrnoException)?.path,
+      cause,
+      message: `Filesystem ${operation} failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+    });
+  const io = <A>(operation: string, run: () => Promise<A>) =>
+    fromPromise(run, (cause) => nativeError(operation, cause)).pipe(
+      Effect.uninterruptible,
+    );
 
   const copy = (request: TransferRequest) =>
     withReservedPaths(request, copyReserved(request));
@@ -47,7 +66,7 @@ export function createFileTransfers() {
 
   function withReservedPaths(
     request: TransferRequest,
-    work: Effect.Effect<void, Error>,
+    work: Effect.Effect<void, FilesystemTransferError>,
   ) {
     return Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
@@ -111,7 +130,9 @@ export function createFileTransfers() {
       Effect.gen(function* () {
         yield* assertActive(transfer);
         transfer.reporter?.update("moving");
-        yield* io(() => fs.rename(transfer.source, transfer.destination)).pipe(
+        yield* io("rename", () =>
+          fs.rename(transfer.source, transfer.destination),
+        ).pipe(
           Effect.catch((error) => {
             if ((error as NodeJS.ErrnoException).code !== "EXDEV")
               return Effect.fail(error);
@@ -130,16 +151,19 @@ export function createFileTransfers() {
       yield* Effect.gen(function* () {
         yield* assertActive(transfer);
         transfer.reporter?.update("removing-source");
-        yield* io(() =>
+        yield* io("rm", () =>
           fs.rm(transfer.source, { recursive: true, force: false }),
         );
       }).pipe(
         Effect.mapError(
           (error) =>
-            new Error(
-              "Move copied the destination but could not completely remove the source",
-              { cause: error },
-            ),
+            new FilesystemTransferIncomplete({
+              source: transfer.source,
+              destination: transfer.destination,
+              message:
+                "Move copied the destination but could not completely remove the source",
+              cause: error,
+            }),
         ),
       );
     }
@@ -149,35 +173,51 @@ export function createFileTransfers() {
     request: TransferRequest,
     operation: "copy" | "move",
   ) {
-    const sourceStats = yield* io(() => fs.stat(request.source));
-    const canonicalSource = yield* io(() => fs.realpath(request.source));
+    const sourceStats = yield* io("stat", () => fs.stat(request.source));
+    const canonicalSource = yield* io("realpath", () =>
+      fs.realpath(request.source),
+    );
     const canonicalDestination = yield* resolveCanonicalPath(
       request.destination,
     );
     if (canonicalSource === canonicalDestination)
       return yield* Effect.fail(
-        new Error("Source and destination must be different"),
+        new FilesystemTransferRejected({
+          source: request.source,
+          destination: request.destination,
+          message: "Source and destination must be different",
+        }),
       );
     if (
       sourceStats.isDirectory() &&
       isPathWithin(canonicalSource, canonicalDestination)
     )
       return yield* Effect.fail(
-        new Error(
-          `Cannot ${operation} a directory into itself or a descendant`,
-        ),
+        new FilesystemTransferRejected({
+          source: request.source,
+          destination: request.destination,
+          message: `Cannot ${operation} a directory into itself or a descendant`,
+        }),
       );
     if (isPathWithin(canonicalDestination, canonicalSource))
       return yield* Effect.fail(
-        new Error("Source and destination paths overlap"),
+        new FilesystemTransferRejected({
+          source: request.source,
+          destination: request.destination,
+          message: "Source and destination paths overlap",
+        }),
       );
     const destinationExists = yield* pathExists(request.destination);
     if (destinationExists && !request.overwrite)
       return yield* Effect.fail(
-        new Error(`Destination '${request.destinationLabel}' already exists`),
+        new FilesystemTransferRejected({
+          source: request.source,
+          destination: request.destination,
+          message: `Destination '${request.destinationLabel}' already exists`,
+        }),
       );
     yield* assertActive(request);
-    yield* io(() =>
+    yield* io("mkdir", () =>
       fs.mkdir(path.dirname(request.destination), { recursive: true }),
     );
     return {
@@ -192,7 +232,7 @@ export function createFileTransfers() {
 
   const runWithDestinationRollback = (
     transfer: PreparedTransfer,
-    work: Effect.Effect<void, Error>,
+    work: Effect.Effect<void, FilesystemTransferError>,
   ) =>
     Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
@@ -206,8 +246,11 @@ export function createFileTransfers() {
               transfer.reporter?.update("rolling-back");
               const rollback = [
                 Effect.gen(function* () {
-                  yield* transfer.assertDestinationActive?.() ?? Effect.void;
-                  yield* io(() =>
+                  yield* assertAccessible(
+                    transfer.assertDestinationActive,
+                    transfer.destination,
+                  );
+                  yield* io("rm", () =>
                     fs.rm(transfer.destination, {
                       recursive: true,
                       force: true,
@@ -218,20 +261,35 @@ export function createFileTransfers() {
               if (backup)
                 rollback.push(
                   Effect.gen(function* () {
-                    yield* transfer.assertDestinationActive?.() ?? Effect.void;
-                    yield* io(() => fs.rename(backup, transfer.destination));
+                    yield* assertAccessible(
+                      transfer.assertDestinationActive,
+                      transfer.destination,
+                    );
+                    yield* io("rename", () =>
+                      fs.rename(backup, transfer.destination),
+                    );
                   }),
                 );
               const [, rollbackErrors] = yield* Effect.partition(
                 rollback,
                 (step) => step,
               );
-              if (rollbackErrors.length)
+              if (
+                rollbackErrors.length &&
+                !Cause.hasDies(cause) &&
+                !Cause.hasInterrupts(cause)
+              )
                 return yield* Effect.fail(
-                  new AggregateError(
-                    [Cause.squash(cause), ...rollbackErrors],
-                    "Filesystem transfer failed and rollback was incomplete",
-                  ),
+                  new FilesystemTransferIncomplete({
+                    source: transfer.source,
+                    destination: transfer.destination,
+                    message:
+                      "Filesystem transfer failed and rollback was incomplete",
+                    cause: new AggregateError([
+                      Cause.squash(cause),
+                      ...rollbackErrors,
+                    ]),
+                  }),
                 );
               return yield* Effect.failCause(cause);
             }),
@@ -239,8 +297,13 @@ export function createFileTransfers() {
         );
         if (backup) {
           transfer.reporter?.update("cleaning-up");
-          yield* transfer.assertDestinationActive?.() ?? Effect.void;
-          yield* io(() => fs.rm(backup, { recursive: true, force: true }));
+          yield* assertAccessible(
+            transfer.assertDestinationActive,
+            transfer.destination,
+          );
+          yield* io("rm", () =>
+            fs.rm(backup, { recursive: true, force: true }),
+          );
         }
       }),
     );
@@ -250,21 +313,45 @@ export function createFileTransfers() {
       path.dirname(destination),
       `.${path.basename(destination)}.eden-transfer-${randomUUID()}`,
     );
-    yield* io(() => fs.rename(destination, backup));
+    yield* io("rename", () => fs.rename(destination, backup));
     return backup;
   });
+
+  const assertAccessible = (
+    check: (() => Effect.Effect<void, Error>) | undefined,
+    hostPath: string,
+  ): Effect.Effect<void, FilesystemPathError> =>
+    check
+      ? check().pipe(
+          Effect.mapError((cause) =>
+            cause instanceof VolumeUnavailable ||
+            cause instanceof VolumeIoFailed ||
+            cause instanceof FilesystemAccessDenied ||
+            cause instanceof FilesystemIoFailed
+              ? cause
+              : new FilesystemAccessDenied({
+                  path: hostPath,
+                  cause,
+                  message: cause.message,
+                }),
+          ),
+        )
+      : Effect.void;
 
   const assertActive = Effect.fn(function* (
     transfer: TransferRequest | PreparedTransfer,
   ) {
-    yield* transfer.assertSourceActive?.() ?? Effect.void;
-    yield* transfer.assertDestinationActive?.() ?? Effect.void;
+    yield* assertAccessible(transfer.assertSourceActive, transfer.source);
+    yield* assertAccessible(
+      transfer.assertDestinationActive,
+      transfer.destination,
+    );
   });
 
   const copyEntry = Effect.fn(function* (transfer: PreparedTransfer) {
     const clock = yield* Clock.Clock;
     const { source, destination } = transfer;
-    const sourceStats = yield* io(() => fs.lstat(source));
+    const sourceStats = yield* io("lstat", () => fs.lstat(source));
     const total = sourceStats.isFile() ? sourceStats.size : undefined;
     let completed = 0;
     let lastReport = 0;
@@ -277,68 +364,68 @@ export function createFileTransfers() {
     // fs.cp requires Promise callbacks; keep that conversion at this native edge.
     // @eden-effect-next-line domain-interpreter -- Native fs.cp filters require Promises; fs.cp awaits them before the volume lease releases.
     const runFilter = Effect.runPromiseWith(yield* Effect.context<never>());
-    yield* fromPromise((signal) =>
-      fs.cp(source, destination, {
-        recursive: true,
-        verbatimSymlinks: true,
-        filter: (entrySource, entryDestination) =>
-          runFilter(
-            Effect.gen(function* () {
-              yield* Effect.try({
-                try: () => signal.throwIfAborted(),
-                catch: asError,
-              });
-              yield* assertActive(transfer);
-              if (transfer.reporter) {
-                const stats = yield* io(() => fs.lstat(entrySource));
-                if (stats.isFile()) {
-                  yield* fromPromise(() =>
-                    pipeline(
-                      createReadStream(entrySource, {
-                        highWaterMark: 1024 * 1024,
-                      }),
-                      async function* (chunks) {
-                        for await (const chunk of chunks) {
-                          yield chunk;
-                          completed += chunk.length;
-                          if (
-                            clock.currentTimeMillisUnsafe() - lastReport >=
-                            100
-                          )
-                            report();
-                        }
-                      },
-                      createWriteStream(entryDestination, {
-                        flags: "wx",
-                        mode: stats.mode,
-                      }),
-                      { signal },
-                    ),
-                  );
-                  yield* io(() => fs.chmod(entryDestination, stats.mode));
-                  yield* assertActive(transfer);
-                  yield* Effect.try({
-                    try: () => signal.throwIfAborted(),
-                    catch: asError,
-                  });
-                  if (clock.currentTimeMillisUnsafe() - lastReport >= 100)
-                    report();
-                  return false;
+    yield* fromPromise(
+      (signal) =>
+        fs.cp(source, destination, {
+          recursive: true,
+          verbatimSymlinks: true,
+          filter: (entrySource, entryDestination) =>
+            runFilter(
+              Effect.gen(function* () {
+                yield* Effect.sync(() => signal.throwIfAborted());
+                yield* assertActive(transfer);
+                if (transfer.reporter) {
+                  const stats = yield* io("lstat", () => fs.lstat(entrySource));
+                  if (stats.isFile()) {
+                    yield* fromPromise(
+                      () =>
+                        pipeline(
+                          createReadStream(entrySource, {
+                            highWaterMark: 1024 * 1024,
+                          }),
+                          async function* (chunks) {
+                            for await (const chunk of chunks) {
+                              yield chunk;
+                              completed += chunk.length;
+                              if (
+                                clock.currentTimeMillisUnsafe() - lastReport >=
+                                100
+                              )
+                                report();
+                            }
+                          },
+                          createWriteStream(entryDestination, {
+                            flags: "wx",
+                            mode: stats.mode,
+                          }),
+                          { signal },
+                        ),
+                      (cause) => nativeError("copy", cause),
+                    );
+                    yield* io("chmod", () =>
+                      fs.chmod(entryDestination, stats.mode),
+                    );
+                    yield* assertActive(transfer);
+                    yield* Effect.sync(() => signal.throwIfAborted());
+                    if (clock.currentTimeMillisUnsafe() - lastReport >= 100)
+                      report();
+                    return false;
+                  }
                 }
-              }
-              return true;
-            }),
-          ),
-        errorOnExist: true,
-        force: false,
-      }),
+                return true;
+              }),
+            ),
+          errorOnExist: true,
+          force: false,
+        }),
+      (cause) => nativeError("copy", cause),
     );
     yield* assertActive(transfer);
     report();
   });
 
   const pathExists = (hostPath: string) =>
-    io(() => fs.lstat(hostPath)).pipe(
+    io("lstat", () => fs.lstat(hostPath)).pipe(
       Effect.as(true),
       Effect.catch((error) =>
         (error as NodeJS.ErrnoException).code === "ENOENT"
@@ -351,14 +438,16 @@ export function createFileTransfers() {
     let existingPath = hostPath;
     const missingSegments: string[] = [];
     while (true) {
-      const result = yield* Effect.exit(io(() => fs.realpath(existingPath)));
-      if (Exit.isSuccess(result))
-        return path.resolve(result.value, ...missingSegments);
-      const error = Cause.squash(result.cause);
+      const result = yield* Effect.result(
+        io("realpath", () => fs.realpath(existingPath)),
+      );
+      if (Result.isSuccess(result))
+        return path.resolve(result.success, ...missingSegments);
+      const error = result.failure;
       if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-        return yield* Effect.fail(asError(error));
+        return yield* Effect.fail(error);
       const parent = path.dirname(existingPath);
-      if (parent === existingPath) return yield* Effect.fail(asError(error));
+      if (parent === existingPath) return yield* Effect.fail(error);
       missingSegments.unshift(path.basename(existingPath));
       existingPath = parent;
     }

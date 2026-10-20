@@ -1,7 +1,7 @@
 export { createVolumeController } from "./controller-edenapi";
 export { createFilesystemController } from "./controller-edenapi-files";
 export {
-  createFilesystem,
-  type Filesystem,
+  Filesystem,
+  FilesystemLive,
 } from "./service";
-export { createVolumes, type Volumes } from "./volumes";
+export { Volumes, VolumesLive } from "./volumes";

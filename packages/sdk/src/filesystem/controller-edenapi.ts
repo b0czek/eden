@@ -1,5 +1,6 @@
 import { command, defineController } from "../controllers/controller";
 import type { ExecutionContext } from "../execution/context";
+import { FilesystemAccessDenied } from "./errors";
 import { volumeEjectArgsSchema } from "./volume-schemas";
 import type { Volumes } from "./volumes";
 
@@ -10,7 +11,9 @@ export function createVolumeController(
   function requirePrincipal(): void {
     const principal = execution.getPrincipal();
     if (principal?.kind !== "user" && principal?.kind !== "system")
-      throw new Error("Caller has no volume execution principal");
+      throw new FilesystemAccessDenied({
+        message: "Caller has no volume execution principal",
+      });
   }
   return defineController("volume", {
     commands: {

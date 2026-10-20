@@ -2,14 +2,15 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { createEvent } from "../../../src/events/event";
-import type { ExecutionContext } from "../../../src/execution";
+import { ExecutionContext } from "../../../src/execution/context";
+import { FilesystemViews } from "../../../src/filesystem/ports";
+import { Filesystem, FilesystemLive } from "../../../src/filesystem/service";
+import { Volumes, VolumesLive } from "../../../src/filesystem/volumes";
+import { UserDirectory } from "../../../src/runtime/inputs";
 import {
-  createFilesystem,
-  type Filesystem,
-} from "../../../src/filesystem/service";
-import { createVolumes } from "../../../src/filesystem/volumes";
-import {
+  buildService,
   createEffectRuntime,
   type EffectRuntime,
 } from "../../support/effect-runtime";
@@ -22,14 +23,14 @@ describe("Filesystem shared addresses and folder restrictions", () => {
   const removed = createEvent<{ viewId: number; webContentsId: number }>();
   const views = { resolveViewId: () => undefined, removed };
   async function createFilesystemFixture(executionContext: ExecutionContext) {
-    const volumes = await effects.acquire(createVolumes());
+    const volumes = await effects.acquire(buildService(Volumes, VolumesLive));
     return effects.acquire(
-      createFilesystem({
-        baseDir: root,
-        executionContext,
-        views,
-        volumes,
-      }),
+      buildService(Filesystem, FilesystemLive).pipe(
+        Effect.provideService(UserDirectory, root),
+        Effect.provideService(ExecutionContext, executionContext),
+        Effect.provideService(FilesystemViews, views),
+        Effect.provideService(Volumes, volumes),
+      ),
     );
   }
   const createUser = (): UserProfile => ({
