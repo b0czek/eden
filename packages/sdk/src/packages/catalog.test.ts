@@ -5,12 +5,9 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
-import { AppsDirectory, DistPath } from "../runtime/inputs";
-import {
-  PackageCatalog,
-  PackageCatalogExecutionContext,
-  PackageCatalogLive,
-} from "./catalog";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { AppsDirectory, DistPath, RuntimeConfig } from "../runtime/inputs";
+import { PackageCatalog, PackageCatalogLive } from "./catalog";
 import { InstalledPackages, InstalledPackagesLive } from "./installed";
 
 const serviceEffects = createEffectRuntime();
@@ -32,7 +29,12 @@ const createInventory = () => {
   const catalog = serviceEffects.acquireSync(
     buildService(PackageCatalog, PackageCatalogLive).pipe(
       Effect.provideService(InstalledPackages, registry),
-      Effect.provideService(PackageCatalogExecutionContext, {
+      Effect.provideService(ExecutionContext, {
+        ...serviceEffects.acquireSync(
+          buildService(ExecutionContext, ExecutionContextLive).pipe(
+            Effect.provideService(RuntimeConfig, {}),
+          ),
+        ),
         canLaunchApp: (appId: string) => appId !== "app.restricted",
       }),
       Effect.provideService(AppsDirectory, "/installed"),

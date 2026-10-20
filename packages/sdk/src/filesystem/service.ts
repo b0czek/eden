@@ -30,6 +30,7 @@ import {
   normalizeDirectoryRestriction,
   resolveDirectoryRestriction,
 } from "../user/directory-restriction";
+import { DirectoryRestrictionIoError } from "../user/errors";
 import {
   accessRejection,
   FilesystemAccessDenied,
@@ -172,11 +173,11 @@ const io = <A>(operation: string, run: () => Promise<A>) =>
 const assertExistingWithin = (rootPath: string, hostPath: string) =>
   assertExistingPathWithin(rootPath, hostPath).pipe(
     Effect.mapError((cause) =>
-      "code" in cause
+      cause instanceof DirectoryRestrictionIoError
         ? new FilesystemIoFailed({
             operation: "resolve",
             path: hostPath,
-            cause,
+            cause: cause.cause,
             message: cause.message,
           })
         : new FilesystemAccessDenied({

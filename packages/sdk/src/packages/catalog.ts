@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import fg from "fast-glob";
 import { fromPromise } from "../effects/io";
-import type { ExecutionContext } from "../execution";
+import { ExecutionContext } from "../execution/context";
 import { log } from "../logging";
 import { AppsDirectory, DistPath } from "../runtime/inputs";
 import { DEFAULT_PACKAGE_ICON_DATA_URL } from "./default-icon";
@@ -52,16 +52,11 @@ export interface AppPackageListOptions {
   showHidden?: boolean;
   showRestricted?: boolean;
 }
-export const PackageCatalogExecutionContext = Context.Service<
-  "eden/PackageCatalogExecutionContext",
-  Pick<ExecutionContext, "canLaunchApp">
->("eden/PackageCatalogExecutionContext");
-
 export const PackageCatalogLive = Layer.effect(
   PackageCatalog,
   Effect.gen(function* () {
     const registry = yield* InstalledPackages;
-    const executionContext = yield* PackageCatalogExecutionContext;
+    const executionContext = yield* ExecutionContext;
     const appsDirectory = yield* AppsDirectory;
     const distPath = yield* DistPath;
     const dlcDirectory = path.join(appsDirectory, ".dlcs");

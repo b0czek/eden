@@ -1,4 +1,4 @@
-import type { OperationHandle } from "@edenapp/types";
+import type { FilesystemChangeKind, OperationHandle } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -11,6 +11,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
+import type { TargetedNotification } from "../controllers/events";
 import { createEvent } from "../events/event";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
 import { Filesystem } from "../filesystem/service";
@@ -54,7 +55,13 @@ describe("operation retention and admission capacity", () => {
         Effect.provide(
           Layer.mock(Filesystem, {
             getBaseDir: unexpectedFilesystemUse,
-            changed: createEvent(),
+            changed:
+              createEvent<
+                TargetedNotification<{
+                  watchId: string;
+                  kind: FilesystemChangeKind;
+                }>
+              >(),
             accessScope: unexpectedFilesystemUse,
             prepareVolumeOperation: unexpectedFilesystemUse,
             unwatch: unexpectedFilesystemUse,

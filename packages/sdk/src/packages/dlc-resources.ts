@@ -12,7 +12,7 @@ import type {
   PlatformProtocolRequest,
   PlatformProtocolResponse,
 } from "../platform/ports";
-import type { Views } from "../views/service";
+import { Views } from "../views/service";
 import { PackageCatalog } from "./catalog";
 
 export interface DlcResources {
@@ -52,15 +52,11 @@ export const DlcResourceProtocols = Context.Service<
   "eden/DlcResourceProtocols",
   DlcResourceProtocols
 >("eden/DlcResourceProtocols");
-export const DlcResourcesViews = Context.Service<
-  "eden/DlcResourcesViews",
-  Pick<Views, "viewRemoved">
->("eden/DlcResourcesViews");
 export const DlcResourcesLive = Layer.effect(
   DlcResources,
   Effect.gen(function* () {
     const catalog = yield* PackageCatalog;
-    const views = yield* DlcResourcesViews;
+    const views = yield* Views;
     const protocols = yield* DlcResourceProtocols;
     const capabilities = new Map<string, Capability>();
     const capabilityByView = new Map<number, Map<string, string>>();

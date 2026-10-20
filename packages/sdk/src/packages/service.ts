@@ -15,6 +15,10 @@ import * as Layer from "effect/Layer";
 import { fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
+import { RuntimeContexts } from "../execution/runtime-contexts";
+import type { VolumeUnavailable } from "../filesystem/errors";
+import { Filesystem } from "../filesystem/service";
+import { Permissions } from "../ipc/permissions";
 import { log } from "../logging";
 import type { OperationReporter, OperationTask } from "../operations/task";
 import { AppsDirectory, DistPath, RuntimeConfig } from "../runtime/inputs";
@@ -40,11 +44,6 @@ import {
 import { InstalledPackages } from "./installed";
 import { createPackageManifests } from "./manifests";
 import { createPackageMutations } from "./mutations";
-import {
-  PackagesFilesystem,
-  PackagesPermissions,
-  PackagesRuntimeContexts,
-} from "./ports";
 import { PackageTransactions } from "./transactions";
 import type {
   InstalledPackageListOptions,
@@ -79,7 +78,10 @@ export interface Packages {
   prepareInstallPackage: (
     location: FilesystemLocation,
     replacementConfirmed?: boolean,
-  ) => OperationTask<InstalledPackageManifest>;
+  ) => OperationTask<
+    InstalledPackageManifest,
+    PackageInstallError | VolumeUnavailable
+  >;
   installPackage: (
     location: FilesystemLocation,
     replacementConfirmed?: boolean,
@@ -121,13 +123,13 @@ export const PackagesLive = Layer.effect(
     const appsDirectory = yield* AppsDirectory;
     const distPath = yield* DistPath;
     const config = yield* RuntimeConfig;
-    const permissions = yield* PackagesPermissions;
-    const filesystem = yield* PackagesFilesystem;
+    const permissions = yield* Permissions;
+    const filesystem = yield* Filesystem;
     const registry = yield* InstalledPackages;
     const catalog = yield* PackageCatalog;
     const dlcResources = yield* DlcResources;
     const operations = yield* PackageTransactions;
-    const runtimeContexts = yield* PackagesRuntimeContexts;
+    const runtimeContexts = yield* RuntimeContexts;
     const prebuiltPackagesDirectory = path.join(distPath, "apps", "prebuilt");
     const installed = yield* scopedEvent<PackageNamespaceEvents["installed"]>();
     const uninstalled =
@@ -327,7 +329,10 @@ export const PackagesLive = Layer.effect(
     function prepareInstallPackage(
       location: FilesystemLocation,
       replacementConfirmed: boolean = false,
-    ): OperationTask<InstalledPackageManifest> {
+    ): OperationTask<
+      InstalledPackageManifest,
+      PackageInstallError | VolumeUnavailable
+    > {
       return filesystem.prepareVolumeOperation([location.volume], (reporter) =>
         installPackage(location, replacementConfirmed, reporter),
       );
