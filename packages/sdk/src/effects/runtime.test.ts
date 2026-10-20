@@ -1,7 +1,14 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import { createExecutionContext } from "../execution/context";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { RuntimeConfig } from "../runtime/inputs";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("Effect runtime ownership", () => {
   it("owns acquired resources until disposal and rolls back a failed acquisition", async () => {
@@ -79,7 +86,11 @@ describe("Effect runtime ownership", () => {
 
   it("keeps caller identity isolated across yielding concurrent work", async () => {
     const runtime = createEffectRuntime();
-    const execution = createExecutionContext({ config: {} });
+    const execution = serviceEffects.acquireSync(
+      buildService(ExecutionContext, ExecutionContextLive).pipe(
+        Effect.provideService(RuntimeConfig, {}),
+      ),
+    );
     function whoami(appId: string) {
       return runtime.run(
         execution.provide(
