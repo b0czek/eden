@@ -9,8 +9,50 @@ import type { RuntimeContexts } from "../execution/runtime-contexts";
 import { log } from "../logging";
 import type { Backends } from "../processes/backends";
 import type { Views } from "../views/service";
+import { EventPermissionDenied } from "./errors";
 import type { EventScope } from "./event-scope";
 import type { Permissions } from "./permissions";
+
+export interface EventRouting {
+  subscribe: (
+    viewId: number,
+    eventName: string,
+    operation?: OperationObservation,
+  ) => boolean;
+  subscribeFoundation: (eventName: string) => boolean;
+  subscribeBackend: (
+    appId: string,
+    eventName: string,
+    operation?: OperationObservation,
+  ) => boolean;
+  unsubscribe: (
+    viewId: number,
+    eventName: string,
+    operation?: OperationObservation,
+  ) => boolean;
+  unsubscribeFoundation: (eventName: string) => boolean;
+  unsubscribeBackend: (
+    appId: string,
+    eventName: string,
+    operation?: OperationObservation,
+  ) => boolean;
+  getSubscribedViews: (eventName: string) => number[];
+  getSubscribedBackends: (eventName: string) => string[];
+  hasSubscribers: (eventName: string, scope?: EventScope) => boolean;
+  notify: <T extends EventName>(
+    eventName: T,
+    payload: EventData<T>,
+    scope?: EventScope,
+  ) => void;
+  notifyView: <T extends EventName>(
+    viewId: number,
+    eventName: T,
+    payload: EventData<T>,
+  ) => boolean;
+  removeViewSubscriptions: (viewId: number) => void;
+  removeBackendSubscriptions: (appId: string) => void;
+  dispose: () => void;
+}
 
 type OperationSubscriptions<T> = Map<string, Map<T, Set<boolean>>>;
 const operationKey = (handle: OperationHandle) =>
@@ -83,14 +125,17 @@ export function createEventRouting({
   contexts: Pick<RuntimeContexts, "resolvePrincipal">;
   backends: Pick<Backends, "sendMessage">;
   permissions: Pick<Permissions, "getEventPermission" | "hasPermission">;
-}) {
-  let subscriptions: Map<string, Set<number>> = new Map();
-  let backendSubscriptions: Map<string, Set<string>> = new Map();
-  let foundationSubscriptions: Map<string, boolean> = new Map();
-  let operationViews: OperationSubscriptions<number> = new Map();
-  let operationBackends: OperationSubscriptions<string> = new Map();
-  let viewScopes = new Map<number, { appId?: string; sessionId?: string }>();
-  let backendScopes = new Map<string, { appId?: string; sessionId?: string }>();
+}): EventRouting {
+  const subscriptions: Map<string, Set<number>> = new Map();
+  const backendSubscriptions: Map<string, Set<string>> = new Map();
+  const foundationSubscriptions: Map<string, boolean> = new Map();
+  const operationViews: OperationSubscriptions<number> = new Map();
+  const operationBackends: OperationSubscriptions<string> = new Map();
+  const viewScopes = new Map<number, { appId?: string; sessionId?: string }>();
+  const backendScopes = new Map<
+    string,
+    { appId?: string; sessionId?: string }
+  >();
 
   function subscribe(
     viewId: number,
@@ -107,9 +152,11 @@ export function createEventRouting({
     const requiredPermission = permissions?.getEventPermission(eventName);
     if (requiredPermission && permissions) {
       if (!permissions.hasPermission(viewInfo.appId, requiredPermission)) {
-        throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
-        );
+        throw new EventPermissionDenied({
+          eventName,
+          permission: requiredPermission,
+          appId: viewInfo.appId,
+        });
       }
     }
 
@@ -144,9 +191,11 @@ export function createEventRouting({
     const requiredPermission = permissions?.getEventPermission(eventName);
     if (requiredPermission && permissions) {
       if (!permissions.hasPermission(appId, requiredPermission)) {
-        throw new Error(
-          `Permission denied: ${requiredPermission} required to subscribe to ${eventName}`,
-        );
+        throw new EventPermissionDenied({
+          eventName,
+          permission: requiredPermission,
+          appId,
+        });
       }
     }
 
@@ -365,4 +414,3 @@ export function createEventRouting({
     dispose,
   };
 }
-export type EventRouting = ReturnType<typeof createEventRouting>;

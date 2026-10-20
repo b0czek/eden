@@ -1,3 +1,5 @@
+import { FoundationAccessDenied } from "./errors";
+
 const FOUNDATION_COMMANDS = new Set([
   "appearance/get-wallpaper",
   "event/subscribe",
@@ -14,12 +16,15 @@ const FOUNDATION_EVENTS = new Set([
 
 export function assertFoundationCommandAllowed(command: string): void {
   if (!FOUNDATION_COMMANDS.has(command)) {
-    throw new Error(`Foundation is not allowed to execute ${command}`);
+    throw new FoundationAccessDenied({ resource: command, action: "execute" });
   }
 }
 
 export function assertFoundationEventAllowed(eventName: string): void {
   if (!FOUNDATION_EVENTS.has(eventName)) {
-    throw new Error(`Foundation is not allowed to subscribe to ${eventName}`);
+    throw new FoundationAccessDenied({
+      resource: eventName,
+      action: "subscribe to",
+    });
   }
 }

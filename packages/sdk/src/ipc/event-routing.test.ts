@@ -1,10 +1,22 @@
-import { createExecutionContext } from "../execution/context";
-import { createRuntimeContexts } from "../execution/runtime-contexts";
+import * as Effect from "effect/Effect";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import {
+  RuntimeContexts,
+  RuntimeContextsLive,
+} from "../execution/runtime-contexts";
 import type { Backends } from "../processes/backends";
-import { createSessionContext } from "../session/context";
+import { RuntimeConfig } from "../runtime/inputs";
+import { SessionContext, SessionContextLive } from "../session/context";
 import type { Views } from "../views/service";
 import { createEventRouting, type EventRouting } from "./event-routing";
 import type { Permissions } from "./permissions";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 type ViewsMock = jest.Mocked<
   Pick<Views, "getViewInfo" | "sendToView" | "sendToMainWindow">
@@ -42,10 +54,21 @@ const createRoutingFixture = (
     views,
     backends,
     permissions,
-    execution: createExecutionContext({ config: {} }),
-    contexts: createRuntimeContexts({
-      sessionContext: createSessionContext(),
-    }),
+    execution: serviceEffects.acquireSync(
+      buildService(ExecutionContext, ExecutionContextLive).pipe(
+        Effect.provideService(RuntimeConfig, {}),
+      ),
+    ),
+    contexts: serviceEffects.acquireSync(
+      buildService(RuntimeContexts, RuntimeContextsLive).pipe(
+        Effect.provideService(
+          SessionContext,
+          serviceEffects.acquireSync(
+            buildService(SessionContext, SessionContextLive),
+          ),
+        ),
+      ),
+    ),
   });
 
 describe("EventRouting", () => {

@@ -1,30 +1,50 @@
+import * as Cause from "effect/Cause";
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as v from "valibot";
-import { createEffectRuntime } from "../../tests/support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
 import { command, defineController } from "../controllers/controller";
-import { createExecutionContext } from "../execution/context";
-import type { Operations } from "../operations/service";
-import { createSessionContext } from "../session/context";
-import { createCommands } from "./commands";
-import { createPermissions } from "./permissions";
+import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { Operations } from "../operations/service";
+import { RuntimeConfig } from "../runtime/inputs";
+import { SessionContext, SessionContextLive } from "../session/context";
+import { Commands, CommandsLive } from "./commands";
+import { Permissions, PermissionsLive } from "./permissions";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 function harness() {
-  const execution = createExecutionContext({ config: {} });
-  const session = createSessionContext();
+  const execution = serviceEffects.acquireSync(
+    buildService(ExecutionContext, ExecutionContextLive).pipe(
+      Effect.provideService(RuntimeConfig, {}),
+    ),
+  );
+  const session = serviceEffects.acquireSync(
+    buildService(SessionContext, SessionContextLive),
+  );
   const effects = createEffectRuntime();
-  const permissions = createPermissions();
-  const commands = createCommands({
-    permissions,
-    sessionContext: session,
-    executionContext: execution,
-    operations: {} as Operations,
-  });
+  const permissions = serviceEffects.acquireSync(
+    buildService(Permissions, PermissionsLive),
+  );
+  const commands = serviceEffects.acquireSync(
+    buildService(Commands, CommandsLive).pipe(
+      Effect.provideService(Permissions, permissions),
+      Effect.provideService(SessionContext, session),
+      Effect.provideService(ExecutionContext, execution),
+      Effect.provideService(Operations, {} as Operations),
+    ),
+  );
   const registry = {
     ...commands,
     execute: <TResult>(...args: Parameters<typeof commands.execute>) =>
       effects.run(commands.execute<TResult>(...args)),
   };
-  return { registry, execution, session, effects, permissions };
+  return { registry, commands, execution, session, effects, permissions };
 }
 const profile = {
   username: "operator",
@@ -102,6 +122,57 @@ describe("command dispatch", () => {
     await expect(h.registry.execute("example/fail", {})).rejects.toThrow(
       "service failed",
     );
+  });
+  it("keeps synchronous programming errors as defects while recovering tagged admission and validation rejections", async () => {
+    class AdmissionRejected extends Data.TaggedError("AdmissionRejected")<{
+      message: string;
+    }> {}
+    const defect = new TypeError("Invalid handler state");
+    const rejection = new AdmissionRejected({
+      message: "Resource unavailable",
+    });
+    h.registry.registerController(
+      defineController("admission", {
+        commands: {
+          defect: command({
+            handle: () => {
+              throw defect;
+            },
+          }),
+          rejected: command({
+            handle: () => {
+              throw rejection;
+            },
+          }),
+          validated: command({
+            input: v.object({ value: v.number() }),
+            handle: ({ value }) => value,
+          }),
+        },
+      }),
+    );
+    const runExit = (name: string) =>
+      h.effects.run(Effect.exit(h.commands.execute(`admission/${name}`, {})));
+    const failed = await runExit("defect");
+    expect(Exit.isFailure(failed)).toBe(true);
+    if (Exit.isFailure(failed)) {
+      expect(Cause.hasDies(failed.cause)).toBe(true);
+      expect(Cause.hasFails(failed.cause)).toBe(false);
+      expect(Cause.squash(failed.cause)).toBe(defect);
+    }
+    const rejected = await runExit("rejected");
+    expect(Exit.isFailure(rejected)).toBe(true);
+    if (Exit.isFailure(rejected)) {
+      expect(Cause.hasDies(rejected.cause)).toBe(false);
+      expect(Cause.hasFails(rejected.cause)).toBe(true);
+      expect(Cause.squash(rejected.cause)).toBe(rejection);
+    }
+    const invalid = await runExit("validated");
+    expect(Exit.isFailure(invalid)).toBe(true);
+    if (Exit.isFailure(invalid)) {
+      expect(Cause.hasDies(invalid.cause)).toBe(false);
+      expect(v.isValiError(Cause.squash(invalid.cause))).toBe(true);
+    }
   });
   it("rejects duplicate commands without replacing the existing controller", async () => {
     const first = defineController("example", {

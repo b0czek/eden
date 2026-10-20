@@ -2,12 +2,6 @@ import type { OperationHandle } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { command, defineController } from "../../../src/controllers/controller";
 import { fromPromise } from "../../../src/effects/io";
-import { Commands } from "../../../src/ipc/commands";
-import { Operations } from "../../../src/operations/service";
-import type { OperationTask } from "../../../src/operations/task";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Processes } from "../../../src/processes/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { promiseOperationTask } from "../../support/operations";
@@ -64,6 +58,11 @@ describe("one bounded IPC deadline", () => {
           }),
           failure: command({
             handle: () => Effect.fail(new TypeError("Command failed")),
+          }),
+          synchronousDefect: command({
+            handle: () => {
+              throw new TypeError("Command failed");
+            },
           }),
           defect: command({
             handle: () => Effect.die(new TypeError("Command failed")),
@@ -145,7 +144,7 @@ describe("one bounded IPC deadline", () => {
     expect(nativeReleased).toBe(true);
   });
 
-  it.each(["failure", "defect"])(
+  it.each(["failure", "defect", "synchronousDefect"])(
     "preserves the %s message and name without exposing its stack",
     async (command) => {
       await expect(invoke(command)).rejects.toMatchObject({

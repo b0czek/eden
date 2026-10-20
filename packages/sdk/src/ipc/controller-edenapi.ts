@@ -4,6 +4,7 @@ import { APP_EVENT_NAMES } from "../generated/runtime";
 import { operationHandleSchema } from "../operations/schemas";
 import type { Operations } from "../operations/service";
 import type { Views } from "../views/service";
+import { EventSubscriptionRejected } from "./errors";
 import type { EventRouting } from "./event-routing";
 import { assertFoundationEventAllowed } from "./foundation-policy";
 
@@ -26,7 +27,10 @@ export function createEventController(
     operation: v.InferOutput<typeof eventArgs>["operation"],
   ) => {
     if (operation && eventName !== "operation/changed")
-      throw new Error("Operation filters require operation/changed");
+      throw new EventSubscriptionRejected({
+        eventName,
+        message: "Operation filters require operation/changed",
+      });
     return operation;
   };
   return defineController("event", {
@@ -35,7 +39,10 @@ export function createEventController(
         input: eventArgs,
         handle: ({ eventName, operation }, caller) => {
           if (!APP_EVENT_NAMES.includes(eventName))
-            throw new Error(`Event '${eventName}' is not supported`);
+            throw new EventSubscriptionRejected({
+              eventName,
+              message: `Event '${eventName}' is not supported`,
+            });
           checkObservation(eventName, operation);
           if (operation) operations.get(operation.handle);
           if (caller.foundation) {
@@ -43,11 +50,19 @@ export function createEventController(
             subscriptions.subscribeFoundation(eventName);
           } else if (caller.webContentsId !== undefined) {
             const viewId = views.getViewIdByWebContentsId(caller.webContentsId);
-            if (viewId === undefined) throw new Error("View not found");
+            if (viewId === undefined)
+              throw new EventSubscriptionRejected({
+                eventName,
+                message: "View not found",
+              });
             subscriptions.subscribe(viewId, eventName, operation);
           } else if (caller.appId)
             subscriptions.subscribeBackend(caller.appId, eventName, operation);
-          else throw new Error("Caller identity not found");
+          else
+            throw new EventSubscriptionRejected({
+              eventName,
+              message: "Caller identity not found",
+            });
         },
       }),
       unsubscribe: command({

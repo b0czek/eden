@@ -1,5 +1,12 @@
 import type { ResolvedGrant } from "@edenapp/types";
-import { createPermissions } from "./permissions";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { Permissions, PermissionsLive } from "./permissions";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("Permissions", () => {
   let logSpy: jest.SpyInstance;
@@ -13,7 +20,9 @@ describe("Permissions", () => {
   });
 
   it("registers base permissions and evaluates matches", () => {
-    const registry = createPermissions();
+    const registry = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
 
     registry.registerApp("app.one", ["fs/read", "fs/*"], []);
 
@@ -24,7 +33,9 @@ describe("Permissions", () => {
   });
 
   it("returns required grant keys when permission is not base", () => {
-    const registry = createPermissions();
+    const registry = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
 
     const grants: ResolvedGrant[] = [
       {
@@ -60,7 +71,9 @@ describe("Permissions", () => {
   });
 
   it("unregisters apps when no permissions or grants are provided", () => {
-    const registry = createPermissions();
+    const registry = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
 
     registry.registerApp("app.three", [], []);
     expect(registry.hasApp("app.three")).toBe(false);
@@ -75,7 +88,9 @@ describe("Permissions", () => {
 
 describe("Event permissions", () => {
   it("tracks required permissions for events", () => {
-    const registry = createPermissions();
+    const registry = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
     registry.registerEventPermission("app/ready", "app/observe");
 
     expect(registry.getEventPermission("app/ready")).toBe("app/observe");
@@ -85,8 +100,12 @@ describe("Event permissions", () => {
   });
 
   it("keeps event permissions isolated between registries", () => {
-    const first = createPermissions();
-    const second = createPermissions();
+    const first = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
+    const second = serviceEffects.acquireSync(
+      buildService(Permissions, PermissionsLive),
+    );
     first.registerEventPermission("app/ready", "app/observe");
 
     expect(second.getEventPermission("app/ready")).toBeUndefined();
