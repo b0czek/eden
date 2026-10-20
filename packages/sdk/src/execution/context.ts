@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type { UserProfile } from "@edenapp/types";
 import * as Context from "effect/Context";
@@ -10,13 +9,13 @@ import { matchesGrants } from "../user/grants";
 import { normalizeAppIds } from "../utils/normalize";
 
 export interface ExecutionContext {
-  /** Enter trusted native callback context, restoring the caller on return or throw. */
-  run: <T>(context: CommandCallerContext, task: () => T) => T;
+  current: Effect.Effect<CommandCallerContext | undefined>;
   /** Bind lazy work to a caller without starting it or interpreting the Effect. */
   provide: <A, E>(
     work: Effect.Effect<A, E>,
     context: CommandCallerContext,
   ) => Effect.Effect<A, E>;
+  /** Synchronous admission checks read only the current Effect fiber's caller. */
   get: () => CommandCallerContext | undefined;
   getPrincipal: () => EffectivePrincipal | undefined;
   hasGrant: (grant: string) => boolean;
@@ -50,21 +49,10 @@ export const ExecutionContextLive = Layer.effect(
       `eden/Caller/${randomUUID()}`,
       { defaultValue: () => undefined },
     );
-    const storage = new AsyncLocalStorage<CommandCallerContext>();
     const coreApps = normalizeAppIds(config.coreApps);
     const restrictedApps = normalizeAppIds(config.restrictedApps);
-    function run<T>(context: CommandCallerContext, task: () => T): T {
-      const fiber = Fiber.getCurrent();
-      const previous = fiber?.context;
-      if (fiber) fiber.setContext(Context.add(fiber.context, caller, context));
-      try {
-        return storage.run(context, task);
-      } finally {
-        if (fiber && previous) fiber.setContext(previous);
-      }
-    }
     function get(): CommandCallerContext | undefined {
-      return Fiber.getCurrent()?.getRef(caller) ?? storage.getStore();
+      return Fiber.getCurrent()?.getRef(caller);
     }
     function getPrincipal(): EffectivePrincipal | undefined {
       return get()?.principal;
@@ -94,7 +82,7 @@ export const ExecutionContextLive = Layer.effect(
       return Effect.provideService(work, caller, context);
     }
     return {
-      run,
+      current: caller,
       provide,
       get,
       getPrincipal,

@@ -10,11 +10,16 @@ export function createSdkContext({
   execution,
   operations,
 }: {
-  execution: Pick<ExecutionContext, "run" | "provide">;
+  execution: Pick<ExecutionContext, "provide">;
   operations: Pick<Operations, "runHost">;
 }) {
   function run<A>(work: () => A): A {
-    return execution.run({ principal: { kind: "system" } }, work);
+    // @eden-effect-next-line domain-interpreter -- Synchronous host methods and native notifications enter an isolated caller context at the SDK boundary.
+    return Effect.runSync(
+      execution.provide(Effect.sync(work), {
+        principal: { kind: "system" },
+      }),
+    );
   }
   function effect<A, E>(
     work: () => Effect.Effect<A, E>,

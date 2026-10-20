@@ -97,7 +97,11 @@ describe("app associations persistence and catalog integration", () => {
       storePath,
       open,
       asVendor: <A>(work: () => A): A =>
-        execution.run({ principal: { kind: "user", profile: vendor } }, work),
+        Effect.runSync(
+          execution.provide(Effect.sync(work), {
+            principal: { kind: "user", profile: vendor },
+          }),
+        ),
     };
   }
 

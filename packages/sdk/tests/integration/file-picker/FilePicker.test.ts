@@ -91,8 +91,8 @@ async function createScenario() {
     ),
   );
   const run = <A, E>(work: Effect.Effect<A, E>) =>
-    execution.run({ principal: { kind: "user", profile: vendor } }, () =>
-      runtime.run(work),
+    runtime.run(
+      execution.provide(work, { principal: { kind: "user", profile: vendor } }),
     );
   const registry = serviceEffects.acquireSync(
     buildService(InstalledPackages, InstalledPackagesLive),

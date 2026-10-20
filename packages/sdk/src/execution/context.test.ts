@@ -1,6 +1,8 @@
 import type { EdenConfig, UserProfile } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import {
   buildService,
   createEffectRuntime,
@@ -30,41 +32,32 @@ describe("ExecutionContext authorization", () => {
     );
   }
 
-  it("restores nested native callers after a thrown callback", () => {
+  it("restores the enclosing caller after a nested workflow defects", async () => {
     const context = acquireContext();
     const outer = { appId: "outer" };
     const inner = { appId: "inner" };
     const failure = new Error("callback failed");
 
-    context.run(outer, () => {
-      expect(() =>
-        context.run(inner, () => {
-          expect(context.get()).toEqual(inner);
-          throw failure;
+    await serviceEffects.run(
+      context.provide(
+        Effect.gen(function* () {
+          const exit = yield* Effect.exit(
+            context.provide(
+              Effect.sync(() => {
+                expect(context.get()).toEqual(inner);
+                throw failure;
+              }),
+              inner,
+            ),
+          );
+          expect(Exit.isFailure(exit)).toBe(true);
+          if (Exit.isFailure(exit))
+            expect(Cause.squash(exit.cause)).toBe(failure);
+          expect(yield* context.current).toEqual(outer);
         }),
-      ).toThrow(failure);
-      expect(context.get()).toEqual(outer);
-    });
-    expect(context.get()).toBeUndefined();
-  });
-
-  it("retains native async callers independently across interleaved callbacks", async () => {
-    const context = acquireContext();
-    let resume!: () => void;
-    const paused = new Promise<void>((resolve) => {
-      resume = resolve;
-    });
-    const first = context.run({ appId: "first" }, async () => {
-      await paused;
-      return context.get()?.appId;
-    });
-    const second = context.run({ appId: "second" }, async () => {
-      await Promise.resolve();
-      resume();
-      return context.get()?.appId;
-    });
-
-    expect(await Promise.all([first, second])).toEqual(["first", "second"]);
+        outer,
+      ),
+    );
     expect(context.get()).toBeUndefined();
   });
 
@@ -112,7 +105,7 @@ describe("ExecutionContext authorization", () => {
     expect(context.canLaunchApp("app.one")).toBe(false);
   });
 
-  it("applies grants and app launch policy to the effective principal", () => {
+  it("applies grants and app launch policy to the effective principal", async () => {
     const context = serviceEffects.acquireSync(
       buildService(ExecutionContext, ExecutionContextLive).pipe(
         Effect.provideService(RuntimeConfig, {
@@ -125,16 +118,23 @@ describe("ExecutionContext authorization", () => {
       grants: ["apps/launch/app.allowed", "settings/com.eden/*"],
     });
 
-    context.run({ principal: { kind: "user", profile } }, () => {
-      expect(context.canLaunchApp("app.core")).toBe(true);
-      expect(context.canLaunchApp("app.allowed")).toBe(true);
-      expect(context.canLaunchApp("app.restricted")).toBe(false);
-      expect(context.canLaunchApp("app.other")).toBe(false);
-      expect(context.hasGrant("settings/com.eden/appearance.theme")).toBe(true);
-    });
+    await serviceEffects.run(
+      context.provide(
+        Effect.sync(() => {
+          expect(context.canLaunchApp("app.core")).toBe(true);
+          expect(context.canLaunchApp("app.allowed")).toBe(true);
+          expect(context.canLaunchApp("app.restricted")).toBe(false);
+          expect(context.canLaunchApp("app.other")).toBe(false);
+          expect(context.hasGrant("settings/com.eden/appearance.theme")).toBe(
+            true,
+          );
+        }),
+        { principal: { kind: "user", profile } },
+      ),
+    );
   });
 
-  it("gives vendor principals unrestricted authorization", () => {
+  it("gives vendor principals unrestricted authorization", async () => {
     const context = serviceEffects.acquireSync(
       buildService(ExecutionContext, ExecutionContextLive).pipe(
         Effect.provideService(RuntimeConfig, {
@@ -144,9 +144,14 @@ describe("ExecutionContext authorization", () => {
     );
     const profile = createUser({ role: "vendor" });
 
-    context.run({ principal: { kind: "user", profile } }, () => {
-      expect(context.hasGrant("anything")).toBe(true);
-      expect(context.canLaunchApp("app.restricted")).toBe(true);
-    });
+    await serviceEffects.run(
+      context.provide(
+        Effect.sync(() => {
+          expect(context.hasGrant("anything")).toBe(true);
+          expect(context.canLaunchApp("app.restricted")).toBe(true);
+        }),
+        { principal: { kind: "user", profile } },
+      ),
+    );
   });
 });

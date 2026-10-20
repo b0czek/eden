@@ -236,15 +236,13 @@ export const OperationsLive = Layer.effect(
           },
           owner,
           transitionSessionId,
-          fiber: execution.run(capturedContext, () =>
-            forkOperation(
-              execution.provide(
-                Effect.andThen(
-                  afterResponse,
-                  Effect.suspend(() => execute(record, prepared)),
-                ),
-                capturedContext,
+          fiber: forkOperation(
+            execution.provide(
+              Effect.andThen(
+                afterResponse,
+                Effect.suspend(() => execute(record, prepared)),
               ),
+              capturedContext,
             ),
           ),
           fingerprint,

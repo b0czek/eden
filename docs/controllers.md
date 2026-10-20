@@ -275,6 +275,12 @@ Effect. `operation` submits through the existing operation ledger when executed
 and awaits completion. Host runners interpret the completed SDK program. SDK event
 callbacks also enter host context and receive detached payloads.
 
+Caller authority is local to the executing Effect fiber. `ExecutionContext.current`
+reads that caller in workflows; synchronous admission checks use `get` on the same
+fiber. Bind work with `ExecutionContext.provide` before execution or forking.
+The synchronous SDK boundary interprets host callbacks with system authority;
+native transports start their scoped fibers with the validated caller provided.
+
 Host operation preparation is a lazy Effect with its own typed rejection channel.
 After preparation succeeds, admission and reservation cleanup are coordinated
 without interruption. Rejected admission releases the prepared task's reservation;

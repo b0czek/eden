@@ -390,13 +390,8 @@ describe("runtime-owned operations", () => {
     const originalId = session.getSessionId();
     // Exercise the existing awaited session method inside an operation transaction.
     register(() =>
-      promiseOperationTask(
-        async () => {
-          await eden.runtime.effects.run(
-            eden.runtime.services.sessions.logout(),
-          );
-          return "changed";
-        },
+      operationTask(
+        () => Effect.as(eden.runtime.services.sessions.logout(), "changed"),
         { transition: "session" },
       ),
     );
@@ -420,15 +415,14 @@ describe("runtime-owned operations", () => {
     const transitioned = gate();
     const blocked = gate();
     register(() =>
-      promiseOperationTask(
-        async () => {
-          await eden.runtime.effects.run(
-            eden.runtime.services.sessions.logout(),
-          );
-          transitioned.release();
-          await blocked.promise;
-          return "done";
-        },
+      operationTask(
+        () =>
+          Effect.gen(function* () {
+            yield* eden.runtime.services.sessions.logout();
+            transitioned.release();
+            yield* Effect.promise(() => blocked.promise);
+            return "done";
+          }),
         { transition: "session" },
       ),
     );
@@ -717,12 +711,11 @@ describe("runtime-owned operations", () => {
     };
     eden.runtime.services.sessionContext.setCurrentUser(profile);
     const launch = (id: string) =>
-      eden.runtime.services.execution.run(
-        { principal: { kind: "user", profile } },
-        () =>
-          eden.runtime.effects.run(
-            eden.runtime.services.processes.launchApp(id),
-          ),
+      eden.runtime.effects.run(
+        eden.runtime.services.execution.provide(
+          eden.runtime.services.processes.launchApp(id),
+          { principal: { kind: "user", profile } },
+        ),
       );
     for (const id of [owner.appId, "other.app"]) {
       permissions.registerApp(id, ["integration/work"]);

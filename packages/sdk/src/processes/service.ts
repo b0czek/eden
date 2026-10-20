@@ -612,8 +612,8 @@ export const ProcessesLive = Layer.effect(
 
         log.info(`Reloading app ${appId}...`);
 
-        // A hot-reload watcher runs outside the request's AsyncLocalStorage
-        // context. Preserve the running process identity before stopApp removes it
+        // A hot-reload watcher runs outside the request's caller context.
+        // Preserve the running process identity before stopApp removes it
         // so relaunch does not depend on ambient user authorization state.
         const runtime = runtimeContexts.get(appId);
 

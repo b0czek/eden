@@ -117,20 +117,19 @@ it("delivers host session observers with system authority when called inside an 
       observed.push(structuredClone(execution.get()));
     });
     try {
-      await execution.run(
-        {
-          appId: "app.foreign",
-          sessionId: "foreign-session",
-          operationId: "foreign-operation",
-          principal: { kind: "user", profile: user },
-        },
-        () =>
-          eden.runtime.effects.run(
-            eden.runtime.users.update({
-              username: user.username,
-              name: "Updated",
-            }),
-          ),
+      await eden.runtime.effects.run(
+        execution.provide(
+          eden.runtime.users.update({
+            username: user.username,
+            name: "Updated",
+          }),
+          {
+            appId: "app.foreign",
+            sessionId: "foreign-session",
+            operationId: "foreign-operation",
+            principal: { kind: "user", profile: user },
+          },
+        ),
       );
       expect(observed).toEqual([{ principal: { kind: "system" } }]);
       expect(eden.runtime.sessions.current()?.name).toBe("Updated");
