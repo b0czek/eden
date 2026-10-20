@@ -6,7 +6,6 @@ import * as Effect from "effect/Effect";
 import { createDevelopmentAutostart } from "../../../src/autostart/development";
 import {
   AutostartProcesses,
-  AutostartSessions,
   DevelopmentAutostart,
 } from "../../../src/autostart/ports";
 import { createAutostartProcesses } from "../../../src/autostart/processes";
@@ -15,10 +14,10 @@ import {
   AutostartDevelopment,
   AutostartLive,
   AutostartLoginAppId,
-  AutostartSettings,
 } from "../../../src/autostart/service";
 import { fromPromise } from "../../../src/effects/io";
 import { AppsDirectory } from "../../../src/runtime/inputs";
+import { Sessions } from "../../../src/session/service";
 import {
   SettingsAuthorization,
   SettingsCatalog,
@@ -130,17 +129,13 @@ async function scopedAutostart(
     },
     eden.runtime.services.execution,
   );
-  const sessionContext = eden.runtime.services.sessionContext;
   const sessions = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
     buildService(Autostart, AutostartLive).pipe(
       Effect.provideService(AutostartDevelopment, options.development ?? false),
       Effect.provideService(AutostartLoginAppId, options.loginAppId),
-      Effect.provideService(AutostartSettings, settings),
-      Effect.provideService(AutostartSessions, {
-        currentUser: () => sessionContext.getCurrentUser(),
-        changed: { on: (listener) => sessions.changed.on(listener) },
-      }),
+      Effect.provideService(Settings, settings),
+      Effect.provideService(Sessions, sessions),
       Effect.provideService(AutostartProcesses, autostartProcesses),
       Effect.provideService(
         DevelopmentAutostart,

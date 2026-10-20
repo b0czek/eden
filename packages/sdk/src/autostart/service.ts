@@ -1,26 +1,47 @@
 import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import { listen } from "../events/scoped";
 import { log } from "../logging";
+import { Sessions } from "../session/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
-import type { AutostartDependencies } from "./ports";
+import { Settings } from "../settings/service";
+import { AutostartProcesses, DevelopmentAutostart } from "./ports";
+
+export interface Autostart {
+  onFoundationReady: () => void;
+  shutdown: () => Effect.Effect<void>;
+}
+
+export const Autostart = Context.Service<"eden/Autostart", Autostart>(
+  "eden/Autostart",
+);
 
 const AUTOSTART_PREFIX = "autostart.";
 type Launch = "development" | "session" | "login";
+export const AutostartDevelopment = Context.Service<
+  "eden/AutostartDevelopment",
+  boolean
+>("eden/AutostartDevelopment");
 
-/** Serialize startup and committed-session launches within one owned lifetime. */
-export function createAutostart({
-  development,
-  loginAppId,
-  settings,
-  sessions,
-  processes,
-  developmentApps,
-}: AutostartDependencies) {
-  return Effect.gen(function* () {
+export const AutostartLoginAppId = Context.Service<
+  "eden/AutostartLoginAppId",
+  string | undefined
+>("eden/AutostartLoginAppId");
+
+export const AutostartLive = Layer.effect(
+  Autostart,
+  Effect.gen(function* () {
+    const development = yield* AutostartDevelopment;
+    const loginAppId = yield* AutostartLoginAppId;
+    const settings = yield* Settings;
+    const sessions = yield* Sessions;
+    const processes = yield* AutostartProcesses;
+    const developmentApps = yield* DevelopmentAutostart;
     let ready = false;
     let disposed = false;
     const pending = yield* Queue.unbounded<Launch, Cause.Done>();
@@ -58,9 +79,9 @@ export function createAutostart({
     function launchSessionApps() {
       return Effect.gen(function* () {
         // Capture the user when this queued job starts, as session transitions may queue.
-        const currentUser = sessions.currentUser();
+        const currentUser = sessions.getCurrentUser();
         if (!currentUser) return;
-        yield* Effect.catchCause(
+        yield* Effect.catch(
           Effect.gen(function* () {
             const entries = yield* loadAutostartSettings();
             for (const [appId, enabled] of entries) {
@@ -76,15 +97,10 @@ export function createAutostart({
               });
             }
           }),
-          (cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.sync(() =>
-                  log.warn(
-                    "Failed to load autostart settings:",
-                    Cause.squash(cause),
-                  ),
-                ),
+          (error) =>
+            Effect.sync(() =>
+              log.warn("Failed to load autostart settings:", error),
+            ),
         );
       });
     }
@@ -93,7 +109,7 @@ export function createAutostart({
       return Effect.gen(function* () {
         if (
           disposed ||
-          sessions.currentUser() ||
+          sessions.getCurrentUser() ||
           !loginAppId ||
           processes.isRunning(loginAppId)
         )
@@ -116,16 +132,7 @@ export function createAutostart({
               : launch === "session"
                 ? launchSessionApps()
                 : launchLoginApp();
-          return Effect.catchCause(task, (cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.sync(() =>
-                  log.error(
-                    "Failed to launch startup apps:",
-                    Cause.squash(cause),
-                  ),
-                ),
-          );
+          return task;
         }),
       ),
     );
@@ -147,7 +154,10 @@ export function createAutostart({
       if (ready || disposed) return;
       ready = true;
       if (development) Queue.offerUnsafe(pending, "development");
-      Queue.offerUnsafe(pending, sessions.currentUser() ? "session" : "login");
+      Queue.offerUnsafe(
+        pending,
+        sessions.getCurrentUser() ? "session" : "login",
+      );
     }
 
     function shutdown() {
@@ -171,7 +181,5 @@ export function createAutostart({
       ),
     );
     return { onFoundationReady, shutdown };
-  });
-}
-
-export type Autostart = Effect.Success<ReturnType<typeof createAutostart>>;
+  }),
+);
