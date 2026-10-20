@@ -1,7 +1,20 @@
 import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
+import * as Effect from "effect/Effect";
 import { testApp } from "../../tests/support/apps";
-import { createPackageCatalog } from "./catalog";
-import { createInstalledPackages } from "./installed";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { AppsDirectory, DistPath } from "../runtime/inputs";
+import {
+  PackageCatalog,
+  PackageCatalogExecutionContext,
+  PackageCatalogLive,
+} from "./catalog";
+import { InstalledPackages, InstalledPackagesLive } from "./installed";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const manifest = (
   id: string,
@@ -13,15 +26,19 @@ const manifest = (
   }) as RuntimeAppManifest;
 
 const createInventory = () => {
-  const registry = createInstalledPackages();
-  const catalog = createPackageCatalog({
-    registry,
-    executionContext: {
-      canLaunchApp: (appId: string) => appId !== "app.restricted",
-    },
-    appsDirectory: "/installed",
-    distPath: "/dist",
-  });
+  const registry = serviceEffects.acquireSync(
+    buildService(InstalledPackages, InstalledPackagesLive),
+  );
+  const catalog = serviceEffects.acquireSync(
+    buildService(PackageCatalog, PackageCatalogLive).pipe(
+      Effect.provideService(InstalledPackages, registry),
+      Effect.provideService(PackageCatalogExecutionContext, {
+        canLaunchApp: (appId: string) => appId !== "app.restricted",
+      }),
+      Effect.provideService(AppsDirectory, "/installed"),
+      Effect.provideService(DistPath, "/dist"),
+    ),
+  );
   return { catalog, registry };
 };
 

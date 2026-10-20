@@ -6,7 +6,6 @@ import type {
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
 import { normalizeGrantPresets } from "../grants/presets";
 import { getHotReloadDevUrl, isHotReloadConfigured } from "../hotreload-config";
 import { normalizeAppIds } from "../utils/normalize";

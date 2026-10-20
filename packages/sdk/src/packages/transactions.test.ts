@@ -2,12 +2,20 @@ import * as nativeFs from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
+import * as Exit from "effect/Exit";
 import {
-  createPackageTransactions,
-  type PackageTransactions,
-} from "./transactions";
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { fromPromise } from "../effects/io";
+import { AppsDirectory } from "../runtime/inputs";
+import { PackageRollbackError } from "./errors";
+import { PackageTransactions, PackageTransactionsLive } from "./transactions";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 describe("PackageTransactions", () => {
   let root: string;
@@ -20,7 +28,11 @@ describe("PackageTransactions", () => {
     );
     apps = path.join(root, "apps");
     await fs.mkdir(apps, { recursive: true });
-    coordinator = createPackageTransactions({ appsDirectory: apps });
+    coordinator = serviceEffects.acquireSync(
+      buildService(PackageTransactions, PackageTransactionsLive).pipe(
+        Effect.provideService(AppsDirectory, apps),
+      ),
+    );
     await Effect.runPromise(coordinator.initialize());
   });
 
@@ -44,7 +56,7 @@ describe("PackageTransactions", () => {
         );
       }
       const transactions = coordinator;
-      const error: unknown = await Effect.runPromise(
+      const exit = await Effect.runPromiseExit(
         transactions.execute(
           targets.map((target) => ({
             target,
@@ -62,12 +74,20 @@ describe("PackageTransactions", () => {
             },
           },
         ),
-      ).catch((error: unknown) => error);
-      expect(error).toBeInstanceOf(AggregateError);
-      expect((error as AggregateError).errors).toEqual([
-        failure,
-        expect.objectContaining({ code: "EACCES" }),
-      ]);
+      );
+      if (!Exit.isFailure(exit))
+        throw new Error("Expected transaction failure");
+      expect(Cause.hasDies(exit.cause)).toBe(true);
+      expect(Cause.findDefect(exit.cause)).toMatchObject({ success: failure });
+      const error = exit.cause.reasons
+        .filter(Cause.isFailReason)
+        .map((reason) => reason.error)
+        .find((error) => error instanceof PackageRollbackError);
+      expect(error).toBeInstanceOf(PackageRollbackError);
+      expect(error).toMatchObject({
+        cause: failure,
+        rollbackCause: { cause: expect.objectContaining({ code: "EACCES" }) },
+      });
       const recoveryRoot = path.join(apps, ".package-transactions");
       const directories = await fs.readdir(recoveryRoot);
       expect(directories).toHaveLength(1);
@@ -87,7 +107,13 @@ describe("PackageTransactions", () => {
 
       await fs.chmod(blockedParent, 0o755);
       await Effect.runPromise(
-        createPackageTransactions({ appsDirectory: apps }).initialize(),
+        serviceEffects
+          .acquireSync(
+            buildService(PackageTransactions, PackageTransactionsLive).pipe(
+              Effect.provideService(AppsDirectory, apps),
+            ),
+          )
+          .initialize(),
       );
       for (const target of targets)
         await expect(

@@ -1,17 +1,17 @@
 export {
   type AppPackageListOptions,
-  createPackageCatalog,
-  type PackageCatalog,
+  PackageCatalog,
+  PackageCatalogLive,
 } from "./catalog";
 export { createPackageController } from "./controller-edenapi";
 export {
-  createDlcResources,
-  type DlcResources,
+  DlcResources,
+  DlcResourcesLive,
 } from "./dlc-resources";
-export { createInstalledPackages, type InstalledPackages } from "./installed";
+export { InstalledPackages, InstalledPackagesLive } from "./installed";
 export { createDlcResourceProtocols } from "./resource-adapter";
-export { createPackages, type Packages } from "./service";
+export { Packages, PackagesLive } from "./service";
 export {
-  createPackageTransactions,
-  type PackageTransactions,
+  PackageTransactions,
+  PackageTransactionsLive,
 } from "./transactions";

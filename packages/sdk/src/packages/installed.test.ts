@@ -1,5 +1,12 @@
 import type { RuntimeAppManifest, RuntimeDlcManifest } from "@edenapp/types";
-import { createInstalledPackages } from "./installed";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../tests/support/effect-runtime";
+import { InstalledPackages, InstalledPackagesLive } from "./installed";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
 
 const app: RuntimeAppManifest = {
   kind: "app",
@@ -25,7 +32,9 @@ const dlc: RuntimeDlcManifest = {
 
 describe("InstalledPackages", () => {
   it("registers and narrows both package kinds", () => {
-    const registry = createInstalledPackages();
+    const registry = serviceEffects.acquireSync(
+      buildService(InstalledPackages, InstalledPackagesLive),
+    );
     registry.register(app);
     registry.register(dlc);
 
@@ -35,7 +44,9 @@ describe("InstalledPackages", () => {
   });
 
   it("returns copies and unregisters by package ID", () => {
-    const registry = createInstalledPackages();
+    const registry = serviceEffects.acquireSync(
+      buildService(InstalledPackages, InstalledPackagesLive),
+    );
     registry.register(app, { sourcePath: "/source/app.example" });
     const returned = registry.getApp(app.id);
     if (!returned) throw new Error("Expected registered app");
