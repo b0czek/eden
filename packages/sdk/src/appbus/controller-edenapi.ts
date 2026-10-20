@@ -2,12 +2,13 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import type { CommandCallerContext } from "../execution/context";
+import { AppChannelCallerRequired } from "./errors";
 import type { AppChannels } from "./service";
 
 function callerAppId(caller: CommandCallerContext) {
   return caller.appId
     ? Effect.succeed(caller.appId)
-    : Effect.fail(new Error("AppBus access requires a caller app identity"));
+    : Effect.fail(new AppChannelCallerRequired());
 }
 
 export function createAppChannelsController(channels: AppChannels) {

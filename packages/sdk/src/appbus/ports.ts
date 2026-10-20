@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import type {
   PlatformMessagePort,
   PlatformWebContents,
@@ -14,6 +15,10 @@ export interface AppChannelTransport {
     | Pick<PlatformWebContents, "postMessage" | "send" | "isDestroyed">
     | undefined;
 }
+export const AppChannelTransport = Context.Service<
+  "eden/AppChannelTransport",
+  AppChannelTransport
+>("eden/AppChannelTransport");
 
 export interface AppChannelBackends {
   hasBackend(appId: string): boolean;
@@ -24,8 +29,16 @@ export interface AppChannelBackends {
   ): boolean;
   sendMessage(appId: string, message: unknown): boolean;
 }
+export const AppChannelBackends = Context.Service<
+  "eden/AppChannelBackends",
+  AppChannelBackends
+>("eden/AppChannelBackends");
 
 /** Synchronous process teardown must remove registrations before views and backends. */
 export interface AppChannelLifecycle {
   unregisterAllServices(appId: string): number;
 }
+export const AppChannelLifecycle = Context.Service<
+  "eden/AppChannelLifecycle",
+  AppChannelLifecycle
+>("eden/AppChannelLifecycle");

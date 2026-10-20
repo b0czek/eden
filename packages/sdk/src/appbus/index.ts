@@ -1,3 +1,3 @@
 export { createAppChannelsController } from "./controller-edenapi";
-export { type AppChannelLifecycle } from "./ports";
-export { type AppChannels, createAppChannels } from "./service";
+export type { AppChannelLifecycle } from "./ports";
+export { AppChannels, AppChannelsLive } from "./service";

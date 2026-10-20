@@ -3,25 +3,44 @@ import type {
   RegisteredService,
   ServiceInfo,
 } from "@edenapp/types";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { log } from "../logging";
-import type { AppChannelBackends, AppChannelTransport } from "./ports";
+import { AppChannelFailure, AppServiceAlreadyRegistered } from "./errors";
+import { AppChannelBackends, AppChannelTransport } from "./ports";
 
-const attempt = <A>(work: () => A) =>
-  Effect.try({
-    try: work,
-    catch: (error) =>
-      error instanceof Error ? error : new Error(String(error)),
-  });
+export interface AppChannels {
+  registerService: (
+    appId: string,
+    serviceName: string,
+    webContentsId: number,
+    options?: { description?: string; allowedClients?: string[] },
+  ) => Effect.Effect<void, AppServiceAlreadyRegistered>;
+  unregisterService: (
+    appId: string,
+    serviceName: string,
+  ) => Effect.Effect<boolean>;
+  connect: (
+    requesterAppId: string,
+    requesterWebContentsId: number,
+    targetAppId: string,
+    serviceName: string,
+  ) => Effect.Effect<ConnectResult, AppChannelFailure>;
+  unregisterAllServices: (appId: string) => number;
+  listServices: () => ServiceInfo[];
+  getServicesByApp: (appId: string) => ServiceInfo[];
+}
 
-export function createAppChannels({
-  channels,
-  backends,
-}: {
-  channels: AppChannelTransport;
-  backends: AppChannelBackends;
-}) {
-  return Effect.gen(function* () {
+export const AppChannels = Context.Service<"eden/AppChannels", AppChannels>(
+  "eden/AppChannels",
+);
+
+export const AppChannelsLive = Layer.effect(
+  AppChannels,
+  Effect.gen(function* () {
+    const channels = yield* AppChannelTransport;
+    const backends = yield* AppChannelBackends;
     const services = new Map<string, RegisteredService>();
     const connections = new Map<
       string,
@@ -42,12 +61,12 @@ export function createAppChannels({
       webContentsId: number,
       options?: { description?: string; allowedClients?: string[] },
     ) {
-      return attempt((): void => {
+      return Effect.gen(function* () {
         const key = serviceKey(appId, serviceName);
 
         if (services.has(key)) {
-          throw new Error(
-            `Service "${serviceName}" is already registered by app "${appId}"`,
+          return yield* Effect.fail(
+            new AppServiceAlreadyRegistered({ appId, serviceName }),
           );
         }
         const providerType =
@@ -69,7 +88,7 @@ export function createAppChannels({
     }
 
     function unregisterService(appId: string, serviceName: string) {
-      return attempt((): boolean => {
+      return Effect.sync((): boolean => {
         const key = serviceKey(appId, serviceName);
         const deleted = services.delete(key);
 
@@ -121,32 +140,55 @@ export function createAppChannels({
       targetAppId: string,
       serviceName: string,
     ) {
-      return attempt((): ConnectResult => {
+      return Effect.gen(function* () {
+        const native = <A>(
+          operation: AppChannelFailure["operation"],
+          work: () => A,
+        ) =>
+          Effect.try({
+            try: work,
+            catch: (cause) =>
+              new AppChannelFailure({
+                operation,
+                requesterAppId,
+                targetAppId,
+                serviceName,
+                cause,
+              }),
+          });
         const service = getService(targetAppId, serviceName);
 
         if (!service) {
           return {
-            success: false,
+            success: false as const,
             error: `Service "${serviceName}" not found on app "${targetAppId}"`,
           };
         }
         if (!isClientAllowed(service, requesterAppId)) {
           return {
-            success: false,
+            success: false as const,
             error: `App "${requesterAppId}" is not allowed to connect to service "${serviceName}"`,
           };
         }
         const requesterWebContents = requesterWebContentsId
-          ? channels.getWebContentsById(requesterWebContentsId)
+          ? yield* native("lookup-requester", () =>
+              channels.getWebContentsById(requesterWebContentsId),
+            )
           : undefined;
-        const targetWebContents = service.webContentsId
-          ? channels.getWebContentsById(service.webContentsId)
+        const providerWebContentsId = service.webContentsId;
+        const targetWebContents = providerWebContentsId
+          ? yield* native("lookup-provider", () =>
+              channels.getWebContentsById(providerWebContentsId),
+            )
           : undefined;
         const isRequesterBackend =
           !requesterWebContents && backends.hasBackend(requesterAppId);
 
         if (!requesterWebContents && !isRequesterBackend) {
-          return { success: false, error: "Requester process not found" };
+          return {
+            success: false as const,
+            error: "Requester process not found",
+          };
         }
         const isTargetBackend =
           service.providerType === "backend" &&
@@ -154,18 +196,20 @@ export function createAppChannels({
 
         if (service.providerType === "frontend" && !targetWebContents) {
           return {
-            success: false,
+            success: false as const,
             error: `Target app "${targetAppId}" frontend is not running`,
           };
         }
 
         if (service.providerType === "backend" && !isTargetBackend) {
           return {
-            success: false,
+            success: false as const,
             error: `Target app "${targetAppId}" backend is not running`,
           };
         }
-        const { port1, port2 } = channels.createMessageChannel();
+        const { port1, port2 } = yield* native("create-channel", () =>
+          channels.createMessageChannel(),
+        );
         const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${Date.now()}`;
 
         connections.set(connectionId, {
@@ -179,55 +223,63 @@ export function createAppChannels({
           `Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`,
         );
         if (requesterWebContents) {
-          requesterWebContents.postMessage(
-            "appbus-port",
-            {
-              connectionId,
-              targetAppId,
-              serviceName,
-              role: "client",
-            },
-            [port1],
+          yield* native("transfer-requester", () =>
+            requesterWebContents.postMessage(
+              "appbus-port",
+              {
+                connectionId,
+                targetAppId,
+                serviceName,
+                role: "client",
+              },
+              [port1],
+            ),
           );
         } else {
-          backends.sendPortToBackend(
-            requesterAppId,
-            {
-              type: "appbus-port",
-              connectionId,
-              targetAppId,
-              serviceName,
-              role: "client",
-            },
-            [port1],
+          yield* native("transfer-requester", () =>
+            backends.sendPortToBackend(
+              requesterAppId,
+              {
+                type: "appbus-port",
+                connectionId,
+                targetAppId,
+                serviceName,
+                role: "client",
+              },
+              [port1],
+            ),
           );
         }
         if (targetWebContents) {
-          targetWebContents.postMessage(
-            "appbus-port",
-            {
-              connectionId,
-              sourceAppId: requesterAppId,
-              serviceName,
-              role: "service",
-            },
-            [port2],
+          yield* native("transfer-provider", () =>
+            targetWebContents.postMessage(
+              "appbus-port",
+              {
+                connectionId,
+                sourceAppId: requesterAppId,
+                serviceName,
+                role: "service",
+              },
+              [port2],
+            ),
           );
         } else {
-          backends.sendPortToBackend(
-            targetAppId,
-            {
-              type: "appbus-port",
-              connectionId,
-              sourceAppId: requesterAppId,
-              serviceName,
-              role: "service",
-            },
-            [port2],
+          yield* native("transfer-provider", () =>
+            backends.sendPortToBackend(
+              targetAppId,
+              {
+                type: "appbus-port",
+                connectionId,
+                sourceAppId: requesterAppId,
+                serviceName,
+                role: "service",
+              },
+              [port2],
+            ),
           );
         }
 
-        return { success: true, connectionId };
+        return { success: true, connectionId } satisfies ConnectResult;
       });
     }
 
@@ -319,7 +371,5 @@ export function createAppChannels({
       listServices,
       getServicesByApp,
     };
-  });
-}
-
-export type AppChannels = Effect.Success<ReturnType<typeof createAppChannels>>;
+  }),
+);
