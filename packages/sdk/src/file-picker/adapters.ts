@@ -3,15 +3,13 @@ import type { Filesystem } from "../filesystem/service";
 import type { Notifications } from "../notification/service";
 import type { Processes } from "../processes/service";
 import type { Views } from "../views/service";
+import { FilePickerIoFailed } from "./errors";
 import type {
   FilePickerFiles,
   FilePickerNotifications,
   FilePickerProcesses,
   FilePickerViews,
 } from "./ports";
-
-const asError = (error: unknown) =>
-  error instanceof Error ? error : new Error(String(error));
 
 export function createFilePickerProcesses(
   processes: Pick<
@@ -20,9 +18,31 @@ export function createFilePickerProcesses(
   >,
 ): FilePickerProcesses {
   return {
-    ensureRunning: (appId) => Effect.asVoid(processes.ensureAppRunning(appId)),
+    ensureRunning: (appId) =>
+      Effect.asVoid(processes.ensureAppRunning(appId)).pipe(
+        Effect.mapError(
+          (cause) =>
+            new FilePickerIoFailed({
+              operation: "start-provider",
+              appId,
+              message: cause.message,
+              cause,
+            }),
+        ),
+      ),
     isRunning: (appId) => Boolean(processes.getAppInstance(appId)),
-    stop: (appId) => processes.stopApp(appId),
+    stop: (appId) =>
+      processes.stopApp(appId).pipe(
+        Effect.mapError(
+          (cause) =>
+            new FilePickerIoFailed({
+              operation: "stop-provider",
+              appId,
+              message: cause.message,
+              cause,
+            }),
+        ),
+      ),
     stopped: processes.stopped,
   };
 }
@@ -48,7 +68,13 @@ export function createFilePickerViews(
           views.showView(id);
           views.focusView(id);
         },
-        catch: asError,
+        catch: (cause) =>
+          new FilePickerIoFailed({
+            operation: "reveal-provider",
+            viewId: id,
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
       }),
   };
 }
@@ -57,7 +83,18 @@ export function createFilePickerFiles(
   files: Pick<Filesystem, "resolvePath" | "accessScope">,
 ): FilePickerFiles {
   return {
-    resolvePath: (location) => Effect.asVoid(files.resolvePath(location)),
+    resolvePath: (location) =>
+      Effect.asVoid(files.resolvePath(location)).pipe(
+        Effect.mapError(
+          (cause) =>
+            new FilePickerIoFailed({
+              operation: "resolve-location",
+              location: { ...location },
+              message: cause.message,
+              cause,
+            }),
+        ),
+      ),
     accessScope: (volume) => files.accessScope(volume),
   };
 }
@@ -78,6 +115,15 @@ export function createFilePickerNotifications(
           {
             "force-open-file-picker": () => Effect.asVoid(replace),
           },
+        ),
+      ).pipe(
+        Effect.mapError(
+          (cause) =>
+            new FilePickerIoFailed({
+              operation: "notify-busy",
+              message: cause.message,
+              cause,
+            }),
         ),
       ),
   };

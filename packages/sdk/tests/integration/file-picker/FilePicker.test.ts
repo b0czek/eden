@@ -8,21 +8,67 @@ import type {
   UserProfile,
   ViewBounds,
 } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import { createAppAssociations } from "../../../src/app-associations/service";
+import * as Exit from "effect/Exit";
+import { AppAssociationStorage } from "../../../src/app-associations/ports";
+import {
+  AppAssociations,
+  AppAssociationsLive,
+} from "../../../src/app-associations/service";
 import type { TargetedNotification } from "../../../src/controllers/events";
 import { createEvent } from "../../../src/events/event";
-import { createExecutionContext } from "../../../src/execution/context";
-import { createFilePickerProcesses } from "../../../src/file-picker/adapters";
+import {
+  ExecutionContext,
+  ExecutionContextLive,
+} from "../../../src/execution/context";
+import {
+  createFilePickerFiles,
+  createFilePickerProcesses,
+} from "../../../src/file-picker/adapters";
 import { createFilePickerController } from "../../../src/file-picker/controller-edenapi";
-import type { FilePickerDependencies } from "../../../src/file-picker/ports";
-import { createFilePicker } from "../../../src/file-picker/service";
-import { createVolumes } from "../../../src/filesystem/volumes";
-import { createPermissions } from "../../../src/ipc/permissions";
-import { createPackageCatalog } from "../../../src/packages/catalog";
-import { createInstalledPackages } from "../../../src/packages/installed";
+
+import {
+  FilePickerFiles,
+  FilePickerNotifications,
+  FilePickerProcesses,
+  FilePickerViews,
+} from "../../../src/file-picker/ports";
+import { FilePicker, FilePickerLive } from "../../../src/file-picker/service";
+import { FilesystemIoFailed } from "../../../src/filesystem/errors";
+import { Volumes, VolumesLive } from "../../../src/filesystem/volumes";
+import { Permissions, PermissionsLive } from "../../../src/ipc/permissions";
+import {
+  PackageCatalog,
+  PackageCatalogLive,
+} from "../../../src/packages/catalog";
+import {
+  InstalledPackages,
+  InstalledPackagesLive,
+} from "../../../src/packages/installed";
+import {
+  AppsDirectory,
+  DistPath,
+  RuntimeConfig,
+} from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
-import { createEffectRuntime } from "../../support/effect-runtime";
+import {
+  buildService,
+  createEffectRuntime,
+} from "../../support/effect-runtime";
+
+const serviceEffects = createEffectRuntime();
+afterAll(() => serviceEffects.dispose());
+
+interface FilePickerTestPorts {
+  associations: AppAssociations;
+  views: FilePickerViews;
+  processes: FilePickerProcesses;
+  files: FilePickerFiles;
+  volumes: Volumes;
+  permissions: Permissions;
+  notifications: FilePickerNotifications;
+}
 
 const provider = { appId: "com.example.picker", webContentsId: 100 };
 const opener = { appId: "com.example.editor", webContentsId: 200 };
@@ -39,13 +85,21 @@ const vendor: UserProfile = {
 
 async function createScenario() {
   const runtime = createEffectRuntime();
-  const execution = createExecutionContext({ config: {} });
+  const execution = serviceEffects.acquireSync(
+    buildService(ExecutionContext, ExecutionContextLive).pipe(
+      Effect.provideService(RuntimeConfig, {}),
+    ),
+  );
   const run = <A, E>(work: Effect.Effect<A, E>) =>
     execution.run({ principal: { kind: "user", profile: vendor } }, () =>
       runtime.run(work),
     );
-  const registry = createInstalledPackages();
-  const permissions = createPermissions();
+  const registry = serviceEffects.acquireSync(
+    buildService(InstalledPackages, InstalledPackagesLive),
+  );
+  const permissions = serviceEffects.acquireSync(
+    buildService(Permissions, PermissionsLive),
+  );
   const installProvider = (id: string, permitted = true) => {
     registry.register(
       testApp(id, {
@@ -56,20 +110,22 @@ async function createScenario() {
     permissions.registerApp(id, permitted ? ["file-picker/display"] : []);
   };
   installProvider(provider.appId);
-  const catalog = createPackageCatalog({
-    registry,
-    executionContext: execution,
-    appsDirectory: "/tmp",
-    distPath: "/tmp",
-  });
+  const catalog = serviceEffects.acquireSync(
+    buildService(PackageCatalog, PackageCatalogLive).pipe(
+      Effect.provideService(InstalledPackages, registry),
+      Effect.provideService(ExecutionContext, execution),
+      Effect.provideService(AppsDirectory, "/tmp"),
+      Effect.provideService(DistPath, "/tmp"),
+    ),
+  );
   const associations = await runtime.acquire(
-    createAppAssociations({
-      catalog,
-      storage: {
+    buildService(AppAssociations, AppAssociationsLive).pipe(
+      Effect.provideService(PackageCatalog, catalog),
+      Effect.provideService(AppAssociationStorage, {
         read: () => Effect.succeed('{"version":1,"associations":{}}'),
         write: () => Effect.void,
-      },
-    }),
+      }),
+    ),
   );
   await run(associations.initialize());
   const stopped = createEvent<{ appId: string }>();
@@ -88,8 +144,8 @@ async function createScenario() {
   const closed: TargetedNotification<FilePickerResult>[] = [];
   const opened: TargetedNotification<{ picker: FilePickerOpenEvent }>[] = [];
   const replacements: Effect.Effect<{ requestId: string }, Error>[] = [];
-  const volumes = await runtime.acquire(createVolumes());
-  const dependencies: FilePickerDependencies = {
+  const volumes = await runtime.acquire(buildService(Volumes, VolumesLive));
+  const dependencies: FilePickerTestPorts = {
     associations,
     views: {
       resolve: (id) =>
@@ -128,7 +184,20 @@ async function createScenario() {
       resolvePath: () => Effect.void,
     },
   };
-  const picker = await runtime.acquire(createFilePicker(dependencies));
+  const picker = await runtime.acquire(
+    buildService(FilePicker, FilePickerLive).pipe(
+      Effect.provideService(AppAssociations, dependencies.associations),
+      Effect.provideService(FilePickerViews, dependencies.views),
+      Effect.provideService(FilePickerProcesses, dependencies.processes),
+      Effect.provideService(FilePickerFiles, dependencies.files),
+      Effect.provideService(Volumes, dependencies.volumes),
+      Effect.provideService(Permissions, dependencies.permissions),
+      Effect.provideService(
+        FilePickerNotifications,
+        dependencies.notifications,
+      ),
+    ),
+  );
   picker.closed.on((event) => {
     closed.push(event);
   });
@@ -412,18 +481,49 @@ describe("file picker composition and request lifecycle", () => {
 
   it("propagates initial-location failures before opening a provider or creating a request", async () => {
     const s = await scenario();
-    const failure = new Error("Location is unavailable");
-    s.dependencies.files.resolvePath = () => Effect.fail(failure);
+    const failure = new FilesystemIoFailed({
+      operation: "resolve-path",
+      message: "Location is unavailable",
+      cause: new Error("Location is unavailable"),
+    });
+    s.dependencies.files.resolvePath = createFilePickerFiles({
+      accessScope: (volume) => ({ volume, path: "/" }),
+      resolvePath: () => Effect.fail(failure),
+    }).resolvePath;
     await expect(
       s.open({
         mode: "open",
         initialLocation: { volume: "home", path: "/missing" },
       }),
-    ).rejects.toBe(failure);
+    ).rejects.toMatchObject({
+      _tag: "FilePickerIoFailed",
+      operation: "resolve-location",
+      message: "Location is unavailable",
+      location: { volume: "home", path: "/missing" },
+      cause: failure,
+    });
     expect(s.opened).toEqual([]);
     expect(s.launches).toEqual([]);
     await s.register();
     await expect(s.open()).resolves.toEqual({ requestId: expect.any(String) });
+  });
+
+  it("keeps unexpected collaborator exceptions outside the recoverable failure channel", async () => {
+    const s = await scenario();
+    await s.register();
+    const defect = new Error("Broken view registry");
+    s.dependencies.views.resolve = () => {
+      throw defect;
+    };
+    const exit = await s.run(
+      Effect.exit(s.picker.openPicker({ mode: "open" }, opener)),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      expect(Cause.hasDies(exit.cause)).toBe(true);
+      expect(Cause.hasFails(exit.cause)).toBe(false);
+    }
+    expect(s.opened).toEqual([]);
   });
 
   it("lets a busy notification replace the active request and route both outcomes", async () => {

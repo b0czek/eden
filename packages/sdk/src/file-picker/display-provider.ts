@@ -1,7 +1,12 @@
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { log } from "../logging";
-import type { FilePickerCaller, FilePickerViews } from "./ports";
+import {
+  FilePickerProviderRejected,
+  FilePickerProviderUnavailable,
+} from "./errors";
+import type { FilePickerViews } from "./ports";
+import type { FilePickerCaller } from "./types";
 
 interface Provider {
   appId: string;
@@ -12,7 +17,7 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
   let provider: Provider | null = null;
   const waiters = new Set<{
     appId: string;
-    complete: (error?: Error) => void;
+    complete: (error?: FilePickerProviderUnavailable) => void;
   }>();
 
   function resolveCallerViewId(webContentsId?: number) {
@@ -35,12 +40,17 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
   function register(caller: FilePickerCaller): { success: boolean } {
     const viewId = resolveCallerViewId(caller.webContentsId);
     if (viewId === undefined || !caller.appId)
-      throw new Error("File picker display provider must be a valid view");
+      throw new FilePickerProviderRejected({
+        appId: caller.appId,
+        message: "File picker display provider must be a valid view",
+      });
     for (const waiter of waiters) {
       if (waiter.appId !== caller.appId)
-        throw new Error(
-          `File picker display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
-        );
+        throw new FilePickerProviderRejected({
+          appId: caller.appId,
+          expectedAppId: waiter.appId,
+          message: `File picker display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
+        });
     }
     provider = { appId: caller.appId, viewId };
     for (const waiter of [...waiters]) waiter.complete();
@@ -70,14 +80,14 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
   }
 
   function waitFor(appId: string) {
-    return Effect.callback<void, Error>((resume) => {
+    return Effect.callback<void, FilePickerProviderUnavailable>((resume) => {
       if (get()?.appId === appId) {
         resume(Effect.void);
         return;
       }
       const waiter = {
         appId,
-        complete(error?: Error) {
+        complete(error?: FilePickerProviderUnavailable) {
           waiters.delete(waiter);
           resume(error ? Effect.fail(error) : Effect.void);
         },
@@ -91,7 +101,11 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
         duration: Duration.seconds(5),
         orElse: () =>
           Effect.fail(
-            new Error("Timed out waiting for File picker display provider"),
+            new FilePickerProviderUnavailable({
+              reason: "timeout",
+              appIds: [appId],
+              message: "Timed out waiting for File picker display provider",
+            }),
           ),
       }),
     );
@@ -100,7 +114,12 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
   function dispose() {
     provider = null;
     for (const waiter of [...waiters])
-      waiter.complete(new Error("File picker display provider disposed"));
+      waiter.complete(
+        new FilePickerProviderUnavailable({
+          reason: "disposed",
+          message: "File picker display provider disposed",
+        }),
+      );
   }
 
   return {
