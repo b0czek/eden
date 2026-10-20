@@ -335,40 +335,50 @@ describe("Daemons", () => {
     },
   );
 
-  it("awaits interrupted startup cleanup before daemon shutdown completes", async () => {
-    await configure();
-    const starting = Deferred.makeUnsafe<void>();
-    const cleaning = Deferred.makeUnsafe<void>();
-    const cleaned = Deferred.makeUnsafe<void>();
-    processes.launchDaemon.mockReturnValue(
-      Effect.gen(function* () {
-        yield* Effect.addFinalizer(() =>
-          Effect.andThen(
-            Deferred.succeed(cleaning, undefined),
-            Deferred.await(cleaned),
-          ),
-        );
-        yield* Deferred.succeed(starting, undefined);
-        yield* Effect.never;
-      }).pipe(Effect.scoped),
-    );
-    const launch = effects.fork(daemons.start(manifest.id));
-    await effects.run(Deferred.await(starting));
-    const shutdown = effects.fork(daemons.shutdown());
-    await effects.run(Deferred.await(cleaning));
-    try {
-      expect(shutdown.pollUnsafe()).toBeUndefined();
-    } finally {
-      await effects.run(Deferred.succeed(cleaned, undefined));
-    }
-    await effects.run(Fiber.join(shutdown));
-    const exit = await effects.run(Fiber.await(launch));
-    expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
-      true,
-    );
-    await effects.run(TestClock.adjust(Duration.seconds(31)));
-    expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
-  });
+  it.each([false, true])(
+    "awaits startup cleanup for every shutdown caller (first caller interrupted: %s)",
+    async (interruptFirst) => {
+      await configure();
+      const starting = Deferred.makeUnsafe<void>();
+      const cleaning = Deferred.makeUnsafe<void>();
+      const cleaned = Deferred.makeUnsafe<void>();
+      processes.launchDaemon.mockReturnValue(
+        Effect.gen(function* () {
+          yield* Effect.addFinalizer(() =>
+            Effect.andThen(
+              Deferred.succeed(cleaning, undefined),
+              Deferred.await(cleaned),
+            ),
+          );
+          yield* Deferred.succeed(starting, undefined);
+          yield* Effect.never;
+        }).pipe(Effect.scoped),
+      );
+      const launch = effects.fork(daemons.start(manifest.id));
+      await effects.run(Deferred.await(starting));
+      const shutdown = effects.fork(daemons.shutdown());
+      await effects.run(Deferred.await(cleaning));
+      const concurrentShutdown = effects.fork(daemons.shutdown());
+      if (interruptFirst) shutdown.interruptUnsafe();
+      try {
+        expect(shutdown.pollUnsafe()).toBeUndefined();
+        expect(concurrentShutdown.pollUnsafe()).toBeUndefined();
+      } finally {
+        await effects.run(Deferred.succeed(cleaned, undefined));
+      }
+      await effects.run(Fiber.join(concurrentShutdown));
+      const shutdownExit = await effects.run(Fiber.await(shutdown));
+      expect(Exit.isFailure(shutdownExit)).toBe(interruptFirst);
+      if (Exit.isFailure(shutdownExit))
+        expect(Cause.hasInterruptsOnly(shutdownExit.cause)).toBe(true);
+      const exit = await effects.run(Fiber.await(launch));
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+        true,
+      );
+      await effects.run(TestClock.adjust(Duration.seconds(31)));
+      expect(processes.launchDaemon).toHaveBeenCalledTimes(1);
+    },
+  );
   it("removes daemon configuration and pending supervision after its package leaves the catalog", async () => {
     const operator: UserProfile = {
       username: "operator",

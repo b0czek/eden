@@ -559,36 +559,39 @@ export const ProcessesLive = Layer.effect(
       );
     }
 
-    const shutdown = Effect.fn(function* () {
-      _shuttingDown = true;
+    const shutdown = Effect.uninterruptible(
+      yield* Effect.cached(
+        Effect.gen(function* () {
+          _shuttingDown = true;
 
-      yield* stopHotReload;
+          yield* stopHotReload;
 
-      const runningAppIds = Array.from(instances.keys());
+          const runningAppIds = Array.from(instances.keys());
 
-      log.info(`Stopping ${runningAppIds.length} running app(s)...`);
+          log.info(`Stopping ${runningAppIds.length} running app(s)...`);
 
-      // Stop all apps sequentially and wait for each to complete
-      for (const appId of runningAppIds) {
-        yield* Effect.gen(function* () {
-          log.info(`Stopping app: ${appId}`);
-          yield* stopApp(appId);
-          log.info(`✓ Stopped app: ${appId}`);
-        }).pipe(
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause).pipe(Effect.orDie)
-              : Effect.sync(() => {
-                  const error = Cause.squash(cause);
-                  log.error(`Failed to stop app ${appId}:`, error);
-                }),
-          ),
-        );
-      }
-    });
+          // Stop all apps sequentially and wait for each to complete
+          for (const appId of runningAppIds) {
+            yield* Effect.gen(function* () {
+              log.info(`Stopping app: ${appId}`);
+              yield* stopApp(appId);
+              log.info(`✓ Stopped app: ${appId}`);
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Cause.hasInterruptsOnly(cause)
+                  ? Effect.failCause(cause).pipe(Effect.orDie)
+                  : Effect.sync(() => {
+                      const error = Cause.squash(cause);
+                      log.error(`Failed to stop app ${appId}:`, error);
+                    }),
+              ),
+            );
+          }
+        }),
+      ),
+    );
 
     function dispose(): void {
-      _shuttingDown = true;
       instances.clear();
       admission.clear();
     }
@@ -670,7 +673,7 @@ export const ProcessesLive = Layer.effect(
     }
     let stopHotReload: Effect.Effect<void> = Effect.void;
     yield* Effect.addFinalizer(() =>
-      shutdown().pipe(
+      shutdown.pipe(
         Effect.catchCause((cause) =>
           Effect.sync(() =>
             log.error("Failed to stop process lifecycle:", Cause.squash(cause)),
@@ -713,7 +716,7 @@ export const ProcessesLive = Layer.effect(
       getAppInstance,
       getInstalledManifest,
       getMetrics,
-      shutdown,
+      shutdown: () => shutdown,
       reloadApp,
       stopSessionApps,
     };

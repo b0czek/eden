@@ -3,7 +3,6 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -122,11 +121,8 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     // @eden-effect-next-line domain-interpreter -- Runtime boundary exposes disposal as an idempotent Promise and awaits managed shutdown.
     disposal ??= Effect.runPromise(
       Effect.gen(function* () {
-        if (startup) {
-          yield* Fiber.interrupt(startup);
-          const exit = yield* Fiber.await(startup);
-          if (Exit.isSuccess(exit) && bundle) yield* bundle.shutdown();
-        }
+        if (startup) yield* Fiber.interrupt(startup);
+        if (bundle) yield* bundle.shutdown();
       }).pipe(
         Effect.catchCause((cause) =>
           Effect.sync(() =>

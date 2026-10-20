@@ -40,15 +40,23 @@ export const acquireDesktopLifecycle = Effect.fn(function* (
     yield* associations.initialize();
     yield* foundation.open();
   });
-  const shutdown = Effect.fn(function* () {
-    operations.closeAdmission();
-    yield* shutdownPhase("filesystem handles", filesystem.closeHandles());
-    yield* shutdownPhase("operation drain", operations.shutdown());
-    yield* shutdownPhase("autostart", autostart.shutdown());
-    yield* shutdownPhase("daemons", daemons.shutdown());
-    yield* shutdownPhase("processes", processes.shutdown());
-  });
-  return { initialize, shutdown, closeAdmission: operations.closeAdmission };
+  const shutdown = Effect.uninterruptible(
+    yield* Effect.cached(
+      Effect.gen(function* () {
+        operations.closeAdmission();
+        yield* shutdownPhase("filesystem handles", filesystem.closeHandles());
+        yield* shutdownPhase("operation drain", operations.shutdown());
+        yield* shutdownPhase("autostart", autostart.shutdown());
+        yield* shutdownPhase("daemons", daemons.shutdown());
+        yield* shutdownPhase("processes", processes.shutdown());
+      }),
+    ),
+  );
+  return {
+    initialize,
+    shutdown: () => shutdown,
+    closeAdmission: operations.closeAdmission,
+  };
 });
 
 function shutdownPhase<A, E>(name: string, work: Effect.Effect<A, E>) {

@@ -358,6 +358,12 @@ shutdown closes operation admission, drains accepted work, and stops processes
 before disposing the managed graph. Failed acquisition releases partial resources
 and preserves the startup error even when cleanup fails.
 
+Daemon, process and autostart shutdown each share one terminal program between
+explicit callers and scoped cleanup. Desktop startup-failure and disposal paths
+share one ordered shutdown program. Every caller waits for settlement;
+interrupting a caller does not abandon terminal cleanup. Operation drains remain
+repeatable because they exclude the calling operation.
+
 Host execution uses `eden.runPromise` or `eden.runFork`. Native IPC and protocol
 adapters own their callback fibers in their acquisition scopes. Services compose
 Effects and receive no outer runtime runner. Test fixtures can acquire standalone

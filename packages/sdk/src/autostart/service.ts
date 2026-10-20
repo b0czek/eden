@@ -160,26 +160,26 @@ export const AutostartLive = Layer.effect(
       );
     }
 
-    function shutdown() {
-      return Effect.gen(function* () {
-        if (!disposed) {
+    const shutdown = Effect.uninterruptible(
+      yield* Effect.cached(
+        Effect.gen(function* () {
           disposed = true;
           ready = false;
           unsubscribe();
           yield* Queue.end(pending);
-        }
-        yield* Fiber.join(worker);
-      }).pipe(Effect.uninterruptible);
-    }
+          yield* Fiber.join(worker);
+        }),
+      ),
+    );
 
     yield* Effect.addFinalizer(() =>
-      Effect.catchCause(shutdown(), (cause) =>
+      Effect.catchCause(shutdown, (cause) =>
         Effect.sync(() => {
           if (!Cause.hasInterruptsOnly(cause))
             log.error("Failed to stop startup launches:", Cause.squash(cause));
         }),
       ),
     );
-    return { onFoundationReady, shutdown };
+    return { onFoundationReady, shutdown: () => shutdown };
   }),
 );

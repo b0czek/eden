@@ -450,10 +450,14 @@ export const DaemonsLive = Layer.effect(
           );
       });
     }
-    const shutdown = Effect.fn(function* () {
-      shuttingDown = true;
-      yield* FiberMap.clear(fibers);
-    });
+    const shutdown = Effect.uninterruptible(
+      yield* Effect.cached(
+        Effect.gen(function* () {
+          shuttingDown = true;
+          yield* FiberMap.clear(fibers);
+        }),
+      ),
+    );
     const initialize = Effect.fn(function* () {
       const persisted = yield* readPersisted();
       for (const app of daemonApps()) {
@@ -470,7 +474,7 @@ export const DaemonsLive = Layer.effect(
       for (const definition of loaded.values())
         if (definition.enabled) yield* startAttempt(definition.appId, true);
     });
-    yield* Effect.addFinalizer(() => shutdown().pipe(Effect.orDie));
+    yield* Effect.addFinalizer(() => shutdown);
     return {
       initialize,
       list,
@@ -479,7 +483,7 @@ export const DaemonsLive = Layer.effect(
       start,
       stop,
       restart,
-      shutdown,
+      shutdown: () => shutdown,
       changed,
       processExited,
       processStopped,
