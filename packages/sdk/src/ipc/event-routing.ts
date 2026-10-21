@@ -162,9 +162,12 @@ export function createEventRouting({
 
     if (operation) addOperation(operationViews, viewId, operation);
     else {
-      if (!subscriptions.has(eventName))
-        subscriptions.set(eventName, new Set());
-      subscriptions.get(eventName)!.add(viewId);
+      let recipients = subscriptions.get(eventName);
+      if (!recipients) {
+        recipients = new Set();
+        subscriptions.set(eventName, recipients);
+      }
+      recipients.add(viewId);
     }
     viewScopes.set(viewId, {
       appId: viewInfo.appId,
@@ -201,9 +204,12 @@ export function createEventRouting({
 
     if (operation) addOperation(operationBackends, appId, operation);
     else {
-      if (!backendSubscriptions.has(eventName))
-        backendSubscriptions.set(eventName, new Set());
-      backendSubscriptions.get(eventName)!.add(appId);
+      let recipients = backendSubscriptions.get(eventName);
+      if (!recipients) {
+        recipients = new Set();
+        backendSubscriptions.set(eventName, recipients);
+      }
+      recipients.add(appId);
     }
     backendScopes.set(appId, {
       appId,
@@ -294,9 +300,10 @@ export function createEventRouting({
     if (!scope) return true;
     const subscriber = viewScopes.get(viewId);
     return (
-      subscriber?.appId === scope.appId &&
-      subscriber?.sessionId === scope.sessionId &&
-      !!contexts?.resolvePrincipal(subscriber.appId!)
+      subscriber?.appId !== undefined &&
+      subscriber.appId === scope.appId &&
+      subscriber.sessionId === scope.sessionId &&
+      !!contexts.resolvePrincipal(subscriber.appId)
     );
   }
   function backendAuthorized(appId: string, scope?: EventScope): boolean {

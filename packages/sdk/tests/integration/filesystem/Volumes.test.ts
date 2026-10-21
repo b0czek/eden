@@ -2,11 +2,7 @@ import { statSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type {
-  FilesystemVolume,
-  OperationHandle,
-  UserProfile,
-} from "@edenapp/types";
+import type { FilesystemVolume, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../../../src/effects/io";
 import { createFileTransfers } from "../../../src/filesystem/transfers";
@@ -54,21 +50,12 @@ describe("consumer-managed filesystem volumes", () => {
       principal: { kind: "user", profile: user },
     });
 
-  const invoke = async (id: string, command: string, args: unknown) => {
-    const instance = requireValue(
-      eden.runtime.services.processes.getAppInstance(id),
-    );
-    const view = requireValue(
-      eden.runtime.services.views.getViewInfo(instance.viewId),
-    );
-    const response = (await eden.platform.rendererIpc.invoke(
-      "shell-command",
-      view.view.webContents.id,
+  const invoke = (id: string, command: string, args: unknown) =>
+    eden.executeFromView(
+      eden.getAppView(id).view.webContents.id,
       command,
       args,
-    )) as { mode: "result"; result: unknown };
-    return response.result;
-  };
+    );
 
   it("publishes detached metadata without revealing mount paths", async () => {
     const changes: FilesystemVolume[][] = [];
@@ -594,18 +581,10 @@ describe("consumer-managed filesystem volumes", () => {
         created.options.webPreferences?.additionalArguments ?? [],
       ),
     ).toEqual({ appId: handlerId, args: [], file: usb });
-    const instance = requireValue(
-      eden.runtime.services.processes.getAppInstance(handlerId),
-    );
-    const view = requireValue(
-      eden.runtime.services.views.getViewInfo(instance.viewId),
-    );
-    await eden.platform.rendererIpc.invoke(
-      "shell-command",
-      view.view.webContents.id,
-      "event/subscribe",
-      { eventName: "file/opened" },
-    );
+    const view = eden.getAppView(handlerId);
+    await eden.executeFromView(view.view.webContents.id, "event/subscribe", {
+      eventName: "file/opened",
+    });
     await expect(
       execute("file/open", {
         location: { volume: "home", path: "/operators/one/same-path" },
@@ -984,33 +963,12 @@ describe("consumer-managed filesystem volumes", () => {
       const app = testApp(appId, { name: "Volumes" });
       eden.runtime.services.installedPackages.register(app);
       await eden.complete("process/launch", { appId });
-      const instance = requireValue(
-        eden.runtime.services.processes.getAppInstance(appId),
-      );
-      const view = requireValue(
-        eden.runtime.services.views.getViewInfo(instance.viewId),
-      );
+      const view = eden.getAppView(appId);
       const webContentsId = view.view.webContents.id;
-      const invoke = async (command: string, args: unknown) => {
-        const response = (await eden.platform.rendererIpc.invoke(
-          "shell-command",
-          webContentsId,
-          command,
-          args,
-        )) as
-          | { mode: "operation"; handle: OperationHandle }
-          | { mode: "result"; result: unknown };
-        const result =
-          response.mode === "operation" ? response.handle : response.result;
-        return command === "volume/eject"
-          ? eden.runtime.effects.run(
-              eden.runtime.services.operations.wait(result as OperationHandle, {
-                appId,
-                principal: { kind: "user", profile: user },
-              }),
-            )
-          : result;
-      };
+      const invoke = (command: string, args: unknown) =>
+        eden.executeFromView(webContentsId, command, args, {
+          waitForCompletion: true,
+        });
       await invoke("event/subscribe", { eventName: "fs/changed" });
       await invoke("event/subscribe", { eventName: "volume/changed" });
       if (removal === "eject") {

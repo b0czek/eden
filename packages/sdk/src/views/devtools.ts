@@ -1,7 +1,7 @@
 import { log } from "../logging";
 import type { PlatformView } from "../platform/ports";
 export function createViewDevTools() {
-  let _viewsWithDevTools: Set<number> = new Set();
+  const _viewsWithDevTools: Set<number> = new Set();
 
   function registerShortcut(view: PlatformView): void {
     view.webContents.on(

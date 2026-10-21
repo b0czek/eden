@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { targetedEvent } from "../controllers/events";
@@ -191,4 +192,3 @@ export function createViewController(
     },
   });
 }
-import * as Effect from "effect/Effect";

@@ -1,6 +1,5 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { SettingsPanelResponse } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { createTestEden, type TestEden } from "../../support/createTestEden";

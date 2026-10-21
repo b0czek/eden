@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, OperationSnapshot } from "@edenapp/types";
@@ -8,9 +9,6 @@ import * as Scope from "effect/Scope";
 import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { command, defineController } from "../../../src/controllers/controller";
-import { ExecutionContext } from "../../../src/execution/context";
-import { RuntimeContexts } from "../../../src/execution/runtime-contexts";
-import { Commands, IpcTransport, Permissions } from "../../../src/ipc";
 import { operationQuotaLimits } from "../../../src/operations/quota";
 import type { Operations } from "../../../src/operations/service";
 import {
@@ -18,12 +16,6 @@ import {
   type OperationTask,
   operationTask,
 } from "../../../src/operations/task";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Backends } from "../../../src/processes/backends";
-import { Processes } from "../../../src/processes/service";
-import { SessionContext } from "../../../src/session/context";
-import { Sessions } from "../../../src/session/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -495,12 +487,7 @@ describe("runtime-owned operations", () => {
         ),
       );
       await tick();
-      const effect = eden.platform.effects
-        .filter((item) => item.type === "utility-process-started")
-        .at(-1)!;
-      if (effect.type !== "utility-process-started")
-        throw new Error("Backend did not start");
-      const process = eden.platform.utilityProcesses.get(effect.pid)!;
+      const process = eden.getBackendProcess(id);
       process.emit("message", { type: "backend-ready" });
       await starting;
       process.emit("message", {
@@ -536,7 +523,8 @@ describe("runtime-owned operations", () => {
       mode: "operation",
       handle: { command: "integration/work", id: expect.any(String) },
     });
-    const handle = response!.result.handle;
+    assert(response, "Backend operation response is missing");
+    const handle = response.result.handle;
     expect(operations.get(handle, owner).status).toBe("running");
     blocked.release();
     await eden.runtime.effects.run(operations.wait(handle, owner));
@@ -562,12 +550,7 @@ describe("runtime-owned operations", () => {
       ),
     );
     await tick();
-    const restartedEffect = eden.platform.effects
-      .filter((effect) => effect.type === "utility-process-started")
-      .at(-1)!;
-    if (restartedEffect.type !== "utility-process-started")
-      throw new Error("Backend did not restart");
-    const restarted = eden.platform.utilityProcesses.get(restartedEffect.pid)!;
+    const restarted = eden.getBackendProcess(owner.appId);
     restarted.emit("message", { type: "backend-ready" });
     await restarting;
     const afterRestart = await submit();
@@ -613,12 +596,7 @@ describe("runtime-owned operations", () => {
         ),
       );
       await tick();
-      const effect = eden.platform.effects
-        .filter((item) => item.type === "utility-process-started")
-        .at(-1)!;
-      if (effect.type !== "utility-process-started")
-        throw new Error("Backend did not start");
-      const process = eden.platform.utilityProcesses.get(effect.pid)!;
+      const process = eden.getBackendProcess(owner.appId);
       process.emit("message", { type: "backend-ready" });
       await starting;
       return process;
@@ -722,14 +700,10 @@ describe("runtime-owned operations", () => {
       registry.register(testApp(id));
       await launch(id);
     }
-    const view = (id: string) =>
-      eden.runtime.services.views.getViewInfo(
-        eden.runtime.services.processes.getAppInstance(id)!.viewId,
-      )!.view;
     const invoke = async (id: string, command: string, args: unknown) => {
       const response = (await eden.platform.rendererIpc.invoke(
         "shell-command",
-        view(id).webContents.id,
+        eden.getAppView(id).view.webContents.id,
         command,
         args,
       )) as
@@ -739,7 +713,8 @@ describe("runtime-owned operations", () => {
     };
     for (const id of [owner.appId, "other.app"]) {
       await invoke(id, "event/subscribe", { eventName: "operation/changed" });
-      const context = eden.runtime.services.runtimeContexts.get(id)!;
+      const context = eden.runtime.services.runtimeContexts.get(id);
+      assert(context, "Launched app context is missing");
       await eden.execute(
         "event/subscribe",
         { eventName: "operation/changed" },
@@ -760,8 +735,9 @@ describe("runtime-owned operations", () => {
         return "persisted";
       }),
     );
-    const originalWebContentsId = view(owner.appId).webContents.id;
-    const otherWebContentsId = view("other.app").webContents.id;
+    const originalWebContentsId = eden.getAppView(owner.appId).view.webContents
+      .id;
+    const otherWebContentsId = eden.getAppView("other.app").view.webContents.id;
     const response = (await invoke(owner.appId, "integration/work", {
       value: "item",
     })) as { mode: "operation"; handle: OperationHandle };
@@ -772,7 +748,9 @@ describe("runtime-owned operations", () => {
     blocked.release();
     await eden.runtime.effects.run(operations.wait(handle, owner));
     await launch(owner.appId);
-    expect(view(owner.appId).webContents.id).not.toBe(originalWebContentsId);
+    expect(eden.getAppView(owner.appId).view.webContents.id).not.toBe(
+      originalWebContentsId,
+    );
     expect(
       await invoke(owner.appId, "operation/get", { handle }),
     ).toMatchObject({ status: "succeeded", result: "persisted" });

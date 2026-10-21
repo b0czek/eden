@@ -20,20 +20,14 @@ import type {
   ShellCommandResponse,
   ShellTransport,
 } from "../../../src/app-runtime/common/shell-transport";
-import { Permissions } from "../../../src/ipc/permissions";
-import { IpcTransport } from "../../../src/ipc/transport";
-import { Operations } from "../../../src/operations/service";
 import type { OperationReporter } from "../../../src/operations/task";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Processes } from "../../../src/processes/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 import { promiseOperationTask } from "../../support/operations";
 
-const eventName = "volume/changed";
+const _eventName = "volume/changed";
 
 describe("client subscriptions across renderer IPC", () => {
   let eden: TestEden;
@@ -63,9 +57,7 @@ describe("client subscriptions across renderer IPC", () => {
       eden.runtime.sessions.login(profile.username, "password"),
     );
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime.services.processes.getAppInstance(appId)!;
-    const contents = eden.runtime.services.views.getViewInfo(instance.viewId)!
-      .view.webContents;
+    const contents = eden.getAppView(appId).view.webContents;
     webContentsId = contents.id;
     listeners = new Map();
     contents.on(
@@ -389,7 +381,7 @@ describe("client subscriptions across renderer IPC", () => {
     "isolates %s operation-watch failures for initial and subsequent snapshots",
     async (kind) => {
       const api = createEdenAPI(transport, listeners);
-      const operation = work("watch-failure-" + kind);
+      const operation = work(`watch-failure-${kind}`);
       await operation.started;
       const broken: number[] = [];
       const healthy: number[] = [];
@@ -415,7 +407,7 @@ describe("client subscriptions across renderer IPC", () => {
         expect(healthy).toHaveLength(2);
         const completion = api.operations.from(operation.handle).result();
         operation.finish();
-        await expect(completion).resolves.toBe("watch-failure-" + kind);
+        await expect(completion).resolves.toBe(`watch-failure-${kind}`);
         await tick();
         expect(broken).toEqual(healthy);
         expect(healthy).toHaveLength(3);
@@ -568,7 +560,8 @@ describe("client subscriptions across renderer IPC", () => {
       if (
         !cancellation &&
         snapshot.phase === "copying" &&
-        snapshot.progress!.completed > 0
+        snapshot.progress !== undefined &&
+        snapshot.progress.completed > 0
       ) {
         cancellation = copy.cancel();
       }

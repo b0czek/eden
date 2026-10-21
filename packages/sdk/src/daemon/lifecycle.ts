@@ -43,7 +43,7 @@ export const connectDaemonLifecycle = Effect.fn(function* (
   yield* Effect.forkScoped(
     Effect.forever(
       Queue.take(pending).pipe(
-        Effect.flatMap((work) => work),
+        Effect.flatten,
         Effect.catchCause((cause) =>
           Cause.hasInterruptsOnly(cause)
             ? Effect.failCause(cause)

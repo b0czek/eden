@@ -5,12 +5,6 @@ import * as path from "node:path";
 import { bundle } from "@edenapp/genesis";
 import * as packageBundler from "@edenapp/genesis/dist/bundler";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
-import type { Operations } from "../../../src/operations/service";
-import type { PackageCatalog } from "../../../src/packages/catalog";
-import type { InstalledPackages } from "../../../src/packages/installed";
-import type { Packages } from "../../../src/packages/service";
-import type { Processes } from "../../../src/processes/service";
-import type { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -46,8 +40,7 @@ describe("Processes integration", () => {
     );
     await eden.complete("process/launch", { appId });
     const processes = eden.runtime.services.processes;
-    const instance = processes.getAppInstance(appId)!;
-    const view = eden.runtime.services.views.getViewInfo(instance.viewId)!.view;
+    const view = eden.getAppView(appId).view;
     const response = (await eden.platform.rendererIpc.invoke(
       "shell-command",
       view.webContents.id,

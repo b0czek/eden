@@ -1,19 +1,11 @@
-import type { InstalledPackages } from "../../../src/packages/installed";
-import type { Backends } from "../../../src/processes/backends";
 import type { Processes } from "../../../src/processes/service";
-import type { SessionContext } from "../../../src/session/context";
-import type { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
 async function readyBackend(eden: TestEden, appId: string) {
   await tick();
-  const backend = eden.runtime.services.backends.getBackend(appId);
-  const process = backend?.pid
-    ? eden.platform.utilityProcesses.get(backend.pid)
-    : undefined;
-  if (!process) throw new Error("Backend process did not start");
+  const process = eden.getBackendProcess(appId);
   process.emit("message", { type: "backend-ready" });
 }
 

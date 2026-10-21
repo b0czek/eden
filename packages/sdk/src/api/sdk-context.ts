@@ -31,7 +31,7 @@ export function createSdkContext({
           if (cause instanceof v.ValiError) return cause;
           throw cause;
         },
-      }).pipe(Effect.flatMap((work) => work)),
+      }).pipe(Effect.flatten),
       { principal: { kind: "system" } },
     );
   }

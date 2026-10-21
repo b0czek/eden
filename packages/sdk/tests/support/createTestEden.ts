@@ -1,20 +1,20 @@
+import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { OperationHandle } from "@edenapp/types";
+import type { OperationHandle, OperationSubmission } from "@edenapp/types";
 import type { EdenConfig } from "../../src/api/config";
 import type { CommandCallerContext } from "../../src/execution";
-import { Commands, Permissions } from "../../src/ipc";
-import { Operations } from "../../src/operations/service";
 import {
   createEdenRuntime,
   type EdenRuntime,
   type EdenRuntimePaths,
 } from "../../src/runtime/runtime";
-import { SessionContext } from "../../src/session/context";
+import type { ViewInfo } from "../../src/views/types";
 import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,
+  type InMemoryUtilityProcess,
 } from "./InMemoryPlatform";
 
 export interface CreateTestEdenOptions {
@@ -24,11 +24,25 @@ export interface CreateTestEdenOptions {
   root?: string;
 }
 
+export interface ExecuteFromViewOptions {
+  submission?: OperationSubmission;
+  waitForCompletion?: boolean;
+}
+
 export interface TestEden {
   readonly runtime: EdenRuntime;
   readonly platform: InMemoryPlatform;
   readonly paths: EdenRuntimePaths & { root: string };
   start(): Promise<void>;
+  getAppView(appId: string): ViewInfo;
+  getBackendProcess(appId: string): InMemoryUtilityProcess;
+  /** Operation commands return their handle unless waitForCompletion is enabled. */
+  executeFromView<TResult = unknown>(
+    webContentsId: number,
+    command: string,
+    args?: unknown,
+    options?: ExecuteFromViewOptions,
+  ): Promise<TResult>;
   execute<TResult = unknown>(
     command: string,
     args?: unknown,
@@ -80,6 +94,61 @@ export async function createTestEden(
     platform,
     paths,
     start: () => runtime.start(),
+    getAppView: (appId) => {
+      const instance = runtime.services.processes.getAppInstance(appId);
+      assert(instance, `App instance is missing: ${appId}`);
+      const view = runtime.services.views.getViewInfo(instance.viewId);
+      assert(view, `App view is missing: ${appId} (view ${instance.viewId})`);
+      return view;
+    },
+    getBackendProcess: (appId) => {
+      const backend = runtime.services.backends.getBackend(appId);
+      assert(backend?.pid !== undefined, `Backend has no process: ${appId}`);
+      const process = platform.utilityProcesses.get(backend.pid);
+      assert(
+        process,
+        `Backend process is missing: ${appId} (pid ${backend.pid})`,
+      );
+      return process;
+    },
+    executeFromView: async <TResult>(
+      webContentsId: number,
+      command: string,
+      args: unknown = {},
+      options: ExecuteFromViewOptions = {},
+    ) => {
+      // Keep the submitting identity even if the operation closes its view or session.
+      const appId =
+        runtime.services.views.getAppIdByWebContentsId(webContentsId);
+      const owner = appId
+        ? runtime.services.runtimeContexts.get(appId)?.owner
+        : undefined;
+      const caller = {
+        appId,
+        sessionId:
+          owner?.kind === "system"
+            ? "runtime"
+            : (owner?.sessionId ??
+              runtime.services.sessionContext.getSessionId()),
+      };
+      const response = (await platform.rendererIpc.invoke(
+        "shell-command",
+        webContentsId,
+        command,
+        args,
+        options.submission,
+      )) as
+        | { mode: "result"; result: TResult }
+        | { mode: "operation"; handle: OperationHandle };
+      if (response.mode === "result") return response.result;
+      return (
+        options.waitForCompletion
+          ? await runtime.effects.run(
+              runtime.services.operations.wait(response.handle, caller),
+            )
+          : response.handle
+      ) as TResult;
+    },
     execute: <TResult>(
       command: string,
       args: unknown = {},

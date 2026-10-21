@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import type { EdenPowerProvider } from "../api/config";
+import { PowerUnavailable } from "./errors";
 import type { PowerHost } from "./ports";
 
 export function createPowerHost(
@@ -12,8 +13,11 @@ export function createPowerHost(
       reboot: typeof provider.reboot === "function",
     }),
     perform: (action) =>
-      Effect.suspend(() => provider[action]!.call(provider)).pipe(
-        Effect.uninterruptible,
-      ),
+      Effect.suspend(() => {
+        const perform = provider[action];
+        return perform
+          ? perform.call(provider)
+          : Effect.fail(new PowerUnavailable({ action, reason: "action" }));
+      }).pipe(Effect.uninterruptible),
   };
 }

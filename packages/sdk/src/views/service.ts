@@ -21,13 +21,13 @@ import { createViewDevTools } from "./devtools";
 import {
   MainWindowUnavailable,
   TileActionUnavailable,
-  ViewModeUnsupported,
-  ViewNativeFailure,
-  viewMutationFailure,
   type ViewCreateError,
-  type ViewMutationError,
   type ViewModeError,
+  ViewModeUnsupported,
+  type ViewMutationError,
+  ViewNativeFailure,
   type ViewTileError,
+  viewMutationFailure,
 } from "./errors";
 import { createFloatingWindows } from "./floating-windows";
 import { createInterfaceScale } from "./interface-scale";

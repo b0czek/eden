@@ -4,7 +4,6 @@ import {
   ExecutionContext,
   ExecutionContextLive,
 } from "../../src/execution/context";
-import { Permissions } from "../../src/ipc";
 import { RuntimeConfig } from "../../src/runtime/inputs";
 import type { TestEden } from "./createTestEden";
 import { buildService } from "./effect-runtime";

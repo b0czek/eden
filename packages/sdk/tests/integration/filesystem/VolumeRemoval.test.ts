@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -275,7 +276,8 @@ describe("safe volume removal", () => {
       );
       await closing.promise;
       await new Promise<void>((resolve) => setImmediate(resolve));
-      expect(handle!.fd).toBeGreaterThanOrEqual(0);
+      assert(handle, "Filesystem handle was not opened");
+      expect(handle.fd).toBeGreaterThanOrEqual(0);
       expect(hostCalls).toBe(0);
       finishClose.resolve();
       // No handler is installed, but the real metadata read must finish safely.
@@ -324,7 +326,8 @@ describe("safe volume removal", () => {
       await closing.promise;
       const removal = execute("volume/eject", { volume: "usb" });
       await new Promise<void>((resolve) => setImmediate(resolve));
-      expect(handle!.fd).toBeGreaterThanOrEqual(0);
+      assert(handle, "Filesystem handle was not opened");
+      expect(handle.fd).toBeGreaterThanOrEqual(0);
       expect(hostCalls).toBe(0);
       finishClose.resolve();
       await lookup;

@@ -13,10 +13,6 @@ import {
   type EventSubscriptionCallback,
 } from "../../../src/app-runtime/common/event-subscriptions";
 import type { ShellCommandResponse } from "../../../src/app-runtime/common/shell-transport";
-import { Permissions } from "../../../src/ipc/permissions";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Processes } from "../../../src/processes/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -48,12 +44,7 @@ describe.each(["window", "worker"])(
         eden.runtime.sessions.login("client", "password"),
       );
       await eden.complete("process/launch", { appId });
-      const instance = eden.runtime.services.processes.getAppInstance(appId);
-      if (!instance)
-        throw new Error("Generated client test app was not launched");
-      const view = eden.runtime.services.views.getViewInfo(instance.viewId);
-      if (!view) throw new Error("Generated client test view was not created");
-      const contents = view.view.webContents;
+      const contents = eden.getAppView(appId).view.webContents;
       const listeners = new Map<string, Set<EventSubscriptionCallback>>();
       contents.on(
         "message-sent",

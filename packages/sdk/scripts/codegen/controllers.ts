@@ -52,6 +52,7 @@ export function extractControllers(source: SourceFile): {
       const args: Type | undefined = commandContract
         .getProperty("input")
         ?.getTypeAtLocation(node);
+      const stringIndexType = args?.getStringIndexType();
       if (
         !args ||
         (!args.isObject() && !args.isIntersection()) ||
@@ -59,7 +60,7 @@ export function extractControllers(source: SourceFile): {
         args.isArray() ||
         args.getNumberIndexType() ||
         args.getCallSignatures().length ||
-        (args.getStringIndexType() && !args.getStringIndexType()!.isNever())
+        (stringIndexType && !stringIndexType.isNever())
       )
         throw new Error(
           `${namespace}/${command}: client arguments require an object with declared fields`,

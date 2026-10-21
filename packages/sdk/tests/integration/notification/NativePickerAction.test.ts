@@ -30,12 +30,11 @@ it("executes a native notification action to replace the busy file picker across
     await eden.runtime.effects.run(
       eden.runtime.sessions.login(user.username, "password"),
     );
-    const processes = eden.runtime.services.processes;
-    const views = eden.runtime.services.views;
     async function launch(appId: string) {
       await eden.complete("process/launch", { appId });
-      const viewId = processes.getAppInstance(appId)!.viewId;
-      const webContentsId = views.getViewInfo(viewId)!.view.webContents.id;
+      const view = eden.getAppView(appId);
+      const viewId = view.id;
+      const webContentsId = view.view.webContents.id;
       return { viewId, caller: { ...caller, appId, webContentsId } };
     }
     const provider = await launch(providerId);

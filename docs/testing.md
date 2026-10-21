@@ -49,6 +49,13 @@ For Electron, append a filename to select a suite or use `--project=sdk` /
 `--project=apps`. On headless Linux, prefix the command with
 `xvfb-run --auto-servernum`.
 
+Node integration tests use `createTestEden`. Its `executeFromView` method runs
+commands through renderer IPC and returns an operation handle by default. Pass
+`{ waitForCompletion: true }` as its fourth argument to await an operation and
+return its completion value or reject with its failure. Result commands return
+their values in either mode. Put submission metadata in the same options object
+under `submission`.
+
 ## Eden API throughput
 
 After building the SDK, run `pnpm --filter @edenapp/sdk benchmark:edenapi`.

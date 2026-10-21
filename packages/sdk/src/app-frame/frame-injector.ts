@@ -1,5 +1,4 @@
 import * as eden from "@edenapp/client";
-import type { ViewBounds } from "@edenapp/types";
 
 /**
  * Eden App Frame Injector

@@ -6,10 +6,6 @@ import {
   targetedEvent,
 } from "../../../src/controllers/events";
 import { createEvent } from "../../../src/events/event";
-import { IpcTransport } from "../../../src/ipc/transport";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Processes } from "../../../src/processes/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/createTestEden";
@@ -26,7 +22,6 @@ it("delivers a controller notification only to selected subscribed views and rel
     await eden.runtime.effects.run(
       eden.runtime.sessions.login(user.username, "password"),
     );
-    const views = eden.runtime.services.views;
     const bridge = eden.runtime.services.ipc;
     bridge.registerController(
       defineController("routing", {
@@ -37,12 +32,9 @@ it("delivers a controller notification only to selected subscribed views and rel
     const recipients: Array<{ viewId: number; contentsId: number }> = [];
     for (const appId of ids) {
       await eden.complete("process/launch", { appId });
-      const viewId =
-        eden.runtime.services.processes.getAppInstance(appId)!.viewId;
-      recipients.push({
-        viewId,
-        contentsId: views.getViewInfo(viewId)!.view.webContents.id,
-      });
+      const view = eden.getAppView(appId);
+      const viewId = view.id;
+      recipients.push({ viewId, contentsId: view.view.webContents.id });
       expect(bridge.eventSubscribers.subscribe(viewId, "routing/changed")).toBe(
         true,
       );

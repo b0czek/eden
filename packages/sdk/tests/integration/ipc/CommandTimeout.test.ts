@@ -33,9 +33,7 @@ describe("one bounded IPC deadline", () => {
       testApp(appId, { name: "Deadlines" }),
     );
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime.services.processes.getAppInstance(appId)!;
-    webContentsId = eden.runtime.services.views.getViewInfo(instance.viewId)!
-      .view.webContents.id;
+    webContentsId = eden.getAppView(appId).view.webContents.id;
     const completion = new Promise<string>((resolve) => {
       complete = resolve;
     });

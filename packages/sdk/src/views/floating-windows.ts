@@ -8,9 +8,9 @@ export function createFloatingWindows(
   getViews: ViewCollection,
   getInterfaceScale: () => number = () => 1,
 ) {
-  let _MIN_GRABBABLE_WIDTH = 100;
-  let _MIN_GRABBABLE_HEIGHT = 100;
-  let _CASCADE_OFFSET = 30;
+  const _MIN_GRABBABLE_WIDTH = 100;
+  const _MIN_GRABBABLE_HEIGHT = 100;
+  const _CASCADE_OFFSET = 30;
   const _getWorkspaceBounds = getWorkspaceBounds;
   const _getViews = getViews;
   const _getInterfaceScale = getInterfaceScale;

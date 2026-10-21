@@ -29,7 +29,6 @@ import {
   type HostOperationFailure,
   InvalidOperationRequestKey,
   OperationAdmissionClosed,
-  type OperationAdmissionFailure,
   OperationCancelled,
   OperationCapacityExhausted,
   OperationNotCancellable,
@@ -402,10 +401,11 @@ export const OperationsLive = Layer.effect(
         } finally {
           if (
             task.transition === "session" &&
-            closedSessions.get(record.transitionSessionId!) ===
+            record.transitionSessionId !== undefined &&
+            closedSessions.get(record.transitionSessionId) ===
               record.snapshot.id
           )
-            closedSessions.delete(record.transitionSessionId!);
+            closedSessions.delete(record.transitionSessionId);
           if (
             task.transition === "runtime" &&
             runtimeTransition === record.snapshot.id
@@ -456,6 +456,12 @@ export const OperationsLive = Layer.effect(
       handle: OperationHandle,
       context = execution.get() ?? {},
     ): OperationSnapshot {
+      return structuredClone(getRecord(handle, context).snapshot);
+    }
+    function getRecord(
+      handle: OperationHandle,
+      context: CommandCallerContext,
+    ): RecordEntry {
       prune();
       const record = records.get(handle.id);
       if (
@@ -464,15 +470,15 @@ export const OperationsLive = Layer.effect(
         !authorized(record, context)
       )
         throw new OperationNotFound({ handle });
-      return structuredClone(record.snapshot);
+      return record;
     }
     function cancel(
       handle: OperationHandle,
       context = execution.get() ?? {},
     ): void {
-      const snapshot = get(handle, context);
+      const record = getRecord(handle, context);
+      const snapshot = record.snapshot;
       if (snapshot.status !== "queued" && snapshot.status !== "running") return;
-      const record = records.get(handle.id)!;
       if (!snapshot.cancellable) throw new OperationNotCancellable({ handle });
       if (snapshot.phase === "cancelling") return;
       update(record, { phase: "cancelling" });
@@ -489,8 +495,7 @@ export const OperationsLive = Layer.effect(
       context = execution.get() ?? {},
     ): Effect.Effect<unknown, unknown> {
       return Effect.suspend(() => {
-        get(handle, context);
-        const record = records.get(handle.id)!;
+        const record = getRecord(handle, context);
         return Fiber.join(record.fiber).pipe(
           Effect.map((value) => structuredClone(value)),
           Effect.catchCause((cause) => {

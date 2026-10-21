@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -10,9 +11,6 @@ import type {
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { ExecutionContext } from "../../../src/execution/context";
-import { Permissions } from "../../../src/ipc/permissions";
-import { InstalledPackages } from "../../../src/packages/installed";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
@@ -93,7 +91,8 @@ describe("control-plane API integration", () => {
     await started;
     const snapshot = eden.runtime.operations
       .list()
-      .find((snapshot) => snapshot.command === "volume/eject")!;
+      .find((snapshot) => snapshot.command === "volume/eject");
+    assert(snapshot, "Eject operation is missing");
     expect(snapshot).toMatchObject({ status: "running", phase: "host-eject" });
     snapshot.phase = "changed by observer";
     expect(eden.runtime.operations.get(snapshot)?.phase).toBe("host-eject");

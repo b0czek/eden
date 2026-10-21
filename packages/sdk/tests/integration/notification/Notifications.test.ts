@@ -17,26 +17,10 @@ it("delivers through real notification controllers only to the display and origi
     );
     const packages = eden.runtime.services.installedPackages;
     const permissions = eden.runtime.services.permissions;
-    const processes = eden.runtime.services.processes;
-    const views = eden.runtime.services.views;
     const messages = new Map<
       number,
       Array<{ type: string; payload: unknown }>
     >();
-    const contentsByApp = new Map<string, number>();
-    const invoke = async <T>(
-      contentsId: number,
-      command: string,
-      args: unknown = {},
-    ) => {
-      const response = (await eden.platform.rendererIpc.invoke(
-        "shell-command",
-        contentsId,
-        command,
-        args,
-      )) as { mode: "result"; result: T };
-      return response.result;
-    };
     for (const appId of [providerApp, sourceApp, observerApp]) {
       packages.register(testApp(appId));
       permissions.registerApp(
@@ -44,10 +28,7 @@ it("delivers through real notification controllers only to the display and origi
         appId === providerApp ? ["notification/display"] : [],
       );
       await eden.complete("process/launch", { appId });
-      const contents = views.getViewInfo(
-        processes.getAppInstance(appId)!.viewId,
-      )!.view.webContents;
-      contentsByApp.set(appId, contents.id);
+      const contents = eden.getAppView(appId).view.webContents;
       const received: Array<{ type: string; payload: unknown }> = [];
       messages.set(contents.id, received);
       contents.on(
@@ -65,13 +46,15 @@ it("delivers through real notification controllers only to the display and origi
         "notification/action-clicked",
         "notification/removed",
       ])
-        await invoke(contents.id, "event/subscribe", { eventName: event });
+        await eden.executeFromView(contents.id, "event/subscribe", {
+          eventName: event,
+        });
     }
-    const provider = contentsByApp.get(providerApp)!;
-    const source = contentsByApp.get(sourceApp)!;
-    const observer = contentsByApp.get(observerApp)!;
-    await invoke(provider, "notification/register-display");
-    const notification = await invoke<Notification>(
+    const provider = eden.getAppView(providerApp).view.webContents.id;
+    const source = eden.getAppView(sourceApp).view.webContents.id;
+    const observer = eden.getAppView(observerApp).view.webContents.id;
+    await eden.executeFromView(provider, "notification/register-display");
+    const notification = await eden.executeFromView<Notification>(
       source,
       "notification/push",
       {
@@ -87,18 +70,18 @@ it("delivers through real notification controllers only to the display and origi
     expect(messages.get(source)).toEqual([]);
     expect(messages.get(observer)).toEqual([]);
     await expect(
-      invoke(source, "notification/action-clicked", {
+      eden.executeFromView(source, "notification/action-clicked", {
         notificationId: notification.id,
         actionId: "open",
         _callerAppId: providerApp,
         _callerWebContentsId: provider,
       }),
     ).rejects.toThrow("Permission denied");
-    await invoke(provider, "notification/action-clicked", {
+    await eden.executeFromView(provider, "notification/action-clicked", {
       notificationId: notification.id,
       actionId: "open",
     });
-    await invoke(provider, "notification/dismissed", {
+    await eden.executeFromView(provider, "notification/dismissed", {
       notificationId: notification.id,
     });
     expect(messages.get(source)).toEqual([
@@ -115,7 +98,7 @@ it("delivers through real notification controllers only to the display and origi
       title: "Host",
       message: "Host message",
     });
-    await invoke(provider, "notification/action-clicked", {
+    await eden.executeFromView(provider, "notification/action-clicked", {
       notificationId: host.id,
       actionId: "details",
     });

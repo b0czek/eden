@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -164,7 +165,8 @@ describe("app associations persistence and catalog integration", () => {
       "file:directory": { appId: "com.eden.files", kind: "file.directory" },
     });
     listed["file:directory"].appId = "mutated";
-    const selected = associations.get("file:directory")!;
+    const selected = associations.get("file:directory");
+    assert(selected, "Default file association is missing");
     expect(selected.appId).toBe("com.eden.files");
     selected.appId = "also-mutated";
     expect(associations.get("file:directory")?.appId).toBe("com.eden.files");

@@ -5,9 +5,6 @@ import {
   defineController,
   operation,
 } from "../../../src/controllers/controller";
-import { ExecutionContext } from "../../../src/execution/context";
-import { Commands, Permissions } from "../../../src/ipc";
-import { Operations } from "../../../src/operations/service";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 

@@ -36,12 +36,16 @@ export type CommandContracts = [
   Assert<Equal<OperationCompletion<"fs/cp">, void>>,
   Assert<Equal<OperationCompletion<string>, unknown>>,
   Assert<Equal<CommandCompletion<"system/info">, never>>,
-  Assert<Equal<ResultCommand<{}, string>["response"], string>>,
+  Assert<
+    Equal<ResultCommand<Record<string, never>, string>["response"], string>
+  >,
   Assert<
     Equal<
-      OperationCommand<{}, number, "copy">["response"],
+      OperationCommand<Record<string, never>, number, "copy">["response"],
       OperationHandle<"copy">
     >
   >,
-  Assert<Equal<OperationCommand<{}, number>["completion"], number>>,
+  Assert<
+    Equal<OperationCommand<Record<string, never>, number>["completion"], number>
+  >,
 ];

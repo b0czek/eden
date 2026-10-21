@@ -40,11 +40,7 @@ describe("app instance ownership", () => {
   }
   async function backend() {
     await tick();
-    const pid = eden.runtime.services.backends.getBackend(appId)?.pid;
-    const native =
-      pid === undefined ? undefined : eden.platform.utilityProcesses.get(pid);
-    if (!native) throw new Error("Backend did not start");
-    return native;
+    return eden.getBackendProcess(appId);
   }
 
   it("cleans up an exited app while another app's uninstall cleanup is pending", async () => {

@@ -69,7 +69,9 @@ export async function createElectronHost(
       .toBe(true);
     const windows = electronApp.windows();
     const titles = await Promise.all(windows.map((page) => page.title()));
-    foundation = windows[titles.indexOf("Eden Electron Integration")];
+    const foundationPage = windows[titles.indexOf("Eden Electron Integration")];
+    if (!foundationPage) throw new Error("Foundation window is unavailable");
+    foundation = foundationPage;
     await expect
       .poll(() =>
         electronApp?.evaluate(() => {
@@ -88,7 +90,7 @@ export async function createElectronHost(
   const host: ElectronHost = {
     ...profile,
     electronApp,
-    foundation: foundation!,
+    foundation,
     mainPid,
     utilityPids: [],
     async executeHostCommand<TResult>(

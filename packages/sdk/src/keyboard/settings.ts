@@ -1,7 +1,7 @@
 import type { EdenKeyboardPlacementMode } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { Settings } from "../settings/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
+import type { Settings } from "../settings/service";
 import type { KeyboardPreferences } from "./state";
 
 export const KEYBOARD_SETTINGS = {

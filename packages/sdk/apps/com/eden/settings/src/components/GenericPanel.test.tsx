@@ -4,7 +4,7 @@ import type {
 } from "@edenapp/types";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { PanelAction } from "../types";
 import GenericPanel from "./GenericPanel";
 
@@ -80,7 +80,8 @@ describe("GenericPanel", () => {
           : kind === "radio"
             ? 'input[value="b"]'
             : "input",
-      )!;
+      );
+      assert(control, "Missing panel control");
       for (const success of [false, true]) {
         if (kind === "toggle" || kind === "checkbox" || kind === "radio")
           await fireEvent.click(control);
@@ -134,10 +135,12 @@ describe("GenericPanel", () => {
     const radios = view.container.querySelectorAll<HTMLInputElement>(
       'input[type="radio"]',
     );
-    await fireEvent.click(radios[1]!);
-    expect(radios[0]!.checked).toBe(false);
-    expect(radios[1]!.checked).toBe(true);
-    expect(radios[2]!.checked).toBe(true);
+    const secondRadio = radios[1];
+    assert(secondRadio, "Missing second radio option");
+    fireEvent.click(secondRadio);
+    expect(radios[0]?.checked).toBe(false);
+    expect(secondRadio.checked).toBe(true);
+    expect(radios[2]?.checked).toBe(true);
   });
 
   it("discards dirty drafts when the input kind changes", async () => {
@@ -169,12 +172,14 @@ describe("GenericPanel", () => {
         onAction={onAction}
       />
     ));
-    const original = view.container.querySelector("input")!;
-    await fireEvent.input(original, { target: { value: "draft" } });
+    const original = view.container.querySelector("input");
+    assert(original, "Missing original input");
+    fireEvent.input(original, { target: { value: "draft" } });
     setLoaded(snapshot("text", "refreshed"));
     expect(original.value).toBe("draft");
     setLoaded(snapshot("number", 42));
-    const numeric = view.container.querySelector("input")!;
+    const numeric = view.container.querySelector("input");
+    assert(numeric, "Missing numeric input");
     expect(numeric.type).toBe("number");
     expect(numeric.value).toBe("42");
     await fireEvent.blur(numeric);

@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import type { ContextMenuOpenEvent, ContextMenuResult } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import {
@@ -105,7 +106,9 @@ describe("context menus", () => {
   });
 
   it("scales renderer coordinates by the opener view zoom factor", async () => {
-    s.viewState.get(20)!.scale = 1.5;
+    const view = s.viewState.get(20);
+    assert(view, "Missing opener view");
+    view.scale = 1.5;
     await s.run(s.menu.registerDisplayProvider(provider));
     await s.run(
       s.menu.openMenu(
@@ -189,7 +192,9 @@ describe("context menus", () => {
 
   it("skips a destroyed provider and releases event listeners when its scope closes", async () => {
     await s.run(s.menu.registerDisplayProvider(provider));
-    s.viewState.get(10)!.alive = false;
+    const view = s.viewState.get(10);
+    assert(view, "Missing provider view");
+    view.alive = false;
     await s.run(s.menu.openMenu({ position: {}, items: [] }, opener));
     expect(s.opened[0].viewIds).toEqual([20]);
     await s.runtime.dispose();

@@ -1,4 +1,3 @@
-import * as eden from "@edenapp/client";
 import {
   redo as redoCommand,
   redoDepth,
@@ -6,6 +5,7 @@ import {
   undoDepth,
 } from "@codemirror/commands";
 import type { EditorState, StateEffect } from "@codemirror/state";
+import * as eden from "@edenapp/client";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { filePicker } from "@edenapp/tablets";
 import type { FileOpenedEvent, FilesystemLocation } from "@edenapp/types";

@@ -1,4 +1,5 @@
 import * as eden from "@edenapp/client";
+
 // Cache for fetched icons to avoid redundant API calls
 const iconCache = new Map<string, string | undefined>();
 

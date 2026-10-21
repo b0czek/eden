@@ -1,9 +1,4 @@
 import type { ConnectResult } from "@edenapp/types";
-import { Permissions } from "../../../src/ipc/permissions";
-import { InstalledPackages } from "../../../src/packages/installed";
-import { Backends } from "../../../src/processes/backends";
-import { Processes } from "../../../src/processes/service";
-import { Views } from "../../../src/views/service";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
@@ -19,9 +14,6 @@ async function scenario() {
   );
   const packages = eden.runtime.services.installedPackages;
   const permissions = eden.runtime.services.permissions;
-  const processes = eden.runtime.services.processes;
-  const views = eden.runtime.services.views;
-  const contents = new Map<string, number>();
   for (const appId of [provider, client, denied]) {
     packages.register(testApp(appId));
     permissions.registerApp(
@@ -33,25 +25,7 @@ async function scenario() {
           : [],
     );
     await eden.complete("process/launch", { appId });
-    contents.set(
-      appId,
-      views.getViewInfo(processes.getAppInstance(appId)!.viewId)!.view
-        .webContents.id,
-    );
   }
-  const invoke = async <A>(
-    appId: string,
-    command: string,
-    args: unknown = {},
-  ) => {
-    const response = (await eden.platform.rendererIpc.invoke(
-      "shell-command",
-      contents.get(appId)!,
-      command,
-      args,
-    )) as { mode: "result"; result: A };
-    return response.result;
-  };
   return {
     eden,
     provider,
@@ -60,10 +34,11 @@ async function scenario() {
     packages,
     permissions,
     user,
-    processes,
-    views,
-    contents,
-    invoke,
+    contents: {
+      provider: eden.getAppView(provider).view.webContents.id,
+      client: eden.getAppView(client).view.webContents.id,
+      denied: eden.getAppView(denied).view.webContents.id,
+    },
   };
 }
 
@@ -77,16 +52,16 @@ describe("AppBus command and process lifecycle integration", () => {
     const s = await scenario();
     eden = s.eden;
     await expect(
-      s.invoke(s.provider, "appbus/register", {
+      eden.executeFromView(s.contents.provider, "appbus/register", {
         serviceName: "documents",
         description: "Original",
         allowedClients: [s.client],
         _callerAppId: s.client,
-        _callerWebContentsId: s.contents.get(s.client),
+        _callerWebContentsId: s.contents.client,
       }),
     ).resolves.toEqual({ success: true });
     await expect(
-      s.invoke(s.provider, "appbus/register", {
+      eden.executeFromView(s.contents.provider, "appbus/register", {
         serviceName: "documents",
         description: "Replacement",
       }),
@@ -95,7 +70,9 @@ describe("AppBus command and process lifecycle integration", () => {
       error: expect.stringContaining("already registered"),
     });
     await expect(
-      s.invoke(s.client, "appbus/list-by-app", { appId: s.provider }),
+      eden.executeFromView(s.contents.client, "appbus/list-by-app", {
+        appId: s.provider,
+      }),
     ).resolves.toEqual({
       services: [
         {
@@ -106,21 +83,19 @@ describe("AppBus command and process lifecycle integration", () => {
       ],
     });
     await expect(
-      s.invoke(s.denied, "appbus/connect", {
+      eden.executeFromView(s.contents.denied, "appbus/connect", {
         targetAppId: s.provider,
         serviceName: "documents",
       }),
     ).rejects.toThrow(/permission|denied/i);
-    const connection = await s.invoke<ConnectResult>(
-      s.client,
+    const connection = await eden.executeFromView<ConnectResult>(
+      s.contents.client,
       "appbus/connect",
       { targetAppId: s.provider, serviceName: "documents" },
     );
     expect(connection.success).toBe(true);
     const stoppedConnections: unknown[] = [];
-    const clientView = s.views.getViewInfo(
-      s.processes.getAppInstance(s.client)!.viewId,
-    )!;
+    const clientView = eden.getAppView(s.client);
     clientView.view.webContents.on(
       "message-sent",
       (channel: string, payload: unknown) => {
@@ -132,7 +107,9 @@ describe("AppBus command and process lifecycle integration", () => {
       { connectionId: connection.connectionId },
     ]);
     await expect(
-      s.invoke(s.client, "appbus/list-by-app", { appId: s.provider }),
+      eden.executeFromView(s.contents.client, "appbus/list-by-app", {
+        appId: s.provider,
+      }),
     ).resolves.toEqual({ services: [] });
   });
 
@@ -149,14 +126,12 @@ describe("AppBus command and process lifecycle integration", () => {
     s.permissions.registerApp(backendAppId, ["appbus/connect"]);
     const launching = eden.complete("process/launch", { appId: backendAppId });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    const backendProcess =
-      eden.runtime.services.backends.getBackend(backendAppId);
-    if (!backendProcess?.pid) throw new Error("Backend did not start");
-    eden.platform.utilityProcesses
-      .get(backendProcess.pid)!
-      .emit("message", { type: "backend-ready" });
+    const backend = eden.getBackendProcess(backendAppId);
+    backend.emit("message", { type: "backend-ready" });
     await launching;
-    await s.invoke(s.provider, "appbus/register", { serviceName: "documents" });
+    await eden.executeFromView(s.contents.provider, "appbus/register", {
+      serviceName: "documents",
+    });
     const connection = await eden.execute<ConnectResult>(
       "appbus/connect",
       {
@@ -167,8 +142,6 @@ describe("AppBus command and process lifecycle integration", () => {
       { appId: backendAppId, principal: { kind: "user", profile: s.user } },
     );
     expect(connection.success).toBe(true);
-    const pid = eden.runtime.services.backends.getBackend(backendAppId)!.pid!;
-    const backend = eden.platform.utilityProcesses.get(pid)!;
     expect(backend.messages).toContainEqual({
       type: "appbus-port",
       connectionId: connection.connectionId,

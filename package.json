@@ -39,6 +39,6 @@
     "pre-commit": "pnpm lint-staged"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,cjs,mjs,json,jsonc}": "biome format --write"
+    "*.{js,jsx,ts,tsx,cjs,mjs,json,jsonc,css}": "biome check --write"
   }
 }

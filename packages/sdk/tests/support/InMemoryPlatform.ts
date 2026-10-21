@@ -398,7 +398,7 @@ class InMemoryRendererIpc implements RendererIpcPort {
   }
 }
 
-class InMemoryUtilityProcess
+export class InMemoryUtilityProcess
   extends EventEmitter
   implements PlatformUtilityProcess
 {

@@ -14,6 +14,7 @@ import type {
   Operation,
   SystemInfo,
 } from "@edenapp/types";
+import { expectTypeOf } from "vitest";
 
 function signatures() {
   const location = { volume: "home", path: "/file.txt" };
@@ -51,7 +52,8 @@ function signatures() {
     "panels-changed",
     changed,
   );
-  const unsubscribed: void = settings.unsubscribe("panels-changed", changed);
+  const unsubscribed = settings.unsubscribe("panels-changed", changed);
+  expectTypeOf(unsubscribed).toEqualTypeOf<void>();
   fs.subscribe("changed", (event) => {
     const watchId: string = event.watchId;
     // @ts-expect-error payloads belong to the selected event
@@ -63,7 +65,7 @@ function signatures() {
   // @ts-expect-error events from other domains are not accepted
   settings.subscribe("launched", () => {});
   // @ts-expect-error callbacks must accept the selected event's payload
-  fs.subscribe("changed", (event: { panelId: string }) => {});
+  fs.subscribe("changed", (_event: { panelId: string }) => {});
   // @ts-expect-error command-only domains do not expose subscriptions
   system.subscribe("changed", () => {});
   // @ts-expect-error a location is required

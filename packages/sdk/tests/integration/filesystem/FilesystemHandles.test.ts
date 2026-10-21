@@ -314,10 +314,7 @@ describe("file handle access and lifetime", () => {
     const launching = execute("process/launch", { appId });
     if (backend) {
       await new Promise<void>((resolve) => setImmediate(resolve));
-      const process = eden.runtime.services.backends.getBackend(appId);
-      if (!process?.pid) throw new Error("Backend did not start");
-      const simulated = eden.platform.utilityProcesses.get(process.pid);
-      if (!simulated) throw new Error("Backend process is unavailable");
+      const simulated = eden.getBackendProcess(appId);
       simulated.emit("message", { type: "backend-ready" });
     }
     await launching;
@@ -325,18 +322,15 @@ describe("file handle access and lifetime", () => {
 
   it("closes frontend handles when their view is removed", async () => {
     await launchOwner();
-    const instance = eden.runtime.services.processes.getAppInstance(appId);
-    if (!instance) throw new Error("Owner app is unavailable");
     const views = eden.runtime.services.views;
-    const view = views.getViewInfo(instance.viewId);
-    if (!view) throw new Error("Owner view is unavailable");
+    const view = eden.getAppView(appId);
     const owner = { ...caller, webContentsId: view.view.webContents.id };
     const handle = await execute<FilesystemHandle>(
       "fs/open",
       { location },
       owner,
     );
-    await eden.runtime.effects.run(views.removeView(instance.viewId));
+    await eden.runtime.effects.run(views.removeView(view.id));
     await expect(
       execute("fs/read", { location: handle }, owner),
     ).rejects.toThrow(/unavailable/);

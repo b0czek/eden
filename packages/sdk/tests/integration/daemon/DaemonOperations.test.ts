@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import type {
   DaemonStatus,
   OperationHandle,
@@ -9,20 +10,14 @@ import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/createTestEden";
 
-async function readyBackend(eden: TestEden, previousPid = 0) {
+async function readyBackend(eden: TestEden, appId: string, previousPid = 0) {
   const deadline = Date.now() + 2000;
   while (Date.now() < deadline) {
-    const effect = eden.platform.effects
-      .filter((item) => item.type === "utility-process-started")
-      .at(-1);
-    if (
-      effect?.type === "utility-process-started" &&
-      effect.pid !== previousPid
-    ) {
-      eden.platform.utilityProcesses
-        .get(effect.pid)!
-        .emit("message", { type: "backend-ready" });
-      return effect.pid;
+    const pid = eden.runtime.services.backends.getBackend(appId)?.pid;
+    if (pid !== undefined && pid !== previousPid) {
+      const process = eden.getBackendProcess(appId);
+      process.emit("message", { type: "backend-ready" });
+      return process.pid;
     }
     await tick();
   }
@@ -72,7 +67,7 @@ describe("daemon operation lifecycle", () => {
       const starting = eden.runtime.effects.run(
         eden.runtime.daemons.start(appId),
       );
-      const pid = await readyBackend(eden);
+      const pid = await readyBackend(eden, appId);
       await starting;
       expect(statuses.at(-1)).toMatchObject({
         appId,
@@ -85,7 +80,7 @@ describe("daemon operation lifecycle", () => {
       const backend = eden.platform.utilityProcesses.get(pid);
       if (!backend) throw new Error("Daemon backend did not start");
       backend.kill();
-      expect(await readyBackend(eden, pid)).not.toBe(pid);
+      expect(await readyBackend(eden, appId, pid)).not.toBe(pid);
       expect(statuses.some((status) => status.state === "backoff")).toBe(true);
     } finally {
       off();
@@ -128,7 +123,7 @@ describe("daemon operation lifecycle", () => {
       if (status.appId === appId) states.push(status.state);
     });
     const daemons = eden.runtime.services.operations;
-    const ready = (previousPid = 0) => readyBackend(eden, previousPid);
+    const ready = (previousPid = 0) => readyBackend(eden, appId, previousPid);
     const start = await eden.execute<OperationHandle>("daemon/start", {
       appId,
     });
@@ -186,7 +181,7 @@ describe("daemon operation lifecycle", () => {
     const launching = eden.runtime.effects.run(
       eden.runtime.daemons.start(appId),
     );
-    const pid = await readyBackend(eden);
+    const pid = await readyBackend(eden, appId);
     await launching;
 
     const queued = gate();
@@ -210,7 +205,7 @@ describe("daemon operation lifecycle", () => {
         eden.runtime.daemons.restart(appId),
       );
       await queued.promise;
-      const nextPid = await readyBackend(eden, pid);
+      const nextPid = await readyBackend(eden, appId, pid);
       await restarting;
       resume.release();
       await processed.promise;
@@ -226,7 +221,7 @@ describe("daemon operation lifecycle", () => {
       const reloading = eden.runtime.effects.run(
         eden.runtime.services.processes.reloadApp(appId),
       );
-      const reloadedPid = await readyBackend(eden, nextPid);
+      const reloadedPid = await readyBackend(eden, appId, nextPid);
       await reloading;
 
       const backoff = gate();
@@ -235,7 +230,9 @@ describe("daemon operation lifecycle", () => {
           backoff.release();
       });
       try {
-        eden.platform.utilityProcesses.get(reloadedPid)!.kill();
+        const process = eden.platform.utilityProcesses.get(reloadedPid);
+        assert(process, "Reloaded daemon utility process is missing");
+        process.kill();
         await backoff.promise;
         expect(
           (await eden.runtime.effects.run(eden.runtime.daemons.list()))[0],

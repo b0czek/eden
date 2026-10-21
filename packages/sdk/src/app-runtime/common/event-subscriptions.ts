@@ -64,8 +64,12 @@ export function createEventSubscriptions(
     const entry = subscription;
     const registration: Registration = { ready: Promise.resolve() };
     entry.callbacks.set(listener, registration);
-    if (!listeners.has(key)) listeners.set(key, new Set());
-    listeners.get(key)!.add(listener);
+    let callbacks = listeners.get(key);
+    if (!callbacks) {
+      callbacks = new Set();
+      listeners.set(key, callbacks);
+    }
+    callbacks.add(listener);
     registration.ready = enqueue(key, entry, async () => {
       if (entry.callbacks.get(listener) !== registration) return;
       if (!entry.registered) {

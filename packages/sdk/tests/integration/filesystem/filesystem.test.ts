@@ -41,11 +41,7 @@ describe("Filesystem native watch integration", () => {
       eden.runtime.sessions.login(profile.username, "password"),
     );
     await eden.complete("process/launch", { appId });
-    const instance = eden.runtime.services.processes.getAppInstance(appId);
-    if (!instance) throw new Error("Filesystem test app was not launched");
-    const viewInfo = eden.runtime.services.views.getViewInfo(instance.viewId);
-    if (!viewInfo) throw new Error("Filesystem test app view was not created");
-    webContentsId = viewInfo.view.webContents.id;
+    webContentsId = eden.getAppView(appId).view.webContents.id;
     await invokeFromView("event/subscribe", { eventName: "fs/changed" });
   });
 
@@ -53,26 +49,10 @@ describe("Filesystem native watch integration", () => {
     await eden?.dispose();
   });
 
-  const invokeFromView = async (command: string, args: unknown) => {
-    const response = (await eden.platform.rendererIpc.invoke(
-      "shell-command",
-      webContentsId,
-      command,
-      args,
-    )) as
-      | { mode: "operation"; handle: OperationHandle }
-      | { mode: "result"; result: unknown };
-    const result =
-      response.mode === "operation" ? response.handle : response.result;
-    return command === "fs/mv"
-      ? eden.runtime.effects.run(
-          eden.runtime.services.operations.wait(
-            result as OperationHandle,
-            caller(appId, profile),
-          ),
-        )
-      : result;
-  };
+  const invokeFromView = (command: string, args: unknown) =>
+    eden.executeFromView(webContentsId, command, args, {
+      waitForCompletion: true,
+    });
 
   const changeMessages = () =>
     eden.platform.effects.filter(
@@ -181,23 +161,12 @@ describe("Filesystem native watch integration", () => {
     );
     eden.runtime.services.permissions.registerApp(otherAppId, ["fs/read"]);
     await eden.complete("process/launch", { appId: otherAppId });
-    const otherInstance =
-      eden.runtime.services.processes.getAppInstance(otherAppId);
-    if (!otherInstance)
-      throw new Error("Second filesystem test app was not launched");
-    const otherViewInfo = eden.runtime.services.views.getViewInfo(
-      otherInstance.viewId,
-    );
-    if (!otherViewInfo)
-      throw new Error("Second filesystem test view was not created");
+    const otherViewInfo = eden.getAppView(otherAppId);
 
     await expect(
-      eden.platform.rendererIpc.invoke(
-        "shell-command",
-        otherViewInfo.view.webContents.id,
-        "fs/unwatch",
-        { watchId },
-      ),
+      eden.executeFromView(otherViewInfo.view.webContents.id, "fs/unwatch", {
+        watchId,
+      }),
     ).rejects.toThrow("not owned by the calling view");
   });
 
@@ -459,7 +428,8 @@ describe("Filesystem integration", () => {
         if (
           !cancellation &&
           snapshot.phase === "copying" &&
-          snapshot.progress!.completed > 0
+          snapshot.progress !== undefined &&
+          snapshot.progress.completed > 0
         ) {
           cancellation = eden.execute(
             "operation/cancel",

@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -99,7 +100,8 @@ function addView(
   const id = Effect.runSync(
     views.createView(manifest.id, manifest, "/apps/example", bounds),
   );
-  const info = views.getViewInfo(id)!;
+  const info = views.getViewInfo(id);
+  assert(info, "Created view is missing");
   return { info, setBounds: info.view.setBounds as jest.Mock };
 }
 
@@ -258,7 +260,9 @@ describe("web contents lookup lifecycle", () => {
     const viewId = Effect.runSync(
       views.createView(appId, manifest, "/apps/example", undefined),
     );
-    return { viewId, contents: views.getViewInfo(viewId)!.view.webContents };
+    const info = views.getViewInfo(viewId);
+    assert(info, "Created view is missing");
+    return { viewId, contents: info.view.webContents };
   }
 
   it("defers native view creation and removal until their Effects execute", async () => {
@@ -272,7 +276,9 @@ describe("web contents lookup lifecycle", () => {
     expect(views.getAllViews()).toEqual([]);
     expect(platform.windows.views).toHaveLength(0);
     const id = await effects.run(creation);
-    const contents = views.getView(id)!.webContents;
+    const view = views.getView(id);
+    assert(view, "Created native view is missing");
+    const contents = view.webContents;
     const removal = views.removeView(id);
     expect(contents.isDestroyed()).toBe(false);
     expect(views.getView(id)).toBeDefined();
@@ -306,7 +312,9 @@ describe("web contents lookup lifecycle", () => {
 
   it("rejects unsupported modes and unavailable tile actions before changing presentation", () => {
     const view = create("app.floating");
-    const before = { ...views.getViewInfo(view.viewId)!.bounds };
+    const info = views.getViewInfo(view.viewId);
+    assert(info, "Created view is missing");
+    const before = { ...info.bounds };
     expect(() =>
       Effect.runSync(views.setViewMode(view.viewId, "tiled")),
     ).toThrow(ViewModeUnsupported);
@@ -336,11 +344,11 @@ describe("web contents lookup lifecycle", () => {
     views.boundsUpdated.on((event) => {
       updates.push(event);
     });
-    jest
-      .spyOn(views.getView(view.viewId)!, "setBounds")
-      .mockImplementationOnce(() => {
-        throw cause;
-      });
+    const nativeView = views.getView(view.viewId);
+    assert(nativeView, "Created native view is missing");
+    jest.spyOn(nativeView, "setBounds").mockImplementationOnce(() => {
+      throw cause;
+    });
     expect(() =>
       Effect.runSync(
         views.setViewBounds(
@@ -435,7 +443,8 @@ describe("web contents lookup lifecycle", () => {
         cause: expect.objectContaining({ message: "Focus tracking failed" }),
       }),
     );
-    const failed = platform.windows.views.at(-1)!;
+    const failed = platform.windows.views.at(-1);
+    assert(failed, "Failed native view was not captured");
     expect(failed.webContents.isDestroyed()).toBe(true);
     expect(
       views.getAppIdByWebContentsId(failed.webContents.id),
