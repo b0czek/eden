@@ -15,7 +15,7 @@ const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const close of cleanups.splice(0)) await close();
 });
-const createController = async (
+const createScaleFixture = async (
   views: ViewInfo[] = [],
   notifyScaleChanged = jest.fn(),
   initialScale: string | null = null,
@@ -33,13 +33,13 @@ const createController = async (
 
   const effects = createEffectRuntime();
   cleanups.unshift(() => effects.dispose());
-  const controller = await effects.acquire(
+  const scale = await effects.acquire(
     createInterfaceScale(settings as never, () => views, notifyScaleChanged),
   );
 
   return {
-    controller,
-    initialize: () => effects.run(controller.initialize()),
+    scale,
+    initialize: () => effects.run(scale.initialize()),
     notifyScaleChanged,
     emitSettingsChanged: (value: string) =>
       changed.emit({
@@ -74,18 +74,18 @@ const getSetZoomFactor = (view: ViewInfo) =>
 describe("InterfaceScale", () => {
   it("applies scale automatically to regular app views", async () => {
     const view = createView("app");
-    const { controller } = await createController([view]);
+    const { scale } = await createScaleFixture([view]);
 
-    controller.setScale(1.5);
+    scale.setScale(1.5);
 
     expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
   });
 
   it("keeps overlay views manual by default", async () => {
     const view = createView("overlay");
-    const { controller } = await createController([view]);
+    const { scale } = await createScaleFixture([view]);
 
-    controller.setScale(1.5);
+    scale.setScale(1.5);
 
     expect(getSetZoomFactor(view)).not.toHaveBeenCalled();
   });
@@ -95,16 +95,16 @@ describe("InterfaceScale", () => {
       mode: "floating",
       scaling: "auto",
     });
-    const { controller } = await createController([view]);
+    const { scale } = await createScaleFixture([view]);
 
-    controller.setScale(1.5);
+    scale.setScale(1.5);
 
     expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
   });
 
   it("notifies when the effective interface scale changes", async () => {
     const notifyScaleChanged = jest.fn();
-    const { emitSettingsChanged } = await createController(
+    const { emitSettingsChanged } = await createScaleFixture(
       [],
       notifyScaleChanged,
     );
@@ -119,7 +119,7 @@ describe("InterfaceScale", () => {
     const notifyScaleChanged = jest.fn();
 
     await (
-      await createController([view], notifyScaleChanged, "1.5")
+      await createScaleFixture([view], notifyScaleChanged, "1.5")
     ).initialize();
 
     expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
