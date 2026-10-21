@@ -152,3 +152,7 @@ failures and the retained recovery directory under
 `<appsDirectory>/.package-transactions`. Leave that directory intact, correct the
 filesystem problem (such as permissions), and restart Eden to retry recovery
 before installed packages are loaded.
+
+If a package change commits but temporary cleanup fails, the new package stays
+installed. Eden logs the retained transaction directory and retries cleanup on
+the next startup after the filesystem problem is corrected.

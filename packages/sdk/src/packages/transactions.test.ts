@@ -10,6 +10,7 @@ import {
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { fromPromise } from "../effects/io";
+import { log } from "../logging/logger";
 import { AppsDirectory } from "../runtime/inputs";
 import { PackageRollbackError } from "./errors";
 import { PackageTransactions, PackageTransactionsLive } from "./transactions";
@@ -38,6 +39,65 @@ describe("PackageTransactions", () => {
 
   afterEach(async () => {
     await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it("keeps the committed package when backup deletion fails and retries cleanup on recovery", async () => {
+    const target = path.join(apps, "com.example.app");
+    const locked = path.join(target, "locked");
+    const recoveryRoot = path.join(apps, ".package-transactions");
+    await fs.mkdir(locked, { recursive: true });
+    await fs.writeFile(path.join(target, "version"), "old");
+    await fs.writeFile(path.join(locked, "content"), "original");
+    await fs.chmod(locked, 0o555);
+    const warning = jest.spyOn(log, "warn").mockImplementation(() => {});
+    try {
+      await expect(
+        Effect.runPromise(
+          coordinator.execute([
+            {
+              target,
+              prepare: (stage) =>
+                fromPromise(() =>
+                  fs.writeFile(path.join(stage, "version"), "new"),
+                ),
+            },
+          ]),
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.readFile(path.join(target, "version"), "utf8"),
+      ).resolves.toBe("new");
+      const directories = await fs.readdir(recoveryRoot);
+      expect(directories).toHaveLength(1);
+      const directory = path.join(recoveryRoot, directories[0]);
+      const journal = JSON.parse(
+        await fs.readFile(path.join(directory, "journal.json"), "utf8"),
+      );
+      expect(journal.state).toBe("committed");
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining(directory),
+        expect.objectContaining({
+          cause: expect.objectContaining({ code: "EACCES" }),
+        }),
+      );
+      await Effect.runPromise(coordinator.initialize());
+      await expect(
+        fs.readFile(path.join(target, "version"), "utf8"),
+      ).resolves.toBe("new");
+      await fs.chmod(path.join(directory, "backups/0/locked"), 0o755);
+      await Effect.runPromise(coordinator.initialize());
+      await expect(fs.readdir(recoveryRoot)).resolves.toEqual([]);
+      await expect(
+        fs.readFile(path.join(target, "version"), "utf8"),
+      ).resolves.toBe("new");
+    } finally {
+      warning.mockRestore();
+      await fs.chmod(locked, 0o755).catch(() => undefined);
+      for (const directory of await fs.readdir(recoveryRoot))
+        await fs
+          .chmod(path.join(recoveryRoot, directory, "backups/0/locked"), 0o755)
+          .catch(() => undefined);
+    }
   });
 
   it("retains recoverable originals and both failures when rollback cannot finish", async () => {

@@ -54,9 +54,11 @@ export const acquireAppInstance = Effect.fn(function* (
         if (contexts.get(appId) === identity) contexts.unregister(appId);
       }),
   );
-  yield* Effect.addFinalizer(() =>
-    Effect.sync(() => channels.unregisterAllServices(appId)),
+  const withdrawServices = Effect.sync(() =>
+    channels.unregisterAllServices(appId),
   );
+  // Failed startup still needs cleanup before releasing the execution identity.
+  yield* Effect.addFinalizer(() => withdrawServices);
   const backend = manifest.backend?.entry
     ? (yield* backends.createBackend(
         appId,
@@ -84,6 +86,8 @@ export const acquireAppInstance = Effect.fn(function* (
           ),
       )
     : -1;
+  // Finalizers run in reverse order: withdraw discovery before native teardown.
+  yield* Effect.addFinalizer(() => withdrawServices);
   if (backend && backends.getBackend(appId) !== backend)
     return yield* Effect.fail(
       new BackendStartupFailed({

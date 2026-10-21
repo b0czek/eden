@@ -1,5 +1,6 @@
 import type { ConnectResult } from "@edenapp/types";
 import { testApp } from "../../support/apps";
+import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
@@ -45,7 +46,56 @@ async function scenario() {
 describe("AppBus command and process lifecycle integration", () => {
   let eden: TestEden | undefined;
   afterEach(async () => {
+    jest.restoreAllMocks();
     await eden?.dispose();
+  });
+
+  it("withdraws services before a provider backend receives shutdown", async () => {
+    const s = await scenario();
+    eden = s.eden;
+    const provider = "app.stopping-provider";
+    s.packages.register(
+      testApp(provider, { backend: { entry: "backend.js" } }),
+    );
+    s.permissions.registerApp(provider, ["appbus/expose"]);
+    const launching = eden.complete("process/launch", { appId: provider });
+    await tick();
+    const backend = eden.getBackendProcess(provider);
+    backend.emit("message", { type: "backend-ready" });
+    await launching;
+    await expect(
+      eden.execute(
+        "appbus/register",
+        { serviceName: "documents" },
+        { appId: provider, principal: { kind: "user", profile: s.user } },
+      ),
+    ).resolves.toEqual({ success: true });
+    const shutdown = gate();
+    const postMessage = backend.postMessage.bind(backend);
+    jest.spyOn(backend, "postMessage").mockImplementation((message) => {
+      postMessage(message);
+      if ((message as { type?: string }).type === "shutdown")
+        shutdown.release();
+    });
+    const stopping = eden.complete("process/stop", { appId: provider });
+    try {
+      await shutdown.promise;
+      await expect(eden.execute("appbus/list")).resolves.toEqual({
+        services: [],
+      });
+      await expect(
+        eden.executeFromView(s.contents.client, "appbus/connect", {
+          targetAppId: provider,
+          serviceName: "documents",
+        }),
+      ).resolves.toMatchObject({
+        success: false,
+        error: expect.stringContaining("not found"),
+      });
+    } finally {
+      backend.kill();
+      await stopping;
+    }
   });
 
   it("uses authenticated renderer identities and removes registrations and peers when their provider stops", async () => {

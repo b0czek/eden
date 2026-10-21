@@ -123,7 +123,16 @@ describe("app instance ownership", () => {
     const starting = eden.runtime.effects
       .run(launch())
       .catch((error: unknown) => error);
-    (await backend()).emit("message", { type: "backend-ready" });
+    const native = await backend();
+    eden.runtime.services.permissions.registerApp(appId, ["appbus/expose"]);
+    await expect(
+      eden.execute(
+        "appbus/register",
+        { serviceName: "startup-service" },
+        { appId, principal: { kind: "user", profile } },
+      ),
+    ).resolves.toEqual({ success: true });
+    native.emit("message", { type: "backend-ready" });
     const failed = await starting;
     expect(failed).toMatchObject({ _tag: "ViewNativeFailure", appId });
     if (!(failed instanceof ViewNativeFailure))
@@ -135,6 +144,9 @@ describe("app instance ownership", () => {
       eden.runtime.services.processes.getAppInstance(appId),
     ).toBeUndefined();
     expect(eden.runtime.services.runtimeContexts.get(appId)).toBeUndefined();
+    await expect(eden.execute("appbus/list")).resolves.toEqual({
+      services: [],
+    });
     broken.mockRestore();
     const retry = eden.runtime.effects.run(launch());
     (await backend()).emit("message", { type: "backend-ready" });

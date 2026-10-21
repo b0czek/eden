@@ -85,8 +85,11 @@ export const PackageTransactionsLive = Layer.effect(
               return;
             }
             const journal = yield* readJournal(directory);
-            if (journal.state !== "committed")
-              yield* rollback(directory, journal);
+            if (journal.state === "committed") {
+              yield* cleanupCommitted(directory);
+              return;
+            }
+            yield* rollback(directory, journal);
             yield* fromPromise(() =>
               fs.rm(directory, { recursive: true, force: true }),
             );
@@ -140,7 +143,7 @@ export const PackageTransactionsLive = Layer.effect(
         state: "prepared",
         entries,
       };
-      return yield* Effect.catchCause(
+      yield* Effect.catchCause(
         Effect.gen(function* () {
           for (const [index, operation] of operations.entries()) {
             const stage = entries[index].stage;
@@ -178,9 +181,6 @@ export const PackageTransactionsLive = Layer.effect(
           reporter?.update("committing-transaction");
           journal.state = "committed";
           yield* writeJournal(directory, journal);
-          yield* fromPromise(() =>
-            fs.rm(directory, { recursive: true, force: true }),
-          );
         }),
         (error) =>
           Effect.gen(function* () {
@@ -215,7 +215,29 @@ export const PackageTransactionsLive = Layer.effect(
             return yield* Effect.failCause(error);
           }),
       );
+      yield* cleanupCommitted(directory);
     }, Effect.uninterruptible);
+    const cleanupCommitted = Effect.fn(function* (directory: string) {
+      yield* Effect.gen(function* () {
+        // Keep the committed journal until all disposable package data is gone.
+        for (const name of ["backups", "stages"])
+          yield* fromPromise(() =>
+            fs.rm(path.join(directory, name), { recursive: true, force: true }),
+          );
+        yield* fromPromise(() =>
+          fs.rm(directory, { recursive: true, force: true }),
+        );
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() =>
+            log.warn(
+              `Failed to clean committed package transaction; cleanup will be retried on startup at ${directory}:`,
+              error,
+            ),
+          ),
+        ),
+      );
+    });
     const rollback = Effect.fn(function* (
       directory: string,
       journal: TransactionJournal,
