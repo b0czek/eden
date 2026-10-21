@@ -1,6 +1,6 @@
 import type { NamespaceCommands } from "./commands";
 import type { NamespaceEvents } from "./events";
-import { generateHeader } from "./utils";
+import { compareIdentifiers, generateHeader } from "./utils";
 
 function clientName(name: string, command: string): string {
   const normalized = name.replace(/[-/]([a-zA-Z0-9])/g, (_, letter: string) =>
@@ -53,7 +53,10 @@ export function generateClientCode(
     else namespaces.set(namespace.namespace, { ...namespace, commands: [] });
   }
   const exports = new Set<string>();
-  for (const namespace of namespaces.values()) {
+  const sortedNamespaces = Array.from(namespaces.values()).sort((left, right) =>
+    compareIdentifiers(left.namespace, right.namespace),
+  );
+  for (const namespace of sortedNamespaces) {
     const name = clientName(namespace.namespace, namespace.namespace);
     if (exports.has(name))
       throw new Error(

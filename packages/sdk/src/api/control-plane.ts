@@ -25,7 +25,7 @@ import type {
 import type {
   VolumeEjectError,
   VolumeRegistrationError,
-} from "../filesystem/errors";
+} from "../filesystem/volumes/errors";
 import type { HostOperationFailure } from "../operations/errors";
 import type {
   PackageArchiveInstallError,

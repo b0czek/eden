@@ -8,7 +8,7 @@ import { Autostart } from "../autostart/service";
 import { Branding } from "../branding/service";
 import { Daemons } from "../daemon/service";
 import { ExecutionContext } from "../execution/context";
-import { Volumes } from "../filesystem/volumes";
+import { Volumes } from "../filesystem/volumes/service";
 import { IpcTransport } from "../ipc/transport";
 import { Keyboard } from "../keyboard/service";
 import { createOperationsSdkController } from "../operations/controller-sdk";

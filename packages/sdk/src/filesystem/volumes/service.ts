@@ -11,15 +11,15 @@ import * as Fiber from "effect/Fiber";
 import * as Latch from "effect/Latch";
 import * as Layer from "effect/Layer";
 import type * as Scope from "effect/Scope";
-import type { EdenVolumeOptions } from "../api/control-plane";
-import { fromPromise } from "../effects/io";
-import type { Event } from "../events/event";
-import { scopedEvent } from "../events/scoped";
+import type { EdenVolumeOptions } from "../../api/control-plane";
+import { fromPromise } from "../../effects/io";
+import type { Event } from "../../events/event";
+import { scopedEvent } from "../../events/scoped";
 import {
   type OperationReporter,
   type OperationTask,
   operationTask,
-} from "../operations/task";
+} from "../../operations/task";
 
 import {
   type VolumeAccessError,

@@ -1,15 +1,15 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import type { EdenVolumesApi } from "../api/control-plane";
-import type { SdkContext } from "../api/sdk-context";
+import type { EdenVolumesApi } from "../../api/control-plane";
+import type { SdkContext } from "../../api/sdk-context";
 import { VolumeEjectRejected, VolumeUnavailable } from "./errors";
 import {
   volumeEjectArgsSchema,
   volumeIdSchema,
   volumeOptionsSchema,
   volumeRegistrationSchema,
-} from "./volume-schemas";
-import type { Volumes } from "./volumes";
+} from "./schemas";
+import type { Volumes } from "./service";
 
 export function createVolumesSdkController({
   volumes,

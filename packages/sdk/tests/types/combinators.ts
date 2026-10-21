@@ -2,7 +2,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import { command } from "../../src/controllers/controller";
 import type { Filesystem } from "../../src/filesystem/service";
-import type { Volumes } from "../../src/filesystem/volumes";
+import type { Volumes } from "../../src/filesystem/volumes/service";
 import type { PackageTransactions } from "../../src/packages/transactions";
 
 class CallerResource extends Context.Service<

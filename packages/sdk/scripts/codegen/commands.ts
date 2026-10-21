@@ -5,6 +5,7 @@
  */
 
 import {
+  compareIdentifiers,
   generateHeader,
   namespaceToInterfaceName,
   replaceTypesWithInlineImports,
@@ -39,14 +40,19 @@ export interface NamespaceCommands {
 }
 
 /**
- * Group commands by namespace
+ * Group commands alphabetically by namespace and command name.
  */
 export function groupCommandsByNamespace(
   allCommands: CommandInfo[],
 ): NamespaceCommands[] {
   const namespaceMap = new Map<string, NamespaceCommands>();
 
-  allCommands.forEach((cmd) => {
+  const commands = [...allCommands].sort(
+    (left, right) =>
+      compareIdentifiers(left.namespace, right.namespace) ||
+      compareIdentifiers(left.command, right.command),
+  );
+  commands.forEach((cmd) => {
     if (!namespaceMap.has(cmd.namespace)) {
       namespaceMap.set(cmd.namespace, {
         namespace: cmd.namespace,

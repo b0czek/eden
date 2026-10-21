@@ -7,7 +7,7 @@ import { createEvent } from "../../../src/events/event";
 import { ExecutionContext } from "../../../src/execution/context";
 import { FilesystemViews } from "../../../src/filesystem/ports";
 import { Filesystem, FilesystemLive } from "../../../src/filesystem/service";
-import { Volumes, VolumesLive } from "../../../src/filesystem/volumes";
+import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
 import { UserDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,

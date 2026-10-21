@@ -3,7 +3,7 @@ import { Daemons } from "../daemon/service";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
 import { Filesystem } from "../filesystem/service";
-import { Volumes } from "../filesystem/volumes";
+import { Volumes } from "../filesystem/volumes/service";
 import { Commands } from "../ipc/commands";
 import { Permissions } from "../ipc/permissions";
 import { IpcTransport } from "../ipc/transport";

@@ -41,7 +41,6 @@ import {
   type FilesystemTransferError,
   type FilesystemWatchError,
   FilesystemWatchRejected,
-  type VolumeUnavailable,
   watchRejection,
 } from "./errors";
 import {
@@ -51,8 +50,9 @@ import {
 } from "./file-handles";
 import { FilesystemViews } from "./ports";
 import { createFileTransfers } from "./transfers";
-import type { VolumeRoot } from "./volumes";
-import { Volumes } from "./volumes";
+import type { VolumeUnavailable } from "./volumes/errors";
+import type { VolumeRoot } from "./volumes/service";
+import { Volumes } from "./volumes/service";
 import { createFilesystemWatches } from "./watches";
 
 export interface Filesystem {

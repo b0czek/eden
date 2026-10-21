@@ -7,9 +7,12 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { EdenVolumeOptions } from "../../../src/api/control-plane";
-import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/create-test-eden";
+import type { EdenVolumeOptions } from "../../../../src/api/control-plane";
+import { createTestCaller } from "../../../support/callers";
+import {
+  createTestEden,
+  type TestEden,
+} from "../../../support/create-test-eden";
 
 const appId = "com.example.volume-removal";
 

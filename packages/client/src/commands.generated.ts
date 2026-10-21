@@ -11,31 +11,14 @@ import { invoke } from "./invoke.js";
 
 import { subscribe, unsubscribe } from "./subscriptions.js";
 
-const associationsCommands = {
-  ["get"]: (key: CommandArgs<"associations/get">["key"]): Promise<CommandResult<"associations/get">> =>
-    invoke("associations/get", { ["key"]: key }),
-  ["set"]: (key: CommandArgs<"associations/set">["key"], appId: CommandArgs<"associations/set">["appId"], kind: CommandArgs<"associations/set">["kind"], options?: Pick<CommandArgs<"associations/set">, "label">): Promise<CommandResult<"associations/set">> =>
-    invoke("associations/set", { ["key"]: key, ["appId"]: appId, ["kind"]: kind, ["label"]: options?.["label"] }),
-  ["remove"]: (key: CommandArgs<"associations/remove">["key"]): Promise<CommandResult<"associations/remove">> =>
-    invoke("associations/remove", { ["key"]: key }),
-  ["list"]: (options?: Pick<CommandArgs<"associations/list">, "kindPrefix">): Promise<CommandResult<"associations/list">> =>
-    invoke("associations/list", { ["kindPrefix"]: options?.["kindPrefix"] }),
-};
-export { associationsCommands as associations };
-
 const appbusCommands = {
   /**
-   * Register a service that this app exposes
-   * Requires "appbus/expose" permission
+   * Connect to another app's service
+   * Creates MessageChannel and transfers ports directly to both apps
+   * Requires "appbus/connect" permission
    */
-  ["register"]: (serviceName: CommandArgs<"appbus/register">["serviceName"], options?: Pick<CommandArgs<"appbus/register">, "description" | "allowedClients">): Promise<CommandResult<"appbus/register">> =>
-    invoke("appbus/register", { ["serviceName"]: serviceName, ["description"]: options?.["description"], ["allowedClients"]: options?.["allowedClients"] }),
-  /**
-   * Unregister a service
-   * Requires "appbus/expose" permission
-   */
-  ["unregister"]: (serviceName: CommandArgs<"appbus/unregister">["serviceName"]): Promise<CommandResult<"appbus/unregister">> =>
-    invoke("appbus/unregister", { ["serviceName"]: serviceName }),
+  ["connect"]: (targetAppId: CommandArgs<"appbus/connect">["targetAppId"], serviceName: CommandArgs<"appbus/connect">["serviceName"]): Promise<CommandResult<"appbus/connect">> =>
+    invoke("appbus/connect", { ["targetAppId"]: targetAppId, ["serviceName"]: serviceName }),
   /**
    * List all available services
    * No permission required
@@ -49,22 +32,27 @@ const appbusCommands = {
   ["listByApp"]: (appId: CommandArgs<"appbus/list-by-app">["appId"]): Promise<CommandResult<"appbus/list-by-app">> =>
     invoke("appbus/list-by-app", { ["appId"]: appId }),
   /**
-   * Connect to another app's service
-   * Creates MessageChannel and transfers ports directly to both apps
-   * Requires "appbus/connect" permission
+   * Register a service that this app exposes
+   * Requires "appbus/expose" permission
    */
-  ["connect"]: (targetAppId: CommandArgs<"appbus/connect">["targetAppId"], serviceName: CommandArgs<"appbus/connect">["serviceName"]): Promise<CommandResult<"appbus/connect">> =>
-    invoke("appbus/connect", { ["targetAppId"]: targetAppId, ["serviceName"]: serviceName }),
+  ["register"]: (serviceName: CommandArgs<"appbus/register">["serviceName"], options?: Pick<CommandArgs<"appbus/register">, "description" | "allowedClients">): Promise<CommandResult<"appbus/register">> =>
+    invoke("appbus/register", { ["serviceName"]: serviceName, ["description"]: options?.["description"], ["allowedClients"]: options?.["allowedClients"] }),
+  /**
+   * Unregister a service
+   * Requires "appbus/expose" permission
+   */
+  ["unregister"]: (serviceName: CommandArgs<"appbus/unregister">["serviceName"]): Promise<CommandResult<"appbus/unregister">> =>
+    invoke("appbus/unregister", { ["serviceName"]: serviceName }),
 };
 export { appbusCommands as appbus };
 
 const appearanceCommands = {
-  ["setWallpaper"]: (wallpaper: CommandArgs<"appearance/set-wallpaper">["wallpaper"]): Promise<CommandResult<"appearance/set-wallpaper">> =>
-    invoke("appearance/set-wallpaper", { ["wallpaper"]: wallpaper }),
-  ["getWallpaper"]: (): Promise<CommandResult<"appearance/get-wallpaper">> =>
-    invoke("appearance/get-wallpaper", {  }),
   ["getPresets"]: (): Promise<CommandResult<"appearance/get-presets">> =>
     invoke("appearance/get-presets", {  }),
+  ["getWallpaper"]: (): Promise<CommandResult<"appearance/get-wallpaper">> =>
+    invoke("appearance/get-wallpaper", {  }),
+  ["setWallpaper"]: (wallpaper: CommandArgs<"appearance/set-wallpaper">["wallpaper"]): Promise<CommandResult<"appearance/set-wallpaper">> =>
+    invoke("appearance/set-wallpaper", { ["wallpaper"]: wallpaper }),
   ["subscribe"]: <E extends "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): Promise<void> =>
     subscribe(`appearance/${event}`, callback),
   ["unsubscribe"]: <E extends "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): void =>
@@ -72,52 +60,49 @@ const appearanceCommands = {
 };
 export { appearanceCommands as appearance };
 
-const systemCommands = {
-  /**
-   * Get consumer-controlled product branding for SDK-owned interfaces.
-   */
-  ["branding"]: (): Promise<CommandResult<"system/branding">> =>
-    invoke("system/branding", {  }),
-  ["powerCapabilities"]: (): Promise<CommandResult<"system/power-capabilities">> =>
-    invoke("system/power-capabilities", {  }),
-  ["power"]: (action: CommandArgs<"system/power">["action"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"system/power">> =>
-    invoke("system/power", { ["action"]: action }, options?.submission),
-  ["info"]: (): Promise<CommandResult<"system/info">> =>
-    invoke("system/info", {  }),
+const associationsCommands = {
+  ["get"]: (key: CommandArgs<"associations/get">["key"]): Promise<CommandResult<"associations/get">> =>
+    invoke("associations/get", { ["key"]: key }),
+  ["list"]: (options?: Pick<CommandArgs<"associations/list">, "kindPrefix">): Promise<CommandResult<"associations/list">> =>
+    invoke("associations/list", { ["kindPrefix"]: options?.["kindPrefix"] }),
+  ["remove"]: (key: CommandArgs<"associations/remove">["key"]): Promise<CommandResult<"associations/remove">> =>
+    invoke("associations/remove", { ["key"]: key }),
+  ["set"]: (key: CommandArgs<"associations/set">["key"], appId: CommandArgs<"associations/set">["appId"], kind: CommandArgs<"associations/set">["kind"], options?: Pick<CommandArgs<"associations/set">, "label">): Promise<CommandResult<"associations/set">> =>
+    invoke("associations/set", { ["key"]: key, ["appId"]: appId, ["kind"]: kind, ["label"]: options?.["label"] }),
 };
-export { systemCommands as system };
+export { associationsCommands as associations };
 
 const contextMenuCommands = {
-  ["registerDisplay"]: (): Promise<CommandResult<"context-menu/register-display">> =>
-    invoke("context-menu/register-display", {  }),
-  ["open"]: (position: CommandArgs<"context-menu/open">["position"], items: CommandArgs<"context-menu/open">["items"], options?: Pick<CommandArgs<"context-menu/open">, "title">): Promise<CommandResult<"context-menu/open">> =>
-    invoke("context-menu/open", { ["position"]: position, ["items"]: items, ["title"]: options?.["title"] }),
-  ["resolve"]: (requestId: CommandArgs<"context-menu/resolve">["requestId"], reason: CommandArgs<"context-menu/resolve">["reason"], options?: Pick<CommandArgs<"context-menu/resolve">, "itemId">): Promise<CommandResult<"context-menu/resolve">> =>
-    invoke("context-menu/resolve", { ["requestId"]: requestId, ["reason"]: reason, ["itemId"]: options?.["itemId"] }),
   ["close"]: (options?: Pick<CommandArgs<"context-menu/close">, "requestId">): Promise<CommandResult<"context-menu/close">> =>
     invoke("context-menu/close", { ["requestId"]: options?.["requestId"] }),
-  ["subscribe"]: <E extends "opened" | "closed">(event: E, callback: (data: EventData<`context-menu/${E}`>) => void): Promise<void> =>
+  ["open"]: (position: CommandArgs<"context-menu/open">["position"], items: CommandArgs<"context-menu/open">["items"], options?: Pick<CommandArgs<"context-menu/open">, "title">): Promise<CommandResult<"context-menu/open">> =>
+    invoke("context-menu/open", { ["position"]: position, ["items"]: items, ["title"]: options?.["title"] }),
+  ["registerDisplay"]: (): Promise<CommandResult<"context-menu/register-display">> =>
+    invoke("context-menu/register-display", {  }),
+  ["resolve"]: (requestId: CommandArgs<"context-menu/resolve">["requestId"], reason: CommandArgs<"context-menu/resolve">["reason"], options?: Pick<CommandArgs<"context-menu/resolve">, "itemId">): Promise<CommandResult<"context-menu/resolve">> =>
+    invoke("context-menu/resolve", { ["requestId"]: requestId, ["reason"]: reason, ["itemId"]: options?.["itemId"] }),
+  ["subscribe"]: <E extends "closed" | "opened">(event: E, callback: (data: EventData<`context-menu/${E}`>) => void): Promise<void> =>
     subscribe(`context-menu/${event}`, callback),
-  ["unsubscribe"]: <E extends "opened" | "closed">(event: E, callback: (data: EventData<`context-menu/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "closed" | "opened">(event: E, callback: (data: EventData<`context-menu/${E}`>) => void): void =>
     unsubscribe(`context-menu/${event}`, callback),
 };
 export { contextMenuCommands as contextMenu };
 
 const daemonCommands = {
-  ["list"]: (): Promise<CommandResult<"daemon/list">> =>
-    invoke("daemon/list", {  }),
-  ["updateDefinition"]: (definition: CommandArgs<"daemon/update-definition">["definition"]): Promise<CommandResult<"daemon/update-definition">> =>
-    invoke("daemon/update-definition", { ["definition"]: definition }),
-  ["enable"]: (appId: CommandArgs<"daemon/enable">["appId"]): Promise<CommandResult<"daemon/enable">> =>
-    invoke("daemon/enable", { ["appId"]: appId }),
   ["disable"]: (appId: CommandArgs<"daemon/disable">["appId"]): Promise<CommandResult<"daemon/disable">> =>
     invoke("daemon/disable", { ["appId"]: appId }),
+  ["enable"]: (appId: CommandArgs<"daemon/enable">["appId"]): Promise<CommandResult<"daemon/enable">> =>
+    invoke("daemon/enable", { ["appId"]: appId }),
+  ["list"]: (): Promise<CommandResult<"daemon/list">> =>
+    invoke("daemon/list", {  }),
+  ["restart"]: (appId: CommandArgs<"daemon/restart">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"daemon/restart">> =>
+    invoke("daemon/restart", { ["appId"]: appId }, options?.submission),
   ["start"]: (appId: CommandArgs<"daemon/start">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"daemon/start">> =>
     invoke("daemon/start", { ["appId"]: appId }, options?.submission),
   ["stop"]: (appId: CommandArgs<"daemon/stop">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"daemon/stop">> =>
     invoke("daemon/stop", { ["appId"]: appId }, options?.submission),
-  ["restart"]: (appId: CommandArgs<"daemon/restart">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"daemon/restart">> =>
-    invoke("daemon/restart", { ["appId"]: appId }, options?.submission),
+  ["updateDefinition"]: (definition: CommandArgs<"daemon/update-definition">["definition"]): Promise<CommandResult<"daemon/update-definition">> =>
+    invoke("daemon/update-definition", { ["definition"]: definition }),
   ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`daemon/${E}`>) => void): Promise<void> =>
     subscribe(`daemon/${event}`, callback),
   ["unsubscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`daemon/${E}`>) => void): void =>
@@ -127,69 +112,94 @@ export { daemonCommands as daemon };
 
 const dbCommands = {
   /**
-   * Get a value from database (scoped to caller's app)
-   */
-  ["get"]: (key: CommandArgs<"db/get">["key"]): Promise<CommandResult<"db/get">> =>
-    invoke("db/get", { ["key"]: key }),
-  /**
-   * Set a value in database (scoped to caller's app)
-   */
-  ["set"]: (key: CommandArgs<"db/set">["key"], value: CommandArgs<"db/set">["value"]): Promise<CommandResult<"db/set">> =>
-    invoke("db/set", { ["key"]: key, ["value"]: value }),
-  /**
-   * Delete a key from database (scoped to caller's app)
-   */
-  ["delete"]: (key: CommandArgs<"db/delete">["key"]): Promise<CommandResult<"db/delete">> =>
-    invoke("db/delete", { ["key"]: key }),
-  /**
-   * Check if a key exists (scoped to caller's app)
-   */
-  ["has"]: (key: CommandArgs<"db/has">["key"]): Promise<CommandResult<"db/has">> =>
-    invoke("db/has", { ["key"]: key }),
-  /**
    * Clear all keys (scoped to caller's app)
    */
   ["clear"]: (): Promise<CommandResult<"db/clear">> =>
     invoke("db/clear", {  }),
-  /**
-   * List all keys (scoped to caller's app)
-   */
-  ["list"]: (): Promise<CommandResult<"db/list">> =>
-    invoke("db/list", {  }),
-  /**
-   * Get a value from any app's namespace (superuser only)
-   */
-  ["getSu"]: (appId: CommandArgs<"db/get/su">["appId"], key: CommandArgs<"db/get/su">["key"]): Promise<CommandResult<"db/get/su">> =>
-    invoke("db/get/su", { ["appId"]: appId, ["key"]: key }),
-  /**
-   * Set a value in any app's namespace (superuser only)
-   */
-  ["setSu"]: (appId: CommandArgs<"db/set/su">["appId"], key: CommandArgs<"db/set/su">["key"], value: CommandArgs<"db/set/su">["value"]): Promise<CommandResult<"db/set/su">> =>
-    invoke("db/set/su", { ["appId"]: appId, ["key"]: key, ["value"]: value }),
-  /**
-   * Delete a key from any app's namespace (superuser only)
-   */
-  ["deleteSu"]: (appId: CommandArgs<"db/delete/su">["appId"], key: CommandArgs<"db/delete/su">["key"]): Promise<CommandResult<"db/delete/su">> =>
-    invoke("db/delete/su", { ["appId"]: appId, ["key"]: key }),
-  /**
-   * Check if a key exists in any app's namespace (superuser only)
-   */
-  ["hasSu"]: (appId: CommandArgs<"db/has/su">["appId"], key: CommandArgs<"db/has/su">["key"]): Promise<CommandResult<"db/has/su">> =>
-    invoke("db/has/su", { ["appId"]: appId, ["key"]: key }),
   /**
    * Clear all keys in any app's namespace (superuser only)
    */
   ["clearSu"]: (appId: CommandArgs<"db/clear/su">["appId"]): Promise<CommandResult<"db/clear/su">> =>
     invoke("db/clear/su", { ["appId"]: appId }),
   /**
+   * Delete a key from database (scoped to caller's app)
+   */
+  ["delete"]: (key: CommandArgs<"db/delete">["key"]): Promise<CommandResult<"db/delete">> =>
+    invoke("db/delete", { ["key"]: key }),
+  /**
+   * Delete a key from any app's namespace (superuser only)
+   */
+  ["deleteSu"]: (appId: CommandArgs<"db/delete/su">["appId"], key: CommandArgs<"db/delete/su">["key"]): Promise<CommandResult<"db/delete/su">> =>
+    invoke("db/delete/su", { ["appId"]: appId, ["key"]: key }),
+  /**
+   * Get a value from database (scoped to caller's app)
+   */
+  ["get"]: (key: CommandArgs<"db/get">["key"]): Promise<CommandResult<"db/get">> =>
+    invoke("db/get", { ["key"]: key }),
+  /**
+   * Get a value from any app's namespace (superuser only)
+   */
+  ["getSu"]: (appId: CommandArgs<"db/get/su">["appId"], key: CommandArgs<"db/get/su">["key"]): Promise<CommandResult<"db/get/su">> =>
+    invoke("db/get/su", { ["appId"]: appId, ["key"]: key }),
+  /**
+   * Check if a key exists (scoped to caller's app)
+   */
+  ["has"]: (key: CommandArgs<"db/has">["key"]): Promise<CommandResult<"db/has">> =>
+    invoke("db/has", { ["key"]: key }),
+  /**
+   * Check if a key exists in any app's namespace (superuser only)
+   */
+  ["hasSu"]: (appId: CommandArgs<"db/has/su">["appId"], key: CommandArgs<"db/has/su">["key"]): Promise<CommandResult<"db/has/su">> =>
+    invoke("db/has/su", { ["appId"]: appId, ["key"]: key }),
+  /**
+   * List all keys (scoped to caller's app)
+   */
+  ["list"]: (): Promise<CommandResult<"db/list">> =>
+    invoke("db/list", {  }),
+  /**
    * List all keys in any app's namespace (superuser only)
    */
   ["listSu"]: (appId: CommandArgs<"db/list/su">["appId"]): Promise<CommandResult<"db/list/su">> =>
     invoke("db/list/su", { ["appId"]: appId }),
+  /**
+   * Set a value in database (scoped to caller's app)
+   */
+  ["set"]: (key: CommandArgs<"db/set">["key"], value: CommandArgs<"db/set">["value"]): Promise<CommandResult<"db/set">> =>
+    invoke("db/set", { ["key"]: key, ["value"]: value }),
+  /**
+   * Set a value in any app's namespace (superuser only)
+   */
+  ["setSu"]: (appId: CommandArgs<"db/set/su">["appId"], key: CommandArgs<"db/set/su">["key"], value: CommandArgs<"db/set/su">["value"]): Promise<CommandResult<"db/set/su">> =>
+    invoke("db/set/su", { ["appId"]: appId, ["key"]: key, ["value"]: value }),
 };
 export { dbCommands as db };
 
+const eventCommands = {
+  ["exists"]: (eventName: CommandArgs<"event/exists">["eventName"]): Promise<CommandResult<"event/exists">> =>
+    invoke("event/exists", { ["eventName"]: eventName }),
+  ["subscribe"]: (eventName: CommandArgs<"event/subscribe">["eventName"], options?: Pick<CommandArgs<"event/subscribe">, "operation">): Promise<CommandResult<"event/subscribe">> =>
+    invoke("event/subscribe", { ["eventName"]: eventName, ["operation"]: options?.["operation"] }),
+  ["unsubscribe"]: (eventName: CommandArgs<"event/unsubscribe">["eventName"], options?: Pick<CommandArgs<"event/unsubscribe">, "operation">): Promise<CommandResult<"event/unsubscribe">> =>
+    invoke("event/unsubscribe", { ["eventName"]: eventName, ["operation"]: options?.["operation"] }),
+};
+export { eventCommands as event };
+
 const fileCommands = {
+  /**
+   * Get all file type associations
+   */
+  ["getAssociations"]: (): Promise<CommandResult<"file/get-associations">> =>
+    invoke("file/get-associations", {  }),
+  /**
+   * Get the default handler app for a file path
+   */
+  ["getHandler"]: (location: CommandArgs<"file/get-handler">["location"]): Promise<CommandResult<"file/get-handler">> =>
+    invoke("file/get-handler", { ["location"]: location }),
+  /**
+   * Get all apps that can handle a specific file path
+   */
+  ["getSupportedHandlers"]: (location: CommandArgs<"file/get-supported-handlers">["location"]): Promise<CommandResult<"file/get-supported-handlers">> =>
+    invoke("file/get-supported-handlers", { ["location"]: location }),
   /**
    * Open a file with its default handler
    */
@@ -201,30 +211,15 @@ const fileCommands = {
   ["openWith"]: (location: CommandArgs<"file/open-with">["location"], appId: CommandArgs<"file/open-with">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"file/open-with">> =>
     invoke("file/open-with", { ["location"]: location, ["appId"]: appId }, options?.submission),
   /**
-   * Get the default handler app for a file path
-   */
-  ["getHandler"]: (location: CommandArgs<"file/get-handler">["location"]): Promise<CommandResult<"file/get-handler">> =>
-    invoke("file/get-handler", { ["location"]: location }),
-  /**
-   * Set user preference for a file path's default handler
-   */
-  ["setDefaultHandler"]: (location: CommandArgs<"file/set-default-handler">["location"], appId: CommandArgs<"file/set-default-handler">["appId"]): Promise<CommandResult<"file/set-default-handler">> =>
-    invoke("file/set-default-handler", { ["location"]: location, ["appId"]: appId }),
-  /**
    * Remove user preference for a file path (revert to default)
    */
   ["removeDefaultHandler"]: (location: CommandArgs<"file/remove-default-handler">["location"]): Promise<CommandResult<"file/remove-default-handler">> =>
     invoke("file/remove-default-handler", { ["location"]: location }),
   /**
-   * Get all apps that can handle a specific file path
+   * Set user preference for a file path's default handler
    */
-  ["getSupportedHandlers"]: (location: CommandArgs<"file/get-supported-handlers">["location"]): Promise<CommandResult<"file/get-supported-handlers">> =>
-    invoke("file/get-supported-handlers", { ["location"]: location }),
-  /**
-   * Get all file type associations
-   */
-  ["getAssociations"]: (): Promise<CommandResult<"file/get-associations">> =>
-    invoke("file/get-associations", {  }),
+  ["setDefaultHandler"]: (location: CommandArgs<"file/set-default-handler">["location"], appId: CommandArgs<"file/set-default-handler">["appId"]): Promise<CommandResult<"file/set-default-handler">> =>
+    invoke("file/set-default-handler", { ["location"]: location, ["appId"]: appId }),
   ["subscribe"]: <E extends "opened">(event: E, callback: (data: EventData<`file/${E}`>) => void): Promise<void> =>
     subscribe(`file/${event}`, callback),
   ["unsubscribe"]: <E extends "opened">(event: E, callback: (data: EventData<`file/${E}`>) => void): void =>
@@ -233,17 +228,17 @@ const fileCommands = {
 export { fileCommands as file };
 
 const filePickerCommands = {
-  ["registerDisplay"]: (): Promise<CommandResult<"file-picker/register-display">> =>
-    invoke("file-picker/register-display", {  }),
-  ["open"]: (mode: CommandArgs<"file-picker/open">["mode"], options?: Pick<CommandArgs<"file-picker/open">, "selection" | "multiple" | "title" | "initialLocation" | "allowedVolumes" | "suggestedName" | "filters" | "confirmLabel" | "canCreateDirectories" | "overwritePrompt">): Promise<CommandResult<"file-picker/open">> =>
-    invoke("file-picker/open", { ["mode"]: mode, ["selection"]: options?.["selection"], ["multiple"]: options?.["multiple"], ["title"]: options?.["title"], ["initialLocation"]: options?.["initialLocation"], ["allowedVolumes"]: options?.["allowedVolumes"], ["suggestedName"]: options?.["suggestedName"], ["filters"]: options?.["filters"], ["confirmLabel"]: options?.["confirmLabel"], ["canCreateDirectories"]: options?.["canCreateDirectories"], ["overwritePrompt"]: options?.["overwritePrompt"] }),
-  ["resolve"]: (requestId: CommandArgs<"file-picker/resolve">["requestId"], reason: CommandArgs<"file-picker/resolve">["reason"], options?: Pick<CommandArgs<"file-picker/resolve">, "locations">): Promise<CommandResult<"file-picker/resolve">> =>
-    invoke("file-picker/resolve", { ["requestId"]: requestId, ["reason"]: reason, ["locations"]: options?.["locations"] }),
   ["close"]: (options?: Pick<CommandArgs<"file-picker/close">, "requestId">): Promise<CommandResult<"file-picker/close">> =>
     invoke("file-picker/close", { ["requestId"]: options?.["requestId"] }),
-  ["subscribe"]: <E extends "opened" | "closed">(event: E, callback: (data: EventData<`file-picker/${E}`>) => void): Promise<void> =>
+  ["open"]: (mode: CommandArgs<"file-picker/open">["mode"], options?: Pick<CommandArgs<"file-picker/open">, "selection" | "multiple" | "title" | "initialLocation" | "allowedVolumes" | "suggestedName" | "filters" | "confirmLabel" | "canCreateDirectories" | "overwritePrompt">): Promise<CommandResult<"file-picker/open">> =>
+    invoke("file-picker/open", { ["mode"]: mode, ["selection"]: options?.["selection"], ["multiple"]: options?.["multiple"], ["title"]: options?.["title"], ["initialLocation"]: options?.["initialLocation"], ["allowedVolumes"]: options?.["allowedVolumes"], ["suggestedName"]: options?.["suggestedName"], ["filters"]: options?.["filters"], ["confirmLabel"]: options?.["confirmLabel"], ["canCreateDirectories"]: options?.["canCreateDirectories"], ["overwritePrompt"]: options?.["overwritePrompt"] }),
+  ["registerDisplay"]: (): Promise<CommandResult<"file-picker/register-display">> =>
+    invoke("file-picker/register-display", {  }),
+  ["resolve"]: (requestId: CommandArgs<"file-picker/resolve">["requestId"], reason: CommandArgs<"file-picker/resolve">["reason"], options?: Pick<CommandArgs<"file-picker/resolve">, "locations">): Promise<CommandResult<"file-picker/resolve">> =>
+    invoke("file-picker/resolve", { ["requestId"]: requestId, ["reason"]: reason, ["locations"]: options?.["locations"] }),
+  ["subscribe"]: <E extends "closed" | "opened">(event: E, callback: (data: EventData<`file-picker/${E}`>) => void): Promise<void> =>
     subscribe(`file-picker/${event}`, callback),
-  ["unsubscribe"]: <E extends "opened" | "closed">(event: E, callback: (data: EventData<`file-picker/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "closed" | "opened">(event: E, callback: (data: EventData<`file-picker/${E}`>) => void): void =>
     unsubscribe(`file-picker/${event}`, callback),
 };
 export { filePickerCommands as filePicker };
@@ -251,40 +246,40 @@ export { filePickerCommands as filePicker };
 const fsCommands = {
   ["accessScope"]: (volume: CommandArgs<"fs/access-scope">["volume"]): Promise<CommandResult<"fs/access-scope">> =>
     invoke("fs/access-scope", { ["volume"]: volume }),
-  ["open"]: (location: CommandArgs<"fs/open">["location"], options?: Pick<CommandArgs<"fs/open">, "mode">): Promise<CommandResult<"fs/open">> =>
-    invoke("fs/open", { ["location"]: location, ["mode"]: options?.["mode"] }),
   ["close"]: (handle: CommandArgs<"fs/close">["handle"]): Promise<CommandResult<"fs/close">> =>
     invoke("fs/close", { ["handle"]: handle }),
-  ["read"]: (location: CommandArgs<"fs/read">["location"], options?: Pick<CommandArgs<"fs/read">, "encoding">): Promise<CommandResult<"fs/read">> =>
-    invoke("fs/read", { ["location"]: location, ["encoding"]: options?.["encoding"] }),
-  ["readBinary"]: (location: CommandArgs<"fs/read-binary">["location"]): Promise<CommandResult<"fs/read-binary">> =>
-    invoke("fs/read-binary", { ["location"]: location }),
-  ["write"]: (location: CommandArgs<"fs/write">["location"], content: CommandArgs<"fs/write">["content"], options?: Pick<CommandArgs<"fs/write">, "encoding">): Promise<CommandResult<"fs/write">> =>
-    invoke("fs/write", { ["location"]: location, ["content"]: content, ["encoding"]: options?.["encoding"] }),
-  ["writeBinary"]: (location: CommandArgs<"fs/write-binary">["location"], content: CommandArgs<"fs/write-binary">["content"]): Promise<CommandResult<"fs/write-binary">> =>
-    invoke("fs/write-binary", { ["location"]: location, ["content"]: content }),
+  ["cp"]: (from: CommandArgs<"fs/cp">["from"], to: CommandArgs<"fs/cp">["to"], options?: Pick<CommandArgs<"fs/cp">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/cp">> =>
+    invoke("fs/cp", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
+  ["delete"]: (location: CommandArgs<"fs/delete">["location"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/delete">> =>
+    invoke("fs/delete", { ["location"]: location }, options?.submission),
   ["exists"]: (location: CommandArgs<"fs/exists">["location"]): Promise<CommandResult<"fs/exists">> =>
     invoke("fs/exists", { ["location"]: location }),
   ["mkdir"]: (location: CommandArgs<"fs/mkdir">["location"]): Promise<CommandResult<"fs/mkdir">> =>
     invoke("fs/mkdir", { ["location"]: location }),
+  ["mv"]: (from: CommandArgs<"fs/mv">["from"], to: CommandArgs<"fs/mv">["to"], options?: Pick<CommandArgs<"fs/mv">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/mv">> =>
+    invoke("fs/mv", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
+  ["open"]: (location: CommandArgs<"fs/open">["location"], options?: Pick<CommandArgs<"fs/open">, "mode">): Promise<CommandResult<"fs/open">> =>
+    invoke("fs/open", { ["location"]: location, ["mode"]: options?.["mode"] }),
+  ["read"]: (location: CommandArgs<"fs/read">["location"], options?: Pick<CommandArgs<"fs/read">, "encoding">): Promise<CommandResult<"fs/read">> =>
+    invoke("fs/read", { ["location"]: location, ["encoding"]: options?.["encoding"] }),
+  ["readBinary"]: (location: CommandArgs<"fs/read-binary">["location"]): Promise<CommandResult<"fs/read-binary">> =>
+    invoke("fs/read-binary", { ["location"]: location }),
   ["readdir"]: (location: CommandArgs<"fs/readdir">["location"]): Promise<CommandResult<"fs/readdir">> =>
     invoke("fs/readdir", { ["location"]: location }),
-  ["stat"]: (location: CommandArgs<"fs/stat">["location"]): Promise<CommandResult<"fs/stat">> =>
-    invoke("fs/stat", { ["location"]: location }),
-  ["watch"]: (location: CommandArgs<"fs/watch">["location"]): Promise<CommandResult<"fs/watch">> =>
-    invoke("fs/watch", { ["location"]: location }),
-  ["unwatch"]: (watchId: CommandArgs<"fs/unwatch">["watchId"]): Promise<CommandResult<"fs/unwatch">> =>
-    invoke("fs/unwatch", { ["watchId"]: watchId }),
   ["resolve"]: (location: CommandArgs<"fs/resolve">["location"]): Promise<CommandResult<"fs/resolve">> =>
     invoke("fs/resolve", { ["location"]: location }),
   ["search"]: (location: CommandArgs<"fs/search">["location"], pattern: CommandArgs<"fs/search">["pattern"], options?: Pick<CommandArgs<"fs/search">, "limit">): Promise<CommandResult<"fs/search">> =>
     invoke("fs/search", { ["location"]: location, ["pattern"]: pattern, ["limit"]: options?.["limit"] }),
-  ["delete"]: (location: CommandArgs<"fs/delete">["location"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/delete">> =>
-    invoke("fs/delete", { ["location"]: location }, options?.submission),
-  ["cp"]: (from: CommandArgs<"fs/cp">["from"], to: CommandArgs<"fs/cp">["to"], options?: Pick<CommandArgs<"fs/cp">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/cp">> =>
-    invoke("fs/cp", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
-  ["mv"]: (from: CommandArgs<"fs/mv">["from"], to: CommandArgs<"fs/mv">["to"], options?: Pick<CommandArgs<"fs/mv">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/mv">> =>
-    invoke("fs/mv", { ["from"]: from, ["to"]: to, ["overwrite"]: options?.["overwrite"] }, options?.submission),
+  ["stat"]: (location: CommandArgs<"fs/stat">["location"]): Promise<CommandResult<"fs/stat">> =>
+    invoke("fs/stat", { ["location"]: location }),
+  ["unwatch"]: (watchId: CommandArgs<"fs/unwatch">["watchId"]): Promise<CommandResult<"fs/unwatch">> =>
+    invoke("fs/unwatch", { ["watchId"]: watchId }),
+  ["watch"]: (location: CommandArgs<"fs/watch">["location"]): Promise<CommandResult<"fs/watch">> =>
+    invoke("fs/watch", { ["location"]: location }),
+  ["write"]: (location: CommandArgs<"fs/write">["location"], content: CommandArgs<"fs/write">["content"], options?: Pick<CommandArgs<"fs/write">, "encoding">): Promise<CommandResult<"fs/write">> =>
+    invoke("fs/write", { ["location"]: location, ["content"]: content, ["encoding"]: options?.["encoding"] }),
+  ["writeBinary"]: (location: CommandArgs<"fs/write-binary">["location"], content: CommandArgs<"fs/write-binary">["content"]): Promise<CommandResult<"fs/write-binary">> =>
+    invoke("fs/write-binary", { ["location"]: location, ["content"]: content }),
   ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): Promise<void> =>
     subscribe(`fs/${event}`, callback),
   ["unsubscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): void =>
@@ -292,23 +287,11 @@ const fsCommands = {
 };
 export { fsCommands as fs };
 
-const volumeCommands = {
-  ["list"]: (): Promise<CommandResult<"volume/list">> =>
-    invoke("volume/list", {  }),
-  ["eject"]: (volume: CommandArgs<"volume/eject">["volume"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"volume/eject">> =>
-    invoke("volume/eject", { ["volume"]: volume }, options?.submission),
-  ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`volume/${E}`>) => void): Promise<void> =>
-    subscribe(`volume/${event}`, callback),
-  ["unsubscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`volume/${E}`>) => void): void =>
-    unsubscribe(`volume/${event}`, callback),
-};
-export { volumeCommands as volume };
-
 const i18nCommands = {
-  ["getLocale"]: (): Promise<CommandResult<"i18n/get-locale">> =>
-    invoke("i18n/get-locale", {  }),
   ["getCommon"]: (locale: CommandArgs<"i18n/get-common">["locale"]): Promise<CommandResult<"i18n/get-common">> =>
     invoke("i18n/get-common", { ["locale"]: locale }),
+  ["getLocale"]: (): Promise<CommandResult<"i18n/get-locale">> =>
+    invoke("i18n/get-locale", {  }),
   ["subscribe"]: <E extends "locale-changed">(event: E, callback: (data: EventData<`i18n/${E}`>) => void): Promise<void> =>
     subscribe(`i18n/${event}`, callback),
   ["unsubscribe"]: <E extends "locale-changed">(event: E, callback: (data: EventData<`i18n/${E}`>) => void): void =>
@@ -316,27 +299,7 @@ const i18nCommands = {
 };
 export { i18nCommands as i18n };
 
-const eventCommands = {
-  ["subscribe"]: (eventName: CommandArgs<"event/subscribe">["eventName"], options?: Pick<CommandArgs<"event/subscribe">, "operation">): Promise<CommandResult<"event/subscribe">> =>
-    invoke("event/subscribe", { ["eventName"]: eventName, ["operation"]: options?.["operation"] }),
-  ["unsubscribe"]: (eventName: CommandArgs<"event/unsubscribe">["eventName"], options?: Pick<CommandArgs<"event/unsubscribe">, "operation">): Promise<CommandResult<"event/unsubscribe">> =>
-    invoke("event/unsubscribe", { ["eventName"]: eventName, ["operation"]: options?.["operation"] }),
-  ["exists"]: (eventName: CommandArgs<"event/exists">["eventName"]): Promise<CommandResult<"event/exists">> =>
-    invoke("event/exists", { ["eventName"]: eventName }),
-};
-export { eventCommands as event };
-
 const notificationCommands = {
-  /**
-   * Register the notification display provider.
-   */
-  ["registerDisplay"]: (): Promise<CommandResult<"notification/register-display">> =>
-    invoke("notification/register-display", {  }),
-  /**
-   * Push a new notification to subscribers.
-   */
-  ["push"]: (title: CommandArgs<"notification/push">["title"], message: CommandArgs<"notification/push">["message"], options?: Pick<CommandArgs<"notification/push">, "timeout" | "type" | "actions">): Promise<CommandResult<"notification/push">> =>
-    invoke("notification/push", { ["title"]: title, ["message"]: message, ["timeout"]: options?.["timeout"], ["type"]: options?.["type"], ["actions"]: options?.["actions"] }),
   /**
    * Report a notification action click from the toaster.
    */
@@ -347,18 +310,28 @@ const notificationCommands = {
    */
   ["dismissed"]: (notificationId: CommandArgs<"notification/dismissed">["notificationId"]): Promise<CommandResult<"notification/dismissed">> =>
     invoke("notification/dismissed", { ["notificationId"]: notificationId }),
-  ["subscribe"]: <E extends "added" | "removed" | "action-clicked">(event: E, callback: (data: EventData<`notification/${E}`>) => void): Promise<void> =>
+  /**
+   * Push a new notification to subscribers.
+   */
+  ["push"]: (title: CommandArgs<"notification/push">["title"], message: CommandArgs<"notification/push">["message"], options?: Pick<CommandArgs<"notification/push">, "timeout" | "type" | "actions">): Promise<CommandResult<"notification/push">> =>
+    invoke("notification/push", { ["title"]: title, ["message"]: message, ["timeout"]: options?.["timeout"], ["type"]: options?.["type"], ["actions"]: options?.["actions"] }),
+  /**
+   * Register the notification display provider.
+   */
+  ["registerDisplay"]: (): Promise<CommandResult<"notification/register-display">> =>
+    invoke("notification/register-display", {  }),
+  ["subscribe"]: <E extends "action-clicked" | "added" | "removed">(event: E, callback: (data: EventData<`notification/${E}`>) => void): Promise<void> =>
     subscribe(`notification/${event}`, callback),
-  ["unsubscribe"]: <E extends "added" | "removed" | "action-clicked">(event: E, callback: (data: EventData<`notification/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "action-clicked" | "added" | "removed">(event: E, callback: (data: EventData<`notification/${E}`>) => void): void =>
     unsubscribe(`notification/${event}`, callback),
 };
 export { notificationCommands as notification };
 
 const operationCommands = {
-  ["get"]: (handle: CommandArgs<"operation/get">["handle"]): Promise<CommandResult<"operation/get">> =>
-    invoke("operation/get", { ["handle"]: handle }),
   ["cancel"]: (handle: CommandArgs<"operation/cancel">["handle"]): Promise<CommandResult<"operation/cancel">> =>
     invoke("operation/cancel", { ["handle"]: handle }),
+  ["get"]: (handle: CommandArgs<"operation/get">["handle"]): Promise<CommandResult<"operation/get">> =>
+    invoke("operation/get", { ["handle"]: handle }),
   ["list"]: (): Promise<CommandResult<"operation/list">> =>
     invoke("operation/list", {  }),
   ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`operation/${E}`>) => void): Promise<void> =>
@@ -369,26 +342,26 @@ const operationCommands = {
 export { operationCommands as operation };
 
 const packageCommands = {
-  ["install"]: (source: CommandArgs<"package/install">["source"], options?: Pick<CommandArgs<"package/install">, "replace"> & { submission?: OperationSubmission }): Promise<CommandResult<"package/install">> =>
-    invoke("package/install", { ["source"]: source, ["replace"]: options?.["replace"] }, options?.submission),
-  ["uninstall"]: (packageId: CommandArgs<"package/uninstall">["packageId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"package/uninstall">> =>
-    invoke("package/uninstall", { ["packageId"]: packageId }, options?.submission),
-  ["list"]: (options?: Pick<CommandArgs<"package/list">, "showHidden" | "showRestricted">): Promise<CommandResult<"package/list">> =>
-    invoke("package/list", { ["showHidden"]: options?.["showHidden"], ["showRestricted"]: options?.["showRestricted"] }),
-  ["self"]: (): Promise<CommandResult<"package/self">> =>
-    invoke("package/self", {  }),
   ["get"]: (packageId: CommandArgs<"package/get">["packageId"]): Promise<CommandResult<"package/get">> =>
     invoke("package/get", { ["packageId"]: packageId }),
-  ["toggleHotReload"]: (packageId: CommandArgs<"package/toggle-hot-reload">["packageId"]): Promise<CommandResult<"package/toggle-hot-reload">> =>
-    invoke("package/toggle-hot-reload", { ["packageId"]: packageId }),
-  ["isHotReloadEnabled"]: (packageId: CommandArgs<"package/is-hot-reload-enabled">["packageId"]): Promise<CommandResult<"package/is-hot-reload-enabled">> =>
-    invoke("package/is-hot-reload-enabled", { ["packageId"]: packageId }),
   ["getIcon"]: (packageId: CommandArgs<"package/get-icon">["packageId"]): Promise<CommandResult<"package/get-icon">> =>
     invoke("package/get-icon", { ["packageId"]: packageId }),
   ["getInfo"]: (location: CommandArgs<"package/get-info">["location"]): Promise<CommandResult<"package/get-info">> =>
     invoke("package/get-info", { ["location"]: location }),
   ["getSize"]: (packageId: CommandArgs<"package/get-size">["packageId"]): Promise<CommandResult<"package/get-size">> =>
     invoke("package/get-size", { ["packageId"]: packageId }),
+  ["install"]: (source: CommandArgs<"package/install">["source"], options?: Pick<CommandArgs<"package/install">, "replace"> & { submission?: OperationSubmission }): Promise<CommandResult<"package/install">> =>
+    invoke("package/install", { ["source"]: source, ["replace"]: options?.["replace"] }, options?.submission),
+  ["isHotReloadEnabled"]: (packageId: CommandArgs<"package/is-hot-reload-enabled">["packageId"]): Promise<CommandResult<"package/is-hot-reload-enabled">> =>
+    invoke("package/is-hot-reload-enabled", { ["packageId"]: packageId }),
+  ["list"]: (options?: Pick<CommandArgs<"package/list">, "showHidden" | "showRestricted">): Promise<CommandResult<"package/list">> =>
+    invoke("package/list", { ["showHidden"]: options?.["showHidden"], ["showRestricted"]: options?.["showRestricted"] }),
+  ["self"]: (): Promise<CommandResult<"package/self">> =>
+    invoke("package/self", {  }),
+  ["toggleHotReload"]: (packageId: CommandArgs<"package/toggle-hot-reload">["packageId"]): Promise<CommandResult<"package/toggle-hot-reload">> =>
+    invoke("package/toggle-hot-reload", { ["packageId"]: packageId }),
+  ["uninstall"]: (packageId: CommandArgs<"package/uninstall">["packageId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"package/uninstall">> =>
+    invoke("package/uninstall", { ["packageId"]: packageId }, options?.submission),
   ["subscribe"]: <E extends "installed" | "uninstalled">(event: E, callback: (data: EventData<`package/${E}`>) => void): Promise<void> =>
     subscribe(`package/${event}`, callback),
   ["unsubscribe"]: <E extends "installed" | "uninstalled">(event: E, callback: (data: EventData<`package/${E}`>) => void): void =>
@@ -397,19 +370,19 @@ const packageCommands = {
 export { packageCommands as package };
 
 const processCommands = {
-  ["launch"]: (appId: CommandArgs<"process/launch">["appId"], options?: Pick<CommandArgs<"process/launch">, "bounds"> & { submission?: OperationSubmission }): Promise<CommandResult<"process/launch">> =>
-    invoke("process/launch", { ["appId"]: appId, ["bounds"]: options?.["bounds"] }, options?.submission),
-  ["stop"]: (appId: CommandArgs<"process/stop">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"process/stop">> =>
-    invoke("process/stop", { ["appId"]: appId }, options?.submission),
   ["exit"]: (options?: { submission?: OperationSubmission }): Promise<CommandResult<"process/exit">> =>
     invoke("process/exit", {  }, options?.submission),
+  ["launch"]: (appId: CommandArgs<"process/launch">["appId"], options?: Pick<CommandArgs<"process/launch">, "bounds"> & { submission?: OperationSubmission }): Promise<CommandResult<"process/launch">> =>
+    invoke("process/launch", { ["appId"]: appId, ["bounds"]: options?.["bounds"] }, options?.submission),
   ["list"]: (options?: Pick<CommandArgs<"process/list">, "showHidden">): Promise<CommandResult<"process/list">> =>
     invoke("process/list", { ["showHidden"]: options?.["showHidden"] }),
   ["metrics"]: (options?: Pick<CommandArgs<"process/metrics">, "showHidden" | "pollingTimeoutMs" | "waitForAccurateCpu">): Promise<CommandResult<"process/metrics">> =>
     invoke("process/metrics", { ["showHidden"]: options?.["showHidden"], ["pollingTimeoutMs"]: options?.["pollingTimeoutMs"], ["waitForAccurateCpu"]: options?.["waitForAccurateCpu"] }),
-  ["subscribe"]: <E extends "launched" | "stopped" | "reloading" | "error" | "exited">(event: E, callback: (data: EventData<`process/${E}`>) => void): Promise<void> =>
+  ["stop"]: (appId: CommandArgs<"process/stop">["appId"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"process/stop">> =>
+    invoke("process/stop", { ["appId"]: appId }, options?.submission),
+  ["subscribe"]: <E extends "error" | "exited" | "launched" | "reloading" | "stopped">(event: E, callback: (data: EventData<`process/${E}`>) => void): Promise<void> =>
     subscribe(`process/${event}`, callback),
-  ["unsubscribe"]: <E extends "launched" | "stopped" | "reloading" | "error" | "exited">(event: E, callback: (data: EventData<`process/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "error" | "exited" | "launched" | "reloading" | "stopped">(event: E, callback: (data: EventData<`process/${E}`>) => void): void =>
     unsubscribe(`process/${event}`, callback),
 };
 export { processCommands as process };
@@ -429,10 +402,6 @@ const sessionCommands = {
 export { sessionCommands as session };
 
 const settingsCommands = {
-  ["panels"]: (): Promise<CommandResult<"settings/panels">> =>
-    invoke("settings/panels", {  }),
-  ["panel"]: (panelId: CommandArgs<"settings/panel">["panelId"]): Promise<CommandResult<"settings/panel">> =>
-    invoke("settings/panel", { ["panelId"]: panelId }),
   ["action"]: (panelId: CommandArgs<"settings/action">["panelId"], actionId: CommandArgs<"settings/action">["actionId"], options?: Pick<CommandArgs<"settings/action">, "invocation">): Promise<CommandResult<"settings/action">> =>
     invoke("settings/action", { ["panelId"]: panelId, ["actionId"]: actionId, ["invocation"]: options?.["invocation"] }),
   /**
@@ -441,41 +410,10 @@ const settingsCommands = {
   ["get"]: (key: CommandArgs<"settings/get">["key"], options?: Pick<CommandArgs<"settings/get">, "appId">): Promise<CommandResult<"settings/get">> =>
     invoke("settings/get", { ["key"]: key, ["appId"]: options?.["appId"] }),
   /**
-   * Set a setting value (scoped to caller's app)
-   */
-  ["set"]: (key: CommandArgs<"settings/set">["key"], value: CommandArgs<"settings/set">["value"]): Promise<CommandResult<"settings/set">> =>
-    invoke("settings/set", { ["key"]: key, ["value"]: value }),
-  /**
-   * List all settings keys (scoped to caller's app)
-   */
-  ["list"]: (): Promise<CommandResult<"settings/list">> =>
-    invoke("settings/list", {  }),
-  /**
    * Get all settings with values (scoped to caller's app)
    */
   ["getAll"]: (): Promise<CommandResult<"settings/get-all">> =>
     invoke("settings/get-all", {  }),
-  /**
-   * Reset a setting to default (scoped to caller's app)
-   */
-  ["reset"]: (key: CommandArgs<"settings/reset">["key"], options?: Pick<CommandArgs<"settings/reset">, "schema">): Promise<CommandResult<"settings/reset">> =>
-    invoke("settings/reset", { ["key"]: key, ["schema"]: options?.["schema"] }),
-  /**
-   * Get a setting from any app's namespace (superuser only)
-   */
-  ["getSu"]: (appId: CommandArgs<"settings/get/su">["appId"], key: CommandArgs<"settings/get/su">["key"]): Promise<CommandResult<"settings/get/su">> =>
-    invoke("settings/get/su", { ["appId"]: appId, ["key"]: key }),
-  /**
-   * Set a setting in any app's namespace (superuser only)
-   */
-  ["setSu"]: (appId: CommandArgs<"settings/set/su">["appId"], key: CommandArgs<"settings/set/su">["key"], value: CommandArgs<"settings/set/su">["value"]): Promise<CommandResult<"settings/set/su">> =>
-    invoke("settings/set/su", { ["appId"]: appId, ["key"]: key, ["value"]: value }),
-  /**
-   * List all settings in any app's namespace (superuser only)
-   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
-   */
-  ["listSu"]: (appId: CommandArgs<"settings/list/su">["appId"], options?: Pick<CommandArgs<"settings/list/su">, "showRestricted">): Promise<CommandResult<"settings/list/su">> =>
-    invoke("settings/list/su", { ["appId"]: appId, ["showRestricted"]: options?.["showRestricted"] }),
   /**
    * Get all settings with values for any app (superuser only)
    * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
@@ -483,38 +421,88 @@ const settingsCommands = {
   ["getAllSu"]: (appId: CommandArgs<"settings/get-all/su">["appId"], options?: Pick<CommandArgs<"settings/get-all/su">, "showRestricted">): Promise<CommandResult<"settings/get-all/su">> =>
     invoke("settings/get-all/su", { ["appId"]: appId, ["showRestricted"]: options?.["showRestricted"] }),
   /**
+   * Get a setting from any app's namespace (superuser only)
+   */
+  ["getSu"]: (appId: CommandArgs<"settings/get/su">["appId"], key: CommandArgs<"settings/get/su">["key"]): Promise<CommandResult<"settings/get/su">> =>
+    invoke("settings/get/su", { ["appId"]: appId, ["key"]: key }),
+  /**
+   * List all settings keys (scoped to caller's app)
+   */
+  ["list"]: (): Promise<CommandResult<"settings/list">> =>
+    invoke("settings/list", {  }),
+  /**
+   * List all settings in any app's namespace (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
+   */
+  ["listSu"]: (appId: CommandArgs<"settings/list/su">["appId"], options?: Pick<CommandArgs<"settings/list/su">, "showRestricted">): Promise<CommandResult<"settings/list/su">> =>
+    invoke("settings/list/su", { ["appId"]: appId, ["showRestricted"]: options?.["showRestricted"] }),
+  ["panel"]: (panelId: CommandArgs<"settings/panel">["panelId"]): Promise<CommandResult<"settings/panel">> =>
+    invoke("settings/panel", { ["panelId"]: panelId }),
+  ["panels"]: (): Promise<CommandResult<"settings/panels">> =>
+    invoke("settings/panels", {  }),
+  /**
+   * Reset a setting to default (scoped to caller's app)
+   */
+  ["reset"]: (key: CommandArgs<"settings/reset">["key"], options?: Pick<CommandArgs<"settings/reset">, "schema">): Promise<CommandResult<"settings/reset">> =>
+    invoke("settings/reset", { ["key"]: key, ["schema"]: options?.["schema"] }),
+  /**
    * Reset a setting for any app (superuser only)
    */
   ["resetSu"]: (appId: CommandArgs<"settings/reset/su">["appId"], key: CommandArgs<"settings/reset/su">["key"], options?: Pick<CommandArgs<"settings/reset/su">, "schema">): Promise<CommandResult<"settings/reset/su">> =>
     invoke("settings/reset/su", { ["appId"]: appId, ["key"]: key, ["schema"]: options?.["schema"] }),
-  ["subscribe"]: <E extends "panels-changed" | "changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): Promise<void> =>
+  /**
+   * Set a setting value (scoped to caller's app)
+   */
+  ["set"]: (key: CommandArgs<"settings/set">["key"], value: CommandArgs<"settings/set">["value"]): Promise<CommandResult<"settings/set">> =>
+    invoke("settings/set", { ["key"]: key, ["value"]: value }),
+  /**
+   * Set a setting in any app's namespace (superuser only)
+   */
+  ["setSu"]: (appId: CommandArgs<"settings/set/su">["appId"], key: CommandArgs<"settings/set/su">["key"], value: CommandArgs<"settings/set/su">["value"]): Promise<CommandResult<"settings/set/su">> =>
+    invoke("settings/set/su", { ["appId"]: appId, ["key"]: key, ["value"]: value }),
+  ["subscribe"]: <E extends "changed" | "panels-changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): Promise<void> =>
     subscribe(`settings/${event}`, callback),
-  ["unsubscribe"]: <E extends "panels-changed" | "changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "changed" | "panels-changed">(event: E, callback: (data: EventData<`settings/${E}`>) => void): void =>
     unsubscribe(`settings/${event}`, callback),
 };
 export { settingsCommands as settings };
 
+const systemCommands = {
+  /**
+   * Get consumer-controlled product branding for SDK-owned interfaces.
+   */
+  ["branding"]: (): Promise<CommandResult<"system/branding">> =>
+    invoke("system/branding", {  }),
+  ["info"]: (): Promise<CommandResult<"system/info">> =>
+    invoke("system/info", {  }),
+  ["power"]: (action: CommandArgs<"system/power">["action"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"system/power">> =>
+    invoke("system/power", { ["action"]: action }, options?.submission),
+  ["powerCapabilities"]: (): Promise<CommandResult<"system/power-capabilities">> =>
+    invoke("system/power-capabilities", {  }),
+};
+export { systemCommands as system };
+
 const userCommands = {
-  ["grantOptions"]: (): Promise<CommandResult<"user/grant-options">> =>
-    invoke("user/grant-options", {  }),
-  ["list"]: (): Promise<CommandResult<"user/list">> =>
-    invoke("user/list", {  }),
-  ["create"]: (name: CommandArgs<"user/create">["name"], password: CommandArgs<"user/create">["password"], options?: Pick<CommandArgs<"user/create">, "username" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/create">> =>
-    invoke("user/create", { ["name"]: name, ["password"]: password, ["username"]: options?.["username"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
-  ["update"]: (username: CommandArgs<"user/update">["username"], options?: Pick<CommandArgs<"user/update">, "name" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/update">> =>
-    invoke("user/update", { ["username"]: username, ["name"]: options?.["name"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
-  ["delete"]: (username: CommandArgs<"user/delete">["username"]): Promise<CommandResult<"user/delete">> =>
-    invoke("user/delete", { ["username"]: username }),
-  ["setPassword"]: (username: CommandArgs<"user/set-password">["username"], password: CommandArgs<"user/set-password">["password"]): Promise<CommandResult<"user/set-password">> =>
-    invoke("user/set-password", { ["username"]: username, ["password"]: password }),
   ["changePassword"]: (currentPassword: CommandArgs<"user/change-password">["currentPassword"], newPassword: CommandArgs<"user/change-password">["newPassword"]): Promise<CommandResult<"user/change-password">> =>
     invoke("user/change-password", { ["currentPassword"]: currentPassword, ["newPassword"]: newPassword }),
-  ["hasGrant"]: (grant: CommandArgs<"user/has-grant">["grant"]): Promise<CommandResult<"user/has-grant">> =>
-    invoke("user/has-grant", { ["grant"]: grant }),
+  ["create"]: (name: CommandArgs<"user/create">["name"], password: CommandArgs<"user/create">["password"], options?: Pick<CommandArgs<"user/create">, "username" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/create">> =>
+    invoke("user/create", { ["name"]: name, ["password"]: password, ["username"]: options?.["username"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
+  ["delete"]: (username: CommandArgs<"user/delete">["username"]): Promise<CommandResult<"user/delete">> =>
+    invoke("user/delete", { ["username"]: username }),
   ["getDefault"]: (): Promise<CommandResult<"user/get-default">> =>
     invoke("user/get-default", {  }),
+  ["grantOptions"]: (): Promise<CommandResult<"user/grant-options">> =>
+    invoke("user/grant-options", {  }),
+  ["hasGrant"]: (grant: CommandArgs<"user/has-grant">["grant"]): Promise<CommandResult<"user/has-grant">> =>
+    invoke("user/has-grant", { ["grant"]: grant }),
+  ["list"]: (): Promise<CommandResult<"user/list">> =>
+    invoke("user/list", {  }),
   ["setDefault"]: (username: CommandArgs<"user/set-default">["username"]): Promise<CommandResult<"user/set-default">> =>
     invoke("user/set-default", { ["username"]: username }),
+  ["setPassword"]: (username: CommandArgs<"user/set-password">["username"], password: CommandArgs<"user/set-password">["password"]): Promise<CommandResult<"user/set-password">> =>
+    invoke("user/set-password", { ["username"]: username, ["password"]: password }),
+  ["update"]: (username: CommandArgs<"user/update">["username"], options?: Pick<CommandArgs<"user/update">, "name" | "role" | "grants" | "directoryRestriction">): Promise<CommandResult<"user/update">> =>
+    invoke("user/update", { ["username"]: username, ["name"]: options?.["name"], ["role"]: options?.["role"], ["grants"]: options?.["grants"], ["directoryRestriction"]: options?.["directoryRestriction"] }),
   ["subscribe"]: <E extends "grant-options-changed">(event: E, callback: (data: EventData<`user/${E}`>) => void): Promise<void> =>
     subscribe(`user/${event}`, callback),
   ["unsubscribe"]: <E extends "grant-options-changed">(event: E, callback: (data: EventData<`user/${E}`>) => void): void =>
@@ -523,49 +511,61 @@ const userCommands = {
 export { userCommands as user };
 
 const viewCommands = {
-  ["updateBounds"]: (bounds: CommandArgs<"view/update-bounds">["bounds"]): Promise<CommandResult<"view/update-bounds">> =>
-    invoke("view/update-bounds", { ["bounds"]: bounds }),
-  ["updateViewBounds"]: (appId: CommandArgs<"view/update-view-bounds">["appId"], bounds: CommandArgs<"view/update-view-bounds">["bounds"]): Promise<CommandResult<"view/update-view-bounds">> =>
-    invoke("view/update-view-bounds", { ["appId"]: appId, ["bounds"]: bounds }),
-  ["setVisibility"]: (visible: CommandArgs<"view/set-visibility">["visible"]): Promise<CommandResult<"view/set-visibility">> =>
-    invoke("view/set-visibility", { ["visible"]: visible }),
-  ["setViewVisibility"]: (appId: CommandArgs<"view/set-view-visibility">["appId"], visible: CommandArgs<"view/set-view-visibility">["visible"]): Promise<CommandResult<"view/set-view-visibility">> =>
-    invoke("view/set-view-visibility", { ["appId"]: appId, ["visible"]: visible }),
+  ["endDrag"]: (): Promise<CommandResult<"view/end-drag">> =>
+    invoke("view/end-drag", {  }),
+  ["endResize"]: (): Promise<CommandResult<"view/end-resize">> =>
+    invoke("view/end-resize", {  }),
+  ["expandTile"]: (direction: CommandArgs<"view/expand-tile">["direction"]): Promise<CommandResult<"view/expand-tile">> =>
+    invoke("view/expand-tile", { ["direction"]: direction }),
   ["focus"]: (): Promise<CommandResult<"view/focus">> =>
     invoke("view/focus", {  }),
   ["focusView"]: (appId: CommandArgs<"view/focus-view">["appId"]): Promise<CommandResult<"view/focus-view">> =>
     invoke("view/focus-view", { ["appId"]: appId }),
-  ["updateGlobalBounds"]: (bounds: CommandArgs<"view/update-global-bounds">["bounds"], windowSize: CommandArgs<"view/update-global-bounds">["windowSize"]): Promise<CommandResult<"view/update-global-bounds">> =>
-    invoke("view/update-global-bounds", { ["bounds"]: bounds, ["windowSize"]: windowSize }),
+  ["getInterfaceScale"]: (): Promise<CommandResult<"view/get-interface-scale">> =>
+    invoke("view/get-interface-scale", {  }),
+  ["globalMouseup"]: (): Promise<CommandResult<"view/global-mouseup">> =>
+    invoke("view/global-mouseup", {  }),
+  ["setInterfaceScale"]: (scale: CommandArgs<"view/set-interface-scale">["scale"]): Promise<CommandResult<"view/set-interface-scale">> =>
+    invoke("view/set-interface-scale", { ["scale"]: scale }),
+  ["setViewVisibility"]: (appId: CommandArgs<"view/set-view-visibility">["appId"], visible: CommandArgs<"view/set-view-visibility">["visible"]): Promise<CommandResult<"view/set-view-visibility">> =>
+    invoke("view/set-view-visibility", { ["appId"]: appId, ["visible"]: visible }),
+  ["setVisibility"]: (visible: CommandArgs<"view/set-visibility">["visible"]): Promise<CommandResult<"view/set-visibility">> =>
+    invoke("view/set-visibility", { ["visible"]: visible }),
+  ["startDrag"]: (startX: CommandArgs<"view/start-drag">["startX"], startY: CommandArgs<"view/start-drag">["startY"]): Promise<CommandResult<"view/start-drag">> =>
+    invoke("view/start-drag", { ["startX"]: startX, ["startY"]: startY }),
+  ["startResize"]: (startX: CommandArgs<"view/start-resize">["startX"], startY: CommandArgs<"view/start-resize">["startY"], options?: Pick<CommandArgs<"view/start-resize">, "direction">): Promise<CommandResult<"view/start-resize">> =>
+    invoke("view/start-resize", { ["startX"]: startX, ["startY"]: startY, ["direction"]: options?.["direction"] }),
+  ["swapTile"]: (direction: CommandArgs<"view/swap-tile">["direction"]): Promise<CommandResult<"view/swap-tile">> =>
+    invoke("view/swap-tile", { ["direction"]: direction }),
+  ["tileLayoutState"]: (): Promise<CommandResult<"view/tile-layout-state">> =>
+    invoke("view/tile-layout-state", {  }),
   ["toggleMode"]: (options?: Pick<CommandArgs<"view/toggle-mode">, "mode">): Promise<CommandResult<"view/toggle-mode">> =>
     invoke("view/toggle-mode", { ["mode"]: options?.["mode"] }),
   ["toggleViewMode"]: (appId: CommandArgs<"view/toggle-view-mode">["appId"], options?: Pick<CommandArgs<"view/toggle-view-mode">, "mode">): Promise<CommandResult<"view/toggle-view-mode">> =>
     invoke("view/toggle-view-mode", { ["appId"]: appId, ["mode"]: options?.["mode"] }),
-  ["tileLayoutState"]: (): Promise<CommandResult<"view/tile-layout-state">> =>
-    invoke("view/tile-layout-state", {  }),
-  ["swapTile"]: (direction: CommandArgs<"view/swap-tile">["direction"]): Promise<CommandResult<"view/swap-tile">> =>
-    invoke("view/swap-tile", { ["direction"]: direction }),
-  ["expandTile"]: (direction: CommandArgs<"view/expand-tile">["direction"]): Promise<CommandResult<"view/expand-tile">> =>
-    invoke("view/expand-tile", { ["direction"]: direction }),
-  ["startDrag"]: (startX: CommandArgs<"view/start-drag">["startX"], startY: CommandArgs<"view/start-drag">["startY"]): Promise<CommandResult<"view/start-drag">> =>
-    invoke("view/start-drag", { ["startX"]: startX, ["startY"]: startY }),
-  ["endDrag"]: (): Promise<CommandResult<"view/end-drag">> =>
-    invoke("view/end-drag", {  }),
-  ["globalMouseup"]: (): Promise<CommandResult<"view/global-mouseup">> =>
-    invoke("view/global-mouseup", {  }),
-  ["startResize"]: (startX: CommandArgs<"view/start-resize">["startX"], startY: CommandArgs<"view/start-resize">["startY"], options?: Pick<CommandArgs<"view/start-resize">, "direction">): Promise<CommandResult<"view/start-resize">> =>
-    invoke("view/start-resize", { ["startX"]: startX, ["startY"]: startY, ["direction"]: options?.["direction"] }),
-  ["endResize"]: (): Promise<CommandResult<"view/end-resize">> =>
-    invoke("view/end-resize", {  }),
+  ["updateBounds"]: (bounds: CommandArgs<"view/update-bounds">["bounds"]): Promise<CommandResult<"view/update-bounds">> =>
+    invoke("view/update-bounds", { ["bounds"]: bounds }),
+  ["updateGlobalBounds"]: (bounds: CommandArgs<"view/update-global-bounds">["bounds"], windowSize: CommandArgs<"view/update-global-bounds">["windowSize"]): Promise<CommandResult<"view/update-global-bounds">> =>
+    invoke("view/update-global-bounds", { ["bounds"]: bounds, ["windowSize"]: windowSize }),
+  ["updateViewBounds"]: (appId: CommandArgs<"view/update-view-bounds">["appId"], bounds: CommandArgs<"view/update-view-bounds">["bounds"]): Promise<CommandResult<"view/update-view-bounds">> =>
+    invoke("view/update-view-bounds", { ["appId"]: appId, ["bounds"]: bounds }),
   ["windowSize"]: (): Promise<CommandResult<"view/window-size">> =>
     invoke("view/window-size", {  }),
-  ["setInterfaceScale"]: (scale: CommandArgs<"view/set-interface-scale">["scale"]): Promise<CommandResult<"view/set-interface-scale">> =>
-    invoke("view/set-interface-scale", { ["scale"]: scale }),
-  ["getInterfaceScale"]: (): Promise<CommandResult<"view/get-interface-scale">> =>
-    invoke("view/get-interface-scale", {  }),
-  ["subscribe"]: <E extends "view-removed" | "view-loaded" | "view-load-failed" | "interface-scale-changed" | "global-bounds-changed" | "bounds-updated" | "mode-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): Promise<void> =>
+  ["subscribe"]: <E extends "bounds-updated" | "global-bounds-changed" | "interface-scale-changed" | "mode-changed" | "view-load-failed" | "view-loaded" | "view-removed">(event: E, callback: (data: EventData<`view/${E}`>) => void): Promise<void> =>
     subscribe(`view/${event}`, callback),
-  ["unsubscribe"]: <E extends "view-removed" | "view-loaded" | "view-load-failed" | "interface-scale-changed" | "global-bounds-changed" | "bounds-updated" | "mode-changed">(event: E, callback: (data: EventData<`view/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "bounds-updated" | "global-bounds-changed" | "interface-scale-changed" | "mode-changed" | "view-load-failed" | "view-loaded" | "view-removed">(event: E, callback: (data: EventData<`view/${E}`>) => void): void =>
     unsubscribe(`view/${event}`, callback),
 };
 export { viewCommands as view };
+
+const volumeCommands = {
+  ["eject"]: (volume: CommandArgs<"volume/eject">["volume"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"volume/eject">> =>
+    invoke("volume/eject", { ["volume"]: volume }, options?.submission),
+  ["list"]: (): Promise<CommandResult<"volume/list">> =>
+    invoke("volume/list", {  }),
+  ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`volume/${E}`>) => void): Promise<void> =>
+    subscribe(`volume/${event}`, callback),
+  ["unsubscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`volume/${E}`>) => void): void =>
+    unsubscribe(`volume/${event}`, callback),
+};
+export { volumeCommands as volume };

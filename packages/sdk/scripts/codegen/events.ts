@@ -5,6 +5,7 @@
  */
 
 import {
+  compareIdentifiers,
   generateHeader,
   namespaceToInterfaceName,
   replaceTypesWithInlineImports,
@@ -24,14 +25,19 @@ export interface NamespaceEvents {
 }
 
 /**
- * Group events by namespace
+ * Group events alphabetically by namespace and event name.
  */
 export function groupEventsByNamespace(
   allEvents: EventInfo[],
 ): NamespaceEvents[] {
   const eventNamespaceMap = new Map<string, NamespaceEvents>();
 
-  allEvents.forEach((evt) => {
+  const events = [...allEvents].sort(
+    (left, right) =>
+      compareIdentifiers(left.namespace, right.namespace) ||
+      compareIdentifiers(left.eventName, right.eventName),
+  );
+  events.forEach((evt) => {
     if (!eventNamespaceMap.has(evt.namespace)) {
       eventNamespaceMap.set(evt.namespace, {
         namespace: evt.namespace,

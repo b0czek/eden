@@ -4,14 +4,17 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { FilesystemVolume, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../../../src/effects/io";
-import { createFileTransfers } from "../../../src/filesystem/transfers";
-import { decodeLaunchContext } from "../../../src/utils/app-launch-context";
-import { testApp } from "../../support/apps";
-import { gate } from "../../support/async";
-import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/create-test-eden";
-import { registerTestVolume } from "../../support/filesystem";
+import { fromPromise } from "../../../../src/effects/io";
+import { createFileTransfers } from "../../../../src/filesystem/transfers";
+import { decodeLaunchContext } from "../../../../src/utils/app-launch-context";
+import { testApp } from "../../../support/apps";
+import { gate } from "../../../support/async";
+import { createTestCaller } from "../../../support/callers";
+import {
+  createTestEden,
+  type TestEden,
+} from "../../../support/create-test-eden";
+import { registerTestVolume } from "../../../support/filesystem";
 
 const appId = "com.example.volumes";
 

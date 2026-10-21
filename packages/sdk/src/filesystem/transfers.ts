@@ -18,9 +18,8 @@ import {
   type FilesystemTransferError,
   FilesystemTransferIncomplete,
   FilesystemTransferRejected,
-  VolumeIoFailed,
-  VolumeUnavailable,
 } from "./errors";
+import { VolumeIoFailed, VolumeUnavailable } from "./volumes/errors";
 
 interface TransferRequest {
   source: string;

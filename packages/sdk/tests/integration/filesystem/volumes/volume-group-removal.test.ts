@@ -2,10 +2,13 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../../../src/effects/io";
-import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/create-test-eden";
-import { registerTestVolume } from "../../support/filesystem";
+import { fromPromise } from "../../../../src/effects/io";
+import { createTestCaller } from "../../../support/callers";
+import {
+  createTestEden,
+  type TestEden,
+} from "../../../support/create-test-eden";
+import { registerTestVolume } from "../../../support/filesystem";
 
 const appId = "com.example.native-reader";
 function deferred() {

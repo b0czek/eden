@@ -41,8 +41,14 @@ functions. Give mutable state and native resources one owner: the Views
 while [coordination](../packages/sdk/src/views/coordination.ts) owns layout and
 presentation. Their [service](../packages/sdk/src/views/service.ts) acquires
 dependencies, connects scoped events, and exposes the explicit contract. Nested
-capabilities, such as Settings panels, keep their contracts, behavior, and
-controllers together below their domain.
+capabilities, such as Settings panels and filesystem volumes, keep their contracts,
+behavior, and controllers together below their domain.
+
+Filesystem owns caller path access and file operations. Its nested
+[Volumes capability](../packages/sdk/src/filesystem/volumes/service.ts) owns
+registrations, root availability, leases, and safe removal. Each capability
+registers its API through its own `runtime.ts`. Filesystem consumes Volumes and
+its failures; Volumes does not depend on file operations or filesystem failures.
 
 View creation, removal, bounds, visibility, focus, mode and tile mutations return
 lazy Effects with view-owned failure types. Native setup and presentation hooks
@@ -58,7 +64,7 @@ avoid duplicating state in an extracted helper.
 Name service interfaces and keys for their capabilities: `Processes`, `Volumes`,
 and `SettingsPanels`. Name their implementations `ProcessesLive`, `VolumesLive`,
 and `SettingsPanelsLive`. Use lowercase filenames such as `service.ts` and
-`volumes.ts`. Reserve `controller` for API boundaries; view behavior lives in
+`schemas.ts`. Reserve `controller` for API boundaries; view behavior lives in
 modules such as `tiling.ts` and `rendering.ts`.
 
 ### Expected failures
@@ -273,6 +279,10 @@ and the completion value from an operation task. Effect failure types and servic
 requirements do not enter generated client declarations. Apps keep the existing
 Promise-based client API, including operation controls and subscriptions, without
 an Effect dependency.
+
+Generated namespaces and their command and event names are sorted alphabetically
+using a locale-independent comparison. Argument fields retain declaration order
+because required fields become positional parameters in the generated client.
 
 ## SDK controllers
 

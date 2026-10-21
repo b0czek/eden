@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import * as v from "valibot";
-import type { EdenVolumeOptions } from "../api/control-plane";
+import type { EdenVolumeOptions } from "../../api/control-plane";
 
 export const volumeIdSchema = v.pipe(v.string(), v.nonEmpty());
 export const volumeEjectArgsSchema = v.object({ volume: volumeIdSchema });

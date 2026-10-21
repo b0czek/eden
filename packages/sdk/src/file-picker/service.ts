@@ -14,12 +14,10 @@ import { AppAssociations } from "../app-associations/service";
 import type { TargetedNotification } from "../controllers/events";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
-import {
-  FilesystemAccessDenied,
-  VolumeUnavailable,
-} from "../filesystem/errors";
+import { FilesystemAccessDenied } from "../filesystem/errors";
 import { filesystemLocationSchema } from "../filesystem/location-schema";
-import { Volumes } from "../filesystem/volumes";
+import { VolumeUnavailable } from "../filesystem/volumes/errors";
+import { Volumes } from "../filesystem/volumes/service";
 import { Permissions } from "../ipc/permissions";
 import { log } from "../logging";
 import { createPickerDisplayProvider } from "./display-provider";

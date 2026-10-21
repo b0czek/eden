@@ -45,7 +45,8 @@ import {
   registerFilesystemApi,
 } from "../filesystem/runtime";
 import { FilesystemLive } from "../filesystem/service";
-import { VolumesLive } from "../filesystem/volumes";
+import { registerVolumesApi } from "../filesystem/volumes/runtime";
+import { VolumesLive } from "../filesystem/volumes/service";
 import { I18nPortsLive, registerI18nApi } from "../i18n/runtime";
 import { I18nLive } from "../i18n/service";
 import { CommandsLive } from "../ipc/commands";
@@ -178,6 +179,7 @@ const ApiLive = Layer.effectDiscard(
       registerFileOpenApi,
       registerFilePickerApi,
       registerFilesystemApi,
+      registerVolumesApi,
       registerI18nApi,
       registerNotificationsApi,
       registerOperationsApi,

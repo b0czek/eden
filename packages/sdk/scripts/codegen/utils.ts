@@ -4,6 +4,11 @@
 
 import { Node } from "ts-morph";
 
+/** Compare identifiers without depending on the host's locale. */
+export function compareIdentifiers(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /**
  * Replace custom type references with inline imports
  */

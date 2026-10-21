@@ -1,9 +1,7 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import * as Data from "effect/Data";
-import type {
-  FilesystemAccessDenied,
-  VolumeUnavailable,
-} from "../filesystem/errors";
+import type { FilesystemAccessDenied } from "../filesystem/errors";
+import type { VolumeUnavailable } from "../filesystem/volumes/errors";
 
 export class FilePickerRequestRejected extends Data.TaggedError(
   "FilePickerRequestRejected",

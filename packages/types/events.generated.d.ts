@@ -17,8 +17,8 @@ export interface AppearanceEvents {
  * ContextMenuEvents - Events for the "context-menu" namespace
  */
 export interface ContextMenuEvents {
-  "context-menu/opened": { menu: import("./index").ContextMenuOpenEvent; };
   "context-menu/closed": import("./index").ContextMenuResult;
+  "context-menu/opened": { menu: import("./index").ContextMenuOpenEvent; };
 }
 
 /**
@@ -39,8 +39,8 @@ export interface FileEvents {
  * FilePickerEvents - Events for the "file-picker" namespace
  */
 export interface FilePickerEvents {
-  "file-picker/opened": { picker: import("./index").FilePickerOpenEvent; };
   "file-picker/closed": import("./index").FilePickerResult;
+  "file-picker/opened": { picker: import("./index").FilePickerOpenEvent; };
 }
 
 /**
@@ -48,13 +48,6 @@ export interface FilePickerEvents {
  */
 export interface FsEvents {
   "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind; };
-}
-
-/**
- * VolumeEvents - Events for the "volume" namespace
- */
-export interface VolumeEvents {
-  "volume/changed": { volumes: import("./index").FilesystemVolume[]; };
 }
 
 /**
@@ -68,9 +61,9 @@ export interface I18nEvents {
  * NotificationEvents - Events for the "notification" namespace
  */
 export interface NotificationEvents {
+  "notification/action-clicked": { notificationId: string; actionId: string; };
   "notification/added": { notification: import("./index").Notification; };
   "notification/removed": { id: string; };
-  "notification/action-clicked": { notificationId: string; actionId: string; };
 }
 
 /**
@@ -92,11 +85,11 @@ export interface PackageEvents {
  * ProcessEvents - Events for the "process" namespace
  */
 export interface ProcessEvents {
-  "process/launched": { instance: import("./index").AppInstance; };
-  "process/stopped": { appId: string; };
-  "process/reloading": { appId: string; };
   "process/error": { appId: string; error: unknown; };
   "process/exited": { appId: string; code: number; };
+  "process/launched": { instance: import("./index").AppInstance; };
+  "process/reloading": { appId: string; };
+  "process/stopped": { appId: string; };
 }
 
 /**
@@ -110,8 +103,8 @@ export interface SessionEvents {
  * SettingsEvents - Events for the "settings" namespace
  */
 export interface SettingsEvents {
-  "settings/panels-changed": { reason: "catalog" | "grants" | "session" | "state" | "visibility"; panelId?: string; };
   "settings/changed": { appId: string; key: string; value: string; };
+  "settings/panels-changed": { reason: "catalog" | "grants" | "session" | "state" | "visibility"; panelId?: string; };
 }
 
 /**
@@ -125,16 +118,23 @@ export interface UserEvents {
  * ViewEvents - Events for the "view" namespace
  */
 export interface ViewEvents {
-  "view/view-removed": { viewId: number; appId: string; webContentsId: number; };
-  "view/view-loaded": { viewId: number; appId: string; overlay: boolean; };
-  "view/view-load-failed": { viewId: number; appId: string; errorCode: number; errorDescription: string; };
-  "view/interface-scale-changed": { scale: number; };
-  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize; };
   "view/bounds-updated": import("./index").ViewBounds;
+  "view/global-bounds-changed": { workspaceBounds: import("./index").ViewBounds; windowSize: import("./index").WindowSize; };
+  "view/interface-scale-changed": { scale: number; };
   "view/mode-changed": { mode: "floating" | "tiled"; bounds: import("./index").ViewBounds; };
+  "view/view-load-failed": { viewId: number; appId: string; errorCode: number; errorDescription: string; };
+  "view/view-loaded": { viewId: number; appId: string; overlay: boolean; };
+  "view/view-removed": { viewId: number; appId: string; webContentsId: number; };
+}
+
+/**
+ * VolumeEvents - Events for the "volume" namespace
+ */
+export interface VolumeEvents {
+  "volume/changed": { volumes: import("./index").FilesystemVolume[]; };
 }
 
 /**
  * Global event map - merge all event namespaces
  */
-export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, VolumeEvents, I18nEvents, NotificationEvents, OperationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents {}
+export interface AppEvents extends AppearanceEvents, ContextMenuEvents, DaemonEvents, FileEvents, FilePickerEvents, FsEvents, I18nEvents, NotificationEvents, OperationEvents, PackageEvents, ProcessEvents, SessionEvents, SettingsEvents, UserEvents, ViewEvents, VolumeEvents {}

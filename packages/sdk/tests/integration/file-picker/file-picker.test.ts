@@ -36,7 +36,7 @@ import {
 } from "../../../src/file-picker/ports";
 import { FilePicker, FilePickerLive } from "../../../src/file-picker/service";
 import { FilesystemIoFailed } from "../../../src/filesystem/errors";
-import { Volumes, VolumesLive } from "../../../src/filesystem/volumes";
+import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
 import { Permissions, PermissionsLive } from "../../../src/ipc/permissions";
 import {
   PackageCatalog,

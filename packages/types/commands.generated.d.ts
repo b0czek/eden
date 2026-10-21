@@ -7,52 +7,18 @@
  */
 
 /**
- * AssociationsCommands - Commands for the "associations" namespace
- */
-export interface AssociationsCommands {
-  "associations/get": {
-    mode: "result";
-    args: { key: string; };
-    response: { association: import("./index").AppAssociation | undefined; };
-  };
-  "associations/set": {
-    mode: "result";
-    args: { key: string; appId: string; kind: string; label?: string | undefined; };
-    response: { success: boolean; };
-  };
-  "associations/remove": {
-    mode: "result";
-    args: { key: string; };
-    response: { success: boolean; };
-  };
-  "associations/list": {
-    mode: "result";
-    args: { kindPrefix?: string | undefined; };
-    response: { associations: Record<string, import("./index").AppAssociation>; };
-  };
-}
-
-/**
  * AppbusCommands - Commands for the "appbus" namespace
  */
 export interface AppbusCommands {
   /**
-   * Register a service that this app exposes
-   * Requires "appbus/expose" permission
+   * Connect to another app's service
+   * Creates MessageChannel and transfers ports directly to both apps
+   * Requires "appbus/connect" permission
    */
-  "appbus/register": {
+  "appbus/connect": {
     mode: "result";
-    args: { serviceName: string; description?: string | undefined; allowedClients?: string[] | undefined; };
-    response: { success: boolean; error?: string; };
-  };
-  /**
-   * Unregister a service
-   * Requires "appbus/expose" permission
-   */
-  "appbus/unregister": {
-    mode: "result";
-    args: { serviceName: string; };
-    response: { success: boolean; };
+    args: { targetAppId: string; serviceName: string; };
+    response: import("./index").ConnectResult;
   };
   /**
    * List all available services
@@ -73,14 +39,22 @@ export interface AppbusCommands {
     response: { services: import("./index").ServiceInfo[]; };
   };
   /**
-   * Connect to another app's service
-   * Creates MessageChannel and transfers ports directly to both apps
-   * Requires "appbus/connect" permission
+   * Register a service that this app exposes
+   * Requires "appbus/expose" permission
    */
-  "appbus/connect": {
+  "appbus/register": {
     mode: "result";
-    args: { targetAppId: string; serviceName: string; };
-    response: import("./index").ConnectResult;
+    args: { serviceName: string; description?: string | undefined; allowedClients?: string[] | undefined; };
+    response: { success: boolean; error?: string; };
+  };
+  /**
+   * Unregister a service
+   * Requires "appbus/expose" permission
+   */
+  "appbus/unregister": {
+    mode: "result";
+    args: { serviceName: string; };
+    response: { success: boolean; };
   };
 }
 
@@ -88,50 +62,46 @@ export interface AppbusCommands {
  * AppearanceCommands - Commands for the "appearance" namespace
  */
 export interface AppearanceCommands {
-  "appearance/set-wallpaper": {
+  "appearance/get-presets": {
     mode: "result";
-    args: { wallpaper: import("./index").WallpaperConfig; };
-    response: void;
+    args: Record<string, never>;
+    response: { solid: import("./index").WallpaperPreset[]; gradients: import("./index").WallpaperPreset[]; };
   };
   "appearance/get-wallpaper": {
     mode: "result";
     args: Record<string, never>;
     response: { wallpaper: import("./index").WallpaperPreset; };
   };
-  "appearance/get-presets": {
+  "appearance/set-wallpaper": {
     mode: "result";
-    args: Record<string, never>;
-    response: { solid: import("./index").WallpaperPreset[]; gradients: import("./index").WallpaperPreset[]; };
+    args: { wallpaper: import("./index").WallpaperConfig; };
+    response: void;
   };
 }
 
 /**
- * SystemCommands - Commands for the "system" namespace
+ * AssociationsCommands - Commands for the "associations" namespace
  */
-export interface SystemCommands {
-  /**
-   * Get consumer-controlled product branding for SDK-owned interfaces.
-   */
-  "system/branding": {
+export interface AssociationsCommands {
+  "associations/get": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").EdenBrandingInfo;
+    args: { key: string; };
+    response: { association: import("./index").AppAssociation | undefined; };
   };
-  "system/power-capabilities": {
+  "associations/list": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").EdenPowerCapabilities;
+    args: { kindPrefix?: string | undefined; };
+    response: { associations: Record<string, import("./index").AppAssociation>; };
   };
-  "system/power": {
-    mode: "operation";
-    args: { action: "poweroff" | "reboot"; };
-    response: import("./index").OperationHandle<"system/power">;
-    completion: void;
-  };
-  "system/info": {
+  "associations/remove": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").SystemInfo;
+    args: { key: string; };
+    response: { success: boolean; };
+  };
+  "associations/set": {
+    mode: "result";
+    args: { key: string; appId: string; kind: string; label?: string | undefined; };
+    response: { success: boolean; };
   };
 }
 
@@ -139,9 +109,9 @@ export interface SystemCommands {
  * ContextMenuCommands - Commands for the "context-menu" namespace
  */
 export interface ContextMenuCommands {
-  "context-menu/register-display": {
+  "context-menu/close": {
     mode: "result";
-    args: Record<string, never>;
+    args: { requestId?: string | undefined; };
     response: { success: boolean; };
   };
   "context-menu/open": {
@@ -149,14 +119,14 @@ export interface ContextMenuCommands {
     args: import("./index").ContextMenuOpenArgs;
     response: { requestId: string; };
   };
+  "context-menu/register-display": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { success: boolean; };
+  };
   "context-menu/resolve": {
     mode: "result";
     args: import("./index").ContextMenuResult;
-    response: { success: boolean; };
-  };
-  "context-menu/close": {
-    mode: "result";
-    args: { requestId?: string | undefined; };
     response: { success: boolean; };
   };
 }
@@ -165,14 +135,9 @@ export interface ContextMenuCommands {
  * DaemonCommands - Commands for the "daemon" namespace
  */
 export interface DaemonCommands {
-  "daemon/list": {
+  "daemon/disable": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").DaemonStatus[];
-  };
-  "daemon/update-definition": {
-    mode: "result";
-    args: { definition: import("./index").DaemonDefinition; };
+    args: { appId: string; };
     response: { readonly success: true; };
   };
   "daemon/enable": {
@@ -180,10 +145,16 @@ export interface DaemonCommands {
     args: { appId: string; };
     response: { readonly success: true; };
   };
-  "daemon/disable": {
+  "daemon/list": {
     mode: "result";
+    args: Record<string, never>;
+    response: import("./index").DaemonStatus[];
+  };
+  "daemon/restart": {
+    mode: "operation";
     args: { appId: string; };
-    response: { readonly success: true; };
+    response: import("./index").OperationHandle<"daemon/restart">;
+    completion: { readonly success: true; };
   };
   "daemon/start": {
     mode: "operation";
@@ -197,11 +168,10 @@ export interface DaemonCommands {
     response: import("./index").OperationHandle<"daemon/stop">;
     completion: { readonly success: true; };
   };
-  "daemon/restart": {
-    mode: "operation";
-    args: { appId: string; };
-    response: import("./index").OperationHandle<"daemon/restart">;
-    completion: { readonly success: true; };
+  "daemon/update-definition": {
+    mode: "result";
+    args: { definition: import("./index").DaemonDefinition; };
+    response: { readonly success: true; };
   };
 }
 
@@ -210,19 +180,19 @@ export interface DaemonCommands {
  */
 export interface DbCommands {
   /**
-   * Get a value from database (scoped to caller's app)
+   * Clear all keys (scoped to caller's app)
    */
-  "db/get": {
+  "db/clear": {
     mode: "result";
-    args: { key: string; };
-    response: { value: string | undefined; };
+    args: Record<string, never>;
+    response: { success: boolean; };
   };
   /**
-   * Set a value in database (scoped to caller's app)
+   * Clear all keys in any app's namespace (superuser only)
    */
-  "db/set": {
+  "db/clear/su": {
     mode: "result";
-    args: { key: string; value: string; };
+    args: { appId: string; };
     response: { success: boolean; };
   };
   /**
@@ -234,28 +204,20 @@ export interface DbCommands {
     response: { success: boolean; };
   };
   /**
-   * Check if a key exists (scoped to caller's app)
+   * Delete a key from any app's namespace (superuser only)
    */
-  "db/has": {
+  "db/delete/su": {
     mode: "result";
-    args: { key: string; };
-    response: { exists: boolean; };
-  };
-  /**
-   * Clear all keys (scoped to caller's app)
-   */
-  "db/clear": {
-    mode: "result";
-    args: Record<string, never>;
+    args: { appId: string; key: string; };
     response: { success: boolean; };
   };
   /**
-   * List all keys (scoped to caller's app)
+   * Get a value from database (scoped to caller's app)
    */
-  "db/list": {
+  "db/get": {
     mode: "result";
-    args: Record<string, never>;
-    response: { keys: string[]; };
+    args: { key: string; };
+    response: { value: string | undefined; };
   };
   /**
    * Get a value from any app's namespace (superuser only)
@@ -266,20 +228,12 @@ export interface DbCommands {
     response: { value: string | undefined; };
   };
   /**
-   * Set a value in any app's namespace (superuser only)
+   * Check if a key exists (scoped to caller's app)
    */
-  "db/set/su": {
+  "db/has": {
     mode: "result";
-    args: { appId: string; key: string; value: string; };
-    response: { success: boolean; };
-  };
-  /**
-   * Delete a key from any app's namespace (superuser only)
-   */
-  "db/delete/su": {
-    mode: "result";
-    args: { appId: string; key: string; };
-    response: { success: boolean; };
+    args: { key: string; };
+    response: { exists: boolean; };
   };
   /**
    * Check if a key exists in any app's namespace (superuser only)
@@ -290,12 +244,12 @@ export interface DbCommands {
     response: { exists: boolean; };
   };
   /**
-   * Clear all keys in any app's namespace (superuser only)
+   * List all keys (scoped to caller's app)
    */
-  "db/clear/su": {
+  "db/list": {
     mode: "result";
-    args: { appId: string; };
-    response: { success: boolean; };
+    args: Record<string, never>;
+    response: { keys: string[]; };
   };
   /**
    * List all keys in any app's namespace (superuser only)
@@ -305,12 +259,73 @@ export interface DbCommands {
     args: { appId: string; };
     response: { keys: string[]; };
   };
+  /**
+   * Set a value in database (scoped to caller's app)
+   */
+  "db/set": {
+    mode: "result";
+    args: { key: string; value: string; };
+    response: { success: boolean; };
+  };
+  /**
+   * Set a value in any app's namespace (superuser only)
+   */
+  "db/set/su": {
+    mode: "result";
+    args: { appId: string; key: string; value: string; };
+    response: { success: boolean; };
+  };
+}
+
+/**
+ * EventCommands - Commands for the "event" namespace
+ */
+export interface EventCommands {
+  "event/exists": {
+    mode: "result";
+    args: { eventName: string; };
+    response: boolean;
+  };
+  "event/subscribe": {
+    mode: "result";
+    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
+    response: void;
+  };
+  "event/unsubscribe": {
+    mode: "result";
+    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
+    response: void;
+  };
 }
 
 /**
  * FileCommands - Commands for the "file" namespace
  */
 export interface FileCommands {
+  /**
+   * Get all file type associations
+   */
+  "file/get-associations": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { [x: string]: { default: string | undefined; userOverride: string | undefined; }; };
+  };
+  /**
+   * Get the default handler app for a file path
+   */
+  "file/get-handler": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; };
+    response: { appId: string | undefined; };
+  };
+  /**
+   * Get all apps that can handle a specific file path
+   */
+  "file/get-supported-handlers": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; };
+    response: import("./index").FileHandlerInfo[];
+  };
   /**
    * Open a file with its default handler
    */
@@ -330,12 +345,12 @@ export interface FileCommands {
     completion: import("./index").FileOpenResult;
   };
   /**
-   * Get the default handler app for a file path
+   * Remove user preference for a file path (revert to default)
    */
-  "file/get-handler": {
+  "file/remove-default-handler": {
     mode: "result";
     args: { location: { volume: string; path: string; }; };
-    response: { appId: string | undefined; };
+    response: void;
   };
   /**
    * Set user preference for a file path's default handler
@@ -345,39 +360,15 @@ export interface FileCommands {
     args: { location: { volume: string; path: string; }; appId: string; };
     response: void;
   };
-  /**
-   * Remove user preference for a file path (revert to default)
-   */
-  "file/remove-default-handler": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; };
-    response: void;
-  };
-  /**
-   * Get all apps that can handle a specific file path
-   */
-  "file/get-supported-handlers": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; };
-    response: import("./index").FileHandlerInfo[];
-  };
-  /**
-   * Get all file type associations
-   */
-  "file/get-associations": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { [x: string]: { default: string | undefined; userOverride: string | undefined; }; };
-  };
 }
 
 /**
  * FilePickerCommands - Commands for the "file-picker" namespace
  */
 export interface FilePickerCommands {
-  "file-picker/register-display": {
+  "file-picker/close": {
     mode: "result";
-    args: Record<string, never>;
+    args: { requestId?: string | undefined; };
     response: { success: boolean; };
   };
   "file-picker/open": {
@@ -385,14 +376,14 @@ export interface FilePickerCommands {
     args: import("./index").FilePickerOpenArgs;
     response: { requestId: string; };
   };
+  "file-picker/register-display": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { success: boolean; };
+  };
   "file-picker/resolve": {
     mode: "result";
     args: import("./index").FilePickerResult;
-    response: { success: boolean; };
-  };
-  "file-picker/close": {
-    mode: "result";
-    args: { requestId?: string | undefined; };
     response: { success: boolean; };
   };
 }
@@ -406,35 +397,22 @@ export interface FsCommands {
     args: { volume: string; };
     response: import("./index").FilesystemLocation;
   };
-  "fs/open": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; mode?: "read" | undefined; };
-    response: import("./index").FilesystemHandle;
-  };
   "fs/close": {
     mode: "result";
     args: { handle: { handleId: string; }; };
     response: void;
   };
-  "fs/read": {
-    mode: "result";
-    args: { location: import("./index").FilesystemSource; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
-    response: string;
+  "fs/cp": {
+    mode: "operation";
+    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
+    response: import("./index").OperationHandle<"fs/cp">;
+    completion: void;
   };
-  "fs/read-binary": {
-    mode: "result";
-    args: { location: import("./index").FilesystemSource; };
-    response: Uint8Array<ArrayBuffer>;
-  };
-  "fs/write": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; content: string; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
-    response: void;
-  };
-  "fs/write-binary": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; content: Uint8Array<ArrayBufferLike>; };
-    response: void;
+  "fs/delete": {
+    mode: "operation";
+    args: { location: { volume: string; path: string; }; };
+    response: import("./index").OperationHandle<"fs/delete">;
+    completion: void;
   };
   "fs/exists": {
     mode: "result";
@@ -446,25 +424,31 @@ export interface FsCommands {
     args: { location: { volume: string; path: string; }; };
     response: void;
   };
+  "fs/mv": {
+    mode: "operation";
+    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
+    response: import("./index").OperationHandle<"fs/mv">;
+    completion: void;
+  };
+  "fs/open": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; mode?: "read" | undefined; };
+    response: import("./index").FilesystemHandle;
+  };
+  "fs/read": {
+    mode: "result";
+    args: { location: import("./index").FilesystemSource; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
+    response: string;
+  };
+  "fs/read-binary": {
+    mode: "result";
+    args: { location: import("./index").FilesystemSource; };
+    response: Uint8Array<ArrayBuffer>;
+  };
   "fs/readdir": {
     mode: "result";
     args: { location: { volume: string; path: string; }; };
     response: string[];
-  };
-  "fs/stat": {
-    mode: "result";
-    args: { location: import("./index").FilesystemSource; };
-    response: import("./index").FileStats;
-  };
-  "fs/watch": {
-    mode: "result";
-    args: { location: { volume: string; path: string; }; };
-    response: { watchId: string; };
-  };
-  "fs/unwatch": {
-    mode: "result";
-    args: { watchId: string; };
-    response: void;
   };
   "fs/resolve": {
     mode: "result";
@@ -476,40 +460,30 @@ export interface FsCommands {
     args: { location: { volume: string; path: string; }; pattern: string; limit?: number | undefined; };
     response: import("./index").SearchResult[];
   };
-  "fs/delete": {
-    mode: "operation";
-    args: { location: { volume: string; path: string; }; };
-    response: import("./index").OperationHandle<"fs/delete">;
-    completion: void;
-  };
-  "fs/cp": {
-    mode: "operation";
-    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
-    response: import("./index").OperationHandle<"fs/cp">;
-    completion: void;
-  };
-  "fs/mv": {
-    mode: "operation";
-    args: { from: { volume: string; path: string; }; to: { volume: string; path: string; }; overwrite?: boolean | undefined; };
-    response: import("./index").OperationHandle<"fs/mv">;
-    completion: void;
-  };
-}
-
-/**
- * VolumeCommands - Commands for the "volume" namespace
- */
-export interface VolumeCommands {
-  "volume/list": {
+  "fs/stat": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").FilesystemVolume[];
+    args: { location: import("./index").FilesystemSource; };
+    response: import("./index").FileStats;
   };
-  "volume/eject": {
-    mode: "operation";
-    args: { volume: string; };
-    response: import("./index").OperationHandle<"volume/eject">;
-    completion: void;
+  "fs/unwatch": {
+    mode: "result";
+    args: { watchId: string; };
+    response: void;
+  };
+  "fs/watch": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; };
+    response: { watchId: string; };
+  };
+  "fs/write": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; content: string; encoding?: "ascii" | "utf8" | "utf-8" | "utf16le" | "utf-16le" | "ucs2" | "ucs-2" | "base64" | "base64url" | "latin1" | "binary" | "hex" | undefined; };
+    response: void;
+  };
+  "fs/write-binary": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; content: Uint8Array<ArrayBufferLike>; };
+    response: void;
   };
 }
 
@@ -517,36 +491,15 @@ export interface VolumeCommands {
  * I18nCommands - Commands for the "i18n" namespace
  */
 export interface I18nCommands {
-  "i18n/get-locale": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { locale: string; };
-  };
   "i18n/get-common": {
     mode: "result";
     args: { locale: string; };
     response: { translations: import("./index").RecursiveObject<string>; };
   };
-}
-
-/**
- * EventCommands - Commands for the "event" namespace
- */
-export interface EventCommands {
-  "event/subscribe": {
+  "i18n/get-locale": {
     mode: "result";
-    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
-    response: void;
-  };
-  "event/unsubscribe": {
-    mode: "result";
-    args: { eventName: string; operation?: { handle: { command: string; id: string; }; terminalOnly?: boolean | undefined; } | undefined; };
-    response: void;
-  };
-  "event/exists": {
-    mode: "result";
-    args: { eventName: string; };
-    response: boolean;
+    args: Record<string, never>;
+    response: { locale: string; };
   };
 }
 
@@ -554,22 +507,6 @@ export interface EventCommands {
  * NotificationCommands - Commands for the "notification" namespace
  */
 export interface NotificationCommands {
-  /**
-   * Register the notification display provider.
-   */
-  "notification/register-display": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { success: boolean; };
-  };
-  /**
-   * Push a new notification to subscribers.
-   */
-  "notification/push": {
-    mode: "result";
-    args: { title: string; message: string; timeout?: number | undefined; type?: import("./index").NotificationType | undefined; actions?: import("./index").NotificationAction[] | undefined; };
-    response: import("./index").Notification;
-  };
   /**
    * Report a notification action click from the toaster.
    */
@@ -586,21 +523,37 @@ export interface NotificationCommands {
     args: { notificationId: string; };
     response: { success: boolean; };
   };
+  /**
+   * Push a new notification to subscribers.
+   */
+  "notification/push": {
+    mode: "result";
+    args: { title: string; message: string; timeout?: number | undefined; type?: import("./index").NotificationType | undefined; actions?: import("./index").NotificationAction[] | undefined; };
+    response: import("./index").Notification;
+  };
+  /**
+   * Register the notification display provider.
+   */
+  "notification/register-display": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { success: boolean; };
+  };
 }
 
 /**
  * OperationCommands - Commands for the "operation" namespace
  */
 export interface OperationCommands {
-  "operation/get": {
-    mode: "result";
-    args: { handle: { command: string; id: string; }; };
-    response: (import("./index").OperationSnapshotBase<string> & { status: "queued" | "running"; }) | (import("./index").OperationSnapshotBase<string> & { status: "cancelled"; completedAt: number; }) | (import("./index").OperationSnapshotBase<string> & { status: "succeeded"; completedAt: number; result: unknown; }) | (import("./index").OperationSnapshotBase<string> & { status: "failed"; completedAt: number; error: import("./index").OperationError; response?: unknown; });
-  };
   "operation/cancel": {
     mode: "result";
     args: { handle: { command: string; id: string; }; };
     response: void;
+  };
+  "operation/get": {
+    mode: "result";
+    args: { handle: { command: string; id: string; }; };
+    response: (import("./index").OperationSnapshotBase<string> & { status: "queued" | "running"; }) | (import("./index").OperationSnapshotBase<string> & { status: "cancelled"; completedAt: number; }) | (import("./index").OperationSnapshotBase<string> & { status: "succeeded"; completedAt: number; result: unknown; }) | (import("./index").OperationSnapshotBase<string> & { status: "failed"; completedAt: number; error: import("./index").OperationError; response?: unknown; });
   };
   "operation/list": {
     mode: "result";
@@ -613,42 +566,10 @@ export interface OperationCommands {
  * PackageCommands - Commands for the "package" namespace
  */
 export interface PackageCommands {
-  "package/install": {
-    mode: "operation";
-    args: { source: { volume: string; path: string; }; replace?: boolean | undefined; };
-    response: import("./index").OperationHandle<"package/install">;
-    completion: import("./index").RuntimeAppManifest | import("./index").RuntimeDlcManifest;
-  };
-  "package/uninstall": {
-    mode: "operation";
-    args: { packageId: string; };
-    response: import("./index").OperationHandle<"package/uninstall">;
-    completion: boolean;
-  };
-  "package/list": {
-    mode: "result";
-    args: { showHidden?: boolean | undefined; showRestricted?: boolean | undefined; };
-    response: import("./index").RuntimeAppManifest[];
-  };
-  "package/self": {
-    mode: "result";
-    args: Record<string, never>;
-    response: import("./index").InstalledPackageInfo;
-  };
   "package/get": {
     mode: "result";
     args: { packageId: string; };
     response: import("./index").InstalledPackageInfo;
-  };
-  "package/toggle-hot-reload": {
-    mode: "result";
-    args: { packageId: string; };
-    response: { enabled: boolean; };
-  };
-  "package/is-hot-reload-enabled": {
-    mode: "result";
-    args: { packageId: string; };
-    response: { enabled: boolean; };
   };
   "package/get-icon": {
     mode: "result";
@@ -665,29 +586,55 @@ export interface PackageCommands {
     args: { packageId: string; };
     response: { size: number | undefined; };
   };
+  "package/install": {
+    mode: "operation";
+    args: { source: { volume: string; path: string; }; replace?: boolean | undefined; };
+    response: import("./index").OperationHandle<"package/install">;
+    completion: import("./index").RuntimeAppManifest | import("./index").RuntimeDlcManifest;
+  };
+  "package/is-hot-reload-enabled": {
+    mode: "result";
+    args: { packageId: string; };
+    response: { enabled: boolean; };
+  };
+  "package/list": {
+    mode: "result";
+    args: { showHidden?: boolean | undefined; showRestricted?: boolean | undefined; };
+    response: import("./index").RuntimeAppManifest[];
+  };
+  "package/self": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").InstalledPackageInfo;
+  };
+  "package/toggle-hot-reload": {
+    mode: "result";
+    args: { packageId: string; };
+    response: { enabled: boolean; };
+  };
+  "package/uninstall": {
+    mode: "operation";
+    args: { packageId: string; };
+    response: import("./index").OperationHandle<"package/uninstall">;
+    completion: boolean;
+  };
 }
 
 /**
  * ProcessCommands - Commands for the "process" namespace
  */
 export interface ProcessCommands {
-  "process/launch": {
-    mode: "operation";
-    args: { appId: string; bounds?: { x: number; y: number; width: number; height: number; } | undefined; };
-    response: import("./index").OperationHandle<"process/launch">;
-    completion: import("./index").LaunchResult;
-  };
-  "process/stop": {
-    mode: "operation";
-    args: { appId: string; };
-    response: import("./index").OperationHandle<"process/stop">;
-    completion: { success: boolean; };
-  };
   "process/exit": {
     mode: "operation";
     args: Record<string, never>;
     response: import("./index").OperationHandle<"process/exit">;
     completion: { success: boolean; };
+  };
+  "process/launch": {
+    mode: "operation";
+    args: { appId: string; bounds?: { x: number; y: number; width: number; height: number; } | undefined; };
+    response: import("./index").OperationHandle<"process/launch">;
+    completion: import("./index").LaunchResult;
   };
   "process/list": {
     mode: "result";
@@ -698,6 +645,12 @@ export interface ProcessCommands {
     mode: "result";
     args: { showHidden?: boolean | undefined; pollingTimeoutMs?: number | undefined; waitForAccurateCpu?: boolean | undefined; };
     response: import("./index").ProcessMetricsSnapshot;
+  };
+  "process/stop": {
+    mode: "operation";
+    args: { appId: string; };
+    response: import("./index").OperationHandle<"process/stop">;
+    completion: { success: boolean; };
   };
 }
 
@@ -728,16 +681,6 @@ export interface SessionCommands {
  * SettingsCommands - Commands for the "settings" namespace
  */
 export interface SettingsCommands {
-  "settings/panels": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { panels: import("./index").SettingsPanelSummary[]; };
-  };
-  "settings/panel": {
-    mode: "result";
-    args: { panelId: string; };
-    response: import("./index").SettingsPanelResponse;
-  };
   "settings/action": {
     mode: "result";
     args: { panelId: string; actionId: string; invocation?: import("./index").SettingsPanelActionInvocation | undefined; };
@@ -752,61 +695,12 @@ export interface SettingsCommands {
     response: { value: string | undefined; };
   };
   /**
-   * Set a setting value (scoped to caller's app)
-   */
-  "settings/set": {
-    mode: "result";
-    args: { key: string; value: string; };
-    response: { success: boolean; };
-  };
-  /**
-   * List all settings keys (scoped to caller's app)
-   */
-  "settings/list": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { keys: string[]; };
-  };
-  /**
    * Get all settings with values (scoped to caller's app)
    */
   "settings/get-all": {
     mode: "result";
     args: Record<string, never>;
     response: { settings: Record<string, string>; };
-  };
-  /**
-   * Reset a setting to default (scoped to caller's app)
-   */
-  "settings/reset": {
-    mode: "result";
-    args: { key: string; schema?: import("./index").SettingsCategory[] | undefined; };
-    response: { success: boolean; };
-  };
-  /**
-   * Get a setting from any app's namespace (superuser only)
-   */
-  "settings/get/su": {
-    mode: "result";
-    args: { appId: string; key: string; };
-    response: { value: string | undefined; };
-  };
-  /**
-   * Set a setting in any app's namespace (superuser only)
-   */
-  "settings/set/su": {
-    mode: "result";
-    args: { appId: string; key: string; value: string; };
-    response: { success: boolean; };
-  };
-  /**
-   * List all settings in any app's namespace (superuser only)
-   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
-   */
-  "settings/list/su": {
-    mode: "result";
-    args: { appId: string; showRestricted?: boolean | undefined; };
-    response: { keys: string[]; };
   };
   /**
    * Get all settings with values for any app (superuser only)
@@ -818,6 +712,49 @@ export interface SettingsCommands {
     response: { settings: Record<string, string>; };
   };
   /**
+   * Get a setting from any app's namespace (superuser only)
+   */
+  "settings/get/su": {
+    mode: "result";
+    args: { appId: string; key: string; };
+    response: { value: string | undefined; };
+  };
+  /**
+   * List all settings keys (scoped to caller's app)
+   */
+  "settings/list": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { keys: string[]; };
+  };
+  /**
+   * List all settings in any app's namespace (superuser only)
+   * @param showRestricted - If true, includes settings the current user cannot access (hidden by default)
+   */
+  "settings/list/su": {
+    mode: "result";
+    args: { appId: string; showRestricted?: boolean | undefined; };
+    response: { keys: string[]; };
+  };
+  "settings/panel": {
+    mode: "result";
+    args: { panelId: string; };
+    response: import("./index").SettingsPanelResponse;
+  };
+  "settings/panels": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { panels: import("./index").SettingsPanelSummary[]; };
+  };
+  /**
+   * Reset a setting to default (scoped to caller's app)
+   */
+  "settings/reset": {
+    mode: "result";
+    args: { key: string; schema?: import("./index").SettingsCategory[] | undefined; };
+    response: { success: boolean; };
+  };
+  /**
    * Reset a setting for any app (superuser only)
    */
   "settings/reset/su": {
@@ -825,30 +762,66 @@ export interface SettingsCommands {
     args: { appId: string; key: string; schema?: import("./index").SettingsCategory[] | undefined; };
     response: { success: boolean; };
   };
+  /**
+   * Set a setting value (scoped to caller's app)
+   */
+  "settings/set": {
+    mode: "result";
+    args: { key: string; value: string; };
+    response: { success: boolean; };
+  };
+  /**
+   * Set a setting in any app's namespace (superuser only)
+   */
+  "settings/set/su": {
+    mode: "result";
+    args: { appId: string; key: string; value: string; };
+    response: { success: boolean; };
+  };
+}
+
+/**
+ * SystemCommands - Commands for the "system" namespace
+ */
+export interface SystemCommands {
+  /**
+   * Get consumer-controlled product branding for SDK-owned interfaces.
+   */
+  "system/branding": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").EdenBrandingInfo;
+  };
+  "system/info": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").SystemInfo;
+  };
+  "system/power": {
+    mode: "operation";
+    args: { action: "poweroff" | "reboot"; };
+    response: import("./index").OperationHandle<"system/power">;
+    completion: void;
+  };
+  "system/power-capabilities": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").EdenPowerCapabilities;
+  };
 }
 
 /**
  * UserCommands - Commands for the "user" namespace
  */
 export interface UserCommands {
-  "user/grant-options": {
+  "user/change-password": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").UserGrantOptionsResponse;
-  };
-  "user/list": {
-    mode: "result";
-    args: Record<string, never>;
-    response: { users: import("./index").UserProfile[]; };
+    args: { currentPassword: string; newPassword: string; };
+    response: { success: boolean; error?: string; } | { success: boolean; error: string; };
   };
   "user/create": {
     mode: "result";
     args: { username?: string | undefined; name: string; role?: "standard" | "vendor" | undefined; password: string; grants?: string[] | undefined; directoryRestriction?: string | undefined; };
-    response: { user: import("./index").UserProfile; };
-  };
-  "user/update": {
-    mode: "result";
-    args: { username: string; name?: string | undefined; role?: "standard" | "vendor" | undefined; grants?: string[] | undefined; directoryRestriction?: string | null | undefined; };
     response: { user: import("./index").UserProfile; };
   };
   "user/delete": {
@@ -856,30 +829,40 @@ export interface UserCommands {
     args: { username: string; };
     response: { success: boolean; };
   };
-  "user/set-password": {
+  "user/get-default": {
     mode: "result";
-    args: { username: string; password: string; };
-    response: { success: boolean; };
+    args: Record<string, never>;
+    response: { username: string | null; };
   };
-  "user/change-password": {
+  "user/grant-options": {
     mode: "result";
-    args: { currentPassword: string; newPassword: string; };
-    response: { success: boolean; error?: string; } | { success: boolean; error: string; };
+    args: Record<string, never>;
+    response: import("./index").UserGrantOptionsResponse;
   };
   "user/has-grant": {
     mode: "result";
     args: { grant: string; };
     response: { allowed: boolean; };
   };
-  "user/get-default": {
+  "user/list": {
     mode: "result";
     args: Record<string, never>;
-    response: { username: string | null; };
+    response: { users: import("./index").UserProfile[]; };
   };
   "user/set-default": {
     mode: "result";
     args: { username: string | null; };
     response: { success: boolean; };
+  };
+  "user/set-password": {
+    mode: "result";
+    args: { username: string; password: string; };
+    response: { success: boolean; };
+  };
+  "user/update": {
+    mode: "result";
+    args: { username: string; name?: string | undefined; role?: "standard" | "vendor" | undefined; grants?: string[] | undefined; directoryRestriction?: string | null | undefined; };
+    response: { user: import("./index").UserProfile; };
   };
 }
 
@@ -887,25 +870,20 @@ export interface UserCommands {
  * ViewCommands - Commands for the "view" namespace
  */
 export interface ViewCommands {
-  "view/update-bounds": {
+  "view/end-drag": {
     mode: "result";
-    args: { bounds: { x: number; y: number; width: number; height: number; }; };
+    args: Record<string, never>;
     response: { success: boolean; };
   };
-  "view/update-view-bounds": {
+  "view/end-resize": {
     mode: "result";
-    args: { appId: string; bounds: { x: number; y: number; width: number; height: number; }; };
+    args: Record<string, never>;
     response: { success: boolean; };
   };
-  "view/set-visibility": {
+  "view/expand-tile": {
     mode: "result";
-    args: { visible: boolean; };
-    response: { success: boolean; };
-  };
-  "view/set-view-visibility": {
-    mode: "result";
-    args: { appId: string; visible: boolean; };
-    response: { success: boolean; };
+    args: { direction: "left" | "right" | "top" | "bottom"; };
+    response: import("./index").TileLayoutState;
   };
   "view/focus": {
     mode: "result";
@@ -917,10 +895,50 @@ export interface ViewCommands {
     args: { appId: string; };
     response: { success: boolean; };
   };
-  "view/update-global-bounds": {
+  "view/get-interface-scale": {
     mode: "result";
-    args: { bounds: { x: number; y: number; width: number; height: number; }; windowSize: { width: number; height: number; }; };
+    args: Record<string, never>;
+    response: { scale: number; };
+  };
+  "view/global-mouseup": {
+    mode: "result";
+    args: Record<string, never>;
     response: { success: boolean; };
+  };
+  "view/set-interface-scale": {
+    mode: "result";
+    args: { scale: string; };
+    response: { success: boolean; };
+  };
+  "view/set-view-visibility": {
+    mode: "result";
+    args: { appId: string; visible: boolean; };
+    response: { success: boolean; };
+  };
+  "view/set-visibility": {
+    mode: "result";
+    args: { visible: boolean; };
+    response: { success: boolean; };
+  };
+  "view/start-drag": {
+    mode: "result";
+    args: { startX: number; startY: number; };
+    response: { success: boolean; };
+  };
+  "view/start-resize": {
+    mode: "result";
+    args: { direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" | undefined; startX: number; startY: number; };
+    response: { success: boolean; };
+  };
+  "view/swap-tile": {
+    mode: "result";
+    args: { direction: "left" | "right" | "top" | "bottom"; };
+    response: import("./index").TileLayoutState;
+  };
+  "view/tile-layout-state": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").TileLayoutState;
   };
   "view/toggle-mode": {
     mode: "result";
@@ -932,44 +950,19 @@ export interface ViewCommands {
     args: { appId: string; mode?: "floating" | "tiled" | undefined; };
     response: { success: boolean; };
   };
-  "view/tile-layout-state": {
+  "view/update-bounds": {
     mode: "result";
-    args: Record<string, never>;
-    response: import("./index").TileLayoutState;
-  };
-  "view/swap-tile": {
-    mode: "result";
-    args: { direction: "left" | "right" | "top" | "bottom"; };
-    response: import("./index").TileLayoutState;
-  };
-  "view/expand-tile": {
-    mode: "result";
-    args: { direction: "left" | "right" | "top" | "bottom"; };
-    response: import("./index").TileLayoutState;
-  };
-  "view/start-drag": {
-    mode: "result";
-    args: { startX: number; startY: number; };
+    args: { bounds: { x: number; y: number; width: number; height: number; }; };
     response: { success: boolean; };
   };
-  "view/end-drag": {
+  "view/update-global-bounds": {
     mode: "result";
-    args: Record<string, never>;
+    args: { bounds: { x: number; y: number; width: number; height: number; }; windowSize: { width: number; height: number; }; };
     response: { success: boolean; };
   };
-  "view/global-mouseup": {
+  "view/update-view-bounds": {
     mode: "result";
-    args: Record<string, never>;
-    response: { success: boolean; };
-  };
-  "view/start-resize": {
-    mode: "result";
-    args: { direction?: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" | undefined; startX: number; startY: number; };
-    response: { success: boolean; };
-  };
-  "view/end-resize": {
-    mode: "result";
-    args: Record<string, never>;
+    args: { appId: string; bounds: { x: number; y: number; width: number; height: number; }; };
     response: { success: boolean; };
   };
   "view/window-size": {
@@ -977,19 +970,26 @@ export interface ViewCommands {
     args: Record<string, never>;
     response: import("./index").WindowSize;
   };
-  "view/set-interface-scale": {
-    mode: "result";
-    args: { scale: string; };
-    response: { success: boolean; };
+}
+
+/**
+ * VolumeCommands - Commands for the "volume" namespace
+ */
+export interface VolumeCommands {
+  "volume/eject": {
+    mode: "operation";
+    args: { volume: string; };
+    response: import("./index").OperationHandle<"volume/eject">;
+    completion: void;
   };
-  "view/get-interface-scale": {
+  "volume/list": {
     mode: "result";
     args: Record<string, never>;
-    response: { scale: number; };
+    response: import("./index").FilesystemVolume[];
   };
 }
 
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends AssociationsCommands, AppbusCommands, AppearanceCommands, SystemCommands, ContextMenuCommands, DaemonCommands, DbCommands, FileCommands, FilePickerCommands, FsCommands, VolumeCommands, I18nCommands, EventCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, UserCommands, ViewCommands {}
+export interface CommandMap extends AppbusCommands, AppearanceCommands, AssociationsCommands, ContextMenuCommands, DaemonCommands, DbCommands, EventCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, SystemCommands, UserCommands, ViewCommands, VolumeCommands {}
