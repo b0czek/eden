@@ -79,6 +79,26 @@ describe("runtime-owned operations", () => {
     ).resolves.toBe("done");
   });
 
+  it("resolves wait authority at execution unless a caller is explicitly supplied", async () => {
+    register(() => operationTask(() => Effect.succeed("done")));
+    const handle = await submit();
+    const execution = eden.runtime.services.execution;
+    const waiting = operations.wait(handle);
+    const other = { ...owner, appId: "other.app" };
+
+    await expect(
+      eden.runtime.effects.run(execution.provide(waiting, owner)),
+    ).resolves.toBe("done");
+    await expect(
+      eden.runtime.effects.run(execution.provide(waiting, other)),
+    ).rejects.toMatchObject({ _tag: "OperationNotFound" });
+    await expect(
+      eden.runtime.effects.run(
+        execution.provide(operations.wait(handle, owner), other),
+      ),
+    ).resolves.toBe("done");
+  });
+
   it("interrupts native Effect work and publishes cancellation only after its cleanup", async () => {
     const started = gate();
     const finishWork = gate();

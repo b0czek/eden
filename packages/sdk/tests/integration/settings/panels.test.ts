@@ -36,9 +36,7 @@ describe("SettingsPanels integration", () => {
       }),
     );
 
-    expect(
-      await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
-    ).toMatchObject({
+    expect(eden.runtime.appearance.getWallpaper()).toMatchObject({
       id: "midnight",
       value: "#1a1b26",
     });

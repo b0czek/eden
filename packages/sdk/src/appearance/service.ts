@@ -24,7 +24,7 @@ export interface Appearance {
   setWallpaper: (
     config: WallpaperConfig,
   ) => Effect.Effect<void, StorageWriteFailure | SettingValueError>;
-  getWallpaper: () => Effect.Effect<WallpaperPreset>;
+  getWallpaper: () => WallpaperPreset;
   getPresets: () => { solid: WallpaperPreset[]; gradients: WallpaperPreset[] };
   wallpaperChanged: Event<WallpaperPreset>;
 }
@@ -66,7 +66,7 @@ export const AppearanceLive = Layer.effect(
     }
 
     function getWallpaper() {
-      return Effect.sync(() => currentWallpaper);
+      return currentWallpaper;
     }
 
     function getPresets() {

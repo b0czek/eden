@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
 import { wallpaperConfigSchema } from "./schemas";
@@ -13,10 +12,7 @@ export function createAppearanceController(appearance: Appearance) {
         handle: ({ wallpaper }) => appearance.setWallpaper(wallpaper),
       }),
       "get-wallpaper": command({
-        handle: () =>
-          appearance
-            .getWallpaper()
-            .pipe(Effect.map((wallpaper) => ({ wallpaper }))),
+        handle: () => ({ wallpaper: appearance.getWallpaper() }),
       }),
       "get-presets": command({
         handle: () => appearance.getPresets(),

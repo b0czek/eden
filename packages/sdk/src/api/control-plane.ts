@@ -199,7 +199,7 @@ export interface EdenWallpaperPresets {
 }
 
 export interface EdenAppearanceApi {
-  getWallpaper(): Effect.Effect<WallpaperPreset, EdenInputError>;
+  getWallpaper(): WallpaperPreset;
   getPresets(): EdenWallpaperPresets;
   setWallpaper(
     config: WallpaperConfig,

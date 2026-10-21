@@ -122,7 +122,7 @@ it("composes persisted settings with locale notifications and appearance state a
     expect(
       await first.run(settings.get("com.eden", "appearance.wallpaper")),
     ).toBe('{"type":"preset","id":"midnight"}');
-    expect((await first.run(appearance.getWallpaper())).id).toBe("midnight");
+    expect(appearance.getWallpaper().id).toBe("midnight");
     await first.dispose();
     expect(settings.changed.hasListeners()).toBe(false);
     expect(i18n.localeChanged.hasListeners()).toBe(false);
@@ -150,9 +150,7 @@ it("composes persisted settings with locale notifications and appearance state a
     );
     await second.run(nextAppearance.initialize());
     expect(await second.run(nextI18n.getLocale())).toBe("pl");
-    expect((await second.run(nextAppearance.getWallpaper())).id).toBe(
-      "midnight",
-    );
+    expect(nextAppearance.getWallpaper().id).toBe("midnight");
   } finally {
     await first.dispose();
     await second.dispose();
@@ -224,7 +222,7 @@ it("finishes a pending appearance commit and its notifications before closing se
       ),
     );
     await second.run(nextAppearance.initialize());
-    expect((await second.run(nextAppearance.getWallpaper())).id).toBe("aurora");
+    expect(nextAppearance.getWallpaper().id).toBe("aurora");
   } finally {
     releaseWrite();
     await first.dispose();

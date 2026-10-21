@@ -60,16 +60,21 @@ export interface Daemons {
   ) => Effect.Effect<void, DaemonLaunchError | DaemonStopError>;
   shutdown: () => Effect.Effect<void>;
   changed: Event<{ status: DaemonStatus }>;
+  /** Capture the current launch attempt synchronously; return queued exit handling. */
   processExited: (
     appId: string,
     code: number,
   ) => Effect.Effect<void, DaemonLaunchError>;
+  /** Capture the current launch attempt synchronously; return queued stop handling. */
   processStopped: (appId: string) => Effect.Effect<void, DaemonLaunchError>;
+  /** Reserve adopted supervision synchronously so subsequent exits bind to it. */
   processLaunched: (
     appId: string,
     ownerKind: string,
   ) => Effect.Effect<void, DaemonLaunchError>;
+  /** Revoke current supervision synchronously; return queued cancellation. */
   processReloading: (appId: string) => Effect.Effect<void>;
+  /** Revoke current supervision synchronously; return queued persistent cleanup. */
   packageUninstalled: (
     appId: string,
   ) => Effect.Effect<void, DaemonDefinitionRemoveError>;

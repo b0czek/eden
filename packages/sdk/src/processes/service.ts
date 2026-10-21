@@ -146,8 +146,10 @@ export const ProcessesLive = Layer.effect(
       });
     }
     function closeInstance(record: InstanceRecord, exit = Exit.void) {
-      record.closing = true;
-      return Scope.close(record.scope, exit).pipe(
+      return Effect.suspend(() => {
+        record.closing = true;
+        return Scope.close(record.scope, exit);
+      }).pipe(
         Effect.catchCause((cause) => {
           // Scope finalizers carry native cleanup failures as defects. Recover only
           // known boundary errors; unexpected defects keep their original channel.

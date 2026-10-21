@@ -124,16 +124,10 @@ describe("EdenRuntime integration", () => {
         value: "#445566",
       }),
     );
-    expect(
-      await first.runtime.effects.run(first.runtime.appearance.getWallpaper()),
-    ).toMatchObject({
+    expect(first.runtime.appearance.getWallpaper()).toMatchObject({
       value: "#112233",
     });
-    expect(
-      await second.runtime.effects.run(
-        second.runtime.appearance.getWallpaper(),
-      ),
-    ).toMatchObject({
+    expect(second.runtime.appearance.getWallpaper()).toMatchObject({
       value: "#445566",
     });
 
@@ -477,11 +471,7 @@ describe("EdenRuntime integration", () => {
           second.runtime.services.settings.get("restart-app", "theme"),
         ),
       ).toBe("changed-theme");
-      expect(
-        await second.runtime.effects.run(
-          second.runtime.appearance.getWallpaper(),
-        ),
-      ).toMatchObject({
+      expect(second.runtime.appearance.getWallpaper()).toMatchObject({
         type: "custom",
         value: "#abcdef",
       });

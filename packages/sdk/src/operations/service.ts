@@ -62,6 +62,7 @@ export interface Operations {
   /** Throws OperationNotFound or OperationNotCancellable synchronously. */
   cancel: (handle: OperationHandle, context?: CommandCallerContext) => void;
   list: (context?: CommandCallerContext) => OperationSnapshot[];
+  /** Resolve the caller at execution unless explicitly bound by the caller. */
   wait: (
     handle: OperationHandle,
     context?: CommandCallerContext,
@@ -495,10 +496,10 @@ export const OperationsLive = Layer.effect(
     }
     function wait(
       handle: OperationHandle,
-      context = execution.get() ?? {},
+      context?: CommandCallerContext,
     ): Effect.Effect<unknown, unknown> {
       return Effect.suspend(() => {
-        const record = getRecord(handle, context);
+        const record = getRecord(handle, context ?? execution.get() ?? {});
         return Fiber.join(record.fiber).pipe(
           Effect.map((value) => structuredClone(value)),
           Effect.catchCause((cause) => {

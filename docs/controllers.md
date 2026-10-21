@@ -17,6 +17,14 @@ and a `Layer.effect` implementation, in that order. The interface owns the
 supported operations, events, and failure types. Check implementations against
 that contract; infer types within private helpers where useful.
 
+Return current in-memory snapshots synchronously, as with appearance wallpaper,
+presets, session state, and associations. Use lazy Effects for I/O and workflows.
+Admission checks run synchronously before retained work is accepted. Document
+which state reservations and bindings of queued work happen immediately and
+which returned work still needs execution.
+Ordinary Effect methods defer state reads, mutations, and resource acquisition
+until execution.
+
 Layer implementations acquire dependencies with `yield*`, keep instance state
 in closures, and register resource cleanup in their Effect scope. I/O methods
 return Effects that describe work without starting it. Keep each port key beside

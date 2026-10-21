@@ -220,9 +220,7 @@ describe("client subscriptions across renderer IPC", () => {
         owner,
       ),
     ).rejects.toThrow();
-    expect(
-      await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
-    ).toEqual(expected);
+    expect(eden.runtime.appearance.getWallpaper()).toEqual(expected);
     api.unsubscribe("appearance/wallpaper-changed", listener);
     stop();
   });

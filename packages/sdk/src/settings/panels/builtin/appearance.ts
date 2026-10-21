@@ -57,10 +57,10 @@ export const appearancePanel: BuiltinPanelModule = {
   createLoader:
     ({ appearance }) =>
     () =>
-      Effect.map(appearance.getWallpaper(), (wallpaper) => ({
+      Effect.sync(() => ({
         data: cloneRendererValue({
           presets: appearance.getPresets(),
-          wallpaper,
+          wallpaper: appearance.getWallpaper(),
         }) as unknown as SettingsPanelValue,
       })),
 };

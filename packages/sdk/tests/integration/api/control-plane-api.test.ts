@@ -253,9 +253,7 @@ describe("control-plane API integration", () => {
     const before = await eden.runtime.effects.run(
       settings.get("com.eden", "appearance.wallpaper"),
     );
-    const wallpaper = await eden.runtime.effects.run(
-      eden.runtime.appearance.getWallpaper(),
-    );
+    const wallpaper = eden.runtime.appearance.getWallpaper();
     const changes: unknown[] = [];
     const stop = eden.runtime.appearance.onChanged((value) =>
       changes.push(value),
@@ -274,9 +272,7 @@ describe("control-plane API integration", () => {
           settings.get("com.eden", "appearance.wallpaper"),
         ),
       ).toBe(before);
-      expect(
-        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
-      ).toEqual(wallpaper);
+      expect(eden.runtime.appearance.getWallpaper()).toEqual(wallpaper);
       expect(changes).toEqual([]);
     } finally {
       stop();
@@ -333,20 +329,19 @@ describe("control-plane API integration", () => {
         },
       );
       expect(contexts).toEqual([{ principal: { kind: "system" } }]);
-      expect(
-        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
-      ).toMatchObject({
+      const snapshot = eden.runtime.appearance.getWallpaper();
+      expect(snapshot).toMatchObject({
         value: "#123456",
       });
+      snapshot.value = "changed by reader";
+      expect(eden.runtime.appearance.getWallpaper().value).toBe("#123456");
       const input: WallpaperConfig = { type: "custom", value: "#abcdef" };
       const update = eden.runtime.effects.run(
         eden.runtime.appearance.setWallpaper(input),
       );
       input.value = "mutated after submission";
       await update;
-      expect(
-        await eden.runtime.effects.run(eden.runtime.appearance.getWallpaper()),
-      ).toMatchObject({
+      expect(eden.runtime.appearance.getWallpaper()).toMatchObject({
         value: "#abcdef",
       });
     } finally {

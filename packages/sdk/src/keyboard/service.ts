@@ -274,6 +274,7 @@ export const KeyboardLive = Layer.effect(
       key: string,
       value: string,
     ): Effect.Effect<void, KeyboardNativeFailure> {
+      // Commit preferences during notification delivery; queue native presentation.
       const preferences = state.preferences;
       if (key === KEYBOARD_SETTINGS.placementMode) {
         const next = parsePlacementMode(value);

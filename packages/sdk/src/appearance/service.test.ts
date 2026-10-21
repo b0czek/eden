@@ -30,9 +30,7 @@ describe("appearance effects", () => {
 
             yield* appearance.initialize();
 
-            expect(yield* appearance.getWallpaper()).toEqual(
-              DEFAULT_WALLPAPER_PRESET,
-            );
+            expect(appearance.getWallpaper()).toEqual(DEFAULT_WALLPAPER_PRESET);
           }),
         ),
       );
@@ -65,7 +63,7 @@ describe("appearance effects", () => {
 
           yield* appearance.initialize();
 
-          expect(yield* appearance.getWallpaper()).toEqual({
+          expect(appearance.getWallpaper()).toEqual({
             id: "midnight",
             name: "Midnight",
             type: "color",
@@ -103,9 +101,7 @@ describe("appearance effects", () => {
           expect(yield* appearance.initialize().pipe(Effect.flip)).toBe(
             failure,
           );
-          expect(yield* appearance.getWallpaper()).toEqual(
-            DEFAULT_WALLPAPER_PRESET,
-          );
+          expect(appearance.getWallpaper()).toEqual(DEFAULT_WALLPAPER_PRESET);
         }),
       ),
     );
@@ -140,9 +136,7 @@ describe("appearance effects", () => {
 
           expect(writes).toEqual([]);
           expect(notifications).toEqual([]);
-          expect(yield* appearance.getWallpaper()).toEqual(
-            DEFAULT_WALLPAPER_PRESET,
-          );
+          expect(appearance.getWallpaper()).toEqual(DEFAULT_WALLPAPER_PRESET);
 
           yield* update;
           expect(writes).toEqual([
@@ -160,7 +154,7 @@ describe("appearance effects", () => {
               value: "#123456",
             },
           ]);
-          expect(yield* appearance.getWallpaper()).toEqual(notifications[0]);
+          expect(appearance.getWallpaper()).toEqual(notifications[0]);
           return appearance;
         }),
       ),
@@ -201,9 +195,7 @@ describe("appearance effects", () => {
 
           expect(received).toBe(failure);
           expect(notifications).toEqual([]);
-          expect(yield* appearance.getWallpaper()).toEqual(
-            DEFAULT_WALLPAPER_PRESET,
-          );
+          expect(appearance.getWallpaper()).toEqual(DEFAULT_WALLPAPER_PRESET);
         }),
       ),
     );
@@ -257,7 +249,7 @@ describe("appearance effects", () => {
           fiber.addObserver(() => {
             completedState = {
               persisted,
-              wallpaper: Effect.runSync(appearance.getWallpaper()),
+              wallpaper: appearance.getWallpaper(),
               notifications: [...notifications],
             };
           });
