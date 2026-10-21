@@ -131,7 +131,7 @@ Advance time with `TestClock.adjust(Duration.millis(...))`. Check the instant
 before a deadline as well as the deadline itself. Await explicit milestones with
 `Deferred`, fiber completion, or the service's drain method; advancing time does
 not complete native I/O. See the
-[backend deadline tests](../packages/sdk/tests/integration/processes/Backends.test.ts)
+[backend deadline tests](../packages/sdk/tests/integration/processes/backends.test.ts)
 and [operation retention tests](../packages/sdk/src/operations/retention.test.ts).
 
 Operation timestamps and expiry read the Clock captured during acquisition, so
