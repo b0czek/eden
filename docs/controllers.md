@@ -54,6 +54,12 @@ registrations, root availability, leases, and safe removal. Each capability
 registers its API through its own `runtime.ts`. Filesystem consumes Volumes and
 its failures; Volumes does not depend on file operations or filesystem failures.
 
+Shared lexical and symlink-aware path containment belongs to
+[`filesystem/path-containment.ts`](../packages/sdk/src/filesystem/path-containment.ts).
+These primitives have no account policy; the user domain owns restriction
+normalization, role rules, and restricted-directory creation. Each domain adapts
+containment failures to its own error contract.
+
 View creation, removal, bounds, visibility, focus, mode and tile mutations return
 lazy Effects with view-owned failure types. Native setup and presentation hooks
 remain synchronous. The view registry owns destruction, including cleanup after

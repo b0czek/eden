@@ -4,8 +4,16 @@ import type { UserRole } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../effects/io";
 import {
+  assertExistingPathWithin,
+  assertPathWithin,
+  type PathContainmentFailure,
+  PathContainmentIoError,
+  PathOutsideRoot,
+} from "../filesystem/path-containment";
+import {
   DirectoryRestrictionError,
   DirectoryRestrictionIoError,
+  type UserDirectoryFailure,
 } from "./errors";
 
 export function normalizeDirectoryRestriction(
@@ -51,7 +59,13 @@ export function resolveDirectoryRestriction(
     resolvedRoot,
     ...directoryRestriction.split("/"),
   );
-  assertPathWithin(resolvedRoot, resolvedDirectory, "Directory restriction");
+  try {
+    assertPathWithin(resolvedRoot, resolvedDirectory, "Directory restriction");
+  } catch (cause) {
+    if (cause instanceof PathOutsideRoot)
+      throw directoryContainmentFailure(cause);
+    throw cause;
+  }
   return resolvedDirectory;
 }
 
@@ -82,7 +96,9 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
 
   const root = path.resolve(userDirectory);
   const directory = resolveDirectoryRestriction(root, normalized);
-  yield* assertExistingPathWithin(root, directory);
+  yield* assertExistingPathWithin(root, directory).pipe(
+    Effect.mapError(directoryContainmentFailure),
+  );
   yield* fromPromise(
     () => fs.mkdir(directory, { recursive: true }),
     (cause) =>
@@ -92,82 +108,26 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
         cause,
       }),
   );
-  yield* assertExistingPathWithin(root, directory);
+  yield* assertExistingPathWithin(root, directory).pipe(
+    Effect.mapError(directoryContainmentFailure),
+  );
   return normalized;
 });
 
-export function assertPathWithin(
-  rootPath: string,
-  targetPath: string,
-  label: string = "Path",
-): void {
-  const relative = path.relative(rootPath, targetPath);
-  if (
-    relative === ".." ||
-    relative.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relative)
-  ) {
-    throw new DirectoryRestrictionError({
-      path: targetPath,
-      message: `${label} is outside of the allowed directory`,
-    });
-  }
+function directoryContainmentFailure(
+  cause: PathContainmentFailure,
+): UserDirectoryFailure {
+  return cause instanceof PathContainmentIoError
+    ? new DirectoryRestrictionIoError({
+        path: cause.path,
+        operation: cause.operation,
+        cause: cause.cause,
+      })
+    : new DirectoryRestrictionError({
+        path: cause.path,
+        message: cause.message,
+      });
 }
-
-export const assertExistingPathWithin = Effect.fn(function* (
-  rootPath: string,
-  targetPath: string,
-) {
-  const resolvedRoot = path.resolve(rootPath);
-  const resolvedTarget = path.resolve(targetPath);
-  yield* Effect.try({
-    try: () => assertPathWithin(resolvedRoot, resolvedTarget),
-    catch: directoryValidationFailure,
-  });
-  const realRoot = yield* fromPromise(
-    () => fs.realpath(resolvedRoot),
-    (cause) =>
-      new DirectoryRestrictionIoError({
-        path: resolvedRoot,
-        operation: "realpath",
-        cause,
-      }),
-  );
-  const relative = path.relative(resolvedRoot, resolvedTarget);
-  let current = resolvedRoot;
-  for (const component of relative.split(path.sep).filter(Boolean)) {
-    current = path.join(current, component);
-    const stats = yield* fromPromise(
-      () => fs.lstat(current),
-      (cause) =>
-        new DirectoryRestrictionIoError({
-          path: current,
-          operation: "lstat",
-          cause,
-        }),
-    ).pipe(
-      Effect.catch((error) =>
-        (error.cause as NodeJS.ErrnoException).code === "ENOENT"
-          ? Effect.succeed(undefined)
-          : Effect.fail(error),
-      ),
-    );
-    if (!stats) return;
-    const realCurrent = yield* fromPromise(
-      () => fs.realpath(current),
-      (cause) =>
-        new DirectoryRestrictionIoError({
-          path: current,
-          operation: "realpath",
-          cause,
-        }),
-    );
-    yield* Effect.try({
-      try: () => assertPathWithin(realRoot, realCurrent),
-      catch: directoryValidationFailure,
-    });
-  }
-});
 
 // Validation helpers throw only this documented rejection; programmer failures remain defects.
 export function directoryValidationFailure(

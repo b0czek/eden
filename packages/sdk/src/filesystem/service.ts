@@ -25,12 +25,9 @@ import { log } from "../logging/logger";
 import type { OperationReporter, OperationTask } from "../operations/task";
 import { UserDirectory } from "../runtime/inputs";
 import {
-  assertExistingPathWithin,
-  assertPathWithin,
   normalizeDirectoryRestriction,
   resolveDirectoryRestriction,
 } from "../user/directory-restriction";
-import { DirectoryRestrictionIoError } from "../user/errors";
 import {
   accessRejection,
   FilesystemAccessDenied,
@@ -48,6 +45,12 @@ import {
   type OpenedFilesystemFile,
   readOpenedFile,
 } from "./file-handles";
+import {
+  assertExistingPathWithin,
+  assertPathWithin,
+  PathContainmentIoError,
+  PathOutsideRoot,
+} from "./path-containment";
 import { FilesystemViews } from "./ports";
 import { createFileTransfers } from "./transfers";
 import type { VolumeUnavailable } from "./volumes/errors";
@@ -169,11 +172,10 @@ const io = <A>(operation: string, run: () => Promise<A>) =>
       }),
   ).pipe(Effect.uninterruptible);
 
-// This dependency owns sandbox path validation; translate its failures here.
 const assertExistingWithin = (rootPath: string, hostPath: string) =>
   assertExistingPathWithin(rootPath, hostPath).pipe(
     Effect.mapError((cause) =>
-      cause instanceof DirectoryRestrictionIoError
+      cause instanceof PathContainmentIoError
         ? new FilesystemIoFailed({
             operation: "resolve",
             path: hostPath,
@@ -191,10 +193,11 @@ function assertWithin(rootPath: string, hostPath: string, label: string): void {
   try {
     assertPathWithin(rootPath, hostPath, label);
   } catch (cause) {
+    if (!(cause instanceof PathOutsideRoot)) throw cause;
     throw new FilesystemAccessDenied({
       path: hostPath,
       cause,
-      message: cause instanceof Error ? cause.message : String(cause),
+      message: cause.message,
     });
   }
 }

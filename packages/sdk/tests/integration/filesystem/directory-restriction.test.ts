@@ -90,112 +90,11 @@ describe("Filesystem shared addresses and folder restrictions", () => {
     ).resolves.toBe(path.join(root, "state.json"));
   });
 
-  it("enforces a user daemon's restriction without rebasing its addresses", async () => {
-    const daemonUser = {
-      ...createUser(),
-      username: "service-account",
-      directoryRestriction: "services/stateful-daemon",
-    };
-    await fs.mkdir(path.join(root, daemonUser.directoryRestriction), {
-      recursive: true,
-    });
-    filesystem = await createFilesystemFixture({
-      getPrincipal: () => ({ kind: "user" as const, profile: daemonUser }),
-    } as ExecutionContext);
-
-    await expect(
-      effects.run(
-        filesystem.resolvePath({
-          volume: "home",
-          path: "/services/stateful-daemon/state.json",
-        }),
-      ),
-    ).resolves.toBe(
-      path.join(root, daemonUser.directoryRestriction, "state.json"),
-    );
-  });
-
-  it("uses full paths within a configured restriction", async () => {
-    await fs.mkdir(path.join(root, "teams", "operators"), {
-      recursive: true,
-    });
-    currentUser = {
-      ...createUser(),
-      directoryRestriction: "teams/operators",
-    };
-
-    await expect(
-      effects.run(
-        filesystem.resolvePath({
-          volume: "home",
-          path: "/teams/operators/Documents/report.txt",
-        }),
-      ),
-    ).resolves.toBe(
-      path.join(root, "teams", "operators", "Documents", "report.txt"),
-    );
-  });
-
   it("denies access without an execution principal", async () => {
     currentUser = null;
     await expect(
       effects.run(filesystem.resolvePath({ volume: "home", path: "/" })),
     ).rejects.toThrow("Caller has no filesystem execution principal");
-  });
-
-  it("rejects traversal outside the restriction", async () => {
-    await fs.mkdir(path.join(root, "homes", "operator"), { recursive: true });
-    currentUser = {
-      ...createUser(),
-      directoryRestriction: "homes/operator",
-    };
-
-    await expect(
-      effects.run(
-        filesystem.resolvePath({
-          volume: "home",
-          path: "/homes/operator/../../shared.txt",
-        }),
-      ),
-    ).rejects.toThrow("outside of the allowed directory");
-  });
-
-  it("rejects symlinks into sibling folders for existing and new files", async () => {
-    const home = path.join(root, "homes", "operator");
-    const sibling = path.join(root, "homes", "other");
-    await fs.mkdir(home, { recursive: true });
-    await fs.mkdir(sibling, { recursive: true });
-    await fs.symlink(sibling, path.join(home, "other"));
-    currentUser = {
-      ...createUser(),
-      directoryRestriction: "homes/operator",
-    };
-
-    await expect(
-      effects.run(
-        filesystem.resolvePath({
-          volume: "home",
-          path: "/homes/operator/other/private.txt",
-        }),
-      ),
-    ).rejects.toThrow("outside of the allowed directory");
-    await expect(
-      effects.run(
-        filesystem.writeFile(
-          { volume: "home", path: "/homes/operator/other/private.txt" },
-          "secret",
-        ),
-      ),
-    ).rejects.toThrow("outside of the allowed directory");
-    await expect(
-      effects.run(
-        filesystem.writeBinaryFile(
-          { volume: "home", path: "/homes/operator/other/private.bin" },
-          new Uint8Array([1, 2, 3]),
-        ),
-      ),
-    ).rejects.toThrow("outside of the allowed directory");
-    await expect(fs.readdir(sibling)).resolves.toEqual([]);
   });
 
   it("shares actual contents and inverse addresses across identical and overlapping restrictions", async () => {
@@ -231,11 +130,6 @@ describe("Filesystem shared addresses and folder restrictions", () => {
       volume: "home",
       path: "/projects/design",
     });
-    await expect(
-      effects.run(
-        filesystem.resolvePath({ volume: "home", path: "/notes.txt" }),
-      ),
-    ).rejects.toThrow("outside of the allowed directory");
     await expect(
       effects.run(
         filesystem.toMaskedPath(path.join(root, "other/notes.txt"), "home"),

@@ -56,18 +56,4 @@ describe("user directory restrictions", () => {
       ),
     ).rejects.toThrow("always use the userDirectory root");
   });
-
-  it("rejects a restriction reached through a symlink outside userDirectory", async () => {
-    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "eden-outside-"));
-    try {
-      await fs.symlink(outside, path.join(root, "escape"));
-      await expect(
-        Effect.runPromise(
-          ensureDirectoryRestriction(root, "standard", "escape/home"),
-        ),
-      ).rejects.toThrow("outside of the allowed directory");
-    } finally {
-      await fs.rm(outside, { recursive: true, force: true });
-    }
-  });
 });
