@@ -68,7 +68,7 @@ ipcRenderer.on("backend-port", (event) => {
   _backendPort = port;
   log.info(`Backend port received for app ${appId}`);
 
-  // Wrap DOM MessagePort to IPCPort interface
+  // Wrap DOM MessagePort to IpcPort interface
   const wrappedPort = wrapDOMPort(port);
 
   // Create connection object - handles all message routing internally
@@ -181,7 +181,7 @@ ipcRenderer.on("appbus-port", (event, data: AppBusPortData) => {
     return;
   }
 
-  // Wrap DOM MessagePort to IPCPort interface
+  // Wrap DOM MessagePort to IpcPort interface
   const wrappedPort = wrapDOMPort(port);
 
   handleAppBusPort(wrappedPort, data, appBusState);

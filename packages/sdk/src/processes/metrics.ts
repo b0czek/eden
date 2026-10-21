@@ -46,7 +46,7 @@ const METRICS_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_METRICS_POLLING_TIMEOUT_MS = 1000;
 const MAX_METRICS_POLLING_TIMEOUT_MS = 10000;
 
-interface ProcessMetricsDeps {
+interface ProcessMetricsDependencies {
   backends: Pick<Backends, "getBackend">;
   views: Pick<Views, "getView">;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
@@ -57,7 +57,7 @@ export const createProcessMetrics = Effect.fn(function* ({
   views,
   getRunningApps,
   processMetrics,
-}: ProcessMetricsDeps) {
+}: ProcessMetricsDependencies) {
   const clock = yield* Clock.Clock;
   const sampler = yield* FiberHandle.make<void>();
   let firstSample = createPendingSample();

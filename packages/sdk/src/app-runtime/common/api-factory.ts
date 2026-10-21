@@ -8,7 +8,7 @@ import type {
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
-import type { AppBusState, IPCPort } from "./port-channel";
+import type { AppBusState, IpcPort } from "./port-channel";
 import { createPortConnection, waitForPort } from "./port-channel";
 import type { ShellTransport } from "./shell-transport";
 
@@ -106,7 +106,7 @@ export function createAppBusAPI(
       }
 
       // Wait for the port to be received via handleAppBusPort
-      let port: IPCPort;
+      let port: IpcPort;
       try {
         port = await waitForPort(connectionId, state, 5000);
       } catch (err) {

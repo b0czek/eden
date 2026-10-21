@@ -206,7 +206,7 @@ console.log("Computed result:", result);
 ### How It Works
 
 1. **MessagePort Creation**: When an app starts, the main process creates a `MessageChannel` and transfers one port to the frontend and one to the backend
-2. **Port Wrapping**: Ports are wrapped with the `IPCPort` interface to normalize DOM and Electron port APIs
+2. **Port Wrapping**: Ports are wrapped with the `IpcPort` interface to normalize DOM and Electron port APIs
 3. **Message Routing**: The `createPortConnection` function sets up handlers for:
    - `message`: Fire-and-forget messages dispatched to `on()` listeners
    - `request`: Requests that expect a response, dispatched to `handle()` handlers

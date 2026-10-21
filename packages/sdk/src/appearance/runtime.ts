@@ -12,7 +12,7 @@ export const registerAppearanceApi = Effect.gen(function* () {
     createAppearanceController(yield* Appearance),
   );
 });
-export const AppearancePortsLive = Layer.effect(
+export const AppearanceSettingsLive = Layer.effect(
   AppearanceSettings,
   Effect.map(Settings, createAppearanceSettings),
 );

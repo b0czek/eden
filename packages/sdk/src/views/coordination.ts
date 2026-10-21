@@ -20,9 +20,9 @@ import type { ViewRegistry } from "./registry";
 import type { Tiling } from "./tiling";
 import {
   compareOverlayViews,
+  type ViewEvents,
   type ViewInfo,
   type ViewMode,
-  type ViewsEvents,
 } from "./types";
 
 export interface ViewLayout {
@@ -65,10 +65,10 @@ export function createViewLayout(
   _floatingWindows: FloatingWindows,
   _presentation: ViewPresentation,
   events: {
-    interfaceScaleChanged: Event<ViewsEvents["interface-scale-changed"]>;
-    globalBoundsChanged: Event<ViewsEvents["global-bounds-changed"]>;
+    interfaceScaleChanged: Event<ViewEvents["interface-scale-changed"]>;
+    globalBoundsChanged: Event<ViewEvents["global-bounds-changed"]>;
     boundsUpdated: Event<TargetedNotification<ViewBounds>>;
-    modeChanged: Event<TargetedNotification<ViewsEvents["mode-changed"]>>;
+    modeChanged: Event<TargetedNotification<ViewEvents["mode-changed"]>>;
   },
 ): ViewLayout {
   const _views = registry.views;

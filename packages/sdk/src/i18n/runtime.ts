@@ -9,7 +9,7 @@ import { createI18nSettings } from "./settings";
 export const registerI18nApi = Effect.gen(function* () {
   (yield* IpcTransport).registerController(createI18nController(yield* I18n));
 });
-export const I18nPortsLive = Layer.effect(
+export const I18nSettingsLive = Layer.effect(
   I18nSettings,
   Effect.map(Settings, createI18nSettings),
 );

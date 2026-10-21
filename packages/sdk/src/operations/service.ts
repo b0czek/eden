@@ -84,7 +84,7 @@ export const Operations = Context.Service<"eden/Operations", Operations>(
   "eden/Operations",
 );
 
-interface OperationNamespaceEvents {
+interface OperationEvents {
   changed: { snapshot: OperationSnapshot };
 }
 
@@ -120,9 +120,7 @@ export const OperationsLive = Layer.effect(
     const filesystem = yield* Filesystem;
     const clock = yield* Clock.Clock;
     const changed =
-      yield* scopedEvent<
-        RoutedNotification<OperationNamespaceEvents["changed"]>
-      >();
+      yield* scopedEvent<RoutedNotification<OperationEvents["changed"]>>();
     const forkOperation = yield* FiberSet.makeRuntime<
       never,
       unknown,

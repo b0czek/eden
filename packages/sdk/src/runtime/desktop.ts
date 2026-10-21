@@ -69,7 +69,5 @@ export const assembleDesktop = Effect.fn(function* () {
   };
 });
 
-export type RuntimeBundle = Effect.Success<ReturnType<typeof assembleDesktop>>;
-export const Desktop = Context.Service<"eden/Desktop", RuntimeBundle>(
-  "eden/Desktop",
-);
+export type Desktop = Effect.Success<ReturnType<typeof assembleDesktop>>;
+export const Desktop = Context.Service<"eden/Desktop", Desktop>("eden/Desktop");

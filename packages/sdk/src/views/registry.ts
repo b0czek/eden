@@ -24,7 +24,7 @@ import {
 } from "./lifecycle";
 import type { ViewRendering } from "./rendering";
 import type { Views } from "./service";
-import type { ViewInfo, ViewsEvents } from "./types";
+import type { ViewEvents, ViewInfo } from "./types";
 
 type ViewLifecycleLayout = Pick<
   ViewLayout,
@@ -71,9 +71,9 @@ export function createViewRegistry(
   _interfaceScale: InterfaceScale,
   _devtools: ViewDevTools,
   events: {
-    viewRemoved: Event<ViewsEvents["view-removed"]>;
-    viewLoaded: Event<ViewsEvents["view-loaded"]>;
-    viewLoadFailed: Event<ViewsEvents["view-load-failed"]>;
+    viewRemoved: Event<ViewEvents["view-removed"]>;
+    viewLoaded: Event<ViewEvents["view-loaded"]>;
+    viewLoadFailed: Event<ViewEvents["view-load-failed"]>;
   },
 ): ViewRegistry {
   const _views = new Map<number, ViewInfo>();

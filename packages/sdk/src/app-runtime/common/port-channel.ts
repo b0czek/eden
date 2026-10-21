@@ -11,15 +11,15 @@ import { log } from "../../logging/logger";
  * - backend-preload.ts (backend)
  */
 
-export type { IPCPort } from "./ipc-port";
-// Re-export IPCPort types and wrappers
+export type { IpcPort } from "./ipc-port";
+// Re-export IpcPort types and wrappers
 export { wrapDOMPort, wrapElectronPort } from "./ipc-port";
 
 import type {
   AppBusConnection,
   ServiceConnectCallback,
 } from "@edenapp/types/ipc/appbus";
-import type { IPCPort } from "./ipc-port";
+import type { IpcPort } from "./ipc-port";
 
 /**
  * Pending request tracking
@@ -33,7 +33,7 @@ export interface PendingRequest {
  * Pending port arrival tracking
  */
 export interface PendingPortArrival {
-  resolve: (port: IPCPort) => void;
+  resolve: (port: IpcPort) => void;
   reject: (reason: Error) => void;
 }
 
@@ -41,9 +41,9 @@ export interface PendingPortArrival {
  * Options for setting up a client port
  */
 export interface ClientPortOptions {
-  port: IPCPort;
+  port: IpcPort;
   connectionId: string;
-  portStore: Map<string, IPCPort>;
+  portStore: Map<string, IpcPort>;
   pendingRequests: Map<string, PendingRequest>;
   pendingPortArrivals?: Map<string, PendingPortArrival>;
   logPrefix?: string;
@@ -62,7 +62,7 @@ export function createMessageIdGenerator(prefix: string = "msg"): () => string {
  */
 export interface AppBusState {
   registeredServices: Map<string, ServiceConnectCallback>;
-  connectedPorts: Map<string, IPCPort>;
+  connectedPorts: Map<string, IpcPort>;
   pendingRequests: Map<string, PendingRequest>;
   pendingPortArrivals: Map<string, PendingPortArrival>;
   messageIdGenerator: () => string;
@@ -101,7 +101,7 @@ export function waitForPort(
   connectionId: string,
   state: AppBusState,
   timeoutMs: number = 5000,
-): Promise<IPCPort> {
+): Promise<IpcPort> {
   // Check if port is already available
   const existing = state.connectedPorts.get(connectionId);
   if (existing) {
@@ -119,7 +119,7 @@ export function waitForPort(
     }, timeoutMs);
 
     state.pendingPortArrivals.set(connectionId, {
-      resolve: (port: IPCPort) => {
+      resolve: (port: IpcPort) => {
         clearTimeout(timeout);
         resolve(port);
       },
@@ -181,7 +181,7 @@ export function setupClientPort(options: ClientPortOptions): void {
 /**
  * Create a connection object for a port (Electron IPC style)
  *
- * @param port The IPCPort to wrap
+ * @param port The IpcPort to wrap
  * @param connectionId The connection ID
  * @param portStore The Map storing ports
  * @param pendingRequests The Map tracking pending requests for outgoing requests
@@ -189,9 +189,9 @@ export function setupClientPort(options: ClientPortOptions): void {
  * @returns Connection object with send/on/off, request/handle/removeHandler, and close methods
  */
 export function createPortConnection(
-  port: IPCPort,
+  port: IpcPort,
   connectionId: string,
-  portStore: Map<string, IPCPort>,
+  portStore: Map<string, IpcPort>,
   pendingRequests: Map<string, PendingRequest>,
   generateMessageId: () => string,
 ): AppBusConnection {
@@ -405,7 +405,7 @@ export function createPortConnection(
  * @param logPrefix Prefix for log messages
  */
 export function handleAppBusPort(
-  port: IPCPort,
+  port: IpcPort,
   data: AppBusPortData,
   state: AppBusState,
 ): void {

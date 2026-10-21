@@ -26,7 +26,7 @@ export interface BuiltinSettingsDependencies {
   config: EdenConfig;
 }
 
-type PanelRenderer = SettingsPanelCustomSnapshot["renderer"];
+type CustomPanelRenderer = SettingsPanelCustomSnapshot["renderer"];
 
 export interface GeneratedBuiltinPanel {
   kind: "generated";
@@ -35,7 +35,7 @@ export interface GeneratedBuiltinPanel {
 
 export interface CustomBuiltinPanel {
   kind: "custom";
-  category: SettingsCategory & { view: PanelRenderer };
+  category: SettingsCategory & { view: CustomPanelRenderer };
   actions: Record<string, BuiltinPanelAction>;
   createLoader(
     dependencies: BuiltinSettingsDependencies,

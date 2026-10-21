@@ -13,7 +13,7 @@ import {
 } from "../appbus/runtime";
 import { AppChannelsLive } from "../appbus/service";
 import {
-  AppearancePortsLive,
+  AppearanceSettingsLive,
   registerAppearanceApi,
 } from "../appearance/runtime";
 import { AppearanceLive } from "../appearance/service";
@@ -47,7 +47,7 @@ import {
 import { FilesystemLive } from "../filesystem/service";
 import { registerVolumesApi } from "../filesystem/volumes/runtime";
 import { VolumesLive } from "../filesystem/volumes/service";
-import { I18nPortsLive, registerI18nApi } from "../i18n/runtime";
+import { I18nSettingsLive, registerI18nApi } from "../i18n/runtime";
 import { I18nLive } from "../i18n/service";
 import { CommandsLive } from "../ipc/commands";
 import { PermissionsLive } from "../ipc/permissions";
@@ -142,9 +142,9 @@ const ServicesLive = Layer.mergeAll(
   Layer.provideMerge([
     ViewsLive,
     SettingsPanelsLive,
-    I18nLive.pipe(Layer.provide(I18nPortsLive)),
+    I18nLive.pipe(Layer.provide(I18nSettingsLive)),
     AppAssociationsLive.pipe(Layer.provide(AppAssociationsPortsLive)),
-    AppearanceLive.pipe(Layer.provide(AppearancePortsLive)),
+    AppearanceLive.pipe(Layer.provide(AppearanceSettingsLive)),
   ]),
   Layer.provideMerge(
     SettingsLive.pipe(

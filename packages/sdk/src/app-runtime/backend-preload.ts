@@ -318,7 +318,7 @@ function handleAppBusPort(
   port: Electron.MessagePortMain,
   data: AppBusPortData,
 ): void {
-  // Wrap Electron MessagePortMain to IPCPort interface
+  // Wrap Electron MessagePortMain to IpcPort interface
   const wrappedPort = wrapElectronPort(port);
 
   handlePortSetup(wrappedPort, data, appBusState);

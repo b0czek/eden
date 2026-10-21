@@ -40,18 +40,18 @@ import { createViewPresentation } from "./presentation";
 import { createViewRegistry, type ViewRegistry } from "./registry";
 import { createViewRendering } from "./rendering";
 import { createTiling } from "./tiling";
-import type { ViewInfo, ViewMode, ViewsEvents } from "./types";
+import type { ViewEvents, ViewInfo, ViewMode } from "./types";
 
 /** Native setup and presentation hooks are synchronous; workflows return lazy Effects. */
 export interface Views {
   initialize: () => Effect.Effect<void>;
-  viewRemoved: Event<ViewsEvents["view-removed"]>;
-  viewLoaded: Event<ViewsEvents["view-loaded"]>;
-  viewLoadFailed: Event<ViewsEvents["view-load-failed"]>;
-  interfaceScaleChanged: Event<ViewsEvents["interface-scale-changed"]>;
-  globalBoundsChanged: Event<ViewsEvents["global-bounds-changed"]>;
+  viewRemoved: Event<ViewEvents["view-removed"]>;
+  viewLoaded: Event<ViewEvents["view-loaded"]>;
+  viewLoadFailed: Event<ViewEvents["view-load-failed"]>;
+  interfaceScaleChanged: Event<ViewEvents["interface-scale-changed"]>;
+  globalBoundsChanged: Event<ViewEvents["global-bounds-changed"]>;
   boundsUpdated: Event<TargetedNotification<ViewBounds>>;
-  modeChanged: Event<TargetedNotification<ViewsEvents["mode-changed"]>>;
+  modeChanged: Event<TargetedNotification<ViewEvents["mode-changed"]>>;
   setMainWindow: (window: PlatformWindow) => void;
   updateGlobalBounds: (bounds: ViewBounds, windowSize: WindowSize) => void;
   setWorkspaceBounds: (bounds: Bounds) => void;
@@ -112,18 +112,17 @@ export const ViewsLive = Layer.effect(
     const distPath = yield* DistPath;
     const settings = yield* Settings;
     const windows = yield* WindowingPort;
-    const viewRemoved = yield* scopedEvent<ViewsEvents["view-removed"]>();
-    const viewLoaded = yield* scopedEvent<ViewsEvents["view-loaded"]>();
-    const viewLoadFailed =
-      yield* scopedEvent<ViewsEvents["view-load-failed"]>();
+    const viewRemoved = yield* scopedEvent<ViewEvents["view-removed"]>();
+    const viewLoaded = yield* scopedEvent<ViewEvents["view-loaded"]>();
+    const viewLoadFailed = yield* scopedEvent<ViewEvents["view-load-failed"]>();
     const interfaceScaleChanged =
-      yield* scopedEvent<ViewsEvents["interface-scale-changed"]>();
+      yield* scopedEvent<ViewEvents["interface-scale-changed"]>();
     const globalBoundsChanged =
-      yield* scopedEvent<ViewsEvents["global-bounds-changed"]>();
+      yield* scopedEvent<ViewEvents["global-bounds-changed"]>();
     const boundsUpdated =
       yield* scopedEvent<TargetedNotification<ViewBounds>>();
     const modeChanged =
-      yield* scopedEvent<TargetedNotification<ViewsEvents["mode-changed"]>>();
+      yield* scopedEvent<TargetedNotification<ViewEvents["mode-changed"]>>();
     let registry: ViewRegistry | undefined;
     let layout: ViewLayout | undefined;
     const getViews = () => registry?.views.values() ?? [];

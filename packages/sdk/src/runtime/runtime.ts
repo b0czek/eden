@@ -14,13 +14,13 @@ import { log } from "../logging/logger";
 import { createSettingsSdkController } from "../settings/controller-sdk";
 import { createPanelRegistry } from "../settings/panels/registry";
 import { createDesktopLayer } from "./composition";
-import { Desktop, type RuntimeBundle } from "./desktop";
+import { Desktop } from "./desktop";
 import type { EdenRuntimeOptions } from "./environment";
 
 export type { EdenRuntimeOptions, EdenRuntimePaths } from "./environment";
 export type { RuntimeServices } from "./services";
 
-const ReadyDesktop = Context.Service<"eden/ReadyDesktop", RuntimeBundle>(
+const ReadyDesktop = Context.Service<"eden/ReadyDesktop", Desktop>(
   "eden/ReadyDesktop",
 );
 
@@ -38,7 +38,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   const registrations = createPanelRegistry();
   const settings = createSettingsSdkController({ panels: registrations });
   let state: EdenLifecycleState = "created";
-  let bundle: RuntimeBundle | undefined;
+  let bundle: Desktop | undefined;
   let startup: Fiber.Fiber<void, unknown> | undefined;
   let disposal: Promise<void> | undefined;
   const launched = Deferred.makeUnsafe<Fiber.Fiber<void, unknown>, Error>();

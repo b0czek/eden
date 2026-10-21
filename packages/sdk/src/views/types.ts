@@ -65,7 +65,7 @@ export function compareOverlayViews(a: ViewInfo, b: ViewInfo): number {
 /**
  * View lifecycle notifications.
  */
-export interface ViewsEvents {
+export interface ViewEvents {
   "view-removed": { viewId: number; appId: string; webContentsId: number };
   "bounds-updated": ViewBounds;
   "interface-scale-changed": { scale: number };
