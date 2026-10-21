@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import {
   type BackendDlcBinding,
   resolveDlcModuleSpecifier,
-} from "../app-runtime/common/dlc-module-resolver";
+} from "./dlc-module-resolver";
 
 describe("DLC backend module resolver", () => {
   let root: string;
