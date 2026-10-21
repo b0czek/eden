@@ -6,7 +6,7 @@ import type {
 } from "@edenapp/types";
 import type { ExecutionContext } from "../execution/context";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { Backends } from "../processes/backends";
 import type { Views } from "../views/service";
 import { EventPermissionDenied } from "./errors";

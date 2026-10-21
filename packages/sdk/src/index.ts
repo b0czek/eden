@@ -18,12 +18,15 @@ export type {
   OperationsAPI,
   ResultCommand,
 } from "@edenapp/types";
-export * from "./api";
+export * from "./api/config";
+export * from "./api/control-plane";
+export * from "./api/settings";
 export { createEden, type Eden } from "./host";
-export type { LogContext, Logger, LoggerConfig, LogLevel } from "./logging";
+export type { LogLevel } from "./logging/levels";
+export type { LogContext, Logger, LoggerConfig } from "./logging/logger";
 export {
   configureLogger,
   getLoggerConfig,
   log,
   setLogContext,
-} from "./logging";
+} from "./logging/logger";

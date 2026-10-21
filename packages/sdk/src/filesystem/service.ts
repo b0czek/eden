@@ -21,7 +21,7 @@ import { fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { OperationReporter, OperationTask } from "../operations/task";
 import { UserDirectory } from "../runtime/inputs";
 import {

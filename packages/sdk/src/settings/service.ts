@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type {
   StorageClosedError,
   StorageReadFailure,

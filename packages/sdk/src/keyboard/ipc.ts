@@ -7,8 +7,8 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
-import { log } from "../logging";
-import type { RendererIpcPort } from "../platform/ports";
+import { log } from "../logging/logger";
+import type { RendererIpcPort } from "../platform/ports/types";
 import type { KeyboardNativeFailure, KeyboardSenderRejected } from "./errors";
 import { keyboardChannels as channel } from "./protocol";
 

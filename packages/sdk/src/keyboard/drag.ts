@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
-import type { DisplayPort } from "../platform/ports";
+import type { DisplayPort } from "../platform/ports/types";
 import { type KeyboardNativeFailure, KeyboardSenderRejected } from "./errors";
 import { effectivePlacement } from "./placement";
 import type { KeyboardDragState, KeyboardState } from "./state";

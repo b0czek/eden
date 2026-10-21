@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import type { Processes } from "../processes";
+import type { Processes } from "../processes/service";
 import type { FileOpenProcesses } from "./ports";
 
 export function createFileOpenProcesses(

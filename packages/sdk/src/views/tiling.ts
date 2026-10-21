@@ -4,7 +4,7 @@ import type {
   TilingConfig,
   WindowConfig,
 } from "@edenapp/types";
-import type { Bounds } from "../platform/ports";
+import type { Bounds } from "../platform/ports/types";
 import {
   calculateTileBounds as calculateLayoutTileBounds,
   getSmartTilingCapacity,

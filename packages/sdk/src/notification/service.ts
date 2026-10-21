@@ -14,7 +14,7 @@ import type {
 } from "../controllers/events";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { NotificationCallerRejected, NotificationsClosed } from "./errors";
 import { NotificationViews } from "./ports";
 import type { NotificationActionCallbacks, NotificationCaller } from "./types";

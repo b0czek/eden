@@ -2,7 +2,7 @@ import type { AppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { listen } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import type { Settings } from "../settings/service";
 import { interfaceScaleSchema } from "./schemas";

@@ -12,8 +12,13 @@ import * as Layer from "effect/Layer";
 import type { TargetedNotification } from "../controllers/events";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import type { Bounds, PlatformView, PlatformWindow } from "../platform/ports";
-import { WindowingPort } from "../platform/ports/types";
+import {
+  type Bounds,
+  type PlatformView,
+  type PlatformWindow,
+  WindowingPort,
+} from "../platform/ports/types";
+
 import { DistPath, RuntimeConfig } from "../runtime/inputs";
 import { Settings } from "../settings/service";
 import { createViewLayout, type ViewLayout } from "./coordination";

@@ -8,7 +8,7 @@ import * as FiberMap from "effect/FiberMap";
 import * as Option from "effect/Option";
 import type { Event } from "../events/event";
 import { listen } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 
 import { FilesystemIoFailed, FilesystemWatchRejected } from "./errors";
 

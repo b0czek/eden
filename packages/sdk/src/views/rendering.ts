@@ -8,8 +8,12 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
 import { fromPromise } from "../effects/io";
-import { log } from "../logging";
-import type { Bounds, PlatformView, WindowingPort } from "../platform/ports";
+import { log } from "../logging/logger";
+import type {
+  Bounds,
+  PlatformView,
+  WindowingPort,
+} from "../platform/ports/types";
 import { encodeLaunchContext } from "../utils/app-launch-context";
 import { createCachedFileReader } from "../utils/cached-file-reader";
 import { callViewNative } from "./errors";

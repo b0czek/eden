@@ -1,1 +1,0 @@
-export { seedDatabase } from "./seed";

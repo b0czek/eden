@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as v from "valibot";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { SettingValueError } from "../settings/errors";
 import type {
   StorageReadFailure,

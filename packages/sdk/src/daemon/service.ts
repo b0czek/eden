@@ -15,7 +15,7 @@ import * as Layer from "effect/Layer";
 import * as v from "valibot";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { PackageCatalog } from "../packages/catalog";
 import { Processes } from "../processes/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";

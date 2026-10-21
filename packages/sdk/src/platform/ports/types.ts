@@ -1,5 +1,5 @@
 import * as Context from "effect/Context";
-import type { LogContext } from "../../logging";
+import type { LogContext } from "../../logging/logger";
 
 export interface Bounds {
   x: number;

@@ -9,8 +9,12 @@ import {
 } from "../../tests/support/effect-runtime";
 import { InMemoryPlatform } from "../../tests/support/in-memory-platform";
 import { createEvent } from "../events/event";
-import type { Bounds, PlatformWindow } from "../platform/ports";
-import { WindowingPort } from "../platform/ports/types";
+import {
+  type Bounds,
+  type PlatformWindow,
+  WindowingPort,
+} from "../platform/ports/types";
+
 import { DistPath, RuntimeConfig } from "../runtime/inputs";
 import { Settings } from "../settings/service";
 import {

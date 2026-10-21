@@ -5,7 +5,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import type * as Scope from "effect/Scope";
-import type { PlatformUtilityProcess } from "../platform/ports";
+import type { PlatformUtilityProcess } from "../platform/ports/types";
 
 export interface AppRuntime {
   owner: ProcessOwner;

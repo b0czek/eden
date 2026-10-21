@@ -1,4 +1,4 @@
-import { log } from "../../logging";
+import { log } from "../../logging/logger";
 
 /**
  * Port Channel - Shared utilities for MessagePort communication

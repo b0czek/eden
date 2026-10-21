@@ -3,9 +3,9 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 import type { EdenConfig } from "./api/config";
-import { log } from "./logging";
-import { createElectronPlatform } from "./platform/electron";
-import type { ApplicationLifecyclePort } from "./platform/ports";
+import { log } from "./logging/logger";
+import { createElectronPlatform } from "./platform/electron/platform";
+import type { ApplicationLifecyclePort } from "./platform/ports/types";
 import { createEdenRuntime, type EdenRuntime } from "./runtime/runtime";
 
 /** Create and start an isolated Eden desktop in the Electron main process. */

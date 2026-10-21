@@ -6,6 +6,10 @@ Each domain keeps its public boundaries beside its implementation:
 their dependencies through Effect and own domain behavior and state. The
 runtime composes the controllers and registers the EdenAPI command contracts.
 
+Within the SDK, import services, contracts, and adapters directly from their
+owning implementation modules. `packages/sdk/src/index.ts` is the package's
+public export boundary; internal capabilities do not add their own barrels.
+
 ## Services
 
 Declare an explicit service interface, its same-named `Context.Service` key,

@@ -19,7 +19,7 @@ import { RuntimeContexts } from "../execution/runtime-contexts";
 import { Filesystem } from "../filesystem/service";
 import type { VolumeUnavailable } from "../filesystem/volumes/errors";
 import { Permissions } from "../ipc/permissions";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { OperationReporter, OperationTask } from "../operations/task";
 import { AppsDirectory, DistPath, RuntimeConfig } from "../runtime/inputs";
 import { PackageCatalog } from "./catalog";

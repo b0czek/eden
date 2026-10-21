@@ -10,9 +10,9 @@ import type * as Effect from "effect/Effect";
 import type { SettingsPanelActionHandler } from "../../../api/settings";
 
 import type { Appearance } from "../../../appearance/service";
-import type { Daemons } from "../../../daemon";
-import type { Packages } from "../../../packages";
-import type { Users } from "../../../user";
+import type { Daemons } from "../../../daemon/service";
+import type { Packages } from "../../../packages/service";
+import type { Users } from "../../../user/service";
 import type { Settings } from "../../service";
 import type { SettingsPanels } from "../service";
 

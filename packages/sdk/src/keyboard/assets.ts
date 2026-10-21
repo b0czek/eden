@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { KeyboardAssets } from "./ports";
 
 /** The keyboard renderer and preload belong to the SDK's native asset directory. */

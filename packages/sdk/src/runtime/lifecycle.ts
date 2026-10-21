@@ -5,7 +5,7 @@ import { Appearance } from "../appearance/service";
 import { Autostart } from "../autostart/service";
 import { Daemons } from "../daemon/service";
 import { Filesystem } from "../filesystem/service";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { Operations } from "../operations/service";
 import { Packages } from "../packages/service";
 import { Processes } from "../processes/service";

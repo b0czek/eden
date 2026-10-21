@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import { listen } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { Sessions } from "../session/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { Settings } from "../settings/service";

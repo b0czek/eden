@@ -1,5 +1,5 @@
-import { log } from "../logging";
-import type { PlatformView } from "../platform/ports";
+import { log } from "../logging/logger";
+import type { PlatformView } from "../platform/ports/types";
 export function createViewDevTools() {
   const _viewsWithDevTools: Set<number> = new Set();
 

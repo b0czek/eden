@@ -20,11 +20,15 @@ import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { PackageCatalog } from "../packages/catalog";
 import { Packages } from "../packages/service";
-import type { PlatformUtilityProcess } from "../platform/ports";
-import { type Bounds, ProcessMetricsPort } from "../platform/ports/types";
+import {
+  type Bounds,
+  type PlatformUtilityProcess,
+  ProcessMetricsPort,
+} from "../platform/ports/types";
+
 import { RuntimeConfig } from "../runtime/inputs";
 import { SessionContext } from "../session/context";
 import { ViewNativeFailure } from "../views/errors";

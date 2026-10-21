@@ -7,7 +7,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { createFilesystemBrandingAssets } from "./assets";
 import { InvalidBrandingName } from "./errors";
 import { BrandingAssets, BrandingConfig } from "./ports";

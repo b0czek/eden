@@ -8,13 +8,14 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import { listen } from "../events/scoped";
-import { log } from "../logging";
-import type { PlatformWindow } from "../platform/ports";
+import { log } from "../logging/logger";
 import {
   DisplayPort,
+  type PlatformWindow,
   RendererIpcPort,
   WindowingPort,
 } from "../platform/ports/types";
+
 import { Processes } from "../processes/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { Settings } from "../settings/service";

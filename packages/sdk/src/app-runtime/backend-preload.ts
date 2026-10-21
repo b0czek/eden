@@ -3,7 +3,7 @@ import {
   log,
   logFromConsole,
   setLogContext,
-} from "../logging";
+} from "../logging/logger";
 import { decodeLaunchContext } from "../utils/app-launch-context";
 import { dispatchEvent } from "./common/event-subscriptions";
 /**

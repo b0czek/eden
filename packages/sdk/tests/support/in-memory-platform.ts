@@ -21,7 +21,7 @@ import type {
   ThemeStatePort,
   UtilityProcessPort,
   WindowingPort,
-} from "../../src/platform/ports";
+} from "../../src/platform/ports/types";
 
 type RecordedEffect =
   | { type: "window-created"; options: PlatformWindowOptions }

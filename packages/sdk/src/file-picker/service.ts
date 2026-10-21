@@ -19,7 +19,7 @@ import { filesystemLocationSchema } from "../filesystem/location-schema";
 import { VolumeUnavailable } from "../filesystem/volumes/errors";
 import { Volumes } from "../filesystem/volumes/service";
 import { Permissions } from "../ipc/permissions";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { createPickerDisplayProvider } from "./display-provider";
 import {
   type FilePickerOpenError,

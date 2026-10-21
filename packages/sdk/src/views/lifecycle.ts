@@ -1,9 +1,9 @@
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type {
   PlatformView,
   PlatformWindow,
   WindowingPort,
-} from "../platform/ports";
+} from "../platform/ports/types";
 import { ViewNativeFailure, ViewUnavailable } from "./errors";
 import type { ViewCreationOptions, ViewInfo } from "./types";
 /**

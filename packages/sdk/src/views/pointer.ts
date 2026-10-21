@@ -4,8 +4,8 @@ import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
-import { log } from "../logging";
-import type { DisplayPort } from "../platform/ports";
+import { log } from "../logging/logger";
+import type { DisplayPort } from "../platform/ports/types";
 /**
  * Callback function for mouse updates
  */

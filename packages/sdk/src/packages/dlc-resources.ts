@@ -11,7 +11,7 @@ import { listen } from "../events/scoped";
 import type {
   PlatformProtocolRequest,
   PlatformProtocolResponse,
-} from "../platform/ports";
+} from "../platform/ports/types";
 import { Views } from "../views/service";
 import { PackageCatalog } from "./catalog";
 

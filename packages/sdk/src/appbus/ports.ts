@@ -2,7 +2,7 @@ import * as Context from "effect/Context";
 import type {
   PlatformMessagePort,
   PlatformWebContents,
-} from "../platform/ports";
+} from "../platform/ports/types";
 
 export interface AppChannelTransport {
   createMessageChannel(): {

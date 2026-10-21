@@ -2,7 +2,7 @@ import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
 import Keyv from "keyv";
 import { fromPromise } from "../effects/io";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import {
   StorageClosedError,
   StorageDisconnectError,

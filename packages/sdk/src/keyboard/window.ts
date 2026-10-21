@@ -1,7 +1,7 @@
 import type { EdenKeyboardPlacementMode, ViewBounds } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { scopedEvent } from "../events/scoped";
-import type { PlatformWindow, WindowingPort } from "../platform/ports";
+import type { PlatformWindow, WindowingPort } from "../platform/ports/types";
 import { KeyboardNativeFailure } from "./errors";
 import { defaultContentBounds } from "./placement";
 import type { KeyboardAssets } from "./ports";

@@ -1,6 +1,6 @@
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import {
   FilePickerProviderRejected,
   FilePickerProviderUnavailable,

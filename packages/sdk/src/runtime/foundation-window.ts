@@ -2,11 +2,11 @@ import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as Scope from "effect/Scope";
-import type { Autostart } from "../autostart";
-import type { Branding } from "../branding";
+import type { Autostart } from "../autostart/service";
+import type { Branding } from "../branding/service";
 import type { IpcTransport } from "../ipc/transport";
-import type { Keyboard } from "../keyboard";
-import type { EdenPlatform, PlatformWindow } from "../platform/ports";
+import type { Keyboard } from "../keyboard/service";
+import type { EdenPlatform, PlatformWindow } from "../platform/ports/types";
 import type { Views } from "../views/service";
 
 /** Each foundation window joins the runtime scope as soon as it is created. */

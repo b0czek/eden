@@ -7,7 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import { asError, fromPromise as nativeFromPromise } from "../effects/io";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { OperationReporter } from "../operations/task";
 import { AppsDirectory } from "../runtime/inputs";
 import {

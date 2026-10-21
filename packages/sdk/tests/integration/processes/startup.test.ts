@@ -1,7 +1,7 @@
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import type { WindowingPort } from "../../../src/platform/ports";
+import type { WindowingPort } from "../../../src/platform/ports/types";
 import { ViewNativeFailure } from "../../../src/views/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";

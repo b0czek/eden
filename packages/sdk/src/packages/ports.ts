@@ -1,5 +1,5 @@
 import type { RuntimeContexts } from "../execution/runtime-contexts";
-import type { Filesystem } from "../filesystem";
+import type { Filesystem } from "../filesystem/service";
 import type { Permissions } from "../ipc/permissions";
 
 export type PackagePermissions = Pick<

@@ -13,7 +13,7 @@ import * as Option from "effect/Option";
 import type {
   PlatformProcessMetric,
   ProcessMetricsPort,
-} from "../platform/ports";
+} from "../platform/ports/types";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
 

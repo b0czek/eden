@@ -7,7 +7,7 @@ import { Daemons } from "../daemon/service";
 import { listen } from "../events/scoped";
 import { Filesystem } from "../filesystem/service";
 import { IpcTransport } from "../ipc/transport";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { Packages } from "../packages/service";
 import { Backends } from "../processes/backends";
 import { Processes } from "../processes/service";

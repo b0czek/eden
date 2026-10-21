@@ -1,17 +1,17 @@
-import type { AppAssociations } from "../app-associations";
 import { createAssociationsSdkController } from "../app-associations/controller-sdk";
+import type { AppAssociations } from "../app-associations/service";
 import { createAppearanceSdkController } from "../appearance/controller-sdk";
 import type { Appearance } from "../appearance/service";
-import type { Daemons } from "../daemon";
 import { createDaemonsSdkController } from "../daemon/controller-sdk";
+import type { Daemons } from "../daemon/service";
 import { createVolumesSdkController } from "../filesystem/volumes/controller-sdk";
 import type { Volumes } from "../filesystem/volumes/service";
-import type { Packages } from "../packages";
 import { createPackagesSdkController } from "../packages/controller-sdk";
-import type { Sessions } from "../session";
+import type { Packages } from "../packages/service";
 import { createSessionsSdkController } from "../session/controller-sdk";
-import type { Users } from "../user";
+import type { Sessions } from "../session/service";
 import { createUsersSdkController } from "../user/controller-sdk";
+import type { Users } from "../user/service";
 import type {
   EdenAppearanceApi,
   EdenAssociationsApi,

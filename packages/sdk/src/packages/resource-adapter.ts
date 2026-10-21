@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
-import type { ResourceProtocolPort } from "../platform/ports";
+import type { ResourceProtocolPort } from "../platform/ports/types";
 import type { DlcResourceProtocols } from "./dlc-resources";
 
 /** Own resource requests at the platform's Promise callback boundary. */

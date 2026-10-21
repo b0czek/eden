@@ -1,4 +1,4 @@
-import type { PlatformWebContents } from "../platform/ports";
+import type { PlatformWebContents } from "../platform/ports/types";
 import type { LogLevel } from "./levels";
 import type { CallsiteInfo, LogContext } from "./logger";
 import { logExternal } from "./logger";

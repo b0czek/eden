@@ -10,7 +10,7 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import type { EdenPackageChange } from "../../../src/api";
+import type { EdenPackageChange } from "../../../src/api/control-plane";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const vendor: UserProfile = {

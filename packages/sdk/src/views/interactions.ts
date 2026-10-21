@@ -2,8 +2,8 @@ import type { ViewBounds } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
-import { log } from "../logging";
-import type { DisplayPort } from "../platform/ports";
+import { log } from "../logging/logger";
+import type { DisplayPort } from "../platform/ports/types";
 import { createPointerTracking } from "./pointer";
 import {
   calculateResizeBounds,

@@ -13,7 +13,7 @@ import {
   isHotReloadConfigured,
   loadHotReloadServerState,
 } from "../hotreload-config";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { Packages } from "../packages/service";
 import { HotReloadWatchFailed } from "./errors";
 

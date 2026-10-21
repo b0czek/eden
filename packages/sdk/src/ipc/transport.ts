@@ -12,10 +12,10 @@ import { asError } from "../effects/io";
 import type { CommandCallerContext } from "../execution/context";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { Operations } from "../operations/service";
-import type { PlatformWindow } from "../platform/ports";
-import { RendererIpcPort } from "../platform/ports/types";
+import { type PlatformWindow, RendererIpcPort } from "../platform/ports/types";
+
 import { Backends } from "../processes/backends";
 import { Views } from "../views/service";
 import { Commands } from "./commands";

@@ -8,13 +8,14 @@ import type * as Scope from "effect/Scope";
 import { asError } from "../effects/io";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { DlcResources } from "../packages/dlc-resources";
-import type {
-  PlatformMessagePort,
-  PlatformUtilityProcess,
-} from "../platform/ports";
-import { UtilityProcessPort } from "../platform/ports/types";
+import {
+  type PlatformMessagePort,
+  type PlatformUtilityProcess,
+  UtilityProcessPort,
+} from "../platform/ports/types";
+
 import { DistPath } from "../runtime/inputs";
 import { encodeLaunchContext } from "../utils/app-launch-context";
 import {

@@ -2,7 +2,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import { listen } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { Packages } from "../packages/service";
 import type { Processes } from "../processes/service";
 import type { DaemonDefinitionRemoveError, DaemonLaunchError } from "./errors";

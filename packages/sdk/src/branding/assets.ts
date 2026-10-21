@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../effects/io";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { BrandingAssets } from "./ports";
 
 const LOGO_MIME_TYPES: Record<string, string> = {

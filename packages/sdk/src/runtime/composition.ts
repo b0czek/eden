@@ -54,7 +54,7 @@ import { PermissionsLive } from "../ipc/permissions";
 import { IpcTransportLive } from "../ipc/transport";
 import { KeyboardPortsLive } from "../keyboard/runtime";
 import { KeyboardLive } from "../keyboard/service";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import {
   NotificationsPortsLive,
   registerNotificationsApi,
@@ -86,7 +86,7 @@ import {
   registerProcessesApi,
 } from "../processes/runtime";
 import { ProcessesLive } from "../processes/service";
-import { seedDatabase } from "../seed";
+import { seedDatabase } from "../seed/seed";
 import { SessionContextLive } from "../session/context";
 import { registerSessionsApi } from "../session/runtime";
 import { SessionsLive } from "../session/service";

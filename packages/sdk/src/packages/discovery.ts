@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import { asError, fromPromise } from "../effects/io";
 import { loadHotReloadAppsState } from "../hotreload-config";
 import type { Permissions } from "../ipc/permissions";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type { PackageCatalog } from "./catalog";
 import type { InstalledPackages } from "./installed";
 import type { PackageManifests } from "./manifests";

@@ -1,4 +1,4 @@
-import { log } from "../../logging";
+import { log } from "../../logging/logger";
 /**
  * IPC Port - Unified interface for MessagePort communication
  *

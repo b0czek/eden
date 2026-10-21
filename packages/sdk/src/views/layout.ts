@@ -1,5 +1,5 @@
 import type { TilingConfig, TilingMode } from "@edenapp/types";
-import type { Bounds } from "../platform/ports";
+import type { Bounds } from "../platform/ports/types";
 
 /**
  * Grid dimensions for a layout

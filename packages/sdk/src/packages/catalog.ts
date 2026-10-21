@@ -11,7 +11,7 @@ import * as Layer from "effect/Layer";
 import fg from "fast-glob";
 import { fromPromise } from "../effects/io";
 import { ExecutionContext } from "../execution/context";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { AppsDirectory, DistPath } from "../runtime/inputs";
 import { DEFAULT_PACKAGE_ICON_DATA_URL } from "./default-icon";
 import { PackageResourceError } from "./errors";

@@ -39,7 +39,7 @@ import type {
   ThemeStatePort,
   UtilityProcessPort,
   WindowingPort,
-} from "../ports";
+} from "../ports/types";
 
 let privilegedSchemesRegistered = false;
 

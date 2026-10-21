@@ -21,7 +21,7 @@ import * as Layer from "effect/Layer";
 import { asError } from "../../effects/io";
 import type { Event } from "../../events/event";
 import { ExecutionContext } from "../../execution/context";
-import { log } from "../../logging";
+import { log } from "../../logging/logger";
 import { PackageCatalog } from "../../packages/catalog";
 import { SessionContext } from "../../session/context";
 import { Settings } from "../service";

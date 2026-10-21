@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer";
 import type { TargetedNotification } from "../controllers/events";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import {
   ContextMenuCallerRejected,
   type ContextMenuCloseFailure,

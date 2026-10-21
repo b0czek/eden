@@ -6,8 +6,8 @@ import type {
 } from "@edenapp/types";
 import type { TargetedNotification } from "../controllers/events";
 import type { Event } from "../events/event";
-import { log } from "../logging";
-import type { Bounds } from "../platform/ports";
+import { log } from "../logging/logger";
+import type { Bounds } from "../platform/ports/types";
 import {
   callViewNative,
   TileActionUnavailable,

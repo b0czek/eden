@@ -1,5 +1,5 @@
 import type { AppManifest, ViewBounds, WindowSize } from "@edenapp/types";
-import type { Bounds, PlatformView } from "../platform/ports";
+import type { Bounds, PlatformView } from "../platform/ports/types";
 
 export type ViewMode = "floating" | "tiled";
 export type ViewType = "app" | "overlay";

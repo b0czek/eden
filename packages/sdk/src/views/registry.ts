@@ -1,12 +1,12 @@
 import type { AppManifest, FilesystemLocation } from "@edenapp/types";
 import type { Event } from "../events/event";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import type {
   Bounds,
   PlatformView,
   PlatformWindow,
   WindowingPort,
-} from "../platform/ports";
+} from "../platform/ports/types";
 import type { ViewLayout } from "./coordination";
 import type { ViewDevTools } from "./devtools";
 import {

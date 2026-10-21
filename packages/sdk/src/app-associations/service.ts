@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import * as v from "valibot";
-import { log } from "../logging";
+import { log } from "../logging/logger";
 import { PackageCatalog } from "../packages/catalog";
 import type { AppAssociationStorageWriteError } from "./errors";
 import { AppAssociationStorage } from "./ports";

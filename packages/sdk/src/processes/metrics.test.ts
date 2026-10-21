@@ -4,7 +4,10 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
 import { createEffectRuntime } from "../../tests/support/effect-runtime";
-import type { PlatformUtilityProcess, PlatformView } from "../platform/ports";
+import type {
+  PlatformUtilityProcess,
+  PlatformView,
+} from "../platform/ports/types";
 import { createProcessMetrics } from "./metrics";
 
 const getAppMetrics = jest.fn();
