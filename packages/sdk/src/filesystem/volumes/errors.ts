@@ -47,9 +47,3 @@ export function volumeRejection(cause: unknown): VolumeUnavailable {
   if (cause instanceof VolumeUnavailable) return cause;
   throw cause;
 }
-export function volumeRegistrationRejection(
-  cause: unknown,
-): VolumeRegistrationRejected {
-  if (cause instanceof VolumeRegistrationRejected) return cause;
-  throw cause;
-}

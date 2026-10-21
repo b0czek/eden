@@ -1,4 +1,14 @@
-import type { InstalledPackageManifest } from "@edenapp/types";
+import type {
+  InstalledPackageManifest,
+  PackageManifest,
+  PackageOperationPreview,
+} from "@edenapp/types";
+
+export interface PackageInspection {
+  manifest: PackageManifest;
+  checksum?: string;
+  preview: PackageOperationPreview;
+}
 
 /**
  * Package installation and removal notifications.

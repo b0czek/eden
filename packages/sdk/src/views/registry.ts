@@ -1,4 +1,7 @@
 import type { AppManifest, FilesystemLocation } from "@edenapp/types";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Result from "effect/Result";
 import type { Event } from "../events/event";
 import { log } from "../logging/logger";
 import type {
@@ -12,13 +15,15 @@ import type { ViewDevTools } from "./devtools";
 import {
   callViewNative,
   MainWindowUnavailable,
-  ViewNativeFailure,
+  type ViewCreateError,
+  type ViewMutationError,
   ViewUnavailable,
 } from "./errors";
 import type { InterfaceScale } from "./interface-scale";
 import {
   cleanupDestroyedViews,
   destroyView,
+  findView,
   isWindowAlive,
   requireView,
 } from "./lifecycle";
@@ -49,7 +54,7 @@ export interface ViewRegistry
     | "getActiveViews"
   > {
   readonly views: ReadonlyMap<number, ViewInfo>;
-  focusView(viewId: number): void;
+  focusView(viewId: number): Effect.Effect<void, ViewMutationError>;
   getMainWindow(): PlatformWindow | null;
   createView(
     layout: ViewLifecycleLayout,
@@ -59,8 +64,11 @@ export interface ViewRegistry
     bounds: Bounds | undefined,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): number;
-  removeView(layout: ViewLifecycleLayout, viewId: number): void;
+  ): Effect.Effect<number, ViewCreateError>;
+  removeView(
+    layout: ViewLifecycleLayout,
+    viewId: number,
+  ): Effect.Effect<void, ViewMutationError>;
   cleanupDestroyed(): void;
   dispose(): void;
 }
@@ -84,8 +92,8 @@ export function createViewRegistry(
     viewInfo.lastFocusedAt = Date.now();
   }
 
-  function attachFocusTracking(viewId: number, viewInfo: ViewInfo): void {
-    callViewNative("register", viewInfo, () => {
+  function attachFocusTracking(viewId: number, viewInfo: ViewInfo) {
+    return callViewNative("register", viewInfo, () => {
       viewInfo.view.webContents.on("focus", () => {
         const trackedView = _views.get(viewId);
         if (!trackedView) return;
@@ -98,7 +106,7 @@ export function createViewRegistry(
     _mainWindow = window;
   }
 
-  function createView(
+  const createView = Effect.fn(function* (
     layout: ViewLifecycleLayout,
     appId: string,
     manifest: AppManifest,
@@ -106,12 +114,10 @@ export function createViewRegistry(
     bounds: Bounds | undefined,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): number {
-    if (!isWindowAlive(_mainWindow)) {
-      throw new MainWindowUnavailable({ appId });
-    }
-
-    const viewInfo = _rendering.createView(
+  ) {
+    if (!isWindowAlive(_mainWindow))
+      return yield* Effect.fail(new MainWindowUnavailable({ appId }));
+    const viewInfo = yield* _rendering.createView(
       appId,
       manifest,
       installPath,
@@ -120,135 +126,121 @@ export function createViewRegistry(
       launchArgs,
       launchFile,
     );
-
-    try {
+    return yield* Effect.gen(function* () {
       const viewId = viewInfo.id;
-
-      callViewNative("register", viewInfo, () => {
-        _windows.attachWebContentsLogger(viewInfo.view.webContents, {
-          appId,
-          viewId,
-          source: viewInfo.viewType === "overlay" ? "overlay" : "app",
-        });
-      });
-
-      // Store view info
+      yield* Effect.fromResult(
+        callViewNative("register", viewInfo, () => {
+          _windows.attachWebContentsLogger(viewInfo.view.webContents, {
+            appId,
+            viewId,
+            source: viewInfo.viewType === "overlay" ? "overlay" : "app",
+          });
+        }),
+      );
       _views.set(viewId, viewInfo);
       _viewsByWebContentsId.set(viewInfo.view.webContents.id, viewInfo);
-      attachFocusTracking(viewId, viewInfo);
-
-      // Apply current interface scale to the new view
+      yield* Effect.fromResult(attachFocusTracking(viewId, viewInfo));
       _interfaceScale.applyToView(viewInfo);
-
-      // Register DevTools shortcut on this view
-      _devtools.registerShortcut(viewInfo.view);
-
-      // Re-apply zoom after page finishes loading (content load can reset zoom)
-      callViewNative("register", viewInfo, () => {
-        viewInfo.view.webContents.on("did-finish-load", () => {
-          _interfaceScale.applyToView(viewInfo);
-        });
-
-        // Electron event listener for view load failure
-        viewInfo.view.webContents.on(
-          "did-fail-load",
-          (_event, errorCode: number, errorDescription: string) => {
-            log.error(`View load failed for ${appId}:`, errorDescription);
-            viewLoadFailed.emit({
-              viewId: viewInfo.id,
-              appId,
-              errorCode,
-              errorDescription,
-            });
-          },
-        );
-      });
-
-      // Notify listeners that the view has been loaded
+      yield* Effect.fromResult(
+        callViewNative("register", viewInfo, () =>
+          _devtools.registerShortcut(viewInfo.view),
+        ),
+      );
+      yield* Effect.fromResult(
+        callViewNative("register", viewInfo, () => {
+          viewInfo.view.webContents.on("did-finish-load", () =>
+            _interfaceScale.applyToView(viewInfo),
+          );
+          viewInfo.view.webContents.on(
+            "did-fail-load",
+            (_event, errorCode: number, errorDescription: string) => {
+              log.error(`View load failed for ${appId}:`, errorDescription);
+              viewLoadFailed.emit({
+                viewId,
+                appId,
+                errorCode,
+                errorDescription,
+              });
+            },
+          );
+        }),
+      );
       viewLoaded.emit({
-        viewId: viewInfo.id,
+        viewId,
         appId,
         overlay: viewInfo.viewType === "overlay",
       });
-
-      // Recalculate all tiles if using tiling and this is a tiled view
-      if (viewInfo.mode === "tiled" && layout.isTilingEnabled()) {
-        layout.syncTiledLayout({ preferredViewId: viewId });
-      }
-
-      // Add to main window's contentView and maintain proper layering
-      layout.reorderViewLayers();
-
-      return viewId;
-    } catch (error) {
-      try {
-        if (_views.has(viewInfo.id)) removeView(layout, viewInfo.id);
-        else destroyView(viewInfo, _mainWindow);
-      } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          `Failed to create and release view for ${appId}`,
-          { cause: error },
+      if (viewInfo.mode === "tiled" && layout.isTilingEnabled())
+        yield* Effect.fromResult(
+          layout.syncTiledLayout({ preferredViewId: viewId }),
         );
-      }
-      throw error;
-    }
-  }
+      layout.reorderViewLayers();
+      return viewId;
+    }).pipe(
+      Effect.onExit((exit) =>
+        Exit.isFailure(exit)
+          ? _views.has(viewInfo.id)
+            ? removeNativeView(layout, viewInfo)
+            : Effect.fromResult(destroyView(viewInfo, _mainWindow))
+          : Effect.void,
+      ),
+    );
+  }, Effect.uninterruptible);
 
-  function removeView(layout: ViewLifecycleLayout, viewId: number): void {
+  const removeView = Effect.fn(function* (
+    layout: ViewLifecycleLayout,
+    viewId: number,
+  ) {
     const viewInfo = _views.get(viewId);
-    if (!viewInfo) {
-      throw new ViewUnavailable({ viewId, reason: "missing" });
-    }
-    const webContentsId = viewInfo.view.webContents.id;
+    if (!viewInfo)
+      return yield* Effect.fail(
+        new ViewUnavailable({ viewId, reason: "missing" }),
+      );
+    yield* removeNativeView(layout, viewInfo);
+  }, Effect.uninterruptible);
 
-    const failures: unknown[] = [];
-    try {
+  const removeNativeView = Effect.fn(function* (
+    layout: ViewLifecycleLayout,
+    viewInfo: ViewInfo,
+  ) {
+    const viewId = viewInfo.id;
+    const webContentsId = viewInfo.view.webContents.id;
+    yield* Effect.sync(() => {
       layout.restoreExpansionForView(viewId);
       _devtools.closeDevToolsForView(viewInfo.view);
-    } catch (error) {
-      failures.push(error);
-    }
-    try {
-      destroyView(viewInfo, _mainWindow);
-    } catch (error) {
-      failures.push(error);
-      try {
-        if (!viewInfo.view.webContents.isDestroyed())
-          callViewNative("destroy", viewInfo, () =>
-            viewInfo.view.webContents.close(),
-          );
-      } catch (cleanupError) {
-        failures.push(cleanupError);
-      }
-    }
-    if (_views.delete(viewId)) {
-      _viewsByWebContentsId.delete(webContentsId);
-      viewRemoved.emit({ viewId, appId: viewInfo.appId, webContentsId });
-    }
-    if (failures.length === 1) throw failures[0];
-    if (failures.length > 1) {
-      const cause = new AggregateError(
-        failures,
-        `Failed to release view ${viewId}`,
-        {
-          cause: failures[0],
-        },
-      );
-      throw failures.every((failure) => failure instanceof ViewNativeFailure)
-        ? new ViewNativeFailure({
-            operation: "destroy",
-            viewId,
-            appId: viewInfo.appId,
-            cause,
-          })
-        : cause;
-    }
+    }).pipe(
+      Effect.onExit(() =>
+        Effect.suspend(() =>
+          Effect.fromResult(destroyView(viewInfo, _mainWindow)),
+        ).pipe(
+          Effect.onExit((exit) =>
+            Exit.isFailure(exit)
+              ? Effect.fromResult(
+                  callViewNative("destroy", viewInfo, () => {
+                    if (!viewInfo.view.webContents.isDestroyed())
+                      viewInfo.view.webContents.close();
+                  }),
+                )
+              : Effect.void,
+          ),
+        ),
+      ),
+      Effect.onExit(() =>
+        Effect.sync(() => {
+          if (_views.delete(viewId)) {
+            _viewsByWebContentsId.delete(webContentsId);
+            viewRemoved.emit({ viewId, appId: viewInfo.appId, webContentsId });
+          }
+        }),
+      ),
+    );
     if (viewInfo.viewType === "app" && layout.isTilingEnabled()) {
-      const visibilityChanged = layout.syncTiledLayout();
+      const visibilityChanged = yield* Effect.fromResult(
+        layout.syncTiledLayout(),
+      );
       if (visibilityChanged) layout.reorderViewLayers();
     }
-  }
+  });
 
   function getView(viewId: number): PlatformView | undefined {
     return _views.get(viewId)?.view;
@@ -280,11 +272,14 @@ export function createViewRegistry(
     return Array.from(_views.entries());
   }
 
-  function focusView(viewId: number): void {
-    const viewInfo = requireView(viewId, _views);
-    if (viewInfo.view.webContents.isDestroyed()) return;
-    callViewNative("focus", viewInfo, () => viewInfo.view.webContents.focus());
-  }
+  const focusView = Effect.fn(function* (viewId: number) {
+    const viewInfo = yield* Effect.fromResult(findView(viewId, _views));
+    yield* Effect.fromResult(
+      callViewNative("focus", viewInfo, () =>
+        viewInfo.view.webContents.focus(),
+      ),
+    );
+  });
 
   function sendToView(
     viewId: number,
@@ -321,7 +316,7 @@ export function createViewRegistry(
   function dispose(): void {
     for (const info of _views.values()) {
       try {
-        destroyView(info, _mainWindow);
+        Result.getOrThrow(destroyView(info, _mainWindow));
       } catch (error) {
         log.warn(`Failed to destroy view ${info.id} during disposal:`, error);
       }

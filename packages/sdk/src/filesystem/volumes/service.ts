@@ -29,7 +29,6 @@ import {
   type VolumeRegistrationError,
   VolumeRegistrationRejected,
   VolumeUnavailable,
-  volumeRegistrationRejection,
   volumeRejection,
 } from "./errors";
 
@@ -146,38 +145,40 @@ export const VolumesLive = Layer.effect(
       const eject = options.eject?.bind(options);
       const rootPath = yield* io.realpath(input.rootPath);
       const stats = yield* io.stat(rootPath);
-      yield* Effect.try({
-        try: () => {
-          if (!stats.isDirectory())
-            throw new VolumeRegistrationRejected({
-              volume: input.id,
-              message: "Volume root must be a directory",
-            });
-          if (disposed)
-            throw new VolumeRegistrationRejected({
-              volume: input.id,
-              message: "Filesystem volumes are disposed",
-            });
-          if (mounted.has(input.id))
-            throw new VolumeRegistrationRejected({
-              volume: input.id,
-              message: `Volume '${input.id}' is already registered`,
-            });
-          if (
-            options.ejectGroup &&
-            [...mounted.values()].some(
-              (entry) =>
-                entry.ejectGroup === options.ejectGroup && entry.removal,
-            )
-          )
-            throw new VolumeRegistrationRejected({
-              volume: input.id,
-              message:
-                "Cannot register a volume while its eject group is being removed",
-            });
-        },
-        catch: volumeRegistrationRejection,
-      });
+      if (!stats.isDirectory())
+        return yield* Effect.fail(
+          new VolumeRegistrationRejected({
+            volume: input.id,
+            message: "Volume root must be a directory",
+          }),
+        );
+      if (disposed)
+        return yield* Effect.fail(
+          new VolumeRegistrationRejected({
+            volume: input.id,
+            message: "Filesystem volumes are disposed",
+          }),
+        );
+      if (mounted.has(input.id))
+        return yield* Effect.fail(
+          new VolumeRegistrationRejected({
+            volume: input.id,
+            message: `Volume '${input.id}' is already registered`,
+          }),
+        );
+      if (
+        options.ejectGroup &&
+        [...mounted.values()].some(
+          (entry) => entry.ejectGroup === options.ejectGroup && entry.removal,
+        )
+      )
+        return yield* Effect.fail(
+          new VolumeRegistrationRejected({
+            volume: input.id,
+            message:
+              "Cannot register a volume while its eject group is being removed",
+          }),
+        );
       const info: FilesystemVolume = {
         id: input.id,
         label: input.label,
@@ -453,16 +454,19 @@ export const VolumesLive = Layer.effect(
       id: string,
       entry: MountedVolume,
     ) {
-      const assertRegistered = () => {
+      const checkRegistered = Effect.suspend(() => {
         if (disposed || mounted.get(id) !== entry)
-          throw new VolumeUnavailable({
-            volume: id,
-            message: `Filesystem volume '${id}' is unavailable`,
-          });
-      };
-      yield* Effect.try({ try: assertRegistered, catch: volumeRejection });
+          return Effect.fail(
+            new VolumeUnavailable({
+              volume: id,
+              message: `Filesystem volume '${id}' is unavailable`,
+            }),
+          );
+        return Effect.void;
+      });
+      yield* checkRegistered;
       const stats = yield* io.stat(entry.rootPath);
-      yield* Effect.try({ try: assertRegistered, catch: volumeRejection });
+      yield* checkRegistered;
       if (
         !stats.isDirectory() ||
         stats.dev !== entry.device ||
@@ -476,46 +480,49 @@ export const VolumesLive = Layer.effect(
         );
     });
 
-    function getRoot(
+    const getRoot = Effect.fn(function* (
       id: string,
       inherited: Map<string, VolumeLease>,
-    ): VolumeRoot | undefined {
-      get(id);
+    ) {
+      if (disposed)
+        return yield* Effect.fail(
+          new VolumeUnavailable({
+            volume: id,
+            message: "Filesystem volumes are disposed",
+          }),
+        );
       if (id === "home") return undefined;
       const entry = mounted.get(id);
       if (!entry)
-        throw new VolumeUnavailable({
-          volume: id,
-          message: `Filesystem volume '${id}' is unavailable`,
-        });
-      const lease = inherited?.get(id);
-      const assertAccessible = () => {
-        if (
-          entry.info.state !== "ready" &&
-          !(lease?.entry === entry && !lease.released)
-        )
-          throw new VolumeUnavailable({
+        return yield* Effect.fail(
+          new VolumeUnavailable({
             volume: id,
-            message: `Filesystem volume '${id}' is ${entry.info.state}`,
-          });
-      };
-      assertAccessible();
+            message: `Filesystem volume '${id}' is unavailable`,
+          }),
+        );
+      const lease = inherited.get(id);
+      const checkAccessible = Effect.suspend(() =>
+        entry.info.state !== "ready" &&
+        !(lease?.entry === entry && !lease.released)
+          ? Effect.fail(
+              new VolumeUnavailable({
+                volume: id,
+                message: `Filesystem volume '${id}' is ${entry.info.state}`,
+              }),
+            )
+          : Effect.void,
+      );
+      yield* checkAccessible;
       return {
         rootPath: entry.rootPath,
         assertActive: () =>
           Effect.gen(function* () {
-            yield* Effect.try({
-              try: assertAccessible,
-              catch: volumeRejection,
-            });
+            yield* checkAccessible;
             yield* assertMounted(id, entry);
-            yield* Effect.try({
-              try: assertAccessible,
-              catch: volumeRejection,
-            });
+            yield* checkAccessible;
           }),
-      };
-    }
+      } satisfies VolumeRoot;
+    });
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
@@ -524,12 +531,7 @@ export const VolumesLive = Layer.effect(
       }),
     );
     const root = (id: string) =>
-      Effect.flatMap(effectContext, (inherited) =>
-        Effect.try({
-          try: () => getRoot(id, inherited),
-          catch: volumeRejection,
-        }),
-      );
+      Effect.flatMap(effectContext, (inherited) => getRoot(id, inherited));
     return {
       list,
       get,

@@ -3,6 +3,7 @@ import * as v from "valibot";
 import type { EdenPackagesApi } from "../api/control-plane";
 import type { SdkContext } from "../api/sdk-context";
 import { operationTask } from "../operations/task";
+import { packageInfoResponse } from "./responses";
 import {
   packageHostPathSchema,
   packageIdSchema,
@@ -48,8 +49,10 @@ export function createPackagesSdkController({
     inspect: (sourcePath) =>
       sdk.effect(() =>
         Effect.map(
-          packages.getPackageInfoFromHostPath(
-            v.parse(packageHostPathSchema, sourcePath),
+          packageInfoResponse(
+            packages.getPackageInfoFromHostPath(
+              v.parse(packageHostPathSchema, sourcePath),
+            ),
           ),
           clone,
         ),

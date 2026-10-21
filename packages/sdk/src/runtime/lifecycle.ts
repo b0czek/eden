@@ -1,11 +1,10 @@
-import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import { AppAssociations } from "../app-associations/service";
 import { Appearance } from "../appearance/service";
 import { Autostart } from "../autostart/service";
 import { Daemons } from "../daemon/service";
+import { logCleanupFailure } from "../effects/failure-policy";
 import { Filesystem } from "../filesystem/service";
-import { log } from "../logging/logger";
 import { Operations } from "../operations/service";
 import { Packages } from "../packages/service";
 import { Processes } from "../processes/service";
@@ -60,9 +59,5 @@ export const acquireDesktopLifecycle = Effect.fn(function* (
 });
 
 function shutdownPhase<A, E>(name: string, work: Effect.Effect<A, E>) {
-  return Effect.catchCause(work, (cause) =>
-    Effect.sync(() =>
-      log.error(`Failed to shut down Eden ${name}:`, Cause.squash(cause)),
-    ),
-  );
+  return work.pipe(logCleanupFailure(`Failed to shut down Eden ${name}:`));
 }

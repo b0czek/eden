@@ -1,7 +1,7 @@
 import type { ViewBounds } from "@edenapp/types";
-import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
+import { logBackgroundFailure } from "../effects/failure-policy";
 import { log } from "../logging/logger";
 import type { DisplayPort } from "../platform/ports/types";
 import { createPointerTracking } from "./pointer";
@@ -77,15 +77,7 @@ export const createViewInteractions = Effect.fn(function* (
       runBoundsUpdate(
         _views
           .setViewBounds(viewId, newBounds, { notify: true })
-          .pipe(
-            Effect.catchCause((cause) =>
-              Cause.hasInterruptsOnly(cause)
-                ? Effect.failCause(cause).pipe(Effect.orDie)
-                : Effect.sync(() =>
-                    log.error("Failed to drag view:", Cause.squash(cause)),
-                  ),
-            ),
-          ),
+          .pipe(logBackgroundFailure("Failed to drag view:")),
       );
     });
   }
@@ -162,15 +154,7 @@ export const createViewInteractions = Effect.fn(function* (
       runBoundsUpdate(
         _views
           .setViewBounds(viewId, newBounds, { notify: true })
-          .pipe(
-            Effect.catchCause((cause) =>
-              Cause.hasInterruptsOnly(cause)
-                ? Effect.failCause(cause).pipe(Effect.orDie)
-                : Effect.sync(() =>
-                    log.error("Failed to resize view:", Cause.squash(cause)),
-                  ),
-            ),
-          ),
+          .pipe(logBackgroundFailure("Failed to resize view:")),
       );
     });
   }

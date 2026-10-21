@@ -4,8 +4,10 @@ import type {
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
+import type * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 import type { PlatformUtilityProcess } from "../platform/ports/types";
+import type { ProcessStopFailed } from "./errors";
 
 export interface AppRuntime {
   owner: ProcessOwner;
@@ -27,4 +29,5 @@ export interface InstanceRecord {
   instance?: AppInstance;
   backend?: PlatformUtilityProcess;
   closing: boolean;
+  close: Effect.Effect<void, ProcessStopFailed>;
 }

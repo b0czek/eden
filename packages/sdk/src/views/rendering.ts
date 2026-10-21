@@ -4,9 +4,10 @@ import type {
   FilesystemLocation,
   WindowConfig,
 } from "@edenapp/types";
-import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FiberSet from "effect/FiberSet";
+import { logBackgroundFailure } from "../effects/failure-policy";
 import { fromPromise } from "../effects/io";
 import { log } from "../logging/logger";
 import type {
@@ -212,7 +213,7 @@ export const createViewRendering = Effect.fn(function* (
     return { viewBounds, tileIndex: undefined, zIndex: undefined };
   }
 
-  function createView(
+  const createView = Effect.fn(function* (
     appId: string,
     manifest: AppManifest,
     installPath: string,
@@ -220,7 +221,7 @@ export const createViewRendering = Effect.fn(function* (
     existingViews: Iterable<ViewInfo>,
     launchArgs?: string[],
     launchFile?: FilesystemLocation,
-  ): ViewInfo {
+  ) {
     // Extract manifest properties
     const windowConfig = manifest.window;
     const isOverlay = !!manifest.overlay;
@@ -253,67 +254,71 @@ export const createViewRendering = Effect.fn(function* (
     const viewId = _nextViewId++;
     const preloadScript = path.join(_basePath, "app-runtime/app-preload.js");
 
-    const view = createPlatformView(
-      {
-        preloadScript,
-        additionalArguments: encodeLaunchContext({
-          appId,
-          args: launchArgs ?? [],
-          file: launchFile,
-        }),
-      },
-      _windows,
-      { appId, viewId },
+    const view = yield* Effect.fromResult(
+      createPlatformView(
+        {
+          preloadScript,
+          additionalArguments: encodeLaunchContext({
+            appId,
+            args: launchArgs ?? [],
+            file: launchFile,
+          }),
+        },
+        _windows,
+        { appId, viewId },
+      ),
     );
 
-    try {
+    return yield* Effect.gen(function* () {
       log.info(
         `Creating ${viewType} view for ${appId} with preload: ${preloadScript}`,
       );
 
       // Set bounds
-      callViewNative("set-bounds", { id: viewId, appId }, () =>
-        view.setBounds(viewBounds),
+      yield* Effect.fromResult(
+        callViewNative("set-bounds", { id: viewId, appId }, () =>
+          view.setBounds(viewBounds),
+        ),
       );
 
-      // Load the frontend HTML or remote URL
-      if (isRemoteEntry(frontendEntry)) {
+      const remote = isRemoteEntry(frontendEntry);
+      const target = remote
+        ? frontendEntry
+        : path.join(installPath, frontendEntry);
+      if (remote)
         log.info(`Loading remote frontend for ${appId}: ${frontendEntry}`);
-        view.webContents.loadURL(frontendEntry);
-      } else {
-        const frontendPath = path.join(installPath, frontendEntry);
-        view.webContents.loadFile(frontendPath);
-      }
+      yield* Effect.fromResult(
+        callViewNative("create", { id: viewId, appId }, () => {
+          if (remote) view.webContents.loadURL(target);
+          else view.webContents.loadFile(target);
+        }),
+      );
 
       // Setup injections after view is loaded
-      view.webContents.on("did-finish-load", () => {
-        forkInjection(
-          Effect.gen(function* () {
-            const cssMode = getCSSInjectionMode(windowConfig);
-            if (cssMode !== "none") yield* injectEdenCSS(view, cssMode);
-            if (
-              shouldInjectAppFrame(windowConfig) &&
-              !view.webContents.isDestroyed()
-            )
-              yield* injectAppFrame(
-                view,
-                appId,
-                manifest.name,
-                viewMode,
-                windowConfig,
-                view.getBounds(),
-              );
-          }).pipe(
-            Effect.catchCause((cause) =>
-              Cause.hasInterruptsOnly(cause)
-                ? Effect.failCause(cause)
-                : Effect.sync(() =>
-                    log.error("View injection failed:", Cause.squash(cause)),
-                  ),
-            ),
-          ),
-        );
-      });
+      yield* Effect.fromResult(
+        callViewNative("register", { id: viewId, appId }, () =>
+          view.webContents.on("did-finish-load", () => {
+            forkInjection(
+              Effect.gen(function* () {
+                const cssMode = getCSSInjectionMode(windowConfig);
+                if (cssMode !== "none") yield* injectEdenCSS(view, cssMode);
+                if (
+                  shouldInjectAppFrame(windowConfig) &&
+                  !view.webContents.isDestroyed()
+                )
+                  yield* injectAppFrame(
+                    view,
+                    appId,
+                    manifest.name,
+                    viewMode,
+                    windowConfig,
+                    view.getBounds(),
+                  );
+              }).pipe(logBackgroundFailure("View injection failed:")),
+            );
+          }),
+        ),
+      );
 
       // Return view info
       return {
@@ -329,20 +334,19 @@ export const createViewRendering = Effect.fn(function* (
         tileIndex,
         zIndex,
         launchArgs,
-      };
-    } catch (error) {
-      try {
-        if (!view.webContents.isDestroyed()) view.webContents.close();
-      } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          `Failed to create and release frontend for ${appId}`,
-          { cause: error },
-        );
-      }
-      throw error;
-    }
-  }
+      } satisfies ViewInfo;
+    }).pipe(
+      Effect.onExit((exit) =>
+        Exit.isFailure(exit)
+          ? Effect.fromResult(
+              callViewNative("destroy", { id: viewId, appId }, () => {
+                if (!view.webContents.isDestroyed()) view.webContents.close();
+              }),
+            )
+          : Effect.void,
+      ),
+    );
+  }, Effect.uninterruptible);
 
   return {
     isRemoteEntry,

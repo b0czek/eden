@@ -4,7 +4,9 @@ import type {
   TilingConfig,
   WindowConfig,
 } from "@edenapp/types";
+import * as Result from "effect/Result";
 import type { Bounds } from "../platform/ports/types";
+import { callViewNative } from "./errors";
 import {
   calculateTileBounds as calculateLayoutTileBounds,
   getSmartTilingCapacity,
@@ -668,58 +670,62 @@ export function createTiling(
       .length;
   }
 
-  function recalculateTiledViews(views: ReadonlyMap<number, ViewInfo>): void {
-    if (!isEnabled()) return;
+  function recalculateTiledViews(views: ReadonlyMap<number, ViewInfo>) {
+    return Result.gen(function* () {
+      if (!isEnabled()) return;
 
-    const { visibleViews, boundsByViewId } = getBaseLayout(views);
-    const presentedBoundsByViewId = new Map(boundsByViewId);
+      const { visibleViews, boundsByViewId } = getBaseLayout(views);
+      const presentedBoundsByViewId = new Map(boundsByViewId);
 
-    for (const [sourceId, targetId] of _expandedTiles) {
-      const source = views.get(sourceId);
-      const target = views.get(targetId);
-      const direction = findDirectionToView(
-        sourceId,
-        targetId,
-        visibleViews,
-        boundsByViewId,
-      );
-      if (
-        !source ||
-        !target ||
-        !direction ||
-        !canCoverNeighbor(source, target, direction, boundsByViewId)
-      ) {
-        _expandedTiles.delete(sourceId);
-        continue;
+      for (const [sourceId, targetId] of _expandedTiles) {
+        const source = views.get(sourceId);
+        const target = views.get(targetId);
+        const direction = findDirectionToView(
+          sourceId,
+          targetId,
+          visibleViews,
+          boundsByViewId,
+        );
+        if (
+          !source ||
+          !target ||
+          !direction ||
+          !canCoverNeighbor(source, target, direction, boundsByViewId)
+        ) {
+          _expandedTiles.delete(sourceId);
+          continue;
+        }
+
+        const sourceBounds = boundsByViewId.get(sourceId);
+        const targetBounds = boundsByViewId.get(targetId);
+        if (!sourceBounds || !targetBounds) continue;
+        presentedBoundsByViewId.set(
+          sourceId,
+          combineBounds(sourceBounds, targetBounds),
+        );
+        presentedBoundsByViewId.set(targetId, {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        });
       }
 
-      const sourceBounds = boundsByViewId.get(sourceId);
-      const targetBounds = boundsByViewId.get(targetId);
-      if (!sourceBounds || !targetBounds) continue;
-      presentedBoundsByViewId.set(
-        sourceId,
-        combineBounds(sourceBounds, targetBounds),
-      );
-      presentedBoundsByViewId.set(targetId, {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-      });
-    }
+      for (const [index, info] of visibleViews.entries()) {
+        const bounds = presentedBoundsByViewId.get(info.id);
+        if (!bounds) {
+          continue;
+        }
 
-    visibleViews.forEach((info, index) => {
-      const bounds = presentedBoundsByViewId.get(info.id);
-      if (!bounds) {
-        return;
-      }
+        info.tileIndex = index;
+        info.bounds = bounds;
 
-      info.tileIndex = index;
-      info.bounds = bounds;
-
-      // Only set bounds if view is not destroyed
-      if (!info.view.webContents.isDestroyed()) {
-        info.view.setBounds(bounds);
+        // Only set bounds if view is not destroyed
+        if (!info.view.webContents.isDestroyed()) {
+          yield* callViewNative("set-bounds", info, () =>
+            info.view.setBounds(bounds),
+          );
+        }
       }
     });
   }

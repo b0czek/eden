@@ -1,4 +1,5 @@
 import type { AppManifest } from "@edenapp/types";
+import * as Result from "effect/Result";
 import { createTiling } from "./tiling";
 import type { ViewInfo } from "./types";
 
@@ -67,7 +68,7 @@ describe("Tiling tile layout actions", () => {
       ],
       [2, createTiledView(2, { visible: true, tileIndex: 1 })],
     ]);
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
     return { tiling, views };
   }
 
@@ -102,7 +103,7 @@ describe("Tiling tile layout actions", () => {
         return [id, createTiledView(id, { visible: true, tileIndex: index })];
       }),
     );
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
 
     const state = tiling.getTileLayoutState(5, views);
     expect(state.neighbors.top?.name).toBe("App 2");
@@ -118,7 +119,7 @@ describe("Tiling tile layout actions", () => {
     const { tiling, views } = createHorizontalPair();
 
     expect(tiling.swapTile(1, "right", views)).toBe(true);
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
 
     expect(views.get(1)?.bounds).toEqual({
       x: 505,
@@ -141,7 +142,7 @@ describe("Tiling tile layout actions", () => {
     const { tiling, views } = createHorizontalPair();
 
     expect(tiling.expandTile(1, "right", views)).toBe(true);
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
 
     expect(views.get(1)?.bounds).toEqual({
       x: 0,
@@ -161,12 +162,12 @@ describe("Tiling tile layout actions", () => {
     });
 
     expect(tiling.swapTile(1, "right", views)).toBe(false);
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
     expect(views.get(1)?.bounds.width).toBe(1000);
     expect(views.get(2)?.bounds.width).toBe(0);
 
     expect(tiling.restoreExpansionForView(1)).toBe(true);
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
 
     expect(views.get(1)?.bounds.width).toBe(495);
     expect(views.get(2)?.bounds).toEqual({
@@ -527,7 +528,7 @@ describe("Tiling.recalculateTiledViews", () => {
     });
     const views = new Map<number, ViewInfo>([[1, view]]);
 
-    tiling.recalculateTiledViews(views);
+    Result.getOrThrow(tiling.recalculateTiledViews(views));
 
     expect(view.bounds).toEqual({
       x: 300,

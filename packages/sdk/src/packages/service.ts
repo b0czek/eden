@@ -4,17 +4,17 @@ import type {
   FilesystemLocation,
   InstalledPackageInfo,
   InstalledPackageManifest,
-  PackageInfo,
   RuntimeAppManifest,
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { fromPromise } from "../effects/io";
+import { asError, fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { RuntimeContexts } from "../execution/runtime-contexts";
+import type { FilesystemPathError } from "../filesystem/errors";
 import { FilesystemIoFailed } from "../filesystem/native-errors";
 import { io } from "../filesystem/native-io";
 import { Filesystem } from "../filesystem/service";
@@ -31,21 +31,23 @@ import type {
   PackageArchiveInstallError,
   PackageDevelopmentFailure,
   PackageInstallError,
+  PackageRejected,
   PackageRemovalError,
 } from "./errors";
 import {
   PackageArchiveError,
   PackageInitializationError,
-  PackageJournalError,
   PackageLocationError,
-  PackageRejected,
-  PackageRollbackError,
 } from "./errors";
 import { InstalledPackages } from "./installed";
 import { createPackageManifests } from "./manifests";
 import { createPackageMutations } from "./mutations";
 import { PackageTransactions } from "./transactions";
-import type { InstalledPackageListOptions, PackageEvents } from "./types";
+import type {
+  InstalledPackageListOptions,
+  PackageEvents,
+  PackageInspection,
+} from "./types";
 
 export interface Packages {
   installed: Event<PackageEvents["installed"]>;
@@ -54,8 +56,15 @@ export interface Packages {
     void,
     PackageInitializationError | FilesystemIoFailed
   >;
-  getPackageInfo: (location: FilesystemLocation) => Effect.Effect<PackageInfo>;
-  getPackageInfoFromHostPath: (hostPath: string) => Effect.Effect<PackageInfo>;
+  getPackageInfo: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<
+    PackageInspection,
+    PackageArchiveError | FilesystemPathError
+  >;
+  getPackageInfoFromHostPath: (
+    hostPath: string,
+  ) => Effect.Effect<PackageInspection, PackageArchiveError>;
   listInstalledPackages: {
     (
       options: InstalledPackageListOptions & { kind: "app" },
@@ -202,78 +211,67 @@ export const PackagesLive = Layer.effect(
           : new PackageInitializationError({ message: cause.message, cause }),
       ),
     );
-    const getPackageInfo: (
-      location: FilesystemLocation,
-    ) => Effect.Effect<PackageInfo> = Effect.fn(function* (
-      location: FilesystemLocation,
-    ) {
-      return yield* Effect.catch(
-        Effect.gen(function* () {
-          return yield* filesystem.withVolume(location, (hostPath) =>
-            getPackageInfoFromHostPath(hostPath),
-          );
-        }),
-        (error) =>
-          Effect.sync(() => {
-            return { success: false, error: (error as Error).message };
+    const getPackageInfo = (location: FilesystemLocation) =>
+      filesystem.withVolume(location, getPackageInfoFromHostPath);
+    const getPackageInfoFromHostPath = Effect.fn(function* (hostPath: string) {
+      const resolvedPath = path.resolve(hostPath);
+      const info = yield* fromPromise(
+        () => genesisBundler.getInfo(resolvedPath),
+        (cause) =>
+          new PackageArchiveError({
+            path: resolvedPath,
+            operation: "inspect",
+            message: asError(cause).message,
+            cause,
           }),
       );
-    });
-    const getPackageInfoFromHostPath: (
-      hostPath: string,
-    ) => Effect.Effect<PackageInfo> = Effect.fn(function* (hostPath: string) {
-      return yield* Effect.catch(
-        Effect.gen(function* () {
-          const resolvedPath = path.resolve(hostPath);
-          const info = yield* fromPromise(() =>
-            genesisBundler.getInfo(resolvedPath),
-          );
-          if (!info.success || !info.manifest) return info;
-          const manifest = info.manifest;
-          if (manifest.kind === "dlc") {
-            const host = catalog.getApp(manifest.hostAppId);
-            const existing = catalog.getDlc(manifest.id);
-            const compatibilityErrors = host
-              ? genesisBundler.isDlcCompatible(host, manifest).errors
-              : [`Host app ${manifest.hostAppId} is not installed`];
-            return {
-              ...info,
-              preview: {
-                kind: "dlc" as const,
-                existingVersion: existing?.version,
-                host,
-                compatibilityErrors,
-                hostRunning:
-                  (!!host && !!runtimeContexts.get(host.id)) ||
-                  (!!existing && !!runtimeContexts.get(existing.hostAppId)),
-                replaceable: !existing?.isPrebuilt,
-              },
-            };
-          }
-          const existing = catalog.getApp(manifest.id);
-          const incompatibleDlcs = getIncompatibleDlcs(manifest);
-          return {
-            ...info,
-            preview: {
-              kind: "app" as const,
-              existingVersion: existing?.version,
-              incompatibleDlcs,
-              hostRunning: !!existing && !!runtimeContexts.get(existing.id),
-              replaceable:
-                (!existing ||
-                  (!existing.isPrebuilt && !existing.isDevelopment)) &&
-                incompatibleDlcs.every((dlc) => !dlc.isPrebuilt),
-            },
-          };
-        }),
-        (error) =>
-          Effect.sync(() => {
-            return {
-              success: false,
-              error: (error as Error).message,
-            };
+      if (!info.success || !info.manifest)
+        return yield* Effect.fail(
+          new PackageArchiveError({
+            path: resolvedPath,
+            operation: "inspect",
+            message:
+              info.error ?? "Package archive does not contain a manifest",
+            cause: info,
           }),
-      );
+        );
+      const manifest = info.manifest;
+      if (manifest.kind === "dlc") {
+        const host = catalog.getApp(manifest.hostAppId);
+        const existing = catalog.getDlc(manifest.id);
+        const compatibilityErrors = host
+          ? genesisBundler.isDlcCompatible(host, manifest).errors
+          : [`Host app ${manifest.hostAppId} is not installed`];
+        return {
+          manifest,
+          checksum: info.checksum,
+          preview: {
+            kind: "dlc" as const,
+            existingVersion: existing?.version,
+            host,
+            compatibilityErrors,
+            hostRunning:
+              (!!host && !!runtimeContexts.get(host.id)) ||
+              (!!existing && !!runtimeContexts.get(existing.hostAppId)),
+            replaceable: !existing?.isPrebuilt,
+          },
+        };
+      }
+      const existing = catalog.getApp(manifest.id);
+      const incompatibleDlcs = getIncompatibleDlcs(manifest);
+      return {
+        manifest,
+        checksum: info.checksum,
+        preview: {
+          kind: "app" as const,
+          existingVersion: existing?.version,
+          incompatibleDlcs,
+          hostRunning: !!existing && !!runtimeContexts.get(existing.id),
+          replaceable:
+            (!existing || (!existing.isPrebuilt && !existing.isDevelopment)) &&
+            incompatibleDlcs.every((dlc) => !dlc.isPrebuilt),
+        },
+      };
     });
     function listInstalledPackages(
       options: InstalledPackageListOptions & { kind: "app" },
@@ -341,19 +339,16 @@ export const PackagesLive = Layer.effect(
           installPackageFromHostPath(hostPath, replacementConfirmed, reporter),
         )
         .pipe(
-          Effect.mapError((cause) =>
-            cause instanceof PackageLocationError ||
-            cause instanceof PackageRejected ||
-            cause instanceof PackageArchiveError ||
-            cause instanceof FilesystemIoFailed ||
-            cause instanceof PackageRollbackError ||
-            cause instanceof PackageJournalError
-              ? cause
-              : new PackageLocationError({
+          Effect.catchTag(
+            ["FilesystemAccessDenied", "VolumeUnavailable"],
+            (cause) =>
+              Effect.fail(
+                new PackageLocationError({
                   location,
                   message: cause.message,
                   cause,
                 }),
+              ),
           ),
         );
     });

@@ -16,6 +16,10 @@ import * as Layer from "effect/Layer";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import { AppChannels } from "../appbus/service";
+import {
+  logBackgroundFailure,
+  logCleanupFailure,
+} from "../effects/failure-policy";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
@@ -31,18 +35,14 @@ import {
 
 import { RuntimeConfig } from "../runtime/inputs";
 import { SessionContext } from "../session/context";
-import { ViewNativeFailure } from "../views/errors";
 import { Views } from "../views/service";
 import { Backends } from "./backends";
 import {
-  BackendIoFailed,
-  BackendTerminationTimedOut,
   type ProcessLaunchError,
   ProcessLaunchRejected,
   type ProcessMetricsError,
   ProcessNotRunning,
   type ProcessStopError,
-  ProcessStopFailed,
   SessionProcessesStopFailed,
 } from "./errors";
 import { watchHotReload } from "./hot-reload";
@@ -119,16 +119,7 @@ export const ProcessesLive = Layer.effect(
       forkLifecycle(
         work.pipe(
           Effect.asVoid,
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause).pipe(Effect.orDie)
-              : Effect.sync(() =>
-                  log.error(
-                    "Process lifecycle task failed:",
-                    Cause.squash(cause),
-                  ),
-                ),
-          ),
+          logBackgroundFailure("Process lifecycle task failed:"),
         ),
       );
     }
@@ -146,29 +137,12 @@ export const ProcessesLive = Layer.effect(
       });
     }
     function closeInstance(record: InstanceRecord, exit = Exit.void) {
-      return Effect.suspend(() => {
-        record.closing = true;
-        return Scope.close(record.scope, exit);
-      }).pipe(
-        Effect.catchCause((cause) => {
-          // Scope finalizers carry native cleanup failures as defects. Recover only
-          // known boundary errors; unexpected defects keep their original channel.
-          const expected = cause.reasons.every(
-            (reason) =>
-              Cause.isDieReason(reason) &&
-              (reason.defect instanceof ViewNativeFailure ||
-                reason.defect instanceof BackendIoFailed ||
-                reason.defect instanceof BackendTerminationTimedOut),
+      return Effect.uninterruptible(
+        Effect.suspend(() => {
+          record.closing = true;
+          return record.close.pipe(
+            Effect.ensuring(Scope.close(record.scope, exit)),
           );
-          return expected
-            ? Effect.fail(
-                new ProcessStopFailed({
-                  appId: record.appId,
-                  cause: Cause.squash(cause),
-                  message: `Failed to stop app ${record.appId}`,
-                }),
-              )
-            : Effect.failCause(cause);
         }),
       );
     }
@@ -357,6 +331,7 @@ export const ProcessesLive = Layer.effect(
             scope,
             runtime: resolvedRuntime,
             closing: false,
+            close: Effect.void,
           };
           instances.set(appId, record);
           yield* Scope.addFinalizer(
@@ -388,6 +363,7 @@ export const ProcessesLive = Layer.effect(
                     channels,
                   },
                 );
+                record.close = acquired.close;
                 if (_shuttingDown)
                   return yield* Effect.fail(
                     new ProcessLaunchRejected({
@@ -578,16 +554,7 @@ export const ProcessesLive = Layer.effect(
               log.info(`Stopping app: ${appId}`);
               yield* stopApp(appId);
               log.info(`✓ Stopped app: ${appId}`);
-            }).pipe(
-              Effect.catchCause((cause) =>
-                Cause.hasInterruptsOnly(cause)
-                  ? Effect.failCause(cause).pipe(Effect.orDie)
-                  : Effect.sync(() => {
-                      const error = Cause.squash(cause);
-                      log.error(`Failed to stop app ${appId}:`, error);
-                    }),
-              ),
-            );
+            }).pipe(logBackgroundFailure(`Failed to stop app ${appId}:`));
           }
         }),
       ),
@@ -678,11 +645,7 @@ export const ProcessesLive = Layer.effect(
     let stopHotReload: Effect.Effect<void> = Effect.void;
     yield* Effect.addFinalizer(() =>
       shutdown.pipe(
-        Effect.catchCause((cause) =>
-          Effect.sync(() =>
-            log.error("Failed to stop process lifecycle:", Cause.squash(cause)),
-          ),
-        ),
+        logCleanupFailure("Failed to stop process lifecycle:"),
         Effect.ensuring(Effect.sync(dispose)),
       ),
     );
@@ -694,16 +657,8 @@ export const ProcessesLive = Layer.effect(
       reloadApp,
       runLifecycle,
     }).pipe(
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.sync(() =>
-              log.error(
-                "Failed to watch hot reload state:",
-                Cause.squash(cause),
-              ),
-            ).pipe(Effect.as(Effect.void)),
-      ),
+      logBackgroundFailure("Failed to watch hot reload state:"),
+      Effect.map((stop) => stop ?? Effect.void),
     );
     return {
       launched,

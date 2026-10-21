@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as Effect from "effect/Effect";
 import { createFloatingWindows } from "../../../src/views/floating-windows";
 import { createViewRendering } from "../../../src/views/rendering";
 import { createTiling } from "../../../src/views/tiling";
@@ -45,12 +46,8 @@ it.each([false, true])(
       );
       const bounds = { x: 0, y: 0, width: 640, height: 480 };
       const firstApp = testApp("com.example.first-render");
-      const first = creator.createView(
-        firstApp.id,
-        firstApp,
-        directory,
-        bounds,
-        [],
+      const first = Effect.runSync(
+        creator.createView(firstApp.id, firstApp, directory, bounds, []),
       );
       jest
         .spyOn(first.view.webContents, "insertCSS")
@@ -67,12 +64,8 @@ it.each([false, true])(
       await inserting.promise;
       if (closed) first.view.webContents.close();
       const secondApp = testApp("com.example.second-render");
-      const second = creator.createView(
-        secondApp.id,
-        secondApp,
-        directory,
-        bounds,
-        [],
+      const second = Effect.runSync(
+        creator.createView(secondApp.id, secondApp, directory, bounds, []),
       );
       const css: string[] = [];
       jest

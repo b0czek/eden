@@ -1,10 +1,10 @@
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
-import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Semaphore from "effect/Semaphore";
+import { logBackgroundFailure } from "../effects/failure-policy";
 import { io } from "../filesystem/native-io";
 import {
   getHotReloadServersPath,
@@ -114,16 +114,7 @@ export const watchHotReload = Effect.fn(function* ({
     );
     if (!refreshed || !isRunning(appId)) return;
     yield* reloadApp(appId).pipe(
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.sync(() =>
-              log.error(
-                `Failed to reload hot reload app ${appId}:`,
-                Cause.squash(cause),
-              ),
-            ),
-      ),
+      logBackgroundFailure(`Failed to reload hot reload app ${appId}:`),
     );
   });
 

@@ -42,6 +42,15 @@ describe("package and daemon SDK boundaries", () => {
     ).rejects.toThrow(v.ValiError);
     expect(eden.runtime.operations.list()).toEqual([]);
     await expect(
+      eden.runtime.effects.run(
+        eden.runtime.services.packages.getPackageInfoFromHostPath(missing),
+      ),
+    ).rejects.toMatchObject({
+      _tag: "PackageArchiveError",
+      path: missing,
+      operation: "inspect",
+    });
+    await expect(
       eden.runtime.effects.run(packages.inspect(missing)),
     ).resolves.toMatchObject({
       success: false,

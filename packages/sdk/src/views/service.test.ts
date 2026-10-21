@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import type { AppManifest, EdenConfig, TilingConfig } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import { testApp } from "../../tests/support/apps";
 import {
@@ -293,6 +295,7 @@ describe("web contents lookup lifecycle", () => {
 
   it("rejects missing or destroyed renderers without changing surviving views", () => {
     const surviving = create("app.surviving");
+    expect(() => views.getTileLayoutState(-1)).toThrow(ViewUnavailable);
     expect(() => Effect.runSync(views.showView(-1))).toThrow(ViewUnavailable);
     expect(() => Effect.runSync(views.showView(-1))).toThrow(
       expect.objectContaining({ viewId: -1, reason: "missing" }),
@@ -353,24 +356,41 @@ describe("web contents lookup lifecycle", () => {
     jest.spyOn(nativeView, "setBounds").mockImplementationOnce(() => {
       throw cause;
     });
-    expect(() =>
-      Effect.runSync(
-        views.setViewBounds(
-          view.viewId,
-          { x: 10, y: 20, width: 500, height: 300 },
-          { notify: true },
-        ),
+    const exit = Effect.runSyncExit(
+      views.setViewBounds(
+        view.viewId,
+        { x: 10, y: 20, width: 500, height: 300 },
+        { notify: true },
       ),
-    ).toThrow(
-      expect.objectContaining({
-        _tag: "ViewNativeFailure",
-        operation: "set-bounds",
-        viewId: view.viewId,
-        appId: "app.bounds",
-        cause,
+    );
+    assert(Exit.isFailure(exit));
+    expect(Cause.hasDies(exit.cause)).toBe(false);
+    expect(Cause.squash(exit.cause)).toMatchObject({
+      _tag: "ViewNativeFailure",
+      operation: "set-bounds",
+      viewId: view.viewId,
+      appId: "app.bounds",
+      cause,
+    });
+    expect(updates).toEqual([]);
+  });
+
+  it("preserves defects in layout calculations without converting them to native failures", () => {
+    const view = create("app.layout-defect");
+    const defect = new Error("Invalid layout state");
+    const exit = Effect.runSyncExit(
+      views.setViewBounds(view.viewId, {
+        x: 0,
+        y: 0,
+        height: 300,
+        get width(): number {
+          throw defect;
+        },
       }),
     );
-    expect(updates).toEqual([]);
+    assert(Exit.isFailure(exit));
+    expect(Cause.hasFails(exit.cause)).toBe(false);
+    expect(Cause.squash(exit.cause)).toBe(defect);
   });
 
   it("resolves distinct views, including views of the same app, and forgets removed callers", () => {

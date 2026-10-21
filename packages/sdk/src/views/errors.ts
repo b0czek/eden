@@ -1,5 +1,6 @@
 import type { TileLayoutDirection } from "@edenapp/types";
 import * as Data from "effect/Data";
+import * as Result from "effect/Result";
 import type { ViewMode } from "./types";
 
 /** The requested renderer no longer exists. */
@@ -71,25 +72,20 @@ export type ViewMutationError = ViewUnavailable | ViewNativeFailure;
 export type ViewModeError = ViewMutationError | ViewModeUnsupported;
 export type ViewTileError = ViewMutationError | TileActionUnavailable;
 
-export function viewMutationFailure(cause: unknown): ViewMutationError {
-  if (cause instanceof ViewUnavailable || cause instanceof ViewNativeFailure)
-    return cause;
-  throw cause;
-}
-
+/** Catch native exceptions once, for synchronous hooks and Effect workflows. */
 export function callViewNative<A>(
   operation: ViewNativeFailure["operation"],
   view: { id: number; appId: string },
   call: () => A,
-): A {
-  try {
-    return call();
-  } catch (cause) {
-    throw new ViewNativeFailure({
-      operation,
-      viewId: view.id,
-      appId: view.appId,
-      cause,
-    });
-  }
+): Result.Result<A, ViewNativeFailure> {
+  return Result.try({
+    try: call,
+    catch: (cause) =>
+      new ViewNativeFailure({
+        operation,
+        viewId: view.id,
+        appId: view.appId,
+        cause,
+      }),
+  });
 }

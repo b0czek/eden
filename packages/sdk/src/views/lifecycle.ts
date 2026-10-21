@@ -1,10 +1,15 @@
+import * as Result from "effect/Result";
 import { log } from "../logging/logger";
 import type {
   PlatformView,
   PlatformWindow,
   WindowingPort,
 } from "../platform/ports/types";
-import { ViewNativeFailure, ViewUnavailable } from "./errors";
+import {
+  callViewNative,
+  type ViewNativeFailure,
+  ViewUnavailable,
+} from "./errors";
 import type { ViewCreationOptions, ViewInfo } from "./types";
 /**
  * Check if a WebContentsView exists and is valid.
@@ -34,49 +39,26 @@ export function isWindowAlive(
   return window !== undefined && window !== null && !window.isDestroyed();
 }
 
-/**
- * Get a view from the map with validation.
- * Throws an error if view is not found or destroyed.
- */
+/** Synchronous callers share the same validation as Effect workflows. */
 export function requireView(
   viewId: number,
   views: ReadonlyMap<number, ViewInfo>,
 ): ViewInfo {
-  const viewInfo = views.get(viewId);
-
-  if (!viewInfo) {
-    throw new ViewUnavailable({ viewId, reason: "missing" });
-  }
-
-  if (!isViewAlive(viewInfo.view)) {
-    throw new ViewUnavailable({
-      viewId,
-      appId: viewInfo.appId,
-      reason: "destroyed",
-    });
-  }
-
-  return viewInfo;
+  return Result.getOrThrow(findView(viewId, views));
 }
 
-/**
- * Get a view by app ID from the map, returning the first matching view.
- * Throws an error if view is not found or destroyed.
- */
-export function requireViewByAppId(
-  appId: string,
+export function findView(
+  viewId: number,
   views: ReadonlyMap<number, ViewInfo>,
-): { viewId: number; viewInfo: ViewInfo } {
-  for (const [viewId, info] of views.entries()) {
-    if (info.appId === appId) {
-      if (!isViewAlive(info.view)) {
-        throw new ViewUnavailable({ viewId, appId, reason: "destroyed" });
-      }
-      return { viewId, viewInfo: info };
-    }
-  }
-
-  throw new ViewUnavailable({ appId, reason: "missing" });
+): Result.Result<ViewInfo, ViewUnavailable> {
+  const info = views.get(viewId);
+  if (!info)
+    return Result.fail(new ViewUnavailable({ viewId, reason: "missing" }));
+  if (!isViewAlive(info.view))
+    return Result.fail(
+      new ViewUnavailable({ viewId, appId: info.appId, reason: "destroyed" }),
+    );
+  return Result.succeed(info);
 }
 
 /**
@@ -86,7 +68,7 @@ export function createView(
   options: ViewCreationOptions,
   windows: WindowingPort,
   context: { appId: string; viewId: number },
-): PlatformView {
+): Result.Result<PlatformView, ViewNativeFailure> {
   const {
     preloadScript,
     transparent = true,
@@ -94,23 +76,24 @@ export function createView(
     additionalArguments = [],
   } = options;
 
-  try {
-    return windows.createView({
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false,
-        preload: preloadScript,
-        transparent,
-        backgroundThrottling,
-        scrollBounce: false,
-        spellcheck: false,
-        additionalArguments,
-      },
-    });
-  } catch (cause) {
-    throw new ViewNativeFailure({ operation: "create", ...context, cause });
-  }
+  return callViewNative(
+    "create",
+    { id: context.viewId, appId: context.appId },
+    () =>
+      windows.createView({
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: false,
+          preload: preloadScript,
+          transparent,
+          backgroundThrottling,
+          scrollBounce: false,
+          spellcheck: false,
+          additionalArguments,
+        },
+      }),
+  );
 }
 
 /**
@@ -119,39 +102,20 @@ export function createView(
 export function destroyView(
   viewInfo: ViewInfo,
   mainWindow: PlatformWindow | null,
-): void {
-  try {
-    // Check if view is already destroyed
-    if (!isViewAlive(viewInfo.view)) {
-      // View already destroyed, nothing to do
-      return;
-    }
-
-    // Remove from main window if window still exists
-    if (isWindowAlive(mainWindow)) {
-      try {
-        mainWindow.contentView.removeChildView(viewInfo.view);
-      } catch (error) {
-        // Ignore errors during removal - view might already be removed
-        log.warn("Ignoring error during view removal:", error);
-      }
-    }
-
-    // Detaching the view from the window is not enough. The renderer process
-    // keeps running until its webContents is explicitly closed.
-    if (!viewInfo.view.webContents.isDestroyed()) {
-      viewInfo.view.webContents.close();
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error("Failed to destroy view:", errorMessage);
-    throw new ViewNativeFailure({
-      operation: "destroy",
-      viewId: viewInfo.id,
-      appId: viewInfo.appId,
-      cause: error,
-    });
+): Result.Result<void, ViewNativeFailure> {
+  if (!isViewAlive(viewInfo.view)) return Result.succeed(undefined);
+  if (isWindowAlive(mainWindow)) {
+    const detached = callViewNative("destroy", viewInfo, () =>
+      mainWindow.contentView.removeChildView(viewInfo.view),
+    );
+    if (Result.isFailure(detached))
+      log.warn("Ignoring error during view removal:", detached.failure.cause);
   }
+  return callViewNative("destroy", viewInfo, () => {
+    // Detaching alone leaves the renderer running.
+    if (!viewInfo.view.webContents.isDestroyed())
+      viewInfo.view.webContents.close();
+  });
 }
 
 /**

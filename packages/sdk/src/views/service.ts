@@ -23,16 +23,11 @@ import { DistPath, RuntimeConfig } from "../runtime/inputs";
 import { Settings } from "../settings/service";
 import { createViewLayout, type ViewLayout } from "./coordination";
 import { createViewDevTools } from "./devtools";
-import {
-  MainWindowUnavailable,
-  TileActionUnavailable,
-  type ViewCreateError,
-  type ViewModeError,
-  ViewModeUnsupported,
-  type ViewMutationError,
-  ViewNativeFailure,
-  type ViewTileError,
-  viewMutationFailure,
+import type {
+  ViewCreateError,
+  ViewModeError,
+  ViewMutationError,
+  ViewTileError,
 } from "./errors";
 import { createFloatingWindows } from "./floating-windows";
 import { createInterfaceScale } from "./interface-scale";
@@ -180,11 +175,7 @@ export const ViewsLive = Layer.effect(
       setWorkspaceBounds: coordination.setWorkspaceBounds,
       setWindowSize: coordination.setWindowSize,
       getWindowSize: coordination.getWindowSize,
-      setViewBounds: (...args) =>
-        Effect.try({
-          try: () => coordination.setViewBounds(...args),
-          catch: viewMutationFailure,
-        }),
+      setViewBounds: coordination.setViewBounds,
       getView: nativeViews.getView,
       getViewInfo: nativeViews.getViewInfo,
       getViewsByAppId: nativeViews.getViewsByAppId,
@@ -192,48 +183,15 @@ export const ViewsLive = Layer.effect(
       getViewIdByWebContentsId: nativeViews.getViewIdByWebContentsId,
       getAllViews: nativeViews.getAllViews,
       getTileLayoutState: coordination.getTileLayoutState,
-      swapTiledView: (...args) =>
-        Effect.try({
-          try: () => coordination.swapTiledView(...args),
-          catch: (cause) =>
-            cause instanceof TileActionUnavailable
-              ? cause
-              : viewMutationFailure(cause),
-        }),
-      expandTiledView: (...args) =>
-        Effect.try({
-          try: () => coordination.expandTiledView(...args),
-          catch: (cause) =>
-            cause instanceof TileActionUnavailable
-              ? cause
-              : viewMutationFailure(cause),
-        }),
-      showView: (id) =>
-        Effect.try({
-          try: () => coordination.showView(id),
-          catch: viewMutationFailure,
-        }),
-      focusView: (id) =>
-        Effect.try({
-          try: () => nativeViews.focusView(id),
-          catch: viewMutationFailure,
-        }),
-      hideView: (id) =>
-        Effect.try({
-          try: () => coordination.hideView(id),
-          catch: viewMutationFailure,
-        }),
+      swapTiledView: coordination.swapTiledView,
+      expandTiledView: coordination.expandTiledView,
+      showView: coordination.showView,
+      focusView: nativeViews.focusView,
+      hideView: coordination.hideView,
       sendToView: nativeViews.sendToView,
       sendToMainWindow: nativeViews.sendToMainWindow,
       getActiveViews: nativeViews.getActiveViews,
-      setViewMode: (...args) =>
-        Effect.try({
-          try: () => coordination.setViewMode(...args),
-          catch: (cause) =>
-            cause instanceof ViewModeUnsupported
-              ? cause
-              : viewMutationFailure(cause),
-        }),
+      setViewMode: coordination.setViewMode,
       setKeyboardPresentationLift: coordination.setKeyboardPresentationLift,
       getKeyboardPresentationLift: coordination.getKeyboardPresentationLift,
       initialize: interfaceScale.initialize,
@@ -244,23 +202,8 @@ export const ViewsLive = Layer.effect(
       globalBoundsChanged,
       boundsUpdated,
       modeChanged,
-      createView: (...args) =>
-        Effect.try({
-          try: () => nativeViews.createView(coordination, ...args),
-          catch: (cause) => {
-            if (
-              cause instanceof MainWindowUnavailable ||
-              cause instanceof ViewNativeFailure
-            )
-              return cause;
-            throw cause;
-          },
-        }),
-      removeView: (viewId) =>
-        Effect.try({
-          try: () => nativeViews.removeView(coordination, viewId),
-          catch: viewMutationFailure,
-        }),
+      createView: (...args) => nativeViews.createView(coordination, ...args),
+      removeView: (viewId) => nativeViews.removeView(coordination, viewId),
       getCurrentScale: interfaceScale.getScale,
       setInterfaceScale: interfaceScale.setScale,
     } satisfies Views;

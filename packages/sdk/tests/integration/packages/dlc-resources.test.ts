@@ -291,6 +291,21 @@ describe("DLC package lifecycle", () => {
 
     eden.runtime.volumes.unregister("usb");
     await expect(
+      eden.runtime.effects.run(
+        eden.runtime.services.packages.getPackageInfo(location),
+      ),
+    ).rejects.toMatchObject({ _tag: "VolumeUnavailable", volume: "usb" });
+    await expect(
+      eden.runtime.effects.run(
+        eden.runtime.services.packages.installPackage(location),
+      ),
+    ).rejects.toMatchObject({
+      _tag: "PackageLocationError",
+      location,
+      cause: { _tag: "VolumeUnavailable" },
+    });
+
+    await expect(
       eden.execute("package/get-info", { location }, caller),
     ).resolves.toMatchObject({
       success: false,

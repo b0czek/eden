@@ -9,6 +9,7 @@ import {
   filesystemLocationArgsSchema,
   filesystemLocationSchema,
 } from "../filesystem/location-schema";
+import { packageInfoResponse } from "./responses";
 import { packageIdSchema, packageInstallOptionsSchema } from "./schemas";
 import type { Packages } from "./service";
 
@@ -96,7 +97,8 @@ export function createPackageController(packages: Packages) {
       "get-info": command({
         permission: "read",
         input: filesystemLocationArgsSchema,
-        handle: ({ location }) => packages.getPackageInfo(location),
+        handle: ({ location }) =>
+          packageInfoResponse(packages.getPackageInfo(location)),
       }),
       "get-size": command({
         permission: "read",

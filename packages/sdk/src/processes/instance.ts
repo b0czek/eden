@@ -9,7 +9,7 @@ import type { AppChannels } from "../appbus/service";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
 import type { Views } from "../views/service";
 import type { Backends } from "./backends";
-import { BackendStartupFailed } from "./errors";
+import { BackendStartupFailed, ProcessStopFailed } from "./errors";
 
 import type { AppRuntime } from "./types";
 
@@ -68,26 +68,49 @@ export const acquireAppInstance = Effect.fn(function* (
         launchFile,
       )).backend
     : undefined;
-  const viewId = manifest.frontend?.entry
-    ? yield* Effect.acquireRelease(
-        views.createView(
+  let viewId = -1;
+  let closed = false;
+  const close: Effect.Effect<void, ProcessStopFailed> = Effect.uninterruptible(
+    Effect.suspend(() => {
+      if (closed) return Effect.void;
+      closed = true;
+      return withdrawServices.pipe(
+        Effect.onExit(() =>
+          Effect.suspend(() =>
+            viewId !== -1 && views.getViewInfo(viewId)
+              ? views.removeView(viewId)
+              : Effect.void,
+          ),
+        ),
+        Effect.onExit(() =>
+          backend ? backends.terminateBackend(appId, backend) : Effect.void,
+        ),
+        Effect.mapError(
+          (cause) =>
+            new ProcessStopFailed({
+              appId,
+              cause,
+              message: `Failed to stop app ${appId}`,
+            }),
+        ),
+      );
+    }),
+  );
+  yield* Effect.addFinalizer(() => close.pipe(Effect.orDie));
+  if (manifest.frontend?.entry) {
+    yield* Effect.uninterruptible(
+      Effect.gen(function* () {
+        viewId = yield* views.createView(
           appId,
           manifest,
           installPath,
           bounds,
           launchArgs,
           launchFile,
-        ),
-        (id) =>
-          Effect.suspend(() =>
-            views.getViewInfo(id)
-              ? views.removeView(id).pipe(Effect.orDie)
-              : Effect.void,
-          ),
-      )
-    : -1;
-  // Finalizers run in reverse order: withdraw discovery before native teardown.
-  yield* Effect.addFinalizer(() => withdrawServices);
+        );
+      }),
+    );
+  }
   if (backend && backends.getBackend(appId) !== backend)
     return yield* Effect.fail(
       new BackendStartupFailed({
@@ -107,5 +130,5 @@ export const acquireAppInstance = Effect.fn(function* (
     installedAt: new Date(),
     lastLaunched: new Date(),
   };
-  return { instance, backend };
+  return { instance, backend, close };
 });
