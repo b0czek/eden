@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 import { AppearanceSettings } from "../../../src/appearance/ports";
 import { Appearance, AppearanceLive } from "../../../src/appearance/service";
-import { createAppearanceSettings } from "../../../src/appearance/settings-adapter";
+import { createAppearanceSettings } from "../../../src/appearance/settings";
 import { ExecutionContext } from "../../../src/execution/context";
 import { I18n, I18nLive, I18nSettings } from "../../../src/i18n/service";
 import { createI18nSettings } from "../../../src/i18n/settings";

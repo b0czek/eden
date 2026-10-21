@@ -5,7 +5,7 @@ import { Settings } from "../settings/service";
 import { createAppearanceController } from "./controller-edenapi";
 import { AppearanceSettings } from "./ports";
 import { Appearance } from "./service";
-import { createAppearanceSettings } from "./settings-adapter";
+import { createAppearanceSettings } from "./settings";
 
 export const registerAppearanceApi = Effect.gen(function* () {
   (yield* IpcTransport).registerController(

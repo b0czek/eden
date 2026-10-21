@@ -108,7 +108,7 @@ export interface AppearanceSettings {
 
 The domain owns this contract. Adapt collaborating services to it at the
 composition boundary, as in
-[appearance/settings-adapter.ts](../packages/sdk/src/appearance/settings-adapter.ts)
+[appearance/settings.ts](../packages/sdk/src/appearance/settings.ts)
 and [i18n/settings.ts](../packages/sdk/src/i18n/settings.ts). Those adapters
 translate persistence keys and notifications while composing the settings
 service's Effects directly. Adapters for native Promise APIs defer work with

@@ -6,7 +6,7 @@ import { StorageReadError, StorageWriteError } from "../storage/errors";
 import { AppearanceSettings } from "./ports";
 import { DEFAULT_WALLPAPER_PRESET } from "./presets";
 import { Appearance, AppearanceLive } from "./service";
-import { createAppearanceSettings } from "./settings-adapter";
+import { createAppearanceSettings } from "./settings";
 
 describe("appearance effects", () => {
   it.each(["not JSON", JSON.stringify({ type: "custom", value: 42 })])(
