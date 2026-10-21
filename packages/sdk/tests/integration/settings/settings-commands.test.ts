@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { SettingAccessError } from "../../../src/settings/errors";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 
 it("keeps denied cross-namespace reads and superuser setting mutations in the expected failure channel", async () => {
   const eden = await createTestEden();

@@ -12,7 +12,7 @@ import * as Fiber from "effect/Fiber";
 import type { CommandCallerContext } from "../../../src/execution/context";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { registerTestVolume } from "../../support/filesystem";
 
 describe("file handle access and lifetime", () => {

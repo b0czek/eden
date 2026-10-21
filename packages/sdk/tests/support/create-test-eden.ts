@@ -15,7 +15,7 @@ import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,
   type InMemoryUtilityProcess,
-} from "./InMemoryPlatform";
+} from "./in-memory-platform";
 
 export interface CreateTestEdenOptions {
   autoStart?: boolean;

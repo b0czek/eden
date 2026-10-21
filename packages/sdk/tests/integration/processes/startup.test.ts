@@ -5,7 +5,7 @@ import type { WindowingPort } from "../../../src/platform/ports";
 import { ViewNativeFailure } from "../../../src/views/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("app instance ownership", () => {
   const appId = "com.example.owned-launch";

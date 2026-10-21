@@ -1,7 +1,7 @@
 import type { ConnectResult } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 async function scenario() {
   const eden = await createTestEden();

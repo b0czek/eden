@@ -5,7 +5,7 @@ import type {
 } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 
 it("executes a native notification action to replace the busy file picker across services", async () => {
   const eden = await createTestEden();

@@ -1,6 +1,6 @@
 import type { OperationHandle, RuntimeDlcManifest } from "@edenapp/types";
 import { testApp } from "../../support/apps";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("file opening integration", () => {
   let eden: TestEden;

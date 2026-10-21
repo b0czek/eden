@@ -15,7 +15,7 @@ import {
 import type { ShellCommandResponse } from "../../../src/app-runtime/common/shell-transport";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe.each(["window", "worker"])(
   "generated %s client over production shell IPC",

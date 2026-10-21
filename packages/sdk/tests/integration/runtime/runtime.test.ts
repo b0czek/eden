@@ -10,7 +10,7 @@ import * as desktopComposition from "../../../src/runtime/composition";
 import { Desktop } from "../../../src/runtime/desktop";
 import { hashPassword } from "../../../src/user/auth";
 import { gate } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,

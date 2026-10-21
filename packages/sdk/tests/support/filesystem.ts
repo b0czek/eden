@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FilesystemVolumeRegistration } from "@edenapp/types";
 import type { EdenVolumeOptions } from "../../src/api/control-plane";
-import type { TestEden } from "./createTestEden";
+import type { TestEden } from "./create-test-eden";
 
 export async function registerTestVolume(
   eden: TestEden,

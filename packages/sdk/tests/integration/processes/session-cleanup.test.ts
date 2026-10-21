@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("session cleanup failure composition", () => {
   let eden: TestEden;

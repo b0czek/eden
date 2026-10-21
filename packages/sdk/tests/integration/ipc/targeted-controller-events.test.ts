@@ -8,7 +8,7 @@ import {
 import { createEvent } from "../../../src/events/event";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 
 it("delivers a controller notification only to selected subscribed views and releases forwarding on shutdown", async () => {
   const eden = await createTestEden();

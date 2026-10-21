@@ -10,7 +10,7 @@ import { SqliteDbStorageLive } from "../../../src/db/sqlite-storage";
 import { AppsDirectory } from "../../../src/runtime/inputs";
 import { StorageClosedError } from "../../../src/storage/errors";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 import {
   buildService,
   createEffectRuntime,

@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import { StorageClosedError } from "../../../src/storage/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 async function readyBackend(eden: TestEden, appId: string, previousPid = 0) {
   const deadline = Date.now() + 2000;

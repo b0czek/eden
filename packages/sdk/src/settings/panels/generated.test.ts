@@ -1,8 +1,8 @@
 import type { RuntimeAppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { testApp } from "../../../tests/support/apps";
+import { createSettingsPanelHarness as harness } from "../../../tests/support/settings/panel-harness";
 import { panelUser as user } from "../../../tests/support/settings/panels";
-import { createSettingsPanelHarness as harness } from "../../../tests/support/settings/SettingsPanelTestHarness";
 
 describe("SettingsPanels manifest panels", () => {
   it("normalizes one app panel and reads only setting-granted keys", async () => {

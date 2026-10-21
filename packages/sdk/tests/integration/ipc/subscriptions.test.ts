@@ -24,7 +24,7 @@ import type { OperationReporter } from "../../../src/operations/task";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { promiseOperationTask } from "../../support/operations";
 
 const _eventName = "volume/changed";

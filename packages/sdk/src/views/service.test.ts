@@ -7,7 +7,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
-import { InMemoryPlatform } from "../../tests/support/InMemoryPlatform";
+import { InMemoryPlatform } from "../../tests/support/in-memory-platform";
 import { createEvent } from "../events/event";
 import type { Bounds, PlatformWindow } from "../platform/ports";
 import { WindowingPort } from "../platform/ports/types";

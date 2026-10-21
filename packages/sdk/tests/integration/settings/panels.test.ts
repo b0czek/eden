@@ -1,6 +1,6 @@
 import type { SettingsPanelResponse } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("SettingsPanels integration", () => {
   let eden: TestEden;

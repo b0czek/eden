@@ -11,7 +11,7 @@ import { createFileTransfers } from "../../../src/filesystem/transfers";
 import type { Operations } from "../../../src/operations/service";
 import { operationTask } from "../../../src/operations/task";
 import { gate } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("operation completion failures", () => {
   let eden: TestEden;

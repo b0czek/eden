@@ -1,7 +1,7 @@
 import type { Processes } from "../../../src/processes/service";
 import { testApp } from "../../support/apps";
 import { tick } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 async function readyBackend(eden: TestEden, appId: string) {
   await tick();

@@ -7,7 +7,7 @@ import type {
 } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,

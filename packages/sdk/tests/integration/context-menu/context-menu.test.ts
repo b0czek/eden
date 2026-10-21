@@ -12,7 +12,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../support/effect-runtime";
-import { InMemoryPlatform } from "../../support/InMemoryPlatform";
+import { InMemoryPlatform } from "../../support/in-memory-platform";
 
 async function scenario() {
   const runtime = createEffectRuntime();

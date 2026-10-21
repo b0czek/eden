@@ -1,6 +1,6 @@
 import { createEdenHost } from "../../../src/host";
 import { gate } from "../../support/async";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 
 it("disposes the host before application readiness without starting desktop services", async () => {
   const eden = await createTestEden({ autoStart: false });

@@ -32,7 +32,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../support/effect-runtime";
-import { InMemoryPlatform } from "../../support/InMemoryPlatform";
+import { InMemoryPlatform } from "../../support/in-memory-platform";
 
 function unusedProcessMethod(): never {
   throw new Error("Keyboard must only observe process stop notifications");

@@ -10,7 +10,7 @@ import { decodeLaunchContext } from "../../../src/utils/app-launch-context";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { registerTestVolume } from "../../support/filesystem";
 
 const appId = "com.example.volumes";

@@ -3,7 +3,7 @@ import * as path from "node:path";
 import type { DaemonDefinition } from "@edenapp/types";
 import * as v from "valibot";
 import { testApp } from "../../support/apps";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("package and daemon SDK boundaries", () => {
   let eden: TestEden;

@@ -3,7 +3,7 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import type { Users } from "../../../src/user/service";
 import { testApp } from "../../support/apps";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const mutations = [
   ["user/create", { username: "new", name: "New", password: "new-password" }],

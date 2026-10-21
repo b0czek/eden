@@ -25,7 +25,7 @@ import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage"
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestExecutionContext } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import {
   buildService,
   createEffectRuntime,

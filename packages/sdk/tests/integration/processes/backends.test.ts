@@ -15,7 +15,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../support/effect-runtime";
-import { InMemoryPlatform } from "../../support/InMemoryPlatform";
+import { InMemoryPlatform } from "../../support/in-memory-platform";
 
 describe("backend readiness and termination", () => {
   let effects: ReturnType<typeof createEffectRuntime>;

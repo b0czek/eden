@@ -11,7 +11,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { EdenPackageChange } from "../../../src/api";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const vendor: UserProfile = {
   username: "vendor",

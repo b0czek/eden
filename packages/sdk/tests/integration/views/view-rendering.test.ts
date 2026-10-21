@@ -7,7 +7,7 @@ import { createTiling } from "../../../src/views/tiling";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createEffectRuntime } from "../../support/effect-runtime";
-import { InMemoryPlatform } from "../../support/InMemoryPlatform";
+import { InMemoryPlatform } from "../../support/in-memory-platform";
 
 it.each([false, true])(
   "renders later views while earlier CSS is pending (closed=%s)",

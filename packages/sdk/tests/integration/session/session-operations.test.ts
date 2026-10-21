@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { promiseOperationTask } from "../../support/operations";
 
 describe("session operation transactions", () => {

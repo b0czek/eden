@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import { command, defineController } from "../../../src/controllers/controller";
 import { fromPromise } from "../../../src/effects/io";
 import { testApp } from "../../support/apps";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { promiseOperationTask } from "../../support/operations";
 
 const appId = "com.example.command-deadlines";

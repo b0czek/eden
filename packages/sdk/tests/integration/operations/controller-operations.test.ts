@@ -6,7 +6,7 @@ import {
   operation,
 } from "../../../src/controllers/controller";
 import { gate } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("Effect controller operations", () => {
   let eden: TestEden;

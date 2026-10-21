@@ -7,7 +7,7 @@ import * as packageBundler from "@edenapp/genesis/dist/bundler";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const caller = (appId: string, profile: UserProfile) => ({
   appId,

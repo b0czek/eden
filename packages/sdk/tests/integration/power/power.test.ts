@@ -1,6 +1,6 @@
 import type { OperationHandle } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 import { promiseOperationTask } from "../../support/operations";
 
 describe("power operation lifecycle", () => {

@@ -5,7 +5,7 @@ import {
   ExecutionContextLive,
 } from "../../src/execution/context";
 import { RuntimeConfig } from "../../src/runtime/inputs";
-import type { TestEden } from "./createTestEden";
+import type { TestEden } from "./create-test-eden";
 import { buildService } from "./effect-runtime";
 
 /** Scoped caller context with a controlled grant policy for settings fixtures. */

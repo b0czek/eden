@@ -1,7 +1,7 @@
 import type { Notification } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden } from "../../support/createTestEden";
+import { createTestEden } from "../../support/create-test-eden";
 
 it("delivers through real notification controllers only to the display and original source views", async () => {
   const eden = await createTestEden();

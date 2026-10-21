@@ -5,7 +5,7 @@ import { operationTask } from "../../../src/operations/task";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
-import { createTestEden, type TestEden } from "../../support/createTestEden";
+import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 describe("renderer command completion", () => {
   const appId = "app.renderer-completion";
