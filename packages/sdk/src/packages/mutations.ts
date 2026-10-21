@@ -18,7 +18,7 @@ import type { InstalledPackages } from "./installed";
 import type { PackageManifests } from "./manifests";
 import type { PackagePermissions, PackageRuntimeContexts } from "./ports";
 import type { PackageTransactions } from "./transactions";
-import type { PackageNamespaceEvents } from "./types";
+import type { PackageEvents } from "./types";
 
 const RESERVED_PACKAGE_IDS = new Set([
   "com.eden",
@@ -40,7 +40,7 @@ export function createPackageMutations({
   permissions,
   runtimeContexts,
   manifests,
-  operations,
+  packageTransactions,
   installed,
   uninstalled,
 }: {
@@ -50,9 +50,9 @@ export function createPackageMutations({
   permissions: PackagePermissions;
   runtimeContexts: PackageRuntimeContexts;
   manifests: PackageManifests;
-  operations: PackageTransactions;
-  installed: Event<PackageNamespaceEvents["installed"]>;
-  uninstalled: Event<PackageNamespaceEvents["uninstalled"]>;
+  packageTransactions: PackageTransactions;
+  installed: Event<PackageEvents["installed"]>;
+  uninstalled: Event<PackageEvents["uninstalled"]>;
 }) {
   const changingHostIds = new Map<string, number>();
   const installPackageFromHostPath = Effect.fn(function* (
@@ -65,7 +65,7 @@ export function createPackageMutations({
     const info = yield* readPackageInfo(edenitePath);
     const rawManifest = info.manifest;
     yield* assertPackageIdAvailable(rawManifest.id);
-    return yield* operations.runExclusive(
+    return yield* packageTransactions.runExclusive(
       installPackageExclusive(
         edenitePath,
         rawManifest,
@@ -176,7 +176,7 @@ export function createPackageMutations({
       );
     }
     const targetPath = path.join(appsDirectory, rawManifest.id);
-    yield* operations.execute(
+    yield* packageTransactions.execute(
       [
         {
           target: targetPath,
@@ -221,7 +221,7 @@ export function createPackageMutations({
     packageId: string,
     reporter?: OperationReporter,
   ) {
-    return yield* operations.runExclusive(
+    return yield* packageTransactions.runExclusive(
       uninstallPackageExclusive(packageId, reporter),
       reporter,
     );
@@ -271,7 +271,7 @@ export function createPackageMutations({
         }),
       );
     }
-    yield* operations.execute(
+    yield* packageTransactions.execute(
       [
         { target: path.join(appsDirectory, manifest.id) },
         ...dlcs.map((dlc) => ({
@@ -327,7 +327,7 @@ export function createPackageMutations({
       );
     }
     const target = path.join(catalog.dlcDirectory, manifest.id);
-    yield* operations.execute(
+    yield* packageTransactions.execute(
       [
         {
           target,
@@ -373,7 +373,7 @@ export function createPackageMutations({
       );
     }
     yield* assertHostStopped(manifest.hostAppId);
-    yield* operations.execute(
+    yield* packageTransactions.execute(
       [{ target: path.join(catalog.dlcDirectory, manifest.id) }],
       reporter,
     );

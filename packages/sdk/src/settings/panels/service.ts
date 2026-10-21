@@ -40,7 +40,7 @@ import {
   createGeneratedSettingsPanel,
   type GeneratedPanelOwner,
 } from "./generated";
-import { PanelRegistryService, type SettingsPanelEvents } from "./registry";
+import { PanelRegistry, type SettingsPanelEvents } from "./registry";
 import { cloneRendererValue } from "./serialization";
 import type {
   InternalSettingsPanelProvider,
@@ -97,7 +97,7 @@ export const SettingsPanelsLive = Layer.effect(
     const packageCatalog = yield* PackageCatalog;
     const sessionContext = yield* SessionContext;
     const executionContext = yield* ExecutionContext;
-    const registry = yield* PanelRegistryService;
+    const registry = yield* PanelRegistry;
     const { panels, changed, registerPanel, register } = registry;
 
     function registerBuiltinPanel(

@@ -49,11 +49,7 @@ import { watchHotReload } from "./hot-reload";
 import { acquireAppInstance } from "./instance";
 import { createProcessMetrics } from "./metrics";
 import { ProcessesRouting } from "./ports";
-import type {
-  AppRuntime,
-  InstanceRecord,
-  ProcessNamespaceEvents,
-} from "./types";
+import type { AppRuntime, InstanceRecord, ProcessEvents } from "./types";
 
 export interface Processes {
   launched: Event<{ instance: AppInstance }>;
@@ -113,11 +109,11 @@ export const ProcessesLive = Layer.effect(
     const runtimeContexts = yield* RuntimeContexts;
     const processMetrics = yield* ProcessMetricsPort;
     const routing = yield* ProcessesRouting;
-    const launched = yield* scopedEvent<ProcessNamespaceEvents["launched"]>();
-    const stopped = yield* scopedEvent<ProcessNamespaceEvents["stopped"]>();
-    const reloading = yield* scopedEvent<ProcessNamespaceEvents["reloading"]>();
-    const processError = yield* scopedEvent<ProcessNamespaceEvents["error"]>();
-    const exited = yield* scopedEvent<ProcessNamespaceEvents["exited"]>();
+    const launched = yield* scopedEvent<ProcessEvents["launched"]>();
+    const stopped = yield* scopedEvent<ProcessEvents["stopped"]>();
+    const reloading = yield* scopedEvent<ProcessEvents["reloading"]>();
+    const processError = yield* scopedEvent<ProcessEvents["error"]>();
+    const exited = yield* scopedEvent<ProcessEvents["exited"]>();
     const forkLifecycle = yield* FiberSet.makeRuntime<never, void, never>();
     function runLifecycle(work: Effect.Effect<unknown, unknown>) {
       forkLifecycle(

@@ -90,7 +90,7 @@ import { seedDatabase } from "../seed/seed";
 import { SessionContextLive } from "../session/context";
 import { registerSessionsApi } from "../session/runtime";
 import { SessionsLive } from "../session/service";
-import { PanelRegistryService } from "../settings/panels/registry";
+import { PanelRegistry } from "../settings/panels/registry";
 import { registerSettingsPanelsApi } from "../settings/panels/runtime";
 import { SettingsPanelsLive } from "../settings/panels/service";
 import { registerSettingsApi, SettingsCatalogLive } from "../settings/runtime";
@@ -213,7 +213,7 @@ export function createDesktopLayer(environment: RuntimeEnvironment) {
         Context.add(AppsDirectory, paths.appsDirectory),
         Context.add(UserDirectory, paths.userDirectory),
         Context.add(DistPath, paths.distPath),
-        Context.add(PanelRegistryService, registrations),
+        Context.add(PanelRegistry, registrations),
         Context.add(WindowingPort, platform.windows),
         Context.add(RendererIpcPort, platform.rendererIpc),
         Context.add(UtilityProcessPort, platform.utilityProcesses),

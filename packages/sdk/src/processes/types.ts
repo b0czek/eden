@@ -13,7 +13,7 @@ export interface AppRuntime {
   profile?: UserProfile;
 }
 
-export interface ProcessNamespaceEvents {
+export interface ProcessEvents {
   launched: { instance: AppInstance };
   stopped: { appId: string };
   reloading: { appId: string };

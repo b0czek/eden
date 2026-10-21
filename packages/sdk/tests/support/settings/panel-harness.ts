@@ -9,7 +9,7 @@ import { RuntimeConfig } from "../../../src/runtime/inputs";
 import { SessionContext } from "../../../src/session/context";
 import {
   createPanelRegistry,
-  PanelRegistryService,
+  PanelRegistry,
 } from "../../../src/settings/panels/registry";
 import {
   SettingsPanels,
@@ -109,7 +109,7 @@ export function createSettingsPanelHarness(
         getSessionId: () => sessionId,
       } as SessionContext),
       Effect.provideService(ExecutionContext, execution),
-      Effect.provideService(PanelRegistryService, createPanelRegistry()),
+      Effect.provideService(PanelRegistry, createPanelRegistry()),
     ),
   );
   panels.changed.on(notify);

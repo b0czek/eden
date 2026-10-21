@@ -45,14 +45,11 @@ import { InstalledPackages } from "./installed";
 import { createPackageManifests } from "./manifests";
 import { createPackageMutations } from "./mutations";
 import { PackageTransactions } from "./transactions";
-import type {
-  InstalledPackageListOptions,
-  PackageNamespaceEvents,
-} from "./types";
+import type { InstalledPackageListOptions, PackageEvents } from "./types";
 
 export interface Packages {
-  installed: Event<PackageNamespaceEvents["installed"]>;
-  uninstalled: Event<PackageNamespaceEvents["uninstalled"]>;
+  installed: Event<PackageEvents["installed"]>;
+  uninstalled: Event<PackageEvents["uninstalled"]>;
   initialize: () => Effect.Effect<void, PackageInitializationError>;
   getPackageInfo: (location: FilesystemLocation) => Effect.Effect<PackageInfo>;
   getPackageInfoFromHostPath: (hostPath: string) => Effect.Effect<PackageInfo>;
@@ -128,12 +125,11 @@ export const PackagesLive = Layer.effect(
     const registry = yield* InstalledPackages;
     const catalog = yield* PackageCatalog;
     const dlcResources = yield* DlcResources;
-    const operations = yield* PackageTransactions;
+    const packageTransactions = yield* PackageTransactions;
     const runtimeContexts = yield* RuntimeContexts;
     const prebuiltPackagesDirectory = path.join(distPath, "apps", "prebuilt");
-    const installed = yield* scopedEvent<PackageNamespaceEvents["installed"]>();
-    const uninstalled =
-      yield* scopedEvent<PackageNamespaceEvents["uninstalled"]>();
+    const installed = yield* scopedEvent<PackageEvents["installed"]>();
+    const uninstalled = yield* scopedEvent<PackageEvents["uninstalled"]>();
     const manifests = createPackageManifests(config);
     const discovery = createPackageDiscovery({
       appsDirectory,
@@ -151,7 +147,7 @@ export const PackagesLive = Layer.effect(
       permissions,
       runtimeContexts,
       manifests,
-      operations,
+      packageTransactions,
       installed,
       uninstalled,
     });
@@ -177,7 +173,7 @@ export const PackagesLive = Layer.effect(
         yield* fromPromise(() =>
           fs.mkdir(catalog.dlcDirectory, { recursive: true }),
         );
-        yield* operations.initialize();
+        yield* packageTransactions.initialize();
         // Discover built-in packages and register apps before resolving DLC hosts.
         const prebuiltDlcs = yield* discovery.loadPrebuiltPackages();
         const prebuiltDlcIds = new Set(prebuiltDlcs.map((dlc) => dlc.id));

@@ -3,7 +3,7 @@ import type { InstalledPackageManifest } from "@edenapp/types";
 /**
  * Package installation and removal notifications.
  */
-export interface PackageNamespaceEvents {
+export interface PackageEvents {
   installed: {
     manifest: InstalledPackageManifest;
   };

@@ -35,7 +35,7 @@ export const inspectRuntimeServices = Effect.gen(function* () {
     ipc: yield* IpcTransport,
     installedPackages: yield* InstalledPackages,
     catalog: yield* PackageCatalog,
-    packageOperations: yield* PackageTransactions,
+    packageTransactions: yield* PackageTransactions,
     dlcResources: yield* DlcResources,
     settings: yield* Settings,
     settingsPanels: yield* SettingsPanels,

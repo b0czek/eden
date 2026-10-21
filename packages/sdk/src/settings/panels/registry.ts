@@ -42,10 +42,10 @@ export interface PanelRegistry {
   dispose(): void;
 }
 
-export const PanelRegistryService = Context.Service<
-  "eden/PanelRegistryService",
+export const PanelRegistry = Context.Service<
+  "eden/PanelRegistry",
   PanelRegistry
->("eden/PanelRegistryService");
+>("eden/PanelRegistry");
 
 /** Synchronous host registrations have a lifetime independent of service startup. */
 export function createPanelRegistry(): PanelRegistry {

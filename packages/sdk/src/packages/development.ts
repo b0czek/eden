@@ -18,7 +18,7 @@ import { PackageDevelopmentError, PackageRejected } from "./errors";
 import type { InstalledPackages } from "./installed";
 import type { PackageManifests } from "./manifests";
 import type { PackagePermissions } from "./ports";
-import type { PackageNamespaceEvents } from "./types";
+import type { PackageEvents } from "./types";
 
 export function createPackageDevelopment({
   config,
@@ -34,7 +34,7 @@ export function createPackageDevelopment({
   registry: InstalledPackages;
   permissions: PackagePermissions;
   manifests: PackageManifests;
-  installed: Event<PackageNamespaceEvents["installed"]>;
+  installed: Event<PackageEvents["installed"]>;
   getIncompatibleDlcs: (host: AppManifest) => RuntimeDlcManifest[];
 }) {
   const reloadPackage = Effect.fn(function* (packageId: string) {
