@@ -1,7 +1,8 @@
-import * as fs from "node:fs";
 import { registerHooks } from "node:module";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { isPathWithin } from "../../filesystem/lexical-path";
+import { syncIo } from "../../filesystem/native-sync";
 
 export interface BackendDlcBinding {
   capability: string;
@@ -63,17 +64,15 @@ export function resolveDlcModuleSpecifier(
   if (!root) throw new Error(`DLC ${dlcId} is not available to this backend`);
 
   const target = path.resolve(root, ...relativeSegments);
-  const relative = path.relative(root, target);
-  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+  if (!isPathWithin(root, target, { allowRoot: false })) {
     throw new Error("Eden DLC module path escapes its package root");
   }
-  const realRoot = fs.realpathSync(root);
-  const realTarget = fs.realpathSync(target);
-  if (!fs.statSync(realTarget).isFile()) {
+  const realRoot = syncIo.realpath(root);
+  const realTarget = syncIo.realpath(target);
+  if (!syncIo.stat(realTarget).isFile()) {
     throw new Error("Eden DLC module path is not a file");
   }
-  const realRelative = path.relative(realRoot, realTarget);
-  if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+  if (!isPathWithin(realRoot, realTarget)) {
     throw new Error("Eden DLC module resolves outside its package root");
   }
 
@@ -109,7 +108,7 @@ export function installDlcModuleResolver(serializedBinding?: string): void {
     const fileUrl = resolveDlcModuleSpecifier(requestUrl, binding);
     if (!fileUrl) throw new TypeError("Invalid Eden DLC resource URL");
     const filePath = fileURLToPath(fileUrl);
-    const body = method === "HEAD" ? null : fs.readFileSync(filePath);
+    const body = method === "HEAD" ? null : syncIo.readFile(filePath);
     signal?.throwIfAborted();
     const response = new Response(body, {
       status: 200,

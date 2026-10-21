@@ -22,15 +22,14 @@ describe("path containment", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("allows the root and its descendants but rejects parents and sibling roots", () => {
-    for (const target of [
-      root,
-      path.join(root, "nested/file"),
-      path.join(root, "..notes"),
-    ])
-      expect(() => assertPathWithin(root, target)).not.toThrow();
-    for (const target of [directory, `${root}-sibling/file`])
-      expect(() => assertPathWithin(root, target)).toThrow(PathOutsideRoot);
+  it("adapts a lexical escape to PathOutsideRoot", () => {
+    expect(() => assertPathWithin(root, root)).not.toThrow();
+    expect(() => assertPathWithin(root, directory, "Source")).toThrow(
+      new PathOutsideRoot({
+        path: directory,
+        message: "Source is outside of the allowed directory",
+      }),
+    );
   });
 
   it("allows missing descendants through contained symlinks and a symlinked root", async () => {
@@ -87,7 +86,7 @@ describe("path containment", () => {
         assertExistingPathWithin(missing, path.join(missing, "file")),
       ),
     ).rejects.toMatchObject({
-      _tag: "PathContainmentIoError",
+      _tag: "FilesystemIoFailed",
       operation: "realpath",
       path: missing,
       cause: expect.objectContaining({ code: "ENOENT" }),
@@ -102,7 +101,7 @@ describe("path containment", () => {
         assertExistingPathWithin(root, path.join(link, "file")),
       ),
     ).rejects.toMatchObject({
-      _tag: "PathContainmentIoError",
+      _tag: "FilesystemIoFailed",
       operation: "realpath",
       path: link,
       cause: expect.objectContaining({ code: "ENOENT" }),
@@ -116,7 +115,7 @@ describe("path containment", () => {
     await expect(
       Effect.runPromise(assertExistingPathWithin(root, target)),
     ).rejects.toMatchObject({
-      _tag: "PathContainmentIoError",
+      _tag: "FilesystemIoFailed",
       operation: "lstat",
       path: target,
       cause: expect.objectContaining({ code: "ENOTDIR" }),

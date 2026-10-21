@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import type { OperationHandle, RuntimeDlcManifest } from "@edenapp/types";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
@@ -91,8 +92,9 @@ describe("file opening integration", () => {
     await expect(
       eden.runtime.effects.run(operations.wait(handle, caller)),
     ).rejects.toMatchObject({
-      _tag: "FileMetadataFailed",
-      location,
+      _tag: "FilesystemIoFailed",
+      path: path.join(eden.paths.userDirectory, "missing.txt"),
+      operation: "stat",
       cause: { code: "ENOENT" },
     });
     expect(operations.get(handle, caller)).toMatchObject({

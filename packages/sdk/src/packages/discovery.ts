@@ -1,9 +1,9 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
 import type { DlcManifest, EdenConfig, PackageManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { asError, fromPromise } from "../effects/io";
+import { asError } from "../effects/io";
+import { io } from "../filesystem/native-io";
 import { loadHotReloadAppsState } from "../hotreload-config";
 import type { Permissions } from "../ipc/permissions";
 import { log } from "../logging/logger";
@@ -35,8 +35,9 @@ export function createPackageDiscovery({
       yield* Effect.catch(
         Effect.gen(function* () {
           const sourcePath = path.resolve(entry.sourcePath);
-          const manifestContents = yield* fromPromise(() =>
-            fs.readFile(path.join(sourcePath, "manifest.json"), "utf-8"),
+          const manifestContents = yield* io.readFile(
+            path.join(sourcePath, "manifest.json"),
+            "utf-8",
           );
           const parsed = (yield* Effect.try({
             try: () => JSON.parse(manifestContents),
@@ -93,21 +94,19 @@ export function createPackageDiscovery({
     const packageIds = new Set<string>();
     yield* Effect.catch(
       Effect.gen(function* () {
-        const directoryExists = yield* fromPromise(() =>
-          fs.access(prebuiltPackagesDirectory),
-        ).pipe(
-          Effect.map(() => true),
-          Effect.catch(() => Effect.succeed(false)),
-        );
+        const directoryExists = yield* io
+          .access(prebuiltPackagesDirectory)
+          .pipe(
+            Effect.map(() => true),
+            Effect.catch(() => Effect.succeed(false)),
+          );
         if (!directoryExists) {
           log.info("No built-in package directory found, skipping...");
           return;
         }
-        const entries = yield* fromPromise(() =>
-          fs.readdir(prebuiltPackagesDirectory, {
-            withFileTypes: true,
-          }),
-        );
+        const entries = yield* io.readdir(prebuiltPackagesDirectory, {
+          withFileTypes: true,
+        });
         for (const entry of entries) {
           if (entry.isDirectory() && !entry.name.startsWith(".")) {
             yield* Effect.catch(
@@ -117,8 +116,9 @@ export function createPackageDiscovery({
                   entry.name,
                   "manifest.json",
                 );
-                const manifestContent = yield* fromPromise(() =>
-                  fs.readFile(manifestPath, "utf-8"),
+                const manifestContent = yield* io.readFile(
+                  manifestPath,
+                  "utf-8",
                 );
                 const parsed = (yield* Effect.try({
                   try: () => JSON.parse(manifestContent),
@@ -218,20 +218,16 @@ export function createPackageDiscovery({
   const loadInstalledDlcs = Effect.fn(function* (
     prebuiltDlcIds: ReadonlySet<string>,
   ) {
-    const entries = yield* fromPromise(() =>
-      fs.readdir(catalog.dlcDirectory, {
-        withFileTypes: true,
-      }),
-    );
+    const entries = yield* io.readdir(catalog.dlcDirectory, {
+      withFileTypes: true,
+    });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       yield* Effect.catch(
         Effect.gen(function* () {
-          const manifestContents = yield* fromPromise(() =>
-            fs.readFile(
-              path.join(catalog.dlcDirectory, entry.name, "manifest.json"),
-              "utf-8",
-            ),
+          const manifestContents = yield* io.readFile(
+            path.join(catalog.dlcDirectory, entry.name, "manifest.json"),
+            "utf-8",
           );
           const parsed = (yield* Effect.try({
             try: () => JSON.parse(manifestContents),
@@ -283,11 +279,9 @@ export function createPackageDiscovery({
   ) {
     return yield* Effect.catch(
       Effect.gen(function* () {
-        const entries = yield* fromPromise(() =>
-          fs.readdir(appsDirectory, {
-            withFileTypes: true,
-          }),
-        );
+        const entries = yield* io.readdir(appsDirectory, {
+          withFileTypes: true,
+        });
         for (const entry of entries) {
           if (entry.isDirectory() && !entry.name.startsWith(".")) {
             yield* Effect.catch(
@@ -297,8 +291,9 @@ export function createPackageDiscovery({
                   entry.name,
                   "manifest.json",
                 );
-                const manifestContent = yield* fromPromise(() =>
-                  fs.readFile(manifestPath, "utf-8"),
+                const manifestContent = yield* io.readFile(
+                  manifestPath,
+                  "utf-8",
                 );
                 const parsed = (yield* Effect.try({
                   try: () => JSON.parse(manifestContent),

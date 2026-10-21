@@ -8,9 +8,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import * as v from "valibot";
+import type { FilesystemIoFailed } from "../filesystem/native-errors";
 import { log } from "../logging/logger";
 import { PackageCatalog } from "../packages/catalog";
-import type { AppAssociationStorageWriteError } from "./errors";
+
 import { AppAssociationStorage } from "./ports";
 import { appAssociationSchema } from "./schemas";
 
@@ -24,8 +25,8 @@ export interface AppAssociations {
   set: (
     key: string,
     association: AppAssociation,
-  ) => Effect.Effect<void, AppAssociationStorageWriteError>;
-  remove: (key: string) => Effect.Effect<void, AppAssociationStorageWriteError>;
+  ) => Effect.Effect<void, FilesystemIoFailed>;
+  remove: (key: string) => Effect.Effect<void, FilesystemIoFailed>;
   list: (options?: AppAssociationListOptions) => Record<string, AppAssociation>;
 }
 

@@ -91,11 +91,4 @@ export class SessionProcessesStopFailed extends Data.TaggedError(
   message: string;
 }> {}
 
-export class HotReloadWatchFailed extends Data.TaggedError(
-  "HotReloadWatchFailed",
-)<{
-  path: string;
-  cause: unknown;
-  message: string;
-}> {}
 export type ProcessStopError = ProcessNotRunning | ProcessStopFailed;

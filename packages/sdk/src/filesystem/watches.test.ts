@@ -56,8 +56,8 @@ describe("filesystem watch debounce", () => {
     const rightPath = path.join(directory, "right");
     await fs.mkdir(leftPath);
     await fs.mkdir(rightPath);
-    const left = watches.watch(leftPath, 1, "home");
-    const right = watches.watch(rightPath, 2, "home");
+    const left = await effects.run(watches.watch(leftPath, 1, "home"));
+    const right = await effects.run(watches.watch(rightPath, 2, "home"));
 
     watches.invalidate(leftPath);
     await advance(50);
@@ -78,11 +78,11 @@ describe("filesystem watch debounce", () => {
   });
 
   it("drops a pending notification when its watch is removed and lets a replacement watch debounce", async () => {
-    const previous = watches.watch(directory, 1, "home");
+    const previous = await effects.run(watches.watch(directory, 1, "home"));
     watches.invalidate(directory);
     await advance(50);
     watches.unwatch(previous.watchId, 1);
-    const replacement = watches.watch(directory, 1, "home");
+    const replacement = await effects.run(watches.watch(directory, 1, "home"));
     watches.invalidate(directory);
 
     await advance(50);
@@ -94,7 +94,7 @@ describe("filesystem watch debounce", () => {
   });
 
   it("drops pending notifications when the service scope closes", async () => {
-    watches.watch(directory, 1, "home");
+    await effects.run(watches.watch(directory, 1, "home"));
     watches.invalidate(directory);
     await effects.run(watches.close());
     await advance(100);

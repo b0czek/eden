@@ -1,25 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { pipeline } from "node:stream/promises";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Result from "effect/Result";
-import { fromPromise } from "../effects/io";
 import type { OperationReporter } from "../operations/task";
 import {
   FilesystemAccessDenied,
-  FilesystemIoFailed,
   type FilesystemPathError,
   type FilesystemTransferError,
   FilesystemTransferIncomplete,
   FilesystemTransferRejected,
 } from "./errors";
-import { VolumeIoFailed, VolumeUnavailable } from "./volumes/errors";
+import { isPathWithin } from "./lexical-path";
+import { FilesystemIoFailed } from "./native-errors";
+import { io } from "./native-io";
+import { VolumeUnavailable } from "./volumes/errors";
 
 interface TransferRequest {
   source: string;
@@ -47,18 +45,6 @@ interface PathReservation {
 
 export function createFileTransfers() {
   const reservations = new Set<PathReservation>();
-  const nativeError = (operation: string, cause: unknown) =>
-    new FilesystemIoFailed({
-      operation,
-      path: (cause as NodeJS.ErrnoException)?.path,
-      cause,
-      message: `Filesystem ${operation} failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-    });
-  const io = <A>(operation: string, run: () => Promise<A>) =>
-    fromPromise(run, (cause) => nativeError(operation, cause)).pipe(
-      Effect.uninterruptible,
-    );
-
   const copy = (request: TransferRequest) =>
     withReservedPaths(request, copyReserved(request));
   const move = (request: TransferRequest) =>
@@ -80,7 +66,6 @@ export function createFileTransfers() {
           reservation.paths.some((reserved) =>
             paths.some(
               (candidate) =>
-                reserved === candidate ||
                 isPathWithin(reserved, candidate) ||
                 isPathWithin(candidate, reserved),
             ),
@@ -130,12 +115,9 @@ export function createFileTransfers() {
       Effect.gen(function* () {
         yield* assertActive(transfer);
         transfer.reporter?.update("moving");
-        yield* io("rename", () =>
-          fs.rename(transfer.source, transfer.destination),
-        ).pipe(
+        yield* io.rename(transfer.source, transfer.destination).pipe(
           Effect.catch((error) => {
-            if ((error as NodeJS.ErrnoException).code !== "EXDEV")
-              return Effect.fail(error);
+            if (error.code !== "EXDEV") return Effect.fail(error);
             return copyEntry(transfer).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
@@ -151,9 +133,7 @@ export function createFileTransfers() {
       yield* Effect.gen(function* () {
         yield* assertActive(transfer);
         transfer.reporter?.update("removing-source");
-        yield* io("rm", () =>
-          fs.rm(transfer.source, { recursive: true, force: false }),
-        );
+        yield* io.rm(transfer.source, { recursive: true, force: false });
       }).pipe(
         Effect.mapError(
           (error) =>
@@ -173,10 +153,8 @@ export function createFileTransfers() {
     request: TransferRequest,
     operation: "copy" | "move",
   ) {
-    const sourceStats = yield* io("stat", () => fs.stat(request.source));
-    const canonicalSource = yield* io("realpath", () =>
-      fs.realpath(request.source),
-    );
+    const sourceStats = yield* io.stat(request.source);
+    const canonicalSource = yield* io.realpath(request.source);
     const canonicalDestination = yield* resolveCanonicalPath(
       request.destination,
     );
@@ -217,9 +195,7 @@ export function createFileTransfers() {
         }),
       );
     yield* assertActive(request);
-    yield* io("mkdir", () =>
-      fs.mkdir(path.dirname(request.destination), { recursive: true }),
-    );
+    yield* io.mkdir(path.dirname(request.destination));
     return {
       reporter: request.reporter,
       source: request.source,
@@ -250,12 +226,10 @@ export function createFileTransfers() {
                     transfer.assertDestinationActive,
                     transfer.destination,
                   );
-                  yield* io("rm", () =>
-                    fs.rm(transfer.destination, {
-                      recursive: true,
-                      force: true,
-                    }),
-                  );
+                  yield* io.rm(transfer.destination, {
+                    recursive: true,
+                    force: true,
+                  });
                 }),
               ];
               if (backup)
@@ -265,9 +239,7 @@ export function createFileTransfers() {
                       transfer.assertDestinationActive,
                       transfer.destination,
                     );
-                    yield* io("rename", () =>
-                      fs.rename(backup, transfer.destination),
-                    );
+                    yield* io.rename(backup, transfer.destination);
                   }),
                 );
               const rollbackExits = yield* Effect.forEach(rollback, (step) =>
@@ -309,9 +281,7 @@ export function createFileTransfers() {
             transfer.assertDestinationActive,
             transfer.destination,
           );
-          yield* io("rm", () =>
-            fs.rm(backup, { recursive: true, force: true }),
-          );
+          yield* io.rm(backup, { recursive: true, force: true });
         }
       }),
     );
@@ -321,7 +291,7 @@ export function createFileTransfers() {
       path.dirname(destination),
       `.${path.basename(destination)}.eden-transfer-${randomUUID()}`,
     );
-    yield* io("rename", () => fs.rename(destination, backup));
+    yield* io.rename(destination, backup);
     return backup;
   });
 
@@ -333,7 +303,6 @@ export function createFileTransfers() {
       ? check().pipe(
           Effect.mapError((cause) =>
             cause instanceof VolumeUnavailable ||
-            cause instanceof VolumeIoFailed ||
             cause instanceof FilesystemAccessDenied ||
             cause instanceof FilesystemIoFailed
               ? cause
@@ -359,7 +328,7 @@ export function createFileTransfers() {
   const copyEntry = Effect.fn(function* (transfer: PreparedTransfer) {
     const clock = yield* Clock.Clock;
     const { source, destination } = transfer;
-    const sourceStats = yield* io("lstat", () => fs.lstat(source));
+    const sourceStats = yield* io.lstat(source);
     const total = sourceStats.isFile() ? sourceStats.size : undefined;
     let completed = 0;
     let lastReport = 0;
@@ -369,76 +338,22 @@ export function createFileTransfers() {
     };
     report();
     lastReport = Number.NEGATIVE_INFINITY;
-    // fs.cp requires Promise callbacks; keep that conversion at this native edge.
-    // @eden-effect-next-line domain-interpreter -- Native fs.cp filters require Promises; fs.cp awaits them before the volume lease releases.
-    const runFilter = Effect.runPromiseWith(yield* Effect.context<never>());
-    yield* fromPromise(
-      (signal) =>
-        fs.cp(source, destination, {
-          recursive: true,
-          verbatimSymlinks: true,
-          filter: (entrySource, entryDestination) =>
-            runFilter(
-              Effect.gen(function* () {
-                yield* Effect.sync(() => signal.throwIfAborted());
-                yield* assertActive(transfer);
-                if (transfer.reporter) {
-                  const stats = yield* io("lstat", () => fs.lstat(entrySource));
-                  if (stats.isFile()) {
-                    yield* fromPromise(
-                      () =>
-                        pipeline(
-                          createReadStream(entrySource, {
-                            highWaterMark: 1024 * 1024,
-                          }),
-                          async function* (chunks) {
-                            for await (const chunk of chunks) {
-                              yield chunk;
-                              completed += chunk.length;
-                              if (
-                                clock.currentTimeMillisUnsafe() - lastReport >=
-                                100
-                              )
-                                report();
-                            }
-                          },
-                          createWriteStream(entryDestination, {
-                            flags: "wx",
-                            mode: stats.mode,
-                          }),
-                          { signal },
-                        ),
-                      (cause) => nativeError("copy", cause),
-                    );
-                    yield* io("chmod", () =>
-                      fs.chmod(entryDestination, stats.mode),
-                    );
-                    yield* assertActive(transfer);
-                    yield* Effect.sync(() => signal.throwIfAborted());
-                    if (clock.currentTimeMillisUnsafe() - lastReport >= 100)
-                      report();
-                    return false;
-                  }
-                }
-                return true;
-              }),
-            ),
-          errorOnExist: true,
-          force: false,
-        }),
-      (cause) => nativeError("copy", cause),
-    );
+    yield* io.copy(source, destination, {
+      checkAccess: () => assertActive(transfer),
+      onBytes: (bytes) => {
+        completed += bytes;
+        if (clock.currentTimeMillisUnsafe() - lastReport >= 100) report();
+      },
+    });
     yield* assertActive(transfer);
     report();
   });
 
   const pathExists = (hostPath: string) =>
-    io("lstat", () => fs.lstat(hostPath)).pipe(
+    io.lstat(hostPath).pipe(
       Effect.as(true),
       Effect.catch((error) =>
-        (error as NodeJS.ErrnoException).code === "ENOENT"
-          ? Effect.succeed(false)
-          : Effect.fail(error),
+        error.code === "ENOENT" ? Effect.succeed(false) : Effect.fail(error),
       ),
     );
 
@@ -446,14 +361,11 @@ export function createFileTransfers() {
     let existingPath = hostPath;
     const missingSegments: string[] = [];
     while (true) {
-      const result = yield* Effect.result(
-        io("realpath", () => fs.realpath(existingPath)),
-      );
+      const result = yield* Effect.result(io.realpath(existingPath));
       if (Result.isSuccess(result))
         return path.resolve(result.success, ...missingSegments);
       const error = result.failure;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-        return yield* Effect.fail(error);
+      if (error.code !== "ENOENT") return yield* Effect.fail(error);
       const parent = path.dirname(existingPath);
       if (parent === existingPath) return yield* Effect.fail(error);
       missingSegments.unshift(path.basename(existingPath));
@@ -461,14 +373,5 @@ export function createFileTransfers() {
     }
   });
 
-  function isPathWithin(parentPath: string, candidatePath: string): boolean {
-    const relative = path.relative(parentPath, candidatePath);
-    return (
-      relative !== "" &&
-      relative !== ".." &&
-      !relative.startsWith(`..${path.sep}`) &&
-      !path.isAbsolute(relative)
-    );
-  }
   return { copy, move };
 }

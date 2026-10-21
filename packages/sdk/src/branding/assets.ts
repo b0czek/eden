@@ -1,7 +1,6 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
+import { io } from "../filesystem/native-io";
 import { log } from "../logging/logger";
 import type { BrandingAssets } from "./ports";
 
@@ -38,7 +37,7 @@ export function createFilesystemBrandingAssets(
       return undefined;
     }
 
-    const stat = yield* fromPromise(() => fs.stat(resolvedPath)).pipe(
+    const stat = yield* io.stat(resolvedPath).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
           log.warn(
@@ -67,7 +66,7 @@ export function createFilesystemBrandingAssets(
       LOGO_EXTENSIONS,
     );
     if (!logoPath) return undefined;
-    return yield* fromPromise(() => fs.readFile(logoPath)).pipe(
+    return yield* io.readFile(logoPath).pipe(
       Effect.map(
         (contents) =>
           `data:${LOGO_MIME_TYPES[path.extname(logoPath).toLowerCase()]};base64,${contents.toString("base64")}`,

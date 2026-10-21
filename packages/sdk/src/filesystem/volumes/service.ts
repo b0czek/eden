@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import * as fs from "node:fs/promises";
 import type {
   FilesystemVolume,
   FilesystemVolumeRegistration,
@@ -12,7 +11,6 @@ import * as Latch from "effect/Latch";
 import * as Layer from "effect/Layer";
 import type * as Scope from "effect/Scope";
 import type { EdenVolumeOptions } from "../../api/control-plane";
-import { fromPromise } from "../../effects/io";
 import type { Event } from "../../events/event";
 import { scopedEvent } from "../../events/scoped";
 import {
@@ -20,6 +18,8 @@ import {
   type OperationTask,
   operationTask,
 } from "../../operations/task";
+
+import { io } from "../native-io";
 
 import {
   type VolumeAccessError,
@@ -117,23 +117,6 @@ export const VolumesLive = Layer.effect(
       supportsEject: false,
       state: "ready",
     };
-    const io = <A>(
-      volume: string,
-      operation: "register" | "inspect",
-      path: string,
-      run: () => Promise<A>,
-    ) =>
-      fromPromise(
-        run,
-        (cause) =>
-          new VolumeIoFailed({
-            volume,
-            operation,
-            path,
-            cause,
-            message: `Cannot ${operation} filesystem volume '${volume}': ${cause instanceof Error ? cause.message : String(cause)}`,
-          }),
-      ).pipe(Effect.uninterruptible);
     function list(): FilesystemVolume[] {
       return structuredClone([
         home,
@@ -161,12 +144,8 @@ export const VolumesLive = Layer.effect(
       options: EdenVolumeOptions = {},
     ) {
       const eject = options.eject?.bind(options);
-      const rootPath = yield* io(input.id, "register", input.rootPath, () =>
-        fs.realpath(input.rootPath),
-      );
-      const stats = yield* io(input.id, "register", rootPath, () =>
-        fs.stat(rootPath),
-      );
+      const rootPath = yield* io.realpath(input.rootPath);
+      const stats = yield* io.stat(rootPath);
       yield* Effect.try({
         try: () => {
           if (!stats.isDirectory())
@@ -482,9 +461,7 @@ export const VolumesLive = Layer.effect(
           });
       };
       yield* Effect.try({ try: assertRegistered, catch: volumeRejection });
-      const stats = yield* io(id, "inspect", entry.rootPath, () =>
-        fs.stat(entry.rootPath),
-      );
+      const stats = yield* io.stat(entry.rootPath);
       yield* Effect.try({ try: assertRegistered, catch: volumeRejection });
       if (
         !stats.isDirectory() ||

@@ -146,7 +146,11 @@ describe("branding", () => {
     expect(branding.getInfo()).toEqual({ name: "Acme" });
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("Failed to read branding logo"),
-      failure,
+      expect.objectContaining({
+        _tag: "FilesystemIoFailed",
+        operation: "readFile",
+        cause: failure,
+      }),
     );
   });
 });

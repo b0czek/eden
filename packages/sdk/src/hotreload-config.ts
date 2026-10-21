@@ -1,3 +1,4 @@
+import { io } from "./filesystem/native-io";
 /**
  * Hot reload state helpers.
  *
@@ -5,12 +6,10 @@
  * consumer project, not inside the installed SDK package.
  */
 
-import { randomUUID } from "node:crypto";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { asError, fromPromise } from "./effects/io";
+import { asError } from "./effects/io";
 
 export interface HotReloadEnabledState {
   apps: string[];
@@ -78,7 +77,7 @@ function readState<A>(
   decode: (value: unknown) => A,
   fallback: A,
 ) {
-  return fromPromise(() => fs.readFile(filePath, "utf-8")).pipe(
+  return io.readFile(filePath, "utf-8").pipe(
     Effect.flatMap((content) =>
       Effect.try({ try: () => decode(JSON.parse(content)), catch: asError }),
     ),
@@ -186,16 +185,6 @@ export const getHotReloadApps = Effect.fn(function* (config?: EdenConfig) {
 });
 
 const writeJsonAtomic = Effect.fn(function* (filePath: string, value: unknown) {
-  yield* fromPromise(() =>
-    fs.mkdir(path.dirname(filePath), { recursive: true }),
-  );
-  const tempPath = yield* Effect.acquireRelease(
-    Effect.sync(() => `${filePath}.${randomUUID()}.tmp`),
-    (temporary) =>
-      fromPromise(() => fs.rm(temporary, { force: true })).pipe(Effect.orDie),
-  );
-  yield* fromPromise(() =>
-    fs.writeFile(tempPath, JSON.stringify(value, null, 2), "utf-8"),
-  );
-  yield* fromPromise(() => fs.rename(tempPath, filePath));
-}, Effect.scoped);
+  yield* io.mkdir(path.dirname(filePath), { recursive: true });
+  yield* io.writeFileAtomic(filePath, JSON.stringify(value, null, 2), "utf-8");
+});

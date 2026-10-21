@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { type FSWatcher, watch as watchNative } from "node:fs";
 import * as path from "node:path";
 import type { FilesystemChangeKind } from "@edenapp/types";
 import * as Duration from "effect/Duration";
@@ -10,10 +9,11 @@ import type { Event } from "../events/event";
 import { listen } from "../events/scoped";
 import { log } from "../logging/logger";
 
-import { FilesystemIoFailed, FilesystemWatchRejected } from "./errors";
+import { FilesystemWatchRejected, watchRejection } from "./errors";
+import { io, type NativeWatch } from "./native-io";
 
 interface DirectoryWatch {
-  watcher: FSWatcher;
+  watcher: NativeWatch;
   watchIds: Set<string>;
 }
 
@@ -42,33 +42,27 @@ export const createFilesystemWatches = Effect.fn(function* (
 
   yield* listen(options.viewRemoved, ({ viewId }) => removeViewWatches(viewId));
 
-  function watch(
+  const watch = Effect.fn(function* (
     hostPath: string,
     callerWebContentsId: number | undefined,
     volume: string,
-  ): { watchId: string } {
-    const viewId = resolveCallerView(callerWebContentsId);
+  ) {
+    const viewId = yield* Effect.try({
+      try: () => resolveCallerView(callerWebContentsId),
+      catch: watchRejection,
+    });
     let directoryWatch = directoryWatches.get(hostPath);
     if (!directoryWatch) {
       const watchIds = new Set<string>();
-      let watcher: FSWatcher;
-      try {
-        watcher = watchNative(hostPath, { persistent: false }, () => {
-          scheduleChange(hostPath, "change");
-        });
-      } catch (cause) {
-        throw new FilesystemIoFailed({
-          operation: "watch",
-          path: hostPath,
-          cause,
-          message: `Cannot watch filesystem path '${hostPath}'`,
-        });
-      }
+      const watcher = yield* io.watch(
+        hostPath,
+        () => scheduleChange(hostPath, "change"),
+        (error) => {
+          log.warn(`Filesystem watch failed for ${hostPath}:`, error);
+          scheduleChange(hostPath, "watch-error");
+        },
+      );
       directoryWatch = { watcher, watchIds };
-      watcher.on("error", (error) => {
-        log.warn(`Filesystem watch failed for ${hostPath}:`, error);
-        scheduleChange(hostPath, "watch-error");
-      });
       directoryWatches.set(hostPath, directoryWatch);
     }
 
@@ -76,7 +70,7 @@ export const createFilesystemWatches = Effect.fn(function* (
     directoryWatch.watchIds.add(watchId);
     viewWatches.set(watchId, { viewId, hostPath, volume });
     return { watchId };
-  }
+  }, Effect.uninterruptible);
 
   function unwatch(
     watchId: string,

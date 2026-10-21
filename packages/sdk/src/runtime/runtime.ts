@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -10,6 +9,7 @@ import type { EdenConfig } from "../api/config";
 import type { EdenLifecycleState } from "../api/control-plane";
 import { resolveBrandingName } from "../branding/service";
 import { asError } from "../effects/io";
+import { syncIo } from "../filesystem/native-sync";
 import { log } from "../logging/logger";
 import { createSettingsSdkController } from "../settings/controller-sdk";
 import { createPanelRegistry } from "../settings/panels/registry";
@@ -32,8 +32,8 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   };
   const paths = { ...options.paths };
   const platform = options.platform;
-  fs.mkdirSync(paths.appsDirectory, { recursive: true });
-  fs.mkdirSync(paths.userDirectory, { recursive: true });
+  syncIo.mkdir(paths.appsDirectory, { recursive: true });
+  syncIo.mkdir(paths.userDirectory, { recursive: true });
   resolveBrandingName(config.branding);
   const registrations = createPanelRegistry();
   const settings = createSettingsSdkController({ panels: registrations });

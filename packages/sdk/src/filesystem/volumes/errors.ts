@@ -1,4 +1,5 @@
 import * as Data from "effect/Data";
+import type { FilesystemIoFailed } from "../native-errors";
 
 /** Volume API admission requires an authenticated caller or trusted host. */
 export class VolumeAccessDenied extends Data.TaggedError("VolumeAccessDenied")<{
@@ -24,7 +25,7 @@ export class VolumeEjectRejected extends Data.TaggedError(
 }> {}
 export class VolumeIoFailed extends Data.TaggedError("VolumeIoFailed")<{
   volume: string;
-  operation: "register" | "inspect" | "eject";
+  operation: "eject";
   path?: string;
   message: string;
   cause: unknown;
@@ -33,11 +34,14 @@ export class VolumeIoFailed extends Data.TaggedError("VolumeIoFailed")<{
     return (this.cause as NodeJS.ErrnoException | undefined)?.code;
   }
 }
-export type VolumeAccessError = VolumeUnavailable | VolumeIoFailed;
+export type VolumeAccessError = VolumeUnavailable | FilesystemIoFailed;
 export type VolumeRegistrationError =
   | VolumeRegistrationRejected
+  | FilesystemIoFailed;
+export type VolumeEjectError =
+  | VolumeAccessError
+  | VolumeEjectRejected
   | VolumeIoFailed;
-export type VolumeEjectError = VolumeAccessError | VolumeEjectRejected;
 
 export function volumeRejection(cause: unknown): VolumeUnavailable {
   if (cause instanceof VolumeUnavailable) return cause;

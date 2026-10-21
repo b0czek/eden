@@ -10,6 +10,7 @@
 const esbuild = require("esbuild");
 const path = require("node:path");
 const fs = require("node:fs");
+const preloadDependencies = require("./preload-dependencies.cjs");
 
 const srcDir = path.join(__dirname, "../src/app-runtime");
 const distDir = path.join(__dirname, "../dist/app-runtime");
@@ -47,6 +48,7 @@ async function bundle() {
       target: "node16",
       platform: "node",
       external: ["electron"], // Don't bundle electron
+      plugins: [preloadDependencies],
       minify: true,
       sourcemap: true,
       logLevel: "info",
@@ -63,6 +65,7 @@ async function bundle() {
       target: "node16",
       platform: "node",
       external: ["electron"], // Don't bundle electron
+      plugins: [preloadDependencies],
       minify: true,
       sourcemap: true,
       logLevel: "info",

@@ -15,13 +15,13 @@ import type {
 } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
 import type { GenericSchema, ValiError } from "valibot";
-import type { AppAssociationStorageWriteError } from "../app-associations/errors";
 import type {
   DaemonDefinitionReadError,
   DaemonLaunchError,
   DaemonStopError,
   DaemonUpdateError,
 } from "../daemon/errors";
+import type { FilesystemIoFailed } from "../filesystem/native-errors";
 import type {
   VolumeEjectError,
   VolumeRegistrationError,
@@ -220,10 +220,8 @@ export interface EdenAssociationsApi {
   set(
     key: string,
     association: AppAssociation,
-  ): Effect.Effect<void, EdenInputError | AppAssociationStorageWriteError>;
-  remove(
-    key: string,
-  ): Effect.Effect<void, EdenInputError | AppAssociationStorageWriteError>;
+  ): Effect.Effect<void, EdenInputError | FilesystemIoFailed>;
+  remove(key: string): Effect.Effect<void, EdenInputError | FilesystemIoFailed>;
 }
 
 /** Host operations for a consumer-managed mounted directory. */

@@ -1,13 +1,12 @@
 import { randomBytes } from "node:crypto";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { DlcResource } from "@edenapp/types";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as Scope from "effect/Scope";
-import { fromPromise } from "../effects/io";
 import { listen } from "../events/scoped";
+import { io } from "../filesystem/native-io";
 import type {
   PlatformProtocolRequest,
   PlatformProtocolResponse,
@@ -147,7 +146,7 @@ export const DlcResourcesLive = Layer.effect(
           route.dlcId,
           route.relativePath,
         );
-        const stat = yield* fromPromise(() => fs.stat(filePath));
+        const stat = yield* io.stat(filePath);
         if (!stat.isFile()) return { status: 404 };
         return {
           status: 200,

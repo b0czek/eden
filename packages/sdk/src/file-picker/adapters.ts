@@ -81,18 +81,7 @@ export function createFilePickerFiles(
   files: Pick<Filesystem, "resolvePath" | "accessScope">,
 ): FilePickerFiles {
   return {
-    resolvePath: (location) =>
-      Effect.asVoid(files.resolvePath(location)).pipe(
-        Effect.mapError(
-          (cause) =>
-            new FilePickerIoFailed({
-              operation: "resolve-location",
-              location: { ...location },
-              message: cause.message,
-              cause,
-            }),
-        ),
-      ),
+    resolvePath: (location) => Effect.asVoid(files.resolvePath(location)),
     accessScope: (volume) => files.accessScope(volume),
   };
 }

@@ -1,4 +1,3 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   InstalledPackageManifest,
@@ -8,9 +7,10 @@ import type {
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import fg from "fast-glob";
-import { fromPromise } from "../effects/io";
 import { ExecutionContext } from "../execution/context";
+import { isPathWithin } from "../filesystem/lexical-path";
+import type { FilesystemIoFailed } from "../filesystem/native-errors";
+import { io } from "../filesystem/native-io";
 import { log } from "../logging/logger";
 import { AppsDirectory, DistPath } from "../runtime/inputs";
 import { DEFAULT_PACKAGE_ICON_DATA_URL } from "./default-icon";
@@ -40,7 +40,7 @@ export interface PackageCatalog {
   resolveContainedDlcPath: (
     dlcId: string,
     relativePath: string,
-  ) => Effect.Effect<string, PackageResourceError>;
+  ) => Effect.Effect<string, PackageResourceError | FilesystemIoFailed>;
 }
 
 export const PackageCatalog = Context.Service<
@@ -144,7 +144,7 @@ export const PackageCatalogLive = Layer.effect(
           manifest.kind === "dlc"
             ? yield* resolveContainedDlcPath(packageId, icon)
             : path.join(packagePath, icon);
-        const content = yield* fromPromise(() => fs.readFile(iconPath));
+        const content = yield* io.readFile(iconPath);
         return `data:${imageMimeType(iconPath)};base64,${content.toString("base64")}`;
       }).pipe(
         Effect.catch((error) =>
@@ -160,14 +160,12 @@ export const PackageCatalogLive = Layer.effect(
       if (!packagePath) return undefined;
       return yield* Effect.catch(
         Effect.gen(function* () {
-          const files = yield* fromPromise(() =>
-            fg("**/*", {
-              cwd: packagePath,
-              stats: true,
-              followSymbolicLinks: false,
-              onlyFiles: true,
-            }),
-          );
+          const files = yield* io.glob("**/*", {
+            cwd: packagePath,
+            stats: true,
+            followSymbolicLinks: false,
+            onlyFiles: true,
+          });
           return files.reduce((sum, file) => sum + (file.stats?.size ?? 0), 0);
         }),
         (error) =>
@@ -203,8 +201,7 @@ export const PackageCatalogLive = Layer.effect(
         );
       }
       const target = path.resolve(root, relativePath);
-      const relative = path.relative(root, target);
-      if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      if (!isPathWithin(root, target, { allowRoot: false })) {
         return yield* Effect.fail(
           new PackageResourceError({
             packageId: dlcId,
@@ -214,19 +211,11 @@ export const PackageCatalogLive = Layer.effect(
           }),
         );
       }
-      const [realRoot, realTarget] = yield* fromPromise(
-        () => Promise.all([fs.realpath(root), fs.realpath(target)]),
-        (cause) =>
-          new PackageResourceError({
-            packageId: dlcId,
-            relativePath,
-            reason: "read",
-            message: `Failed to resolve DLC resource: ${relativePath}`,
-            cause,
-          }),
+      const [realRoot, realTarget] = yield* Effect.all(
+        [io.realpath(root), io.realpath(target)],
+        { concurrency: "unbounded" },
       );
-      const realRelative = path.relative(realRoot, realTarget);
-      if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+      if (!isPathWithin(realRoot, realTarget)) {
         return yield* Effect.fail(
           new PackageResourceError({
             packageId: dlcId,

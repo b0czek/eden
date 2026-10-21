@@ -1,6 +1,6 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
+import { syncIo } from "../filesystem/native-sync";
 import { log } from "../logging/logger";
 import type { KeyboardAssets } from "./ports";
 
@@ -14,13 +14,13 @@ export function createKeyboardAssets(
     frontendPath,
     preloadPath,
     available: Effect.sync(() => {
-      if (!fs.existsSync(frontendPath)) {
+      if (!syncIo.exists(frontendPath)) {
         log.error(
           `Keyboard frontend not found at ${frontendPath}. Build the SDK apps first.`,
         );
         return false;
       }
-      if (!fs.existsSync(preloadPath)) {
+      if (!syncIo.exists(preloadPath)) {
         log.error(
           `Keyboard preload not found at ${preloadPath}. Build/copy SDK foundation assets first.`,
         );

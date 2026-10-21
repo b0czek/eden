@@ -7,13 +7,14 @@ import {
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
+import { FilesystemIoFailed } from "../filesystem/native-errors";
 import { PackageCatalog, PackageCatalogLive } from "../packages/catalog";
 import {
   InstalledPackages,
   InstalledPackagesLive,
 } from "../packages/installed";
 import { AppsDirectory, DistPath, RuntimeConfig } from "../runtime/inputs";
-import { AppAssociationStorageWriteError } from "./errors";
+
 import { AppAssociationStorage } from "./ports";
 import { AppAssociations, AppAssociationsLive } from "./service";
 
@@ -108,8 +109,10 @@ it.each(["set", "remove"] as const)(
     };
     let persisted = JSON.stringify(store);
     let failWrite = true;
-    const failure = new AppAssociationStorageWriteError({
+    const failure = new FilesystemIoFailed({
       path: "/unavailable/app-associations.json",
+      operation: "writeFile",
+      message: "Association storage is unavailable",
       cause: new Error("Association storage is unavailable"),
     });
     const { runtime, associations } = await createAssociations({

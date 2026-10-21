@@ -7,11 +7,12 @@ import {
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { AppAssociations } from "../app-associations/service";
+import { FilesystemIoFailed } from "../filesystem/native-errors";
 import { I18n } from "../i18n/service";
 import { PackageCatalog } from "../packages/catalog";
 import { ProcessLaunchRejected } from "../processes/errors";
 import { Views } from "../views/service";
-import { FileMetadataFailed } from "./errors";
+
 import { FileOpenFilesystem, FileOpenProcesses } from "./ports";
 import { FileOpen, FileOpenLive } from "./service";
 
@@ -104,8 +105,9 @@ describe("file opening failures", () => {
 
   it("keeps metadata and launch failures in the expected failure channel", async () => {
     const native = new Error("Cannot read file");
-    const metadata = new FileMetadataFailed({
-      location,
+    const metadata = new FilesystemIoFailed({
+      path: "/file.txt",
+      operation: "stat",
       cause: native,
       message: native.message,
     });

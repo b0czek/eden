@@ -1,4 +1,3 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
 import type {
@@ -16,6 +15,8 @@ import { fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { RuntimeContexts } from "../execution/runtime-contexts";
+import { FilesystemIoFailed } from "../filesystem/native-errors";
+import { io } from "../filesystem/native-io";
 import { Filesystem } from "../filesystem/service";
 import type { VolumeUnavailable } from "../filesystem/volumes/errors";
 import { Permissions } from "../ipc/permissions";
@@ -39,7 +40,6 @@ import {
   PackageLocationError,
   PackageRejected,
   PackageRollbackError,
-  PackageTransactionError,
 } from "./errors";
 import { InstalledPackages } from "./installed";
 import { createPackageManifests } from "./manifests";
@@ -50,7 +50,10 @@ import type { InstalledPackageListOptions, PackageEvents } from "./types";
 export interface Packages {
   installed: Event<PackageEvents["installed"]>;
   uninstalled: Event<PackageEvents["uninstalled"]>;
-  initialize: () => Effect.Effect<void, PackageInitializationError>;
+  initialize: () => Effect.Effect<
+    void,
+    PackageInitializationError | FilesystemIoFailed
+  >;
   getPackageInfo: (location: FilesystemLocation) => Effect.Effect<PackageInfo>;
   getPackageInfoFromHostPath: (hostPath: string) => Effect.Effect<PackageInfo>;
   listInstalledPackages: {
@@ -169,10 +172,8 @@ export const PackagesLive = Layer.effect(
     const initialize = Effect.fn(
       function* () {
         // Ensure apps directory exists
-        yield* fromPromise(() => fs.mkdir(appsDirectory, { recursive: true }));
-        yield* fromPromise(() =>
-          fs.mkdir(catalog.dlcDirectory, { recursive: true }),
-        );
+        yield* io.mkdir(appsDirectory, { recursive: true });
+        yield* io.mkdir(catalog.dlcDirectory, { recursive: true });
         yield* packageTransactions.initialize();
         // Discover built-in packages and register apps before resolving DLC hosts.
         const prebuiltDlcs = yield* discovery.loadPrebuiltPackages();
@@ -195,9 +196,10 @@ export const PackagesLive = Layer.effect(
           `Packages initialized. Found ${prebuiltAppCount} built-in apps, ${prebuiltDlcCount} built-in DLCs, ${installedAppCount} installed apps, and ${installedDlcCount} installed DLCs.`,
         );
       },
-      Effect.mapError(
-        (cause) =>
-          new PackageInitializationError({ message: cause.message, cause }),
+      Effect.mapError((cause) =>
+        cause instanceof FilesystemIoFailed
+          ? cause
+          : new PackageInitializationError({ message: cause.message, cause }),
       ),
     );
     const getPackageInfo: (
@@ -343,7 +345,7 @@ export const PackagesLive = Layer.effect(
             cause instanceof PackageLocationError ||
             cause instanceof PackageRejected ||
             cause instanceof PackageArchiveError ||
-            cause instanceof PackageTransactionError ||
+            cause instanceof FilesystemIoFailed ||
             cause instanceof PackageRollbackError ||
             cause instanceof PackageJournalError
               ? cause

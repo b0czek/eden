@@ -1,19 +1,20 @@
 import { randomUUID } from "node:crypto";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
-import { asError, fromPromise as nativeFromPromise } from "../effects/io";
+import { asError } from "../effects/io";
+import { isPathWithin } from "../filesystem/lexical-path";
+
+import { io } from "../filesystem/native-io";
 import { log } from "../logging/logger";
 import type { OperationReporter } from "../operations/task";
 import { AppsDirectory } from "../runtime/inputs";
 import {
   PackageJournalError,
   PackageRollbackError,
-  PackageTransactionError,
   type PackageTransactionFailure,
 } from "./errors";
 
@@ -56,32 +57,17 @@ export const PackageTransactionsLive = Layer.effect(
   Effect.gen(function* () {
     const appsDirectory = yield* AppsDirectory;
     const root = path.join(appsDirectory, ".package-transactions");
-    const fromPromise = <A>(evaluate: () => Promise<A>) =>
-      nativeFromPromise(
-        evaluate,
-        (cause) =>
-          new PackageTransactionError({
-            directory: root,
-            operation: "filesystem",
-            message: asError(cause).message,
-            cause,
-          }),
-      );
     const mutationLock = Semaphore.makeUnsafe(1);
     const initialize = Effect.fn(function* () {
-      yield* fromPromise(() => fs.mkdir(root, { recursive: true }));
-      const entries = yield* fromPromise(() =>
-        fs.readdir(root, { withFileTypes: true }),
-      );
+      yield* io.mkdir(root, { recursive: true });
+      const entries = yield* io.readdir(root, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const directory = path.join(root, entry.name);
         yield* Effect.catch(
           Effect.gen(function* () {
             if (!(yield* exists(path.join(directory, "journal.json")))) {
-              yield* fromPromise(() =>
-                fs.rm(directory, { recursive: true, force: true }),
-              );
+              yield* io.rm(directory, { recursive: true, force: true });
               return;
             }
             const journal = yield* readJournal(directory);
@@ -90,9 +76,7 @@ export const PackageTransactionsLive = Layer.effect(
               return;
             }
             yield* rollback(directory, journal);
-            yield* fromPromise(() =>
-              fs.rm(directory, { recursive: true, force: true }),
-            );
+            yield* io.rm(directory, { recursive: true, force: true });
           }),
           (error) =>
             Effect.gen(function* () {
@@ -121,12 +105,8 @@ export const PackageTransactionsLive = Layer.effect(
       reporter?.update("staging-transaction");
       if (operations.length === 0) return;
       const directory = path.join(root, randomUUID());
-      yield* fromPromise(() =>
-        fs.mkdir(path.join(directory, "stages"), { recursive: true }),
-      );
-      yield* fromPromise(() =>
-        fs.mkdir(path.join(directory, "backups"), { recursive: true }),
-      );
+      yield* io.mkdir(path.join(directory, "stages"), { recursive: true });
+      yield* io.mkdir(path.join(directory, "backups"), { recursive: true });
       const entries: TransactionEntry[] = operations.map(
         (operation, index) => ({
           target: assertManagedPath(operation.target),
@@ -148,7 +128,7 @@ export const PackageTransactionsLive = Layer.effect(
           for (const [index, operation] of operations.entries()) {
             const stage = entries[index].stage;
             if (operation.prepare && stage) {
-              yield* fromPromise(() => fs.mkdir(stage, { recursive: true }));
+              yield* io.mkdir(stage, { recursive: true });
               yield* operation.prepare(stage);
             }
           }
@@ -159,16 +139,14 @@ export const PackageTransactionsLive = Layer.effect(
           let completed = 0;
           for (const entry of journal.entries) {
             if (yield* exists(entry.target)) {
-              yield* fromPromise(() => fs.rename(entry.target, entry.backup));
+              yield* io.rename(entry.target, entry.backup);
               entry.backedUp = true;
               yield* writeJournal(directory, journal);
             }
             const stage = entry.stage;
             if (stage) {
-              yield* fromPromise(() =>
-                fs.mkdir(path.dirname(entry.target), { recursive: true }),
-              );
-              yield* fromPromise(() => fs.rename(stage, entry.target));
+              yield* io.mkdir(path.dirname(entry.target), { recursive: true });
+              yield* io.rename(stage, entry.target);
               entry.installed = true;
               yield* writeJournal(directory, journal);
             }
@@ -209,9 +187,9 @@ export const PackageTransactionsLive = Layer.effect(
                   : Effect.fail(rollbackError);
               },
             );
-            yield* fromPromise(() =>
-              fs.rm(directory, { recursive: true, force: true }),
-            ).pipe(Effect.catch(() => Effect.void));
+            yield* io
+              .rm(directory, { recursive: true, force: true })
+              .pipe(Effect.catch(() => Effect.void));
             return yield* Effect.failCause(error);
           }),
       );
@@ -221,12 +199,11 @@ export const PackageTransactionsLive = Layer.effect(
       yield* Effect.gen(function* () {
         // Keep the committed journal until all disposable package data is gone.
         for (const name of ["backups", "stages"])
-          yield* fromPromise(() =>
-            fs.rm(path.join(directory, name), { recursive: true, force: true }),
-          );
-        yield* fromPromise(() =>
-          fs.rm(directory, { recursive: true, force: true }),
-        );
+          yield* io.rm(path.join(directory, name), {
+            recursive: true,
+            force: true,
+          });
+        yield* io.rm(directory, { recursive: true, force: true });
       }).pipe(
         Effect.catch((error) =>
           Effect.sync(() =>
@@ -253,32 +230,25 @@ export const PackageTransactionsLive = Layer.effect(
             (!entry.backedUp && (entry.installed || inferredInstalled))) &&
           targetExists
         ) {
-          yield* fromPromise(() =>
-            fs.rm(entry.target, { recursive: true, force: true }),
-          );
+          yield* io.rm(entry.target, { recursive: true, force: true });
         }
         if (backupExists) {
           if (!entry.backedUp) {
             entry.backedUp = true;
             yield* writeJournal(directory, journal);
           }
-          yield* fromPromise(() =>
-            fs.mkdir(path.dirname(entry.target), { recursive: true }),
-          );
-          yield* fromPromise(() => fs.rename(entry.backup, entry.target));
+          yield* io.mkdir(path.dirname(entry.target), { recursive: true });
+          yield* io.rename(entry.backup, entry.target);
         }
       }
-      yield* fromPromise(() =>
-        fs.rm(path.join(directory, "stages"), {
-          recursive: true,
-          force: true,
-        }),
-      );
+      yield* io.rm(path.join(directory, "stages"), {
+        recursive: true,
+        force: true,
+      });
     });
     function assertManagedPath(target: string): string {
       const resolved = path.resolve(target);
-      const relative = path.relative(path.dirname(root), resolved);
-      if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      if (!isPathWithin(path.dirname(root), resolved, { allowRoot: false })) {
         throw new Error(
           `Package operation target escapes the apps directory: ${target}`,
         );
@@ -286,8 +256,9 @@ export const PackageTransactionsLive = Layer.effect(
       return resolved;
     }
     const readJournal = Effect.fn(function* (directory: string) {
-      const contents = yield* fromPromise(() =>
-        fs.readFile(path.join(directory, "journal.json"), "utf-8"),
+      const contents = yield* io.readFile(
+        path.join(directory, "journal.json"),
+        "utf-8",
       );
       const value = (yield* Effect.try({
         try: () => JSON.parse(contents),
@@ -322,23 +293,20 @@ export const PackageTransactionsLive = Layer.effect(
       directory: string,
       journal: TransactionJournal,
     ) {
-      const target = path.join(directory, "journal.json");
-      const temporary = `${target}.tmp`;
-      yield* fromPromise(() =>
-        fs.writeFile(temporary, JSON.stringify(journal), "utf-8"),
+      yield* io.writeFileAtomic(
+        path.join(directory, "journal.json"),
+        JSON.stringify(journal),
+        "utf-8",
       );
-      yield* fromPromise(() => fs.rename(temporary, target));
     });
     const exists = Effect.fn(function* (target: string) {
       return yield* Effect.catch(
         Effect.gen(function* () {
-          yield* fromPromise(() => fs.access(target));
+          yield* io.access(target);
           return true;
         }),
         (error) =>
-          ["ENOENT", "ENOTDIR"].includes(
-            (error.cause as NodeJS.ErrnoException).code ?? "",
-          )
+          ["ENOENT", "ENOTDIR"].includes(error.code ?? "")
             ? Effect.succeed(false)
             : Effect.fail(error),
       );

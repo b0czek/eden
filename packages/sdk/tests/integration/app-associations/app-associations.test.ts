@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createJsonFileAssociationStorage } from "../../../src/app-associations/json-file";
 import { AppAssociationStorage } from "../../../src/app-associations/ports";
+import { AppAssociationsPortsLive } from "../../../src/app-associations/runtime";
 import {
   AppAssociations,
   AppAssociationsLive,
@@ -26,6 +26,7 @@ import {
   AppsDirectory,
   DistPath,
   RuntimeConfig,
+  UserDirectory,
 } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
 import {
@@ -59,6 +60,11 @@ describe("app associations persistence and catalog integration", () => {
     resources.push({ runtime, userDirectory });
     const storePath = path.join(userDirectory, "app-associations.json");
     if (content !== undefined) await fs.writeFile(storePath, content);
+    const storage = await runtime.acquire(
+      buildService(AppAssociationStorage, AppAssociationsPortsLive).pipe(
+        Effect.provideService(UserDirectory, userDirectory),
+      ),
+    );
 
     const registry = serviceEffects.acquireSync(
       buildService(InstalledPackages, InstalledPackagesLive),
@@ -80,10 +86,7 @@ describe("app associations persistence and catalog integration", () => {
       const service = await runtime.acquire(
         buildService(AppAssociations, AppAssociationsLive).pipe(
           Effect.provideService(PackageCatalog, catalog),
-          Effect.provideService(
-            AppAssociationStorage,
-            createJsonFileAssociationStorage(userDirectory),
-          ),
+          Effect.provideService(AppAssociationStorage, storage),
         ),
       );
       await runtime.run(service.initialize());
@@ -96,6 +99,7 @@ describe("app associations persistence and catalog integration", () => {
       runtime,
       registry,
       storePath,
+      storage,
       open,
       asVendor: <A>(work: () => A): A =>
         Effect.runSync(
@@ -114,11 +118,11 @@ describe("app associations persistence and catalog integration", () => {
   });
 
   it("loads a missing store as empty state", async () => {
-    const { associations, runtime, storePath } = await createAssociations();
+    const { associations, runtime, storePath, storage } =
+      await createAssociations();
     expect(associations.list()).toEqual({});
-    const storage = createJsonFileAssociationStorage(path.dirname(storePath));
     await expect(runtime.run(storage.read())).rejects.toMatchObject({
-      _tag: "AppAssociationStorageReadError",
+      _tag: "FilesystemIoFailed",
       path: storePath,
       cause: { code: "ENOENT" },
     });
@@ -288,7 +292,7 @@ describe("app associations persistence and catalog integration", () => {
         }),
       ),
     ).rejects.toMatchObject({
-      _tag: "AppAssociationStorageWriteError",
+      _tag: "FilesystemIoFailed",
       path: storePath,
       cause: { code: "EISDIR" },
     });

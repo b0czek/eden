@@ -1,12 +1,12 @@
-import * as fs from "node:fs/promises";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { WASMagic } from "wasmagic";
-import { asError, fromPromise } from "../effects/io";
+import { fromPromise } from "../effects/io";
+import { io } from "../filesystem/native-io";
 import type { Filesystem } from "../filesystem/service";
 import { log } from "../logging/logger";
-import { FileMetadataFailed } from "./errors";
+
 import { normalizeMimeType } from "./handlers";
 import type { FileOpenFilesystem } from "./ports";
 
@@ -22,14 +22,9 @@ export const createFileOpenFilesystem = Effect.fn(function* (
   );
   const detectMimeType = Effect.fn(function* (fullPath: string) {
     return yield* Effect.gen(function* () {
-      const handle = yield* Effect.acquireRelease(
-        fromPromise(() => fs.open(fullPath, "r")),
-        (handle) => fromPromise(() => handle.close()).pipe(Effect.orDie),
-      );
+      const handle = yield* io.open(fullPath);
       const buffer = Buffer.alloc(MIME_DETECTION_BYTES);
-      const { bytesRead } = yield* fromPromise(() =>
-        handle.read(buffer, 0, buffer.length, 0),
-      );
+      const bytesRead = yield* handle.read(buffer, 0);
       if (bytesRead === 0) return undefined;
       const magic = yield* detector;
       return normalizeMimeType(magic.detect(buffer.subarray(0, bytesRead)));
@@ -47,15 +42,7 @@ export const createFileOpenFilesystem = Effect.fn(function* (
     inspect: (location) =>
       filesystem.withVolume(location, (fullPath) =>
         Effect.gen(function* () {
-          const stats = yield* fromPromise(
-            () => fs.stat(fullPath),
-            (cause) =>
-              new FileMetadataFailed({
-                location: { ...location },
-                cause,
-                message: asError(cause).message,
-              }),
-          );
+          const stats = yield* io.stat(fullPath);
           const isDirectory = stats.isDirectory();
           return {
             isDirectory,
@@ -65,15 +52,7 @@ export const createFileOpenFilesystem = Effect.fn(function* (
       ),
     isDirectory: (location) =>
       filesystem.withVolume(location, (fullPath) =>
-        fromPromise(
-          () => fs.stat(fullPath),
-          (cause) =>
-            new FileMetadataFailed({
-              location: { ...location },
-              cause,
-              message: asError(cause).message,
-            }),
-        ).pipe(Effect.map((stat) => stat.isDirectory())),
+        io.stat(fullPath).pipe(Effect.map((stat) => stat.isDirectory())),
       ),
   } satisfies FileOpenFilesystem;
 });

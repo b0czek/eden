@@ -1,6 +1,9 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import * as Data from "effect/Data";
-import { FilesystemAccessDenied } from "../filesystem/errors";
+import {
+  FilesystemAccessDenied,
+  type FilesystemPathError,
+} from "../filesystem/errors";
 import { VolumeUnavailable } from "../filesystem/volumes/errors";
 
 export class FilePickerRequestRejected extends Data.TaggedError(
@@ -42,7 +45,6 @@ export class FilePickerProviderUnavailable extends Data.TaggedError(
 
 export class FilePickerIoFailed extends Data.TaggedError("FilePickerIoFailed")<{
   operation:
-    | "resolve-location"
     | "reveal-provider"
     | "start-provider"
     | "stop-provider"
@@ -58,8 +60,7 @@ export type FilePickerOpenError =
   | FilePickerRequestRejected
   | FilePickerProviderUnavailable
   | FilePickerIoFailed
-  | FilesystemAccessDenied
-  | VolumeUnavailable;
+  | FilesystemPathError;
 export type FilePickerResolveError =
   | FilePickerRequestRejected
   | VolumeUnavailable;

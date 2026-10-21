@@ -52,13 +52,43 @@ Filesystem owns caller path access and file operations. Its nested
 [Volumes capability](../packages/sdk/src/filesystem/volumes/service.ts) owns
 registrations, root availability, leases, and safe removal. Each capability
 registers its API through its own `runtime.ts`. Filesystem consumes Volumes and
-its failures; Volumes does not depend on file operations or filesystem failures.
+its failures; Volumes does not depend on file operations.
 
-Shared lexical and symlink-aware path containment belongs to
+Main-process SDK runtime code uses the typed
+[`io` facade](../packages/sdk/src/filesystem/native-io.ts) for host filesystem I/O,
+including package loading, configuration and assets.
+Call named operations such as `io.realpath(path)` and `io.readFile(path, "utf-8")`.
+It owns native failure construction, interruption policy, stream cleanup and
+descriptor acquisition in the caller's Effect scope. Native calls settle before
+their resources are released. Copying owns directory traversal, file streams,
+symlink preservation and file modes. Its `checkAccess` Effect hook enforces domain
+access during traversal; `onBytes` reports progress without changing how files
+are copied. Hook failures, defects and cancellation propagate directly. Watch
+setup returns an Effect and a synchronous close handle owned by the watch
+registry. Synchronous module hooks and pre-runtime setup use the separate
+[`syncIo` adapter](../packages/sdk/src/filesystem/native-sync.ts). Both adapters
+share the Effect-free native failure contract in
+[`native-errors.ts`](../packages/sdk/src/filesystem/native-errors.ts).
+Frontend and backend preloads must have no runtime dependency on Effect,
+including through transitive imports. Their bundle build enforces this boundary.
+Access decisions, volume leases and transfer rollback
+stay in their domain modules. Native failures propagate as `FilesystemIoFailed`,
+retaining the operation, path, descriptor, errno and original cause. Domain error
+types describe refusals, invalid data or multi-step outcomes such as incomplete
+rollback; they do not rename native I/O failures.
+
+Use `io.writeFileAtomic(path, content, encoding?)` to replace a complete file:
+it writes a unique sibling temporary file, renames it into place, and cleans up
+on failure or interruption. Callers own serialization and parent-directory creation.
+
+Shared lexical containment belongs to the Effect-free
+[`filesystem/lexical-path.ts`](../packages/sdk/src/filesystem/lexical-path.ts).
+Callers choose whether to allow the root itself and own existence and symlink
+requirements. Symlink-aware ancestor checks belong to
 [`filesystem/path-containment.ts`](../packages/sdk/src/filesystem/path-containment.ts).
 These primitives have no account policy; the user domain owns restriction
 normalization, role rules, and restricted-directory creation. Each domain adapts
-containment failures to its own error contract.
+path-access refusals to its own error contract and propagates native I/O failures.
 
 View creation, removal, bounds, visibility, focus, mode and tile mutations return
 lazy Effects with view-owned failure types. Native setup and presentation hooks

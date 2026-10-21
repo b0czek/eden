@@ -2,6 +2,7 @@ import type { FilesystemLocation, ViewBounds } from "@edenapp/types";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { Event } from "../events/event";
+import type { FilesystemPathError } from "../filesystem/errors";
 import type { FilePickerIoFailed, FilePickerOpenError } from "./errors";
 
 export interface FilePickerViews {
@@ -28,7 +29,7 @@ export const FilePickerProcesses = Context.Service<
 export interface FilePickerFiles {
   resolvePath(
     location: FilesystemLocation,
-  ): Effect.Effect<void, FilePickerIoFailed>;
+  ): Effect.Effect<void, FilesystemPathError>;
   /** Synchronously throws FilesystemAccessDenied or VolumeUnavailable on access refusal. */
   accessScope(volume: string): FilesystemLocation;
 }

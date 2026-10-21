@@ -1,4 +1,3 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
 import type {
@@ -7,8 +6,10 @@ import type {
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { asError, fromPromise } from "../effects/io";
+import { asError } from "../effects/io";
 import type { Event } from "../events/event";
+import { FilesystemIoFailed } from "../filesystem/native-errors";
+import { io } from "../filesystem/native-io";
 import {
   isHotReloadEnabled as readHotReloadEnabled,
   toggleHotReload as updateHotReload,
@@ -51,9 +52,7 @@ export function createPackageDevelopment({
       );
     }
     const manifestPath = path.join(appPath, "manifest.json");
-    const manifestContent = yield* fromPromise(() =>
-      fs.readFile(manifestPath, "utf-8"),
-    );
+    const manifestContent = yield* io.readFile(manifestPath, "utf-8");
     const validation = genesisBundler.validatePackageManifestObject(
       yield* Effect.try({
         try: () => JSON.parse(manifestContent),
@@ -139,7 +138,8 @@ export function createPackageDevelopment({
     reloadPackage: (packageId: string) =>
       reloadPackage(packageId).pipe(
         Effect.mapError((cause) =>
-          cause instanceof PackageRejected
+          cause instanceof PackageRejected ||
+          cause instanceof FilesystemIoFailed
             ? cause
             : new PackageDevelopmentError({
                 packageId,
@@ -150,18 +150,6 @@ export function createPackageDevelopment({
         ),
       ),
     isHotReloadEnabled,
-    toggleHotReload: (packageId: string) =>
-      toggleHotReload(packageId).pipe(
-        Effect.mapError((cause) =>
-          cause instanceof PackageRejected
-            ? cause
-            : new PackageDevelopmentError({
-                packageId,
-                operation: "save-preference",
-                message: cause.message,
-                cause,
-              }),
-        ),
-      ),
+    toggleHotReload,
   };
 }

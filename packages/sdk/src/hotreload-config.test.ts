@@ -6,6 +6,8 @@ import * as Effect from "effect/Effect";
 import {
   HOT_RELOAD_PROTOCOL_VERSION,
   loadHotReloadAppsState,
+  loadHotReloadEnabledState,
+  saveHotReloadEnabledState,
 } from "./hotreload-config";
 
 describe("development source state", () => {
@@ -19,6 +21,36 @@ describe("development source state", () => {
 
   afterEach(async () => {
     await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  it("saves normalized enabled apps in a new state directory", async () => {
+    config = {
+      hotReload: {
+        enabled: true,
+        stateDirectory: path.join(directory, "state"),
+      },
+    };
+    await Effect.runPromise(
+      saveHotReloadEnabledState(
+        { apps: ["com.example.z", "com.example.a", "com.example.z"] },
+        config,
+      ),
+    );
+    expect(
+      JSON.parse(
+        await fs.readFile(
+          path.join(directory, "state", "enabled.json"),
+          "utf-8",
+        ),
+      ),
+    ).toEqual({
+      apps: ["com.example.a", "com.example.z"],
+    });
+    await expect(
+      Effect.runPromise(loadHotReloadEnabledState(config)),
+    ).resolves.toEqual({
+      apps: ["com.example.a", "com.example.z"],
+    });
   });
 
   it("loads valid source apps for the current protocol", async () => {

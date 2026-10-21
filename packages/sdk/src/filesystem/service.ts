@@ -1,5 +1,3 @@
-import { constants } from "node:fs";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
   FileStats,
@@ -15,9 +13,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
 import * as Layer from "effect/Layer";
-import fg from "fast-glob";
 import type { TargetedNotification } from "../controllers/events";
-import { fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
 import { ExecutionContext } from "../execution/context";
@@ -33,22 +29,18 @@ import {
   FilesystemAccessDenied,
   type FilesystemFileError,
   type FilesystemHandleRejected,
-  FilesystemIoFailed,
   type FilesystemPathError,
   type FilesystemTransferError,
   type FilesystemWatchError,
   FilesystemWatchRejected,
   watchRejection,
 } from "./errors";
-import {
-  createFileHandles,
-  type OpenedFilesystemFile,
-  readOpenedFile,
-} from "./file-handles";
+import { createFileHandles, type OpenedFilesystemFile } from "./file-handles";
+import { FilesystemIoFailed } from "./native-errors";
+import { io, type NativeFile } from "./native-io";
 import {
   assertExistingPathWithin,
   assertPathWithin,
-  PathContainmentIoError,
   PathOutsideRoot,
 } from "./path-containment";
 import { FilesystemViews } from "./ports";
@@ -157,31 +149,11 @@ export const Filesystem = Context.Service<"eden/Filesystem", Filesystem>(
   "eden/Filesystem",
 );
 
-const openFlags: Record<FilesystemOpenMode, number> = {
-  read: constants.O_RDONLY | constants.O_NONBLOCK,
-};
-const io = <A>(operation: string, run: () => Promise<A>) =>
-  fromPromise(
-    run,
-    (cause) =>
-      new FilesystemIoFailed({
-        operation,
-        path: (cause as NodeJS.ErrnoException)?.path,
-        cause,
-        message: `Filesystem ${operation} failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-      }),
-  ).pipe(Effect.uninterruptible);
-
 const assertExistingWithin = (rootPath: string, hostPath: string) =>
   assertExistingPathWithin(rootPath, hostPath).pipe(
     Effect.mapError((cause) =>
-      cause instanceof PathContainmentIoError
-        ? new FilesystemIoFailed({
-            operation: "resolve",
-            path: hostPath,
-            cause: cause.cause,
-            message: cause.message,
-          })
+      cause instanceof FilesystemIoFailed
+        ? cause
         : new FilesystemAccessDenied({
             path: hostPath,
             cause,
@@ -311,12 +283,8 @@ export const FilesystemLive = Layer.effect(
       return yield* access.effect(
         Effect.gen(function* () {
           const target = yield* resolveTarget(location);
-          const file = yield* Effect.acquireRelease(
-            io("open", () => fs.open(target.hostPath, openFlags[mode])),
-            (descriptor) =>
-              io("close", () => descriptor.close()).pipe(Effect.orDie),
-          );
-          if (!(yield* io("stat", () => file.stat())).isFile())
+          const file = yield* io.open(target.hostPath, mode);
+          if (!(yield* file.stat()).isFile())
             return yield* Effect.fail(
               new FilesystemAccessDenied({
                 message: "Filesystem source is not a regular file",
@@ -324,9 +292,7 @@ export const FilesystemLive = Layer.effect(
             );
           yield* target.assertActive();
           return {
-            use: <A, E>(
-              operation: (file: fs.FileHandle) => Effect.Effect<A, E>,
-            ) =>
+            use: <A, E>(operation: (file: NativeFile) => Effect.Effect<A, E>) =>
               access.effect(
                 Effect.gen(function* () {
                   yield* target.assertActive();
@@ -440,15 +406,11 @@ export const FilesystemLive = Layer.effect(
       encoding: BufferEncoding = "utf-8",
     ) =>
       handles.use(source, (file) =>
-        readOpenedFile(file).pipe(
-          Effect.map((buffer) => buffer.toString(encoding)),
-        ),
+        file.readAll().pipe(Effect.map((buffer) => buffer.toString(encoding))),
       );
     const readBinaryFile = (source: FilesystemSource) =>
       handles.use(source, (file) =>
-        readOpenedFile(file).pipe(
-          Effect.map((buffer) => new Uint8Array(buffer)),
-        ),
+        file.readAll().pipe(Effect.map((buffer) => new Uint8Array(buffer))),
       );
     const writeContent = (
       location: FilesystemLocation,
@@ -460,17 +422,13 @@ export const FilesystemLive = Layer.effect(
         Effect.gen(function* () {
           const target = yield* resolveTarget(location, true);
           yield* target.assertActive();
-          yield* io("mkdir", () =>
-            fs.mkdir(path.dirname(target.hostPath), { recursive: true }),
-          );
+          yield* io.mkdir(path.dirname(target.hostPath));
           yield* target.assertActive();
           yield* assertExistingWithin(target.rootPath, target.hostPath);
           if (target.accessPath !== target.rootPath)
             yield* assertExistingWithin(target.accessPath, target.hostPath);
           yield* target.assertActive();
-          yield* io("writeFile", () =>
-            fs.writeFile(target.hostPath, content, encoding),
-          );
+          yield* io.writeFile(target.hostPath, content, encoding);
           watcher.invalidate(path.dirname(target.hostPath));
         }),
       );
@@ -489,11 +447,14 @@ export const FilesystemLive = Layer.effect(
         Effect.gen(function* () {
           return yield* Effect.gen(function* () {
             const fullPath = yield* resolvePath(location);
-            yield* io("access", () => fs.access(fullPath));
+            yield* io.access(fullPath);
             return true;
           }).pipe(
             Effect.catch((error) => {
-              if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+              if (
+                !(error instanceof FilesystemIoFailed) ||
+                error.code !== "ENOENT"
+              )
                 return Effect.fail(error);
               return Effect.gen(function* () {
                 const root = yield* volumes.root(location.volume);
@@ -510,22 +471,18 @@ export const FilesystemLive = Layer.effect(
         Effect.gen(function* () {
           const target = yield* resolveTarget(location, true);
           yield* target.assertActive();
-          yield* io("mkdir", () =>
-            fs.mkdir(target.hostPath, { recursive: true }),
-          );
+          yield* io.mkdir(target.hostPath);
           watcher.invalidate(path.dirname(target.hostPath));
         }),
       );
     const readdir = (location: FilesystemLocation) =>
-      withVolume(location, (hostPath) =>
-        io("readdir", () => fs.readdir(hostPath)),
-      );
+      withVolume(location, (hostPath) => io.readdir(hostPath));
     const stat = Effect.fn(function* (
       source: FilesystemSource,
     ): Effect.fn.Return<FileStats, FilesystemFileError> {
       const stats = yield* "handleId" in source
-        ? handles.use(source, (file) => io("stat", () => file.stat()))
-        : withVolume(source, (hostPath) => io("stat", () => fs.stat(hostPath)));
+        ? handles.use(source, (file) => file.stat())
+        : withVolume(source, io.stat);
       return {
         isFile: stats.isFile(),
         isDirectory: stats.isDirectory(),
@@ -540,16 +497,14 @@ export const FilesystemLive = Layer.effect(
     ) =>
       withVolume(location, (fullPath) =>
         Effect.gen(function* () {
-          const entries = yield* io("search", () =>
-            fg(pattern ? `**/*${pattern}*` : "**/*", {
-              cwd: fullPath,
-              onlyFiles: false,
-              deep: 3,
-              suppressErrors: true,
-              stats: true,
-              followSymbolicLinks: false,
-            }),
-          );
+          const entries = yield* io.glob(pattern ? `**/*${pattern}*` : "**/*", {
+            cwd: fullPath,
+            onlyFiles: false,
+            deep: 3,
+            suppressErrors: true,
+            stats: true,
+            followSymbolicLinks: false,
+          });
           const results: SearchResult[] = [];
           for (const entry of entries) {
             if (results.length >= limit) break;
@@ -588,14 +543,10 @@ export const FilesystemLive = Layer.effect(
             try: () => assertNotRoot(target),
             catch: accessRejection,
           });
-          const stats = yield* io("stat", () => fs.stat(target.hostPath));
+          const stats = yield* io.stat(target.hostPath);
           yield* target.assertActive();
           reporter?.update("deleting");
-          yield* io("delete", () =>
-            stats.isDirectory()
-              ? fs.rm(target.hostPath, { recursive: true, force: true })
-              : fs.unlink(target.hostPath),
-          );
+          yield* io.delete(target.hostPath, stats.isDirectory());
           watcher.invalidate(path.dirname(target.hostPath));
         }),
       );
@@ -676,9 +627,9 @@ export const FilesystemLive = Layer.effect(
             },
             catch: watchRejection,
           });
-          const stats = yield* io("stat", () => fs.stat(target.hostPath));
+          const stats = yield* io.stat(target.hostPath);
           yield* target.assertActive();
-          return yield* Effect.try({
+          yield* Effect.try({
             try: () => {
               if (!stats.isDirectory())
                 throw new FilesystemWatchRejected({
@@ -688,14 +639,14 @@ export const FilesystemLive = Layer.effect(
                 throw new FilesystemWatchRejected({
                   message: "Filesystem volume is being removed",
                 });
-              return watcher.watch(
-                target.hostPath,
-                webContentsId,
-                location.volume,
-              );
             },
             catch: watchRejection,
           });
+          return yield* watcher.watch(
+            target.hostPath,
+            webContentsId,
+            location.volume,
+          );
         }),
       );
     return {

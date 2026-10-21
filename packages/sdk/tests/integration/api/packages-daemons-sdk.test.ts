@@ -48,7 +48,12 @@ describe("package and daemon SDK boundaries", () => {
     });
     await expect(
       eden.runtime.effects.run(packages.install(missing)),
-    ).rejects.toThrow("File not found:");
+    ).rejects.toMatchObject({
+      _tag: "FilesystemIoFailed",
+      operation: "access",
+      path: missing,
+      code: "ENOENT",
+    });
     expect(eden.runtime.operations.list()).toEqual([
       expect.objectContaining({ command: "package/install", status: "failed" }),
     ]);

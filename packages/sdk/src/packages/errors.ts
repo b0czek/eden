@@ -1,5 +1,6 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import * as Data from "effect/Data";
+import type { FilesystemIoFailed } from "../filesystem/native-errors";
 
 /** A package mutation violates current catalog or host state. */
 export class PackageRejected extends Data.TaggedError("PackageRejected")<{
@@ -44,15 +45,6 @@ export class PackageInitializationError extends Data.TaggedError(
   cause: unknown;
 }> {}
 
-export class PackageTransactionError extends Data.TaggedError(
-  "PackageTransactionError",
-)<{
-  directory: string;
-  operation: "filesystem";
-  message: string;
-  cause: unknown;
-}> {}
-
 export class PackageJournalError extends Data.TaggedError(
   "PackageJournalError",
 )<{
@@ -71,7 +63,7 @@ export class PackageRollbackError extends Data.TaggedError(
 }> {}
 
 export type PackageTransactionFailure =
-  | PackageTransactionError
+  | FilesystemIoFailed
   | PackageJournalError
   | PackageRollbackError;
 export class PackageLocationError extends Data.TaggedError(
@@ -91,7 +83,8 @@ export type PackageInstallError =
   | PackageArchiveInstallError;
 export type PackageDevelopmentFailure =
   | PackageRejected
-  | PackageDevelopmentError;
+  | PackageDevelopmentError
+  | FilesystemIoFailed;
 export type PackageRemovalError = PackageRejected | PackageTransactionFailure;
 
 export class PackageResourceError extends Data.TaggedError(

@@ -1,20 +1,15 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserRole } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
+import { FilesystemIoFailed } from "../filesystem/native-errors";
+import { io } from "../filesystem/native-io";
 import {
   assertExistingPathWithin,
   assertPathWithin,
   type PathContainmentFailure,
-  PathContainmentIoError,
   PathOutsideRoot,
 } from "../filesystem/path-containment";
-import {
-  DirectoryRestrictionError,
-  DirectoryRestrictionIoError,
-  type UserDirectoryFailure,
-} from "./errors";
+import { DirectoryRestrictionError, type UserDirectoryFailure } from "./errors";
 
 export function normalizeDirectoryRestriction(
   directoryRestriction: string | null | undefined,
@@ -99,15 +94,7 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
   yield* assertExistingPathWithin(root, directory).pipe(
     Effect.mapError(directoryContainmentFailure),
   );
-  yield* fromPromise(
-    () => fs.mkdir(directory, { recursive: true }),
-    (cause) =>
-      new DirectoryRestrictionIoError({
-        path: directory,
-        operation: "mkdir",
-        cause,
-      }),
-  );
+  yield* io.mkdir(directory, { recursive: true });
   yield* assertExistingPathWithin(root, directory).pipe(
     Effect.mapError(directoryContainmentFailure),
   );
@@ -117,12 +104,8 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
 function directoryContainmentFailure(
   cause: PathContainmentFailure,
 ): UserDirectoryFailure {
-  return cause instanceof PathContainmentIoError
-    ? new DirectoryRestrictionIoError({
-        path: cause.path,
-        operation: cause.operation,
-        cause: cause.cause,
-      })
+  return cause instanceof FilesystemIoFailed
+    ? cause
     : new DirectoryRestrictionError({
         path: cause.path,
         message: cause.message,

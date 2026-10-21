@@ -1,14 +1,12 @@
-import * as fs from "node:fs";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { fromPromise } from "../effects/io";
+import { io } from "../filesystem/native-io";
 
 export const createCachedFileReader = Effect.fn(function* () {
   const cache = yield* Cache.makeWith(
-    (filePath: string) =>
-      fromPromise(() => fs.promises.readFile(filePath, "utf-8")),
+    (filePath: string) => io.readFile(filePath, "utf-8"),
     {
       capacity: Number.POSITIVE_INFINITY,
       // Assets stay fixed for this rendering scope; failed reads must be retryable.

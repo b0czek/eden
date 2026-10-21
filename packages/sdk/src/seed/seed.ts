@@ -1,3 +1,4 @@
+import { io } from "../filesystem/native-io";
 import { log } from "../logging/logger";
 
 /**
@@ -7,11 +8,9 @@ import { log } from "../logging/logger";
  * to the database. This runs once at startup before services initialize.
  */
 
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { EdenSeedConfig, EdenUserConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../effects/io";
 import { openKeyvSqlite } from "../storage/keyv-sqlite";
 import { ensureDirectoryRestriction } from "../user/directory-restriction";
 import { defaultGrantsForRole } from "../user/grants";
@@ -33,9 +32,7 @@ export const seedDatabase = Effect.fn(function* (
   seedPath: string,
   userDirectory: string,
 ) {
-  const seedConfig = yield* fromPromise(() =>
-    fs.readFile(seedPath, "utf-8"),
-  ).pipe(
+  const seedConfig = yield* io.readFile(seedPath, "utf-8").pipe(
     Effect.flatMap((content) =>
       Effect.try(() => JSON.parse(content) as EdenSeedConfig),
     ),

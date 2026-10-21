@@ -27,7 +27,6 @@ import {
   createFilePickerProcesses,
 } from "../../../src/file-picker/adapters";
 import { createFilePickerController } from "../../../src/file-picker/controller-edenapi";
-
 import {
   FilePickerFiles,
   FilePickerNotifications,
@@ -35,7 +34,8 @@ import {
   FilePickerViews,
 } from "../../../src/file-picker/ports";
 import { FilePicker, FilePickerLive } from "../../../src/file-picker/service";
-import { FilesystemIoFailed } from "../../../src/filesystem/errors";
+import { FilesystemIoFailed } from "../../../src/filesystem/native-errors";
+
 import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
 import { Permissions, PermissionsLive } from "../../../src/ipc/permissions";
 import {
@@ -495,13 +495,7 @@ describe("file picker composition and request lifecycle", () => {
         mode: "open",
         initialLocation: { volume: "home", path: "/missing" },
       }),
-    ).rejects.toMatchObject({
-      _tag: "FilePickerIoFailed",
-      operation: "resolve-location",
-      message: "Location is unavailable",
-      location: { volume: "home", path: "/missing" },
-      cause: failure,
-    });
+    ).rejects.toBe(failure);
     expect(s.opened).toEqual([]);
     expect(s.launches).toEqual([]);
     await s.register();

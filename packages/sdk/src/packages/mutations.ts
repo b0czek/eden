@@ -1,4 +1,3 @@
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as genesisBundler from "@edenapp/genesis";
 import type {
@@ -11,6 +10,7 @@ import type {
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../effects/io";
 import type { Event } from "../events/event";
+import { io } from "../filesystem/native-io";
 import type { OperationReporter } from "../operations/task";
 import type { PackageCatalog } from "./catalog";
 import { PackageArchiveError, PackageRejected } from "./errors";
@@ -445,17 +445,7 @@ export function createPackageMutations({
     return Effect.void;
   }
   const readPackageInfo = Effect.fn(function* (edenitePath: string) {
-    yield* archiveIo(edenitePath, "read", () => fs.access(edenitePath)).pipe(
-      Effect.mapError(
-        (cause) =>
-          new PackageArchiveError({
-            path: edenitePath,
-            operation: "read",
-            message: `File not found: ${edenitePath}`,
-            cause: cause.cause,
-          }),
-      ),
-    );
+    yield* io.access(edenitePath);
     if (!edenitePath.endsWith(".edenite")) {
       return yield* Effect.fail(
         new PackageRejected({

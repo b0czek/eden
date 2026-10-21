@@ -1,4 +1,5 @@
 import * as Data from "effect/Data";
+import { FilesystemIoFailed } from "./native-errors";
 import { type VolumeAccessError, VolumeUnavailable } from "./volumes/errors";
 
 export class FilesystemAccessDenied extends Data.TaggedError(
@@ -20,18 +21,6 @@ export class FilesystemWatchRejected extends Data.TaggedError(
   message: string;
   watchId?: string;
 }> {}
-export class FilesystemIoFailed extends Data.TaggedError("FilesystemIoFailed")<{
-  operation: string;
-  path?: string;
-  descriptor?: number;
-  message: string;
-  cause: unknown;
-}> {
-  /** Native errno is retained for existing absence/cross-device recovery. */
-  get code(): string | undefined {
-    return (this.cause as NodeJS.ErrnoException | undefined)?.code;
-  }
-}
 export class FilesystemTransferRejected extends Data.TaggedError(
   "FilesystemTransferRejected",
 )<{

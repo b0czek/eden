@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { FileHandle } from "node:fs/promises";
 import type {
   FilesystemHandle,
   FilesystemLocation,
@@ -11,7 +10,6 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Latch from "effect/Latch";
 import * as Scope from "effect/Scope";
-import { fromPromise } from "../effects/io";
 import type {
   EffectivePrincipal,
   ExecutionContext,
@@ -20,13 +18,13 @@ import type {
 import {
   type FilesystemFileError,
   FilesystemHandleRejected,
-  FilesystemIoFailed,
   handleRejection,
 } from "./errors";
+import type { NativeFile } from "./native-io";
 
 export interface OpenedFilesystemFile {
   use<A, E>(
-    operation: (file: FileHandle) => Effect.Effect<A, E>,
+    operation: (file: NativeFile) => Effect.Effect<A, E>,
   ): Effect.Effect<A, E | FilesystemFileError>;
 }
 
@@ -128,7 +126,7 @@ export const createFileHandles = Effect.fn(function* (
 
   function use<A, E>(
     source: FilesystemSource,
-    operation: (file: FileHandle) => Effect.Effect<A, E>,
+    operation: (file: NativeFile) => Effect.Effect<A, E>,
   ): Effect.Effect<A, E | FilesystemFileError> {
     return Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
@@ -279,26 +277,4 @@ export const createFileHandles = Effect.fn(function* (
   }
   yield* Effect.addFinalizer(dispose);
   return { open, use, close, closeOwner, dispose };
-});
-
-/** Whole-file reads use explicit positions so repeated and concurrent reads start at zero. */
-export const readOpenedFile = Effect.fn(function* (file: FileHandle) {
-  const chunks: Buffer[] = [];
-  let position = 0;
-  while (true) {
-    const buffer = Buffer.allocUnsafe(64 * 1024);
-    const { bytesRead } = yield* fromPromise(
-      () => file.read(buffer, 0, buffer.length, position),
-      (cause) =>
-        new FilesystemIoFailed({
-          operation: "read",
-          descriptor: file.fd,
-          cause,
-          message: `Filesystem read failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-        }),
-    );
-    if (bytesRead === 0) return Buffer.concat(chunks, position);
-    chunks.push(buffer.subarray(0, bytesRead));
-    position += bytesRead;
-  }
 });

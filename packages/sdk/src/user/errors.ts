@@ -1,5 +1,6 @@
 import * as Data from "effect/Data";
 import { asError } from "../effects/io";
+import type { FilesystemIoFailed } from "../filesystem/native-errors";
 import type {
   StorageReadFailure,
   StorageRemoveFailure,
@@ -79,18 +80,6 @@ export class DirectoryRestrictionError extends Data.TaggedError(
   readonly message: string;
 }> {}
 
-export class DirectoryRestrictionIoError extends Data.TaggedError(
-  "DirectoryRestrictionIoError",
-)<{
-  readonly path: string;
-  readonly operation: "mkdir" | "realpath" | "lstat";
-  readonly cause: unknown;
-}> {
-  override get message() {
-    return asError(this.cause).message;
-  }
-}
-
 export type UserRecordReadFailure = StorageReadFailure;
 export type UserRecordSaveFailure = StorageReadFailure | StorageWriteFailure;
 export type UserRecordDeleteFailure =
@@ -102,7 +91,7 @@ export type UserDefaultWriteFailure =
   | StorageRemoveFailure;
 export type UserDirectoryFailure =
   | DirectoryRestrictionError
-  | DirectoryRestrictionIoError;
+  | FilesystemIoFailed;
 export type CreateUserFailure =
   | UserRecordSaveFailure
   | UserAlreadyExistsError

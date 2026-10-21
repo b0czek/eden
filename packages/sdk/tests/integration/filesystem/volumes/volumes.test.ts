@@ -308,9 +308,8 @@ describe("consumer-managed filesystem volumes", () => {
         }),
       ),
     ).rejects.toMatchObject({
-      _tag: "VolumeIoFailed",
-      volume: "missing",
-      operation: "register",
+      _tag: "FilesystemIoFailed",
+      operation: "realpath",
       path: missingRoot,
       cause: expect.objectContaining({ code: "ENOENT" }),
     });

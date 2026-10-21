@@ -1,5 +1,3 @@
-import * as fs from "node:fs";
-import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import * as Cause from "effect/Cause";
@@ -7,7 +5,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Semaphore from "effect/Semaphore";
-import { fromPromise } from "../effects/io";
+import { io } from "../filesystem/native-io";
 import {
   getHotReloadServersPath,
   isHotReloadConfigured,
@@ -15,7 +13,6 @@ import {
 } from "../hotreload-config";
 import { log } from "../logging/logger";
 import type { Packages } from "../packages/service";
-import { HotReloadWatchFailed } from "./errors";
 
 /** Owns filesystem notifications, debounce, and manifest refresh for this scope. */
 export const watchHotReload = Effect.fn(function* ({
@@ -41,43 +38,33 @@ export const watchHotReload = Effect.fn(function* ({
     if (!isHotReloadConfigured(config)) return;
     const serversPath = getHotReloadServersPath(config);
     const stateDirectory = path.dirname(serversPath);
-    const watchFailure = (cause: unknown) =>
-      new HotReloadWatchFailed({
-        path: stateDirectory,
-        cause,
-        message: `Failed to watch hot reload state at ${stateDirectory}`,
-      });
-    yield* fromPromise(
-      () => fsp.mkdir(stateDirectory, { recursive: true }),
-      watchFailure,
-    );
+    yield* io.mkdir(stateDirectory, { recursive: true });
     yield* Effect.acquireRelease(
-      Effect.try({
-        try: () =>
-          fs.watch(stateDirectory, (eventType, filename) => {
-            if (
-              isShuttingDown() ||
-              (eventType !== "rename" && eventType !== "change")
-            )
-              return;
-            if (filename && filename.toString() !== path.basename(serversPath))
-              return;
-            forkHotReload(
-              Effect.sleep(
-                Duration.millis(
-                  Math.max(config.hotReload?.debounce ?? 300, 50),
-                ),
-              ).pipe(
-                Effect.andThen(
-                  Effect.sync(() => {
-                    runLifecycle(handleHotReloadStateChanged());
-                  }),
-                ),
+      io.watch(
+        stateDirectory,
+        (eventType, filename) => {
+          if (
+            isShuttingDown() ||
+            (eventType !== "rename" && eventType !== "change")
+          )
+            return;
+          if (filename && filename.toString() !== path.basename(serversPath))
+            return;
+          forkHotReload(
+            Effect.sleep(
+              Duration.millis(Math.max(config.hotReload?.debounce ?? 300, 50)),
+            ).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  runLifecycle(handleHotReloadStateChanged());
+                }),
               ),
-            );
-          }),
-        catch: watchFailure,
-      }),
+            ),
+          );
+        },
+        (error) => log.warn("Hot reload watch failed:", error),
+        { persistent: true },
+      ),
       (watcher) => Effect.sync(() => watcher.close()),
     );
     runLifecycle(handleHotReloadStateChanged());
