@@ -115,6 +115,7 @@ adapting native or dependency failures. Each operation declares its actual
 failure union; there is no global catch-all domain error. Successful refusal or
 absence remains a value where that is the public contract.
 
+Within Effect workflows, return or yield `Effect.fail` for expected refusals.
 Translate failures where their meaning changes. Native Promise boundaries can
 use `fromPromise(evaluate, onError)` to produce a tagged failure while preserving
 interruption and native cleanup settlement. Compose existing Effect failures

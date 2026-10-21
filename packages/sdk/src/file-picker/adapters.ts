@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import { accessRejection } from "../filesystem/errors";
 import type { Filesystem } from "../filesystem/service";
 import type { Notifications } from "../notification/service";
 import type { Processes } from "../processes/service";
@@ -82,7 +83,11 @@ export function createFilePickerFiles(
 ): FilePickerFiles {
   return {
     resolvePath: (location) => Effect.asVoid(files.resolvePath(location)),
-    accessScope: (volume) => files.accessScope(volume),
+    accessScope: (volume) =>
+      Effect.try({
+        try: () => files.accessScope(volume),
+        catch: accessRejection,
+      }),
   };
 }
 

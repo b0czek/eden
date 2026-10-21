@@ -37,25 +37,31 @@ export function createPickerDisplayProvider(views: FilePickerViews) {
     return isAlive() ? provider : null;
   }
 
-  function register(caller: FilePickerCaller): { success: boolean } {
-    const viewId = resolveCallerViewId(caller.webContentsId);
-    if (viewId === undefined || !caller.appId)
-      throw new FilePickerProviderRejected({
-        appId: caller.appId,
-        message: "File picker display provider must be a valid view",
-      });
-    for (const waiter of waiters) {
-      if (waiter.appId !== caller.appId)
-        throw new FilePickerProviderRejected({
-          appId: caller.appId,
-          expectedAppId: waiter.appId,
-          message: `File picker display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
-        });
-    }
-    provider = { appId: caller.appId, viewId };
-    for (const waiter of [...waiters]) waiter.complete();
-    log.info(`File picker display provider registered: ${caller.appId}`);
-    return { success: true };
+  function register(caller: FilePickerCaller) {
+    return Effect.gen(function* () {
+      const viewId = resolveCallerViewId(caller.webContentsId);
+      if (viewId === undefined || !caller.appId)
+        return yield* Effect.fail(
+          new FilePickerProviderRejected({
+            appId: caller.appId,
+            message: "File picker display provider must be a valid view",
+          }),
+        );
+      for (const waiter of waiters) {
+        if (waiter.appId !== caller.appId)
+          return yield* Effect.fail(
+            new FilePickerProviderRejected({
+              appId: caller.appId,
+              expectedAppId: waiter.appId,
+              message: `File picker display provider registration from ${caller.appId} does not match expected app ${waiter.appId}`,
+            }),
+          );
+      }
+      provider = { appId: caller.appId, viewId };
+      for (const waiter of [...waiters]) waiter.complete();
+      log.info(`File picker display provider registered: ${caller.appId}`);
+      return { success: true };
+    });
   }
 
   function isProvider(caller: FilePickerCaller) {

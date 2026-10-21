@@ -1,10 +1,7 @@
 import type { FilesystemLocation } from "@edenapp/types";
 import * as Data from "effect/Data";
-import {
-  FilesystemAccessDenied,
-  type FilesystemPathError,
-} from "../filesystem/errors";
-import { VolumeUnavailable } from "../filesystem/volumes/errors";
+import type { FilesystemPathError } from "../filesystem/errors";
+import type { VolumeUnavailable } from "../filesystem/volumes/errors";
 
 export class FilePickerRequestRejected extends Data.TaggedError(
   "FilePickerRequestRejected",
@@ -64,28 +61,3 @@ export type FilePickerOpenError =
 export type FilePickerResolveError =
   | FilePickerRequestRejected
   | VolumeUnavailable;
-
-/** Only documented synchronous refusals become expected failures. */
-export function requestRejection(cause: unknown): FilePickerRequestRejected {
-  if (cause instanceof FilePickerRequestRejected) return cause;
-  throw cause;
-}
-
-export function selectionRejection(cause: unknown): FilePickerResolveError {
-  if (cause instanceof VolumeUnavailable) return cause;
-  return requestRejection(cause);
-}
-
-export function openRejection(cause: unknown): FilePickerOpenError {
-  if (
-    cause instanceof FilePickerProviderUnavailable ||
-    cause instanceof FilesystemAccessDenied
-  )
-    return cause;
-  return selectionRejection(cause);
-}
-
-export function providerRejection(cause: unknown): FilePickerProviderRejected {
-  if (cause instanceof FilePickerProviderRejected) return cause;
-  throw cause;
-}

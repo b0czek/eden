@@ -34,6 +34,7 @@ import {
   FilePickerViews,
 } from "../../../src/file-picker/ports";
 import { FilePicker, FilePickerLive } from "../../../src/file-picker/service";
+import { FilesystemAccessDenied } from "../../../src/filesystem/errors";
 import { FilesystemIoFailed } from "../../../src/filesystem/native-errors";
 
 import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
@@ -180,7 +181,7 @@ async function createScenario() {
     permissions,
     volumes,
     files: {
-      accessScope: (volume) => ({ volume, path: "/" }),
+      accessScope: (volume) => Effect.succeed({ volume, path: "/" }),
       resolvePath: () => Effect.void,
     },
   };
@@ -343,19 +344,43 @@ describe("file picker composition and request lifecycle", () => {
   it("requires a renderer provider and trusted view identity for opening and resolution", async () => {
     const s = await scenario();
     await expect(
-      s.register({ appId: provider.appId } as typeof provider),
-    ).rejects.toThrow("display provider must be a valid view");
+      s.run(
+        Effect.result(
+          s.picker.registerDisplayProvider({ appId: provider.appId }),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "FilePickerProviderRejected" },
+    });
     await s.register();
     await expect(
-      s.run(s.picker.openPicker({ mode: "open" }, { appId: opener.appId })),
-    ).rejects.toThrow("only be opened from a renderer view");
-    await expect(s.open({ mode: "open" }, provider)).rejects.toThrow(
-      "Display provider cannot open file pickers",
-    );
+      s.run(
+        Effect.result(
+          s.picker.openPicker({ mode: "open" }, { appId: opener.appId }),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "FilePickerRequestRejected", reason: "missing-view" },
+    });
+    await expect(
+      s.run(Effect.result(s.picker.openPicker({ mode: "open" }, provider))),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "FilePickerRequestRejected", reason: "provider-caller" },
+    });
     const { requestId } = await s.open();
     await expect(
-      s.run(s.picker.resolvePicker({ requestId, reason: "cancel" }, opener)),
-    ).rejects.toThrow("Only the display provider can resolve file pickers");
+      s.run(
+        Effect.result(
+          s.picker.resolvePicker({ requestId, reason: "cancel" }, opener),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "FilePickerRequestRejected", reason: "unauthorized" },
+    });
     expect(s.closed).toEqual([]);
     expect(await s.run(s.picker.closePicker(requestId, opener))).toEqual({
       success: true,
@@ -376,16 +401,27 @@ describe("file picker composition and request lifecycle", () => {
     ]) {
       await expect(
         s.run(
-          s.picker.resolvePicker(
-            { requestId, reason: "select", locations } as never,
-            provider,
+          Effect.result(
+            s.picker.resolvePicker(
+              { requestId, reason: "select", locations } as never,
+              provider,
+            ),
           ),
         ),
-      ).rejects.toThrow();
+      ).resolves.toMatchObject({
+        _tag: "Failure",
+        failure: {
+          _tag: "FilePickerRequestRejected",
+          reason: "invalid-selection",
+        },
+      });
     }
-    await expect(s.run(s.picker.closePicker(requestId, other))).rejects.toThrow(
-      "Only the original opener can close this file picker",
-    );
+    await expect(
+      s.run(Effect.result(s.picker.closePicker(requestId, other))),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "FilePickerRequestRejected", reason: "unauthorized" },
+    });
     expect(s.closed).toEqual([]);
     expect(await s.run(s.picker.closePicker(requestId, opener))).toEqual({
       success: true,
@@ -502,23 +538,95 @@ describe("file picker composition and request lifecycle", () => {
     await expect(s.open()).resolves.toEqual({ requestId: expect.any(String) });
   });
 
-  it("keeps unexpected collaborator exceptions outside the recoverable failure channel", async () => {
+  it("preserves synchronous volume and filesystem access refusals as expected failures", async () => {
     const s = await scenario();
     await s.register();
-    const defect = new Error("Broken view registry");
-    s.dependencies.views.resolve = () => {
-      throw defect;
-    };
-    const exit = await s.run(
-      Effect.exit(s.picker.openPicker({ mode: "open" }, opener)),
+    await expect(
+      s.run(
+        Effect.result(
+          s.picker.openPicker(
+            {
+              mode: "open",
+              allowedVolumes: ["missing"],
+            },
+            opener,
+          ),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "VolumeUnavailable", volume: "missing" },
+    });
+    const { requestId } = await s.open();
+    await expect(
+      s.run(
+        Effect.result(
+          s.picker.resolvePicker(
+            {
+              requestId,
+              reason: "select",
+              locations: [{ volume: "missing", path: "/" }],
+            },
+            provider,
+          ),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "VolumeUnavailable", volume: "missing" },
+    });
+    expect(s.closed).toEqual([]);
+    await s.run(s.picker.closePicker(requestId, opener));
+    const refusal = new FilesystemAccessDenied({
+      message: "No filesystem principal",
+    });
+    s.dependencies.files.accessScope = createFilePickerFiles({
+      accessScope: () => {
+        throw refusal;
+      },
+      resolvePath: () => Effect.die("Unexpected path resolution"),
+    }).accessScope;
+    const denied = await s.run(
+      Effect.result(s.picker.openPicker({ mode: "open" }, opener)),
     );
-    expect(Exit.isFailure(exit)).toBe(true);
-    if (Exit.isFailure(exit)) {
-      expect(Cause.hasDies(exit.cause)).toBe(true);
-      expect(Cause.hasFails(exit.cause)).toBe(false);
-    }
-    expect(s.opened).toEqual([]);
+    expect(denied._tag).toBe("Failure");
+    if (denied._tag === "Failure") expect(denied.failure).toBe(refusal);
+    expect(s.opened).toHaveLength(1);
   });
+
+  it.each(["view", "volume", "access-scope"] as const)(
+    "keeps unexpected %s exceptions outside the recoverable failure channel",
+    async (boundary) => {
+      const s = await scenario();
+      await s.register();
+      const defect = new Error(`Broken ${boundary}`);
+      const broken = () => {
+        throw defect;
+      };
+      if (boundary === "view") s.dependencies.views.resolve = broken;
+      else if (boundary === "volume") s.dependencies.volumes.get = broken;
+      else
+        s.dependencies.files.accessScope = createFilePickerFiles({
+          accessScope: broken,
+          resolvePath: () => Effect.die("Unexpected path resolution"),
+        }).accessScope;
+      const exit = await s.run(
+        Effect.exit(
+          s.picker.openPicker(
+            { mode: "open", allowedVolumes: ["home"] },
+            opener,
+          ),
+        ),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        expect(Cause.hasDies(exit.cause)).toBe(true);
+        expect(Cause.hasFails(exit.cause)).toBe(false);
+        expect(Cause.squash(exit.cause)).toBe(defect);
+      }
+      expect(s.opened).toEqual([]);
+    },
+  );
 
   it("lets a busy notification replace the active request and route both outcomes", async () => {
     const s = await scenario();

@@ -79,30 +79,60 @@ describe("settings shared reads", () => {
 
   it("rejects missing and unauthorized cross-app settings and enforces reader grants", async () => {
     const settings = await acquireSettings(runtime);
-    expect(() =>
-      settings.assertReadableBy("app.owner", "private", "app.reader"),
-    ).toThrow(
-      new SettingAccessError({
-        appId: "app.owner",
-        key: "private",
-        readerAppId: "app.reader",
-        reason: "reader",
-      }),
-    );
-    expect(() =>
-      settings.assertReadableBy("app.owner", "missing", "app.reader"),
-    ).toThrow(
-      new SettingAccessError({
-        appId: "app.owner",
-        key: "missing",
-        readerAppId: "app.reader",
-        reason: "missing",
-      }),
-    );
+    for (const [key, reason] of [
+      ["private", "reader"],
+      ["missing", "missing"],
+    ] as const) {
+      await expect(
+        runtime.run(
+          Effect.result(
+            settings.assertReadableBy("app.owner", key, "app.reader"),
+          ),
+        ),
+      ).resolves.toMatchObject({
+        _tag: "Failure",
+        failure: new SettingAccessError({
+          appId: "app.owner",
+          key,
+          readerAppId: "app.reader",
+          reason,
+        }),
+      });
+    }
     const restricted = await acquireSettings(runtime, false);
-    expect(() =>
-      restricted.assertReadableBy("app.owner", "shared", "app.reader"),
-    ).toThrow("User does not have grant");
+    await expect(
+      runtime.run(
+        Effect.result(
+          restricted.assertReadableBy("app.owner", "shared", "app.reader"),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "SettingAccessError", reason: "grant" },
+    });
+    await expect(
+      runtime.run(
+        restricted.assertReadableBy("app.owner", "private", "app.owner"),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      runtime.run(
+        settings.assertReadableBy("app.owner", "shared", "app.reader"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("evaluates grants when the access Effect executes", async () => {
+    let permitted = false;
+    const settings = await acquireSettings(runtime, () => permitted);
+    const check = settings.assertAccess("app.owner", "private");
+    permitted = true;
+    await expect(runtime.run(check)).resolves.toBeUndefined();
+    permitted = false;
+    await expect(runtime.run(Effect.result(check))).resolves.toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "SettingAccessError", reason: "grant" },
+    });
   });
 
   it("rejects reset without a default without changing the stored value", async () => {

@@ -56,9 +56,12 @@ export interface Settings {
     ownerAppId: string,
     key: string,
     readerAppId: string,
-  ) => void;
+  ) => Effect.Effect<void, SettingAccessError>;
   resolveGrantKey: (appId: string, settingKey: string) => string;
-  assertAccess: (appId: string, key: string) => void;
+  assertAccess: (
+    appId: string,
+    key: string,
+  ) => Effect.Effect<void, SettingAccessError>;
   filterAllowedKeys: (appId: string, keys: string[]) => string[];
   filterSchemaByGrants: (categories: SettingsCategory[]) => SettingsCategory[];
   changed: Event<{ appId: string; key: string; value: string }>;
@@ -202,23 +205,29 @@ export const SettingsLive = Layer.effect(
       ownerAppId: string,
       key: string,
       readerAppId: string,
-    ): void {
-      if (ownerAppId === readerAppId) return;
-      if (!getSettingDefinition(ownerAppId, key))
-        throw new SettingAccessError({
-          appId: ownerAppId,
-          key,
-          readerAppId,
-          reason: "missing",
-        });
-      if (!canRead(ownerAppId, key, readerAppId))
-        throw new SettingAccessError({
-          appId: ownerAppId,
-          key,
-          readerAppId,
-          reason: "reader",
-        });
-      assertAccess(ownerAppId, key);
+    ) {
+      return Effect.gen(function* () {
+        if (ownerAppId === readerAppId) return;
+        if (!getSettingDefinition(ownerAppId, key))
+          return yield* Effect.fail(
+            new SettingAccessError({
+              appId: ownerAppId,
+              key,
+              readerAppId,
+              reason: "missing",
+            }),
+          );
+        if (!canRead(ownerAppId, key, readerAppId))
+          return yield* Effect.fail(
+            new SettingAccessError({
+              appId: ownerAppId,
+              key,
+              readerAppId,
+              reason: "reader",
+            }),
+          );
+        yield* assertAccess(ownerAppId, key);
+      });
     }
 
     function resolveGrantKey(appId: string, settingKey: string): string {
@@ -231,9 +240,14 @@ export const SettingsLive = Layer.effect(
       return authorization.hasGrant(`settings/${appId}/${key}`);
     }
 
-    function assertAccess(appId: string, key: string): void {
-      if (!canAccessSetting(appId, resolveGrantKey(appId, key)))
-        throw new SettingAccessError({ appId, key, reason: "grant" });
+    function assertAccess(appId: string, key: string) {
+      return Effect.suspend(() =>
+        canAccessSetting(appId, resolveGrantKey(appId, key))
+          ? Effect.void
+          : Effect.fail(
+              new SettingAccessError({ appId, key, reason: "grant" }),
+            ),
+      );
     }
 
     function filterAllowedKeys(appId: string, keys: string[]): string[] {
