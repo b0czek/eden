@@ -407,6 +407,54 @@ describe("Filesystem integration", () => {
     }
   });
 
+  it("finishes a committed overwrite when cancellation is requested during backup cleanup", async () => {
+    const transferCaller = await setUpFilesystemCaller();
+    const operations = eden.runtime.services.operations;
+    const source = path.join(eden.paths.userDirectory, "source");
+    const destination = path.join(eden.paths.userDirectory, "destination");
+    await fs.writeFile(source, "replacement");
+    await fs.writeFile(destination, "original");
+    let cleanup: OperationSnapshot | undefined;
+    let cancellation: Promise<unknown> | undefined;
+    const off = operations.changed.on(({ payload: { snapshot } }) => {
+      if (snapshot.command !== "fs/cp" || snapshot.phase !== "cleaning-up")
+        return;
+      if (cancellation) return;
+      cleanup = snapshot;
+      cancellation = eden
+        .execute("operation/cancel", { handle: snapshot }, transferCaller)
+        .catch((error: unknown) => error);
+    });
+    try {
+      const handle = await eden.execute<OperationHandle>(
+        "fs/cp",
+        {
+          from: { volume: "home", path: "/source" },
+          to: { volume: "home", path: "/destination" },
+          overwrite: true,
+        },
+        transferCaller,
+      );
+      await eden.runtime.effects.run(operations.wait(handle, transferCaller));
+      expect(cleanup).toMatchObject({ status: "running", cancellable: false });
+      expect(await cancellation).toMatchObject({
+        message: "Operation cannot be cancelled",
+      });
+      expect(operations.get(handle, transferCaller)).toMatchObject({
+        status: "succeeded",
+        cancellable: false,
+      });
+      expect(await fs.readFile(destination, "utf8")).toBe("replacement");
+      expect(await fs.readFile(source, "utf8")).toBe("replacement");
+      expect((await fs.readdir(eden.paths.userDirectory)).sort()).toEqual([
+        "destination",
+        "source",
+      ]);
+    } finally {
+      off();
+    }
+  });
+
   it.each([false, true])(
     "cancels an active copy and rolls back its destination (overwrite=%s)",
     async (overwrite) => {

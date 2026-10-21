@@ -291,6 +291,10 @@ Preparation finishes before acceptance; execution starts afterward.
 The operation runtime interprets Effects and retains their completion or failure
 through the existing operation lifecycle. The reporter supplies progress updates;
 work that declares `cancellable: true` is cancelled by fiber interruption.
+Yield `reporter.commit` at a transaction's commit boundary to stop accepting
+cancellation. It interrupts instead if cancellation was already accepted. Keep
+that step inside the transaction's protected region and rollback handler, before
+discarding recovery data or publishing committed results.
 
 Commands may also declare `mode: "operation"` and return an `OperationTask`
 directly, for example when a filesystem capability prepares resource admission.

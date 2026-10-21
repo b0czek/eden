@@ -458,7 +458,7 @@ describe("file picker composition and request lifecycle", () => {
           ),
         ),
       ).rejects.toThrow("Selected volume is being removed");
-      const ejectWork = eject.run({ update() {} });
+      const ejectWork = eject.run({ update() {}, commit: Effect.void });
       await (Effect.isEffect(ejectWork) ? s.run(ejectWork) : ejectWork);
       await s.run(s.volumes.register(registration));
       expect(

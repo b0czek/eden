@@ -46,6 +46,7 @@ it.each(["cancellation", "defect"] as const)(
                   }),
                 ),
           reporter: {
+            commit: Effect.void,
             update(phase) {
               if (phase !== "copying") return;
               accessible = false;
@@ -108,6 +109,7 @@ it("reports initial copy progress at clock zero and throttles subsequent progres
         destinationLabel: "destination",
         overwrite: false,
         reporter: {
+          commit: Effect.void,
           update: (phase, progress) => {
             if (phase === "copying" && progress) updates.push(progress);
           },
@@ -138,6 +140,30 @@ async function fixture(run: (root: string) => Promise<void>) {
     await fs.rm(root, { recursive: true, force: true });
   }
 }
+
+test("an interrupted commit restores the overwritten destination", async () => {
+  await fixture(async (root) => {
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    await fs.writeFile(source, "replacement");
+    await fs.writeFile(destination, "original");
+    const exit = await Effect.runPromiseExit(
+      createFileTransfers().copy({
+        source,
+        destination,
+        destinationLabel: destination,
+        overwrite: true,
+        reporter: { update() {}, commit: Effect.interrupt },
+      }),
+    );
+    expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+      true,
+    );
+    expect(await fs.readFile(destination, "utf8")).toBe("original");
+    expect(await fs.readFile(source, "utf8")).toBe("replacement");
+    expect((await fs.readdir(root)).sort()).toEqual(["destination", "source"]);
+  });
+});
 
 test("a committed rename preserves moved content when the source becomes unavailable", async () => {
   await fixture(async (root) => {
@@ -185,7 +211,7 @@ for (const operation of ["copy", "move"] as const) {
               destination,
               destinationLabel: destination,
               overwrite: false,
-              reporter: { update() {} },
+              reporter: { update() {}, commit: Effect.void },
             }),
           ),
         ),
@@ -242,7 +268,7 @@ for (const operation of ["copy", "move"] as const) {
                     : error,
                 ),
               ),
-            reporter: { update() {} },
+            reporter: { update() {}, commit: Effect.void },
           }),
         ),
         /source disconnected/,
@@ -291,7 +317,7 @@ test("concurrent copies through a directory alias preserve the winning destinati
             destination: destinations[index],
             destinationLabel: destinations[index],
             overwrite: false,
-            reporter: { update() {} },
+            reporter: { update() {}, commit: Effect.void },
           }),
         ),
       ),
@@ -329,7 +355,7 @@ test("concurrent overwrite copies publish complete content and remove their back
             destination,
             destinationLabel: destination,
             overwrite: true,
-            reporter: { update() {} },
+            reporter: { update() {}, commit: Effect.void },
           }),
         ),
       ),

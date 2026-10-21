@@ -27,6 +27,40 @@ describe("operation completion failures", () => {
   });
   afterEach(() => eden.dispose());
 
+  it("refuses commit after cancellation was accepted during uninterruptible work", async () => {
+    const ready = gate();
+    const finish = gate();
+    let committed = false;
+    const handle = operations.submit("completion/commit", {}, owner, () =>
+      operationTask(
+        (reporter) =>
+          Effect.gen(function* () {
+            ready.release();
+            yield* Effect.promise(() => finish.promise);
+            reporter.update("ready-to-commit");
+            yield* reporter.commit;
+            committed = true;
+          }).pipe(Effect.uninterruptible),
+        { cancellable: true },
+      ),
+    );
+    try {
+      await ready.promise;
+      operations.cancel(handle, owner);
+      finish.release();
+      await expect(
+        eden.runtime.effects.run(operations.wait(handle, owner)),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      expect(committed).toBe(false);
+      expect(operations.get(handle, owner)).toMatchObject({
+        status: "cancelled",
+        cancellable: true,
+      });
+    } finally {
+      finish.release();
+    }
+  });
+
   it("exposes incomplete transfer recovery instead of ordinary cancellation", async () => {
     const source = path.join(eden.paths.root, "source");
     const destination = path.join(eden.paths.root, "destination");
@@ -50,6 +84,7 @@ describe("operation completion failures", () => {
                     }),
                   ),
             reporter: {
+              ...reporter,
               update(phase, progress) {
                 reporter.update(phase, progress);
                 if (phase === "copying") {

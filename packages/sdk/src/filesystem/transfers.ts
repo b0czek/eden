@@ -217,6 +217,7 @@ export function createFileTransfers() {
           ? yield* stageDestination(transfer.destination)
           : undefined;
         yield* restore(work).pipe(
+          Effect.andThen(transfer.reporter?.commit ?? Effect.void),
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");

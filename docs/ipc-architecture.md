@@ -422,6 +422,8 @@ request a stop. Continue observing until cleanup completes. A cancelled operatio
 has status `cancelled`, and `copy.result()` rejects with an `AbortError`. Cancelling
 a filesystem copy removes its incomplete destination and restores the previous
 destination when replacing an existing file. The source remains intact.
+Once the copy commits, its snapshot becomes non-cancellable while backup cleanup
+finishes. A later cancellation request is rejected and the committed copy completes.
 
 Progress watching is optional. `copy.watch(listener)` receives changes for that
 operation, including its current retained snapshot. `copy.result()` receives only

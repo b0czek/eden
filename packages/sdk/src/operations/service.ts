@@ -326,6 +326,11 @@ export const OperationsLive = Layer.effect(
       }
       return structuredClone(
         yield* task.run({
+          commit: task.cancellable
+            ? Effect.sync(() => update(record, { cancellable: false })).pipe(
+                Effect.interruptible,
+              )
+            : Effect.void,
           update: (phase, progress) => {
             const previous = record.snapshot.progress;
             const unchanged =

@@ -3,6 +3,8 @@ import type * as Effect from "effect/Effect";
 
 export interface OperationReporter {
   update(phase: string, progress?: OperationProgress): void;
+  /** Stop accepting cancellation, or interrupt if cancellation already won. */
+  readonly commit: Effect.Effect<void>;
 }
 
 /** Prepared synchronously; execution belongs to the runtime after acceptance. */

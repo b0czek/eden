@@ -17,7 +17,7 @@ function runTask<A>(
   runtime: EffectRuntime,
   task: OperationTask<A>,
 ): Promise<A> {
-  const work = task.run({ update() {} });
+  const work = task.run({ update() {}, commit: Effect.void });
   return Effect.isEffect(work) ? runtime.run(work) : work;
 }
 

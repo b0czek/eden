@@ -126,6 +126,7 @@ describe("PackageTransactions", () => {
               ),
           })),
           {
+            commit: Effect.void,
             update: (phase) => {
               if (phase === "committing-transaction") {
                 nativeFs.chmodSync(blockedParent, 0o555);
