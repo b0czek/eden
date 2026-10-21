@@ -55,25 +55,6 @@ export const createViewRendering = Effect.fn(function* (
     return cssOption;
   }
 
-  function embeddingHeadersFilter(
-    details: { responseHeaders?: Record<string, string[]> },
-    callback: (response: {
-      responseHeaders?: Record<string, string[]>;
-    }) => void,
-  ): void {
-    const responseHeaders = { ...details.responseHeaders };
-    for (const key of Object.keys(responseHeaders)) {
-      const lowerKey = key.toLowerCase();
-      if (
-        lowerKey === "x-frame-options" ||
-        lowerKey === "content-security-policy"
-      ) {
-        delete responseHeaders[key];
-      }
-    }
-    callback({ responseHeaders });
-  }
-
   const injectEdenCSS = Effect.fn(function* (
     view: PlatformView,
     mode: "full" | "tokens",
@@ -294,14 +275,6 @@ export const createViewRendering = Effect.fn(function* (
       callViewNative("set-bounds", { id: viewId, appId }, () =>
         view.setBounds(viewBounds),
       );
-
-      // Strip embedding headers if enabled
-      if (manifest.frontend?.allowEmbedding) {
-        view.webContents.session.webRequest.onHeadersReceived(
-          { urls: ["*://*/*"] },
-          embeddingHeadersFilter,
-        );
-      }
 
       // Load the frontend HTML or remote URL
       if (isRemoteEntry(frontendEntry)) {

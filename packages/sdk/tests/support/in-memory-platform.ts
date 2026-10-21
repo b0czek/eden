@@ -51,11 +51,6 @@ class InMemoryMessagePort implements PlatformMessagePort {
 }
 
 class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
-  public readonly session = {
-    webRequest: {
-      onHeadersReceived: () => undefined,
-    },
-  };
   private destroyed = false;
   private zoomFactor = 1;
   private devToolsOpened = false;

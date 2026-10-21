@@ -14,18 +14,6 @@ export interface PlatformMessagePort {
 
 export type PlatformListener = (...args: never[]) => unknown;
 
-export interface PlatformWebRequest {
-  onHeadersReceived(
-    filter: { urls: string[] },
-    listener: (
-      details: { responseHeaders?: Record<string, string[]> },
-      callback: (response: {
-        responseHeaders?: Record<string, string[]>;
-      }) => void,
-    ) => void,
-  ): void;
-}
-
 export interface PlatformProtocolRequest {
   url: string;
   method: string;
@@ -57,7 +45,6 @@ export interface ResourceProtocolPort {
 
 export interface PlatformWebContents {
   readonly id: number;
-  readonly session: { webRequest: PlatformWebRequest };
   on<TListener extends PlatformListener>(
     event: string,
     listener: TListener,

@@ -49,10 +49,6 @@
       "source": "builtin"
     },
     {
-      "id": "com.eden.webbrowser",
-      "source": "builtin"
-    },
-    {
       "id": "com.eden.process-manager",
       "source": "builtin"
     },
