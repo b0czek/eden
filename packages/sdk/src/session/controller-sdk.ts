@@ -53,13 +53,7 @@ export function createSessionsSdkController({
           ),
         ),
       ),
-    onChanged: (listener) => {
-      v.parse(v.function(), listener);
-      return sdk.run(() =>
-        sessions.changed.on((change) =>
-          sdk.run(() => listener(structuredClone(change))),
-        ),
-      );
-    },
+    onChanged: (listener) =>
+      sdk.subscribe(listener, (notify) => sessions.changed.on(notify)),
   };
 }

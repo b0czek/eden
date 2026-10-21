@@ -104,16 +104,13 @@ export function createPackagesSdkController({
         packages.toggleHotReload(v.parse(packageIdSchema, packageId)),
       ),
     onChanged: (listener) =>
-      sdk.run(() => {
-        v.parse(v.function(), listener);
+      sdk.subscribe(listener, (notify) => {
         const offs = [
           packages.installed.on(({ manifest }) =>
-            sdk.run(() =>
-              listener({ type: "upserted", manifest: clone(manifest) }),
-            ),
+            notify({ type: "upserted", manifest }),
           ),
           packages.uninstalled.on((change) =>
-            sdk.run(() => listener({ type: "uninstalled", ...clone(change) })),
+            notify({ type: "uninstalled", ...change }),
           ),
         ];
         return () => {

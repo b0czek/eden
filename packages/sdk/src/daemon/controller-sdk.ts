@@ -56,13 +56,9 @@ export function createDaemonsSdkController({
     start: (appId) => retained("start", appId, "starting-daemon"),
     stop: (appId) => retained("stop", appId, "stopping-daemon"),
     restart: (appId) => retained("restart", appId, "restarting-daemon"),
-    onChanged: (listener) => {
-      v.parse(v.function(), listener);
-      return sdk.run(() =>
-        daemons.changed.on(({ status }) =>
-          sdk.run(() => listener(structuredClone(status))),
-        ),
-      );
-    },
+    onChanged: (listener) =>
+      sdk.subscribe(listener, (notify) =>
+        daemons.changed.on(({ status }) => notify(status)),
+      ),
   };
 }

@@ -308,7 +308,9 @@ with a system principal and no inherited app, renderer or operation identity.
 `effect` defers validation and provides host authority to a fully provided service
 Effect. `operation` submits through the existing operation ledger when executed
 and awaits completion. Host runners interpret the completed SDK program. SDK event
-callbacks also enter host context and receive detached payloads.
+callbacks also enter host context and receive detached payloads. `subscribe`
+validates listeners and applies this boundary to subscription setup, payload
+delivery and teardown; controllers supply event connections and payload mappings.
 
 Caller authority is local to the executing Effect fiber. `ExecutionContext.current`
 reads that caller in workflows; synchronous admission checks use `get` on the same

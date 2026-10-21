@@ -55,12 +55,8 @@ export function createVolumesSdkController({
       sdk.run(() => volumes.unregister(v.parse(volumeIdSchema, id))),
     list: () => sdk.run(() => structuredClone(volumes.list())),
     onChanged: (listener) =>
-      sdk.run(() => {
-        v.parse(v.function(), listener);
-        const stop = volumes.changed.on(({ volumes: current }) =>
-          sdk.run(() => listener(structuredClone(current))),
-        );
-        return () => sdk.run(stop);
-      }),
+      sdk.subscribe(listener, (notify) =>
+        volumes.changed.on(({ volumes: current }) => notify(current)),
+      ),
   };
 }

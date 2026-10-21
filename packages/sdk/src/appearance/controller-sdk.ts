@@ -20,13 +20,9 @@ export function createAppearanceSdkController({
       sdk.effect(() =>
         appearance.setWallpaper(v.parse(wallpaperConfigSchema, input)),
       ),
-    onChanged: (listener) => {
-      v.parse(v.function(), listener);
-      return sdk.run(() =>
-        appearance.wallpaperChanged.on((wallpaper) =>
-          sdk.run(() => listener(structuredClone(wallpaper))),
-        ),
-      );
-    },
+    onChanged: (listener) =>
+      sdk.subscribe(listener, (notify) =>
+        appearance.wallpaperChanged.on(notify),
+      ),
   };
 }

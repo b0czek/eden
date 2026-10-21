@@ -15,13 +15,9 @@ export function createOperationsSdkController({
     get: (handle) =>
       sdk.run(() => operations.inspect(v.parse(operationHandleSchema, handle))),
     list: () => sdk.run(() => operations.inspectAll()),
-    onChanged: (listener) => {
-      v.parse(v.function(), listener);
-      return sdk.run(() =>
-        operations.changed.on(({ payload: { snapshot } }) =>
-          sdk.run(() => listener(structuredClone(snapshot))),
-        ),
-      );
-    },
+    onChanged: (listener) =>
+      sdk.subscribe(listener, (notify) =>
+        operations.changed.on(({ payload: { snapshot } }) => notify(snapshot)),
+      ),
   };
 }

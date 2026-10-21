@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
+import type { EventListener } from "../events/event";
 import type { ExecutionContext } from "../execution/context";
 import type { Operations } from "../operations/service";
 import type { OperationTask } from "../operations/task";
@@ -42,6 +43,16 @@ export function createSdkContext({
   ) {
     return effect(() => operations.runHost(command, args, prepare));
   }
-  return { run, effect, operation };
+  function subscribe<A>(
+    listener: EventListener<A>,
+    connect: (notify: EventListener<A>) => () => void,
+  ): () => void {
+    v.parse(v.function(), listener);
+    const stop = run(() =>
+      connect((payload) => run(() => listener(structuredClone(payload)))),
+    );
+    return () => run(stop);
+  }
+  return { run, effect, operation, subscribe };
 }
 export type SdkContext = ReturnType<typeof createSdkContext>;
