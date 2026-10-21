@@ -8,6 +8,11 @@ A changeset summary is a concise release note, not a work log or an inventory of
 
 # Testing
 
+Review warnings as well as errors from verification. Resolve both within the
+task's scope; do not treat a successful exit status as a clean result when
+warnings remain. Report any unresolved warnings and why they remain, and do
+not weaken checks merely to silence them.
+
 When adding or relocating tests, follow the dependency sets and test boundaries
 in [Contributor testing](docs/testing.md#test-dependencies).
 
