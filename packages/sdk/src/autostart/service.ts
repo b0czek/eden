@@ -10,7 +10,11 @@ import { log } from "../logging/logger";
 import { Sessions } from "../session/service";
 import { EDEN_SETTINGS_APP_ID } from "../settings/constants";
 import { Settings } from "../settings/service";
-import { AutostartProcesses, DevelopmentAutostart } from "./ports";
+import {
+  AutostartConfig,
+  AutostartProcesses,
+  DevelopmentAutostart,
+} from "./ports";
 
 export interface Autostart {
   onFoundationReady: () => void;
@@ -23,21 +27,10 @@ export const Autostart = Context.Service<"eden/Autostart", Autostart>(
 
 const AUTOSTART_PREFIX = "autostart.";
 type Launch = "development" | "session" | "login";
-export const AutostartDevelopment = Context.Service<
-  "eden/AutostartDevelopment",
-  boolean
->("eden/AutostartDevelopment");
-
-export const AutostartLoginAppId = Context.Service<
-  "eden/AutostartLoginAppId",
-  string | undefined
->("eden/AutostartLoginAppId");
-
 export const AutostartLive = Layer.effect(
   Autostart,
   Effect.gen(function* () {
-    const development = yield* AutostartDevelopment;
-    const loginAppId = yield* AutostartLoginAppId;
+    const { development, loginAppId } = yield* AutostartConfig;
     const settings = yield* Settings;
     const sessions = yield* Sessions;
     const processes = yield* AutostartProcesses;

@@ -3,6 +3,15 @@ import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { ProcessLaunchError } from "../processes/errors";
 
+export interface AutostartConfig {
+  readonly development: boolean;
+  readonly loginAppId?: string;
+}
+export const AutostartConfig = Context.Service<
+  "eden/AutostartConfig",
+  AutostartConfig
+>("eden/AutostartConfig");
+
 export interface AutostartProcesses {
   isRunning(appId: string): boolean;
   installedManifest(appId: string): RuntimeAppManifest | undefined;

@@ -14,19 +14,21 @@ import { AppAssociations } from "../app-associations/service";
 import type { TargetedNotification } from "../controllers/events";
 import type { Event } from "../events/event";
 import { listen, scopedEvent } from "../events/scoped";
-import { FilesystemAccessDenied } from "../filesystem/errors";
 import { filesystemLocationSchema } from "../filesystem/location-schema";
-import { VolumeUnavailable } from "../filesystem/volumes/errors";
 import { Volumes } from "../filesystem/volumes/service";
 import { Permissions } from "../ipc/permissions";
 import { log } from "../logging/logger";
 import { createPickerDisplayProvider } from "./display-provider";
 import {
   type FilePickerOpenError,
-  FilePickerProviderRejected,
+  type FilePickerProviderRejected,
   FilePickerProviderUnavailable,
   FilePickerRequestRejected,
   type FilePickerResolveError,
+  openRejection,
+  providerRejection,
+  requestRejection,
+  selectionRejection,
 } from "./errors";
 import {
   FilePickerFiles,
@@ -59,31 +61,6 @@ export interface FilePicker {
 export const FilePicker = Context.Service<"eden/FilePicker", FilePicker>(
   "eden/FilePicker",
 );
-
-// Only documented synchronous domain rejections enter the failure channel.
-function check<A, E extends Error>(
-  work: () => A,
-  expected: (cause: unknown) => cause is E,
-) {
-  return Effect.try({ try: work, catch: (cause) => cause }).pipe(
-    Effect.catch((cause) =>
-      expected(cause) ? Effect.fail(cause) : Effect.die(cause),
-    ),
-  );
-}
-
-const requestRejection = (cause: unknown): cause is FilePickerRequestRejected =>
-  cause instanceof FilePickerRequestRejected;
-const selectionRejection = (cause: unknown): cause is FilePickerResolveError =>
-  requestRejection(cause) || cause instanceof VolumeUnavailable;
-const openRejection = (cause: unknown): cause is FilePickerOpenError =>
-  selectionRejection(cause) ||
-  cause instanceof FilePickerProviderUnavailable ||
-  cause instanceof FilesystemAccessDenied;
-const providerRejection = (
-  cause: unknown,
-): cause is FilePickerProviderRejected =>
-  cause instanceof FilePickerProviderRejected;
 
 export const FilePickerLive = Layer.effect(
   FilePicker,
@@ -188,12 +165,15 @@ export const FilePickerLive = Layer.effect(
     );
 
     function registerDisplayProvider(caller: FilePickerCaller) {
-      return check(() => {
-        if (activeRequest) closeActiveRequest("close");
-        const result = providers.register(caller);
-        if (result.success) cancelIdleStop();
-        return result;
-      }, providerRejection);
+      return Effect.try({
+        try: () => {
+          if (activeRequest) closeActiveRequest("close");
+          const result = providers.register(caller);
+          if (result.success) cancelIdleStop();
+          return result;
+        },
+        catch: providerRejection,
+      });
     }
 
     function ensureDisplayProvider() {
@@ -229,71 +209,78 @@ export const FilePickerLive = Layer.effect(
       caller?: FilePickerCaller,
     ): Effect.Effect<{ requestId: string }, FilePickerOpenError> {
       return Effect.gen(function* () {
-        yield* check(() => {
-          if (disposed)
-            throw new FilePickerRequestRejected({
-              operation: "open",
-              reason: "disposed",
-              message: "File picker is disposed",
-            });
-          pruneStaleState();
-          if (
-            args.allowedVolumes &&
-            (!Array.isArray(args.allowedVolumes) || !args.allowedVolumes.length)
-          )
-            throw new FilePickerRequestRejected({
-              operation: "open",
-              reason: "invalid-volumes",
-              message: "File picker requires at least one allowed volume",
-            });
-          for (const id of args.allowedVolumes ?? []) volumes.get(id);
-          if (args.initialLocation) {
-            const location = args.initialLocation;
-            if (
-              typeof location.volume !== "string" ||
-              typeof location.path !== "string"
-            )
+        yield* Effect.try({
+          try: () => {
+            if (disposed)
               throw new FilePickerRequestRejected({
                 operation: "open",
-                reason: "invalid-location",
-                message: "Initial location requires volume and path",
+                reason: "disposed",
+                message: "File picker is disposed",
               });
-            volumes.get(location.volume);
+            pruneStaleState();
             if (
               args.allowedVolumes &&
-              !args.allowedVolumes.includes(location.volume)
+              (!Array.isArray(args.allowedVolumes) ||
+                !args.allowedVolumes.length)
             )
               throw new FilePickerRequestRejected({
                 operation: "open",
-                reason: "volume-not-allowed",
-                message: "Initial volume is not allowed",
+                reason: "invalid-volumes",
+                message: "File picker requires at least one allowed volume",
               });
-          }
-        }, openRejection);
+            for (const id of args.allowedVolumes ?? []) volumes.get(id);
+            if (args.initialLocation) {
+              const location = args.initialLocation;
+              if (
+                typeof location.volume !== "string" ||
+                typeof location.path !== "string"
+              )
+                throw new FilePickerRequestRejected({
+                  operation: "open",
+                  reason: "invalid-location",
+                  message: "Initial location requires volume and path",
+                });
+              volumes.get(location.volume);
+              if (
+                args.allowedVolumes &&
+                !args.allowedVolumes.includes(location.volume)
+              )
+                throw new FilePickerRequestRejected({
+                  operation: "open",
+                  reason: "volume-not-allowed",
+                  message: "Initial volume is not allowed",
+                });
+            }
+          },
+          catch: openRejection,
+        });
         if (args.initialLocation)
           yield* files.resolvePath(args.initialLocation);
-        const identity = yield* check(() => {
-          if (!caller?.appId)
-            throw new FilePickerRequestRejected({
-              operation: "open",
-              reason: "missing-caller",
-              message: "Caller app ID is required to open file pickers",
-            });
-          const viewId = providers.resolveCallerViewId(caller.webContentsId);
-          if (viewId === undefined)
-            throw new FilePickerRequestRejected({
-              operation: "open",
-              reason: "missing-view",
-              message: "File pickers can only be opened from a renderer view",
-            });
-          if (viewId === providers.get()?.viewId)
-            throw new FilePickerRequestRejected({
-              operation: "open",
-              reason: "provider-caller",
-              message: "Display provider cannot open file pickers",
-            });
-          return { appId: caller.appId, viewId };
-        }, openRejection);
+        const identity = yield* Effect.try({
+          try: () => {
+            if (!caller?.appId)
+              throw new FilePickerRequestRejected({
+                operation: "open",
+                reason: "missing-caller",
+                message: "Caller app ID is required to open file pickers",
+              });
+            const viewId = providers.resolveCallerViewId(caller.webContentsId);
+            if (viewId === undefined)
+              throw new FilePickerRequestRejected({
+                operation: "open",
+                reason: "missing-view",
+                message: "File pickers can only be opened from a renderer view",
+              });
+            if (viewId === providers.get()?.viewId)
+              throw new FilePickerRequestRejected({
+                operation: "open",
+                reason: "provider-caller",
+                message: "Display provider cannot open file pickers",
+              });
+            return { appId: caller.appId, viewId };
+          },
+          catch: openRejection,
+        });
         yield* ensureDisplayProvider();
         if (activeRequest) {
           yield* notifications.busy(
@@ -309,38 +296,44 @@ export const FilePickerLive = Layer.effect(
             }),
           );
         }
-        const request = yield* check(() => {
-          const provider = providers.get();
-          if (!provider)
-            throw new FilePickerProviderUnavailable({
-              reason: "unregistered",
-              message: "File picker display provider is not registered",
+        const request = yield* Effect.try({
+          try: () => {
+            const provider = providers.get();
+            if (!provider)
+              throw new FilePickerProviderUnavailable({
+                reason: "unregistered",
+                message: "File picker display provider is not registered",
+              });
+            const initialLocation =
+              args.initialLocation ??
+              files.accessScope(args.allowedVolumes?.[0] ?? "home");
+            cancelIdleStop();
+            const requestId = `file-picker-${Date.now()}-${++idCounter}`;
+            activeRequest = {
+              requestId,
+              mode: args.mode,
+              allowedVolumes: args.allowedVolumes
+                ? [...args.allowedVolumes]
+                : undefined,
+              opener: identity,
+            };
+            const picker: FilePickerOpenEvent = {
+              ...args,
+              initialLocation,
+              requestId,
+              opener: {
+                ...identity,
+                bounds: views.get(identity.viewId)?.bounds,
+              },
+            };
+            opened.emit({
+              payload: { picker },
+              viewIds: targets(identity.viewId),
             });
-          const initialLocation =
-            args.initialLocation ??
-            files.accessScope(args.allowedVolumes?.[0] ?? "home");
-          cancelIdleStop();
-          const requestId = `file-picker-${Date.now()}-${++idCounter}`;
-          activeRequest = {
-            requestId,
-            mode: args.mode,
-            allowedVolumes: args.allowedVolumes
-              ? [...args.allowedVolumes]
-              : undefined,
-            opener: identity,
-          };
-          const picker: FilePickerOpenEvent = {
-            ...args,
-            initialLocation,
-            requestId,
-            opener: { ...identity, bounds: views.get(identity.viewId)?.bounds },
-          };
-          opened.emit({
-            payload: { picker },
-            viewIds: targets(identity.viewId),
-          });
-          return { requestId, viewId: provider.viewId };
-        }, openRejection);
+            return { requestId, viewId: provider.viewId };
+          },
+          catch: openRejection,
+        });
         yield* views.reveal(request.viewId);
         log.info(`File picker opened (${request.requestId})`);
         return { requestId: request.requestId };
@@ -364,103 +357,109 @@ export const FilePickerLive = Layer.effect(
       result: FilePickerResult,
       caller?: FilePickerCaller,
     ) {
-      return check((): { success: boolean } => {
-        if (!providers.isProvider(caller ?? {}))
-          throw new FilePickerRequestRejected({
-            operation: "resolve",
-            requestId: result.requestId,
-            reason: "unauthorized",
-            message: "Only the display provider can resolve file pickers",
-          });
-        if (!activeRequest || activeRequest.requestId !== result.requestId)
-          return { success: false };
-        if (result.reason === "select") {
-          if (!Array.isArray(result.locations) || !result.locations.length)
+      return Effect.try({
+        try: (): { success: boolean } => {
+          if (!providers.isProvider(caller ?? {}))
             throw new FilePickerRequestRejected({
               operation: "resolve",
               requestId: result.requestId,
-              reason: "invalid-selection",
-              message:
-                "File picker selection requires a nonempty locations array",
+              reason: "unauthorized",
+              message: "Only the display provider can resolve file pickers",
             });
-          for (const location of result.locations) {
-            const parsed = v.safeParse(filesystemLocationSchema, location);
-            if (!parsed.success)
+          if (!activeRequest || activeRequest.requestId !== result.requestId)
+            return { success: false };
+          if (result.reason === "select") {
+            if (!Array.isArray(result.locations) || !result.locations.length)
               throw new FilePickerRequestRejected({
                 operation: "resolve",
                 requestId: result.requestId,
                 reason: "invalid-selection",
-                message: new v.ValiError(parsed.issues).message,
+                message:
+                  "File picker selection requires a nonempty locations array",
               });
-            const volume = volumes.get(location.volume);
-            if (volume.state !== "ready")
-              throw new FilePickerRequestRejected({
-                operation: "resolve",
-                requestId: result.requestId,
-                reason: "volume-removing",
-                message: "Selected volume is being removed",
-              });
-            if (
-              activeRequest.allowedVolumes &&
-              !activeRequest.allowedVolumes.includes(location.volume)
-            )
-              throw new FilePickerRequestRejected({
-                operation: "resolve",
-                requestId: result.requestId,
-                reason: "volume-not-allowed",
-                message: "Selected volume is not allowed",
-              });
-            if (activeRequest.mode === "save" && volume.readOnly)
-              throw new FilePickerRequestRejected({
-                operation: "resolve",
-                requestId: result.requestId,
-                reason: "volume-read-only",
-                message: "Selected volume is read-only",
-              });
+            for (const location of result.locations) {
+              const parsed = v.safeParse(filesystemLocationSchema, location);
+              if (!parsed.success)
+                throw new FilePickerRequestRejected({
+                  operation: "resolve",
+                  requestId: result.requestId,
+                  reason: "invalid-selection",
+                  message: new v.ValiError(parsed.issues).message,
+                });
+              const volume = volumes.get(location.volume);
+              if (volume.state !== "ready")
+                throw new FilePickerRequestRejected({
+                  operation: "resolve",
+                  requestId: result.requestId,
+                  reason: "volume-removing",
+                  message: "Selected volume is being removed",
+                });
+              if (
+                activeRequest.allowedVolumes &&
+                !activeRequest.allowedVolumes.includes(location.volume)
+              )
+                throw new FilePickerRequestRejected({
+                  operation: "resolve",
+                  requestId: result.requestId,
+                  reason: "volume-not-allowed",
+                  message: "Selected volume is not allowed",
+                });
+              if (activeRequest.mode === "save" && volume.readOnly)
+                throw new FilePickerRequestRejected({
+                  operation: "resolve",
+                  requestId: result.requestId,
+                  reason: "volume-read-only",
+                  message: "Selected volume is read-only",
+                });
+            }
           }
-        }
-        const openerViewId = activeRequest.opener.viewId;
-        activeRequest = null;
-        closed.emit({ payload: result, viewIds: targets(openerViewId) });
-        scheduleIdleStop();
-        return { success: true };
-      }, selectionRejection);
+          const openerViewId = activeRequest.opener.viewId;
+          activeRequest = null;
+          closed.emit({ payload: result, viewIds: targets(openerViewId) });
+          scheduleIdleStop();
+          return { success: true };
+        },
+        catch: selectionRejection,
+      });
     }
 
     function closePicker(
       requestId: string | undefined,
       caller?: FilePickerCaller,
     ) {
-      return check((): { success: boolean } => {
-        pruneStaleState();
-        if (!activeRequest) return { success: false };
-        const targetId = requestId ?? activeRequest.requestId;
-        if (targetId !== activeRequest.requestId) return { success: false };
-        if (!caller?.appId)
-          throw new FilePickerRequestRejected({
-            operation: "close",
-            requestId: targetId,
-            reason: "missing-caller",
-            message: "Caller app ID is required to close file pickers",
-          });
-        if (
-          !providers.isProvider(caller) &&
-          providers.resolveCallerViewId(caller.webContentsId) !==
-            activeRequest.opener.viewId
-        ) {
-          log.warn(
-            `File picker close denied for ${caller.appId} (request ${targetId})`,
-          );
-          throw new FilePickerRequestRejected({
-            operation: "close",
-            requestId: targetId,
-            reason: "unauthorized",
-            message: "Only the original opener can close this file picker",
-          });
-        }
-        closeActiveRequest("close");
-        return { success: true };
-      }, requestRejection);
+      return Effect.try({
+        try: (): { success: boolean } => {
+          pruneStaleState();
+          if (!activeRequest) return { success: false };
+          const targetId = requestId ?? activeRequest.requestId;
+          if (targetId !== activeRequest.requestId) return { success: false };
+          if (!caller?.appId)
+            throw new FilePickerRequestRejected({
+              operation: "close",
+              requestId: targetId,
+              reason: "missing-caller",
+              message: "Caller app ID is required to close file pickers",
+            });
+          if (
+            !providers.isProvider(caller) &&
+            providers.resolveCallerViewId(caller.webContentsId) !==
+              activeRequest.opener.viewId
+          ) {
+            log.warn(
+              `File picker close denied for ${caller.appId} (request ${targetId})`,
+            );
+            throw new FilePickerRequestRejected({
+              operation: "close",
+              requestId: targetId,
+              reason: "unauthorized",
+              message: "Only the original opener can close this file picker",
+            });
+          }
+          closeActiveRequest("close");
+          return { success: true };
+        },
+        catch: requestRejection,
+      });
     }
 
     return {
