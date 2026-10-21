@@ -167,6 +167,7 @@ it("generates public success values without Effect failures or service requireme
     import * as v from "valibot";
     import * as Effect from "effect/Effect";
     import { command, defineController, operation } from "./controller";
+    import { fromPromise } from "../effects/io";
     import { operationTask } from "../operations/task";
     declare const load: Effect.Effect<{ value: number }, { _tag: "LoadFailed" }>;
     declare const empty: Effect.Effect<undefined, { _tag: "EmptyFailed" }>;
@@ -180,7 +181,7 @@ it("generates public success values without Effect failures or service requireme
             return load;
           },
         }),
-        promise: command({ handle: async () => ({ value: 2 }) }),
+        adapted: command({ handle: () => fromPromise(async () => ({ value: 2 })) }),
         plain: command({ handle: () => 2 }),
         empty: command({ handle: () => empty }),
         nullable: command({ handle: () => nullable }),
@@ -225,7 +226,7 @@ it("generates public success values without Effect failures or service requireme
     type Assert<T extends true> = T;
     type Contracts = [
       Assert<Equal<ExampleCommands["example/load"]["response"], { value: number }>>,
-      Assert<Equal<ExampleCommands["example/promise"]["response"], { value: number }>>,
+      Assert<Equal<ExampleCommands["example/adapted"]["response"], { value: number }>>,
       Assert<Equal<ExampleCommands["example/plain"]["response"], number>>,
       Assert<Equal<ExampleCommands["example/empty"]["response"], undefined>>,
       Assert<Equal<ExampleCommands["example/nullable"]["response"], string | null | undefined>>,

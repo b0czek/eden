@@ -260,7 +260,8 @@ export function createI18nController(i18n: I18n) {
 argument type. Omit it for commands without public arguments. The generated
 client uses the schema's input type; a handler receives its validated output,
 including defaults and transformations. Results are inferred from the handler.
-Result handlers can return ordinary values, Promises, or fully provided Effects.
+Result handlers return ordinary values or fully provided Effects. Adapt native
+Promise producers with `fromPromise(evaluate, onError)` to declare their failures.
 The command registry returns one Effect program; native IPC adapters execute it
 through scoped fibers. Controllers return work rather than calling `runPromise`
 themselves.
@@ -314,7 +315,7 @@ public failed snapshot carries the encoded response. Defects are never encoded
 as ordinary responses. Successful values, including
 `false` or `{ success: false }`, remain successful operation results.
 
-Codegen extracts the successful result from value, Promise, and Effect handlers,
+Codegen extracts the successful result from value and Effect handlers,
 and the completion value from an operation task. Effect failure types and service
 requirements do not enter generated client declarations. Apps keep the existing
 Promise-based client API, including operation controls and subscriptions, without

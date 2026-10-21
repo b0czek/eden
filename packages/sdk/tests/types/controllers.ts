@@ -2,13 +2,13 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, operation } from "../../src/controllers/controller";
+import { fromPromise } from "../../src/effects/io";
 import { operationTask } from "../../src/operations/task";
 
 command({ handle: () => 42 });
-command({ handle: async () => "value" });
 command({ handle: () => Effect.succeed(42) });
 command({ handle: () => Effect.scoped(Effect.scope) });
-command({ handle: async () => Effect.succeed(42) });
+command({ handle: () => fromPromise(async () => "value") });
 command({ handle: () => Effect.fail(new Error("expected")) });
 command({
   mode: "operation",
@@ -32,19 +32,33 @@ command({
   handle: ({ value }) => Effect.succeed(value),
 });
 
+// Native async work must be adapted to an Effect before returning it.
+// @ts-expect-error Async handlers return a Promise.
+command({ handle: async () => "value" });
+// @ts-expect-error Promises resolving to Effects are not command results.
+command({ handle: async () => Effect.succeed(42) });
+declare const thenable: PromiseLike<number>;
+// @ts-expect-error Custom thenables also require explicit adaptation.
+command({ handle: () => thenable });
+command({
+  input: v.object({ value: v.number() }),
+  // @ts-expect-error Schemas do not enable Promise results.
+  handle: async ({ value }) => value,
+});
+command({
+  // @ts-expect-error Every possible result must be a value or Effect.
+  handle: () => (Math.random() > 0.5 ? 42 : Promise.resolve(42)),
+});
+
 // A command's execution environment cannot provide service or scope requirements.
 // @ts-expect-error Scope has not been provided.
 command({ handle: () => Effect.scope });
-// @ts-expect-error Promises must not hide unmet Effect requirements.
-command({ handle: async () => Effect.scope });
 // @ts-expect-error Input validation does not provide an Effect scope.
 command({ input: v.object({ value: v.number() }), handle: () => Effect.scope });
 command({
   // @ts-expect-error Every possible result must be fully provided.
   handle: () => (Math.random() > 0.5 ? Effect.scope : Effect.succeed(1)),
 });
-// @ts-expect-error Promise results with schemas must also be fully provided.
-command({ input: v.object({}), handle: async () => Effect.scope });
 
 // Operation encoders receive the workflow's declared failures.
 class DeviceUnavailable extends Data.TaggedError("DeviceUnavailable")<{

@@ -8,6 +8,7 @@ import {
   createEffectRuntime,
 } from "../../tests/support/effect-runtime";
 import { command, defineController } from "../controllers/controller";
+import { fromPromise } from "../effects/io";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
 import { Operations } from "../operations/service";
 import { RuntimeConfig } from "../runtime/inputs";
@@ -97,7 +98,9 @@ describe("command dispatch", () => {
                 };
               }),
           }),
-          promised: command({ handle: async () => Effect.succeed("resolved") }),
+          adapted: command({
+            handle: () => fromPromise(() => Promise.resolve("resolved")),
+          }),
           fail: command({
             handle: () => Effect.fail(new Error("service failed")),
           }),
@@ -116,7 +119,7 @@ describe("command dispatch", () => {
       { trusted: "first", current: "first" },
       { trusted: "second", current: "second" },
     ]);
-    await expect(h.registry.execute("example/promised", {})).resolves.toBe(
+    await expect(h.registry.execute("example/adapted", {})).resolves.toBe(
       "resolved",
     );
     await expect(h.registry.execute("example/fail", {})).rejects.toThrow(
@@ -139,6 +142,15 @@ describe("command dispatch", () => {
               throw defect;
             },
           }),
+          effectDefect: command({
+            handle: () =>
+              Effect.sync(() => {
+                throw defect;
+              }),
+          }),
+          adaptedFailure: command({
+            handle: () => fromPromise(() => Promise.reject(defect)),
+          }),
           rejected: command({
             handle: () => {
               throw rejection;
@@ -153,12 +165,21 @@ describe("command dispatch", () => {
     );
     const runExit = (name: string) =>
       h.effects.run(Effect.exit(h.commands.execute(`admission/${name}`, {})));
-    const failed = await runExit("defect");
-    expect(Exit.isFailure(failed)).toBe(true);
-    if (Exit.isFailure(failed)) {
-      expect(Cause.hasDies(failed.cause)).toBe(true);
-      expect(Cause.hasFails(failed.cause)).toBe(false);
-      expect(Cause.squash(failed.cause)).toBe(defect);
+    for (const name of ["defect", "effectDefect"]) {
+      const failed = await runExit(name);
+      expect(Exit.isFailure(failed)).toBe(true);
+      if (Exit.isFailure(failed)) {
+        expect(Cause.hasDies(failed.cause)).toBe(true);
+        expect(Cause.hasFails(failed.cause)).toBe(false);
+        expect(Cause.squash(failed.cause)).toBe(defect);
+      }
+    }
+    const adapted = await runExit("adaptedFailure");
+    expect(Exit.isFailure(adapted)).toBe(true);
+    if (Exit.isFailure(adapted)) {
+      expect(Cause.hasDies(adapted.cause)).toBe(false);
+      expect(Cause.hasFails(adapted.cause)).toBe(true);
+      expect(Cause.squash(adapted.cause)).toBe(defect);
     }
     const rejected = await runExit("rejected");
     expect(Exit.isFailure(rejected)).toBe(true);

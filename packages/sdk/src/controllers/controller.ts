@@ -1,6 +1,5 @@
-import * as Effect from "effect/Effect";
+import type * as Effect from "effect/Effect";
 import * as v from "valibot";
-import { fromPromise } from "../effects/io";
 import type { CommandCallerContext } from "../execution/context";
 import { type OperationTask, operationTask } from "../operations/task";
 import type { ControllerEvent } from "./events";
@@ -11,9 +10,7 @@ type CommandMode = "result" | "operation";
 type ResultSuccess<Result> =
   Result extends Effect.Effect<infer Success, infer _Error, infer _Services>
     ? Success
-    : Result extends PromiseLike<infer Success>
-      ? ResultSuccess<Success>
-      : Result;
+    : Result;
 
 type CommandSuccess<Result, Mode extends CommandMode> = Mode extends "operation"
   ? Result extends OperationTask<infer Completion, infer _Error>
@@ -42,14 +39,14 @@ export interface Command<
   };
 }
 
-/** Reject outstanding requirements, including Effects returned through Promises. */
+/** Accept values and fully provided Effects, with native async work adapted explicitly. */
 type ProvidedResult<Result> =
   Result extends Effect.Effect<infer _Success, infer _Error, infer Services>
     ? [Services] extends [never]
       ? Result
       : never
-    : Result extends PromiseLike<infer Value>
-      ? PromiseLike<ProvidedResult<Value>>
+    : Result extends PromiseLike<unknown>
+      ? never
       : Result;
 
 interface CommandOptions<Args, Result, Mode extends CommandMode> {
@@ -89,22 +86,8 @@ export function command(
   return {
     ...options,
     mode: options.mode ?? "result",
-    execute: (input, caller) => {
-      const result = options.handle(v.parse(schema, input) as never, caller);
-      // Normalize Promise-based extensions once at their controller boundary.
-      if (
-        options.mode !== "operation" &&
-        result &&
-        typeof (result as PromiseLike<unknown>).then === "function"
-      ) {
-        return fromPromise(() => result as PromiseLike<unknown>).pipe(
-          Effect.flatMap((value) =>
-            Effect.isEffect(value) ? value : Effect.succeed(value),
-          ),
-        );
-      }
-      return result;
-    },
+    execute: (input, caller) =>
+      options.handle(v.parse(schema, input) as never, caller),
   };
 }
 
