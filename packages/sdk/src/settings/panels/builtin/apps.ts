@@ -5,7 +5,7 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { EDEN_SETTINGS_APP_ID } from "../../constants";
-import { cloneRendererValue } from "../codec";
+import { cloneRendererValue } from "../serialization";
 import type { BuiltinPanelModule, BuiltinSettingsDependencies } from "./types";
 
 export const appsSettingsCategory = {

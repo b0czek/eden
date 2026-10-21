@@ -33,25 +33,26 @@ import {
   hasUserGrant,
 } from "./authorization";
 import {
-  cloneAndValidatePanelActionInvocation,
-  cloneAndValidatePanelDefinition,
-  cloneAndValidatePanelView,
-  cloneRendererValue,
-  type InternalPanelDefinition,
-  isSettingsPanelViewValidationError,
-  validatePanelProvider,
-} from "./codec";
-import { SettingsPanelRegistrationError } from "./errors";
+  SettingsPanelRegistrationError,
+  SettingsPanelViewValidationError,
+} from "./errors";
 import {
   createGeneratedSettingsPanel,
   type GeneratedPanelOwner,
 } from "./generated";
 import { PanelRegistryService, type SettingsPanelEvents } from "./registry";
+import { cloneRendererValue } from "./serialization";
 import type {
   InternalSettingsPanelProvider,
   PanelRenderer,
   SettingsPanelRecord,
 } from "./types";
+import { cloneAndValidatePanelActionInvocation } from "./validation/actions";
+import {
+  cloneAndValidatePanelDefinition,
+  validatePanelProvider,
+} from "./validation/definition";
+import { cloneAndValidatePanelView } from "./validation/view";
 
 export interface SettingsPanels {
   registerPanel: (
@@ -60,7 +61,7 @@ export interface SettingsPanels {
     options?: SettingsPanelRegistrationOptions,
   ) => SettingsPanelRegistration;
   registerBuiltinPanel: (
-    definition: InternalPanelDefinition,
+    definition: SettingsPanelDefinition,
     provider: InternalSettingsPanelProvider,
     renderer?: PanelRenderer,
   ) => SettingsPanelRegistration;
@@ -100,7 +101,7 @@ export const SettingsPanelsLive = Layer.effect(
     const { panels, changed, registerPanel, register } = registry;
 
     function registerBuiltinPanel(
-      definition: InternalPanelDefinition,
+      definition: SettingsPanelDefinition,
       provider: InternalSettingsPanelProvider,
       renderer: PanelRenderer = "generic",
     ): SettingsPanelRegistration {
@@ -253,7 +254,7 @@ export const SettingsPanelsLive = Layer.effect(
       }).pipe(
         Effect.catch((error) =>
           Effect.sync((): SettingsPanelResponse => {
-            if (isSettingsPanelViewValidationError(error)) {
+            if (error instanceof SettingsPanelViewValidationError) {
               return {
                 error: {
                   code: "load_failed",

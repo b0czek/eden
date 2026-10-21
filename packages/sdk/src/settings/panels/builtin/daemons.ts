@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { authorizeDaemonDefinition } from "../../../daemon/authorization";
 import { daemonDefinitionSchema } from "../../../daemon/schemas";
-import { cloneRendererValue } from "../codec";
+import { cloneRendererValue } from "../serialization";
 import type { BuiltinPanelModule } from "./types";
 
 export const daemonsSettingsCategory = {

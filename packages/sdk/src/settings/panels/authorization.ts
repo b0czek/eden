@@ -6,8 +6,8 @@ import type {
   UserProfile,
 } from "@edenapp/types";
 import { matchesGrants } from "../../user/grants";
-import { cloneRendererValue } from "./codec";
 import { settingGrant } from "./generated";
+import { cloneRendererValue } from "./serialization";
 import type { SettingsPanelRecord } from "./types";
 
 export const hasUserGrant = (user: UserProfile, grant: string): boolean =>

@@ -1,12 +1,6 @@
 import type { SettingsPanelView } from "@edenapp/types";
-import * as Effect from "effect/Effect";
-import { panelDefinition } from "../../../tests/support/settings/panels";
-import {
-  cloneAndValidatePanelActionInvocation,
-  cloneAndValidatePanelDefinition,
-  cloneAndValidatePanelView,
-  validatePanelProvider,
-} from "./codec";
+import { panelDefinition } from "../../../../tests/support/settings/panels";
+import { cloneAndValidatePanelView } from "./view";
 
 const definition = () =>
   panelDefinition({
@@ -132,31 +126,9 @@ const view = (): SettingsPanelView => ({
   ],
 });
 
-describe("SettingsPanelCodec", () => {
+describe("settings panel views", () => {
   it("accepts every resolved node kind and collection row primitive", () => {
     expect(cloneAndValidatePanelView(definition(), view())).toEqual(view());
-  });
-
-  it("strictly validates definitions and providers", () => {
-    expect(() =>
-      cloneAndValidatePanelDefinition(panelDefinition({ id: "bad id" })),
-    ).toThrow("Invalid");
-    expect(() =>
-      cloneAndValidatePanelDefinition({
-        ...definition(),
-        extra: true,
-      } as never),
-    ).toThrow("definition");
-    expect(() =>
-      cloneAndValidatePanelDefinition(
-        panelDefinition({ actions: [{ id: "write", grant: "write" }] }),
-      ),
-    ).toThrow("requires a label");
-    expect(() =>
-      validatePanelProvider(definition(), {
-        load: () => Effect.succeed({ sections: [] }),
-      }),
-    ).toThrow("missing action");
   });
 
   it.each([
@@ -254,22 +226,5 @@ describe("SettingsPanelCodec", () => {
     const candidate = view();
     mutate(candidate);
     expect(() => cloneAndValidatePanelView(definition(), candidate)).toThrow();
-  });
-
-  it("validates invocation channels independently with channel paths", () => {
-    const action = definition().actions?.[0];
-    if (!action) throw new Error("missing action");
-    expect(
-      cloneAndValidatePanelActionInvocation(
-        { params: { deviceId: "one" } },
-        action,
-      ).failures,
-    ).toEqual([]);
-    expect(
-      cloneAndValidatePanelActionInvocation(
-        { params: { deviceId: 1 }, value: true },
-        action,
-      ).failures.map(({ path }) => path),
-    ).toEqual(expect.arrayContaining(["params.deviceId", "value"]));
   });
 });

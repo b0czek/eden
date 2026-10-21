@@ -6,7 +6,7 @@ import type {
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { wallpaperConfigSchema } from "../../../appearance/schemas";
-import { cloneRendererValue } from "../codec";
+import { cloneRendererValue } from "../serialization";
 import type { BuiltinPanelModule } from "./types";
 
 export const appearanceSettingsCategory = {

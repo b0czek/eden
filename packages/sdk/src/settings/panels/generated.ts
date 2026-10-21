@@ -10,12 +10,9 @@ import type {
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import type { Settings } from "../service";
-import {
-  cloneAndValidatePanelView,
-  cloneRendererValue,
-  type InternalPanelDefinition,
-} from "./codec";
+import { cloneRendererValue } from "./serialization";
 import type { InternalSettingsPanelProvider } from "./types";
+import { cloneAndValidatePanelView } from "./validation/view";
 
 export interface GeneratedPanelOwner {
   id: string;
@@ -25,7 +22,7 @@ export interface GeneratedPanelOwner {
   settings?: SettingsCategory[];
 }
 export interface GeneratedSettingsPanel {
-  definition: InternalPanelDefinition;
+  definition: SettingsPanelDefinition;
   provider: InternalSettingsPanelProvider;
   ownerAppId: string;
   settings: SettingsCategory[];
@@ -146,7 +143,7 @@ export function createGeneratedSettingsPanel(
         settings.set(owner.id, setting.key, String(invocation.value));
     });
   });
-  const definition: InternalPanelDefinition = {
+  const definition: SettingsPanelDefinition = {
     id: panelId,
     title: owner.name,
     description: owner.description,

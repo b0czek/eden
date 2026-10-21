@@ -6,8 +6,8 @@ import type {
 } from "@edenapp/types";
 import * as Context from "effect/Context";
 import { createEvent, type Event } from "../../events/event";
-import { cloneRendererValue, type InternalPanelDefinition } from "./codec";
 import { SettingsPanelRegistrationError } from "./errors";
+import { cloneRendererValue } from "./serialization";
 import type {
   InternalSettingsPanelProvider,
   PanelRenderer,
@@ -26,7 +26,7 @@ export interface PanelRegistry {
   panels: Map<string, SettingsPanelRecord>;
   changed: Event<SettingsPanelEvents["panels-changed"]>;
   register(
-    definition: InternalPanelDefinition,
+    definition: SettingsPanelDefinition,
     provider: InternalSettingsPanelProvider,
     source: PanelSource,
     renderer: PanelRenderer,
@@ -74,7 +74,7 @@ export function createPanelRegistry(): PanelRegistry {
     );
   }
   function register(
-    definition: InternalPanelDefinition,
+    definition: SettingsPanelDefinition,
     provider: InternalSettingsPanelProvider,
     source: PanelSource,
     renderer: PanelRenderer,

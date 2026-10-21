@@ -1,11 +1,11 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import type { EdenSettingsApi } from "../api/settings";
+import type { PanelRegistry } from "./panels/registry";
 import {
   cloneAndValidatePanelDefinition,
   validatePanelProvider,
-} from "./panels/codec";
-import type { PanelRegistry } from "./panels/registry";
+} from "./panels/validation/definition";
 
 const registrationOptionsSchema = v.optional(
   v.object({

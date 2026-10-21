@@ -2,13 +2,13 @@ import type {
   SettingsCategory,
   SettingsPanelActionInvocation,
   SettingsPanelCustomSnapshot,
+  SettingsPanelDefinition,
   SettingsPanelProviderContext,
   SettingsPanelSummary,
   SettingsPanelValue,
   SettingsPanelView,
 } from "@edenapp/types";
 import type * as Effect from "effect/Effect";
-import type { InternalPanelDefinition } from "./codec";
 
 export type PanelRenderer = "generic" | SettingsPanelCustomSnapshot["renderer"];
 export type PanelSource = SettingsPanelSummary["source"];
@@ -30,7 +30,7 @@ export interface InternalSettingsPanelProvider {
 }
 
 export interface SettingsPanelRecord {
-  definition: InternalPanelDefinition;
+  definition: SettingsPanelDefinition;
   provider: InternalSettingsPanelProvider;
   source: PanelSource;
   renderer: PanelRenderer;
