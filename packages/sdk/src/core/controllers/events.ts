@@ -1,4 +1,5 @@
 import type { Event } from "../events/event";
+import type { CommandCallerContext } from "../execution/context";
 import type { EventScope } from "../ipc/event-scope";
 
 export interface RoutedNotification<Payload> {
@@ -15,6 +16,7 @@ export interface TargetedNotification<Payload>
 export interface ControllerEvent<Payload> {
   /** Type-only public payload used by contract generation. */
   readonly contract?: { readonly payload: Payload };
+  authorize?(payload: Payload, recipient: CommandCallerContext): boolean;
   on(
     listener: (
       payload: Payload,
@@ -22,6 +24,14 @@ export interface ControllerEvent<Payload> {
       scope?: EventScope,
     ) => void | Promise<void>,
   ): () => void;
+}
+
+/** Evaluate the domain's read policy against each recipient at delivery time. */
+export function authorizedEvent<Payload>(
+  source: Pick<Event<Payload>, "on">,
+  authorize: (payload: Payload, recipient: CommandCallerContext) => boolean,
+): ControllerEvent<Payload> {
+  return { on: (listener) => source.on(listener), authorize };
 }
 
 /** Expose a local notification to its selected views without publishing routing metadata. */

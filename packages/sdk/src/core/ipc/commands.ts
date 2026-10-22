@@ -144,42 +144,30 @@ export const CommandsLive = Layer.effect(
       ): unknown {
         const appId = context.appId;
         // Check app permission if required
-        if (metadata.permission && appId) {
-          // First check if app has this as a base permission
-          const hasBasePermission = permissions.hasPermission(
+        if (
+          metadata.permission &&
+          appId &&
+          !permissions.hasPermission(
+            appId,
+            metadata.permission,
+            executionContext.hasGrant,
+          )
+        ) {
+          const requiredGrantKeys = permissions.getRequiredGrantKeys(
             appId,
             metadata.permission,
           );
-
-          if (!hasBasePermission) {
-            // Check if app declares a grant that would unlock this permission
-            const requiredGrantKeys = permissions.getRequiredGrantKeys(
+          if (requiredGrantKeys.length === 0)
+            throw new CommandPermissionDenied({
+              command: fullCommand,
+              permission: metadata.permission,
               appId,
-              metadata.permission,
-            );
-
-            if (requiredGrantKeys.length === 0) {
-              // App neither has base permission nor declares any grant for it
-              throw new CommandPermissionDenied({
-                command: fullCommand,
-                permission: metadata.permission,
-                appId,
-              });
-            }
-
-            // Check if user has any of the grants that would unlock this permission
-            const hasGrant = requiredGrantKeys.some((grantKey) =>
-              executionContext.hasGrant(grantKey),
-            );
-
-            if (!hasGrant) {
-              throw new CommandGrantDenied({
-                command: fullCommand,
-                grantKeys: requiredGrantKeys,
-                appId,
-              });
-            }
-          }
+            });
+          throw new CommandGrantDenied({
+            command: fullCommand,
+            grantKeys: requiredGrantKeys,
+            appId,
+          });
         }
 
         if (metadata.mode === "operation") {

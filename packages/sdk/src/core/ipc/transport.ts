@@ -86,18 +86,21 @@ export const IpcTransportLive = Layer.effect(
         controllerEvents.set(
           name,
           source.on((payload, viewIds, scope) => {
+            const authorize = source.authorize?.bind(source, payload);
             if (viewIds !== undefined) {
               for (const viewId of new Set(viewIds))
                 eventSubscribers.notifyView(
                   viewId,
                   name,
                   payload as EventData<typeof name>,
+                  authorize,
                 );
             } else {
               eventSubscribers.notify(
                 name,
                 payload as EventData<typeof name>,
                 scope,
+                authorize,
               );
             }
           }),

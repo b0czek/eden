@@ -71,10 +71,18 @@ describe("settings shared reads", () => {
 
   it("allows owners and declared readers only", async () => {
     const settings = await acquireSettings(runtime);
-    expect(settings.canRead("app.owner", "private", "app.owner")).toBe(true);
-    expect(settings.canRead("app.owner", "shared", "app.reader")).toBe(true);
-    expect(settings.canRead("app.owner", "private", "app.reader")).toBe(false);
-    expect(settings.canRead("app.owner", "shared", "app.other")).toBe(false);
+    expect(
+      settings.readAccessError("app.owner", "private", "app.owner"),
+    ).toBeUndefined();
+    expect(
+      settings.readAccessError("app.owner", "shared", "app.reader"),
+    ).toBeUndefined();
+    expect(
+      settings.readAccessError("app.owner", "private", "app.reader"),
+    ).toMatchObject({ reason: "reader" });
+    expect(
+      settings.readAccessError("app.owner", "shared", "app.other"),
+    ).toMatchObject({ reason: "reader" });
   });
 
   it("rejects missing and unauthorized cross-app settings and enforces reader grants", async () => {
@@ -83,43 +91,28 @@ describe("settings shared reads", () => {
       ["private", "reader"],
       ["missing", "missing"],
     ] as const) {
-      await expect(
-        runtime.run(
-          Effect.result(
-            settings.assertReadableBy("app.owner", key, "app.reader"),
-          ),
-        ),
-      ).resolves.toMatchObject({
-        _tag: "Failure",
-        failure: new SettingAccessError({
+      expect(settings.readAccessError("app.owner", key, "app.reader")).toEqual(
+        new SettingAccessError({
           appId: "app.owner",
           key,
           readerAppId: "app.reader",
           reason,
         }),
-      });
+      );
     }
     const restricted = await acquireSettings(runtime, false);
-    await expect(
-      runtime.run(
-        Effect.result(
-          restricted.assertReadableBy("app.owner", "shared", "app.reader"),
-        ),
-      ),
-    ).resolves.toMatchObject({
-      _tag: "Failure",
-      failure: { _tag: "SettingAccessError", reason: "grant" },
+    expect(
+      restricted.readAccessError("app.owner", "shared", "app.reader"),
+    ).toMatchObject({
+      _tag: "SettingAccessError",
+      reason: "grant",
     });
-    await expect(
-      runtime.run(
-        restricted.assertReadableBy("app.owner", "private", "app.owner"),
-      ),
-    ).resolves.toBeUndefined();
-    await expect(
-      runtime.run(
-        settings.assertReadableBy("app.owner", "shared", "app.reader"),
-      ),
-    ).resolves.toBeUndefined();
+    expect(
+      restricted.readAccessError("app.owner", "private", "app.owner"),
+    ).toBeUndefined();
+    expect(
+      settings.readAccessError("app.owner", "shared", "app.reader"),
+    ).toBeUndefined();
   });
 
   it("evaluates grants when the access Effect executes", async () => {

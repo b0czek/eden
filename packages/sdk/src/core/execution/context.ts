@@ -32,6 +32,17 @@ export type EffectivePrincipal =
   | { kind: "system" }
   | { kind: "user"; profile: UserProfile };
 
+export function principalHasGrant(
+  principal: EffectivePrincipal | undefined,
+  grant: string,
+): boolean {
+  return (
+    principal?.kind === "user" &&
+    (principal.profile.role === "vendor" ||
+      matchesGrants(principal.profile.grants, grant))
+  );
+}
+
 export interface CommandCallerContext {
   sessionId?: string;
   operationId?: string;
@@ -58,10 +69,7 @@ export const ExecutionContextLive = Layer.effect(
       return get()?.principal;
     }
     function hasGrant(grant: string): boolean {
-      const principal = getPrincipal();
-      if (principal?.kind !== "user") return false;
-      if (principal.profile.role === "vendor") return true;
-      return matchesGrants(principal.profile.grants, grant);
+      return principalHasGrant(getPrincipal(), grant);
     }
     function canLaunchApp(appId: string): boolean {
       const principal = getPrincipal();

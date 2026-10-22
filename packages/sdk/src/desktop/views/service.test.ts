@@ -31,8 +31,7 @@ const unexpectedSettingsUse = (): never => {
   throw new Error("Unexpected Settings dependency");
 };
 const settingsChecks = {
-  canRead: unexpectedSettingsUse,
-  assertReadableBy: unexpectedSettingsUse,
+  readAccessError: unexpectedSettingsUse,
   resolveGrantKey: unexpectedSettingsUse,
   assertAccess: unexpectedSettingsUse,
   filterAllowedKeys: unexpectedSettingsUse,

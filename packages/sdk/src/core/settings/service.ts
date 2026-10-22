@@ -51,12 +51,13 @@ export interface Settings {
     undefined,
     StorageWriteFailure | SettingValueError | SettingDefaultMissingError
   >;
-  canRead: (ownerAppId: string, key: string, readerAppId: string) => boolean;
-  assertReadableBy: (
+  readAccessError: (
     ownerAppId: string,
     key: string,
-    readerAppId: string,
-  ) => Effect.Effect<void, SettingAccessError>;
+    readerAppId: string | undefined,
+    hasGrant?: (grant: string) => boolean,
+    superuser?: boolean,
+  ) => SettingAccessError | undefined;
   resolveGrantKey: (appId: string, settingKey: string) => string;
   assertAccess: (
     appId: string,
@@ -188,46 +189,26 @@ export const SettingsLive = Layer.effect(
       });
     }
 
-    function canRead(
+    function readAccessError(
       ownerAppId: string,
       key: string,
-      readerAppId: string,
-    ): boolean {
-      if (ownerAppId === readerAppId) return true;
-      return (
-        getSettingDefinition(ownerAppId, key)?.sharedWith?.includes(
-          readerAppId,
-        ) ?? false
-      );
-    }
-
-    function assertReadableBy(
-      ownerAppId: string,
-      key: string,
-      readerAppId: string,
-    ) {
-      return Effect.gen(function* () {
+      readerAppId: string | undefined,
+      hasGrant = authorization.hasGrant,
+      superuser = false,
+    ): SettingAccessError | undefined {
+      const denied = (reason: SettingAccessError["reason"]) =>
+        new SettingAccessError({ appId: ownerAppId, key, readerAppId, reason });
+      if (!superuser) {
         if (ownerAppId === readerAppId) return;
-        if (!getSettingDefinition(ownerAppId, key))
-          return yield* Effect.fail(
-            new SettingAccessError({
-              appId: ownerAppId,
-              key,
-              readerAppId,
-              reason: "missing",
-            }),
-          );
-        if (!canRead(ownerAppId, key, readerAppId))
-          return yield* Effect.fail(
-            new SettingAccessError({
-              appId: ownerAppId,
-              key,
-              readerAppId,
-              reason: "reader",
-            }),
-          );
-        yield* assertAccess(ownerAppId, key);
-      });
+        const definition = getSettingDefinition(ownerAppId, key);
+        if (!definition) return denied("missing");
+        if (!readerAppId || !definition.sharedWith?.includes(readerAppId))
+          return denied("reader");
+      }
+      if (
+        !hasGrant(`settings/${ownerAppId}/${resolveGrantKey(ownerAppId, key)}`)
+      )
+        return denied("grant");
     }
 
     function resolveGrantKey(appId: string, settingKey: string): string {
@@ -283,8 +264,7 @@ export const SettingsLive = Layer.effect(
       list,
       getAll,
       reset,
-      canRead,
-      assertReadableBy,
+      readAccessError,
       resolveGrantKey,
       assertAccess,
       filterAllowedKeys,

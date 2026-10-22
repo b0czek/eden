@@ -7,11 +7,16 @@ import type {
 import type { Backends } from "../../applications/processes/backends";
 import type { Views } from "../../desktop/views/service";
 import { log } from "../../platform/logging/logger";
-import type { ExecutionContext } from "../execution/context";
+import type {
+  CommandCallerContext,
+  ExecutionContext,
+} from "../execution/context";
 import type { RuntimeContexts } from "../execution/runtime-contexts";
 import { EventPermissionDenied } from "./errors";
 import type { EventScope } from "./event-scope";
 import type { Permissions } from "./permissions";
+
+type EventAuthorization = (recipient: CommandCallerContext) => boolean;
 
 export interface EventRouting {
   subscribe: (
@@ -43,11 +48,13 @@ export interface EventRouting {
     eventName: T,
     payload: EventData<T>,
     scope?: EventScope,
+    authorize?: EventAuthorization,
   ) => void;
   notifyView: <T extends EventName>(
     viewId: number,
     eventName: T,
     payload: EventData<T>,
+    authorize?: EventAuthorization,
   ) => boolean;
   removeViewSubscriptions: (viewId: number) => void;
   removeBackendSubscriptions: (appId: string) => void;
@@ -328,9 +335,10 @@ export function createEventRouting({
     eventName: T,
     payload: EventData<T>,
     scope?: EventScope,
+    authorize?: EventAuthorization,
   ): void {
     // Notify foundation if subscribed
-    if (!scope && foundationSubscriptions.has(eventName)) {
+    if (!scope && foundationSubscriptions.has(eventName) && !authorize) {
       views.sendToMainWindow("shell-message", {
         type: eventName,
         payload,
@@ -340,6 +348,7 @@ export function createEventRouting({
     // Notify view subscribers
     for (const viewId of viewRecipients(eventName, scope)) {
       if (!viewAuthorized(viewId, scope)) continue;
+      if (!recipientAuthorized(viewScopes.get(viewId), authorize)) continue;
       views.sendToView(viewId, "shell-message", {
         type: eventName,
         payload,
@@ -350,6 +359,7 @@ export function createEventRouting({
     if (backends) {
       for (const appId of backendRecipients(eventName, scope)) {
         if (!backendAuthorized(appId, scope)) continue;
+        if (!recipientAuthorized(backendScopes.get(appId), authorize)) continue;
         backends.sendMessage(appId, {
           type: "shell-event",
           eventName,
@@ -362,16 +372,28 @@ export function createEventRouting({
     viewId: number,
     eventName: T,
     payload: EventData<T>,
+    authorize?: EventAuthorization,
   ): boolean {
     const recipients = subscriptions.get(eventName);
     if (!recipients?.has(viewId)) {
       return false;
     }
+    if (!recipientAuthorized(viewScopes.get(viewId), authorize)) return false;
 
     return views.sendToView(viewId, "shell-message", {
       type: eventName,
       payload,
     });
+  }
+  function recipientAuthorized(
+    recipient: { appId?: string; sessionId?: string } | undefined,
+    authorize?: EventAuthorization,
+  ): boolean {
+    if (!authorize) return true;
+    const appId = recipient?.appId;
+    if (!appId) return false;
+    const principal = contexts.resolvePrincipal(appId);
+    return !!principal && authorize({ ...recipient, appId, principal });
   }
   function removeViewSubscriptions(viewId: number): void {
     removeEndpoint(operationViews, viewId);

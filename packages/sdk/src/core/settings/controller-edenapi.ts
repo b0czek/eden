@@ -2,13 +2,16 @@ import type { SettingsCategory } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
 import { command, defineController } from "../controllers/controller";
+import { authorizedEvent } from "../controllers/events";
 import {
   keyArgsSchema,
   namespaceArgsSchema,
   namespacedKeyArgsSchema,
 } from "../controllers/schemas";
 import type { CommandCallerContext } from "../execution/context";
+import type { Permissions } from "../ipc/permissions";
 import { SettingsCallerIdentityError } from "./errors";
+import { createSettingsReadAccess } from "./read-access";
 import type { Settings } from "./service";
 
 function callerNamespace(caller: CommandCallerContext) {
@@ -23,7 +26,11 @@ const namespaceQuerySchema = v.object({
   showRestricted: v.optional(v.boolean()),
 });
 
-export function createSettingsController(settings: Settings) {
+export function createSettingsController(
+  settings: Settings,
+  permissions: Permissions,
+) {
+  const reads = createSettingsReadAccess(settings, permissions);
   return defineController("settings", {
     commands: {
       /** Get a setting value (scoped to caller's app) */
@@ -37,7 +44,7 @@ export function createSettingsController(settings: Settings) {
           Effect.gen(function* () {
             const readerAppId = yield* callerNamespace(caller);
             const ownerAppId = appId ?? readerAppId;
-            yield* settings.assertReadableBy(ownerAppId, key, readerAppId);
+            yield* reads.assertReadable({ appId: ownerAppId, key }, caller);
             const value = yield* settings.get(ownerAppId, key);
             return { value };
           }),
@@ -91,9 +98,9 @@ export function createSettingsController(settings: Settings) {
       "get/su": command({
         input: namespacedKeyArgsSchema,
         permission: "superuser",
-        handle: ({ appId, key }) =>
+        handle: ({ appId, key }, caller) =>
           Effect.gen(function* () {
-            yield* settings.assertAccess(appId, key);
+            yield* reads.assertReadable({ appId, key }, caller, "superuser");
             const value = yield* settings.get(appId, key);
             return { value };
           }),
@@ -151,6 +158,8 @@ export function createSettingsController(settings: Settings) {
           }),
       }),
     },
-    events: { changed: settings.changed },
+    events: {
+      changed: authorizedEvent(settings.changed, reads.canReadChange),
+    },
   });
 }

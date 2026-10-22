@@ -203,6 +203,8 @@ Registration forwards them to authorized app subscriptions and releases forwardi
 Use `targetedEvent(source)` for `TargetedNotification<Payload>` with explicit `viewIds`.
 Use `routedEvent(source)` for `RoutedNotification<Payload>` when broadcast is also needed.
 An empty audience delivers nothing. Routing metadata stays out of public payloads.
+Use `authorizedEvent(source, authorize)` for data whose read access varies by recipient.
+The policy receives the payload and the recipient's current app identity and principal before delivery to a renderer or backend.
 
 ## Compose and verify
 

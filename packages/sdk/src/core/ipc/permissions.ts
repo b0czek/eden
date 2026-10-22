@@ -26,7 +26,11 @@ export interface Permissions {
     grants?: ResolvedGrant[],
   ) => void;
   unregisterApp: (appId: string) => void;
-  hasPermission: (appId: string, requiredPermission: string) => boolean;
+  hasPermission: (
+    appId: string,
+    requiredPermission: string,
+    hasGrant?: (grant: string) => boolean,
+  ) => boolean;
   getRequiredGrantKeys: (appId: string, requiredPermission: string) => string[];
   hasApp: (appId: string) => boolean;
   registerEventPermission: (eventName: string, permission: string) => void;
@@ -100,10 +104,15 @@ export const PermissionsLive = Layer.effect(
       function hasPermission(
         appId: string,
         requiredPermission: string,
+        hasGrant?: (grant: string) => boolean,
       ): boolean {
         const state = apps.get(appId);
         if (!state) return false;
-        return matchesAny(state.basePermissions, requiredPermission);
+        return (
+          matchesAny(state.basePermissions, requiredPermission) ||
+          (!!hasGrant &&
+            getRequiredGrantKeys(appId, requiredPermission).some(hasGrant))
+        );
       }
       function getRequiredGrantKeys(
         appId: string,
