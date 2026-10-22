@@ -45,6 +45,8 @@ Supply only `reboot` or only `poweroff` to expose one action.
 Eden derives capabilities from the supplied functions.
 
 Before calling the provider, Eden stops managed daemons and apps.
+This ends the desktop session even if the operating system refuses the request.
+On failure, apps remain stopped. Restart Eden to resume using the desktop.
 Operation completion records preparation and host handoff.
 It does not confirm that the operating system has finished shutting down.
 Test provider failures with your platform adapter before enabling the controls in a deployed product.
