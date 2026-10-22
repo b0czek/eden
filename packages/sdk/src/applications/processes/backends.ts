@@ -337,6 +337,11 @@ export const BackendsLive = Layer.effect(
               ),
             );
             yield* Effect.callback<void, BackendIoFailed>((resume) => {
+              // Exit may arrive while the scoped termination work is being set up.
+              if (_backends.get(appId) !== backend) {
+                resume(Effect.void);
+                return;
+              }
               let channelError: BackendIoFailed | undefined;
               const onExit = () =>
                 resume(channelError ? Effect.fail(channelError) : Effect.void);

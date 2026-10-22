@@ -1,7 +1,10 @@
 import type { UserProfile } from "@edenapp/types";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import { ViewNativeFailure } from "../../../src/desktop/views/errors";
+import { log } from "../../../src/platform/logging/logger";
 import type { WindowingPort } from "../../../src/platform/ports/types";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
@@ -42,6 +45,81 @@ describe("app instance ownership", () => {
     await tick();
     return eden.getBackendProcess(appId);
   }
+
+  it.each(["exit", "stop"] as const)(
+    "publishes %s after removing an instance even when native view cleanup fails",
+    async (reason) => {
+      const starting = eden.runtime.effects.run(launch());
+      const native = await backend();
+      native.emit("message", { type: "backend-ready" });
+      await starting;
+      const { processes, views, runtimeContexts } = eden.runtime.services;
+      const view = eden.getAppView(appId);
+      const failure = new Error("Native close failed");
+      const close = jest
+        .spyOn(view.view.webContents, "close")
+        .mockImplementation(() => {
+          throw failure;
+        });
+      const errors = jest.spyOn(log, "error");
+      const notifications: unknown[] = [];
+      const record = (event: "exit" | "stop") => {
+        notifications.push({
+          event,
+          instance: processes.getAppInstance(appId),
+          context: runtimeContexts.get(appId),
+          view: views.getViewInfo(view.id),
+        });
+      };
+      const offExited = processes.exited.on(({ appId: id }) => {
+        if (id === appId) record("exit");
+      });
+      const offStopped = processes.stopped.on(({ appId: id }) => {
+        if (id === appId) record("stop");
+      });
+      try {
+        if (reason === "exit") {
+          native.kill();
+          await tick();
+          // Joining admission waits for the exit cleanup to release the app lock.
+          await expect(
+            eden.runtime.effects.run(processes.stopApp(appId)),
+          ).rejects.toMatchObject({ _tag: "ProcessNotRunning" });
+        } else {
+          const exit = await eden.runtime.effects.run(
+            Effect.exit(processes.stopApp(appId)),
+          );
+          expect(Exit.isFailure(exit)).toBe(true);
+          if (Exit.isFailure(exit)) {
+            expect(Cause.hasDies(exit.cause)).toBe(false);
+            expect(Cause.squash(exit.cause)).toMatchObject({
+              _tag: "ProcessStopFailed",
+              cause: { _tag: "ViewNativeFailure", cause: failure },
+            });
+          }
+        }
+        expect(notifications).toEqual([
+          {
+            event: reason,
+            instance: undefined,
+            context: undefined,
+            view: undefined,
+          },
+        ]);
+        expect(errors).toHaveBeenCalledWith(
+          reason === "exit"
+            ? "Process lifecycle task failed:"
+            : `Failed to stop app ${appId}:`,
+          expect.objectContaining({ _tag: "ProcessStopFailed" }),
+        );
+      } finally {
+        offExited();
+        offStopped();
+        close.mockRestore();
+        view.view.webContents.close();
+      }
+    },
+  );
 
   it("cleans up an exited app while another app's uninstall cleanup is pending", async () => {
     const {

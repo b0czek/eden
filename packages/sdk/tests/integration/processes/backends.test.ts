@@ -4,6 +4,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Scheduler from "effect/Scheduler";
 import * as TestClock from "effect/testing/TestClock";
 import { DlcResources } from "../../../src/applications/packages/dlc-resources";
 import {
@@ -145,6 +146,53 @@ describe("backend readiness and termination", () => {
     expect(platform.utilityProcesses.activeCount).toBe(0);
     expect(backends.hasBackend(appId)).toBe(false);
     backend.kill();
+  });
+
+  it("settles termination when the backend exits during scheduler setup", async () => {
+    const { starting, backend } = await start();
+    backend.emit("message", { type: "backend-ready" });
+    await starting;
+    const scheduler = await effects.run(Scheduler.Scheduler);
+    const exited = Deferred.makeUnsafe<void>();
+    let queued = false;
+    let yielded = false;
+    const exitDuringSetup: Scheduler.Scheduler = {
+      executionMode: scheduler.executionMode,
+      makeDispatcher() {
+        const dispatcher = scheduler.makeDispatcher();
+        return {
+          scheduleTask(task, priority) {
+            queued = true;
+            dispatcher.scheduleTask(task, priority);
+          },
+          flush: () => dispatcher.flush(),
+        };
+      },
+      shouldYield(fiber) {
+        if (queued && !yielded) {
+          yielded = true;
+          // Native exit can arrive while the terminating fiber is yielded.
+          queueMicrotask(() => {
+            backend.kill();
+            Deferred.doneUnsafe(exited, Effect.void);
+          });
+          return true;
+        }
+        return scheduler.shouldYield(fiber);
+      },
+    };
+    const stopping = effects.fork(
+      backends
+        .terminateBackend(appId)
+        .pipe(Effect.provideService(Scheduler.Scheduler, exitDuringSetup)),
+    );
+    await effects.run(Deferred.await(exited));
+    await effects.run(TestClock.adjust(Duration.seconds(5)));
+    expect(await effects.run(Fiber.await(stopping))).toEqual(Exit.void);
+    expect(yielded).toBe(true);
+    expect(backends.hasBackend(appId)).toBe(false);
+    expect(platform.utilityProcesses.activeCount).toBe(0);
+    expect(backend.listenerCount("exit")).toBe(0);
   });
 
   it("retains backend ownership until native exit when termination is interrupted", async () => {

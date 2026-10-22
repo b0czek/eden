@@ -456,10 +456,9 @@ export const ProcessesLive = Layer.effect(
             message: `App ${appId} is not running`,
           }),
         );
-      yield* Effect.gen(function* () {
-        yield* closeInstance(record);
-        stopped.emit({ appId });
-      }).pipe(
+      yield* closeInstance(record).pipe(
+        Effect.ensuring(Effect.sync(() => stopped.emit({ appId }))),
+        Effect.uninterruptible,
         Effect.tapError((error) =>
           Effect.sync(() => log.error(`Failed to stop app ${appId}:`, error)),
         ),
@@ -529,8 +528,10 @@ export const ProcessesLive = Layer.effect(
           appId,
           Effect.gen(function* () {
             if (instances.get(appId) !== record || record.closing) return;
-            yield* closeInstance(record);
-            exited.emit({ appId, code });
+            yield* closeInstance(record).pipe(
+              Effect.ensuring(Effect.sync(() => exited.emit({ appId, code }))),
+              Effect.uninterruptible,
+            );
           }),
         ),
       );
