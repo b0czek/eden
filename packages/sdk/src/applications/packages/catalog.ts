@@ -140,10 +140,7 @@ export const PackageCatalogLive = Layer.effect(
       const icon = manifest?.icon;
       if (!icon || !packagePath) return fallback;
       return yield* Effect.gen(function* () {
-        const iconPath =
-          manifest.kind === "dlc"
-            ? yield* resolveContainedDlcPath(packageId, icon)
-            : path.join(packagePath, icon);
+        const iconPath = yield* resolveContainedPath(packageId, icon);
         const content = yield* io.readFile(iconPath);
         return `data:${imageMimeType(iconPath)};base64,${content.toString("base64")}`;
       }).pipe(
@@ -175,28 +172,28 @@ export const PackageCatalogLive = Layer.effect(
           }),
       );
     });
-    const resolveContainedDlcPath = Effect.fn(function* (
-      dlcId: string,
+    const resolveContainedPath = Effect.fn(function* (
+      packageId: string,
       relativePath: string,
     ) {
-      const manifest = getDlc(dlcId);
-      const root = getPath(dlcId);
+      const manifest = get(packageId);
+      const root = getPath(packageId);
       if (!manifest || !root)
         return yield* Effect.fail(
           new PackageResourceError({
-            packageId: dlcId,
+            packageId,
             relativePath,
             reason: "not-installed",
-            message: `DLC ${dlcId} is not installed`,
+            message: `Package ${packageId} is not installed`,
           }),
         );
       if (!relativePath || path.isAbsolute(relativePath)) {
         return yield* Effect.fail(
           new PackageResourceError({
-            packageId: dlcId,
+            packageId,
             relativePath,
             reason: "invalid-path",
-            message: "DLC path must be relative",
+            message: "Package path must be relative",
           }),
         );
       }
@@ -204,10 +201,10 @@ export const PackageCatalogLive = Layer.effect(
       if (!isPathWithin(root, target, { allowRoot: false })) {
         return yield* Effect.fail(
           new PackageResourceError({
-            packageId: dlcId,
+            packageId,
             relativePath,
             reason: "outside-root",
-            message: "DLC path escapes the package root",
+            message: "Package path escapes the package root",
           }),
         );
       }
@@ -218,14 +215,29 @@ export const PackageCatalogLive = Layer.effect(
       if (!isPathWithin(realRoot, realTarget)) {
         return yield* Effect.fail(
           new PackageResourceError({
-            packageId: dlcId,
+            packageId,
             relativePath,
             reason: "outside-root",
-            message: "DLC path resolves outside the package root",
+            message: "Package path resolves outside the package root",
           }),
         );
       }
       return realTarget;
+    });
+    const resolveContainedDlcPath = Effect.fn(function* (
+      dlcId: string,
+      relativePath: string,
+    ) {
+      if (!getDlc(dlcId))
+        return yield* Effect.fail(
+          new PackageResourceError({
+            packageId: dlcId,
+            relativePath,
+            reason: "not-installed",
+            message: `DLC ${dlcId} is not installed`,
+          }),
+        );
+      return yield* resolveContainedPath(dlcId, relativePath);
     });
     function imageMimeType(filePath: string): string {
       const types: Record<string, string> = {
