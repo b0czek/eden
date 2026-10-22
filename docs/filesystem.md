@@ -1,351 +1,199 @@
-# Filesystem Access
+# Work with files and volumes
 
-Eden apps access files through typed shell commands. Filesystem operations are
-restricted by the permissions declared in the app manifest:
+[Handbook](README.md) · Related: [Operations](ipc-architecture.md#operations), [Users](users.md)
 
-- `fs/read` permits reading metadata and contents, listing and searching
-  directories, and watching directories.
-- `fs/write` permits creating, changing, copying, moving, and deleting files
-  and directories.
-- `fs/resolve` permits resolving a location for an external integration.
-- `fs/*` grants all filesystem permissions.
-- `volume/read` permits discovering volumes and subscribing to inventory changes.
-- `volume/eject` permits safely ejecting devices.
-- `volume/*` grants all volume permissions.
+Apps use virtual file addresses and typed filesystem commands.
+Consumers register host directories as volumes.
+This keeps app file references independent of operating-system mount paths.
 
-## File Addresses
+## Declare access
 
-A file address is a `FilesystemLocation`: `{ volume: string, path: string }`.
-Both fields are required. Paths are virtual and `/` means the root of the selected
-volume. Persist and exchange complete addresses so files with the same path on
-different drives remain distinct.
+Add the permissions your app needs to `manifest.json`:
 
-Keep addresses in a `location: FilesystemLocation` property when combining them
-with command options or file metadata. Single-address commands take `{ location }`.
-Operations with multiple addresses use named properties such as
-`from: FilesystemLocation` and `to: FilesystemLocation`.
+| Permission | Access |
+| --- | --- |
+| `fs/read` | Read contents and metadata; list, search, and watch directories |
+| `fs/write` | Create, change, copy, move, and delete files or directories |
+| `fs/resolve` | Resolve a host path for an external integration |
+| `volume/read` | List volumes and subscribe to volume changes |
+| `volume/eject` | Request safe removal |
 
-The built-in `home` volume maps `/` to `EdenConfig.userDirectory` for every
-caller. Account folder restrictions limit access without changing addresses.
-For example, a restriction of `"projects/design"` allows
-`home:/projects/design/notes.txt`.
-Accounts may share the same folder or overlapping folders. Registered drives
-are shared across users and are independent of Home restrictions.
+`fs/*` includes all filesystem permissions. `volume/*` includes all volume permissions.
+User grants and account folder restrictions also apply.
+A read-only volume permits reading and copying out, but rejects changes, including moves out.
 
-`fs/access-scope({ volume })` returns the caller's accessible starting folder
-as a `FilesystemLocation`. Files and File Picker use it for initial navigation,
-Home actions, and fallback after drive removal. Explicit initial locations
-remain full addresses and must be accessible to the caller.
+## File addresses
 
-```typescript
-const content = await window.edenAPI.shellCommand("fs/read", {
-  location: { volume: "home", path: "/Documents/notes.txt" },
-});
+A `FilesystemLocation` contains both a volume ID and a virtual path:
+
+```ts
+import type { FilesystemLocation } from "@edenapp/types";
+
+const location: FilesystemLocation = { volume: "home", path: "/Documents/notes.txt" };
 ```
 
-Unknown or disconnected volumes fail explicitly. Missing files on an available
-volume return `false` from `fs/exists`. Read-only volumes permit reads and copies
-out, but reject writes, deletes, moves out, and transfers into them.
+`/` means the selected volume's root.
+Store and exchange both fields. The same path on another volume identifies a different file.
 
-## Registering Mounted Drives
+The built-in `home` volume maps `/` to the consumer's `userDirectory` for every account.
+A folder restriction limits access without changing the address.
+For example, a restriction of `projects/design` permits `home:/projects/design/notes.txt`.
+See [shared folders](users.md#shared-filesystem-and-folder-restrictions).
 
-The Electron consumer registers already mounted directories through the
-main-process API. It owns device discovery, mounting, network authentication,
-and OS removal notifications:
+Use `fs.accessScope("home")` to find the caller's accessible starting folder.
+Unknown or disconnected volumes fail explicitly.
+On an available volume, `fs.exists(location)` returns `false` for a missing file.
 
-```typescript
-import { createEden } from "@edenapp/sdk";
+## Read and write
 
-const eden = createEden();
-await eden.whenReady();
+Install `@edenapp/client` in the app:
 
-await eden.runPromise(eden.volumes.register({
-  id: "usb-work",
-  label: "Work USB",
-  kind: "removable",
-  rootPath: "/media/operator/WORK",
-  readOnly: false,
-}));
+```ts
+import { fs } from "@edenapp/client";
 
-// When the consumer detects removal:
-eden.volumes.unregister("usb-work");
+const location = { volume: "home", path: "/Documents/notes.txt" };
+await fs.write(location, "Notes\n", { encoding: "utf8" });
+const text = await fs.read(location);
+const metadata = await fs.stat(location);
+const names = await fs.readdir({ volume: "home", path: "/Documents" });
 ```
 
-IDs identify volumes independently of mount paths and labels. Reuse an ID when
-the same drive reconnects. `home` is reserved, and duplicate registrations are
-rejected. A registration root must already exist and be an absolute directory.
-Registrations belong to one Eden runtime and are rebuilt after startup.
+Text commands default to UTF-8 and accept other Node encodings.
+Writes create missing parent directories within an available volume.
+`readdir` returns entry names. Combine each name with the directory address before querying metadata.
 
-Volume kinds are `local`, `removable`, and `network`. A network registration
-points to a share already mounted by the OS. All kinds use the same commands.
-The consumer can set `readOnly` and `supportsWatch`; watch support defaults to
-true for local/removable volumes and false for network volumes.
+Use `readBinary` and `writeBinary` for whole-file `Uint8Array` values:
 
-`eden.volumes.list()` returns metadata. `eden.volumes.onChanged(listener)` passes
-updated inventories and returns an unsubscribe function. Apps receive metadata
-without host mount paths:
-
-```typescript
-import { volume } from "@edenapp/client";
-
-const volumes = await volume.list();
-await volume.subscribe("changed", ({ volumes }) => {
-  updateVolumeSelector(volumes);
-});
+```ts
+const bytes = await fs.readBinary(location);
+await fs.writeBinary({ volume: "home", path: "/notes-copy.bin" }, bytes);
 ```
 
-## Safely Removing Volumes
-
-The consumer can supply an `eject` callback as the second argument to registration.
-It returns an Effect using the consumer's device integration and succeeds only
-when the OS has finished flushing cached writes and releasing the volume. For a
-mounted share, this means unmounting it; for a USB drive, safely ejecting the
-device. Fail the Effect when the OS reports an error, such as a busy device.
-
-```typescript
-await eden.runPromise(eden.volumes.register(
-  {
-    id: "usb-work",
-    label: "Work USB",
-    kind: "removable",
-    rootPath: mountedDirectory,
-  },
-  { eject: () => volumeProvider.eject(deviceId) },
-));
-
-await eden.runPromise(eden.volumes.eject("usb-work"));
-// The OS has confirmed safe removal.
-```
-
-Here `volumeProvider` is the consumer's OS adapter, whose `eject` method returns
-an Effect. The callback is optional.
-Public metadata advertises `supportsEject` when it is supplied. Home cannot be
-ejected.
-
-Apps with `volume/eject` permission use the corresponding command:
-
-```typescript
-const eject = await window.edenAPI.shellCommand("volume/eject", { volume: "usb-work" });
-await eject.result();
-```
-
-Removal first changes the volume's `state` from `ready` to `ejecting`, closes its
-directory watches, and rejects new filesystem operations on it. Already admitted
-operations finish before the OS callback runs. Subscribe to `volume/changed`
-to show pending state while the OS flushes its caches; this may take minutes.
-Frontend and backend eject commands return an operation object promptly. Use
-`eject.watch(listener)` to observe phases and `eject.result()` to await safe removal.
-The volume leaves the inventory after success.
-
-Repeated requests share the same removal. If the callback rejects, the operation
-retains that error and the volume returns to `ready`; apps can resume access,
-recreate watches, and retry removal with a new submission. Read-only volumes can also be ejected.
-
-`eden.volumes.unregister(id)` removes a registration after the consumer observes
-disconnection. For safe removal, await `eject(id)`, which removes the registration
-after the OS callback completes.
-
-## Files navigation
-
-The Places sidebar folds to an icon rail and expands again using its toggle.
-It folds automatically in narrow windows until the user chooses a state, then
-keeps that choice during resizing.
-
-Pin a folder from its context menu or use **Pin current folder** in the sidebar.
-Files keeps up to eight pinned folders, with editable names and color markers
-that remain visible when folded. A pinned folder's action menu lets users edit
-or unpin it. Pins on disconnected drives stay listed and become available when
-their volume reconnects.
-
-Ongoing operations appear in the sidebar's activity area. The folded view shows
-a compact progress indicator; selecting it opens operation details. Copy
-cancellation is available from the expanded activity area or the details dialog.
-
-## Reading and Writing
-
-Use `fs/readdir` to list entry names and `fs/stat` for metadata:
-
-```typescript
-const directory = { volume: "usb-work", path: "/Documents" };
-const names = await window.edenAPI.shellCommand("fs/readdir", {
-  location: directory,
-});
-const stats = await window.edenAPI.shellCommand("fs/stat", {
-  location: { volume: directory.volume, path: `${directory.path}/${names[0]}` },
-});
-```
-
-Text reads and writes default to UTF-8 and accept another Node encoding.
-Writes create missing parent directories within an available volume:
-
-```typescript
-await window.edenAPI.shellCommand("fs/write", {
-  location: { volume: "home", path: "/Documents/notes.txt" },
-  content: "Notes\n",
-});
-```
-
-Binary commands transfer whole files as `Uint8Array` values:
-
-```typescript
-const location = { volume: "usb-work", path: "/archive.bin" };
-const bytes = await window.edenAPI.shellCommand("fs/read-binary", {
-  location: location,
-});
-await window.edenAPI.shellCommand("fs/write-binary", {
-  location: { volume: "home", path: "/archive-copy.bin" },
-  content: bytes,
-});
-```
+`fs.search` searches beneath a path on one volume.
+Each result includes its complete `location`.
 
 ### File handles
 
-The generated client accepts either a location or an open handle for `fs.read`,
-`fs.readBinary`, and `fs.stat`. Location-based reads acquire access for one
-operation and release it automatically. Open a handle when several operations
-must use the same opened file:
+Open a handle when several reads must use the same opened file:
 
-```typescript
-import { fs } from "@edenapp/client";
-
-const location = { volume: "usb-work", path: "/notes.txt" };
+```ts
 const handle = await fs.open(location, { mode: "read" });
 try {
   const metadata = await fs.stat(handle);
-  const content = await fs.readBinary(handle);
+  const bytes = await fs.readBinary(handle);
 } finally {
   await fs.close(handle);
 }
 ```
 
-`fs.open` opens a regular file and returns a serializable `{ handleId }` value
-with no methods. The example above selects `"read"`, which is also the default
-mode. Whole-file reads start at byte zero on every call, including concurrent
-reads. The opened file survives pathname replacement or deletion, while a location-based read
-uses the current file at that address. Handles do not provide a content snapshot
-or block another writer from modifying the opened file.
+A handle is a serializable `{ handleId }` value.
+`read`, `readBinary`, and `stat` accept a location or handle.
+Location-based calls acquire and release access automatically.
 
-Handles belong to the opening app, account, and session. They can be used by
-that app's frontend or backend under the same identity; passing the value to
-another app does not grant access. A frontend-created handle closes when its
-view is removed. App stop closes remaining handles. Session transitions release
-the outgoing session's handles before waiting for accepted operations, so a
-pending eject can finish before apps stop. Power transitions release all retained
-handles before waiting; runtime shutdown also closes remaining handles. Each
-runtime permits at most 1,024 open handles. Reading, querying, or closing an
-unknown or closed handle fails explicitly.
+Each whole-file read starts at byte zero.
+A handle continues to refer to the opened file after pathname replacement or deletion.
+It does not create a content snapshot or prevent another writer from changing that file.
 
-Closing a handle blocks new uses immediately and waits for accepted native I/O
-before releasing its descriptor and volume access. Interrupted location-based
-reads likewise retain access until their native I/O has settled.
+Handles belong to the opening app, account, and session.
+The same app's frontend and backend can share them under that identity.
+Frontend-created handles close when their view closes. App stop and session teardown release remaining handles.
+An unknown or closed handle fails explicitly. A runtime permits at most 1,024 open handles.
 
-An open handle retains its volume's access until it closes. Safe eject blocks
-new opens and location-based reads, waits for existing handles, and lets those
-handles continue reading during removal. Close handles promptly when work
-finishes. Physical removal or replacement of the registered volume makes reads
-fail; the old handle does not attach to a reconnected volume.
+Close handles promptly. An open handle prevents safe removal from completing.
+During safe removal, existing handles can continue reading until they close.
+Physical removal makes reads fail. Reconnecting the volume does not reconnect old handles.
 
-Raw shell commands keep the `location` argument for reads and stat, accepting
-either a location or handle there. Opening uses
-`fs/open({ location, mode })`; closing uses `fs/close({ handle })`.
+For raw shell commands, reads and stat use `{ location }`, where the value may also be a handle.
+Open uses `fs/open({ location, mode })`. Close uses `fs/close({ handle })`.
 
-`fs/search` searches the selected volume beneath its given path. Each search
-result includes a `location` with its volume and virtual path.
+## Opening files and picking locations
 
-Resolve a host path only when an external integration needs it:
+Ask Eden to open a file with its configured handler:
 
-```typescript
-const { realPath } = await window.edenAPI.shellCommand("fs/resolve", {
-  location: { volume: "usb-work", path: "/Documents/report.txt" },
-});
-```
-
-## Removing related volumes
-
-Volumes registered with the same `ejectGroup` key are removed together. Ejecting
-one member blocks new access to every member, waits for their existing I/O, and
-calls the requested member's host eject callback once. That callback removes the
-complete physical group. Failed removal restores access to remaining members.
-
-## Opening Files and Picking Locations
-
-`file/open` selects a configured handler using the file's type:
-
-```typescript
-const open = await window.edenAPI.shellCommand("file/open", {
-  location: { volume: "usb-work", path: "/Documents/report.txt" },
-});
-const result = await open.result();
-```
-
-Handlers retrieve the initial address with `getLaunchFile()` and receive further
-addresses in `file/opened` events:
-
-```typescript
+```ts
 import { file } from "@edenapp/client";
 
-const initial = window.edenAPI.getLaunchFile();
-if (initial) await openDocument(initial);
-await file.subscribe("opened", ({ location, isDirectory }) => {
-  if (!isDirectory) void openDocument(location);
-});
+const open = await file.open({ volume: "home", path: "/Documents/notes.txt" });
+await open.result();
 ```
 
-The file picker helpers return addresses rather than strings:
+An app that handles files declares their extensions or MIME types:
 
-```typescript
+```json
+{
+  "fileHandlers": [{ "name": "Text documents", "extensions": ["txt", "md"] }]
+}
+```
+
+Read the first address from `getLaunchFile()`.
+Listen for `file/opened` when an existing instance receives another file:
+
+```ts
+const initial = window.edenAPI.getLaunchFile();
+if (initial) await openDocument(initial);
+
+const handleOpened = ({ location, isDirectory }: import("@edenapp/types").EventData<"file/opened">) => {
+  if (!isDirectory) void openDocument(location);
+};
+await file.subscribe("opened", handleOpened);
+
+// On cleanup:
+file.unsubscribe("opened", handleOpened);
+```
+
+Here `openDocument` is your app's loading function.
+
+For a file selection dialog, install `@edenapp/tablets` and use its helper:
+
+```ts
 import { filePicker } from "@edenapp/tablets";
 
 const location = await filePicker.openFile({
   initialLocation: { volume: "home", path: "/Documents" },
 });
 if (location) {
-  const text = await window.edenAPI.shellCommand("fs/read", {
-    location: location,
-  });
+  const text = await fs.read(location);
 }
 ```
 
-Pickers start at Home when no initial location is supplied. `allowedVolumes`
-restricts the selector; if it is supplied without an initial location, the picker
-starts at the first allowed volume. Save pickers cannot select read-only volumes
-as write destinations. Raw picker selections use a nonempty `locations` array.
+The helper returns a complete address or no selection.
+Pickers start at Home unless an initial location is supplied.
+`allowedVolumes` limits the selector. Without an initial location, it selects the first allowed volume.
+Save pickers exclude read-only destinations.
+Picker calls require `file-picker/display`; file reads also require `fs/read`.
+See [Tablets](../packages/tablets/README.md) for options.
 
-## Copying and Moving
+## Copy and move
 
-`fs/cp` and `fs/mv` take independent source and destination addresses, supporting
-transfers between volumes. They reject existing destinations by default:
+Source and destination can use different volumes:
 
-```typescript
-const copy = await window.edenAPI.shellCommand("fs/cp", {
-  from: { volume: "home", path: "/Documents/report.txt" },
-  to: { volume: "usb-work", path: "/report.txt" },
-});
+```ts
+const copy = await fs.cp(
+  { volume: "home", path: "/Documents/notes.txt" },
+  { volume: "usb-work", path: "/notes.txt" },
+);
 await copy.result();
 ```
 
-`overwrite: true` replaces the complete destination, including directories;
-it does not merge their previous contents. Self-transfers and overlapping
-source/destination trees are rejected. Volume roots cannot be deleted, moved,
-or replaced.
+`fs.mv` moves instead of copying.
+Both commands reject existing destinations unless `overwrite: true` is supplied.
+Overwrite replaces the complete destination, including directories; it does not merge contents.
+Volume roots and overlapping source/destination trees cannot be transfer targets.
 
-Copies keep symbolic links and their original targets verbatim. Access through
-copied links remains restricted to the destination volume's sandbox.
+Copies preserve symbolic links and their targets.
+Access through a copied link remains limited to the destination volume.
+If an overwrite fails, Eden restores the original destination while its volume remains available.
+A cross-filesystem move copies before deleting its source.
+If source deletion fails, the destination remains and the operation reports an incomplete move.
 
-If an overwrite fails, the original destination is restored while its volume
-remains available, even if the source disconnects.
+See [operations](ipc-architecture.md#operations) for progress, cancellation, and repeated submissions.
 
-Moves across filesystem boundaries copy before deleting the source. If source
-deletion fails, the completed destination is retained and the command reports
-an incomplete move.
+## Watch a directory
 
-## Watching Directories
+Directory watching requires `fs/read` and a volume with `supportsWatch`.
+Watches are non-recursive. Subscribe before creating the watch, then read the initial directory state:
 
-Apps with `fs/read` can watch non-recursive directories on volumes advertising
-`supportsWatch`. Subscribe before creating the watch and take the initial
-snapshot after watch creation:
-
-```typescript
+```ts
 import { fs } from "@edenapp/client";
 import type { EventData } from "@edenapp/types";
 
@@ -360,19 +208,99 @@ const handleChanged = (event: EventData<"fs/changed">) => {
 };
 
 await fs.subscribe("changed", handleChanged);
-const watch = await fs.watch({ volume: "home", path: "/Documents" });
-watchId = watch.watchId;
-await refreshDirectory();
+try {
+  const watch = await fs.watch({ volume: "home", path: "/Documents" });
+  watchId = watch.watchId;
+  await refreshDirectory();
+} catch (error) {
+  fs.unsubscribe("changed", handleChanged);
+  if (watchId) await fs.unwatch(watchId);
+  throw error;
+}
 
 // On cleanup:
-if (watchId) await fs.unwatch(watchId);
 fs.unsubscribe("changed", handleChanged);
+if (watchId) await fs.unwatch(watchId);
 ```
 
-Each watch belongs to the creating view. Eden releases watches when the owning
-view, volume, or runtime closes. Provide manual refresh for volumes without
-watching.
+The refresh and reporting functions belong to your UI.
+A watch belongs to the creating view. Eden releases it when the view, volume, or runtime closes.
+Offer manual refresh on volumes without watch support.
+Recreate watches if an eject attempt fails and the volume becomes ready again.
 
-Package inspection and installation hold their source-volume access throughout
-archive reads, so safe removal waits until those reads and admitted package work
-finish.
+## Registering mounted drives
+
+The consumer registers an already mounted directory through the host API:
+
+```ts
+await eden.whenReady();
+await eden.runPromise(eden.volumes.register({
+  id: "usb-work",
+  label: "Work USB",
+  kind: "removable",
+  rootPath: "/media/operator/WORK",
+  readOnly: false,
+}));
+```
+
+The consumer owns device discovery, mounting, network authentication, and removal detection.
+The root must be an existing absolute directory.
+Use `local`, `removable`, or `network` for `kind`.
+Network volumes refer to shares already mounted by the operating system.
+
+Reuse the same stable ID when a drive reconnects.
+`home` is reserved. Duplicate IDs are rejected.
+Registrations last for one runtime; rebuild them after startup.
+Watch support defaults to enabled for local/removable volumes and disabled for network volumes.
+Set `supportsWatch` explicitly when needed.
+
+Apps with `volume/read` use `volume.list()` and `volume.subscribe("changed", callback)`.
+They receive volume metadata without host mount paths.
+Hosts use `eden.volumes.list()` and `eden.volumes.onChanged(callback)`.
+
+Use `fs.resolve(location)` only when an external integration needs a host path.
+It requires `fs/resolve` and returns `{ realPath }`.
+
+## Safely remove a volume
+
+Supply an eject provider when registering the volume:
+
+```ts
+await eden.runPromise(eden.volumes.register(
+  {
+    id: "usb-work",
+    label: "Work USB",
+    kind: "removable",
+    rootPath: mountedDirectory,
+  },
+  { eject: () => volumeProvider.eject(deviceId) },
+));
+
+await eden.runPromise(eden.volumes.eject("usb-work"));
+```
+
+In this example, `volumeProvider.eject()` is your OS adapter and returns an Effect.
+It must succeed only after the OS flushes writes and releases the device or mounted share.
+Fail the Effect if the device is busy or removal fails.
+The volume advertises `supportsEject` when a provider is present.
+
+Apps with `volume/eject` can request the same work:
+
+```ts
+import { volume } from "@edenapp/client";
+
+const eject = await volume.eject("usb-work");
+await eject.result();
+```
+
+The volume changes from `ready` to `ejecting`.
+Eden closes watches, blocks new access, and waits for admitted I/O and open handles.
+It then calls the provider. Observe volume changes or operation progress while waiting.
+Success removes the volume. Failure restores `ready` so apps can resume access and retry.
+
+Give related registrations the same `ejectGroup` option to remove them together.
+The requested member's callback runs once and must release the complete physical group.
+Home cannot be ejected.
+
+After physical disconnection, call `eden.volumes.unregister(id)` to remove stale metadata.
+For planned removal, await `eject()` so the OS can finish first.

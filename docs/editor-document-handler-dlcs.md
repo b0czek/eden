@@ -1,13 +1,10 @@
-# Editor document-handler DLCs
+# Add an Editor document handler
 
-The Eden text editor exposes the `document-handlers` extension point for file
-formats that are not stored as plain text but can be represented as one editable
-text document. A handler decodes the original bytes when the file opens and
-encodes the edited text when it is saved.
+[Handbook](README.md) · Prerequisite: [DLC packages](dlc-packages.md)
 
-Document handling and syntax highlighting are independent. Editor chooses both
-by the outer file extension, so a DLC may contribute a document handler, a
-language highlighter, or both.
+Editor exposes the `document-handlers` extension point for formats that can be edited as text.
+A handler decodes file bytes on open and encodes the edited text on save.
+Highlighting uses a separate extension point. You can supply either contribution or both.
 
 ## DLC manifest
 
@@ -46,9 +43,9 @@ level.
 }
 ```
 
-Handler IDs use lowercase letters, numbers, dots, and hyphens. If multiple DLCs
-claim the same handler ID or extension, Editor skips the ambiguous claim and
-keeps unrelated handlers available.
+Use lowercase letters, numbers, dots, and hyphens in handler IDs.
+If several DLCs claim the same ID or extension, Editor skips that claim.
+Other handlers remain available.
 
 ## Handler module
 
@@ -74,23 +71,22 @@ const module = {
 export default module;
 ```
 
-The keys under `handlers` must match the handler IDs in the contribution
-metadata. `open` receives the complete file as a `Uint8Array` and returns the
-text shown in CodeMirror. `save` receives the edited text and the bytes from the
-latest successful open or save, then returns the complete replacement file as a
-`Uint8Array`. This allows a codec to preserve parts of a container that are not
-represented in the editable text.
+Match the keys under `handlers` to the IDs in the contribution metadata.
+`open` receives the complete file as a `Uint8Array` and returns editable text.
+`save` receives that text and the bytes from the latest successful open or save.
+It returns the complete replacement file as a `Uint8Array`.
+Use the previous bytes to preserve container data outside the editable text.
+In this fragment, `decodeDocument` and `encodeDocument` are your format codec functions.
 
-Editor owns filesystem access and gives handlers defensive byte copies. A
-handler may be synchronous or asynchronous. Exceptions and invalid return
-values fail that open or save without changing the last persisted tab state.
+Editor owns file access and gives handlers byte copies.
+Handlers can return values or Promises.
+An exception or invalid result fails the open or save and preserves the last persisted tab state.
 
 ## Highlighting
 
-Editor resolves highlighting from the original path separately from document
-decoding. To highlight the decoded text, contribute the same outer extension to
-`language-highlighters` in this DLC or another compatible DLC. Neither extension
-point depends on the other.
+Editor selects highlighting from the original file extension.
+To highlight decoded text, contribute that extension to
+[language-highlighters](editor-highlighter-dlcs.md) in this DLC or another compatible DLC.
 
 ## Build and install
 

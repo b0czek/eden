@@ -1,137 +1,117 @@
-# Localizing Eden Apps
+# Translate an app
 
-Guide for adding typed i18n to Eden apps.
+[Handbook](README.md) · Prerequisite: [Create an app](app-development.md)
 
-## Setup Steps
+`@edenapp/babel` provides typed translation keys and shared Eden labels.
+Its Solid integration updates the UI when the system locale changes.
 
-### 1. Create Locale Files
+## Install the translation helper
 
-**`src/locales/en.ts`**
+```bash
+npm install @edenapp/babel
+```
 
-```typescript
+## Define locale files
+
+Create `src/locales/en.ts`:
+
+```ts
 export const en = {
-  myApp: {
+  notes: {
     welcome: "Welcome",
     greeting: "Hello, {name}",
   },
 } as const;
 ```
 
-**`src/locales/pl.ts`**
+Create `src/locales/pl.ts` with the same keys:
 
-```typescript
+```ts
 export const pl = {
-  myApp: {
+  notes: {
     welcome: "Witamy",
     greeting: "Witaj, {name}",
   },
 } as const;
 ```
 
-**Critical**: Must use `as const` for type inference.
+Use `as const` so TypeScript can infer keys and interpolation parameters.
+Keep app-specific keys under one namespace, such as `notes`.
 
-### 2. Setup i18n
+## Set up typed translations
 
-**`src/i18n.ts`**
+Create `src/i18n.ts`:
 
-```typescript
+```ts
 import { setupI18n } from "@edenapp/babel/solid";
 import type { I18nCommonTranslations } from "@edenapp/babel/generated/i18n";
 import type { InferTranslations } from "@edenapp/babel/types";
 import { en } from "./locales/en";
 import { pl } from "./locales/pl";
 
-type AppTranslations = InferTranslations<typeof en>;
-type AllTranslations = I18nCommonTranslations & AppTranslations;
+type Translations = I18nCommonTranslations & InferTranslations<typeof en>;
 
-const resources = {
-  en: { translation: en },
-  pl: { translation: pl },
-};
-
-export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({
-  resources,
+export const { t, locale, initLocale } = setupI18n<Translations>({
+  resources: {
+    en: { translation: en },
+    pl: { translation: pl },
+  },
 });
 ```
 
-### 3. Add Dependency
+## Initialize in the app root
 
-Run `pnpm i @edenapp/babel`.
-
-### 4. Initialize
-
-**`App.tsx`**
+Call `initLocale()` from the root component's `onMount` callback:
 
 ```tsx
 import { onMount } from "solid-js";
-import { t, initLocale } from "./i18n";
+import { initLocale, t } from "./i18n";
 
-function App() {
-  onMount(() => initLocale());
-  return <h1>{t("myApp.welcome")}</h1>;
+export default function App() {
+  onMount(() => { void initLocale(); });
+  return (
+    <main>
+      <h1>{t("notes.welcome")}</h1>
+      <p>{t("notes.greeting", { name: "Alice" })}</p>
+      <button>{t("common.save")}</button>
+    </main>
+  );
 }
 ```
 
-### 5. Use in Components
+The helper reads the current locale and subscribes to system changes.
+Initialize it once for the app root.
+Keep `t()` calls inside reactive JSX expressions so translated text updates.
 
-```tsx
-import { t } from "../i18n";
+## Reuse common labels
 
-export function MyComponent() {
-  return <button>{t("common.save")}</button>;
-}
-```
+Use `common.save`, `common.cancel`, `common.close`, and other shared keys for standard actions.
+The [English common resource](../packages/sdk/src/i18n/locales/en.ts) lists available labels.
+Use app keys for text specific to your app.
 
-## Common SDK Translations
+## Translate manifest names
 
-Common `common.*` keys include: `ok`, `cancel`, `save`, `delete`, `close`, `deleteConfirmation`, etc.
-
-See [`packages/sdk/src/i18n/locales/en.ts`](../packages/sdk/src/i18n/locales/en.ts) for the full list.
-
-## Interpolation
-
-```typescript
-// Locale
-export const en = {
-  myApp: {
-    greeting: "Hello, {name}!",
-  },
-} as const;
-
-// Usage
-t("myApp.greeting", { name: "Alice" });
-```
-
-## Reactive Locale
-
-```tsx
-import { locale } from "./i18n";
-
-const getLocalizedName = (name: string | Record<string, string>) => {
-  if (typeof name === "string") return name;
-  return name[locale()] || name.en || Object.values(name)[0];
-};
-```
-
-## Localized Manifest
+Manifest names and setting labels accept locale maps:
 
 ```json
 {
-  "id": "com.example.myapp",
-  "name": {
-    "en": "My App",
-    "pl": "Moja Aplikacja"
-  }
+  "name": { "en": "Notes", "pl": "Notatki" }
 }
 ```
 
-## Key Rules
+For app-owned locale maps, read the reactive locale when resolving a value:
 
-1. **Always use `as const`** on locale exports
-2. **Namespace keys** - Use app name as top-level key
-3. **Use common keys** - Prefer `common.*` over duplicates
-4. **Call `initLocale()`** - Required in `onMount()`
+```ts
+import { locale } from "./i18n";
 
-## Reference
+export function localizedName(name: string | Record<string, string>) {
+  if (typeof name === "string") return name;
+  return name[locale()] ?? name.en ?? Object.values(name)[0] ?? "";
+}
+```
 
-See: `packages/sdk/apps/com/eden/editor`, `packages/sdk/apps/com/eden/eveshell`
+## Check the translation
+
+Open the app, change the system language in Settings, and confirm that visible labels update.
+Check interpolation with a real value and verify that both locale files contain the same keys.
+See [Editor](../packages/sdk/apps/com/eden/editor) for a complete localized app.

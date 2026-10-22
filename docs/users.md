@@ -1,135 +1,130 @@
-# Users
+# Configure users and access
 
-This document summarizes how Eden handles users, roles, grants, and user
-management.
+[Handbook](README.md) · Related: [Consumer setup](consumer-development.md), [Daemons](processes-and-daemons.md)
 
-## Roles and Grants
+An Eden account has a role, grants, and an optional Home folder restriction.
+App permissions describe what an app may request.
+User grants describe what the active account may access.
+A command may require both.
 
-- Roles: `vendor` and `standard`.
-- Vendor:
-  - Can only be created via seeding; runtime creation or promotion is blocked.
-  - Cannot be deleted or demoted.
-  - Always has `*` grants (full access).
-  - Bypasses app launch and settings access checks.
-- Standard:
-  - If no grants are provided at creation, defaults to `*` (full access),
-    but vendor-only user management and restricted app rules still apply.
-- Grants support glob matching:
-  - `*` matches everything.
-- `namespace/*` matches any grant under that namespace.
-- Core apps are always launchable for any user regardless of grants.
+## Seed the first accounts
 
-## App Access Management
+Add users to the consumer's `eden.config.json`:
 
-App launch is controlled by user grants, a core-app allowlist, and a restricted
-app denylist: users can launch an app when they have `apps/launch/<appId>` (or
-`apps/launch/*`), while core apps listed in the Eden constructor config are
-always launchable regardless of grants. Restricted apps listed in that config
-are never launchable by non-vendor users, even if granted. Grants that
-explicitly target restricted apps are stripped when saved for non-vendor users.
-Vendor users bypass these checks entirely.
+```json
+{
+  "users": [
+    {
+      "username": "operator",
+      "name": "Operator",
+      "role": "standard",
+      "password": "local-example-only",
+      "grants": ["apps/launch/*", "settings/*"],
+      "directoryRestriction": "projects/design"
+    }
+  ],
+  "defaultUsername": "operator"
+}
+```
 
-## App Grants
+Choose deployment credentials before distribution.
+The build tools generate `eden-seed.json` with hashed passwords.
+Seeding applies once and does not overwrite existing accounts or settings.
+A valid `defaultUsername` logs in automatically at startup.
+Omit it when the user should log in through the configured login app.
 
-Apps can declare feature-level grants in their manifest under `grants`. These
-become user grants in the form `app/<appId>/<grantId>` and are intended for
-fine-grained feature toggles inside an app. Grants can optionally list
-`permissions` they unlock; those permissions are only usable when the user has
-at least one grant that enables them. Vendor users can assign these in
-the Users app (App grants), and apps can check them via `user/has-grant`.
+## Choose roles and grants
 
-## User Records and Storage
+| Role | Behavior |
+| --- | --- |
+| `standard` | Uses assigned grants; cannot use vendor-only administration |
+| `vendor` | Full `*` access; bypasses app launch and Settings access checks |
 
-- Stored in a Keyv SQLite database at `${appsDirectory}/users.db`.
-- Keys:
-  - `users:index` (list of usernames)
-  - `users:default` (default username)
-  - `user:${username}` (full user record)
-- Stored record includes: `username`, `name`, `role`, `grants`,
-  optional `directoryRestriction`,
-  `passwordHash`, `passwordSalt`, `createdAt`, `updatedAt`.
-- Public user profile exposes: `username`, `name`, `role`, `grants`,
-  optional `directoryRestriction`,
-  `createdAt`, `updatedAt`.
+Create vendor accounts through seeding.
+Runtime creation or promotion to vendor is blocked.
+Vendor accounts cannot be deleted or demoted.
+If a standard account is created without grants, it receives `*` by default.
+Supply explicit grants when access should be limited.
 
-## Shared Filesystem and Folder Restrictions
+Grants support glob patterns. `*` matches all grants; `settings/*` matches grants under `settings`.
+A standard account with `*` still follows vendor-only and restricted-app rules.
 
-`EdenConfig.userDirectory` backs the built-in `home` volume. Its virtual `/`
-always maps to that shared root. Every complete address identifies the same
-file for all users and daemon accounts.
+## Control app launch
 
-Standard accounts may have an optional `directoryRestriction`, relative to
-`userDirectory`. For example, `directoryRestriction: "projects/design"` permits
-access to `home:/projects/design` and its descendants. Files and File Picker start
-there and show full paths such as `home:/projects/design/notes.txt`.
+The user needs `apps/launch/<appId>` or a matching pattern such as `apps/launch/*`.
+The consumer can set two runtime lists:
 
-- Blank or `"."` means access to the full shared tree. Vendor accounts and
-  system principals have full-tree access.
-- Accounts may share the same restriction or overlapping restrictions:
-  `"projects"` and `"projects/design"` share the latter folder's contents.
-- Restrictions apply to both reads and writes, including metadata, listing,
-  search, watching, file opening, and package operations. App permissions and
-  user grants still apply.
-- Restriction paths cannot escape `userDirectory`, including through symlinks.
-  Assigned directories are created if necessary. Deleting an account leaves
-  the files intact.
-- Consumer-registered volumes remain shared across users, subject to app
-  permissions and user grants. A Home restriction does not restrict those drives.
+- `coreApps`: always launchable, regardless of user grants.
+- `restrictedApps`: blocked for non-vendor accounts, even when a grant matches.
 
-Node.js app backends remain trusted processes and can access Node APIs directly.
+Vendor accounts bypass these launch checks.
+Eden removes grants that explicitly target restricted apps when saving them for standard users.
+When shipping the Users app, list it in `restrictedApps`.
 
-## Sessions and Identity
+## Declare app feature grants
 
-- `Sessions` owns the active identity and commits a new session only after
-  all apps from the previous session have stopped.
-- `Users` owns account storage, authentication, grants, and passwords.
-- Key commands:
-  - `user/list` (all user profiles)
-  - `session/login`, `session/logout` (session control)
-  - `session/get-current` (current user profile)
-  - `user/change-password` (current user only)
-  - `user/has-grant` (grant check)
-- App-level permissions gate these handlers:
-  - `session/manage` for login/logout
-  - `session/read` for get-current
-  - `user/session` for change-password
-  - `user/identity` for list
-  - `user/grants` for has-grant
-- `session/changed` is published after the new authorization and filesystem
-  context has been committed. Autostart reacts to it by launching either the
-  configured session apps or login provider.
-- Frontend-bearing processes are owned by an opaque session ID and are stopped
-  before that session is replaced. See
-  [Sessions and Autostart](processes-and-daemons.md#sessions-and-autostart) for
-  process ownership across session transitions.
+An app can declare grants for individual features:
 
-## User Management (Vendor-Only)
+```json
+{
+  "grants": [{
+    "id": "export",
+    "label": "Export documents",
+    "permissions": ["fs/write"]
+  }]
+}
+```
 
-User management is restricted to vendor accounts and is not part of the Eden
-settings schema.
+This grant becomes `app/<appId>/export`.
+The optional `permissions` list unlocks those permissions for users with that grant.
+Apps can query grants with `user/has-grant`, which requires `user/grants` permission.
+Vendor users assign feature grants through the Users app.
 
-- Commands:
-  - `user/create`
-  - `user/update`
-  - `user/delete`
-  - `user/set-password`
-  - `user/get-default`
-  - `user/set-default`
-- These require app permission `user/manage` and a vendor session.
-- Non-vendor access will fail.
-- Vendor accounts cannot be deleted or demoted.
+## Shared filesystem and folder restrictions
 
-## Seeding
+`userDirectory` backs one shared `home` volume.
+A complete address identifies the same file for all accounts and daemon identities.
+Folder restrictions limit access within that shared tree.
 
-- Seeding happens once at startup from `eden-seed.json` (generated at build time
-  from `eden.config.json`).
-- Multiple vendor accounts can be seeded.
-- Default user can be seeded via `defaultUsername` and is auto-logged in on
-  startup if it exists.
+For example, `directoryRestriction: "projects/design"` permits
+`home:/projects/design` and its descendants.
+Files and File Picker start there and keep full addresses visible.
 
-## Users App
+A blank restriction or `"."` permits the whole shared tree.
+Vendor accounts and system principals have full-tree access.
+Two accounts can share a restriction or have overlapping restrictions.
 
-- User administration lives in the Users app (not the Settings schema).
-- The app should be listed in `restrictedApps` so only vendor accounts can
-  launch it.
-- The default username can be changed from the Users app.
+Restrictions cover reads, writes, metadata, listing, search, watches, and package file access.
+Paths cannot escape `userDirectory`, including through symbolic links.
+Eden creates assigned directories as needed.
+Deleting an account leaves its files intact.
+
+Consumer-registered volumes are shared independently of Home restrictions.
+Their access still requires app permissions and applicable grants.
+Node.js backends can also access host files directly; Eden account restrictions govern Eden commands.
+
+## Use session commands from an app
+
+| Command | App permission |
+| --- | --- |
+| `session/login`, `session/logout` | `session/manage` |
+| `session/get-current` | `session/read` |
+| `user/list` | `user/identity` |
+| `user/change-password` | `user/session` |
+| `user/has-grant` | `user/grants` |
+
+Login and logout return operations. Await completion when the caller remains available.
+Eden stops the outgoing session's apps before committing the next identity.
+`session/changed` reports the committed session.
+System-owned daemons continue running with their launch-time identity.
+See [sessions and autostart](processes-and-daemons.md#sessions-and-autostart).
+
+## Manage accounts
+
+The Users app provides vendor administration.
+App commands `user/create`, `user/update`, `user/delete`, `user/set-password`,
+`user/get-default`, and `user/set-default` require `user/manage` and a vendor session.
+
+A trusted consumer can use `eden.users` and `eden.sessions` from the main process.
+Execute their asynchronous methods through `eden.runPromise()`.
+See the [host API](main-process-api.md).

@@ -1,213 +1,196 @@
-# Writing Apps for Eden SDK
+# Create an Eden app
 
-Eden apps are web applications that run within the Eden Desktop Environment. They can be simple frontend-only applications or full-stack applications with a Node.js backend.
+[Handbook](README.md) · Next: [APIs and messages](ipc-architecture.md)
 
-## App Structure
+An Eden app is a web frontend, a Node.js backend, or both.
+Its `manifest.json` declares the entry files and system permissions.
+This chapter starts with a Solid frontend. Other web frameworks can use the same APIs.
 
-An Eden app typically resides in its own directory and contains a `manifest.json` file which defines its metadata and entry points.
+## Generate a project
 
-### Directory Layout
+Run this command from the directory that will contain your app:
 
-A standard app (frontend-only) looks like this:
-
-```
-my-app/
-├── manifest.json       # App configuration
-├── package.json        # Dependencies (if using npm/pnpm)
-├── src/                # Source code
-│   ├── index.tsx       # Entry point
-│   └── ...
-├── dist/               # Build output (after build)
-└── ...
+```bash
+npx --package @edenapp/scripts eden-build scaffold-solid com.example.notes ./notes --mode consumer --name Notes
+cd notes
+npm install
+npm run dev:eden
 ```
 
-A full-stack app (frontend + backend) might look like this:
+The generator creates a Solid and Vite project with a manifest.
+`--mode consumer` selects a project with published package dependencies.
+SDK contributors use `--mode sdk` inside this workspace.
 
-```
-my-app/
+`dev:eden` runs the app in a version-matched Eden development host.
+The first run downloads that host. Later runs reuse the cache.
+You should see the generated app inside Eden, with its window frame and theme.
+Edit `src/App.tsx` to check renderer reload.
+
+A browser running only `npm run dev` does not supply Eden's injected APIs.
+Use `npm run dev:eden` when testing system commands or app communication.
+
+## Know the project files
+
+```text
+notes/
 ├── manifest.json
-├── frontend/
-│   ├── src/
-│   └── package.json
-└── backend/
-    ├── src/
-    └── package.json
+├── icon.svg              # add this icon below
+├── package.json
+├── index.html
+├── vite.config.mts
+├── tsconfig.json
+└── src/
+    ├── index.tsx
+    └── App.tsx
 ```
 
-An app with a backend and no frontend is a [daemon](processes-and-daemons.md). 
+Vite writes the frontend to `dist/` during a production build.
+The generated Vite config uses `base: "./"` so built asset paths work inside Eden.
+Keep that setting if you change the build configuration.
 
-## Manifest (`manifest.json`)
+## Add an icon and configure the manifest
 
-The `manifest.json` is the heart of an Eden app. It tells the system how to run your application.
+Create `icon.svg` in the app root:
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="8" y="4" width="48" height="56" rx="8" fill="#4968b8" />
+  <path d="M20 20h24M20 32h24M20 44h16" stroke="white" stroke-width="4" />
+</svg>
+```
+
+Use this manifest for a Notes app that stores a draft in its app database:
 
 ```json
 {
-  "id": "com.example.myapp",
-  "name": "My App",
+  "id": "com.example.notes",
+  "name": "Notes",
   "version": "1.0.0",
-  "description": "My first Eden app",
-  "author": "Your Name",
   "icon": "icon.svg",
-  "build": {
-    "command": "npm run build"
-  },
-  "frontend": {
-    "entry": "dist/index.html"
-  },
+  "frontend": { "entry": "dist/index.html" },
+  "build": { "command": "npm run build" },
   "window": {
     "mode": "both",
     "defaultMode": "floating",
     "defaultSize": { "width": 800, "height": 600 },
-    "minSize": { "width": 400, "height": 300 },
-    "resizable": true,
-    "movable": true
+    "minSize": { "width": 400, "height": 300 }
   },
-  "permissions": ["fs/*", "db/rw", "system/notifications"]
+  "permissions": ["db/rw"]
 }
 ```
 
-### Key Fields
+Entry and icon paths are relative to the app root.
+Use a stable reverse-domain ID. Other apps and user grants refer to that ID.
 
-- **`id`**: Unique identifier (reverse domain notation recommended).
-- **`frontend.entry`**: Path to the built HTML file relative to the app root.
-- **`backend.entry`** (Optional): Path to the compiled backend JavaScript file.
-- **`window.mode`**: Supported window modes: `floating`, `tiled`, or `both`.
-- **`window.defaultMode`** (Optional): Initial mode to use when `window.mode` is `both`.
-- **`window.overlayPriority`** (Optional): Stacking priority for overlay apps. Higher values render above lower values; defaults to `0`.
-- **`permissions`**: Array of permissions the app requires.
-  - `fs/*`: Full filesystem access. See [Filesystem Access](filesystem.md).
-  - `db/rw`: Read/write access to the app's database.
+`window.mode` accepts `floating`, `tiled`, or `both`.
+For `both`, `defaultMode` selects the initial mode.
+Without it, Eden prefers tiled mode when desktop tiling is enabled.
+Eden injects the window frame and EdenCSS by default.
 
-## Interacting with Eden
+The [manifest types](../packages/types/AppManifest.d.ts) list all fields.
+Add [file handlers](filesystem.md#opening-files-and-picking-locations),
+[settings](settings.md#app-manifest-settings), or [DLC extension points](dlc-packages.md) as needed.
 
-Eden apps run in a sandboxed environment but can interact with the system via the global `edenAPI` object. This API provides secure access to system features based on the requested permissions.
+## Save a draft through the client
 
-### Shell Commands
+Install the typed client:
 
-Install `@edenapp/client` to call typed shell-command methods:
-
-```sh
+```bash
 npm install @edenapp/client
 ```
 
-```typescript
-import { db, fs } from "@edenapp/client";
+Replace `src/App.tsx` with this component:
 
-await db.set("preferences", JSON.stringify({ theme: "dark" }));
-const stats = await fs.stat({ volume: "home", path: "/notes.txt" });
-```
+```tsx
+import { db } from "@edenapp/client";
+import { createSignal, onMount } from "solid-js";
 
-Required arguments are positional; optional fields go in a final options
-object. Empty commands take no arguments. You can also use
-`import * as eden from "@edenapp/client"` and call `eden.db.get("preferences")`.
-The same imports work in backend apps. Bundle the client with the backend entry
-so its dependencies are included in the packaged app.
+export default function App() {
+  const [text, setText] = createSignal("");
+  const [status, setStatus] = createSignal("Loading draft…");
+  const [ready, setReady] = createSignal(false);
 
-See the [client guide](../packages/client/README.md) for argument conventions
-and operation controls. The injected `edenAPI.shellCommand` is also available:
+  onMount(() => {
+    void db.get("draft").then(({ value }) => {
+      setText(value ?? "");
+      setReady(true);
+      setStatus("Ready");
+    }).catch((error) => setStatus(String(error)));
+  });
 
-```typescript
-// Example: Writing to a database
-await window.edenAPI.shellCommand("db/set", {
-  key: "preferences",
-  value: JSON.stringify({ theme: "dark" }),
-});
-```
+  async function save() {
+    try {
+      await db.set("draft", text());
+      setStatus("Saved");
+    } catch (error) {
+      setStatus(String(error));
+    }
+  }
 
-For virtual paths, filesystem commands, opening files, and directory watching,
-see [Filesystem Access](filesystem.md).
-
-### Event subscriptions
-
-Use the same client domains to subscribe to system events:
-
-```typescript
-import { process } from "@edenapp/client";
-
-await process.subscribe("launched", ({ instance }) => {
-  console.log("App launched:", instance.manifest.id);
-});
-```
-
-Event names are local to the domain and payloads are inferred. Pair subscriptions
-with `domain.unsubscribe(event, callback)` using the same callback reference when
-the owner is disposed. See the [client subscription guide](../packages/client/README.md#event-subscriptions)
-for setup and cleanup lifetimes.
-
-## Styling
-
-Eden provides a set of CSS variables and utility classes to ensure your app fits the system theme. For detailed usage instructions and a full list of available tokens, please refer to the [EdenCSS Documentation](../packages/sdk/edencss/README.md).
-
-These are available automatically in the environment, but you should adhere to using the variables for colors, spacing, and typography to support theming (light/dark mode).
-
-Example CSS usage:
-
-```css
-.my-container {
-  background: var(--eden-color-bg-secondary);
-  color: var(--eden-color-text-primary);
-  padding: var(--eden-space-md);
-  border-radius: var(--eden-radius-lg);
+  return (
+    <main class="eden-flex-col eden-gap-md eden-p-md">
+      <label for="draft">Draft</label>
+      <textarea class="eden-textarea" id="draft" value={text()} disabled={!ready()}
+        onInput={(event) => setText(event.currentTarget.value)} />
+      <button class="eden-btn eden-btn-primary" disabled={!ready()} onClick={() => void save()}>Save</button>
+      <p role="status">{status()}</p>
+    </main>
+  );
 }
 ```
 
-## Building
+Type text, save it, and reopen the app. The draft should return.
+Database commands store values under the calling app's namespace.
+Use [filesystem commands](filesystem.md) when users need named files on a volume.
 
-Your app should include a build script (specified in `manifest.json`) that compiles your source code into the entry points defined in the manifest.
+The client returns Promises and uses the host's injected API.
+The app needs each command's permission in its manifest.
+Some commands also check the active user's grants.
+See [client arguments and subscriptions](../packages/client/README.md).
 
-For example, if you use simple static HTML/JS:
+## Build the UI
 
-1.  Ensure `dist/index.html` exists.
-2.  Set `"build": { "command": "echo 'No build needed'" }` or similar if pre-built, or standard `npm run build`.
+Use [EdenCSS](../packages/sdk/edencss/README.md) for layout, controls, colors, and spacing.
+Its styles are available inside Eden without an app import.
+Prefer its tokens and components before adding custom CSS.
+Test the UI in both light and dark themes and at narrow window sizes.
 
-The Eden build system (`genesis build`) will look for this command and execute it when bundling the system.
+Add `@edenapp/types/global` to the frontend's TypeScript `types` array when configuring a project yourself.
+The generated project already includes it.
+For Solid helpers, see [Solid Kit](../packages/solid-kit/README.md).
 
-Apps build alongside one another by default when Eden bundles multiple apps. If
-an app's build command already uses the machine's available parallelism, declare
-`"concurrent": false` in its build configuration so it runs alone:
+## Add a backend when needed
+
+Declare a compiled Node.js entry alongside the frontend:
 
 ```json
 {
-  "build": {
-    "command": "npm run build",
-    "concurrent": false
-  }
+  "backend": { "entry": "backend/dist/index.js" },
+  "frontend": { "entry": "dist/index.html" }
 }
 ```
 
-## Settings Panels
-
-An app can publish ordinary persisted controls through the unchanged
-`settings` array in its manifest. Eden creates one `app.<appId>` panel and
-filters each field with the active-user grant
-`settings/<appId>/<setting.grant-or-key>`. See [Adding
-Settings](settings.md) for the schema and authorization model.
-
-## DLC extension points
-
-Apps can expose named, SemVer-versioned extension points for app-bound data
-packages. See [App-bound DLC packages](dlc-packages.md) for manifest examples,
-packaging, scoped JavaScript module resources, and lifecycle restrictions.
-
-## Running an app from source
-
-Apps scaffolded for consumer projects include a standalone development command:
+Bundle backend dependencies into that entry.
+For a source file at `backend/src/index.ts`, one build command is:
 
 ```bash
-npm run dev:eden
+npm install --save-dev esbuild @types/node
+npx esbuild backend/src/index.ts --bundle --platform=node --format=esm --outfile=backend/dist/index.js
 ```
 
-This runs `eden-build dev` in a cached, version-matched Eden host. 
-Pass another directory as the first argument, or use `--reset` to 
-clear only that project's `.eden-dev/` profile.
+Include this backend build in the app's build script alongside the frontend build.
+Use `worker.edenAPI` or the same `@edenapp/client` imports for Eden commands.
+Use [AppAPI](ipc-architecture.md#connect-a-frontend-to-its-backend) for frontend/backend requests.
+A backend is trusted Node.js code and can use host Node APIs directly.
+Eden permissions govern Eden commands; they do not sandbox Node APIs.
 
-The first run downloads `@edenapp/dev-host`, including with
-`--offline`. Eden contributors can use a built local host with
-`--host-path <path-to-packages/sdk>`.
+A backend-only app can run as a [daemon](processes-and-daemons.md).
 
-By default the command uses `scripts.dev` in the app root, then in `frontend/`.
-For a backend it uses `backend/scripts.dev`, then root `scripts.dev:backend`.
-Commands can be made explicit in `manifest.json`:
+## Control development startup
+
+`eden-build dev` finds the root `scripts.dev`, then `frontend/scripts.dev` for the frontend.
+For a backend, it checks `backend/scripts.dev`, then root `scripts.dev:backend`.
+Set explicit commands when your layout differs:
 
 ```json
 {
@@ -216,14 +199,40 @@ Commands can be made explicit in `manifest.json`:
       "command": "npm run dev -- --port {port}",
       "url": "http://127.0.0.1:{port}"
     },
-    "backend": {
-      "command": "npm run dev:backend"
-    }
+    "backend": { "command": "npm run dev:backend" }
   }
 }
 ```
 
-Both development commands are trusted local repository commands. Vite handles
-renderer HMR; manifest and compiled backend-entry changes restart the app while
-preserving its window bounds. Changing the app ID or development commands
-requires restarting `eden-build dev`.
+These commands run as trusted local repository commands.
+Renderer changes use Vite HMR.
+Manifest and compiled backend changes restart the app and preserve its window bounds.
+Restart `eden-build dev` after changing the app ID or development commands.
+
+Use `eden-build dev --reset` to clear this app's `.eden-dev/` profile.
+Use `--host-path <built-host-directory>` to select a local built host.
+`--offline` requires a cached host. If it is missing, run once without `--offline` to download it.
+Ignore `.eden-dev/` in version control.
+
+## Package and distribute
+
+Install Genesis as a development tool:
+
+```bash
+npm install --save-dev @edenapp/genesis
+npm run build
+npx genesis validate .
+npx genesis build . -o ../notes.edenite
+```
+
+Genesis also executes the app's `build.command` when bundling.
+Keep output archives outside the app source directory.
+A manifest version takes precedence over the version in a sibling `package.json`.
+
+App builds run concurrently when a consumer builds several apps.
+Set `build.concurrent` to `false` if this app's build needs to run alone.
+
+Open the archive with Eden's Installer, or let a consumer include the app at build time.
+Stop the installed app before replacing or removing it.
+Test the installed archive as well as the development source.
+See [Genesis](../packages/genesis/README.md) for archive commands.

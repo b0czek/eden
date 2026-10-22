@@ -1,13 +1,18 @@
-# Adding Settings
+# Add settings
 
-Eden can display settings declared by an app manifest or a trusted Electron host. Use manifest settings for ordinary persisted preferences. Use a host panel when the current view or its actions depend on main-process resources.
+[Handbook](README.md) · Related: [Users and grants](users.md), [Host API](main-process-api.md)
 
-## App Manifest Settings
+Use manifest settings for an app's saved preferences.
+Use a host panel when controls depend on main-process resources or host actions.
+Both appear in the built-in Settings app.
 
-Add a `settings` array to the app's `manifest.json`:
+## App manifest settings
+
+Add a `settings` array and `settings/rw` permission to the app manifest:
 
 ```json
 {
+  "permissions": ["settings/rw"],
   "settings": [{
     "id": "general",
     "name": { "en": "General", "pl": "Ogólne" },
@@ -21,14 +26,46 @@ Add a `settings` array to the app's `manifest.json`:
 }
 ```
 
-Supported types are `text`, `number`, `checkbox`, `radio`, `select`, `toggle`, `textarea`, `color`, and `range`. Values are stored as strings. The owning app uses `settings/get`, `settings/set`, `settings/get-all`, and `settings/reset` with the `settings/rw` permission. A setting is visible when the active user has `settings/<appId>/<setting.grant-or-key>`.
+Eden creates the panel `app.<appId>` from these declarations.
+The active user needs `settings/<appId>/<setting.grant-or-key>` to see a field.
+If `grant` is absent, Eden uses the setting key.
 
-## Host-Registered Panels
-
-A registration contains stable metadata and action declarations. Its loader and action handlers return Effects. The loader produces the complete resolved generic view on every execution. In this example, `readEnabled()` and `writeEnabled()` are host Effects:
+Read and change values from app code:
 
 ```ts
+import { settings } from "@edenapp/client";
+
+const { value } = await settings.get("enabled");
+const enabled = value === "true";
+await settings.set("enabled", "true");
+await settings.reset("enabled");
+```
+
+Values are strings, including booleans and numbers.
+`getAll()` returns the app's settings. Subscribe to `settings/changed` for updates.
+Commands use the calling app's namespace.
+A setting can declare `sharedWith` app IDs for read access through `settings.get(key, { appId })`.
+
+Supported field types are `text`, `number`, `checkbox`, `radio`, `select`,
+`toggle`, `textarea`, `color`, and `range`.
+Select and radio fields declare `options` with stored values and display labels.
+See [setting types](../packages/types/AppManifest.d.ts) for ranges, defaults, and sharing fields.
+
+## Host-registered panels
+
+Register a panel from the Electron main process.
+You can register before `whenReady()` or later while Eden is running.
+The loader and action handlers return Effects.
+Install Effect as a direct dependency as described in the [host guide](main-process-api.md#execute-host-work).
+
+This example keeps a toggle in memory for the current runtime:
+
+```ts
+import { createEden } from "@edenapp/sdk";
 import * as Effect from "effect/Effect";
+
+const eden = createEden();
+let enabled = false;
 
 const registration = eden.settings.registerPanel(
   {
@@ -41,51 +78,54 @@ const registration = eden.settings.registerPanel(
     }],
   },
   {
-    load: () => Effect.gen(function* () {
-      const enabled = yield* readEnabled();
-      return {
-        sections: [{
-          id: "connection",
-          nodes: [{
-            kind: "toggle",
-            id: "enabled",
-            label: { en: "Enabled", pl: "Włączone" },
-            value: enabled,
-            action: { actionId: "set-enabled" },
-          }],
+    load: () => Effect.sync(() => ({
+      sections: [{
+        id: "connection",
+        nodes: [{
+          kind: "toggle",
+          id: "enabled",
+          label: "Enabled",
+          value: enabled,
+          action: { actionId: "set-enabled" },
         }],
-      };
-    }),
+      }],
+    })),
     actions: {
-      "set-enabled": ({ value }) => writeEnabled(value as boolean),
+      "set-enabled": ({ value }) => Effect.sync(() => {
+        enabled = value as boolean;
+      }),
     },
   },
 );
 ```
 
-Generic sections contain `nodes`. Supported nodes are resolved status rows, toggles, buttons, inputs, dialogs, and collections. A loader expresses dynamic visibility by omitting a node from its next snapshot; interactive nodes use `disabled` when they should remain visible but unavailable. Select and radio nodes include their current options.
+For a real device, replace the in-memory read and write with your host adapter's Effects.
+Keep callbacks and host resources in the main process.
+Return only public display data from the loader.
 
-Call `registration.invalidate()` after host-owned state changes outside a panel action. If the panel is selected, Settings reloads only that panel's complete snapshot; it does not reload the catalog. Settings reconciles sections and sibling nodes by stable ID. Collection items and their row nodes are likewise reconciled within their containers, so unchanged components and compatible dialog drafts survive refreshes. Reusing an ID with another node or input kind replaces that local component state.
+Each load returns the complete current view.
+Sections contain status rows, toggles, buttons, inputs, dialogs, or collections.
+Omit a node when it should be hidden. Use `disabled` when it should remain visible but unavailable.
+Resolve select/radio options in the returned view.
 
-The registration also supports `setVisible(boolean)` and `unregister()`. Hidden panels cannot be discovered, loaded, or acted on, although their grants remain in the administrative grant catalog.
+## Refresh and release a panel
 
-## Action Envelopes
+Call `registration.invalidate()` after a host change outside a panel action.
+Settings reloads the selected panel without reloading the panel catalog.
+Use stable IDs so controls and compatible dialog drafts survive refreshes.
+Changing a node's kind resets its local component state.
 
-Action bindings separate the handler from the node instance and may include public parameters:
+`setVisible(false)` hides a panel and blocks loading and actions.
+Its grants remain in the administrative grant catalog.
+`unregister()` releases the registration.
+Eden disposal also releases registrations.
 
-```ts
-{
-  kind: "button",
-  id: "remove",
-  label: "Remove",
-  action: {
-    actionId: "remove-device",
-    params: { deviceId: "opaque-device-id" },
-  },
-}
-```
+IDs must be unique within their container: sections within a view, sibling nodes,
+items within a collection, and row nodes within an item.
 
-Declare each accepted channel independently:
+## Bind an action to a resource
+
+Declare accepted parameters and values separately:
 
 ```ts
 {
@@ -100,15 +140,36 @@ Declare each accepted channel independently:
 }
 ```
 
-Buttons invoke `{ params }`; toggles and inputs invoke `{ params, value }`; dialogs invoke `{ params, fields }`. Empty members are omitted, and provider parameters are never flattened into or merged with user values. An absent channel schema forbids that invocation member.
+A node binds that action to a resource:
 
-Bindings and invocations are both validated. Parameters are still client-visible and tamperable, and referenced resources can disappear after a snapshot loads, so handlers must reauthorize the resource and operation immediately before making changes.
+```ts
+{
+  kind: "input",
+  id: "name",
+  input: "text",
+  label: "Name",
+  value: device.name,
+  action: { actionId: "rename-device", params: { deviceId: device.id } },
+}
+```
 
-An action may declare an additional `grant`. Such an action must have a stable `label`, because the grant catalog is generated without loading providers. Unauthorized generated manifest settings are omitted. Unauthorized host action nodes remain visible but disabled.
+Buttons submit `params`. Toggles and inputs submit `params` and `value`.
+Dialogs submit `params` and `fields`.
+An omitted channel schema forbids that channel in the invocation.
+Eden validates both bindings and submitted data.
 
-## Collections
+Parameters are visible to the client and can be changed there.
+Recheck resource access and current resource state in the action handler before mutation.
+A resource can disappear after the panel loads.
 
-A collection resolves each row and its available operations directly:
+An action can require its own `grant`.
+Supply a stable action `label` when declaring that grant.
+Unauthorized host action nodes remain visible but disabled.
+Unauthorized manifest settings are omitted.
+
+## Show a collection
+
+Resolve row content and operations in the loader:
 
 ```ts
 {
@@ -124,47 +185,44 @@ A collection resolves each row and its available operations directly:
       id: "remove",
       label: "Remove",
       disabled: !device.removable,
-      action: {
-        actionId: "remove-device",
-        params: { deviceId: device.id },
-      },
+      action: { actionId: "remove-device", params: { deviceId: device.id } },
     }],
   })),
 }
 ```
 
-Rows may contain status, button, toggle, and dialog nodes. Direct row inputs, nested collections, and arbitrary recursive layouts are not supported.
+Rows support status, button, toggle, and dialog nodes.
+Use dialogs for row editing.
 
-IDs must be unique within their scope: sections within a view, nodes among siblings, items within a collection, and row nodes within an item.
+## Use dialogs and password fields
 
-## Dialogs and Passwords
+Resolve initial values and current select/radio options in the loader.
+Compatible non-secret drafts survive refreshes.
+Removed fields and changed input kinds reset their drafts.
 
-Dialog fields carry resolved initial values and current select/radio options. Compatible non-secret drafts survive snapshot refreshes while removed fields and fields whose input kind changed are reset.
+Password fields belong in dialogs and cannot have a provider-supplied initial value.
+Settings clears password drafts after submission attempts, close, replacement, and unmount.
+Never return passwords in a panel snapshot.
 
-Password fields are allowed only in dialogs and cannot have a provider-supplied initial value. Settings clears password drafts after every submission attempt, close, node replacement, and unmount. Providers must never return passwords in snapshots.
+## Group panels
 
-## Nested Panels
-
-Set `parentId` on independently registered children and register the parent first. Root panels appear in the sidebar; children appear inside their parent with back and breadcrumb navigation at arbitrary depth.
-
-The active user must be authorized for the selected panel and every ancestor. Parent and child must share an ownership domain: host with host, Eden with Eden, or the same application owner. A public registration cannot be unregistered while descendants remain; unregister descendants first. Registration lifetimes never cascade through the public host API.
-
-For a host navigation category with no controls or grant of its own, register an empty parent panel first:
+Register a parent before its children. Set each child's `parentId` to the parent registration's `panelId`.
+Root panels appear in the sidebar; children appear within their parent.
 
 ```ts
 const parent = eden.settings.registerPanel(
-  { id: "acme.device", title: { en: "Device", pl: "Urządzenie" } },
+  { id: "acme.device", title: "Device" },
   { load: () => Effect.succeed({ sections: [] }) },
-);
-eden.settings.registerPanel(
-  {
-    id: "acme.display",
-    parentId: parent.panelId,
-    title: { en: "Display", pl: "Ekran" },
-    grant: "settings-panels/acme.display",
-  },
-  displayProvider,
 );
 ```
 
-Omitting `grant` adds no permission check for that panel. A root without a grant is public; a child without a grant inherits its ancestors' access requirements. A child with its own grant must satisfy that grant as well as its ancestors' grants. The empty parent remains visible even when none of its children are accessible.
+A child registration can then use `parentId: parent.panelId`.
+The active user needs access to the selected panel and all ancestors.
+Omitting `grant` adds no extra check: an unguarded root is public,
+and an unguarded child still requires access to its ancestors.
+An empty parent stays visible even when no child is accessible.
+
+Unregister children before their parent.
+Public registration cleanup does not cascade to descendants.
+See the [host Settings contracts](../packages/sdk/src/api/settings.ts) and
+[panel view types](../packages/types/SettingsPanel.d.ts) for complete schemas.

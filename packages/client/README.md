@@ -2,6 +2,9 @@
 
 Typed system commands and event subscriptions for Eden frontend and backend apps.
 
+Start with the [Eden handbook](https://github.com/b0czek/eden/blob/main/docs/README.md)
+for complete app and consumer workflows.
+
 ```sh
 npm install @edenapp/client
 ```
@@ -26,7 +29,6 @@ await eden.db.get("theme");
 await eden.package.list();
 ```
 
-
 ## Arguments and results
 
 Each command becomes a method on its namespace. Hyphens and slashes become
@@ -44,7 +46,7 @@ await eden.process.list({ showHidden: true });
 await system.info();
 ```
 
-Methods return promises with the existing command result types. Responses such
+Methods return Promises with typed command results. Responses such
 as `{ value }` keep their structure. Operation commands return controls for
 progress, completion, and cancellation:
 
@@ -62,8 +64,8 @@ try {
 }
 ```
 
-`submission` is available for operation commands and supports the existing
-request-key deduplication behavior. See [IPC operations](../../docs/ipc-architecture.md#operations).
+`submission` is available for operation commands. Use its `requestKey` to prevent duplicate submissions.
+See [IPC operations](../../docs/ipc-architecture.md#operations).
 
 File reads accept locations for one-shot access or plain handles returned by
 `fs.open`. See [file handles](../../docs/filesystem.md#file-handles)
@@ -106,10 +108,8 @@ app bundle; for a Node backend, bundle its entry with dependencies:
 esbuild src/backend.ts --bundle --platform=node --format=esm --outfile=dist/backend.js
 ```
 
-Client imports do not require a running Eden environment. Calling a method
-requires the injected API. Permissions and errors follow the shell-command
-contract. AppBus, launch helpers, and restoring operation controls remain
-available through the injected APIs.
+Calling a method requires the host's injected API.
+AppBus, launch helpers, and operation restoration use the injected APIs directly.
 
 For development in this repository, regenerate the client with
 `pnpm --filter @edenapp/sdk run codegen`, then build it with

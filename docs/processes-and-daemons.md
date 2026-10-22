@@ -1,153 +1,121 @@
-# Processes and Daemons
+# Run apps and background services
 
-`Processes` manages the lifecycle of every Eden app process.
-`Daemons` adds persistent configuration and supervision policy for
-backend-only processes and delegates their lifecycle operations to
-`Processes`.
+[Handbook](README.md) · Related: [Users and sessions](users.md), [Host API](main-process-api.md)
 
-## Responsibilities
+Eden runs at most one instance of each app ID.
+An app with a frontend normally belongs to the current login session.
+A backend-only app can also run as a supervised daemon.
 
-`Processes` owns process mechanics:
+## Choose an app lifetime
 
-- the authoritative map of running `AppInstance` objects;
-- the one-running-instance-per-app-ID invariant;
-- backend creation and termination through `Backends`;
-- frontend view creation and removal through `Views`;
-- appbus service cleanup;
-- runtime execution-context registration;
-- process launch, stop, exit, reload, metrics, and shutdown events;
-- filtering and stopping processes by lifetime owner.
+| App | Start path | Lifetime |
+| --- | --- | --- |
+| Frontend, with or without a backend | Launcher, session autostart, or `process/launch` | Current session |
+| Backend-only, launched directly | `process/launch` | Current session |
+| Backend-only, managed as a daemon | Daemon boot configuration or `daemon/start` | Until stopped or Eden shuts down |
 
-Lifecycle work is serialized per app ID, including startup, stop, and reload.
-A launch publishes its running instance after backend readiness and frontend
-creation succeed. Its child scope owns execution identity, backend, and view;
-failed or interrupted startup releases them before another launch can proceed.
-Stop, reload, and native exit release the resources of that particular instance.
-Session teardown attempts every selected app before reporting cleanup failures.
+A daemon has `backend.entry` and no `frontend.entry`:
 
-`Daemons` owns daemon policy:
-
-- discovering installed backend-only apps;
-- loading and persisting daemon definitions;
-- boot enablement;
-- fixed execution-principal selection;
-- start, stop, and restart commands;
-- restart policy, failure state, and bounded exponential backoff;
-- presenting daemon status to management UI.
-
-All daemon process creation, view handling, runtime-instance tracking, and
-termination remain within `Processes` and its existing collaborators.
-
-## Classifying Apps
-
-An installed app is treated as a daemon when its manifest has a backend entry
-and no frontend entry:
-
-```ts
-!!manifest.backend?.entry && !manifest.frontend?.entry
-```
-
-`process/launch` may launch any installed app directly. Such a process belongs
-to the interactive session. Starting a backend-only app through `daemon/start`
-instead gives it system ownership and daemon supervision. Session autostart
-filters out backend-only apps. Apps with a frontend remain session-owned when
-launched normally, even when they also have a backend.
-
-## Ownership and Principal
-
-Ownership and authorization identity are separate concepts.
-
-`AppInstance.owner` controls lifetime:
-
-- `{ kind: "session", sessionId, username }` means the process belongs to an
-  interactive session and must stop when that session is replaced.
-- `{ kind: "system" }` means the process survives login and logout transitions
-  and stops only through daemon management, reload, or Eden shutdown.
-
-`AppInstance.principal` controls Eden authorization and managed filesystem
-resolution:
-
-- `{ kind: "system" }` uses manifest base permissions.
-- `{ kind: "user", username }` uses a launch-time snapshot of that Eden
-  account's role, grants, and folder restriction.
-
-Every daemon is system-owned, regardless of its principal. A daemon configured
-to run as an Eden user keeps that launch-time identity across session changes.
-Account or restriction changes take effect after the daemon restarts.
-
-These principals affect Eden command authorization and Eden-managed filesystem
-paths. All principals resolve Home addresses against the configured `userDirectory`.
-User principals enforce the account folder restrictions described in
-[Shared Filesystem and Folder Restrictions](users.md#shared-filesystem-and-folder-restrictions). Backend code remains trusted
-Node.js code and retains its host-process UID and GID.
-
-### Execution Context
-
-`executionContext.provide(work, context)` establishes the caller identity for an
-Effect workflow. Use `executionContext.run(context, task)` at JavaScript callback
-boundaries. Both let domain operations use `getPrincipal()`, `hasGrant()`, and
-the other execution-context checks without passing the caller through every
-method:
-
-```ts
-await effects.run(
-  executionContext.provide(processes.launchApp("com.example.app"), {
-    principal: { kind: "user", profile },
-  }),
-);
-```
-
-Effect workflows use the runtime's caller context; JavaScript callbacks use
-Node.js `AsyncLocalStorage`. Concurrent operations may carry different principals
-without changing each other, and the context stops being
-active when its task finishes. It does not change `SessionContext` or the
-logged-in user. IPC commands establish it in `Commands`;
-system-triggered work such as session autostart establishes it explicitly
-before calling code that performs authorization checks.
-
-## Sessions and Autostart
-
-Session IDs are opaque and change when the interactive identity changes.
-`Sessions` stops all processes owned by the old session before committing
-the new session. System-owned daemons remain outside that selection.
-
-`Autostart` handles frontend-bearing session applications after a
-session is committed. It ignores backend-only apps. `Daemons` handles
-backend-only boot services independently and initializes before the first
-interactive session is committed.
-
-Daemon boot launch belongs to `Daemons`; interactive application launch
-belongs to `Autostart`. Process ownership is assigned at launch.
-
-## Definitions and Runtime Behavior
-
-A daemon definition contains:
-
-```ts
+```json
 {
-  appId: string;
-  enabled: boolean;
-  runAs: { kind: "user"; username: string } | null;
-  restart: "never" | "on-failure" | "always";
+  "id": "com.example.worker",
+  "name": "Worker",
+  "version": "1.0.0",
+  "backend": { "entry": "dist/index.js" },
+  "permissions": ["db/rw"]
 }
 ```
 
-Definitions are stored in the Eden settings namespace and adopted immediately
-when saved. There is no separate “reload definitions” phase.
-Status notifications use the currently adopted definition and runtime state, so
-reporting a process change does not depend on settings storage being available.
+Build and bundle the backend as described in [app development](app-development.md#add-a-backend-when-needed).
 
-- `enabled` controls launch during the next Eden boot. Toggling it does not
-  implicitly start or stop the current process.
-- `runAs` selects the Eden account used when the process launches. A daemon
-  must have an account before it can be enabled or started. Changing it on a
-  running daemon marks the daemon as requiring restart.
-- `restart` is supervisor policy and applies to subsequent exits.
-- Start, stop, and restart are explicit current-boot operations.
+## Launch an app from app code
 
-Daemon definitions can be included in the normal first-run settings seed. Use
-the `com.eden` namespace and the key `daemon.<appId>`; the value is the
-JSON-encoded definition:
+Declare `process/launch` permission, then await the launch operation:
+
+```ts
+import { process } from "@edenapp/client";
+
+const launch = await process.launch("com.example.notes");
+await launch.result();
+```
+
+Launch, stop, exit, and daemon start/stop/restart commands return operation objects.
+Await `result()` when subsequent work needs completion.
+For self-exit, await acceptance; the caller may close before it sees completion.
+
+A launched instance becomes available after its backend is ready and its frontend exists.
+Failed startup releases the resources it acquired.
+Launch, stop, and reload for the same app are serialized.
+
+## Sessions and autostart
+
+On logout or account change, Eden stops apps owned by the outgoing session before committing the next session.
+Managed daemons survive that transition.
+
+Seed interactive startup apps in the `com.eden` settings namespace:
+
+```json
+{
+  "settings": {
+    "com.eden": { "autostart.com.example.notes": "true" }
+  }
+}
+```
+
+Session autostart ignores backend-only apps.
+Configure those as daemons when they should start at boot.
+Daemon startup happens before the first interactive session is committed.
+
+## Configure a daemon from the host
+
+Install or include the daemon app first.
+Choose an existing Eden account for its authorization identity:
+
+```ts
+await eden.whenReady();
+await eden.runPromise(eden.daemons.updateDefinition({
+  appId: "com.example.worker",
+  enabled: true,
+  runAs: { kind: "user", username: "worker" },
+  restart: "on-failure",
+}));
+await eden.runPromise(eden.daemons.start("com.example.worker"));
+```
+
+| Field | Meaning |
+| --- | --- |
+| `enabled` | Start during the next Eden boot |
+| `runAs` | Eden account used when the daemon starts; `null` means unassigned |
+| `restart` | `never`, `on-failure`, or `always` |
+
+Assign an account before enabling or starting a daemon.
+Changing `enabled` does not start or stop the current process.
+Use `start`, `stop`, or `restart` for the current boot.
+Definition changes are saved and adopted immediately.
+A running daemon needs a restart to adopt a changed account.
+
+Read state with `eden.runPromise(eden.daemons.list())`.
+Subscribe with `eden.daemons.onChanged(callback)` and release the returned subscription when your integration stops.
+App-based management uses `daemon/read` or `daemon/manage` permissions.
+
+## Ownership and principal
+
+An instance's **owner** controls its lifetime.
+A session owner stops at session replacement; a system owner survives login and logout.
+Managed daemons are system-owned.
+
+An instance's **principal** controls Eden authorization.
+A daemon running as a user keeps a launch-time snapshot of that account's grants and folder restriction.
+Restart it after account changes to apply the new identity.
+All accounts resolve Home against the same `userDirectory`.
+
+This identity controls Eden commands. It does not change the backend's operating-system UID or GID.
+Backend code remains trusted Node.js code with direct host API access.
+
+## Seed a boot service
+
+Put a daemon definition in the consumer's `eden.config.json` settings.
+The key is `daemon.<appId>` and the value is a JSON-encoded definition:
 
 ```json
 {
@@ -159,16 +127,8 @@ JSON-encoded definition:
 }
 ```
 
-Seed the referenced account in `users` as well. The daemon app must be
-installed when daemon initialization runs. Settings seeding is a first-run
-operation and does not overwrite definitions changed by the user.
+Seed the referenced account in `users` and include the daemon in the build's `apps` list.
+Seed data applies only on first run. It does not overwrite later administrative changes.
 
-Unexpected exits follow the configured restart policy. Restarts use bounded
-exponential backoff. Intentional stops, reloads, and Eden shutdown are excluded
-from failure restart handling.
-
-App IPC commands `process/launch`, `process/stop`, `process/exit`, and daemon
-start/stop/restart return operation objects. Await `operation.result()`
-when subsequent work depends on completion. Self-exit only needs to await acceptance;
-Eden queues the response before tearing down the caller. Host daemon methods remain
-awaited convenience APIs.
+Unexpected exits use the configured restart policy with bounded exponential backoff.
+Intentional stops, reloads, and Eden shutdown do not trigger failure restarts.

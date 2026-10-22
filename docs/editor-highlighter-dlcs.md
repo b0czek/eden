@@ -1,15 +1,11 @@
-# Editor language-highlighter DLCs
+# Add an Editor language highlighter
 
-The Eden text editor exposes the `language-highlighters` extension point for
-adding line-based syntax highlighting without adding the language implementation
-to Eden itself. Highlighters run as host-scoped ES modules and use semantic Eden
-styles rather than CodeMirror or raw CSS APIs.
+[Handbook](README.md) · Prerequisite: [DLC packages](dlc-packages.md)
 
-Eden ships an
-[HTTP request highlighter](../packages/sdk/dlcs/com/eden/editor-http-highlighter/)
-as a complete DLC example. It adds `.http` and `.rest` support, which CodeMirror
-does not provide as a built-in language, using the same contract and loading
-path as third-party packages.
+Editor exposes the `language-highlighters` extension point for line-based syntax highlighting.
+A highlighter module returns token spans and maps them to semantic Eden styles.
+The [HTTP request highlighter](../packages/sdk/dlcs/com/eden/editor-http-highlighter/) is a complete example.
+It adds `.http` and `.rest` file support.
 
 ## DLC manifest
 
@@ -97,37 +93,28 @@ const module = {
 export default module;
 ```
 
-The keys under `highlighters` must match the language IDs in the contribution
-metadata.
-`highlightLine` is synchronous and receives one line without its line break.
-Spans use zero-based, half-open UTF-16 offsets relative to that line. The
-second argument, which a tokenizer may ignore, contains the file path, language
-ID, and one-based line number.
+Match keys under `highlighters` to the language IDs in the contribution metadata.
+`highlightLine` receives one line without its line break and returns spans synchronously.
+Each span uses zero-based UTF-16 offsets: `from` is included and `to` is excluded.
+The second argument, which the tokenizer can ignore, contains the path, language ID, and one-based line number.
 
 Token names are owned by the DLC. Map each emitted token name to one of:
 `plain`, `comment`, `keyword`, `operator`, `number`, `string`, `variable`,
 `property`, `type`, `function`, `label`, `heading`, `link`, `meta`, or `invalid`.
-This means an existing tokenizer can keep domain names such as `word-axis` or
-`subprogram`; only the `tokenStyles` map needs to translate them to Eden styles.
-Unknown token names and `plain` spans are left unstyled. Invalid ranges and
-highlighter exceptions are isolated so they cannot stop editing.
+An existing tokenizer can keep its token names.
+Map them to Eden styles through `tokenStyles`.
+Unknown token names and `plain` spans remain unstyled.
+Invalid ranges or highlighter exceptions do not stop editing.
 
 ## Build and install
 
 DLC manifests do not execute build commands. Compile the entry module before
 running Genesis, and bundle any runtime dependencies into it. For example:
 
-```json
-{
-  "scripts": {
-    "build": "esbuild src/index.ts --bundle --format=esm --outfile=dist/index.mjs",
-    "package": "npm run build && genesis build . -o demo-language.edenite"
-  },
-  "devDependencies": {
-    "@edenapp/editor-dlc": "^0.13.0",
-    "esbuild": "^0.28.0"
-  }
-}
+```bash
+npm install --save-dev @edenapp/editor-dlc @edenapp/genesis esbuild
+npx esbuild src/index.ts --bundle --format=esm --outfile=dist/index.mjs
+npx genesis build . -o ../demo-language.edenite
 ```
 
 Stop the editor before installing, replacing, or removing its DLCs. Reopen it

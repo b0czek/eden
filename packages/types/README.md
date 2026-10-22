@@ -2,6 +2,9 @@
 
 TypeScript type definitions for the Eden platform.
 
+See the [Eden handbook](https://github.com/b0czek/eden/blob/main/docs/README.md)
+for app and consumer workflows.
+
 ## Installation
 
 For Eden app development:
@@ -12,7 +15,7 @@ npm install -D @edenapp/types
 
 ## TypeScript Configuration
 
-To enable type support for window APIs, update your `tsconfig.json` to include:
+For frontend APIs, include these types in `tsconfig.json`:
 
 ```json
 {
@@ -22,13 +25,16 @@ To enable type support for window APIs, update your `tsconfig.json` to include:
 }
 ```
 
+For a backend, use `"types": ["node", "@edenapp/types/worker"]` instead.
+Keep other types your project needs in the same array.
+
 ## Usage
 
-Import types in your Eden app:
+The declarations provide types for the injected frontend APIs:
 
 ```typescript
 // Use Eden API in your app's frontend
 const files = await window.edenAPI.shellCommand("fs/readdir", {
-  location: { volume: "home", path: "/home/user/documents" },
+  location: { volume: "home", path: "/Documents" },
 });
 ```
