@@ -20,22 +20,15 @@ import type {
   DaemonLaunchError,
   DaemonStopError,
   DaemonUpdateError,
-} from "../daemon/errors";
-import type { FilesystemIoFailed } from "../filesystem/native-errors";
-import type {
-  VolumeEjectError,
-  VolumeRegistrationError,
-} from "../filesystem/volumes/errors";
-import type { HostOperationFailure } from "../operations/errors";
+} from "../applications/daemon/errors";
 import type {
   PackageArchiveInstallError,
   PackageDevelopmentFailure,
   PackageRejected,
   PackageRemovalError,
-} from "../packages/errors";
-import type { LoginFailure, SessionTransitionFailure } from "../session/errors";
-import type { SettingValueError } from "../settings/errors";
-import type { StorageWriteFailure } from "../storage/errors";
+} from "../applications/packages/errors";
+import type { HostOperationFailure } from "../core/operations/errors";
+import type { SettingValueError } from "../core/settings/errors";
 import type {
   CreateUserFailure,
   DeleteUserFailure,
@@ -43,7 +36,17 @@ import type {
   SetPasswordFailure,
   UpdateUserFailure,
   UserRecordReadFailure,
-} from "../user/errors";
+} from "../core/user/errors";
+import type {
+  LoginFailure,
+  SessionTransitionFailure,
+} from "../desktop/session/errors";
+import type { FilesystemIoFailed } from "../platform/filesystem/native-errors";
+import type {
+  VolumeEjectError,
+  VolumeRegistrationError,
+} from "../platform/filesystem/volumes/errors";
+import type { StorageWriteFailure } from "../platform/storage/errors";
 
 export type EdenInputError = ValiError<GenericSchema>;
 export type EdenDaemonOperationFailure =

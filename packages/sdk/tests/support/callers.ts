@@ -3,7 +3,7 @@ import type { EdenCreateUserInput } from "../../src/api/control-plane";
 import {
   ExecutionContext,
   ExecutionContextLive,
-} from "../../src/execution/context";
+} from "../../src/core/execution/context";
 import { RuntimeConfig } from "../../src/runtime/inputs";
 import type { TestEden } from "./create-test-eden";
 import { buildService } from "./effect-runtime";

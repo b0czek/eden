@@ -20,7 +20,7 @@ import type {
   ShellCommandResponse,
   ShellTransport,
 } from "../../../src/app-runtime/common/shell-transport";
-import type { OperationReporter } from "../../../src/operations/task";
+import type { OperationReporter } from "../../../src/core/operations/task";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";

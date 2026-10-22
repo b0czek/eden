@@ -5,10 +5,13 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
-import { DlcResources } from "../../../src/packages/dlc-resources";
+import { DlcResources } from "../../../src/applications/packages/dlc-resources";
+import {
+  Backends,
+  BackendsLive,
+} from "../../../src/applications/processes/backends";
+import { BackendIoFailed } from "../../../src/applications/processes/errors";
 import { UtilityProcessPort } from "../../../src/platform/ports/types";
-import { Backends, BackendsLive } from "../../../src/processes/backends";
-import { BackendIoFailed } from "../../../src/processes/errors";
 import { DistPath } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
 import {

@@ -4,24 +4,24 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { AppAssociationStorage } from "../../../src/app-associations/ports";
-import { AppAssociationsPortsLive } from "../../../src/app-associations/runtime";
+import { AppAssociationStorage } from "../../../src/applications/app-associations/ports";
+import { AppAssociationsPortsLive } from "../../../src/applications/app-associations/runtime";
 import {
   AppAssociations,
   AppAssociationsLive,
-} from "../../../src/app-associations/service";
-import {
-  ExecutionContext,
-  ExecutionContextLive,
-} from "../../../src/execution/context";
+} from "../../../src/applications/app-associations/service";
 import {
   PackageCatalog,
   PackageCatalogLive,
-} from "../../../src/packages/catalog";
+} from "../../../src/applications/packages/catalog";
 import {
   InstalledPackages,
   InstalledPackagesLive,
-} from "../../../src/packages/installed";
+} from "../../../src/applications/packages/installed";
+import {
+  ExecutionContext,
+  ExecutionContextLive,
+} from "../../../src/core/execution/context";
 import {
   AppsDirectory,
   DistPath,

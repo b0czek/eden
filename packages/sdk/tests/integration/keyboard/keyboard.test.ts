@@ -8,24 +8,30 @@ import type {
   ViewBounds,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEvent } from "../../../src/events/event";
-import { ExecutionContext } from "../../../src/execution/context";
-import { createKeyboardAssets } from "../../../src/keyboard/assets";
-import { KeyboardAssets, KeyboardViews } from "../../../src/keyboard/ports";
-import { Keyboard, KeyboardLive } from "../../../src/keyboard/service";
-import { createKeyboardViews } from "../../../src/keyboard/views";
+import { Processes } from "../../../src/applications/processes/service";
+import { createEvent } from "../../../src/core/events/event";
+import { ExecutionContext } from "../../../src/core/execution/context";
+import { EDEN_SETTINGS_APP_ID } from "../../../src/core/settings/constants";
+import {
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/core/settings/ports";
+import { Settings, SettingsLive } from "../../../src/core/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
+import { createKeyboardAssets } from "../../../src/desktop/keyboard/assets";
+import {
+  KeyboardAssets,
+  KeyboardViews,
+} from "../../../src/desktop/keyboard/ports";
+import { Keyboard, KeyboardLive } from "../../../src/desktop/keyboard/service";
+import { createKeyboardViews } from "../../../src/desktop/keyboard/views";
+import type { ViewInfo } from "../../../src/desktop/views/types";
 import {
   DisplayPort,
   RendererIpcPort,
   WindowingPort,
 } from "../../../src/platform/ports/types";
-import { Processes } from "../../../src/processes/service";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import { EDEN_SETTINGS_APP_ID } from "../../../src/settings/constants";
-import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
-import { Settings, SettingsLive } from "../../../src/settings/service";
-import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
-import type { ViewInfo } from "../../../src/views/types";
 import { testApp } from "../../support/apps";
 import { createTestExecutionContext } from "../../support/callers";
 import {

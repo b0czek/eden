@@ -1,16 +1,16 @@
 import * as Effect from "effect/Effect";
-import { AppAssociations } from "../app-associations/service";
-import { Appearance } from "../appearance/service";
-import { Autostart } from "../autostart/service";
-import { Daemons } from "../daemon/service";
-import { logCleanupFailure } from "../effects/failure-policy";
-import { Filesystem } from "../filesystem/service";
-import { Operations } from "../operations/service";
-import { Packages } from "../packages/service";
-import { Processes } from "../processes/service";
-import { Sessions } from "../session/service";
-import { SettingsPanels } from "../settings/panels/service";
-import { Users } from "../user/service";
+import { AppAssociations } from "../applications/app-associations/service";
+import { Autostart } from "../applications/autostart/service";
+import { Daemons } from "../applications/daemon/service";
+import { Packages } from "../applications/packages/service";
+import { Processes } from "../applications/processes/service";
+import { logCleanupFailure } from "../core/effects/failure-policy";
+import { Operations } from "../core/operations/service";
+import { SettingsPanels } from "../core/settings/panels/service";
+import { Users } from "../core/user/service";
+import { Appearance } from "../desktop/appearance/service";
+import { Sessions } from "../desktop/session/service";
+import { Filesystem } from "../platform/filesystem/service";
 import type { FoundationWindow } from "./foundation-window";
 
 /** Capture lifecycle dependencies once; returned operations are fully provided. */

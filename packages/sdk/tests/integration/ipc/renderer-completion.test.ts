@@ -1,7 +1,10 @@
 import type { OperationHandle } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { command, defineController } from "../../../src/controllers/controller";
-import { operationTask } from "../../../src/operations/task";
+import {
+  command,
+  defineController,
+} from "../../../src/core/controllers/controller";
+import { operationTask } from "../../../src/core/operations/task";
 import { testApp } from "../../support/apps";
 import { gate } from "../../support/async";
 import { createTestCaller } from "../../support/callers";

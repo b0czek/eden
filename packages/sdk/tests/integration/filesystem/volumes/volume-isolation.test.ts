@@ -2,11 +2,11 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
+import type { OperationTask } from "../../../../src/core/operations/task";
 import {
   Volumes,
   VolumesLive,
-} from "../../../../src/filesystem/volumes/service";
-import type { OperationTask } from "../../../../src/operations/task";
+} from "../../../../src/platform/filesystem/volumes/service";
 import {
   buildService,
   createEffectRuntime,

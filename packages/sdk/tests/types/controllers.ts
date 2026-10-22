@@ -1,9 +1,9 @@
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import { command, operation } from "../../src/controllers/controller";
-import { fromPromise } from "../../src/effects/io";
-import { operationTask } from "../../src/operations/task";
+import { command, operation } from "../../src/core/controllers/controller";
+import { fromPromise } from "../../src/core/effects/io";
+import { operationTask } from "../../src/core/operations/task";
 
 command({ handle: () => 42 });
 command({ handle: () => Effect.succeed(42) });

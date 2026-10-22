@@ -86,7 +86,7 @@ Keep `t()` calls inside reactive JSX expressions so translated text updates.
 ## Reuse common labels
 
 Use `common.save`, `common.cancel`, `common.close`, and other shared keys for standard actions.
-The [English common resource](../packages/sdk/src/i18n/locales/en.ts) lists available labels.
+The [English common resource](../packages/sdk/src/core/i18n/locales/en.ts) lists available labels.
 Use app keys for text specific to your app.
 
 ## Translate manifest names

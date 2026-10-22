@@ -1,9 +1,9 @@
-import { fromPromise } from "../../src/effects/io";
+import { fromPromise } from "../../src/core/effects/io";
 import {
   type OperationReporter,
   type OperationTask,
   operationTask,
-} from "../../src/operations/task";
+} from "../../src/core/operations/task";
 
 /** Adapt Promise-based fixture I/O before handing it to the operation runtime. */
 export function promiseOperationTask<R>(

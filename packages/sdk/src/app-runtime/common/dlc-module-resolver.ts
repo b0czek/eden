@@ -1,8 +1,8 @@
 import { registerHooks } from "node:module";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { isPathWithin } from "../../filesystem/lexical-path";
-import { syncIo } from "../../filesystem/native-sync";
+import { isPathWithin } from "../../platform/filesystem/lexical-path";
+import { syncIo } from "../../platform/filesystem/native-sync";
 
 export interface BackendDlcBinding {
   capability: string;

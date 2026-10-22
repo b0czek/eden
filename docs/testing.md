@@ -127,7 +127,7 @@ Await a Deferred milestone, fiber completion, or service drain for asynchronous 
 Advancing time does not complete native I/O.
 
 See the [backend deadline tests](../packages/sdk/tests/integration/processes/backends.test.ts)
-and [operation retention tests](../packages/sdk/src/operations/retention.test.ts).
+and [operation retention tests](../packages/sdk/src/core/operations/retention.test.ts).
 Native filesystem notifications can use real external synchronization.
 
 ## Measure EdenAPI throughput

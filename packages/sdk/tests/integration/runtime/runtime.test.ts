@@ -5,10 +5,13 @@ import type { UserProfile } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { command, defineController } from "../../../src/controllers/controller";
+import {
+  command,
+  defineController,
+} from "../../../src/core/controllers/controller";
+import { hashPassword } from "../../../src/core/user/auth";
 import * as desktopComposition from "../../../src/runtime/composition";
 import { Desktop } from "../../../src/runtime/desktop";
-import { hashPassword } from "../../../src/user/auth";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 

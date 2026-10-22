@@ -1,12 +1,12 @@
 import * as Effect from "effect/Effect";
-import { ContextMenuViewReadFailed } from "../../../src/context-menu/errors";
-import { ContextMenuViews } from "../../../src/context-menu/ports";
+import { ContextMenuViewReadFailed } from "../../../src/desktop/context-menu/errors";
+import { ContextMenuViews } from "../../../src/desktop/context-menu/ports";
 import {
   ContextMenu,
   ContextMenuLive,
-} from "../../../src/context-menu/service";
-import { createContextMenuViews } from "../../../src/context-menu/views";
-import type { ViewInfo } from "../../../src/views/types";
+} from "../../../src/desktop/context-menu/service";
+import { createContextMenuViews } from "../../../src/desktop/context-menu/views";
+import type { ViewInfo } from "../../../src/desktop/views/types";
 import { testApp } from "../../support/apps";
 import {
   buildService,

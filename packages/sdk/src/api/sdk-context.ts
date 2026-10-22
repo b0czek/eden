@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as v from "valibot";
-import type { EventListener } from "../events/event";
-import type { ExecutionContext } from "../execution/context";
-import type { Operations } from "../operations/service";
-import type { OperationTask } from "../operations/task";
+import type { EventListener } from "../core/events/event";
+import type { ExecutionContext } from "../core/execution/context";
+import type { Operations } from "../core/operations/service";
+import type { OperationTask } from "../core/operations/task";
 import type { EdenInputError } from "./control-plane";
 
 /** Trusted SDK work acquires host authority only when it executes. */

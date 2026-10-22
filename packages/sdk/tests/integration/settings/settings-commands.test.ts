@@ -1,7 +1,7 @@
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { SettingAccessError } from "../../../src/settings/errors";
+import { SettingAccessError } from "../../../src/core/settings/errors";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/create-test-eden";
 

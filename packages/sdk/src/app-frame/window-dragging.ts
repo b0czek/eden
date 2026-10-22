@@ -1,5 +1,5 @@
 import * as eden from "@edenapp/client";
-import { log } from "../logging/logger";
+import { log } from "../platform/logging/logger";
 /**
  * Window Dragging
  *

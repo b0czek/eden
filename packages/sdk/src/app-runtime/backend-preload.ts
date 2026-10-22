@@ -1,10 +1,10 @@
+import { decodeLaunchContext } from "../core/utils/app-launch-context";
 import {
   type CallsiteInfo,
   log,
   logFromConsole,
   setLogContext,
-} from "../logging/logger";
-import { decodeLaunchContext } from "../utils/app-launch-context";
+} from "../platform/logging/logger";
 import { dispatchEvent } from "./common/event-subscriptions";
 /**
  * Backend Runtime

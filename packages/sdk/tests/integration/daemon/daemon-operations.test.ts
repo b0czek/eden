@@ -5,7 +5,7 @@ import type {
   RuntimeAppManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { StorageClosedError } from "../../../src/storage/errors";
+import { StorageClosedError } from "../../../src/platform/storage/errors";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";

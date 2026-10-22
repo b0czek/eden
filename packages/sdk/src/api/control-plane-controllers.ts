@@ -1,17 +1,17 @@
-import { createAssociationsSdkController } from "../app-associations/controller-sdk";
-import type { AppAssociations } from "../app-associations/service";
-import { createAppearanceSdkController } from "../appearance/controller-sdk";
-import type { Appearance } from "../appearance/service";
-import { createDaemonsSdkController } from "../daemon/controller-sdk";
-import type { Daemons } from "../daemon/service";
-import { createVolumesSdkController } from "../filesystem/volumes/controller-sdk";
-import type { Volumes } from "../filesystem/volumes/service";
-import { createPackagesSdkController } from "../packages/controller-sdk";
-import type { Packages } from "../packages/service";
-import { createSessionsSdkController } from "../session/controller-sdk";
-import type { Sessions } from "../session/service";
-import { createUsersSdkController } from "../user/controller-sdk";
-import type { Users } from "../user/service";
+import { createAssociationsSdkController } from "../applications/app-associations/controller-sdk";
+import type { AppAssociations } from "../applications/app-associations/service";
+import { createDaemonsSdkController } from "../applications/daemon/controller-sdk";
+import type { Daemons } from "../applications/daemon/service";
+import { createPackagesSdkController } from "../applications/packages/controller-sdk";
+import type { Packages } from "../applications/packages/service";
+import { createUsersSdkController } from "../core/user/controller-sdk";
+import type { Users } from "../core/user/service";
+import { createAppearanceSdkController } from "../desktop/appearance/controller-sdk";
+import type { Appearance } from "../desktop/appearance/service";
+import { createSessionsSdkController } from "../desktop/session/controller-sdk";
+import type { Sessions } from "../desktop/session/service";
+import { createVolumesSdkController } from "../platform/filesystem/volumes/controller-sdk";
+import type { Volumes } from "../platform/filesystem/volumes/service";
 import type {
   EdenAppearanceApi,
   EdenAssociationsApi,

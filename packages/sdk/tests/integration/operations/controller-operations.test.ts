@@ -4,7 +4,7 @@ import * as v from "valibot";
 import {
   defineController,
   operation,
-} from "../../../src/controllers/controller";
+} from "../../../src/core/controllers/controller";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 

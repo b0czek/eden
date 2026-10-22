@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
-import type { Users } from "../../../src/user/service";
+import type { Users } from "../../../src/core/user/service";
 import { testApp } from "../../support/apps";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 

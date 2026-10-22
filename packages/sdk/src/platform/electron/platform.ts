@@ -16,7 +16,7 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
-import { attachWebContentsLogger } from "../../logging/electron";
+import { attachWebContentsLogger } from "../logging/electron";
 import type {
   AppChannelPort,
   ApplicationLifecycleEvent,

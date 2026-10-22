@@ -3,16 +3,22 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
-import { AppearanceSettings } from "../../../src/appearance/ports";
-import { Appearance, AppearanceLive } from "../../../src/appearance/service";
-import { createAppearanceSettings } from "../../../src/appearance/settings";
-import { ExecutionContext } from "../../../src/execution/context";
-import { I18n, I18nLive, I18nSettings } from "../../../src/i18n/service";
-import { createI18nSettings } from "../../../src/i18n/settings";
+import { ExecutionContext } from "../../../src/core/execution/context";
+import { I18n, I18nLive, I18nSettings } from "../../../src/core/i18n/service";
+import { createI18nSettings } from "../../../src/core/i18n/settings";
+import {
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/core/settings/ports";
+import { Settings, SettingsLive } from "../../../src/core/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
+import { AppearanceSettings } from "../../../src/desktop/appearance/ports";
+import {
+  Appearance,
+  AppearanceLive,
+} from "../../../src/desktop/appearance/service";
+import { createAppearanceSettings } from "../../../src/desktop/appearance/settings";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
-import { Settings, SettingsLive } from "../../../src/settings/service";
-import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import { createTestExecutionContext } from "../../support/callers";
 import {
   buildService,

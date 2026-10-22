@@ -9,7 +9,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
-import type { CommandCallerContext } from "../../../src/execution/context";
+import type { CommandCallerContext } from "../../../src/core/execution/context";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";

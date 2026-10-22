@@ -3,11 +3,11 @@ import * as Effect from "effect/Effect";
 import {
   RuntimeContexts,
   RuntimeContextsLive,
-} from "../../../src/execution/runtime-contexts";
+} from "../../../src/core/execution/runtime-contexts";
 import {
   SessionContext,
   SessionContextLive,
-} from "../../../src/session/context";
+} from "../../../src/desktop/session/context";
 import {
   buildService,
   createEffectRuntime,

@@ -11,42 +11,50 @@ import type {
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { AppAssociationStorage } from "../../../src/app-associations/ports";
+import { AppAssociationStorage } from "../../../src/applications/app-associations/ports";
 import {
   AppAssociations,
   AppAssociationsLive,
-} from "../../../src/app-associations/service";
-import type { TargetedNotification } from "../../../src/controllers/events";
-import { createEvent } from "../../../src/events/event";
+} from "../../../src/applications/app-associations/service";
+import {
+  PackageCatalog,
+  PackageCatalogLive,
+} from "../../../src/applications/packages/catalog";
+import {
+  InstalledPackages,
+  InstalledPackagesLive,
+} from "../../../src/applications/packages/installed";
+import type { TargetedNotification } from "../../../src/core/controllers/events";
+import { createEvent } from "../../../src/core/events/event";
 import {
   ExecutionContext,
   ExecutionContextLive,
-} from "../../../src/execution/context";
+} from "../../../src/core/execution/context";
+import {
+  Permissions,
+  PermissionsLive,
+} from "../../../src/core/ipc/permissions";
 import {
   createFilePickerFiles,
   createFilePickerProcesses,
-} from "../../../src/file-picker/adapters";
-import { createFilePickerController } from "../../../src/file-picker/controller-edenapi";
+} from "../../../src/desktop/file-picker/adapters";
+import { createFilePickerController } from "../../../src/desktop/file-picker/controller-edenapi";
 import {
   FilePickerFiles,
   FilePickerNotifications,
   FilePickerProcesses,
   FilePickerViews,
-} from "../../../src/file-picker/ports";
-import { FilePicker, FilePickerLive } from "../../../src/file-picker/service";
-import { FilesystemAccessDenied } from "../../../src/filesystem/errors";
-import { FilesystemIoFailed } from "../../../src/filesystem/native-errors";
-
-import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
-import { Permissions, PermissionsLive } from "../../../src/ipc/permissions";
+} from "../../../src/desktop/file-picker/ports";
 import {
-  PackageCatalog,
-  PackageCatalogLive,
-} from "../../../src/packages/catalog";
+  FilePicker,
+  FilePickerLive,
+} from "../../../src/desktop/file-picker/service";
+import { FilesystemAccessDenied } from "../../../src/platform/filesystem/errors";
+import { FilesystemIoFailed } from "../../../src/platform/filesystem/native-errors";
 import {
-  InstalledPackages,
-  InstalledPackagesLive,
-} from "../../../src/packages/installed";
+  Volumes,
+  VolumesLive,
+} from "../../../src/platform/filesystem/volumes/service";
 import {
   AppsDirectory,
   DistPath,

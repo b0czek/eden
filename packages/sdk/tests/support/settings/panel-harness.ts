@@ -1,22 +1,25 @@
 import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
+import { PackageCatalog } from "../../../src/applications/packages/catalog";
 import {
   ExecutionContext,
   ExecutionContextLive,
-} from "../../../src/execution/context";
-import { PackageCatalog } from "../../../src/packages/catalog";
-import { RuntimeConfig } from "../../../src/runtime/inputs";
-import { SessionContext } from "../../../src/session/context";
+} from "../../../src/core/execution/context";
 import {
   createPanelRegistry,
   PanelRegistry,
-} from "../../../src/settings/panels/registry";
+} from "../../../src/core/settings/panels/registry";
 import {
   SettingsPanels,
   SettingsPanelsLive,
-} from "../../../src/settings/panels/service";
-import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
-import { Settings, SettingsLive } from "../../../src/settings/service";
+} from "../../../src/core/settings/panels/service";
+import {
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/core/settings/ports";
+import { Settings, SettingsLive } from "../../../src/core/settings/service";
+import { SessionContext } from "../../../src/desktop/session/context";
+import { RuntimeConfig } from "../../../src/runtime/inputs";
 import { createTestExecutionContext } from "../callers";
 import { buildService, createEffectRuntime } from "../effect-runtime";
 import { panelUser } from "./panels";

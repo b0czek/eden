@@ -1,4 +1,4 @@
-import { io } from "./filesystem/native-io";
+import { io } from "./platform/filesystem/native-io";
 /**
  * Hot reload state helpers.
  *
@@ -9,7 +9,7 @@ import { io } from "./filesystem/native-io";
 import * as path from "node:path";
 import type { EdenConfig } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { asError } from "./effects/io";
+import { asError } from "./core/effects/io";
 
 export interface HotReloadEnabledState {
   apps: string[];

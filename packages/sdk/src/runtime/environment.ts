@@ -1,7 +1,7 @@
 import * as Context from "effect/Context";
 import type { EdenConfig } from "../api/config";
+import type { PanelRegistry } from "../core/settings/panels/registry";
 import type { EdenPlatform } from "../platform/ports/types";
-import type { PanelRegistry } from "../settings/panels/registry";
 
 export interface EdenRuntimePaths {
   appsDirectory: string;

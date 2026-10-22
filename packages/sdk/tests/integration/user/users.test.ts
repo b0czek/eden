@@ -2,13 +2,13 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
-import { AppsDirectory, UserDirectory } from "../../../src/runtime/inputs";
 import {
   Users,
   UsersLive,
   UsersRestrictedApps,
-} from "../../../src/user/service";
-import { UserStorage, UserStorageLive } from "../../../src/user/storage";
+} from "../../../src/core/user/service";
+import { UserStorage, UserStorageLive } from "../../../src/core/user/storage";
+import { AppsDirectory, UserDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,

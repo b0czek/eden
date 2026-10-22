@@ -3,21 +3,27 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createDevelopmentAutostart } from "../../../src/autostart/development";
+import { createDevelopmentAutostart } from "../../../src/applications/autostart/development";
 import {
   AutostartConfig,
   AutostartProcesses,
   DevelopmentAutostart,
-} from "../../../src/autostart/ports";
-import { createAutostartProcesses } from "../../../src/autostart/processes";
-import { Autostart, AutostartLive } from "../../../src/autostart/service";
-import { fromPromise } from "../../../src/effects/io";
-import { ExecutionContext } from "../../../src/execution/context";
+} from "../../../src/applications/autostart/ports";
+import { createAutostartProcesses } from "../../../src/applications/autostart/processes";
+import {
+  Autostart,
+  AutostartLive,
+} from "../../../src/applications/autostart/service";
+import { fromPromise } from "../../../src/core/effects/io";
+import { ExecutionContext } from "../../../src/core/execution/context";
+import {
+  SettingsCatalog,
+  SettingsStorage,
+} from "../../../src/core/settings/ports";
+import { Settings, SettingsLive } from "../../../src/core/settings/service";
+import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
+import { Sessions } from "../../../src/desktop/session/service";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import { Sessions } from "../../../src/session/service";
-import { SettingsCatalog, SettingsStorage } from "../../../src/settings/ports";
-import { Settings, SettingsLive } from "../../../src/settings/service";
-import { SqliteSettingsStorageLive } from "../../../src/settings/sqlite-storage";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestExecutionContext } from "../../support/callers";

@@ -6,10 +6,10 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
-import { FilesystemAccessDenied } from "../../../src/filesystem/errors";
-import { createFileTransfers } from "../../../src/filesystem/transfers";
-import type { Operations } from "../../../src/operations/service";
-import { operationTask } from "../../../src/operations/task";
+import type { Operations } from "../../../src/core/operations/service";
+import { operationTask } from "../../../src/core/operations/task";
+import { FilesystemAccessDenied } from "../../../src/platform/filesystem/errors";
+import { createFileTransfers } from "../../../src/platform/filesystem/transfers";
 import { gate } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 

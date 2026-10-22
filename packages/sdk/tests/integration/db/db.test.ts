@@ -4,11 +4,11 @@ import * as path from "node:path";
 import KeyvSqlite from "@keyv/sqlite";
 import * as Effect from "effect/Effect";
 import Keyv from "keyv";
-import { DbStorage } from "../../../src/db/ports";
-import { Db, DbLive } from "../../../src/db/service";
-import { SqliteDbStorageLive } from "../../../src/db/sqlite-storage";
+import { DbStorage } from "../../../src/platform/db/ports";
+import { Db, DbLive } from "../../../src/platform/db/service";
+import { SqliteDbStorageLive } from "../../../src/platform/db/sqlite-storage";
+import { StorageClosedError } from "../../../src/platform/storage/errors";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import { StorageClosedError } from "../../../src/storage/errors";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/create-test-eden";
 import {

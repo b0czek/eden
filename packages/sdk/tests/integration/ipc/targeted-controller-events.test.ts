@@ -1,11 +1,11 @@
-import { defineController } from "../../../src/controllers/controller";
+import { defineController } from "../../../src/core/controllers/controller";
 import {
   type RoutedNotification,
   routedEvent,
   type TargetedNotification,
   targetedEvent,
-} from "../../../src/controllers/events";
-import { createEvent } from "../../../src/events/event";
+} from "../../../src/core/controllers/events";
+import { createEvent } from "../../../src/core/events/event";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/create-test-eden";

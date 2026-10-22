@@ -4,7 +4,7 @@ import type {
   OperationObservation,
   OperationSnapshot,
 } from "@edenapp/types";
-import { log } from "../../logging/logger";
+import { log } from "../../platform/logging/logger";
 import type { ShellTransport } from "./shell-transport";
 
 export type EventSubscriptionCallback = (

@@ -98,7 +98,7 @@ function generateI18nTypeCode(keys: FlattenedKey[]): string {
 export function generateI18nTypes(projectRoot: string): void {
   console.log("\n🌐 Generating i18n types from SDK locale files...");
 
-  const localeFile = path.join(projectRoot, "src/i18n/locales/en.ts");
+  const localeFile = path.join(projectRoot, "src/core/i18n/locales/en.ts");
 
   // Read and parse the locale file
   const localeContent = fs.readFileSync(localeFile, "utf-8");

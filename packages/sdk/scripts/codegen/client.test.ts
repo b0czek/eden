@@ -15,7 +15,7 @@ function extract(commands: string, namespace = "fs", declarations = "") {
   const fixture = project.createSourceFile(
     path.join(
       __dirname,
-      `../../src/controllers/client-${fixtureId++}.fixture.ts`,
+      `../../src/core/controllers/client-${fixtureId++}.fixture.ts`,
     ),
     `
     import * as v from "valibot";

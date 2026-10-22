@@ -2,10 +2,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as Effect from "effect/Effect";
+import { UserStorage, UserStorageLive } from "../../../src/core/user/storage";
+import type { StoredUser } from "../../../src/core/user/types";
+import { openKeyvSqlite } from "../../../src/platform/storage/keyv-sqlite";
 import { AppsDirectory } from "../../../src/runtime/inputs";
-import { openKeyvSqlite } from "../../../src/storage/keyv-sqlite";
-import { UserStorage, UserStorageLive } from "../../../src/user/storage";
-import type { StoredUser } from "../../../src/user/types";
 import {
   buildService,
   createEffectRuntime,

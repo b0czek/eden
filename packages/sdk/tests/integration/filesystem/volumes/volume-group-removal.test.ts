@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { fromPromise } from "../../../../src/effects/io";
+import { fromPromise } from "../../../../src/core/effects/io";
 import { createTestCaller } from "../../../support/callers";
 import {
   createTestEden,

@@ -3,8 +3,8 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 import type { EdenConfig } from "./api/config";
-import { log } from "./logging/logger";
 import { createElectronPlatform } from "./platform/electron/platform";
+import { log } from "./platform/logging/logger";
 import type { ApplicationLifecyclePort } from "./platform/ports/types";
 import { createEdenRuntime, type EdenRuntime } from "./runtime/runtime";
 

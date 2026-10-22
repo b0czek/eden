@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
-import type { Views } from "../../src/views/service";
+import type { Views } from "../../src/desktop/views/service";
 import { APP_ID } from "./support/fixtures";
 import { isProcessAlive, useElectronHost } from "./support/host";
 

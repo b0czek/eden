@@ -6,30 +6,33 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import { createSdkContext } from "../../../src/api/sdk-context";
+import { Processes } from "../../../src/applications/processes/service";
 import {
   ExecutionContext,
   ExecutionContextLive,
-} from "../../../src/execution/context";
-import { Filesystem } from "../../../src/filesystem/service";
-import { Operations, OperationsLive } from "../../../src/operations/service";
-import { Processes } from "../../../src/processes/service";
+} from "../../../src/core/execution/context";
+import {
+  Operations,
+  OperationsLive,
+} from "../../../src/core/operations/service";
+import { createUsersSdkController } from "../../../src/core/user/controller-sdk";
+import {
+  Users,
+  UsersLive,
+  UsersRestrictedApps,
+} from "../../../src/core/user/service";
+import { UserStorage, UserStorageLive } from "../../../src/core/user/storage";
+import {
+  SessionContext,
+  SessionContextLive,
+} from "../../../src/desktop/session/context";
+import { Sessions, SessionsLive } from "../../../src/desktop/session/service";
+import { Filesystem } from "../../../src/platform/filesystem/service";
 import {
   AppsDirectory,
   RuntimeConfig,
   UserDirectory,
 } from "../../../src/runtime/inputs";
-import {
-  SessionContext,
-  SessionContextLive,
-} from "../../../src/session/context";
-import { Sessions, SessionsLive } from "../../../src/session/service";
-import { createUsersSdkController } from "../../../src/user/controller-sdk";
-import {
-  Users,
-  UsersLive,
-  UsersRestrictedApps,
-} from "../../../src/user/service";
-import { UserStorage, UserStorageLive } from "../../../src/user/storage";
 import {
   buildService,
   createEffectRuntime,

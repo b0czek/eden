@@ -5,12 +5,12 @@ const v = require("valibot");
 const { createEdenHost } = require("../../dist/host.js");
 const {
   createElectronPlatform,
-} = require("../../dist/platform/electron/index.js");
+} = require("../../dist/platform/electron/platform.js");
 const { createEdenRuntime } = require("../../dist/runtime/runtime.js");
 const {
   defineController,
   operation,
-} = require("../../dist/controllers/controller.js");
+} = require("../../dist/core/controllers/controller.js");
 
 const platform = createElectronPlatform();
 platform.resources.registerSchemes(["eden-dlc"]);

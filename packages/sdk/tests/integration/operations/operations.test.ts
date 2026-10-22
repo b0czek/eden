@@ -8,14 +8,17 @@ import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 import * as v from "valibot";
 import { createOperationsAPI } from "../../../src/app-runtime/common/operations-api";
-import { command, defineController } from "../../../src/controllers/controller";
-import { operationQuotaLimits } from "../../../src/operations/quota";
-import type { Operations } from "../../../src/operations/service";
+import {
+  command,
+  defineController,
+} from "../../../src/core/controllers/controller";
+import { operationQuotaLimits } from "../../../src/core/operations/quota";
+import type { Operations } from "../../../src/core/operations/service";
 import {
   type OperationReporter,
   type OperationTask,
   operationTask,
-} from "../../../src/operations/task";
+} from "../../../src/core/operations/task";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";

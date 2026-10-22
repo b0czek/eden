@@ -22,11 +22,15 @@ export * from "./api/config";
 export * from "./api/control-plane";
 export * from "./api/settings";
 export { createEden, type Eden } from "./host";
-export type { LogLevel } from "./logging/levels";
-export type { LogContext, Logger, LoggerConfig } from "./logging/logger";
+export type { LogLevel } from "./platform/logging/levels";
+export type {
+  LogContext,
+  Logger,
+  LoggerConfig,
+} from "./platform/logging/logger";
 export {
   configureLogger,
   getLoggerConfig,
   log,
   setLogContext,
-} from "./logging/logger";
+} from "./platform/logging/logger";

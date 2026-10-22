@@ -3,11 +3,17 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { createEvent } from "../../../src/events/event";
-import { ExecutionContext } from "../../../src/execution/context";
-import { FilesystemViews } from "../../../src/filesystem/ports";
-import { Filesystem, FilesystemLive } from "../../../src/filesystem/service";
-import { Volumes, VolumesLive } from "../../../src/filesystem/volumes/service";
+import { createEvent } from "../../../src/core/events/event";
+import { ExecutionContext } from "../../../src/core/execution/context";
+import { FilesystemViews } from "../../../src/platform/filesystem/ports";
+import {
+  Filesystem,
+  FilesystemLive,
+} from "../../../src/platform/filesystem/service";
+import {
+  Volumes,
+  VolumesLive,
+} from "../../../src/platform/filesystem/volumes/service";
 import { UserDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,

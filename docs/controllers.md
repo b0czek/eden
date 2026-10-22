@@ -24,6 +24,14 @@ Keep small domains small. Extract a file when it owns a separate responsibility.
 Import internal capabilities directly from their owning modules.
 `packages/sdk/src/index.ts` is the package export boundary.
 
+Under `packages/sdk/src`, `platform/` contains host adapters, filesystems,
+persistence, and logging. `core/` contains shared service primitives,
+authorization, commands, operations, settings, and localization.
+`applications/` contains package management, processes, daemons, app channels,
+and associations. `desktop/` contains views, sessions, and desktop interactions.
+Keep each domain's controllers, ports, service, and unit tests together.
+`runtime/` composes these domains, while `api/` exposes the trusted host API.
+
 ## Define a service
 
 Declare the interface first, the same-named key second, and the implementation third.
@@ -72,8 +80,8 @@ Layer acquisition can require dependencies and a scope.
 Register cleanup beside resource acquisition with `Effect.acquireRelease` or scoped helpers.
 Use explicit `Duration` values for waits and expiry.
 Services compose work; the owning runtime executes it.
-See [i18n](../packages/sdk/src/i18n/service.ts) and
-[appearance](../packages/sdk/src/appearance/service.ts) for production examples.
+See [i18n](../packages/sdk/src/core/i18n/service.ts) and
+[appearance](../packages/sdk/src/desktop/appearance/service.ts) for production examples.
 
 ## Adapt dependencies and failures
 
@@ -93,9 +101,9 @@ Adapt native Promise producers with the SDK's `fromPromise(evaluate, onError)` h
 when interruption and native cleanup must settle together.
 Translate an error where its meaning changes.
 
-For main-process filesystem work, use the [native I/O facade](../packages/sdk/src/filesystem/native-io.ts).
+For main-process filesystem work, use the [native I/O facade](../packages/sdk/src/platform/filesystem/native-io.ts).
 Use `io.writeFileAtomic` for complete-file replacement; the caller owns serialization and parent creation.
-Synchronous pre-runtime hooks use the [sync adapter](../packages/sdk/src/filesystem/native-sync.ts).
+Synchronous pre-runtime hooks use the [sync adapter](../packages/sdk/src/platform/filesystem/native-sync.ts).
 Preloads must remain free of runtime Effect dependencies.
 
 ## Add commands
@@ -151,7 +159,7 @@ power: operation({
 }),
 ```
 
-This fragment follows the [power controller](../packages/sdk/src/power/controller-edenapi.ts).
+This fragment follows the [power controller](../packages/sdk/src/desktop/power/controller-edenapi.ts).
 Preparation validates and admits work synchronously before acceptance.
 It returns a function that receives a reporter and produces a fully provided Effect.
 For resource admission, a handler can return an `OperationTask` synchronously instead.
@@ -176,8 +184,8 @@ Use the shared `effect`, `operation`, and `subscribe` boundaries for their respe
 Caller authority belongs to the executing Effect fiber.
 Use `ExecutionContext.provide` to bind work before execution or forking.
 Keep host authority independent of an app caller active in surrounding code.
-See [appearance](../packages/sdk/src/appearance/controller-sdk.ts) and
-[sessions](../packages/sdk/src/session/controller-sdk.ts) for examples.
+See [appearance](../packages/sdk/src/desktop/appearance/controller-sdk.ts) and
+[sessions](../packages/sdk/src/desktop/session/controller-sdk.ts) for examples.
 
 ## Events
 

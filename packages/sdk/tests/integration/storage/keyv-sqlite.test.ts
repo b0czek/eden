@@ -10,8 +10,8 @@ import {
   StorageReadError,
   StorageRemoveError,
   StorageWriteError,
-} from "../../../src/storage/errors";
-import { openKeyvSqlite } from "../../../src/storage/keyv-sqlite";
+} from "../../../src/platform/storage/errors";
+import { openKeyvSqlite } from "../../../src/platform/storage/keyv-sqlite";
 import { createEffectRuntime } from "../../support/effect-runtime";
 
 it("reports an unusable native connection during acquisition, retaining its cause", async () => {

@@ -1,4 +1,4 @@
-import type { Processes } from "../../../src/processes/service";
+import type { Processes } from "../../../src/applications/processes/service";
 import { testApp } from "../../support/apps";
 import { tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";

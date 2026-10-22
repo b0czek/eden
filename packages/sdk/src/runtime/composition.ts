@@ -5,72 +5,105 @@ import * as Layer from "effect/Layer";
 import {
   AppAssociationsPortsLive,
   registerAppAssociationsApi,
-} from "../app-associations/runtime";
-import { AppAssociationsLive } from "../app-associations/service";
+} from "../applications/app-associations/runtime";
+import { AppAssociationsLive } from "../applications/app-associations/service";
 import {
   AppChannelTransportLive,
   registerAppChannelsApi,
-} from "../appbus/runtime";
-import { AppChannelsLive } from "../appbus/service";
-import {
-  AppearanceSettingsLive,
-  registerAppearanceApi,
-} from "../appearance/runtime";
-import { AppearanceLive } from "../appearance/service";
-import { AutostartPortsLive } from "../autostart/runtime";
-import { AutostartLive } from "../autostart/service";
-import { BrandingPortsLive, registerBrandingApi } from "../branding/runtime";
-import { BrandingLive } from "../branding/service";
-import {
-  ContextMenuPortsLive,
-  registerContextMenuApi,
-} from "../context-menu/runtime";
-import { ContextMenuLive } from "../context-menu/service";
-import { registerDaemonsApi } from "../daemon/runtime";
-import { DaemonsLive } from "../daemon/service";
-import { registerDbApi } from "../db/runtime";
-import { DbLive } from "../db/service";
-import { SqliteDbStorageLive } from "../db/sqlite-storage";
-import { ExecutionContextLive } from "../execution/context";
-import { RuntimeContextsLive } from "../execution/runtime-contexts";
-import { FileOpenPortsLive, registerFileOpenApi } from "../file-open/runtime";
-import { FileOpenLive } from "../file-open/service";
-import {
-  FilePickerPortsLive,
-  registerFilePickerApi,
-} from "../file-picker/runtime";
-import { FilePickerLive } from "../file-picker/service";
-import {
-  FilesystemPortsLive,
-  registerFilesystemApi,
-} from "../filesystem/runtime";
-import { FilesystemLive } from "../filesystem/service";
-import { registerVolumesApi } from "../filesystem/volumes/runtime";
-import { VolumesLive } from "../filesystem/volumes/service";
-import { I18nSettingsLive, registerI18nApi } from "../i18n/runtime";
-import { I18nLive } from "../i18n/service";
-import { CommandsLive } from "../ipc/commands";
-import { PermissionsLive } from "../ipc/permissions";
-import { IpcTransportLive } from "../ipc/transport";
-import { KeyboardPortsLive } from "../keyboard/runtime";
-import { KeyboardLive } from "../keyboard/service";
-import { log } from "../logging/logger";
-import {
-  NotificationsPortsLive,
-  registerNotificationsApi,
-} from "../notification/runtime";
-import { NotificationsLive } from "../notification/service";
-import { registerOperationsApi } from "../operations/runtime";
-import { OperationsLive } from "../operations/service";
-import { PackageCatalogLive } from "../packages/catalog";
-import { DlcResourcesLive } from "../packages/dlc-resources";
-import { InstalledPackagesLive } from "../packages/installed";
+} from "../applications/appbus/runtime";
+import { AppChannelsLive } from "../applications/appbus/service";
+import { AutostartPortsLive } from "../applications/autostart/runtime";
+import { AutostartLive } from "../applications/autostart/service";
+import { registerDaemonsApi } from "../applications/daemon/runtime";
+import { DaemonsLive } from "../applications/daemon/service";
+import { PackageCatalogLive } from "../applications/packages/catalog";
+import { DlcResourcesLive } from "../applications/packages/dlc-resources";
+import { InstalledPackagesLive } from "../applications/packages/installed";
 import {
   DlcResourcesPortsLive,
   registerPackagesApi,
-} from "../packages/runtime";
-import { PackagesLive } from "../packages/service";
-import { PackageTransactionsLive } from "../packages/transactions";
+} from "../applications/packages/runtime";
+import { PackagesLive } from "../applications/packages/service";
+import { PackageTransactionsLive } from "../applications/packages/transactions";
+import { BackendsLive } from "../applications/processes/backends";
+import {
+  ProcessesRoutingLive,
+  registerProcessesApi,
+} from "../applications/processes/runtime";
+import { ProcessesLive } from "../applications/processes/service";
+import { ExecutionContextLive } from "../core/execution/context";
+import { RuntimeContextsLive } from "../core/execution/runtime-contexts";
+import { I18nSettingsLive, registerI18nApi } from "../core/i18n/runtime";
+import { I18nLive } from "../core/i18n/service";
+import { CommandsLive } from "../core/ipc/commands";
+import { PermissionsLive } from "../core/ipc/permissions";
+import { IpcTransportLive } from "../core/ipc/transport";
+import { registerOperationsApi } from "../core/operations/runtime";
+import { OperationsLive } from "../core/operations/service";
+import { PanelRegistry } from "../core/settings/panels/registry";
+import { registerSettingsPanelsApi } from "../core/settings/panels/runtime";
+import { SettingsPanelsLive } from "../core/settings/panels/service";
+import {
+  registerSettingsApi,
+  SettingsCatalogLive,
+} from "../core/settings/runtime";
+import { SettingsLive } from "../core/settings/service";
+import { SqliteSettingsStorageLive } from "../core/settings/sqlite-storage";
+import { GrantCatalogLive } from "../core/user/grant-catalog";
+import { registerUsersApi, UsersPortsLive } from "../core/user/runtime";
+import { UsersLive } from "../core/user/service";
+import { UserStorageLive } from "../core/user/storage";
+import {
+  AppearanceSettingsLive,
+  registerAppearanceApi,
+} from "../desktop/appearance/runtime";
+import { AppearanceLive } from "../desktop/appearance/service";
+import {
+  BrandingPortsLive,
+  registerBrandingApi,
+} from "../desktop/branding/runtime";
+import { BrandingLive } from "../desktop/branding/service";
+import {
+  ContextMenuPortsLive,
+  registerContextMenuApi,
+} from "../desktop/context-menu/runtime";
+import { ContextMenuLive } from "../desktop/context-menu/service";
+import {
+  FileOpenPortsLive,
+  registerFileOpenApi,
+} from "../desktop/file-open/runtime";
+import { FileOpenLive } from "../desktop/file-open/service";
+import {
+  FilePickerPortsLive,
+  registerFilePickerApi,
+} from "../desktop/file-picker/runtime";
+import { FilePickerLive } from "../desktop/file-picker/service";
+import { KeyboardPortsLive } from "../desktop/keyboard/runtime";
+import { KeyboardLive } from "../desktop/keyboard/service";
+import {
+  NotificationsPortsLive,
+  registerNotificationsApi,
+} from "../desktop/notification/runtime";
+import { NotificationsLive } from "../desktop/notification/service";
+import { PowerHostLive, registerPowerApi } from "../desktop/power/runtime";
+import { PowerLive } from "../desktop/power/service";
+import { SessionContextLive } from "../desktop/session/context";
+import { registerSessionsApi } from "../desktop/session/runtime";
+import { SessionsLive } from "../desktop/session/service";
+import { registerSystemApi } from "../desktop/system/runtime";
+import { registerViewsApi } from "../desktop/views/runtime";
+import { ViewsLive } from "../desktop/views/service";
+import { registerDbApi } from "../platform/db/runtime";
+import { DbLive } from "../platform/db/service";
+import { SqliteDbStorageLive } from "../platform/db/sqlite-storage";
+import {
+  FilesystemPortsLive,
+  registerFilesystemApi,
+} from "../platform/filesystem/runtime";
+import { FilesystemLive } from "../platform/filesystem/service";
+import { registerVolumesApi } from "../platform/filesystem/volumes/runtime";
+import { VolumesLive } from "../platform/filesystem/volumes/service";
+import { log } from "../platform/logging/logger";
 import {
   DisplayPort,
   ProcessMetricsPort,
@@ -78,31 +111,7 @@ import {
   UtilityProcessPort,
   WindowingPort,
 } from "../platform/ports/types";
-import { PowerHostLive, registerPowerApi } from "../power/runtime";
-import { PowerLive } from "../power/service";
-import { BackendsLive } from "../processes/backends";
-import {
-  ProcessesRoutingLive,
-  registerProcessesApi,
-} from "../processes/runtime";
-import { ProcessesLive } from "../processes/service";
-import { seedDatabase } from "../seed/seed";
-import { SessionContextLive } from "../session/context";
-import { registerSessionsApi } from "../session/runtime";
-import { SessionsLive } from "../session/service";
-import { PanelRegistry } from "../settings/panels/registry";
-import { registerSettingsPanelsApi } from "../settings/panels/runtime";
-import { SettingsPanelsLive } from "../settings/panels/service";
-import { registerSettingsApi, SettingsCatalogLive } from "../settings/runtime";
-import { SettingsLive } from "../settings/service";
-import { SqliteSettingsStorageLive } from "../settings/sqlite-storage";
-import { registerSystemApi } from "../system/runtime";
-import { GrantCatalogLive } from "../user/grant-catalog";
-import { registerUsersApi, UsersPortsLive } from "../user/runtime";
-import { UsersLive } from "../user/service";
-import { UserStorageLive } from "../user/storage";
-import { registerViewsApi } from "../views/runtime";
-import { ViewsLive } from "../views/service";
+import { seedDatabase } from "../platform/seed/seed";
 import { assembleDesktop, Desktop } from "./desktop";
 import { RuntimeEnvironment } from "./environment";
 import {
@@ -112,8 +121,53 @@ import {
   UserDirectory,
 } from "./inputs";
 
-/** Wire implementations once; domain Layers declare only their requirements. */
-const ServicesLive = Layer.mergeAll(
+/** Host capabilities, execution contexts, and persistent stores. */
+const PlatformPersistenceLive = Layer.mergeAll(
+  ExecutionContextLive,
+  SessionContextLive,
+  PermissionsLive,
+  InstalledPackagesLive,
+  PackageTransactionsLive,
+  BrandingLive.pipe(Layer.provide(BrandingPortsLive)),
+  VolumesLive,
+  UsersLive.pipe(Layer.provide([UsersPortsLive, UserStorageLive])),
+  DbLive.pipe(Layer.provide(SqliteDbStorageLive)),
+);
+
+/** Catalogs and settings support the shared view and preference services. */
+const CoreServicesLive = Layer.mergeAll(
+  ViewsLive,
+  SettingsPanelsLive,
+  I18nLive.pipe(Layer.provide(I18nSettingsLive)),
+  AppAssociationsLive.pipe(Layer.provide(AppAssociationsPortsLive)),
+  AppearanceLive.pipe(Layer.provide(AppearanceSettingsLive)),
+).pipe(
+  Layer.provideMerge(
+    SettingsLive.pipe(
+      Layer.provide([SettingsCatalogLive, SqliteSettingsStorageLive]),
+    ),
+  ),
+  Layer.provideMerge([RuntimeContextsLive, PackageCatalogLive]),
+);
+
+/** Files and domain adapters support operations, backends, and app commands. */
+const ApplicationServicesLive = Layer.mergeAll(
+  CommandsLive,
+  PackagesLive,
+  AppChannelsLive.pipe(Layer.provide(AppChannelTransportLive)),
+).pipe(
+  Layer.provideMerge([OperationsLive, BackendsLive]),
+  Layer.provideMerge([
+    FilesystemLive.pipe(Layer.provide(FilesystemPortsLive)),
+    DlcResourcesLive.pipe(Layer.provide(DlcResourcesPortsLive)),
+    NotificationsLive.pipe(Layer.provide(NotificationsPortsLive)),
+    ContextMenuLive.pipe(Layer.provide(ContextMenuPortsLive)),
+    GrantCatalogLive,
+  ]),
+);
+
+/** IPC and processes support sessions and desktop interactions. */
+const DesktopIntegrationLive = Layer.mergeAll(
   AutostartLive.pipe(Layer.provide(AutostartPortsLive)),
   PowerLive.pipe(Layer.provide(PowerHostLive)),
   FilePickerLive.pipe(Layer.provide(FilePickerPortsLive)),
@@ -126,43 +180,13 @@ const ServicesLive = Layer.mergeAll(
   ]),
   Layer.provideMerge(ProcessesLive.pipe(Layer.provide(ProcessesRoutingLive))),
   Layer.provideMerge(IpcTransportLive),
-  Layer.provideMerge([
-    CommandsLive,
-    PackagesLive,
-    AppChannelsLive.pipe(Layer.provide(AppChannelTransportLive)),
-  ]),
-  Layer.provideMerge([OperationsLive, BackendsLive]),
-  Layer.provideMerge([
-    FilesystemLive.pipe(Layer.provide(FilesystemPortsLive)),
-    DlcResourcesLive.pipe(Layer.provide(DlcResourcesPortsLive)),
-    NotificationsLive.pipe(Layer.provide(NotificationsPortsLive)),
-    ContextMenuLive.pipe(Layer.provide(ContextMenuPortsLive)),
-    GrantCatalogLive,
-  ]),
-  Layer.provideMerge([
-    ViewsLive,
-    SettingsPanelsLive,
-    I18nLive.pipe(Layer.provide(I18nSettingsLive)),
-    AppAssociationsLive.pipe(Layer.provide(AppAssociationsPortsLive)),
-    AppearanceLive.pipe(Layer.provide(AppearanceSettingsLive)),
-  ]),
-  Layer.provideMerge(
-    SettingsLive.pipe(
-      Layer.provide([SettingsCatalogLive, SqliteSettingsStorageLive]),
-    ),
-  ),
-  Layer.provideMerge([RuntimeContextsLive, PackageCatalogLive]),
-  Layer.provideMerge([
-    ExecutionContextLive,
-    SessionContextLive,
-    PermissionsLive,
-    InstalledPackagesLive,
-    PackageTransactionsLive,
-    BrandingLive.pipe(Layer.provide(BrandingPortsLive)),
-    VolumesLive,
-    UsersLive.pipe(Layer.provide([UsersPortsLive, UserStorageLive])),
-    DbLive.pipe(Layer.provide(SqliteDbStorageLive)),
-  ]),
+);
+
+/** Provide each group's dependencies and retain all services for API assembly. */
+const ServicesLive = DesktopIntegrationLive.pipe(
+  Layer.provideMerge(ApplicationServicesLive),
+  Layer.provideMerge(CoreServicesLive),
+  Layer.provideMerge(PlatformPersistenceLive),
 );
 
 /** API registration follows complete service acquisition and precedes startup. */

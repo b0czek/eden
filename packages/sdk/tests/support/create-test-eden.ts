@@ -4,13 +4,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { OperationHandle, OperationSubmission } from "@edenapp/types";
 import type { EdenConfig } from "../../src/api/config";
-import type { CommandCallerContext } from "../../src/execution/context";
+import type { CommandCallerContext } from "../../src/core/execution/context";
+import type { ViewInfo } from "../../src/desktop/views/types";
 import {
   createEdenRuntime,
   type EdenRuntime,
   type EdenRuntimePaths,
 } from "../../src/runtime/runtime";
-import type { ViewInfo } from "../../src/views/types";
 import {
   InMemoryPlatform,
   type InMemoryPlatformOptions,

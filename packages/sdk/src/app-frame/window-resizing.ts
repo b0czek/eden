@@ -1,5 +1,5 @@
 import * as eden from "@edenapp/client";
-import { log } from "../logging/logger";
+import { log } from "../platform/logging/logger";
 /**
  * Window Resizing
  *
@@ -9,7 +9,7 @@ import { log } from "../logging/logger";
 import {
   calculateResizeBounds,
   type ResizeDirection,
-} from "../views/resize-geometry.js";
+} from "../desktop/views/resize-geometry.js";
 import {
   getEdenFrameInternal,
   getScreenCoords,

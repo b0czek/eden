@@ -4,7 +4,7 @@ Generated from `packages/sdk/edencss/` and non-example apps under `packages/sdk/
 
 ## Bundle And Injection
 
-- `packages/sdk/src/views/rendering.ts` defaults `window.injections.css` to `full` when omitted.
+- `packages/sdk/src/desktop/views/rendering.ts` defaults `window.injections.css` to `full` when omitted.
 - `full` injection loads the built `eden.css` bundle; `tokens` loads the built `eden-tokens.css` bundle.
 - `packages/sdk/edencss/eden.css` is the authoritative full bundle source in this repo.
 

@@ -43,7 +43,7 @@ async function main() {
       {
         controllerPath: path.resolve(
           __dirname,
-          "../dist/controllers/controller.js",
+          "../dist/core/controllers/controller.js",
         ),
         asynchronous,
       },

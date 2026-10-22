@@ -51,7 +51,7 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     skipAddingFilesFromTsConfig: true,
   });
   const fixture = project.createSourceFile(
-    path.join(__dirname, "../../src/controllers/contract.fixture.ts"),
+    path.join(__dirname, "../../src/core/controllers/contract.fixture.ts"),
     `
     import * as v from "valibot";
     import * as Effect from "effect/Effect";
@@ -130,11 +130,11 @@ it("extracts schema inputs, inferred results, operations, and event payloads fro
     { namespace: "example", eventName: "notice" },
   ]);
   project.createSourceFile(
-    path.join(__dirname, "../../src/controllers/events.fixture.ts"),
+    path.join(__dirname, "../../src/core/controllers/events.fixture.ts"),
     generateEventsCode(groupEventsByNamespace(contracts.events), new Set()),
   );
   project.createSourceFile(
-    path.join(__dirname, "../../src/controllers/consumer.fixture.ts"),
+    path.join(__dirname, "../../src/core/controllers/consumer.fixture.ts"),
     `
     import type { ExampleEvents } from "./events.fixture";
     const change: ExampleEvents["example/changed"] = { value: 2 };
@@ -160,7 +160,7 @@ it("generates public success values without Effect failures or service requireme
     tsConfigFilePath: path.join(__dirname, "../../tsconfig.json"),
     skipAddingFilesFromTsConfig: true,
   });
-  const directory = path.join(__dirname, "../../src/controllers");
+  const directory = path.join(__dirname, "../../src/core/controllers");
   const fixture = project.createSourceFile(
     path.join(directory, "effect-contract.fixture.ts"),
     `
