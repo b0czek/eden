@@ -6,7 +6,7 @@ import { bundle } from "@edenapp/genesis";
 import * as packageBundler from "@edenapp/genesis/dist/bundler";
 import type { OperationHandle, UserProfile } from "@edenapp/types";
 import { testApp } from "../../support/apps";
-import { gate } from "../../support/async";
+import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -117,6 +117,93 @@ describe("Processes integration", () => {
       eden.runtime.services.processes.getAppInstance(target.id),
     ).toBeUndefined();
   });
+
+  it.each(["alice", "bob"])(
+    "checks %s's queued renderer stop against the owner after daemon startup",
+    async (username) => {
+      eden = await createTestEden();
+      const appId = "com.example.starting-daemon";
+      const controllerId = "com.example.controller";
+      const { processes, operations, sessionContext } = eden.runtime.services;
+      eden.runtime.services.installedPackages.register(
+        testApp(appId, {
+          frontend: undefined,
+          backend: { entry: "backend.js" },
+        }),
+      );
+      eden.runtime.services.installedPackages.register(
+        testApp(controllerId, {
+          permissions: ["process/manage"],
+          window: {
+            mode: "floating",
+            injections: { css: "none", appFrame: "none" },
+          },
+        }),
+      );
+      eden.runtime.services.permissions.registerApp(controllerId, [
+        "process/manage",
+      ]);
+      const profiles = await Promise.all(
+        ["alice", "bob"].map((name) =>
+          eden.runtime.effects.run(
+            eden.runtime.users.create({
+              username: name,
+              name,
+              password: "password",
+              grants: [`apps/launch/${controllerId}`],
+            }),
+          ),
+        ),
+      );
+      const alice = profiles[0];
+      if (!alice) throw new Error("Missing daemon owner");
+      await eden.runtime.effects.run(
+        eden.runtime.sessions.login(username, "password"),
+      );
+      await eden.complete("process/launch", { appId: controllerId });
+      const launching = eden.runtime.effects.run(
+        processes.launchDaemon(
+          appId,
+          { kind: "user", username: "alice" },
+          alice,
+        ),
+      );
+      await tick();
+      const backend = eden.getBackendProcess(appId);
+      let handle: OperationHandle;
+      try {
+        expect(processes.getAppInstance(appId)).toBeUndefined();
+        handle = await eden.executeFromView<OperationHandle>(
+          eden.getAppView(controllerId).view.webContents.id,
+          "process/stop",
+          { appId },
+        );
+        await tick();
+        expect(operations.inspect(handle)?.status).toBe("running");
+      } finally {
+        backend.emit("message", { type: "backend-ready" });
+        await launching;
+      }
+      const stopping = eden.runtime.effects.run(
+        operations.wait(handle, {
+          appId: controllerId,
+          sessionId: sessionContext.getSessionId(),
+        }),
+      );
+      if (username === "alice") {
+        await expect(stopping).resolves.toEqual({ success: true });
+        expect(processes.getAppInstance(appId)).toBeUndefined();
+      } else {
+        await expect(stopping).rejects.toThrow(
+          `User cannot stop process ${appId}`,
+        );
+        expect(processes.getAppInstance(appId)?.principal).toEqual({
+          kind: "user",
+          username: "alice",
+        });
+      }
+    },
+  );
 
   it("rejects launches while the package processes marks a host as changing", async () => {
     eden = await createTestEden();

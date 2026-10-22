@@ -47,8 +47,8 @@ export function createEdenHost({
   function dispose(): Promise<void> {
     // @eden-effect-next-line domain-interpreter -- Native application shutdown awaits the owned host scope and runtime disposal.
     disposal ??= Effect.runPromise(
-      Scope.close(scope, Exit.void).pipe(
-        Effect.ensuring(Effect.promise(() => runtime.dispose())),
+      Effect.promise(() => runtime.dispose()).pipe(
+        Effect.ensuring(Scope.close(scope, Exit.void)),
       ),
     );
     return disposal;
@@ -66,7 +66,9 @@ export function createEdenHost({
             Effect.sync(() => application.on(event, listener)),
             (stop) => Effect.sync(stop),
           );
-        yield* on("window-all-closed", () => application.quit());
+        yield* on("window-all-closed", () => {
+          if (!disposal) application.quit();
+        });
         yield* on("activate", () => runtime.activate());
         yield* on("quit-requested", () => {
           void dispose()

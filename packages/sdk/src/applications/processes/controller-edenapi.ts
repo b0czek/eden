@@ -5,30 +5,12 @@ import {
   defineController,
   operation,
 } from "../../core/controllers/controller";
-import type { ExecutionContext } from "../../core/execution/context";
 import { viewBoundsSchema } from "../../desktop/views/schemas";
 import type { Processes } from "./service";
 
 const appIdSchema = v.object({ appId: v.pipe(v.string(), v.nonEmpty()) });
 
-export function createProcessController(
-  processes: Processes,
-  execution: ExecutionContext,
-) {
-  function assertCanStop(appId: string) {
-    const target = processes.getAppInstance(appId);
-    if (!target) return;
-    const principal = execution.getPrincipal();
-    if (principal?.kind === "system") return;
-    if (
-      principal?.kind === "user" &&
-      (principal.profile.role === "vendor" ||
-        (target.principal.kind === "user" &&
-          target.principal.username === principal.profile.username))
-    )
-      return;
-    throw new Error(`User cannot stop process ${appId}`);
-  }
+export function createProcessController(processes: Processes) {
   return defineController("process", {
     commands: {
       launch: operation({
@@ -49,15 +31,14 @@ export function createProcessController(
       stop: operation({
         permission: "manage",
         input: appIdSchema,
-        prepare: ({ appId }) => {
-          assertCanStop(appId);
-          return (reporter) =>
+        prepare:
+          ({ appId }, caller) =>
+          (reporter) =>
             Effect.gen(function* () {
               reporter.update("stopping");
-              yield* processes.stopApp(appId);
+              yield* processes.stopApp(appId, caller);
               return { success: true };
-            });
-        },
+            }),
       }),
       exit: operation({
         prepare: (_, caller) => {

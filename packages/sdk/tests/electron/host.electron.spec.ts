@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Views } from "../../src/desktop/views/service";
+import type { EdenRuntime } from "../../src/runtime/runtime";
 import { APP_ID } from "./support/fixtures";
 import { isProcessAlive, useElectronHost } from "./support/host";
 
@@ -186,18 +187,115 @@ test.describe
         });
     });
 
-    test("shuts down without orphaning Electron or utility processes", async () => {
+    test("drains accepted writes through repeated quit requests without orphaning processes", async () => {
       const host = getHost();
 
       const app = host.electronApp;
       expect(app).toBeDefined();
       if (!app) return;
 
-      await app.close();
+      const handle = await app.evaluate(() => {
+        const integration = (
+          globalThis as typeof globalThis & {
+            __edenIntegration: {
+              Effect: typeof import("effect/Effect");
+              runtime: EdenRuntime;
+              releaseQuitOperation?: () => void;
+            };
+          }
+        ).__edenIntegration;
+        const { Effect, runtime } = integration;
+        const released = new Promise<void>((resolve) => {
+          integration.releaseQuitOperation = resolve;
+        });
+        return runtime.services.operations.submit(
+          "integration/quit-write",
+          {},
+          { principal: { kind: "system" } },
+          () => ({
+            run: () =>
+              Effect.andThen(
+                Effect.promise(() => released),
+                runtime.services.filesystem.writeFile(
+                  { volume: "home", path: "/quit-completed.txt" },
+                  "finished",
+                ),
+              ),
+          }),
+        );
+      });
+      const inspect = () =>
+        app.evaluate(({ app }, handle) => {
+          const { runtime } = (
+            globalThis as typeof globalThis & {
+              __edenIntegration: { runtime: EdenRuntime };
+            }
+          ).__edenIntegration;
+          return {
+            state: runtime.state,
+            status: runtime.services.operations.inspect(handle)?.status,
+            quitGuards: app.listenerCount("before-quit"),
+          };
+        }, handle);
+      const closed = app.waitForEvent("close");
+      try {
+        await expect.poll(inspect).toMatchObject({ status: "running" });
+        await app.evaluate(({ app }) => app.quit());
+        await expect.poll(inspect).toEqual({
+          state: "stopping",
+          status: "running",
+          quitGuards: 1,
+        });
+        await app.evaluate(({ app }) => app.quit());
+        expect(await inspect()).toEqual({
+          state: "stopping",
+          status: "running",
+          quitGuards: 1,
+        });
+      } finally {
+        await app
+          .evaluate(() => {
+            (
+              globalThis as typeof globalThis & {
+                __edenIntegration: { releaseQuitOperation?: () => void };
+              }
+            ).__edenIntegration.releaseQuitOperation?.();
+          })
+          .catch(() => undefined);
+      }
+      await closed;
       host.electronApp = undefined;
 
+      expect(
+        await fs.readFile(
+          path.join(host.userDirectory, "quit-completed.txt"),
+          "utf-8",
+        ),
+      ).toBe("finished");
       expect(isProcessAlive(host.mainPid)).toBe(false);
       for (const pid of host.utilityPids)
         expect(isProcessAlive(pid)).toBe(false);
     });
   });
+
+test.describe("explicit host disposal", () => {
+  const getHost = useElectronHost();
+
+  test("stops Eden without quitting the embedding application", async () => {
+    const app = getHost().electronApp;
+    if (!app) throw new Error("Electron app is not running");
+    const state = await app.evaluate(async () => {
+      const { eden } = (
+        globalThis as typeof globalThis & {
+          __edenIntegration: {
+            eden: { dispose(): Promise<void>; state: string };
+          };
+        }
+      ).__edenIntegration;
+      await eden.dispose();
+      return eden.state;
+    });
+    expect(state).toBe("stopped");
+    expect(await app.evaluate(({ app }) => app.isReady())).toBe(true);
+  });
+});

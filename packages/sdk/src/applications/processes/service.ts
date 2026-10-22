@@ -21,7 +21,10 @@ import {
 } from "../../core/effects/failure-policy";
 import type { Event } from "../../core/events/event";
 import { listen, scopedEvent } from "../../core/events/scoped";
-import { ExecutionContext } from "../../core/execution/context";
+import {
+  type CommandCallerContext,
+  ExecutionContext,
+} from "../../core/execution/context";
 import { RuntimeContexts } from "../../core/execution/runtime-contexts";
 import { SessionContext } from "../../desktop/session/context";
 import { Views } from "../../desktop/views/service";
@@ -42,6 +45,7 @@ import {
   type ProcessMetricsError,
   ProcessNotRunning,
   type ProcessStopError,
+  ProcessStopRejected,
   SessionProcessesStopFailed,
 } from "./errors";
 import { watchHotReload } from "./hot-reload";
@@ -72,7 +76,11 @@ export interface Processes {
   ensureAppRunning: (
     appId: string,
   ) => Effect.Effect<AppInstance, ProcessLaunchError>;
-  stopApp: (appId: string) => Effect.Effect<void, ProcessStopError>;
+  /** Check caller ownership under the app lock; omit caller for trusted lifecycle cleanup. */
+  stopApp: (
+    appId: string,
+    caller?: CommandCallerContext,
+  ) => Effect.Effect<void, ProcessStopError>;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   getAppInstance: (appId: string) => AppInstance | undefined;
   getInstalledManifest: (appId: string) => RuntimeAppManifest | undefined;
@@ -447,6 +455,7 @@ export const ProcessesLive = Layer.effect(
 
     const stopInstance = Effect.fn(function* (
       appId: string,
+      caller?: CommandCallerContext,
     ): Effect.fn.Return<void, ProcessStopError> {
       const record = instances.get(appId);
       if (!record)
@@ -454,6 +463,24 @@ export const ProcessesLive = Layer.effect(
           new ProcessNotRunning({
             appId,
             message: `App ${appId} is not running`,
+          }),
+        );
+      const principal = caller?.principal;
+      const target = record.runtime.principal;
+      if (
+        caller &&
+        principal?.kind !== "system" &&
+        !(
+          principal?.kind === "user" &&
+          (principal.profile.role === "vendor" ||
+            (target.kind === "user" &&
+              target.username === principal.profile.username))
+        )
+      )
+        return yield* Effect.fail(
+          new ProcessStopRejected({
+            appId,
+            message: `User cannot stop process ${appId}`,
           }),
         );
       yield* closeInstance(record).pipe(
@@ -465,7 +492,8 @@ export const ProcessesLive = Layer.effect(
       );
     });
 
-    const stopApp = (appId: string) => withApp(appId, stopInstance(appId));
+    const stopApp = (appId: string, caller?: CommandCallerContext) =>
+      withApp(appId, stopInstance(appId, caller));
 
     function getRunningApps(showHidden: boolean = false): AppInstance[] {
       const apps = Array.from(instances.values()).flatMap(({ instance }) =>

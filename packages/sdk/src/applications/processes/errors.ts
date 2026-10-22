@@ -22,6 +22,13 @@ export class ProcessNotRunning extends Data.TaggedError("ProcessNotRunning")<{
   message: string;
 }> {}
 
+export class ProcessStopRejected extends Data.TaggedError(
+  "ProcessStopRejected",
+)<{
+  appId: string;
+  message: string;
+}> {}
+
 export class BackendRejected extends Data.TaggedError("BackendRejected")<{
   appId: string;
   reason: "already-running" | "missing-entry";
@@ -91,4 +98,7 @@ export class SessionProcessesStopFailed extends Data.TaggedError(
   message: string;
 }> {}
 
-export type ProcessStopError = ProcessNotRunning | ProcessStopFailed;
+export type ProcessStopError =
+  | ProcessNotRunning
+  | ProcessStopRejected
+  | ProcessStopFailed;
