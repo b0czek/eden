@@ -38,7 +38,10 @@ import { I18nLive } from "../core/i18n/service";
 import { CommandsLive } from "../core/ipc/commands";
 import { PermissionsLive } from "../core/ipc/permissions";
 import { IpcTransportLive } from "../core/ipc/transport";
-import { registerOperationsApi } from "../core/operations/runtime";
+import {
+  OperationTransitionPreparationLive,
+  registerOperationsApi,
+} from "../core/operations/runtime";
 import { OperationsLive } from "../core/operations/service";
 import { PanelRegistry } from "../core/settings/panels/registry";
 import { registerSettingsPanelsApi } from "../core/settings/panels/runtime";
@@ -156,7 +159,10 @@ const ApplicationServicesLive = Layer.mergeAll(
   PackagesLive,
   AppChannelsLive.pipe(Layer.provide(AppChannelTransportLive)),
 ).pipe(
-  Layer.provideMerge([OperationsLive, BackendsLive]),
+  Layer.provideMerge([
+    OperationsLive.pipe(Layer.provide(OperationTransitionPreparationLive)),
+    BackendsLive,
+  ]),
   Layer.provideMerge([
     FilesystemLive.pipe(Layer.provide(FilesystemPortsLive)),
     DlcResourcesLive.pipe(Layer.provide(DlcResourcesPortsLive)),

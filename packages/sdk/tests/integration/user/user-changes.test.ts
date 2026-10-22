@@ -11,6 +11,7 @@ import {
   ExecutionContext,
   ExecutionContextLive,
 } from "../../../src/core/execution/context";
+import { OperationTransitionPreparation } from "../../../src/core/operations/ports";
 import {
   Operations,
   OperationsLive,
@@ -27,7 +28,6 @@ import {
   SessionContextLive,
 } from "../../../src/desktop/session/context";
 import { Sessions, SessionsLive } from "../../../src/desktop/session/service";
-import { Filesystem } from "../../../src/platform/filesystem/service";
 import {
   AppsDirectory,
   RuntimeConfig,
@@ -93,16 +93,10 @@ it("refreshes active grants after a committed user update even when its caller i
       buildService(Operations, OperationsLive).pipe(
         Effect.provideService(ExecutionContext, execution),
         Effect.provideService(SessionContext, context),
-        Effect.provide(
-          Layer.mock(Filesystem, {
-            getBaseDir: unused,
-            changed: unusedEvent,
-            accessScope: unused,
-            prepareVolumeOperation: unused,
-            unwatch: unused,
-            releaseHandles: () => Effect.void,
-          }),
-        ),
+        Effect.provideService(OperationTransitionPreparation, {
+          prepareSession: () => Effect.void,
+          prepareRuntime: () => Effect.void,
+        }),
       ),
     );
     const sessions = await effects.acquire(

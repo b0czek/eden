@@ -1,8 +1,4 @@
-import type {
-  AppInstance,
-  FilesystemChangeKind,
-  UserProfile,
-} from "@edenapp/types";
+import type { AppInstance, UserProfile } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -15,7 +11,6 @@ import {
 } from "../../../tests/support/effect-runtime";
 import { SessionProcessesStopFailed } from "../../applications/processes/errors";
 import { Processes } from "../../applications/processes/service";
-import type { TargetedNotification } from "../../core/controllers/events";
 import { fromPromise } from "../../core/effects/io";
 import { createEvent, type Event } from "../../core/events/event";
 import {
@@ -23,10 +18,10 @@ import {
   ExecutionContextLive,
 } from "../../core/execution/context";
 import { SessionTransitionInProgress } from "../../core/operations/errors";
+import { OperationTransitionPreparation } from "../../core/operations/ports";
 import { Operations, OperationsLive } from "../../core/operations/service";
 import { InvalidUserPasswordError } from "../../core/user/errors";
 import { Users } from "../../core/user/service";
-import { Filesystem } from "../../platform/filesystem/service";
 import { RuntimeConfig } from "../../runtime/inputs";
 import { SessionContext, SessionContextLive } from "./context";
 import { Sessions, SessionsLive } from "./service";
@@ -87,22 +82,10 @@ describe("Sessions", () => {
           ),
         ),
         Effect.provideService(SessionContext, context),
-        Effect.provide(
-          Layer.mock(Filesystem, {
-            releaseHandles: () => Effect.void,
-            getBaseDir: unexpectedDependencyUse,
-            changed:
-              createEvent<
-                TargetedNotification<{
-                  watchId: string;
-                  kind: FilesystemChangeKind;
-                }>
-              >(),
-            accessScope: unexpectedDependencyUse,
-            prepareVolumeOperation: unexpectedDependencyUse,
-            unwatch: unexpectedDependencyUse,
-          }),
-        ),
+        Effect.provideService(OperationTransitionPreparation, {
+          prepareSession: () => Effect.void,
+          prepareRuntime: () => Effect.void,
+        }),
       ),
     );
     sessions = await effects.acquire(

@@ -1,10 +1,9 @@
-import type { FilesystemChangeKind, OperationHandle } from "@edenapp/types";
+import type { OperationHandle } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as TestClock from "effect/testing/TestClock";
 import {
@@ -15,19 +14,13 @@ import {
   SessionContext,
   SessionContextLive,
 } from "../../desktop/session/context";
-import { Filesystem } from "../../platform/filesystem/service";
 import { RuntimeConfig } from "../../runtime/inputs";
-import type { TargetedNotification } from "../controllers/events";
-import { createEvent } from "../events/event";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
 import { OperationAdmissionClosed } from "./errors";
+import { OperationTransitionPreparation } from "./ports";
 import { operationQuotaLimits } from "./quota";
 import { Operations, OperationsLive, operationRetentionMs } from "./service";
 import { type OperationTask, operationTask } from "./task";
-
-const unexpectedFilesystemUse = (): never => {
-  throw new Error("Unexpected Filesystem dependency");
-};
 
 const serviceEffects = createEffectRuntime();
 afterAll(() => serviceEffects.dispose());
@@ -55,22 +48,10 @@ describe("operation retention and admission capacity", () => {
             buildService(SessionContext, SessionContextLive),
           ),
         ),
-        Effect.provide(
-          Layer.mock(Filesystem, {
-            getBaseDir: unexpectedFilesystemUse,
-            changed:
-              createEvent<
-                TargetedNotification<{
-                  watchId: string;
-                  kind: FilesystemChangeKind;
-                }>
-              >(),
-            accessScope: unexpectedFilesystemUse,
-            prepareVolumeOperation: unexpectedFilesystemUse,
-            unwatch: unexpectedFilesystemUse,
-            releaseHandles: () => Effect.void,
-          }),
-        ),
+        Effect.provideService(OperationTransitionPreparation, {
+          prepareSession: () => Effect.void,
+          prepareRuntime: () => Effect.void,
+        }),
       ),
     );
   });

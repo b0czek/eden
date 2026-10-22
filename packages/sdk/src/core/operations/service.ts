@@ -16,7 +16,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import { SessionContext } from "../../desktop/session/context";
-import { Filesystem } from "../../platform/filesystem/service";
 import type { RoutedNotification } from "../controllers/events";
 import { asError } from "../effects/io";
 import type { Event } from "../events/event";
@@ -36,6 +35,7 @@ import {
   OperationRequestConflict,
   SessionTransitionInProgress,
 } from "./errors";
+import { OperationTransitionPreparation } from "./ports";
 import { createOperationQuota } from "./quota";
 import type { OperationTask } from "./task";
 
@@ -118,7 +118,7 @@ export const OperationsLive = Layer.effect(
   Effect.gen(function* () {
     const execution = yield* ExecutionContext;
     const session = yield* SessionContext;
-    const filesystem = yield* Filesystem;
+    const transitions = yield* OperationTransitionPreparation;
     const clock = yield* Clock.Clock;
     const changed =
       yield* scopedEvent<RoutedNotification<OperationEvents["changed"]>>();
@@ -318,11 +318,11 @@ export const OperationsLive = Layer.effect(
       });
       if (task.transition) update(record, { phase: "waiting-for-operations" });
       if (record.transitionSessionId) {
-        yield* filesystem.releaseHandles(record.transitionSessionId);
+        yield* transitions.prepareSession(record.transitionSessionId);
         yield* drainSession(record.transitionSessionId, record.snapshot.id);
       }
       if (task.transition === "runtime") {
-        yield* filesystem.releaseHandles();
+        yield* transitions.prepareRuntime();
         yield* drain(record.snapshot.id);
       }
       return structuredClone(
@@ -560,7 +560,7 @@ export const OperationsLive = Layer.effect(
         const reservation = operationId ?? randomUUID();
         closedSessions.set(sessionId, reservation);
         return Effect.gen(function* () {
-          yield* filesystem.releaseHandles(sessionId);
+          yield* transitions.prepareSession(sessionId);
           yield* drainSession(sessionId, operationId);
           return yield* work;
         }).pipe(
