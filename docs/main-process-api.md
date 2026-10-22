@@ -139,7 +139,9 @@ Electron quit already waits for Eden cleanup.
 Use explicit disposal when your host needs to stop Eden itself.
 Repeated calls await the same cleanup.
 Disposal before Electron readiness prevents startup.
-Eden drains accepted operations and stops apps before releasing runtime resources.
+During disposal, Eden cancels operations that support cancellation.
+It waits for these operations to complete cleanup. Other operations must finish.
+Eden then stops apps and releases runtime resources.
 
 ## Configure logging
 

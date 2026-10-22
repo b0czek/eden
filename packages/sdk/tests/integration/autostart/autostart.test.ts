@@ -16,12 +16,14 @@ import {
 } from "../../../src/applications/autostart/service";
 import { fromPromise } from "../../../src/core/effects/io";
 import { ExecutionContext } from "../../../src/core/execution/context";
+import { Operations } from "../../../src/core/operations/service";
 import {
   SettingsCatalog,
   SettingsStorage,
 } from "../../../src/core/settings/ports";
 import { Settings, SettingsLive } from "../../../src/core/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
+import { SessionContext } from "../../../src/desktop/session/context";
 import { Sessions } from "../../../src/desktop/session/service";
 import { AppsDirectory } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
@@ -113,25 +115,17 @@ async function scopedAutostart(
     ),
   );
   const processes = eden.runtime.services.processes;
-  const autostartProcesses = createAutostartProcesses(
-    {
-      getAppInstance: (appId) => processes.getAppInstance(appId),
-      getInstalledManifest: (appId) => processes.getInstalledManifest(appId),
-      launchApp: (appId, bounds, launchArgs, location) =>
-        Effect.gen(function* () {
-          const beforeLaunch = options.beforeLaunch;
-          if (beforeLaunch)
-            yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
-          return yield* processes.launchApp(
-            appId,
-            bounds,
-            launchArgs,
-            location,
-          );
-        }),
-    },
-    eden.runtime.services.execution,
-  );
+  const autostartProcesses = createAutostartProcesses({
+    getAppInstance: (appId) => processes.getAppInstance(appId),
+    getInstalledManifest: (appId) => processes.getInstalledManifest(appId),
+    launchApp: (appId, bounds, launchArgs, location) =>
+      Effect.gen(function* () {
+        const beforeLaunch = options.beforeLaunch;
+        if (beforeLaunch)
+          yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
+        return yield* processes.launchApp(appId, bounds, launchArgs, location);
+      }),
+  });
   const sessions = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
     buildService(Autostart, AutostartLive).pipe(
@@ -141,6 +135,11 @@ async function scopedAutostart(
       }),
       Effect.provideService(Settings, settings),
       Effect.provideService(Sessions, sessions),
+      Effect.provideService(
+        SessionContext,
+        eden.runtime.services.sessionContext,
+      ),
+      Effect.provideService(Operations, eden.runtime.services.operations),
       Effect.provideService(AutostartProcesses, autostartProcesses),
       Effect.provideService(
         DevelopmentAutostart,
@@ -162,6 +161,160 @@ afterEach(async () => {
 });
 
 describe("autostart session, settings and process composition", () => {
+  it("waits for a cancelled settings read on logout and starts the next session under its own authority", async () => {
+    const eden = await environment();
+    const aliceApp = testApp("com.example.alice-autostart");
+    const bobApp = testApp("com.example.bob-autostart");
+    const { installedPackages, operations, processes, sessionContext } =
+      eden.runtime.services;
+    for (const app of [aliceApp, bobApp]) installedPackages.register(app);
+    const reading = gate();
+    const resume = gate();
+    const s = await scopedAutostart(eden, {
+      beforeList: async () => {
+        reading.release();
+        await resume.promise;
+      },
+    });
+    await s.set(aliceApp.id);
+    await s.set(bobApp.id);
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "alice",
+        name: "Alice",
+        password: "password",
+        grants: [`apps/launch/${aliceApp.id}`, `apps/launch/${bobApp.id}`],
+        directoryRestriction: "alice",
+      }),
+    );
+    await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "bob",
+        name: "Bob",
+        password: "password",
+        grants: [`apps/launch/${bobApp.id}`],
+      }),
+    );
+    s.autostart.onFoundationReady();
+    try {
+      await eden.complete("session/login", {
+        username: "alice",
+        password: "password",
+      });
+      await reading.promise;
+      const startup = operations
+        .inspectAll()
+        .find(
+          (operation) =>
+            operation.command === "autostart/session" &&
+            operation.status === "running",
+        );
+      expect(startup).toBeDefined();
+      let loggedOut = false;
+      const logout = eden.complete("session/logout").then(() => {
+        loggedOut = true;
+      });
+      await tick();
+      expect(loggedOut).toBe(false);
+      expect(sessionContext.getCurrentUser()?.username).toBe("alice");
+      if (startup)
+        expect(operations.inspect(startup)).toMatchObject({
+          phase: "cancelling",
+        });
+      resume.release();
+      await logout;
+      if (startup)
+        expect(operations.inspect(startup)).toMatchObject({
+          status: "cancelled",
+        });
+      expect(processes.getAppInstance(aliceApp.id)).toBeUndefined();
+      const bobStarted = launched(eden, bobApp.id);
+      await eden.complete("session/login", {
+        username: "bob",
+        password: "password",
+      });
+      await bobStarted;
+      expect(processes.getAppInstance(aliceApp.id)).toBeUndefined();
+      expect(processes.getAppInstance(bobApp.id)).toMatchObject({
+        owner: {
+          kind: "session",
+          username: "bob",
+          sessionId: sessionContext.getSessionId(),
+        },
+        principal: { kind: "user", username: "bob" },
+      });
+    } finally {
+      resume.release();
+      await s.effects.run(s.autostart.shutdown());
+    }
+  });
+
+  it("cancels a starting autostart backend on logout without waiting for backend readiness", async () => {
+    const eden = await environment();
+    const first = testApp("com.example.starting-private", {
+      backend: { entry: "backend.js" },
+    });
+    const second = testApp("com.example.late-private");
+    const { installedPackages, processes, views, sessionContext, operations } =
+      eden.runtime.services;
+    for (const app of [first, second]) {
+      installedPackages.register(app);
+      await setAutostart(eden, app.id);
+    }
+    const user = await eden.runtime.effects.run(
+      eden.runtime.users.create({
+        username: "private-user",
+        name: "Private User",
+        password: "password",
+        grants: ["apps/launch/*"],
+        directoryRestriction: "private-user",
+      }),
+    );
+    const native = gate();
+    const fork = eden.platform.utilityProcesses.fork.bind(
+      eden.platform.utilityProcesses,
+    );
+    const observe = jest
+      .spyOn(eden.platform.utilityProcesses, "fork")
+      .mockImplementation((...args) => {
+        const process = fork(...args);
+        native.release();
+        return process;
+      });
+    let logout: Promise<unknown> | undefined;
+    try {
+      await eden.complete("session/login", {
+        username: user.username,
+        password: "password",
+      });
+      await native.promise;
+      expect(eden.runtime.services.backends.hasBackend(first.id)).toBe(true);
+      const startup = operations
+        .inspectAll()
+        .find(
+          (operation) =>
+            operation.command === "autostart/session" &&
+            operation.status === "running",
+        );
+      expect(startup).toBeDefined();
+      logout = eden.complete("session/logout");
+      await logout;
+      await tick();
+      expect(sessionContext.getCurrentUser()).toBeNull();
+      expect(processes.getRunningApps(true)).toEqual([]);
+      expect(views.getAllViews()).toEqual([]);
+      expect(eden.runtime.services.backends.hasBackend(first.id)).toBe(false);
+      if (startup)
+        expect(operations.inspect(startup)).toMatchObject({
+          status: "cancelled",
+        });
+    } finally {
+      observe.mockRestore();
+      eden.runtime.services.backends.getBackend(first.id)?.kill();
+      await logout;
+    }
+  });
+
   it("launches an enabled app under the user principal after a real session transition", async () => {
     const eden = await environment();
     const app = testApp("com.example.autostart");
@@ -265,9 +418,7 @@ describe("autostart session, settings and process composition", () => {
       finish.release();
       await shutdown;
     }
-    expect(s.processes.getAppInstance(app.id)).toMatchObject({
-      principal: { kind: "user", username: user.username },
-    });
+    expect(s.processes.getAppInstance(app.id)).toBeUndefined();
   });
 
   it("launches development apps before login, ignores disabled entries and running apps", async () => {

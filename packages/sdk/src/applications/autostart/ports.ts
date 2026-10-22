@@ -1,4 +1,4 @@
-import type { RuntimeAppManifest, UserProfile } from "@edenapp/types";
+import type { RuntimeAppManifest } from "@edenapp/types";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { ProcessLaunchError } from "../processes/errors";
@@ -15,10 +15,7 @@ export const AutostartConfig = Context.Service<
 export interface AutostartProcesses {
   isRunning(appId: string): boolean;
   installedManifest(appId: string): RuntimeAppManifest | undefined;
-  launch(
-    appId: string,
-    user?: UserProfile,
-  ): Effect.Effect<void, ProcessLaunchError>;
+  launch(appId: string): Effect.Effect<void, ProcessLaunchError>;
 }
 export const AutostartProcesses = Context.Service<
   "eden/AutostartProcesses",

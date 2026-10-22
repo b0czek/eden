@@ -114,9 +114,12 @@ Node.js backends can also access host files directly; Eden account restrictions 
 | `user/has-grant` | `user/grants` |
 
 Login and logout return operations. Await completion when the caller remains available.
-Eden stops the outgoing session's apps before committing the next identity.
-`session/changed` reports the committed session.
-System-owned daemons continue running with their launch-time identity.
+On logout or account change, Eden cancels operations in the outgoing session if they support cancellation.
+This includes queued and running autostart work.
+It waits for cleanup and for other operations to finish.
+Eden then stops that session's apps and changes the current user.
+`session/changed` reports the updated session.
+Managed daemons continue running with their launch-time identity.
 See [sessions and autostart](processes-and-daemons.md#sessions-and-autostart).
 
 ## Manage accounts

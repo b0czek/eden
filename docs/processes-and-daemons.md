@@ -49,8 +49,7 @@ Launch, stop, and reload for the same app are serialized.
 
 ## Sessions and autostart
 
-On logout or account change, Eden stops apps owned by the outgoing session before committing the next session.
-Managed daemons survive that transition.
+For logout and account changes, see [session cleanup](users.md#use-session-commands-from-an-app).
 
 Seed interactive startup apps in the `com.eden` settings namespace:
 

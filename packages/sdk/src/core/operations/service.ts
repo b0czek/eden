@@ -67,9 +67,16 @@ export interface Operations {
     handle: OperationHandle,
     context?: CommandCallerContext,
   ) => Effect.Effect<unknown, unknown>;
+  /** Await finalizers and terminal status without rethrowing the operation outcome. */
+  settle: (
+    handle: OperationHandle,
+    context?: CommandCallerContext,
+  ) => Effect.Effect<void>;
   inspect: (handle: OperationHandle) => OperationSnapshot | undefined;
   inspectAll: () => OperationSnapshot[];
   drainSession: (sessionId: string, excludeId?: string) => Effect.Effect<void>;
+  /** End outgoing-session tasks after transition admission closes. */
+  endSession: (sessionId: string) => Effect.Effect<void>;
   withSessionTransition: <A, E>(
     work: Effect.Effect<A, E>,
   ) => Effect.Effect<
@@ -319,11 +326,15 @@ export const OperationsLive = Layer.effect(
       if (task.transition) update(record, { phase: "waiting-for-operations" });
       if (record.transitionSessionId) {
         yield* transitions.prepareSession(record.transitionSessionId);
-        yield* drainSession(record.transitionSessionId, record.snapshot.id);
+        yield* drainSession(
+          record.transitionSessionId,
+          record.snapshot.id,
+          true,
+        );
       }
       if (task.transition === "runtime") {
         yield* transitions.prepareRuntime();
-        yield* drain(record.snapshot.id);
+        yield* drain(record.snapshot.id, true);
       }
       return structuredClone(
         yield* task.run({
@@ -484,6 +495,11 @@ export const OperationsLive = Layer.effect(
       const snapshot = record.snapshot;
       if (snapshot.status !== "queued" && snapshot.status !== "running") return;
       if (!snapshot.cancellable) throw new OperationNotCancellable({ handle });
+      interrupt(record);
+    }
+    function interrupt(record: RecordEntry): void {
+      const snapshot = record.snapshot;
+      if (snapshot.status !== "queued" && snapshot.status !== "running") return;
       if (snapshot.phase === "cancelling") return;
       update(record, { phase: "cancelling" });
       record.fiber.interruptUnsafe();
@@ -516,13 +532,28 @@ export const OperationsLive = Layer.effect(
         ? structuredClone(record.snapshot)
         : undefined;
     }
+    function settle(handle: OperationHandle, context?: CommandCallerContext) {
+      return Effect.suspend(() =>
+        Effect.asVoid(
+          Fiber.await(
+            getRecord(handle, context ?? execution.get() ?? {}).fiber,
+          ),
+        ),
+      );
+    }
     function inspectAll(): OperationSnapshot[] {
       prune();
       return [...records.values()].map((record) =>
         structuredClone(record.snapshot),
       );
     }
-    function drainSession(sessionId: string, excludeId?: string) {
+    // Cancellable work must not block authentication. Cancel it only after a
+    // session change is authorized, in endSession; committed work still drains.
+    function drainSession(
+      sessionId: string,
+      excludeId?: string,
+      beforeTransition = false,
+    ) {
       return Effect.suspend(() =>
         Effect.asVoid(
           Fiber.awaitAll(
@@ -530,12 +561,30 @@ export const OperationsLive = Layer.effect(
               .filter(
                 (record) =>
                   record.owner.sessionId === sessionId &&
-                  record.snapshot.id !== excludeId,
+                  record.snapshot.id !== excludeId &&
+                  (!beforeTransition || !record.snapshot.cancellable),
               )
               .map((record) => record.fiber),
           ),
         ),
       );
+    }
+    function cancelPending(entries: Iterable<RecordEntry>) {
+      for (const record of entries)
+        if (record.snapshot.cancellable) interrupt(record);
+    }
+    function endSession(sessionId: string) {
+      return Effect.suspend(() => {
+        const operationId = execution.get()?.operationId;
+        cancelPending(
+          [...records.values()].filter(
+            (record) =>
+              record.owner.sessionId === sessionId &&
+              record.snapshot.id !== operationId,
+          ),
+        );
+        return drainSession(sessionId, operationId);
+      });
     }
     function withSessionTransition<A, E>(
       work: Effect.Effect<A, E>,
@@ -561,7 +610,7 @@ export const OperationsLive = Layer.effect(
         closedSessions.set(sessionId, reservation);
         return Effect.gen(function* () {
           yield* transitions.prepareSession(sessionId);
-          yield* drainSession(sessionId, operationId);
+          yield* drainSession(sessionId, operationId, true);
           return yield* work;
         }).pipe(
           Effect.ensuring(
@@ -573,16 +622,16 @@ export const OperationsLive = Layer.effect(
         );
       });
     }
-    function drain(excludeId?: string) {
-      return Effect.suspend(() =>
-        Effect.asVoid(
-          Fiber.awaitAll(
-            [...records.values()]
-              .filter((record) => record.snapshot.id !== excludeId)
-              .map((record) => record.fiber),
-          ),
-        ),
-      );
+    function drain(excludeId?: string, cancel = false) {
+      return Effect.suspend(() => {
+        const pending = [...records.values()].filter(
+          (record) => record.snapshot.id !== excludeId,
+        );
+        if (cancel) cancelPending(pending);
+        return Effect.asVoid(
+          Fiber.awaitAll(pending.map((record) => record.fiber)),
+        );
+      });
     }
     function closeAdmission() {
       shuttingDown = true;
@@ -591,7 +640,7 @@ export const OperationsLive = Layer.effect(
     function shutdown(): Effect.Effect<void> {
       return Effect.gen(function* () {
         closeAdmission();
-        yield* drain(execution.get()?.operationId);
+        yield* drain(execution.get()?.operationId, true);
       });
     }
     function prune(): void {
@@ -619,9 +668,11 @@ export const OperationsLive = Layer.effect(
       cancel,
       list,
       wait,
+      settle,
       inspect,
       inspectAll,
       drainSession,
+      endSession,
       withSessionTransition,
       drain,
       closeAdmission,

@@ -37,6 +37,8 @@ domain services, plain controller definitions, or their domain event sources.
 
 # Docs
 
+Aim for approximately 75% adherence to ASD-STE100 in documentation. Use it as a style guide, while keeping Eden's technical terms where needed.
+
 Documentation must describe supported workflows and useful behavior. Do not document rejected alternatives, removed symbols, internal implementation details, or unsupported actions unless required for migration, compatibility, or safety.
 
 - [App Development](docs/app-development.md)

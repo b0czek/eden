@@ -1,13 +1,17 @@
+import type { OperationHandle } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
-import * as Queue from "effect/Queue";
-import * as Stream from "effect/Stream";
+import * as Semaphore from "effect/Semaphore";
 import { listen } from "../../core/events/scoped";
+import type { CommandCallerContext } from "../../core/execution/context";
+import { OperationAdmissionClosed } from "../../core/operations/errors";
+import { Operations } from "../../core/operations/service";
+import { operationTask } from "../../core/operations/task";
 import { EDEN_SETTINGS_APP_ID } from "../../core/settings/constants";
 import { Settings } from "../../core/settings/service";
+import { SessionContext } from "../../desktop/session/context";
 import { Sessions } from "../../desktop/session/service";
 import { log } from "../../platform/logging/logger";
 import {
@@ -27,17 +31,24 @@ export const Autostart = Context.Service<"eden/Autostart", Autostart>(
 
 const AUTOSTART_PREFIX = "autostart.";
 type Launch = "development" | "session" | "login";
+interface LaunchOperation {
+  handle: OperationHandle;
+  context: CommandCallerContext;
+}
 export const AutostartLive = Layer.effect(
   Autostart,
   Effect.gen(function* () {
     const { development, loginAppId } = yield* AutostartConfig;
     const settings = yield* Settings;
     const sessions = yield* Sessions;
+    const session = yield* SessionContext;
+    const operations = yield* Operations;
     const processes = yield* AutostartProcesses;
     const developmentApps = yield* DevelopmentAutostart;
     let ready = false;
     let disposed = false;
-    const pending = yield* Queue.unbounded<Launch, Cause.Done>();
+    const pending = new Set<LaunchOperation>();
+    const order = Semaphore.makeUnsafe(1);
 
     function launchDevelopmentApps() {
       return Effect.gen(function* () {
@@ -71,9 +82,6 @@ export const AutostartLive = Layer.effect(
 
     function launchSessionApps() {
       return Effect.gen(function* () {
-        // Capture the user when this queued job starts, as session transitions may queue.
-        const currentUser = sessions.getCurrentUser();
-        if (!currentUser) return;
         yield* Effect.catch(
           Effect.gen(function* () {
             const entries = yield* loadAutostartSettings();
@@ -83,7 +91,7 @@ export const AutostartLive = Layer.effect(
               const manifest = processes.installedManifest(appId);
               if (manifest && !manifest.frontend?.entry) continue;
               if (processes.isRunning(appId)) continue;
-              yield* Effect.match(processes.launch(appId, currentUser), {
+              yield* Effect.match(processes.launch(appId), {
                 onFailure: (error) =>
                   log.error(`Failed to launch autostart app ${appId}:`, error),
                 onSuccess: () => log.info(`Autostart app launched: ${appId}`),
@@ -115,20 +123,53 @@ export const AutostartLive = Layer.effect(
       });
     }
 
-    const worker = yield* Effect.forkScoped(
-      Stream.runForEach(Stream.fromQueue(pending), (launch) =>
-        Effect.suspend(() => {
-          if (disposed) return Effect.void;
-          const task =
-            launch === "development"
+    function enqueue(launch: Launch) {
+      if (launch === "login" && !loginAppId) return;
+      const user = session.getCurrentUser();
+      const context: CommandCallerContext = {
+        sessionId: session.getSessionId(),
+        principal: user ? { kind: "user", profile: user } : { kind: "system" },
+      };
+      const work = order
+        .withPermit(
+          Effect.suspend(() => {
+            if (disposed) return Effect.void;
+            return launch === "development"
               ? launchDevelopmentApps()
               : launch === "session"
                 ? launchSessionApps()
                 : launchLoginApp();
-          return task;
-        }),
-      ),
-    );
+          }),
+        )
+        .pipe(
+          Effect.onError((cause) =>
+            Effect.sync(() => {
+              if (!Cause.hasInterruptsOnly(cause))
+                log.error("Startup operation failed:", Cause.squash(cause));
+            }),
+          ),
+        );
+      let entry: LaunchOperation | undefined;
+      try {
+        const handle = operations.submit(
+          `autostart/${launch}`,
+          {},
+          context,
+          () =>
+            operationTask(() => work, {
+              cancellable: true,
+              release: () => {
+                if (entry) pending.delete(entry);
+              },
+            }),
+        );
+        entry = { handle, context };
+        pending.add(entry);
+      } catch (error) {
+        if (!(error instanceof OperationAdmissionClosed))
+          log.error("Failed to schedule startup operation:", error);
+      }
+    }
 
     const unsubscribe = yield* listen(
       sessions.changed,
@@ -139,18 +180,15 @@ export const AutostartLive = Layer.effect(
           (currentUser?.username ?? null) === previousUsername
         )
           return;
-        Queue.offerUnsafe(pending, currentUser ? "session" : "login");
+        enqueue(currentUser ? "session" : "login");
       },
     );
 
     function onFoundationReady() {
       if (ready || disposed) return;
       ready = true;
-      if (development) Queue.offerUnsafe(pending, "development");
-      Queue.offerUnsafe(
-        pending,
-        sessions.getCurrentUser() ? "session" : "login",
-      );
+      if (development) enqueue("development");
+      enqueue(sessions.getCurrentUser() ? "session" : "login");
     }
 
     const shutdown = Effect.uninterruptible(
@@ -159,8 +197,14 @@ export const AutostartLive = Layer.effect(
           disposed = true;
           ready = false;
           unsubscribe();
-          yield* Queue.end(pending);
-          yield* Fiber.join(worker);
+          const active = [...pending];
+          for (const { handle, context } of active)
+            operations.cancel(handle, context);
+          yield* Effect.forEach(
+            active,
+            ({ handle, context }) => operations.settle(handle, context),
+            { discard: true },
+          );
         }),
       ),
     );

@@ -269,7 +269,8 @@ Some commands define a typed failure response; inspect that response as well.
 The command's result type states which form it uses.
 
 IPC responses have a ten-second deadline. Accepted operation execution has no transport deadline.
-Session changes and runtime shutdown drain accepted work before teardown.
+See [session cleanup](users.md#use-session-commands-from-an-app) and
+[runtime disposal](main-process-api.md#stop-the-runtime) for cancellation during logout and shutdown.
 A successful logout or self-exit can close the caller before it sees completion.
 For self-exit, awaiting acceptance is sufficient.
 Power operation completion records host handoff, not completion of the operating system's shutdown.

@@ -168,6 +168,7 @@ A task with a reservation supplies an idempotent `release` callback.
 The operation runtime owns execution, progress, cancellation, and completion.
 For cancellable work, yield `reporter.commit` at the transaction's commit boundary.
 Keep it inside the rollback-protected region before discarding recovery data.
+After this point, Eden refuses cancellation.
 Cancellation interrupts the fiber; terminal status follows finalizer completion.
 
 Supply `encodeFailure` only when a command has a typed public failure response.
@@ -203,8 +204,9 @@ Registration forwards them to authorized app subscriptions and releases forwardi
 Use `targetedEvent(source)` for `TargetedNotification<Payload>` with explicit `viewIds`.
 Use `routedEvent(source)` for `RoutedNotification<Payload>` when broadcast is also needed.
 An empty audience delivers nothing. Routing metadata stays out of public payloads.
-Use `authorizedEvent(source, authorize)` for data whose read access varies by recipient.
-The policy receives the payload and the recipient's current app identity and principal before delivery to a renderer or backend.
+Use `authorizedEvent(source, authorize)` to check read access for each recipient.
+The authorization function receives the payload and the recipient's current app identity and principal.
+Eden checks authorization before it sends the event to a renderer or backend.
 
 ## Compose and verify
 
@@ -213,7 +215,7 @@ Domain integration modules acquire collaborator keys, then register their contro
 Use the runtime's service projection for inspection rather than dependency assembly.
 
 Ordered initialization and shutdown belong to the [runtime lifecycle](../packages/sdk/src/runtime/lifecycle.ts).
-Shutdown closes operation admission, drains accepted work, stops processes, then releases the graph.
+See [runtime disposal](main-process-api.md#stop-the-runtime) for shutdown behavior.
 Partial startup failure releases acquired resources and preserves its failure.
 
 After a public controller change, regenerate and build the client:

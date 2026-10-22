@@ -48,6 +48,7 @@ export const SessionsLive = Layer.effect(
       const previousUsername = context.getCurrentUser()?.username ?? null;
       const nextUsername = user?.username ?? null;
       if (previousUsername !== nextUsername) {
+        yield* operations.endSession(context.getSessionId());
         yield* processes.stopSessionApps(context.getSessionId());
         context.beginSession(user);
       } else context.setCurrentUser(user);

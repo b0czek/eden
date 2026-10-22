@@ -1,7 +1,6 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { ExecutionContext } from "../../core/execution/context";
 import { RuntimeEnvironment } from "../../runtime/environment";
 import { Processes } from "../processes/service";
 import { createDevelopmentAutostart } from "./development";
@@ -21,7 +20,7 @@ export const AutostartPortsLive = Layer.effectContext(
     }).pipe(
       Context.add(
         AutostartProcesses,
-        createAutostartProcesses(yield* Processes, yield* ExecutionContext),
+        createAutostartProcesses(yield* Processes),
       ),
       Context.add(DevelopmentAutostart, createDevelopmentAutostart(config)),
     );
