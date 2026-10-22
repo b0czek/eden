@@ -38,7 +38,13 @@ export async function createElectronProfile(
   try {
     await fs.mkdir(profile.appsDirectory, { recursive: true });
     await fs.mkdir(profile.userDirectory, { recursive: true });
-    for (const asset of ["foundation", "app-runtime", "edencss", "app-frame"]) {
+    for (const asset of [
+      "foundation",
+      "app-runtime",
+      "edencss",
+      "app-frame",
+      "keyboard-ui",
+    ]) {
       await fs.cp(
         path.join(__dirname, "../../../dist", asset),
         path.join(root, "dist", asset),

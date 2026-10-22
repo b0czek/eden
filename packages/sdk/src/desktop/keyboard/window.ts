@@ -109,11 +109,12 @@ export function createKeyboardOverlay({
             },
           });
           keyboardWindow = window;
+          const webContents = window.webContents;
           window.setAlwaysOnTop(true, "screen-saver");
           window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-          window.webContents.setZoomFactor(scale);
+          webContents.setZoomFactor(scale);
           window.setMovable(placementMode === "floating");
-          window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+          webContents.setWindowOpenHandler(() => ({ action: "deny" }));
           const onLoaded = () => loaded.emit();
           const onClosed = () => {
             if (keyboardWindow === window) {
@@ -124,11 +125,12 @@ export function createKeyboardOverlay({
             overlayListeners = undefined;
           };
           const onMoved = () => moved.emit();
-          window.webContents.on("did-finish-load", onLoaded);
+          webContents.on("did-finish-load", onLoaded);
           window.on("closed", onClosed);
           window.on("move", onMoved);
           overlayListeners = () => {
-            window.webContents.removeListener("did-finish-load", onLoaded);
+            // The BrowserWindow getter throws once native teardown has run.
+            webContents.removeListener("did-finish-load", onLoaded);
             window.removeListener("closed", onClosed);
             window.removeListener("move", onMoved);
           };

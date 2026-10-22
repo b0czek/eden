@@ -193,3 +193,44 @@ test.describe
         .toBe(false);
     });
   });
+
+for (const shutdown of ["close foundation", "quit host"] as const) {
+  test.describe(`keyboard shutdown: ${shutdown}`, () => {
+    const getHost = useElectronHost();
+
+    test("releases native listeners without accessing a destroyed window", async () => {
+      const host = getHost();
+      const app = host.electronApp;
+      if (!app) throw new Error("Electron app is not running");
+      const errors: string[] = [];
+      app.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      expect(
+        await app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some(
+            (window) => window.getParentWindow() !== null,
+          ),
+        ),
+      ).toBe(true);
+
+      if (shutdown === "close foundation") {
+        const exited = new Promise<void>((resolve) =>
+          app.once("close", () => resolve()),
+        );
+        await app.evaluate(({ BrowserWindow }) => {
+          const foundation = BrowserWindow.getAllWindows().find(
+            (window) => window.getTitle() === "Eden Electron Integration",
+          );
+          if (!foundation) throw new Error("Foundation window is unavailable");
+          foundation.close();
+        });
+        await exited;
+      } else {
+        await app.close();
+      }
+      host.electronApp = undefined;
+      expect(errors).toEqual([]);
+    });
+  });
+}
