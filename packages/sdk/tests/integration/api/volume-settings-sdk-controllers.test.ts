@@ -1,6 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as v from "valibot";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
@@ -10,6 +14,136 @@ afterEach(async () => {
 });
 
 describe("volume and settings SDK controllers", () => {
+  it("releases host eject preparation interrupted by its volume notification and allows retry and shutdown", async () => {
+    eden = await createTestEden();
+    const { runtime } = eden;
+    let ejects = 0;
+    await runtime.effects.run(
+      runtime.volumes.register(
+        {
+          id: "interrupted-volume",
+          label: "Interrupted volume",
+          kind: "removable",
+          rootPath: eden.paths.root,
+        },
+        {
+          eject: () =>
+            Effect.sync(() => {
+              ejects++;
+            }),
+        },
+      ),
+    );
+    const caller = runtime.effects.fork(
+      Effect.withFiber((fiber) => {
+        const stop = runtime.volumes.onChanged((volumes) => {
+          if (volumes.some((volume) => volume.state === "ejecting"))
+            fiber.interruptUnsafe();
+        });
+        return runtime.volumes
+          .eject("interrupted-volume")
+          .pipe(Effect.ensuring(Effect.sync(stop)));
+      }),
+    );
+    const exit = await runtime.effects.run(Fiber.await(caller));
+    expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+      true,
+    );
+    expect(runtime.volumes.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "interrupted-volume", state: "ready" }),
+      ]),
+    );
+    expect(runtime.operations.list()).toEqual([]);
+    expect(ejects).toBe(0);
+
+    await runtime.effects.run(runtime.volumes.eject("interrupted-volume"));
+    expect(ejects).toBe(1);
+    expect(runtime.volumes.list().map((volume) => volume.id)).toEqual(["home"]);
+    expect(runtime.operations.list()).toEqual([
+      expect.objectContaining({ command: "volume/eject", status: "succeeded" }),
+    ]);
+    await eden.dispose();
+    expect(runtime.state).toBe("stopped");
+    expect(eden.platform.activeResourceCount).toBe(0);
+  });
+
+  it("keeps an accepted host eject reservation when its submitting caller is interrupted", async () => {
+    eden = await createTestEden();
+    const { runtime } = eden;
+    const started = Deferred.makeUnsafe<void>();
+    const finish = Deferred.makeUnsafe<void>();
+    await runtime.effects.run(
+      runtime.volumes.register(
+        {
+          id: "accepted-volume",
+          label: "Accepted volume",
+          kind: "removable",
+          rootPath: eden.paths.root,
+        },
+        {
+          eject: () =>
+            Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Deferred.await(finish)),
+            ),
+        },
+      ),
+    );
+    try {
+      const caller = runtime.effects.fork(
+        Effect.withFiber((fiber) => {
+          const stop = runtime.operations.onChanged((snapshot) => {
+            if (
+              snapshot.command === "volume/eject" &&
+              snapshot.status === "queued"
+            )
+              fiber.interruptUnsafe();
+          });
+          return runtime.volumes
+            .eject("accepted-volume")
+            .pipe(Effect.ensuring(Effect.sync(stop)));
+        }),
+      );
+      const exit = await runtime.effects.run(Fiber.await(caller));
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+        true,
+      );
+      const [accepted] = runtime.operations.list();
+      expect(accepted).toMatchObject({
+        command: "volume/eject",
+        status: "queued",
+      });
+      expect(runtime.volumes.list()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "accepted-volume", state: "ejecting" }),
+        ]),
+      );
+      const failure = await runtime.effects.run(
+        Effect.flip(
+          runtime.services.volumes.withVolumes(
+            ["accepted-volume"],
+            Effect.void,
+          ),
+        ),
+      );
+      expect(failure).toMatchObject({
+        _tag: "VolumeUnavailable",
+        volume: "accepted-volume",
+      });
+      await runtime.effects.run(Deferred.await(started));
+      Deferred.doneUnsafe(finish, Effect.void);
+      await runtime.effects.run(runtime.services.operations.settle(accepted));
+      expect(runtime.operations.get(accepted)).toMatchObject({
+        status: "succeeded",
+      });
+      expect(runtime.volumes.list().map((volume) => volume.id)).toEqual([
+        "home",
+      ]);
+    } finally {
+      Deferred.doneUnsafe(finish, Effect.void);
+    }
+  });
+
   it("releases prepared volume removal when host operation admission is closed", async () => {
     eden = await createTestEden();
     const rootPath = path.join(eden.paths.root, "unaccepted-volume");

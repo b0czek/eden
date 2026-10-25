@@ -285,35 +285,53 @@ export const OperationsLive = Layer.effect(
       args: unknown,
       prepare: Effect.Effect<OperationTask<R, E>, P>,
     ): Effect.Effect<R, E | P | HostOperationFailure> {
-      return Effect.uninterruptibleMask((restore) =>
-        Effect.gen(function* () {
-          const context: CommandCallerContext = {
-            principal: { kind: "system" },
-            sessionId: session.getSessionId(),
-          };
-          const task = yield* restore(prepare);
-          const handle = yield* Effect.try({
-            try: () => submit(command, args, context, () => task),
-            catch: (error) => {
-              if (
-                error instanceof InvalidOperationRequestKey ||
-                error instanceof OperationRequestConflict ||
-                error instanceof OperationAdmissionClosed ||
-                error instanceof OperationCapacityExhausted ||
-                error instanceof SessionTransitionInProgress
-              )
-                return error;
-              throw error;
-            },
-          }).pipe(Effect.onError(() => Effect.sync(() => task.release?.())));
-          // This handle was just submitted from this exact task, so its retained
-          // result/failure types are known despite the heterogeneous ledger.
-          return yield* restore(
-            // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- This newly admitted host handle belongs to the typed task above; the shared ledger erases heterogeneous results.
-            wait(handle, context) as Effect.Effect<R, E | OperationCancelled>,
-          );
-        }),
-      );
+      return Effect.suspend(() => {
+        const context: CommandCallerContext = {
+          principal: { kind: "system" },
+          sessionId: session.getSessionId(),
+        };
+        return Effect.acquireUseRelease(
+          // Preparation can synchronously reserve resources and notify listeners
+          // that interrupt this caller. Capture ownership before interruption.
+          Effect.map(prepare, (task) => ({ task, transferred: false })),
+          (ownership) =>
+            Effect.gen(function* () {
+              const { task } = ownership;
+              const handle = yield* Effect.try({
+                try: () => {
+                  const handle = submit(command, args, context, () => task);
+                  // Submission and ownership transfer are one synchronous step,
+                  // including when an acceptance listener interrupts the caller.
+                  ownership.transferred = true;
+                  return handle;
+                },
+                catch: (error) => {
+                  if (
+                    error instanceof InvalidOperationRequestKey ||
+                    error instanceof OperationRequestConflict ||
+                    error instanceof OperationAdmissionClosed ||
+                    error instanceof OperationCapacityExhausted ||
+                    error instanceof SessionTransitionInProgress
+                  )
+                    return error;
+                  throw error;
+                },
+              });
+              // This handle was just submitted from this exact task, so its retained
+              // result/failure types are known despite the heterogeneous ledger.
+              // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- This newly admitted host handle belongs to the typed task above; the shared ledger erases heterogeneous results.
+              const result = wait(handle, context) as Effect.Effect<
+                R,
+                E | OperationCancelled
+              >;
+              return yield* result;
+            }),
+          ({ task, transferred }) =>
+            Effect.sync(() => {
+              if (!transferred) task.release?.();
+            }),
+        );
+      });
     }
     const execute = Effect.fn(function* (
       record: RecordEntry,

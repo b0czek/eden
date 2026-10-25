@@ -4,6 +4,8 @@ import * as path from "node:path";
 import type { UserProfile } from "@edenapp/types";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import {
   command,
@@ -12,7 +14,7 @@ import {
 import { hashPassword } from "../../../src/core/user/auth";
 import * as desktopComposition from "../../../src/runtime/composition";
 import { Desktop } from "../../../src/runtime/desktop";
-import { gate } from "../../support/async";
+import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
 
 const caller = (appId: string, profile: UserProfile) => ({
@@ -268,6 +270,89 @@ describe("EdenRuntime integration", () => {
     await expect(afterStart.start()).rejects.toThrow(
       "Cannot start Eden runtime from stopped state",
     );
+  });
+
+  it("awaits background cleanup before draining eject operations and disposing services", async () => {
+    const eden = await createTestEden();
+    active.push(eden);
+    const { runtime } = eden;
+    const drive = path.join(eden.paths.root, "background-drive");
+    await fs.mkdir(drive);
+    const leased = Deferred.makeUnsafe<void>();
+    const finishCleanup = Deferred.makeUnsafe<void>();
+    const cleanupEntered = Deferred.makeUnsafe<void>();
+    const draining = gate();
+    let cleaned = false;
+    let ejected = false;
+    await runtime.effects.run(
+      runtime.volumes.register(
+        {
+          id: "background-drive",
+          label: "Background drive",
+          kind: "removable",
+          rootPath: drive,
+        },
+        {
+          eject: () =>
+            Effect.sync(() => {
+              expect(cleaned).toBe(true);
+              ejected = true;
+            }),
+        },
+      ),
+    );
+    const background = runtime.effects.fork(
+      runtime.services.volumes.withVolumes(
+        ["background-drive"],
+        Effect.gen(function* () {
+          yield* Deferred.succeed(leased, undefined);
+          yield* Effect.never;
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              yield* Deferred.succeed(cleanupEntered, undefined);
+              yield* Deferred.await(finishCleanup);
+              // Finalizers still have access to the live service graph.
+              yield* runtime.services.settings
+                .set("background-owner", "cleaned", "true")
+                .pipe(Effect.orDie);
+              cleaned = true;
+            }),
+          ),
+        ),
+      ),
+    );
+    const off = runtime.operations.onChanged((snapshot) => {
+      if (snapshot.phase === "draining-volume-io") draining.release();
+    });
+    let removal: Promise<void> | undefined;
+    let shutdown: Promise<void> | undefined;
+    try {
+      await runtime.effects.run(Deferred.await(leased));
+      removal = runtime.effects.run(runtime.volumes.eject("background-drive"));
+      await draining.promise;
+      shutdown = runtime.dispose();
+      await tick();
+      // This milestone is synchronous with interruption, before native cleanup.
+      expect(Deferred.isDoneUnsafe(cleanupEntered)).toBe(true);
+      expect(background.pollUnsafe()).toBeUndefined();
+      expect(ejected).toBe(false);
+      expect(() => runtime.effects.fork(Effect.void)).toThrow("disposed");
+      Deferred.doneUnsafe(finishCleanup, Effect.void);
+      await Promise.all([removal, shutdown]);
+      expect(cleaned).toBe(true);
+      expect(ejected).toBe(true);
+      expect(
+        Exit.isFailure(await Effect.runPromise(Fiber.await(background))),
+      ).toBe(true);
+      expect(runtime.state).toBe("stopped");
+      expect(eden.platform.activeResourceCount).toBe(0);
+    } finally {
+      off();
+      Deferred.doneUnsafe(finishCleanup, Effect.void);
+      await Effect.runPromise(Fiber.interrupt(background));
+      await Promise.allSettled([removal, shutdown]);
+    }
   });
 
   it("releases pre-start settings registrations without constructing services", async () => {

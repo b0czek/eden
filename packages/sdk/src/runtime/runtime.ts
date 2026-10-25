@@ -2,9 +2,11 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Scope from "effect/Scope";
 import type { EdenConfig } from "../api/config";
 import type { EdenLifecycleState } from "../api/control-plane";
 import { asError } from "../core/effects/io";
@@ -41,6 +43,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   let bundle: Desktop | undefined;
   let startup: Fiber.Fiber<void, unknown> | undefined;
   let disposal: Promise<void> | undefined;
+  const backgroundScope = Scope.makeUnsafe("parallel");
   const launched = Deferred.makeUnsafe<Fiber.Fiber<void, unknown>, Error>();
   // @eden-effect-next-line domain-interpreter -- Runtime boundary exposes startup readiness as a host Promise and joins its retained fiber.
   const readyPromise = Effect.runPromise(
@@ -100,7 +103,11 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     },
     fork<A, E>(work: Effect.Effect<A, E>) {
       if (state === "created") throw new Error("Eden is not ready");
-      return managed.runFork(work);
+      if (disposal || state === "stopping" || state === "stopped")
+        throw new Error("Eden background execution disposed");
+      return managed.runFork(work, {
+        onFiberStart: Fiber.runIn(backgroundScope),
+      });
     },
   };
 
@@ -122,6 +129,8 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
     disposal ??= Effect.runPromise(
       Effect.gen(function* () {
         if (startup) yield* Fiber.interrupt(startup);
+        // Background finalizers can release leases needed by accepted operations.
+        yield* Scope.close(backgroundScope, Exit.void);
         if (bundle) yield* bundle.shutdown();
       }).pipe(
         Effect.catchCause((cause) =>
