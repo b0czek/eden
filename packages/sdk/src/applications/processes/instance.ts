@@ -9,7 +9,7 @@ import type { RuntimeContexts } from "../../core/execution/runtime-contexts";
 import type { Views } from "../../desktop/views/service";
 import type { AppChannels } from "../appbus/service";
 import type { Backends } from "./backends";
-import { BackendStartupFailed, ProcessStopFailed } from "./errors";
+import { ProcessStopFailed } from "./errors";
 
 import type { AppRuntime } from "./types";
 
@@ -111,14 +111,6 @@ export const acquireAppInstance = Effect.fn(function* (
       }),
     );
   }
-  if (backend && backends.getBackend(appId) !== backend)
-    return yield* Effect.fail(
-      new BackendStartupFailed({
-        appId,
-        reason: "exited",
-        message: `Backend ${appId} exited during startup`,
-      }),
-    );
   const instance: AppInstance = {
     manifest,
     instanceId: randomUUID(),

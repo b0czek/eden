@@ -40,6 +40,7 @@ import { PackageCatalog } from "../packages/catalog";
 import { Packages } from "../packages/service";
 import { Backends } from "./backends";
 import {
+  BackendStartupFailed,
   type ProcessLaunchError,
   ProcessLaunchRejected,
   type ProcessMetricsError,
@@ -375,28 +376,48 @@ export const ProcessesLive = Layer.effect(
                   },
                 );
                 record.close = acquired.close;
-                if (_shuttingDown)
-                  return yield* Effect.fail(
-                    new ProcessLaunchRejected({
-                      appId,
-                      reason: "shutting-down",
-                      message: "Processes are shutting down",
-                    }),
-                  );
-                record.instance = acquired.instance;
-                record.backend = acquired.backend;
                 yield* Effect.addFinalizer(() =>
                   Effect.sync(() => {
                     record.closing = true;
                   }),
                 );
-                syncRunningAppsState();
-                launched.emit({ instance: acquired.instance });
-                return {
-                  success: true,
-                  instanceId: acquired.instance.instanceId,
-                  appId,
-                };
+                return yield* Effect.suspend(
+                  (): Effect.Effect<
+                    LaunchResult,
+                    ProcessLaunchRejected | BackendStartupFailed
+                  > => {
+                    if (_shuttingDown)
+                      return Effect.fail(
+                        new ProcessLaunchRejected({
+                          appId,
+                          reason: "shutting-down",
+                          message: "Processes are shutting down",
+                        }),
+                      );
+                    // Native exit must either fail startup here or see the published
+                    // backend in handleAppExit, with no Effect yield between them.
+                    if (
+                      acquired.backend &&
+                      backends.getBackend(appId) !== acquired.backend
+                    )
+                      return Effect.fail(
+                        new BackendStartupFailed({
+                          appId,
+                          reason: "exited",
+                          message: `Backend ${appId} exited during startup`,
+                        }),
+                      );
+                    record.instance = acquired.instance;
+                    record.backend = acquired.backend;
+                    syncRunningAppsState();
+                    launched.emit({ instance: acquired.instance });
+                    return Effect.succeed({
+                      success: true,
+                      instanceId: acquired.instance.instanceId,
+                      appId,
+                    });
+                  },
+                );
               }),
               scope,
             ),

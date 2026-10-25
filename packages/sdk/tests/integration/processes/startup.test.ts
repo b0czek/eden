@@ -1,14 +1,19 @@
 import type { UserProfile } from "@edenapp/types";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Scheduler from "effect/Scheduler";
+import * as TestClock from "effect/testing/TestClock";
 import { ViewNativeFailure } from "../../../src/desktop/views/errors";
 import { log } from "../../../src/platform/logging/logger";
 import type { WindowingPort } from "../../../src/platform/ports/types";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
+import { createEffectRuntime } from "../../support/effect-runtime";
+import type { InMemoryUtilityProcess } from "../../support/in-memory-platform";
 
 describe("app instance ownership", () => {
   const appId = "com.example.owned-launch";
@@ -45,6 +50,217 @@ describe("app instance ownership", () => {
     await tick();
     return eden.getBackendProcess(appId);
   }
+
+  it("rejects an exit before publication and releases the partial view and identity", async () => {
+    const { processes, views, backends, runtimeContexts } =
+      eden.runtime.services;
+    const baseline = eden.platform.activeResourceCount;
+    const scheduler = await eden.runtime.effects.run(Scheduler.Scheduler);
+    const validation = jest.spyOn(backends, "getBackend");
+    const published: unknown[] = [];
+    const off = processes.launched.on((event) => {
+      published.push(event);
+    });
+    let native: InMemoryUtilityProcess | undefined;
+    let yielded = false;
+    const exitBeforeValidation: Scheduler.Scheduler = {
+      executionMode: scheduler.executionMode,
+      makeDispatcher: () => scheduler.makeDispatcher(),
+      shouldYield(fiber) {
+        if (native && !yielded && views.getViewsByAppId(appId).length > 0) {
+          yielded = true;
+          // Frontend acquisition has begun, but the final check has not run.
+          expect(validation).not.toHaveBeenCalled();
+          queueMicrotask(() => native?.kill());
+          return true;
+        }
+        return scheduler.shouldYield(fiber);
+      },
+    };
+    try {
+      const starting = eden.runtime.effects.run(
+        Effect.exit(
+          launch().pipe(
+            Effect.provideService(Scheduler.Scheduler, exitBeforeValidation),
+          ),
+        ),
+      );
+      native = await backend();
+      validation.mockClear();
+      native.emit("message", { type: "backend-ready" });
+      const exit = await starting;
+      expect(yielded).toBe(true);
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (!Exit.isFailure(exit)) throw new Error("Expected startup failure");
+      expect(Cause.hasDies(exit.cause)).toBe(false);
+      expect(Cause.squash(exit.cause)).toMatchObject({
+        _tag: "BackendStartupFailed",
+        appId,
+        reason: "exited",
+      });
+      expect(published).toEqual([]);
+      expect(processes.getAppInstance(appId)).toBeUndefined();
+      expect(runtimeContexts.get(appId)).toBeUndefined();
+      expect(backends.hasBackend(appId)).toBe(false);
+      expect(backends.getFrontendPort(appId)).toBeUndefined();
+      expect(views.getViewsByAppId(appId)).toEqual([]);
+      expect(eden.platform.activeResourceCount).toBe(baseline);
+      const retry = eden.runtime.effects.run(launch());
+      (await backend()).emit("message", { type: "backend-ready" });
+      await expect(retry).resolves.toMatchObject({ success: true });
+    } finally {
+      off();
+      validation.mockRestore();
+    }
+  });
+
+  it.each(["frontend", "backend", "daemon"] as const)(
+    "retains an exit at the first scheduler boundary after liveness validation (%s)",
+    async (kind) => {
+      const {
+        processes,
+        backends,
+        runtimeContexts,
+        installedPackages,
+        daemons,
+      } = eden.runtime.services;
+      installedPackages.register(
+        testApp(appId, {
+          frontend: kind === "frontend" ? { entry: "index.html" } : undefined,
+          backend: { entry: "backend.js" },
+        }),
+      );
+      if (kind === "daemon")
+        await eden.runtime.effects.run(
+          daemons.updateDefinition({
+            appId,
+            enabled: false,
+            runAs: { kind: "user", username: profile.username },
+            restart: "always",
+          }),
+        );
+      const effects = createEffectRuntime(TestClock.layer());
+      const scheduler = await effects.run(Scheduler.Scheduler);
+      // Observe the real lookup without replacing any service behavior.
+      const validation = jest.spyOn(backends, "getBackend");
+      const natives: InMemoryUtilityProcess[] = [];
+      const fork = eden.platform.utilityProcesses.fork.bind(
+        eden.platform.utilityProcesses,
+      );
+      const spawn = jest
+        .spyOn(eden.platform.utilityProcesses, "fork")
+        .mockImplementation((...args) => {
+          const process = fork(...args);
+          const native = eden.platform.utilityProcesses.get(process.pid ?? -1);
+          if (!native) throw new Error("Native backend was not started");
+          natives.push(native);
+          queueMicrotask(() =>
+            native.emit("message", { type: "backend-ready" }),
+          );
+          return native;
+        });
+      const backoff = gate();
+      const delivered = gate();
+      const activeReplacement = gate();
+      const secondBackoff = gate();
+      const offStatus = daemons.changed.on(({ status }) => {
+        if (status.appId !== appId) return;
+        if (status.state === "backoff") {
+          if (status.restartCount === 1) backoff.release();
+          if (status.restartCount === 2) secondBackoff.release();
+        }
+        if (status.state === "active" && natives.length === 2)
+          activeReplacement.release();
+      });
+      const notifications: unknown[] = [];
+      const offExit = processes.exited.on(({ appId: id, code }) => {
+        if (id === appId)
+          notifications.push({
+            code,
+            instance: processes.getAppInstance(appId),
+            identity: runtimeContexts.get(appId),
+          });
+      });
+      let yielded = false;
+      const exitAfterValidation: Scheduler.Scheduler = {
+        executionMode: scheduler.executionMode,
+        makeDispatcher: () => scheduler.makeDispatcher(),
+        shouldYield(fiber) {
+          if (!yielded && validation.mock.results.some((call) => call.value)) {
+            yielded = true;
+            queueMicrotask(() => {
+              natives[0]?.kill();
+              delivered.release();
+            });
+            return true;
+          }
+          return scheduler.shouldYield(fiber);
+        },
+      };
+      try {
+        const starting = kind === "daemon" ? daemons.start(appId) : launch();
+        await effects.run(
+          starting.pipe(
+            Effect.provideService(Scheduler.Scheduler, exitAfterValidation),
+          ),
+        );
+        expect(yielded).toBe(true);
+        await delivered.promise;
+        await tick();
+        // Join admission behind the exit task, including all scope finalizers.
+        await expect(
+          effects.run(processes.stopApp(appId)),
+        ).rejects.toMatchObject({
+          _tag: "ProcessNotRunning",
+        });
+        expect(processes.getAppInstance(appId)).toBeUndefined();
+        expect(runtimeContexts.get(appId)).toBeUndefined();
+        expect(backends.hasBackend(appId)).toBe(false);
+        expect(backends.getFrontendPort(appId)).toBeUndefined();
+        expect(eden.platform.utilityProcesses.activeCount).toBe(0);
+        expect(notifications).toEqual([
+          { code: 0, instance: undefined, identity: undefined },
+        ]);
+
+        if (kind === "daemon") {
+          await backoff.promise;
+          await effects.run(TestClock.adjust(Duration.seconds(1)));
+          await activeReplacement.promise;
+        } else {
+          await effects.run(launch());
+        }
+        expect(natives).toHaveLength(2);
+        expect(processes.getAppInstance(appId)).toBeDefined();
+        expect(runtimeContexts.get(appId)).toBeDefined();
+        expect(backends.getBackend(appId)).toBe(natives[1]);
+        // The same ownership handoff must still handle a normal later exit.
+        natives[1]?.kill();
+        await tick();
+        await expect(
+          effects.run(processes.stopApp(appId)),
+        ).rejects.toMatchObject({
+          _tag: "ProcessNotRunning",
+        });
+        expect(notifications).toHaveLength(2);
+        expect(runtimeContexts.get(appId)).toBeUndefined();
+        expect(eden.platform.utilityProcesses.activeCount).toBe(0);
+        if (kind === "daemon") {
+          await secondBackoff.promise;
+          await effects.run(daemons.stop(appId));
+          expect((await effects.run(daemons.list()))[0]).toMatchObject({
+            state: "inactive",
+          });
+        }
+      } finally {
+        validation.mockRestore();
+        spawn.mockRestore();
+        offExit();
+        offStatus();
+        if (kind === "daemon") await effects.run(daemons.stop(appId));
+        await effects.dispose();
+      }
+    },
+  );
 
   it.each(["exit", "stop"] as const)(
     "publishes %s after removing an instance even when native view cleanup fails",

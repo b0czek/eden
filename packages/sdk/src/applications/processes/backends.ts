@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import type { AppManifest, FilesystemLocation } from "@edenapp/types";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -126,7 +127,8 @@ export const BackendsLive = Layer.effect(
           }),
         );
       const entry = manifest.backend.entry;
-      const backend = yield* Effect.acquireRelease(
+      const startup = yield* Deferred.make<void, BackendStartupFailed>();
+      const { backend } = yield* Effect.acquireRelease(
         Effect.try({
           try: () => {
             const binding = _dlcResources.createBackendBinding(appId);
@@ -155,13 +157,57 @@ export const BackendsLive = Layer.effect(
               _dlcResources.revokeBackend(appId);
               throw error;
             }
-            backend.on("exit", (code) => {
+            // Native events can arrive at the first Effect yield after fork.
+            // Install both listeners here and retain the first startup result.
+            const onMessage = (message: unknown) => {
               if (_backends.get(appId) !== backend) return;
+              const type = getMessageType(message);
+              if (type === "backend-ready")
+                Deferred.doneUnsafe(startup, Effect.void);
+              else if (type === "backend-error")
+                Deferred.doneUnsafe(
+                  startup,
+                  Effect.fail(
+                    new BackendStartupFailed({
+                      appId,
+                      reason: "reported-error",
+                      message:
+                        message &&
+                        typeof message === "object" &&
+                        "error" in message &&
+                        typeof message.error === "string"
+                          ? message.error
+                          : "Unknown backend startup error",
+                    }),
+                  ),
+                );
+              handleBackendMessage(appId, message);
+            };
+            const onExit = (code: number) => {
+              if (_backends.get(appId) !== backend) return;
+              Deferred.doneUnsafe(
+                startup,
+                Effect.fail(
+                  new BackendStartupFailed({
+                    appId,
+                    reason: "exited",
+                    code,
+                    message: `Backend ${appId} exited before becoming ready (${code})`,
+                  }),
+                ),
+              );
+              cleanup();
               releaseBackend(appId, backend);
               backendExit.emit({ appId, backend, code });
-            });
+            };
+            function cleanup() {
+              backend.removeListener("message", onMessage);
+              backend.removeListener("exit", onExit);
+            }
             _backends.set(appId, backend);
-            return backend;
+            backend.on("message", onMessage);
+            backend.on("exit", onExit);
+            return { backend, cleanup };
           },
           catch: (cause) =>
             new BackendIoFailed({
@@ -171,20 +217,21 @@ export const BackendsLive = Layer.effect(
               message: `Failed to spawn backend ${appId}: ${asError(cause).message}`,
             }),
         }),
-        (backend) => terminateBackend(appId, backend).pipe(Effect.orDie),
+        ({ backend, cleanup }) =>
+          terminateBackend(appId, backend).pipe(
+            Effect.ensuring(Effect.sync(cleanup)),
+            Effect.orDie,
+          ),
       );
       yield* Effect.try({
         try: () => {
+          if (_backends.get(appId) !== backend) return;
           pipeBackendOutput(backend);
           if (manifest.frontend?.entry) {
             const { port1, port2 } = _utilityProcesses.createMessageChannel();
             _backendPorts.set(appId, port2);
             backend.postMessage({ type: "init-port" }, [port1]);
           }
-          backend.on("message", (message: unknown) => {
-            if (_backends.get(appId) === backend)
-              handleBackendMessage(appId, message);
-          });
         },
         catch: (cause) =>
           new BackendIoFailed({
@@ -194,49 +241,7 @@ export const BackendsLive = Layer.effect(
             message: `Failed to connect backend ${appId}: ${asError(cause).message}`,
           }),
       });
-      yield* Effect.callback<void, BackendStartupFailed>((resume) => {
-        let completed = false;
-        function finish(error?: BackendStartupFailed) {
-          if (completed) return;
-          completed = true;
-          cleanup();
-          resume(error ? Effect.fail(error) : Effect.void);
-        }
-        const onMessage = (message: unknown) => {
-          const type = getMessageType(message);
-          if (type === "backend-ready") finish();
-          else if (type === "backend-error")
-            finish(
-              new BackendStartupFailed({
-                appId,
-                reason: "reported-error",
-                message:
-                  message &&
-                  typeof message === "object" &&
-                  "error" in message &&
-                  typeof message.error === "string"
-                    ? message.error
-                    : "Unknown backend startup error",
-              }),
-            );
-        };
-        const onExit = (code: number) =>
-          finish(
-            new BackendStartupFailed({
-              appId,
-              reason: "exited",
-              code,
-              message: `Backend ${appId} exited before becoming ready (${code})`,
-            }),
-          );
-        backend.on("message", onMessage);
-        backend.once("exit", onExit);
-        function cleanup() {
-          backend.removeListener("message", onMessage);
-          backend.removeListener("exit", onExit);
-        }
-        return Effect.sync(cleanup);
-      }).pipe(
+      yield* Deferred.await(startup).pipe(
         Effect.timeoutOrElse({
           duration: Duration.seconds(10),
           orElse: () =>

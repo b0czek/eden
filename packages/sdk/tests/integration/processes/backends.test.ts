@@ -11,7 +11,10 @@ import {
   Backends,
   BackendsLive,
 } from "../../../src/applications/processes/backends";
-import { BackendIoFailed } from "../../../src/applications/processes/errors";
+import {
+  BackendIoFailed,
+  BackendStartupFailed,
+} from "../../../src/applications/processes/errors";
 import { UtilityProcessPort } from "../../../src/platform/ports/types";
 import { DistPath } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
@@ -82,6 +85,100 @@ describe("backend readiness and termination", () => {
     if (!backend) throw new Error("Native backend was not started");
     return { starting, backend };
   }
+
+  it.each(
+    (["ready", "reported-error", "exited"] as const).flatMap((result) =>
+      [false, true].map((frontend) => ({ result, frontend })),
+    ),
+  )(
+    "retains early messages and the $result startup result across a scheduler yield (frontend=$frontend)",
+    async ({ result, frontend }) => {
+      const scheduler = await effects.run(Scheduler.Scheduler);
+      const signaled = Deferred.makeUnsafe<void>();
+      const messages: unknown[] = [];
+      const exits: number[] = [];
+      backends.backendMessage.on(({ message }) => {
+        messages.push(message);
+      });
+      backends.backendExit.on(({ code }) => {
+        exits.push(code);
+      });
+      const command = { type: "shell-command", requestId: "early-request" };
+      let yielded = false;
+      const earlyStartup: Scheduler.Scheduler = {
+        executionMode: scheduler.executionMode,
+        makeDispatcher: () => scheduler.makeDispatcher(),
+        shouldYield(fiber) {
+          const backend = backends.getBackend(appId);
+          if (backend && !yielded) {
+            yielded = true;
+            // Deliver native events at the first Effect boundary after fork.
+            queueMicrotask(() => {
+              const native = platform.utilityProcesses.get(backend.pid);
+              if (!native) throw new Error("Native backend was not started");
+              native.emit("message", command);
+              if (result === "exited") native.kill();
+              else {
+                native.emit(
+                  "message",
+                  result === "ready"
+                    ? { type: "backend-ready" }
+                    : { type: "backend-error", error: "early startup failure" },
+                );
+                // Later readiness must not overwrite an earlier failure.
+                if (result === "reported-error")
+                  native.emit("message", { type: "backend-ready" });
+              }
+              Deferred.doneUnsafe(signaled, Effect.void);
+            });
+            return true;
+          }
+          return scheduler.shouldYield(fiber);
+        },
+      };
+      const starting = effects.forkScoped(
+        backends
+          .createBackend(
+            appId,
+            testApp(appId, {
+              frontend: frontend ? { entry: "index.html" } : undefined,
+              backend: { entry: "backend.js" },
+            }),
+            "/app",
+          )
+          .pipe(Effect.provideService(Scheduler.Scheduler, earlyStartup)),
+      );
+      await effects.run(Deferred.await(signaled));
+      // Also let a broken implementation settle via its startup deadline.
+      await effects.run(TestClock.adjust(Duration.seconds(10)));
+      const exit = await effects.run(Fiber.await(starting));
+      expect(yielded).toBe(true);
+      expect(messages).toContainEqual(command);
+      if (result === "ready") {
+        expect(exit).toEqual(
+          Exit.succeed({ backend: backends.getBackend(appId) }),
+        );
+        expect(backends.hasBackend(appId)).toBe(true);
+        expect(platform.utilityProcesses.activeCount).toBe(1);
+      } else {
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) throw new Error("Expected startup failure");
+        const error = Cause.squash(exit.cause);
+        expect(error).toBeInstanceOf(BackendStartupFailed);
+        expect(error).toMatchObject({
+          appId,
+          reason: result,
+          ...(result === "exited"
+            ? { code: 0 }
+            : { message: "early startup failure" }),
+        });
+        expect(backends.hasBackend(appId)).toBe(false);
+        expect(backends.getFrontendPort(appId)).toBeUndefined();
+        expect(platform.utilityProcesses.activeCount).toBe(0);
+        expect(exits).toEqual([0]);
+      }
+    },
+  );
 
   it("terminates every running backend through bulk shutdown", async () => {
     for (const id of [appId, "com.example.second-backend"]) {
