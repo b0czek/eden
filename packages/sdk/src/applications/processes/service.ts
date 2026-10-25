@@ -81,6 +81,10 @@ export interface Processes {
     appId: string,
     caller?: CommandCallerContext,
   ) => Effect.Effect<void, ProcessStopError>;
+  /** Capture the originating instance before acceptance; exit only that instance under the app lock.
+   * @throws ProcessNotRunning before operation acceptance.
+   */
+  prepareExit: (appId: string) => Effect.Effect<void, ProcessStopError>;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   getAppInstance: (appId: string) => AppInstance | undefined;
   getInstalledManifest: (appId: string) => RuntimeAppManifest | undefined;
@@ -495,6 +499,28 @@ export const ProcessesLive = Layer.effect(
     const stopApp = (appId: string, caller?: CommandCallerContext) =>
       withApp(appId, stopInstance(appId, caller));
 
+    function prepareExit(appId: string): Effect.Effect<void, ProcessStopError> {
+      const origin = instances.get(appId);
+      if (!origin || origin.closing)
+        throw new ProcessNotRunning({
+          appId,
+          message: `App ${appId} is not running`,
+        });
+      return withApp(
+        appId,
+        Effect.suspend(() =>
+          instances.get(appId) === origin
+            ? stopInstance(appId)
+            : Effect.fail(
+                new ProcessNotRunning({
+                  appId,
+                  message: `Originating process ${appId} is no longer running`,
+                }),
+              ),
+        ),
+      );
+    }
+
     function getRunningApps(showHidden: boolean = false): AppInstance[] {
       const apps = Array.from(instances.values()).flatMap(({ instance }) =>
         instance ? [instance] : [],
@@ -699,6 +725,7 @@ export const ProcessesLive = Layer.effect(
       launchDaemon,
       ensureAppRunning,
       stopApp,
+      prepareExit,
       getRunningApps,
       getAppInstance,
       getInstalledManifest,

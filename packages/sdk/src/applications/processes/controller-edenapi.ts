@@ -44,11 +44,11 @@ export function createProcessController(processes: Processes) {
         prepare: (_, caller) => {
           if (!caller.appId)
             throw new Error("process/exit requires caller app context");
-          const appId = caller.appId;
+          const exit = processes.prepareExit(caller.appId);
           return (reporter) =>
             Effect.gen(function* () {
               reporter.update("stopping");
-              yield* processes.stopApp(appId);
+              yield* exit;
               return { success: true };
             });
         },

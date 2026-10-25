@@ -64,6 +64,62 @@ describe("Processes integration", () => {
     });
   });
 
+  it("queues backend self-exit during startup without process management permission", async () => {
+    eden = await createTestEden();
+    const appId = "com.example.starting-self-exit";
+    const { processes, operations } = eden.runtime.services;
+    eden.runtime.services.installedPackages.register(
+      testApp(appId, {
+        frontend: undefined,
+        backend: { entry: "backend.js" },
+      }),
+    );
+    const starting = eden.runtime.effects.run(
+      processes.launchDaemon(appId, { kind: "system" }),
+    );
+    await tick();
+    const backend = eden.getBackendProcess(appId);
+    const owner = {
+      appId,
+      sessionId: "runtime",
+      principal: { kind: "system" as const },
+    };
+    let exiting: OperationHandle;
+    try {
+      backend.emit("message", {
+        type: "shell-command",
+        command: "process/exit",
+        commandId: "startup-self-exit",
+        args: {},
+      });
+      await tick();
+      const response = backend.messages.find(
+        (message) =>
+          message !== null &&
+          typeof message === "object" &&
+          "commandId" in message &&
+          message.commandId === "startup-self-exit",
+      ) as { result: { handle: OperationHandle } };
+      expect(response).toMatchObject({
+        type: "shell-command-response",
+        result: {
+          mode: "operation",
+          handle: { command: "process/exit", id: expect.any(String) },
+        },
+      });
+      exiting = response.result.handle;
+      expect(operations.inspect(exiting)?.status).toBe("running");
+    } finally {
+      backend.emit("message", { type: "backend-ready" });
+      await starting;
+    }
+    await expect(
+      eden.runtime.effects.run(operations.wait(exiting, owner)),
+    ).resolves.toEqual({ success: true });
+    expect(processes.getAppInstance(appId)).toBeUndefined();
+    expect(eden.runtime.services.backends.getBackend(appId)).toBeUndefined();
+  });
+
   it("enforces process ownership through the real command path", async () => {
     eden = await createTestEden();
     const target = testApp("com.example.target", { name: "Target App" });
@@ -117,6 +173,90 @@ describe("Processes integration", () => {
       eden.runtime.services.processes.getAppInstance(target.id),
     ).toBeUndefined();
   });
+
+  it.each(["alice", "bob"])(
+    "keeps a queued self-exit from stopping %s's replacement instance",
+    async (replacementOwner) => {
+      eden = await createTestEden();
+      const appId = "com.example.queued-self-exit";
+      const { processes, operations } = eden.runtime.services;
+      eden.runtime.services.installedPackages.register(
+        testApp(appId, {
+          frontend: undefined,
+          backend: { entry: "backend.js" },
+        }),
+      );
+      const alice = await eden.runtime.effects.run(
+        eden.runtime.users.create({
+          username: "alice",
+          name: "Alice",
+          password: "password",
+          grants: ["*"],
+        }),
+      );
+      if (replacementOwner !== "alice")
+        await eden.runtime.effects.run(
+          eden.runtime.users.create({
+            username: replacementOwner,
+            name: replacementOwner,
+            password: "password",
+            grants: ["*"],
+          }),
+        );
+      await eden.runtime.effects.run(
+        eden.runtime.sessions.login(replacementOwner, "password"),
+      );
+      const starting = eden.runtime.effects
+        .run(
+          processes.launchDaemon(
+            appId,
+            { kind: "user", username: "alice" },
+            alice,
+          ),
+        )
+        .catch((error: unknown) => error);
+      await tick();
+      const original = eden.getBackendProcess(appId);
+      const owner = { ...caller(appId, alice), sessionId: "runtime" };
+      let replacement: OperationHandle;
+      let exiting: OperationHandle;
+      try {
+        replacement = await eden.execute<OperationHandle>("process/launch", {
+          appId,
+        });
+        await tick();
+        exiting = await eden.execute<OperationHandle>(
+          "process/exit",
+          {},
+          owner,
+        );
+        await tick();
+        expect(operations.inspect(exiting)?.status).toBe("running");
+      } finally {
+        original.emit("message", {
+          type: "backend-error",
+          error: "Original startup failed",
+        });
+        await starting;
+      }
+      expect(await starting).toMatchObject({ _tag: "BackendStartupFailed" });
+      await tick();
+      const next = eden.getBackendProcess(appId);
+      expect(next).not.toBe(original);
+      next.emit("message", { type: "backend-ready" });
+      await expect(
+        eden.runtime.effects.run(operations.wait(replacement, {})),
+      ).resolves.toMatchObject({ success: true, appId });
+      await expect(
+        eden.runtime.effects.run(operations.wait(exiting, owner)),
+      ).rejects.toThrow(`Originating process ${appId} is no longer running`);
+      expect(processes.getAppInstance(appId)).toMatchObject({
+        instanceId: expect.any(String),
+        principal: { kind: "user", username: replacementOwner },
+      });
+      expect(eden.getBackendProcess(appId)).toBe(next);
+    },
+  );
 
   it.each(["alice", "bob"])(
     "checks %s's queued renderer stop against the owner after daemon startup",
