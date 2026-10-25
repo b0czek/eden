@@ -100,3 +100,29 @@ it("routes settings commands by trusted caller and gates cross-namespace access"
     await eden.dispose();
   }
 });
+
+it("returns prototype-named setting keys in get-all responses", async () => {
+  const eden = await createTestEden();
+  try {
+    const { caller } = await createTestCaller(eden, "app.keys", [
+      "settings/rw",
+    ]);
+    const values = Object.fromEntries([
+      ["__proto__", "prototype value"],
+      ["constructor", "constructor value"],
+      ["toString", "string value"],
+    ]);
+    for (const [key, value] of Object.entries(values))
+      await eden.execute("settings/set", { key, value }, caller);
+    const result = await eden.execute<{ settings: Record<string, string> }>(
+      "settings/get-all",
+      {},
+      caller,
+    );
+    expect(result.settings).toEqual(values);
+    expect(Object.hasOwn(result.settings, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(result.settings)).toBe(Object.prototype);
+  } finally {
+    await eden.dispose();
+  }
+});

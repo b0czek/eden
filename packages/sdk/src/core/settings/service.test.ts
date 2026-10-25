@@ -5,6 +5,7 @@ import {
   buildService,
   createEffectRuntime,
 } from "../../../tests/support/effect-runtime";
+import { log } from "../../platform/logging/logger";
 import { ExecutionContext } from "../execution/context";
 import { SettingAccessError } from "./errors";
 import { SettingsCatalog, SettingsStorage } from "./ports";
@@ -172,12 +173,21 @@ describe("settings shared reads", () => {
         ["app.owner:shared", false],
       ]),
     );
-    await expect(runtime.run(settings.getAll("app.owner"))).resolves.toEqual({
-      shared: "false",
-    });
-    await expect(
-      runtime.run(settings.getAll("app.owner", true)),
-    ).resolves.toEqual({ private: "secret", shared: "false" });
+    const warning = jest.spyOn(log, "warn").mockImplementation(() => {});
+    try {
+      await expect(runtime.run(settings.getAll("app.owner"))).resolves.toEqual({
+        shared: "false",
+      });
+      await expect(
+        runtime.run(settings.getAll("app.owner", true)),
+      ).resolves.toEqual({ private: "secret", shared: "false" });
+      expect(warning.mock.calls).toEqual([
+        ["Non-string value found for key shared, converting to string"],
+        ["Non-string value found for key shared, converting to string"],
+      ]);
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("combines bulk system values with schema defaults and excludes undeclared keys", async () => {

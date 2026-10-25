@@ -161,16 +161,16 @@ export const SettingsLive = Layer.effect(
                 category.settings.map((setting) => setting.key),
               )
             : yield* list(appId, showRestricted);
-        const result: Record<string, string> = {};
-        if (keys.length === 0) return result;
+        const entries: [string, string][] = [];
+        if (keys.length === 0) return {};
         const values = yield* connection.readMany(
           keys.map((key) => `${appId}:${key}`),
         );
         for (const [index, key] of keys.entries()) {
           const value = resolveValue(appId, key, values[index]);
-          if (value !== undefined) result[key] = value;
+          if (value !== undefined) entries.push([key, value]);
         }
-        return result;
+        return Object.fromEntries(entries);
       });
     }
 
