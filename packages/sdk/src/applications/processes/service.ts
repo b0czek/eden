@@ -46,6 +46,7 @@ import {
   type ProcessMetricsError,
   ProcessNotRunning,
   type ProcessStopError,
+  ProcessStopFailed,
   ProcessStopRejected,
   SessionProcessesStopFailed,
 } from "./errors";
@@ -53,7 +54,12 @@ import { watchHotReload } from "./hot-reload";
 import { acquireAppInstance } from "./instance";
 import { createProcessMetrics } from "./metrics";
 import { ProcessesRouting } from "./ports";
-import type { AppRuntime, InstanceRecord, ProcessEvents } from "./types";
+import type {
+  AppRuntime,
+  InstanceRecord,
+  LaunchRequest,
+  ProcessEvents,
+} from "./types";
 
 export interface Processes {
   launched: Event<{ instance: AppInstance }>;
@@ -127,7 +133,7 @@ export const ProcessesLive = Layer.effect(
     const processError = yield* scopedEvent<ProcessEvents["error"]>();
     const exited = yield* scopedEvent<ProcessEvents["exited"]>();
     const forkLifecycle = yield* FiberSet.makeRuntime<never, void, never>();
-    function runLifecycle(work: Effect.Effect<unknown, unknown>) {
+    function runLifecycle<A, E>(work: Effect.Effect<A, E>) {
       forkLifecycle(
         work.pipe(
           Effect.asVoid,
@@ -135,7 +141,6 @@ export const ProcessesLive = Layer.effect(
         ),
       );
     }
-    const processScope = yield* Effect.scope;
     const instances = new Map<string, InstanceRecord>();
     const admission = new Map<string, Semaphore.Semaphore>();
     function withApp<A, E>(appId: string, work: Effect.Effect<A, E>) {
@@ -148,14 +153,25 @@ export const ProcessesLive = Layer.effect(
         return lock.withPermit(work);
       });
     }
-    function closeInstance(record: InstanceRecord, exit = Exit.void) {
-      return Effect.uninterruptible(
-        Effect.suspend(() => {
-          record.closing = true;
-          return record.close.pipe(
-            Effect.ensuring(Scope.close(record.scope, exit)),
-          );
-        }),
+    function closeInstance(
+      record: InstanceRecord,
+      exit: Exit.Exit<unknown, unknown> = Exit.void,
+    ): Effect.Effect<void, ProcessStopFailed> {
+      return Effect.sync(() => {
+        record.closing = true;
+        channels.unregisterAllServices(record.appId);
+      }).pipe(
+        Effect.ensuring(Scope.close(record.scope, exit)),
+        Effect.catchCause((cause) =>
+          Effect.fail(
+            new ProcessStopFailed({
+              appId: record.appId,
+              cause,
+              message: `Failed to stop app ${record.appId}`,
+            }),
+          ),
+        ),
+        Effect.uninterruptible,
       );
     }
 
@@ -205,39 +221,66 @@ export const ProcessesLive = Layer.effect(
         });
     }
 
+    function rejectLaunch(
+      appId: string,
+      reason: ProcessLaunchRejected["reason"],
+    ) {
+      const messages = {
+        forbidden: `User cannot launch app ${appId}`,
+        "not-installed": `App ${appId} is not installed`,
+        "invalid-entry": `App ${appId} must have at least a frontend or backend entry`,
+        "not-daemon": `App ${appId} is not a backend-only daemon`,
+        "already-running": `App ${appId} is already running`,
+        "missing-path": `App path not found for ${appId}`,
+        "shutting-down": "Processes are shutting down",
+      };
+      return Effect.fail(
+        new ProcessLaunchRejected({ appId, reason, message: messages[reason] }),
+      );
+    }
+
+    function sessionRuntime(): AppRuntime {
+      const user = sessionContext.getCurrentUser();
+      return {
+        owner: {
+          kind: "session",
+          sessionId: sessionContext.getSessionId(),
+          username: user?.username ?? null,
+        },
+        principal: user
+          ? { kind: "user", username: user.username }
+          : { kind: "system" },
+      };
+    }
+
+    function launchResult(instance: AppInstance): LaunchResult {
+      return {
+        success: true,
+        appId: instance.manifest.id,
+        instanceId: instance.instanceId,
+      };
+    }
+
     const launchApp = Effect.fn(function* (
       appId: string,
-      bounds?: { x: number; y: number; width: number; height: number },
+      bounds?: Bounds,
       launchArgs?: string[],
       launchFile?: FilesystemLocation,
     ): Effect.fn.Return<LaunchResult, ProcessLaunchError> {
-      if (!canLaunch(appId))
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
+      if (!canLaunch(appId)) return yield* rejectLaunch(appId, "forbidden");
+      return launchResult(
+        yield* withApp(
+          appId,
+          launchInstance({
             appId,
-            reason: "forbidden",
-            message: `User cannot launch app ${appId}`,
+            runtime: sessionRuntime(),
+            bounds,
+            launchArgs,
+            launchFile: launchFile
+              ? { volume: launchFile.volume, path: launchFile.path }
+              : undefined,
           }),
-        );
-
-      const currentUser = sessionContext.getCurrentUser();
-      return yield* launchAppInternal(
-        appId,
-        bounds,
-        launchArgs,
-        {
-          owner: {
-            kind: "session",
-            sessionId: sessionContext.getSessionId(),
-            username: currentUser?.username ?? null,
-          },
-          principal: currentUser
-            ? { kind: "user", username: currentUser.username }
-            : { kind: "system" },
-        },
-        launchFile
-          ? { volume: launchFile.volume, path: launchFile.path }
-          : undefined,
+        ),
       );
     });
 
@@ -247,233 +290,114 @@ export const ProcessesLive = Layer.effect(
       profile?: UserProfile,
     ): Effect.fn.Return<LaunchResult, ProcessLaunchError> {
       const manifest = packages.getAppForLaunch(appId);
-      if (!manifest?.backend?.entry || manifest.frontend?.entry) {
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
+      if (!manifest?.backend?.entry || manifest.frontend?.entry)
+        return yield* rejectLaunch(appId, "not-daemon");
+      return launchResult(
+        yield* withApp(
+          appId,
+          launchInstance({
             appId,
-            reason: "not-daemon",
-            message: `App ${appId} is not a backend-only daemon`,
+            runtime: { owner: { kind: "system" }, principal, profile },
           }),
-        );
-      }
-      return yield* launchAppInternal(appId, undefined, undefined, {
-        owner: { kind: "system" },
-        principal,
-        profile,
-      });
-    });
-
-    const launchInstance = Effect.fn(function* (
-      appId: string,
-      bounds?: { x: number; y: number; width: number; height: number },
-      launchArgs?: string[],
-      runtime?: AppRuntime,
-      launchFile?: FilesystemLocation,
-    ): Effect.fn.Return<LaunchResult, ProcessLaunchError> {
-      const manifest = packages.getAppForLaunch(appId);
-      if (!manifest) {
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
-            appId,
-            reason: "not-installed",
-            message: `App ${appId} is not installed`,
-          }),
-        );
-      }
-
-      // Validate manifest has at least frontend or backend
-      if (!manifest.frontend?.entry && !manifest.backend?.entry) {
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
-            appId,
-            reason: "invalid-entry",
-            message: `App ${appId} must have at least a frontend or backend entry`,
-          }),
-        );
-      }
-
-      // Check if already running
-      if (instances.has(appId)) {
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
-            appId,
-            reason: "already-running",
-            message: `App ${appId} is already running`,
-          }),
-        );
-      }
-
-      // Get the correct install path
-      const installPath = packageCatalog.getPath(appId);
-      if (!installPath) {
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
-            appId,
-            reason: "missing-path",
-            message: `App path not found for ${appId}`,
-          }),
-        );
-      }
-
-      const currentUser = sessionContext.getCurrentUser();
-      const resolvedRuntime: AppRuntime = runtime ?? {
-        owner: {
-          kind: "session" as const,
-          sessionId: sessionContext.getSessionId(),
-          username: currentUser?.username ?? null,
-        },
-        principal: currentUser
-          ? ({ kind: "user", username: currentUser.username } as const)
-          : ({ kind: "system" } as const),
-      };
-
-      if (_shuttingDown)
-        return yield* Effect.fail(
-          new ProcessLaunchRejected({
-            appId,
-            reason: "shutting-down",
-            message: "Processes are shutting down",
-          }),
-        );
-      return yield* Effect.uninterruptibleMask((restore) =>
-        Effect.gen(function* () {
-          const scope = yield* Scope.fork(processScope);
-          const record: InstanceRecord = {
-            appId,
-            scope,
-            runtime: resolvedRuntime,
-            closing: false,
-            close: Effect.void,
-          };
-          instances.set(appId, record);
-          yield* Scope.addFinalizer(
-            scope,
-            Effect.sync(() => {
-              if (instances.get(appId) === record) {
-                instances.delete(appId);
-                syncRunningAppsState();
-              }
-            }),
-          );
-          return yield* restore(
-            Scope.provide(
-              Effect.gen(function* () {
-                const acquired = yield* acquireAppInstance(
-                  {
-                    appId,
-                    manifest,
-                    installPath,
-                    runtime: resolvedRuntime,
-                    bounds,
-                    launchArgs,
-                    launchFile,
-                  },
-                  {
-                    backends,
-                    views,
-                    contexts: runtimeContexts,
-                    channels,
-                  },
-                );
-                record.close = acquired.close;
-                yield* Effect.addFinalizer(() =>
-                  Effect.sync(() => {
-                    record.closing = true;
-                  }),
-                );
-                return yield* Effect.suspend(
-                  (): Effect.Effect<
-                    LaunchResult,
-                    ProcessLaunchRejected | BackendStartupFailed
-                  > => {
-                    if (_shuttingDown)
-                      return Effect.fail(
-                        new ProcessLaunchRejected({
-                          appId,
-                          reason: "shutting-down",
-                          message: "Processes are shutting down",
-                        }),
-                      );
-                    // Native exit must either fail startup here or see the published
-                    // backend in handleAppExit, with no Effect yield between them.
-                    if (
-                      acquired.backend &&
-                      backends.getBackend(appId) !== acquired.backend
-                    )
-                      return Effect.fail(
-                        new BackendStartupFailed({
-                          appId,
-                          reason: "exited",
-                          message: `Backend ${appId} exited during startup`,
-                        }),
-                      );
-                    record.instance = acquired.instance;
-                    record.backend = acquired.backend;
-                    syncRunningAppsState();
-                    launched.emit({ instance: acquired.instance });
-                    return Effect.succeed({
-                      success: true,
-                      instanceId: acquired.instance.instanceId,
-                      appId,
-                    });
-                  },
-                );
-              }),
-              scope,
-            ),
-          ).pipe(
-            Effect.onExit((exit) =>
-              Exit.isFailure(exit)
-                ? closeInstance(record).pipe(Effect.orDie)
-                : Effect.void,
-            ),
-            Effect.tapError((error) =>
-              Effect.sync(() =>
-                log.error(`Failed to launch app ${appId}:`, error),
-              ),
-            ),
-          );
-        }),
+        ),
       );
     });
 
-    const launchAppInternal = (...args: Parameters<typeof launchInstance>) =>
-      withApp(args[0], launchInstance(...args));
+    const reserveInstance = Effect.fn(function* (
+      appId: string,
+      runtime: AppRuntime,
+    ) {
+      // Shutdown owns this scope and always closes it through closeInstance.
+      const scope = yield* Scope.make();
+      const record: InstanceRecord = { appId, runtime, scope, closing: false };
+      instances.set(appId, record);
+      yield* Scope.addFinalizer(
+        scope,
+        Effect.sync(() => {
+          if (instances.get(appId) === record) {
+            instances.delete(appId);
+            syncRunningAppsState();
+          }
+        }),
+      );
+      return record;
+    });
+
+    function publishInstance(
+      record: InstanceRecord,
+      instance: AppInstance,
+      backend?: PlatformUtilityProcess,
+    ) {
+      return Effect.suspend(
+        (): Effect.Effect<
+          AppInstance,
+          ProcessLaunchRejected | BackendStartupFailed
+        > => {
+          const { appId } = record;
+          if (_shuttingDown) return rejectLaunch(appId, "shutting-down");
+          // Check native liveness and publish together, without an Effect yield.
+          if (backend && backends.getBackend(appId) !== backend)
+            return Effect.fail(
+              new BackendStartupFailed({
+                appId,
+                reason: "exited",
+                message: `Backend ${appId} exited during startup`,
+              }),
+            );
+          record.instance = instance;
+          record.backend = backend;
+          syncRunningAppsState();
+          launched.emit({ instance });
+          return Effect.succeed(instance);
+        },
+      );
+    }
+
+    const launchInstance = Effect.fn(function* (
+      request: LaunchRequest,
+    ): Effect.fn.Return<AppInstance, ProcessLaunchError> {
+      const { appId } = request;
+      const manifest = packages.getAppForLaunch(appId);
+      if (!manifest) return yield* rejectLaunch(appId, "not-installed");
+      if (!manifest.frontend?.entry && !manifest.backend?.entry)
+        return yield* rejectLaunch(appId, "invalid-entry");
+      if (instances.has(appId))
+        return yield* rejectLaunch(appId, "already-running");
+      const installPath = packageCatalog.getPath(appId);
+      if (!installPath) return yield* rejectLaunch(appId, "missing-path");
+      if (_shuttingDown) return yield* rejectLaunch(appId, "shutting-down");
+
+      return yield* Effect.acquireUseRelease(
+        reserveInstance(appId, request.runtime),
+        (record) =>
+          acquireAppInstance(
+            { ...request, manifest, installPath },
+            { backends, views, contexts: runtimeContexts },
+          ).pipe(
+            Scope.provide(record.scope),
+            Effect.flatMap(({ instance, backend }) =>
+              publishInstance(record, instance, backend),
+            ),
+          ),
+        (record, exit) =>
+          Exit.isFailure(exit)
+            ? closeInstance(record, exit).pipe(Effect.orDie)
+            : Effect.void,
+      ).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => log.error(`Failed to launch app ${appId}:`, error)),
+        ),
+      );
+    });
 
     const ensureAppRunning = Effect.fn(
       function* (
         appId: string,
-        options: {
-          bounds?: { x: number; y: number; width: number; height: number };
-          launchArgs?: string[];
-        } = {},
       ): Effect.fn.Return<AppInstance, ProcessLaunchError> {
         const existing = getAppInstance(appId);
-        if (existing) {
-          return existing;
-        }
-
-        if (!canLaunch(appId))
-          return yield* Effect.fail(
-            new ProcessLaunchRejected({
-              appId,
-              reason: "forbidden",
-              message: `User cannot launch app ${appId}`,
-            }),
-          );
-        yield* launchInstance(appId, options.bounds, options.launchArgs);
-
-        const launched = getAppInstance(appId);
-        if (!launched) {
-          return yield* Effect.fail(
-            new ProcessLaunchRejected({
-              appId,
-              reason: "invalid-entry",
-              message: `App ${appId} failed to start`,
-            }),
-          );
-        }
-        return launched;
+        if (existing) return existing;
+        if (!canLaunch(appId)) return yield* rejectLaunch(appId, "forbidden");
+        return yield* launchInstance({ appId, runtime: sessionRuntime() });
       },
       (work, appId) => withApp(appId, work),
     );
@@ -663,10 +587,14 @@ export const ProcessesLive = Layer.effect(
 
         if (instance.owner.kind === "system") reloading.emit({ appId });
         yield* stopInstance(appId);
-        yield* launchInstance(appId, bounds, undefined, {
-          owner: instance.owner,
-          principal: instance.principal,
-          profile: runtime?.profile,
+        yield* launchInstance({
+          appId,
+          bounds,
+          runtime: {
+            owner: instance.owner,
+            principal: instance.principal,
+            profile: runtime?.profile,
+          },
         });
 
         log.info(`App ${appId} reloaded successfully`);
@@ -700,16 +628,12 @@ export const ProcessesLive = Layer.effect(
         if (Exit.isFailure(exit)) failures.push(exit.cause);
       }
       if (failures.length) {
-        const cause = failures.reduce(Cause.combine);
-        const failure = new SessionProcessesStopFailed({
-          sessionId,
-          cause: new AggregateError(failures.map(Cause.squash)),
-          message: "Failed to stop all session apps",
-        });
-        return yield* Effect.failCause(
-          Cause.hasDies(cause) || Cause.hasInterrupts(cause)
-            ? Cause.map(cause, () => failure)
-            : Cause.fail(failure),
+        return yield* Effect.fail(
+          new SessionProcessesStopFailed({
+            sessionId,
+            cause: new AggregateError(failures.map(Cause.squash)),
+            message: "Failed to stop all session apps",
+          }),
         );
       }
     }, Effect.uninterruptible);

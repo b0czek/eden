@@ -6,6 +6,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Scheduler from "effect/Scheduler";
 import * as TestClock from "effect/testing/TestClock";
+import { ProcessStopFailed } from "../../../src/applications/processes/errors";
 import { ViewNativeFailure } from "../../../src/desktop/views/errors";
 import { log } from "../../../src/platform/logging/logger";
 import type { WindowingPort } from "../../../src/platform/ports/types";
@@ -308,9 +309,13 @@ describe("app instance ownership", () => {
           expect(Exit.isFailure(exit)).toBe(true);
           if (Exit.isFailure(exit)) {
             expect(Cause.hasDies(exit.cause)).toBe(false);
-            expect(Cause.squash(exit.cause)).toMatchObject({
-              _tag: "ProcessStopFailed",
-              cause: { _tag: "ViewNativeFailure", cause: failure },
+            const error = Cause.squash(exit.cause);
+            expect(error).toBeInstanceOf(ProcessStopFailed);
+            if (!(error instanceof ProcessStopFailed))
+              throw new Error("Expected process stop failure");
+            expect(Cause.squash(error.cause)).toMatchObject({
+              _tag: "ViewNativeFailure",
+              cause: failure,
             });
           }
         }
@@ -336,6 +341,94 @@ describe("app instance ownership", () => {
       }
     },
   );
+
+  it("retains view and backend cleanup failures while releasing instance ownership", async () => {
+    const starting = eden.runtime.effects.run(launch());
+    const native = await backend();
+    native.emit("message", { type: "backend-ready" });
+    await starting;
+    const { processes, views, backends, runtimeContexts } =
+      eden.runtime.services;
+    const view = eden.getAppView(appId);
+    const closeFailure = new Error("Native close failed");
+    const shutdownFailure = new Error("Backend shutdown channel failed");
+    const close = jest
+      .spyOn(view.view.webContents, "close")
+      .mockImplementation(() => {
+        throw closeFailure;
+      });
+    const postMessage = native.postMessage.bind(native);
+    const shutdown = jest
+      .spyOn(native, "postMessage")
+      .mockImplementation((message) => {
+        if ((message as { type: string }).type === "shutdown")
+          throw shutdownFailure;
+        return postMessage(message);
+      });
+    try {
+      const exit = await eden.runtime.effects.run(
+        Effect.exit(processes.stopApp(appId)),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (!Exit.isFailure(exit)) throw new Error("Expected cleanup failure");
+      expect(Cause.hasDies(exit.cause)).toBe(false);
+      expect(exit.cause.reasons).toHaveLength(1);
+      const error = Cause.squash(exit.cause);
+      expect(error).toBeInstanceOf(ProcessStopFailed);
+      if (!(error instanceof ProcessStopFailed))
+        throw new Error("Expected process stop failure");
+      const failures = error.cause.reasons.flatMap((reason) =>
+        Cause.isDieReason(reason) ? [reason.defect] : [],
+      );
+      expect(failures).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            _tag: "ViewNativeFailure",
+            cause: closeFailure,
+          }),
+          expect.objectContaining({
+            _tag: "BackendIoFailed",
+            cause: shutdownFailure,
+          }),
+        ]),
+      );
+      expect(processes.getAppInstance(appId)).toBeUndefined();
+      expect(runtimeContexts.get(appId)).toBeUndefined();
+      expect(views.getViewInfo(view.id)).toBeUndefined();
+      expect(backends.hasBackend(appId)).toBe(false);
+      expect(eden.platform.utilityProcesses.activeCount).toBe(0);
+    } finally {
+      shutdown.mockRestore();
+      close.mockRestore();
+      view.view.webContents.close();
+    }
+  });
+
+  it("releases the instance's backend, view, and identity during runtime disposal", async () => {
+    const starting = eden.runtime.effects.run(launch());
+    const native = await backend();
+    native.emit("message", { type: "backend-ready" });
+    await starting;
+    const { processes, views, backends, runtimeContexts } =
+      eden.runtime.services;
+    const view = eden.getAppView(appId);
+    const notifications: string[] = [];
+    const off = processes.stopped.on(({ appId }) => {
+      notifications.push(appId);
+    });
+    try {
+      await eden.dispose();
+      expect(notifications).toContain(appId);
+      expect(processes.getAppInstance(appId)).toBeUndefined();
+      expect(runtimeContexts.get(appId)).toBeUndefined();
+      expect(views.getViewInfo(view.id)).toBeUndefined();
+      expect(view.view.webContents.isDestroyed()).toBe(true);
+      expect(backends.hasBackend(appId)).toBe(false);
+      expect(eden.platform.activeResourceCount).toBe(0);
+    } finally {
+      off();
+    }
+  });
 
   it("cleans up an exited app while another app's uninstall cleanup is pending", async () => {
     const {

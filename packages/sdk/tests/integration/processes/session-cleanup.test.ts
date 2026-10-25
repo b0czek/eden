@@ -1,6 +1,10 @@
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import {
+  ProcessStopFailed,
+  SessionProcessesStopFailed,
+} from "../../../src/applications/processes/errors";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
@@ -56,7 +60,7 @@ describe("session cleanup failure composition", () => {
     expect(views.getView(second.viewId)).toBeUndefined();
   });
 
-  it("attempts the remaining apps and preserves unexpected cleanup defects", async () => {
+  it("attempts the remaining apps and retains unexpected cleanup errors in the stop failure", async () => {
     const { processes, views } = eden.runtime.services;
     const firstView = processes.getAppInstance(appIds[0])?.viewId;
     if (firstView === undefined)
@@ -75,8 +79,17 @@ describe("session cleanup failure composition", () => {
     );
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(Cause.hasDies(exit.cause)).toBe(true);
-      expect(Cause.squash(exit.cause)).toBe(defect);
+      expect(Cause.hasDies(exit.cause)).toBe(false);
+      const error = Cause.squash(exit.cause);
+      expect(error).toBeInstanceOf(SessionProcessesStopFailed);
+      if (!(error instanceof SessionProcessesStopFailed))
+        throw new Error("Expected session process stop failure");
+      expect(error.cause.errors).toHaveLength(1);
+      const stopped = error.cause.errors[0];
+      expect(stopped).toBeInstanceOf(ProcessStopFailed);
+      if (!(stopped instanceof ProcessStopFailed))
+        throw new Error("Expected process stop failure");
+      expect(Cause.squash(stopped.cause)).toBe(defect);
     }
     for (const appId of appIds)
       expect(processes.getAppInstance(appId)).toBeUndefined();

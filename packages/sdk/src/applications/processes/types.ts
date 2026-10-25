@@ -1,18 +1,28 @@
 import type {
   AppInstance,
   ExecutionPrincipal,
+  FilesystemLocation,
   ProcessOwner,
   UserProfile,
 } from "@edenapp/types";
-import type * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
-import type { PlatformUtilityProcess } from "../../platform/ports/types";
-import type { ProcessStopFailed } from "./errors";
+import type {
+  Bounds,
+  PlatformUtilityProcess,
+} from "../../platform/ports/types";
 
 export interface AppRuntime {
   owner: ProcessOwner;
   principal: ExecutionPrincipal;
   profile?: UserProfile;
+}
+
+export interface LaunchRequest {
+  appId: string;
+  runtime: AppRuntime;
+  bounds?: Bounds;
+  launchArgs?: string[];
+  launchFile?: FilesystemLocation;
 }
 
 export interface ProcessEvents {
@@ -29,5 +39,4 @@ export interface InstanceRecord {
   instance?: AppInstance;
   backend?: PlatformUtilityProcess;
   closing: boolean;
-  close: Effect.Effect<void, ProcessStopFailed>;
 }

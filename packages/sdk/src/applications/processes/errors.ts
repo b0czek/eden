@@ -1,3 +1,4 @@
+import type * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 import type { ViewCreateError } from "../../desktop/views/errors";
 
@@ -86,7 +87,7 @@ export type ProcessLaunchError =
 
 export class ProcessStopFailed extends Data.TaggedError("ProcessStopFailed")<{
   appId: string;
-  cause: unknown;
+  cause: Cause.Cause<never>;
   message: string;
 }> {}
 
