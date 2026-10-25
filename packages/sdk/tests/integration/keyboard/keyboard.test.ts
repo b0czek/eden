@@ -125,7 +125,6 @@ async function createScenario(
         prepareExit: unusedProcessMethod,
         getRunningApps: unusedProcessMethod,
         getAppInstance: unusedProcessMethod,
-        getInstalledManifest: unusedProcessMethod,
         getMetrics: unusedProcessMethod,
         shutdown: unusedProcessMethod,
         reloadApp: unusedProcessMethod,

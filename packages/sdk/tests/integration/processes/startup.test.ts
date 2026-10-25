@@ -1,4 +1,4 @@
-import type { UserProfile } from "@edenapp/types";
+import type { SystemInfo, UserProfile } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -51,6 +51,40 @@ describe("app instance ownership", () => {
     await tick();
     return eden.getBackendProcess(appId);
   }
+
+  it.each(["frontend", "backend"] as const)(
+    "reports published instances directly in system info (%s)",
+    async (kind) => {
+      const { installedPackages, processes } = eden.runtime.services;
+      installedPackages.register(
+        testApp(appId, {
+          frontend: kind === "frontend" ? { entry: "index.html" } : undefined,
+          backend: { entry: "backend.js" },
+        }),
+      );
+      const starting = eden.runtime.effects.run(launch());
+      const native = await backend();
+      expect(
+        (await eden.execute<SystemInfo>("system/info")).runningApps,
+      ).not.toContain(appId);
+      native.emit("message", { type: "backend-ready" });
+      await starting;
+      expect(
+        (await eden.execute<SystemInfo>("system/info")).runningApps,
+      ).toContain(appId);
+      const exited = gate();
+      const off = processes.exited.on(() => exited.release());
+      try {
+        native.kill();
+        await exited.promise;
+        expect(
+          (await eden.execute<SystemInfo>("system/info")).runningApps,
+        ).not.toContain(appId);
+      } finally {
+        off();
+      }
+    },
+  );
 
   it("rejects an exit before publication and releases the partial view and identity", async () => {
     const { processes, views, backends, runtimeContexts } =

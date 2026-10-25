@@ -115,17 +115,24 @@ async function scopedAutostart(
     ),
   );
   const processes = eden.runtime.services.processes;
-  const autostartProcesses = createAutostartProcesses({
-    getAppInstance: (appId) => processes.getAppInstance(appId),
-    getInstalledManifest: (appId) => processes.getInstalledManifest(appId),
-    launchApp: (appId, bounds, launchArgs, location) =>
-      Effect.gen(function* () {
-        const beforeLaunch = options.beforeLaunch;
-        if (beforeLaunch)
-          yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
-        return yield* processes.launchApp(appId, bounds, launchArgs, location);
-      }),
-  });
+  const autostartProcesses = createAutostartProcesses(
+    {
+      getAppInstance: (appId) => processes.getAppInstance(appId),
+      launchApp: (appId, bounds, launchArgs, location) =>
+        Effect.gen(function* () {
+          const beforeLaunch = options.beforeLaunch;
+          if (beforeLaunch)
+            yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
+          return yield* processes.launchApp(
+            appId,
+            bounds,
+            launchArgs,
+            location,
+          );
+        }),
+    },
+    eden.runtime.services.catalog,
+  );
   const sessions = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
     buildService(Autostart, AutostartLive).pipe(

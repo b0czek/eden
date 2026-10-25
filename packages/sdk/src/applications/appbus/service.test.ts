@@ -41,7 +41,6 @@ async function fixture(
             Backends,
             dependency<Backends>({
               hasBackend,
-              sendPortToBackend: () => true,
               sendMessage: () => true,
             }),
           ),

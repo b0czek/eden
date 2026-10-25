@@ -30,8 +30,6 @@ export interface IpcTransport {
   registerController: (controller: Controller) => void;
   setMainWindow: (window: PlatformWindow) => void;
   getMainWindow: () => PlatformWindow | null;
-  updateRunningApps: (appIds: Iterable<string>) => void;
-  getRunningAppIds: () => string[];
   destroy: () => void;
 }
 
@@ -55,7 +53,6 @@ export const IpcTransportLive = Layer.effect(
     let eventSubscribers: EventRouting;
     let mainWindow: PlatformWindow | null = null;
     const controllerEvents = new Map<string, () => void>();
-    let runningAppIds: Set<string> = new Set();
     let stopBackendMessages: (() => void) | undefined;
     let backendMessageListener:
       | ((payload: { appId: string; message: unknown }) => void)
@@ -271,12 +268,6 @@ export const IpcTransportLive = Layer.effect(
         ).addObserver(respond);
       });
     }
-    function updateRunningApps(appIds: Iterable<string>): void {
-      runningAppIds = new Set(appIds);
-    }
-    function getRunningAppIds(): string[] {
-      return Array.from(runningAppIds);
-    }
     function destroy(): void {
       // Remove global IPC handlers
       rendererIpc.removeHandler("shell-command");
@@ -295,8 +286,6 @@ export const IpcTransportLive = Layer.effect(
       registerController,
       setMainWindow,
       getMainWindow,
-      updateRunningApps,
-      getRunningAppIds,
       destroy,
     };
   }),

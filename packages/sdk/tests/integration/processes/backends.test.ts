@@ -251,24 +251,23 @@ describe("backend readiness and termination", () => {
     await starting;
     const scheduler = await effects.run(Scheduler.Scheduler);
     const exited = Deferred.makeUnsafe<void>();
-    let queued = false;
     let yielded = false;
     const exitDuringSetup: Scheduler.Scheduler = {
       executionMode: scheduler.executionMode,
-      makeDispatcher() {
-        const dispatcher = scheduler.makeDispatcher();
-        return {
-          scheduleTask(task, priority) {
-            queued = true;
-            dispatcher.scheduleTask(task, priority);
-          },
-          flush: () => dispatcher.flush(),
-        };
-      },
+      makeDispatcher: () => scheduler.makeDispatcher(),
       shouldYield(fiber) {
-        if (queued && !yielded) {
+        if (
+          !yielded &&
+          backend.messages.some(
+            (message) =>
+              !!message &&
+              typeof message === "object" &&
+              "type" in message &&
+              message.type === "shutdown",
+          )
+        ) {
           yielded = true;
-          // Native exit can arrive while the terminating fiber is yielded.
+          // Native exit can arrive after shutdown is requested but before awaiting it.
           queueMicrotask(() => {
             backend.kill();
             Deferred.doneUnsafe(exited, Effect.void);
@@ -290,6 +289,22 @@ describe("backend readiness and termination", () => {
     expect(backends.hasBackend(appId)).toBe(false);
     expect(platform.utilityProcesses.activeCount).toBe(0);
     expect(backend.listenerCount("exit")).toBe(0);
+  });
+
+  it("settles overlapping termination requests from the same native exit", async () => {
+    const { starting, backend } = await start();
+    backend.emit("message", { type: "backend-ready" });
+    await starting;
+    const first = effects.fork(backends.terminateBackend(appId));
+    const second = effects.fork(backends.terminateBackend(appId));
+    await effects.run(TestClock.adjust(Duration.zero));
+    expect(first.pollUnsafe()).toBeUndefined();
+    expect(second.pollUnsafe()).toBeUndefined();
+    backend.kill();
+    expect(await effects.run(Fiber.await(first))).toEqual(Exit.void);
+    expect(await effects.run(Fiber.await(second))).toEqual(Exit.void);
+    expect(backends.hasBackend(appId)).toBe(false);
+    expect(platform.utilityProcesses.activeCount).toBe(0);
   });
 
   it("retains backend ownership until native exit when termination is interrupted", async () => {

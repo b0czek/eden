@@ -3,6 +3,7 @@ import type {
   RegisteredService,
   ServiceInfo,
 } from "@edenapp/types";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -41,6 +42,7 @@ export const AppChannels = Context.Service<"eden/AppChannels", AppChannels>(
 export const AppChannelsLive = Layer.effect(
   AppChannels,
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const channels = yield* AppChannelTransport;
     const backends = yield* Backends;
     const services = new Map<string, RegisteredService>();
@@ -212,7 +214,7 @@ export const AppChannelsLive = Layer.effect(
         const { port1, port2 } = yield* native("create-channel", () =>
           channels.createMessageChannel(),
         );
-        const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${Date.now()}`;
+        const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${clock.currentTimeMillisUnsafe()}`;
 
         connections.set(connectionId, {
           requesterAppId,
@@ -239,7 +241,7 @@ export const AppChannelsLive = Layer.effect(
           );
         } else {
           yield* native("transfer-requester", () =>
-            backends.sendPortToBackend(
+            backends.sendMessage(
               requesterAppId,
               {
                 type: "appbus-port",
@@ -267,7 +269,7 @@ export const AppChannelsLive = Layer.effect(
           );
         } else {
           yield* native("transfer-provider", () =>
-            backends.sendPortToBackend(
+            backends.sendMessage(
               targetAppId,
               {
                 type: "appbus-port",

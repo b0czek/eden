@@ -26,10 +26,7 @@ import {
 import { PackagesLive } from "../applications/packages/service";
 import { PackageTransactionsLive } from "../applications/packages/transactions";
 import { BackendsLive } from "../applications/processes/backends";
-import {
-  ProcessesRoutingLive,
-  registerProcessesApi,
-} from "../applications/processes/runtime";
+import { registerProcessesApi } from "../applications/processes/runtime";
 import { ProcessesLive } from "../applications/processes/service";
 import { ExecutionContextLive } from "../core/execution/context";
 import { RuntimeContextsLive } from "../core/execution/runtime-contexts";
@@ -184,7 +181,7 @@ const DesktopIntegrationLive = Layer.mergeAll(
     FileOpenLive.pipe(Layer.provide(FileOpenPortsLive)),
     KeyboardLive.pipe(Layer.provide(KeyboardPortsLive)),
   ]),
-  Layer.provideMerge(ProcessesLive.pipe(Layer.provide(ProcessesRoutingLive))),
+  Layer.provideMerge(ProcessesLive),
   Layer.provideMerge(IpcTransportLive),
 );
 

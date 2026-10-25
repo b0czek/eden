@@ -57,7 +57,10 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
     }
     yield* listen(processes.stopped, closeProcessHandles);
     // Native exit closes handle admission before asynchronous instance teardown.
-    yield* listen(backends.backendExit, closeProcessHandles);
+    yield* listen(backends.backendExit, ({ appId }) => {
+      ipc.eventSubscribers.removeBackendSubscriptions(appId);
+      closeProcessHandles({ appId });
+    });
   });
   registerBuiltinSettingsPanels({
     panels: settingsPanels,

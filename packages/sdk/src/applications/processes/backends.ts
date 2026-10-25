@@ -5,6 +5,7 @@ import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Result from "effect/Result";
 import type * as Scope from "effect/Scope";
 import { asError } from "../../core/effects/io";
 import type { Event } from "../../core/events/event";
@@ -34,7 +35,6 @@ export interface Backends {
     backend: PlatformUtilityProcess;
     code: number;
   }>;
-  backendError: Event<{ appId: string; error: unknown }>;
   backendMessage: Event<{ appId: string; message: unknown }>;
   // @eden-effect-next-line unresolved-requirements -- Backend acquisition belongs to the caller-owned app instance scope.
   createBackend: (
@@ -48,11 +48,10 @@ export interface Backends {
     BackendCreateError,
     Scope.Scope
   >;
-  sendMessage: (appId: string, message: unknown) => boolean;
-  sendPortToBackend: (
+  sendMessage: (
     appId: string,
     message: unknown,
-    ports: PlatformMessagePort[],
+    ports?: PlatformMessagePort[],
   ) => boolean;
   getFrontendPort: (appId: string) => PlatformMessagePort | undefined;
   terminateBackend: (
@@ -64,6 +63,13 @@ export interface Backends {
   hasBackend: (appId: string) => boolean;
   getRunningBackends: () => string[];
   terminateAll: () => Effect.Effect<void, BackendTerminateError>;
+}
+
+interface BackendRecord {
+  backend: PlatformUtilityProcess;
+  exited: Deferred.Deferred<number>;
+  frontendPort?: PlatformMessagePort;
+  cleanup(): void;
 }
 
 export const Backends = Context.Service<"eden/Backends", Backends>(
@@ -81,18 +87,11 @@ export const BackendsLive = Layer.effect(
       backend: PlatformUtilityProcess;
       code: number;
     }>();
-    const backendError = yield* scopedEvent<{
-      appId: string;
-      error: unknown;
-    }>();
     const backendMessage = yield* scopedEvent<{
       appId: string;
       message: unknown;
     }>();
-    const _backends: Map<string, PlatformUtilityProcess> = new Map();
-    const _backendPorts: Map<string, PlatformMessagePort> = new Map();
-    const _utilityProcesses = utilityProcesses;
-    const _dlcResources = dlcResources;
+    const backends = new Map<string, BackendRecord>();
 
     function getMessageType(message: unknown): string | undefined {
       if (message && typeof message === "object" && "type" in message) {
@@ -110,7 +109,7 @@ export const BackendsLive = Layer.effect(
       launchArgs?: string[],
       launchFile?: FilesystemLocation,
     ) {
-      if (_backends.has(appId))
+      if (backends.has(appId))
         return yield* Effect.fail(
           new BackendRejected({
             appId,
@@ -128,13 +127,13 @@ export const BackendsLive = Layer.effect(
         );
       const entry = manifest.backend.entry;
       const startup = yield* Deferred.make<void, BackendStartupFailed>();
-      const { backend } = yield* Effect.acquireRelease(
+      const record = yield* Effect.acquireRelease(
         Effect.try({
           try: () => {
-            const binding = _dlcResources.createBackendBinding(appId);
+            const binding = dlcResources.createBackendBinding(appId);
             let backend: PlatformUtilityProcess;
             try {
-              backend = _utilityProcesses.fork(
+              backend = utilityProcesses.fork(
                 path.join(distPath, "app-runtime/backend-preload.js"),
                 encodeLaunchContext({
                   appId,
@@ -154,13 +153,18 @@ export const BackendsLive = Layer.effect(
                 },
               );
             } catch (error) {
-              _dlcResources.revokeBackend(appId);
+              dlcResources.revokeBackend(appId);
               throw error;
             }
+            const record: BackendRecord = {
+              backend,
+              exited: Deferred.makeUnsafe<number>(),
+              cleanup,
+            };
             // Native events can arrive at the first Effect yield after fork.
             // Install both listeners here and retain the first startup result.
             const onMessage = (message: unknown) => {
-              if (_backends.get(appId) !== backend) return;
+              if (backends.get(appId) !== record) return;
               const type = getMessageType(message);
               if (type === "backend-ready")
                 Deferred.doneUnsafe(startup, Effect.void);
@@ -181,10 +185,11 @@ export const BackendsLive = Layer.effect(
                     }),
                   ),
                 );
-              handleBackendMessage(appId, message);
+              backendMessage.emit({ appId, message });
             };
             const onExit = (code: number) => {
-              if (_backends.get(appId) !== backend) return;
+              if (backends.get(appId) !== record) return;
+              Deferred.doneUnsafe(record.exited, Effect.succeed(code));
               Deferred.doneUnsafe(
                 startup,
                 Effect.fail(
@@ -196,18 +201,17 @@ export const BackendsLive = Layer.effect(
                   }),
                 ),
               );
-              cleanup();
-              releaseBackend(appId, backend);
+              releaseBackend(appId, record);
               backendExit.emit({ appId, backend, code });
             };
             function cleanup() {
               backend.removeListener("message", onMessage);
               backend.removeListener("exit", onExit);
             }
-            _backends.set(appId, backend);
+            backends.set(appId, record);
             backend.on("message", onMessage);
             backend.on("exit", onExit);
-            return { backend, cleanup };
+            return record;
           },
           catch: (cause) =>
             new BackendIoFailed({
@@ -217,19 +221,16 @@ export const BackendsLive = Layer.effect(
               message: `Failed to spawn backend ${appId}: ${asError(cause).message}`,
             }),
         }),
-        ({ backend, cleanup }) =>
-          terminateBackend(appId, backend).pipe(
-            Effect.ensuring(Effect.sync(cleanup)),
-            Effect.orDie,
-          ),
+        ({ backend }) => terminateBackend(appId, backend).pipe(Effect.orDie),
       );
+      const { backend } = record;
       yield* Effect.try({
         try: () => {
-          if (_backends.get(appId) !== backend) return;
+          if (backends.get(appId) !== record) return;
           pipeBackendOutput(backend);
           if (manifest.frontend?.entry) {
-            const { port1, port2 } = _utilityProcesses.createMessageChannel();
-            _backendPorts.set(appId, port2);
+            const { port1, port2 } = utilityProcesses.createMessageChannel();
+            record.frontendPort = port2;
             backend.postMessage({ type: "init-port" }, [port1]);
           }
         },
@@ -261,19 +262,22 @@ export const BackendsLive = Layer.effect(
       return { backend };
     });
 
-    function sendMessage(appId: string, message: unknown): boolean {
-      const backend = _backends.get(appId);
+    function sendMessage(
+      appId: string,
+      message: unknown,
+      ports?: PlatformMessagePort[],
+    ): boolean {
+      const backend = backends.get(appId)?.backend;
       if (!backend) {
         log.warn(`No backend found for app ${appId}`);
         return false;
       }
-
       try {
         log.debug(
           `Sending message to backend ${appId}:`,
           getMessageType(message) ?? "unknown",
         );
-        backend.postMessage(message);
+        backend.postMessage(message, ports);
         return true;
       } catch (error) {
         log.error(`Failed to send message to backend ${appId}:`, error);
@@ -281,130 +285,83 @@ export const BackendsLive = Layer.effect(
       }
     }
 
-    function sendPortToBackend(
-      appId: string,
-      message: unknown,
-      ports: PlatformMessagePort[],
-    ): boolean {
-      const backend = _backends.get(appId);
-      if (!backend) {
-        _dlcResources.revokeBackend(appId);
-        log.warn(`No backend found for app ${appId}`);
-        return false;
-      }
-
-      try {
-        log.info(
-          `Sending message with ${ports.length} ports to backend ${appId}:`,
-          getMessageType(message) ?? "unknown",
-        );
-        backend.postMessage(message, ports);
-        return true;
-      } catch (error) {
-        log.error(
-          `Failed to send message with ports to backend ${appId}:`,
-          error,
-        );
-        return false;
-      }
-    }
-
     function getFrontendPort(appId: string): PlatformMessagePort | undefined {
-      return _backendPorts.get(appId);
+      return backends.get(appId)?.frontendPort;
     }
 
-    function releaseBackend(appId: string, backend: PlatformUtilityProcess) {
-      if (_backends.get(appId) !== backend) return;
-      _backends.delete(appId);
-      _backendPorts.get(appId)?.close();
-      _backendPorts.delete(appId);
-      _dlcResources.revokeBackend(appId);
+    function releaseBackend(appId: string, record: BackendRecord) {
+      if (backends.get(appId) !== record) return;
+      backends.delete(appId);
+      record.cleanup();
+      record.frontendPort?.close();
+      dlcResources.revokeBackend(appId);
     }
 
     const terminateBackend = Effect.fn(function* (
       appId: string,
-      expected: PlatformUtilityProcess | undefined = _backends.get(appId),
+      expected: PlatformUtilityProcess | undefined = backends.get(
+        appId,
+      )?.backend,
       force: boolean = false,
     ) {
-      const candidate = _backends.get(appId);
-      if (!candidate || candidate !== expected) return;
-      const backend = candidate;
-      yield* Effect.uninterruptible(
-        Effect.scoped(
-          Effect.gen(function* () {
-            yield* Effect.forkScoped(
-              Effect.sleep(Duration.millis(500)).pipe(
-                Effect.andThen(
-                  Effect.sync(() => {
-                    if (_backends.get(appId) === backend) backend.kill();
-                  }),
-                ),
-              ),
-            );
-            yield* Effect.callback<void, BackendIoFailed>((resume) => {
-              // Exit may arrive while the scoped termination work is being set up.
-              if (_backends.get(appId) !== backend) {
-                resume(Effect.void);
-                return;
-              }
-              let channelError: BackendIoFailed | undefined;
-              const onExit = () =>
-                resume(channelError ? Effect.fail(channelError) : Effect.void);
-              backend.once("exit", onExit);
-              try {
-                if (force) backend.kill();
-                else backend.postMessage({ type: "shutdown" });
-              } catch (error) {
-                channelError = new BackendIoFailed({
-                  appId,
-                  operation: "terminate",
-                  cause: error,
-                  message: `Failed to shut down backend ${appId}: ${asError(error).message}`,
-                });
-                backend.kill();
-              }
-              return Effect.sync(() => backend.removeListener("exit", onExit));
-            }).pipe(
-              Effect.timeoutOrElse({
-                duration: Duration.seconds(5),
-                orElse: () =>
-                  Effect.fail(
-                    new BackendTerminationTimedOut({
-                      appId,
-                      message: `Backend ${appId} termination timed out after 5 seconds`,
-                    }),
-                  ),
+      const record = backends.get(appId);
+      if (!record || record.backend !== expected) return;
+      const { backend, exited } = record;
+      yield* Effect.gen(function* () {
+        const requested = yield* Effect.sync(() =>
+          Result.try({
+            try: () => {
+              if (Deferred.isDoneUnsafe(exited)) return;
+              if (force) backend.kill();
+              else backend.postMessage({ type: "shutdown" });
+            },
+            catch: (cause) =>
+              new BackendIoFailed({
+                appId,
+                operation: "terminate",
+                cause,
+                message: `Failed to shut down backend ${appId}: ${asError(cause).message}`,
               }),
-            );
           }),
-        ),
-      ).pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            releaseBackend(appId, backend);
+        );
+        if (Result.isFailure(requested))
+          yield* Effect.sync(() => backend.kill());
+        yield* Deferred.await(exited).pipe(
+          Effect.timeoutOrElse({
+            duration: Duration.millis(500),
+            orElse: () =>
+              Effect.sync(() => backend.kill()).pipe(
+                Effect.andThen(Deferred.await(exited)),
+              ),
           }),
-        ),
+          Effect.timeoutOrElse({
+            duration: Duration.seconds(5),
+            orElse: () =>
+              Effect.fail(
+                new BackendTerminationTimedOut({
+                  appId,
+                  message: `Backend ${appId} termination timed out after 5 seconds`,
+                }),
+              ),
+          }),
+        );
+        yield* Effect.fromResult(requested);
+      }).pipe(
+        Effect.ensuring(Effect.sync(() => releaseBackend(appId, record))),
+        Effect.uninterruptible,
       );
     });
 
     function getBackend(appId: string): PlatformUtilityProcess | undefined {
-      return _backends.get(appId);
+      return backends.get(appId)?.backend;
     }
 
     function hasBackend(appId: string): boolean {
-      return _backends.has(appId);
+      return backends.has(appId);
     }
 
     function getRunningBackends(): string[] {
-      return Array.from(_backends.keys());
-    }
-
-    function handleBackendMessage(appId: string, message: unknown): void {
-      // Emit event for IPC bridge to handle
-      backendMessage.emit({
-        appId,
-        message,
-      });
+      return Array.from(backends.keys());
     }
 
     function pipeBackendOutput(backend: PlatformUtilityProcess): void {
@@ -418,21 +375,16 @@ export const BackendsLive = Layer.effect(
     }
 
     const terminateAll = () =>
-      Effect.forEach(
-        [..._backends.keys()],
-        (appId) => terminateBackend(appId),
-        {
-          concurrency: "unbounded",
-          discard: true,
-        },
-      );
+      Effect.forEach([...backends.keys()], (appId) => terminateBackend(appId), {
+        concurrency: "unbounded",
+        discard: true,
+      });
     const dispose = () =>
       terminateAll().pipe(
         Effect.ensuring(
           Effect.sync(() => {
-            for (const port of _backendPorts.values()) port.close();
-            _backendPorts.clear();
-            _backends.clear();
+            for (const [appId, record] of backends)
+              releaseBackend(appId, record);
           }),
         ),
       );
@@ -445,11 +397,9 @@ export const BackendsLive = Layer.effect(
     );
     return {
       backendExit,
-      backendError,
       backendMessage,
       createBackend,
       sendMessage,
-      sendPortToBackend,
       getFrontendPort,
       terminateBackend,
       getBackend,

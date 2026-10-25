@@ -460,7 +460,9 @@ describe("Processes integration", () => {
       eden = await createTestEden({
         config: { hotReload: { enabled: true, stateDirectory } },
       });
-      await eden.runtime.dispose();
+      await eden.runtime.effects.run(
+        eden.runtime.services.processes.shutdown(),
+      );
       await closed.promise;
       await expect(fs.access(stateDirectory)).resolves.toBeUndefined();
     } finally {

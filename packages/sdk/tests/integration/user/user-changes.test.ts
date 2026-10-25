@@ -114,7 +114,6 @@ it("refreshes active grants after a committed user update even when its caller i
             assertCanLaunch: unused,
             getRunningApps: unused,
             getAppInstance: unused,
-            getInstalledManifest: unused,
             stopSessionApps: () => Effect.void,
           }),
         ),

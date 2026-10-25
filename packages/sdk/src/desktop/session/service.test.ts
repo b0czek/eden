@@ -109,7 +109,6 @@ describe("Sessions", () => {
             assertCanLaunch: unexpectedDependencyUse,
             getRunningApps: unexpectedDependencyUse,
             getAppInstance: unexpectedDependencyUse,
-            getInstalledManifest: unexpectedDependencyUse,
           }),
         ),
       ),

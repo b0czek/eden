@@ -4,7 +4,6 @@ import type {
   FilesystemLocation,
   LaunchResult,
   ProcessMetricsSnapshot,
-  RuntimeAppManifest,
   UserProfile,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
@@ -53,7 +52,6 @@ import {
 import { watchHotReload } from "./hot-reload";
 import { acquireAppInstance } from "./instance";
 import { createProcessMetrics } from "./metrics";
-import { ProcessesRouting } from "./ports";
 import type {
   AppRuntime,
   InstanceRecord,
@@ -94,7 +92,6 @@ export interface Processes {
   prepareExit: (appId: string) => Effect.Effect<void, ProcessStopError>;
   getRunningApps: (showHidden?: boolean) => AppInstance[];
   getAppInstance: (appId: string) => AppInstance | undefined;
-  getInstalledManifest: (appId: string) => RuntimeAppManifest | undefined;
   getMetrics: (
     showHidden?: boolean | undefined,
     pollingTimeoutMs?: number | undefined,
@@ -126,7 +123,6 @@ export const ProcessesLive = Layer.effect(
     const config = yield* RuntimeConfig;
     const runtimeContexts = yield* RuntimeContexts;
     const processMetrics = yield* ProcessMetricsPort;
-    const routing = yield* ProcessesRouting;
     const launched = yield* scopedEvent<ProcessEvents["launched"]>();
     const stopped = yield* scopedEvent<ProcessEvents["stopped"]>();
     const reloading = yield* scopedEvent<ProcessEvents["reloading"]>();
@@ -185,9 +181,6 @@ export const ProcessesLive = Layer.effect(
       processMetrics,
     });
 
-    yield* listen(backends.backendError, ({ appId, error }) =>
-      handleAppError(appId, error),
-    );
     yield* listen(backends.backendExit, ({ appId, backend, code }) =>
       handleAppExit(appId, backend, code),
     );
@@ -314,10 +307,7 @@ export const ProcessesLive = Layer.effect(
       yield* Scope.addFinalizer(
         scope,
         Effect.sync(() => {
-          if (instances.get(appId) === record) {
-            instances.delete(appId);
-            syncRunningAppsState();
-          }
+          if (instances.get(appId) === record) instances.delete(appId);
         }),
       );
       return record;
@@ -346,7 +336,6 @@ export const ProcessesLive = Layer.effect(
             );
           record.instance = instance;
           record.backend = backend;
-          syncRunningAppsState();
           launched.emit({ instance });
           return Effect.succeed(instance);
         },
@@ -484,10 +473,6 @@ export const ProcessesLive = Layer.effect(
       return instances.get(appId)?.instance;
     }
 
-    function getInstalledManifest(appId: string) {
-      return packageCatalog.getApp(appId);
-    }
-
     const getMetrics = Effect.fn(function* (
       showHidden: boolean = false,
       pollingTimeoutMs?: number,
@@ -500,26 +485,11 @@ export const ProcessesLive = Layer.effect(
       );
     });
 
-    function syncRunningAppsState(): void {
-      routing.updateRunningApps(
-        getRunningApps(true).map((instance) => instance.manifest.id),
-      );
-    }
-
-    function handleAppError(appId: string, error: unknown): void {
-      const instance = getAppInstance(appId);
-      if (instance) {
-        instance.state = "error";
-        processError.emit({ appId, error });
-      }
-    }
-
     function handleAppExit(
       appId: string,
       backend: PlatformUtilityProcess,
       code: number,
     ): void {
-      routing.removeBackendSubscriptions(appId);
       const record = instances.get(appId);
       if (!record || record.backend !== backend || record.closing) return;
       runLifecycle(
@@ -652,9 +622,7 @@ export const ProcessesLive = Layer.effect(
       config,
       packages,
       isRunning: (appId) => instances.has(appId),
-      isShuttingDown: () => _shuttingDown,
       reloadApp,
-      runLifecycle,
     }).pipe(
       logBackgroundFailure("Failed to watch hot reload state:"),
       Effect.map((stop) => stop ?? Effect.void),
@@ -673,7 +641,6 @@ export const ProcessesLive = Layer.effect(
       prepareExit,
       getRunningApps,
       getAppInstance,
-      getInstalledManifest,
       getMetrics,
       shutdown: () => shutdown,
       reloadApp,
