@@ -10,7 +10,7 @@
     "@edenapp/types": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.2"
   },
   "dependencies": {
     "@edenapp/client": "workspace:*"
