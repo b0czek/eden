@@ -347,7 +347,8 @@ export const DaemonsLive = Layer.effect(
       );
       if (isCurrent(appId, runtime)) FiberMap.setUnsafe(fibers, appId, fiber);
       else yield* Fiber.interrupt(fiber);
-      return supervisor.ready;
+      // A fork cancelled before its first turn cannot run the readiness finalizer.
+      return Effect.raceFirst(supervisor.ready, Fiber.join(fiber));
     });
     const startAttempt = Effect.fn(function* (
       appId: string,
@@ -429,7 +430,14 @@ export const DaemonsLive = Layer.effect(
           yield* cancelSupervisor(appId, runtime);
           if (!isCurrent(appId, runtime)) return;
           const ready = yield* supervise(appId, runtime, supervisor);
-          yield* restore(ready);
+          // Cancelling an obsolete supervisor must not cancel lifecycle dispatch.
+          yield* restore(ready).pipe(
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause) && !isCurrent(appId, runtime)
+                ? Effect.void
+                : Effect.failCause(cause),
+            ),
+          );
         }),
       );
     }

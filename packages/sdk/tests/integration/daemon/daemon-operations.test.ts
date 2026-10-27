@@ -157,6 +157,103 @@ describe("daemon operation lifecycle", () => {
     expect(states).toContain("active");
     expect(states.at(-1)).toBe("inactive");
   });
+
+  it.each(["queued", "active"] as const)(
+    "keeps other daemons supervised when a hot-reload adoption is stopped while %s",
+    async (adoption) => {
+      eden = await createTestEden();
+      const reloadedAppId = "com.example.reloaded-daemon";
+      const otherAppId = "com.example.other-daemon";
+      for (const appId of [reloadedAppId, otherAppId])
+        eden.runtime.services.installedPackages.register(
+          testApp(appId, {
+            frontend: undefined,
+            backend: { entry: "backend.js" },
+          }),
+        );
+      const profile = await eden.runtime.effects.run(
+        eden.runtime.users.create({ name: "Daemon", password: "password" }),
+      );
+      for (const appId of [reloadedAppId, otherAppId])
+        await eden.runtime.effects.run(
+          eden.runtime.daemons.updateDefinition({
+            appId,
+            enabled: false,
+            runAs: { kind: "user", username: profile.username },
+            restart: "always",
+          }),
+        );
+      const starting = eden.runtime.effects.run(
+        eden.runtime.daemons.start(reloadedAppId),
+      );
+      const initialPid = await readyBackend(eden, reloadedAppId);
+      await starting;
+
+      const stopped = gate();
+      let stopRequested = false;
+      const stop = async () => {
+        stopRequested = true;
+        if (adoption === "queued") await tick();
+        await eden.runtime.effects.run(
+          adoption === "queued"
+            ? eden.runtime.daemons.stop(reloadedAppId)
+            : eden.runtime.services.daemons.stop(reloadedAppId),
+        );
+      };
+      const offStop =
+        adoption === "queued"
+          ? eden.runtime.services.processes.launched.on(({ instance }) => {
+              if (instance.manifest.id === reloadedAppId && !stopRequested)
+                return stop().then(stopped.release, stopped.reject);
+            })
+          : eden.runtime.services.daemons.changed.on(({ status }) => {
+              if (
+                status.appId === reloadedAppId &&
+                status.state === "active" &&
+                !stopRequested
+              )
+                return stop().then(stopped.release, stopped.reject);
+            });
+      const backoff = gate();
+      const offBackoff = eden.runtime.services.daemons.changed.on(
+        ({ status }) => {
+          if (status.appId === otherAppId && status.state === "backoff")
+            backoff.release();
+        },
+      );
+      try {
+        const reloading = eden.runtime.effects.run(
+          eden.runtime.services.processes.reloadApp(reloadedAppId),
+        );
+        await readyBackend(eden, reloadedAppId, initialPid);
+        await reloading;
+        await stopped.promise;
+        expect(
+          eden.runtime.services.processes.getAppInstance(reloadedAppId),
+        ).toBeUndefined();
+
+        const startingOther = eden.runtime.effects.run(
+          eden.runtime.daemons.start(otherAppId),
+        );
+        const otherPid = await readyBackend(eden, otherAppId);
+        await startingOther;
+        eden.getBackendProcess(otherAppId).kill();
+        await backoff.promise;
+        expect(
+          (await eden.runtime.effects.run(eden.runtime.daemons.list())).find(
+            ({ appId }) => appId === otherAppId,
+          ),
+        ).toMatchObject({ state: "backoff", restartCount: 1 });
+        expect(await readyBackend(eden, otherAppId, otherPid)).not.toBe(
+          otherPid,
+        );
+      } finally {
+        offStop();
+        offBackoff();
+      }
+    },
+  );
+
   it("keeps replacements supervised across delayed stop notifications and process reloads", async () => {
     eden = await createTestEden();
     const appId = "com.example.queued-daemon";
