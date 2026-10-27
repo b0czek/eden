@@ -12,12 +12,10 @@ import {
 } from "../../../src/core/settings/ports";
 import { Settings, SettingsLive } from "../../../src/core/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
-import { AppearanceSettings } from "../../../src/desktop/appearance/ports";
 import {
   Appearance,
   AppearanceLive,
 } from "../../../src/desktop/appearance/service";
-import { createAppearanceSettings } from "../../../src/desktop/appearance/settings";
 import { AppsDirectory } from "../../../src/runtime/inputs";
 import { createTestExecutionContext } from "../../support/callers";
 import {
@@ -99,10 +97,7 @@ it("composes persisted settings with locale notifications and appearance state a
     );
     const appearance = await first.acquire(
       buildService(Appearance, AppearanceLive).pipe(
-        Effect.provideService(
-          AppearanceSettings,
-          createAppearanceSettings(settings),
-        ),
+        Effect.provideService(Settings, settings),
       ),
     );
     await first.run(appearance.initialize());
@@ -148,10 +143,7 @@ it("composes persisted settings with locale notifications and appearance state a
     );
     const nextAppearance = await second.acquire(
       buildService(Appearance, AppearanceLive).pipe(
-        Effect.provideService(
-          AppearanceSettings,
-          createAppearanceSettings(reopened),
-        ),
+        Effect.provideService(Settings, reopened),
       ),
     );
     await second.run(nextAppearance.initialize());
@@ -195,10 +187,7 @@ it("finishes a pending appearance commit and its notifications before closing se
     const settings = await first.acquire(settingsFactory(delayed));
     const appearance = await first.acquire(
       buildService(Appearance, AppearanceLive).pipe(
-        Effect.provideService(
-          AppearanceSettings,
-          createAppearanceSettings(settings),
-        ),
+        Effect.provideService(Settings, settings),
       ),
     );
     const commits: string[] = [];
@@ -221,10 +210,7 @@ it("finishes a pending appearance commit and its notifications before closing se
     const reopened = await second.acquire(settingsFactory(sqlite));
     const nextAppearance = await second.acquire(
       buildService(Appearance, AppearanceLive).pipe(
-        Effect.provideService(
-          AppearanceSettings,
-          createAppearanceSettings(reopened),
-        ),
+        Effect.provideService(Settings, reopened),
       ),
     );
     await second.run(nextAppearance.initialize());

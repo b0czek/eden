@@ -5,13 +5,14 @@ import * as Layer from "effect/Layer";
 import * as v from "valibot";
 import type { Event } from "../../core/events/event";
 import { scopedEvent } from "../../core/events/scoped";
+import { EDEN_SETTINGS_APP_ID } from "../../core/settings/constants";
 import type { SettingValueError } from "../../core/settings/errors";
+import { Settings } from "../../core/settings/service";
 import { log } from "../../platform/logging/logger";
 import type {
   StorageReadFailure,
   StorageWriteFailure,
 } from "../../platform/storage/errors";
-import { AppearanceSettings } from "./ports";
 import {
   DEFAULT_WALLPAPER_PRESET,
   resolveWallpaper,
@@ -35,13 +36,16 @@ export const Appearance = Context.Service<"eden/Appearance", Appearance>(
 export const AppearanceLive = Layer.effect(
   Appearance,
   Effect.gen(function* () {
-    const settings = yield* AppearanceSettings;
+    const settings = yield* Settings;
     const wallpaperChanged = yield* scopedEvent<WallpaperPreset>();
     let currentWallpaper = DEFAULT_WALLPAPER_PRESET;
 
     function initialize() {
       return Effect.gen(function* () {
-        const savedWallpaper = yield* settings.readWallpaper();
+        const savedWallpaper = yield* settings.get(
+          EDEN_SETTINGS_APP_ID,
+          "appearance.wallpaper",
+        );
         if (savedWallpaper) {
           try {
             currentWallpaper = resolveWallpaper(
@@ -58,7 +62,11 @@ export const AppearanceLive = Layer.effect(
       // The store cannot cancel a write already in progress. Finish
       // publishing that commit before honoring interruption.
       return Effect.gen(function* () {
-        yield* settings.saveWallpaper(config);
+        yield* settings.set(
+          EDEN_SETTINGS_APP_ID,
+          "appearance.wallpaper",
+          JSON.stringify(config),
+        );
         const resolved = resolveWallpaper(config);
         currentWallpaper = resolved;
         wallpaperChanged.emit(resolved);

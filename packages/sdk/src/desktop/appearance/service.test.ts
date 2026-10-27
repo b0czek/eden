@@ -1,15 +1,38 @@
 import type { WallpaperConfig, WallpaperPreset } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import { createTestExecutionContext } from "../../../tests/support/callers";
 import { buildService } from "../../../tests/support/effect-runtime";
+import { ExecutionContext } from "../../core/execution/context";
+import { SettingsCatalog, SettingsStorage } from "../../core/settings/ports";
+import { Settings, SettingsLive } from "../../core/settings/service";
 import {
   StorageReadError,
   StorageWriteError,
 } from "../../platform/storage/errors";
-import { AppearanceSettings } from "./ports";
 import { DEFAULT_WALLPAPER_PRESET } from "./presets";
 import { Appearance, AppearanceLive } from "./service";
-import { createAppearanceSettings } from "./settings";
+
+function appearanceWithStorage(
+  storage: Pick<SettingsStorage, "read" | "write">,
+) {
+  return buildService(Appearance, AppearanceLive).pipe(
+    Effect.provideServiceEffect(
+      Settings,
+      buildService(Settings, SettingsLive).pipe(
+        Effect.provide(Layer.mock(SettingsStorage, storage)),
+        Effect.provideService(SettingsCatalog, {
+          getAppSettings: () => undefined,
+        }),
+        Effect.provideServiceEffect(
+          ExecutionContext,
+          createTestExecutionContext(() => true),
+        ),
+      ),
+    ),
+  );
+}
 
 describe("appearance effects", () => {
   it.each(["not JSON", JSON.stringify({ type: "custom", value: 42 })])(
@@ -18,18 +41,10 @@ describe("appearance effects", () => {
       await Effect.runPromise(
         Effect.scoped(
           Effect.gen(function* () {
-            const appearance = yield* buildService(
-              Appearance,
-              AppearanceLive,
-            ).pipe(
-              Effect.provideService(
-                AppearanceSettings,
-                createAppearanceSettings({
-                  get: () => Effect.succeed(savedConfig),
-                  set: () => Effect.void,
-                }),
-              ),
-            );
+            const appearance = yield* appearanceWithStorage({
+              read: () => Effect.succeed(savedConfig),
+              write: () => Effect.void,
+            });
 
             yield* appearance.initialize();
 
@@ -45,21 +60,13 @@ describe("appearance effects", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const appearance = yield* buildService(
-            Appearance,
-            AppearanceLive,
-          ).pipe(
-            Effect.provideService(
-              AppearanceSettings,
-              createAppearanceSettings({
-                get: () =>
-                  Effect.succeed(
-                    JSON.stringify({ type: "preset", id: "midnight" }),
-                  ),
-                set: () => Effect.void,
-              }),
-            ),
-          );
+          const appearance = yield* appearanceWithStorage({
+            read: () =>
+              Effect.succeed(
+                JSON.stringify({ type: "preset", id: "midnight" }),
+              ),
+            write: () => Effect.void,
+          });
           appearance.wallpaperChanged.on((wallpaper) => {
             notifications.push(wallpaper);
           });
@@ -88,18 +95,10 @@ describe("appearance effects", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const appearance = yield* buildService(
-            Appearance,
-            AppearanceLive,
-          ).pipe(
-            Effect.provideService(
-              AppearanceSettings,
-              createAppearanceSettings({
-                get: () => Effect.fail(failure),
-                set: () => Effect.void,
-              }),
-            ),
-          );
+          const appearance = yield* appearanceWithStorage({
+            read: () => Effect.fail(failure),
+            write: () => Effect.void,
+          });
 
           expect(yield* appearance.initialize().pipe(Effect.flip)).toBe(
             failure,
@@ -111,27 +110,19 @@ describe("appearance effects", () => {
   });
 
   it("persists and publishes only when executed, and releases listeners with its scope", async () => {
-    const writes: Array<{ appId: string; key: string; value: string }> = [];
+    const writes: Array<{ key: string; value: string }> = [];
     const notifications: WallpaperPreset[] = [];
     const config: WallpaperConfig = { type: "custom", value: "#123456" };
     const appearance = await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const appearance = yield* buildService(
-            Appearance,
-            AppearanceLive,
-          ).pipe(
-            Effect.provideService(
-              AppearanceSettings,
-              createAppearanceSettings({
-                get: () => Effect.succeed(undefined),
-                set: (appId, key, value) =>
-                  Effect.sync(() => {
-                    writes.push({ appId, key, value });
-                  }),
+          const appearance = yield* appearanceWithStorage({
+            read: () => Effect.succeed(undefined),
+            write: (key, value) =>
+              Effect.sync(() => {
+                writes.push({ key, value });
               }),
-            ),
-          );
+          });
           appearance.wallpaperChanged.on((wallpaper) => {
             notifications.push(wallpaper);
           });
@@ -144,8 +135,7 @@ describe("appearance effects", () => {
           yield* update;
           expect(writes).toEqual([
             {
-              appId: "com.eden",
-              key: "appearance.wallpaper",
+              key: "com.eden:appearance.wallpaper",
               value: JSON.stringify(config),
             },
           ]);
@@ -176,18 +166,10 @@ describe("appearance effects", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const appearance = yield* buildService(
-            Appearance,
-            AppearanceLive,
-          ).pipe(
-            Effect.provideService(
-              AppearanceSettings,
-              createAppearanceSettings({
-                get: () => Effect.succeed(undefined),
-                set: () => Effect.fail(failure),
-              }),
-            ),
-          );
+          const appearance = yield* appearanceWithStorage({
+            read: () => Effect.succeed(undefined),
+            write: () => Effect.fail(failure),
+          });
           appearance.wallpaperChanged.on((wallpaper) => {
             notifications.push(wallpaper);
           });
@@ -226,23 +208,15 @@ describe("appearance effects", () => {
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const appearance = yield* buildService(
-            Appearance,
-            AppearanceLive,
-          ).pipe(
-            Effect.provideService(
-              AppearanceSettings,
-              createAppearanceSettings({
-                get: () => Effect.sync(() => persisted),
-                set: (_appId, _key, value) =>
-                  Effect.promise(async () => {
-                    signalSaveStarted();
-                    await saveReleased;
-                    persisted = value;
-                  }),
+          const appearance = yield* appearanceWithStorage({
+            read: () => Effect.sync(() => persisted),
+            write: (_key, value) =>
+              Effect.promise(async () => {
+                signalSaveStarted();
+                await saveReleased;
+                persisted = value;
               }),
-            ),
-          );
+          });
           appearance.wallpaperChanged.on((wallpaper) => {
             notifications.push(wallpaper);
           });

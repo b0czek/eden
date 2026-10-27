@@ -13,10 +13,11 @@ import { EDEN_SETTINGS_APP_ID } from "../../core/settings/constants";
 import { Settings } from "../../core/settings/service";
 import { SessionContext } from "../../desktop/session/context";
 import { Sessions } from "../../desktop/session/service";
+import { loadHotReloadAppsState } from "../../hotreload-config";
 import { log } from "../../platform/logging/logger";
+import { RuntimeConfig } from "../../runtime/inputs";
 import { PackageCatalog } from "../packages/catalog";
 import { Processes } from "../processes/service";
-import { AutostartConfig, DevelopmentAutostart } from "./ports";
 
 export interface Autostart {
   onFoundationReady: () => void;
@@ -36,14 +37,15 @@ interface LaunchOperation {
 export const AutostartLive = Layer.effect(
   Autostart,
   Effect.gen(function* () {
-    const { development, loginAppId } = yield* AutostartConfig;
+    const config = yield* RuntimeConfig;
+    const { development, loginAppId } = config;
     const settings = yield* Settings;
     const sessions = yield* Sessions;
     const session = yield* SessionContext;
     const operations = yield* Operations;
     const processes = yield* Processes;
     const catalog = yield* PackageCatalog;
-    const developmentApps = yield* DevelopmentAutostart;
+    const developmentApps = loadHotReloadAppsState(config);
     let ready = false;
     let disposed = false;
     const pending = new Set<LaunchOperation>();
@@ -51,7 +53,7 @@ export const AutostartLive = Layer.effect(
 
     function launchDevelopmentApps() {
       return Effect.gen(function* () {
-        const apps = yield* developmentApps.apps;
+        const { apps } = yield* developmentApps;
         for (const app of apps.filter((entry) => entry.launchOnStart)) {
           if (disposed) return;
           if (processes.getAppInstance(app.id)) continue;

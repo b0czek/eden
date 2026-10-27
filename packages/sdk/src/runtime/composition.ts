@@ -12,7 +12,6 @@ import {
   registerAppChannelsApi,
 } from "../applications/appbus/runtime";
 import { AppChannelsLive } from "../applications/appbus/service";
-import { AutostartPortsLive } from "../applications/autostart/runtime";
 import { AutostartLive } from "../applications/autostart/service";
 import { registerDaemonsApi } from "../applications/daemon/runtime";
 import { DaemonsLive } from "../applications/daemon/service";
@@ -53,10 +52,7 @@ import { GrantCatalogLive } from "../core/user/grant-catalog";
 import { registerUsersApi, UsersPortsLive } from "../core/user/runtime";
 import { UsersLive } from "../core/user/service";
 import { UserStorageLive } from "../core/user/storage";
-import {
-  AppearanceSettingsLive,
-  registerAppearanceApi,
-} from "../desktop/appearance/runtime";
+import { registerAppearanceApi } from "../desktop/appearance/runtime";
 import { AppearanceLive } from "../desktop/appearance/service";
 import {
   BrandingPortsLive,
@@ -137,7 +133,7 @@ const CoreServicesLive = Layer.mergeAll(
   SettingsPanelsLive,
   I18nLive.pipe(Layer.provide(I18nSettingsLive)),
   AppAssociationsLive.pipe(Layer.provide(AppAssociationsPortsLive)),
-  AppearanceLive.pipe(Layer.provide(AppearanceSettingsLive)),
+  AppearanceLive,
 ).pipe(
   Layer.provideMerge(
     SettingsLive.pipe(
@@ -168,7 +164,7 @@ const ApplicationServicesLive = Layer.mergeAll(
 
 /** IPC and processes support sessions and desktop interactions. */
 const DesktopIntegrationLive = Layer.mergeAll(
-  AutostartLive.pipe(Layer.provide(AutostartPortsLive)),
+  AutostartLive,
   PowerLive.pipe(Layer.provide(PowerHostLive)),
   FilePickerLive.pipe(Layer.provide(FilePickerViewsLive)),
 ).pipe(
