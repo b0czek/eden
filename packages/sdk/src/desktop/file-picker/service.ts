@@ -3,6 +3,7 @@ import type {
   FilePickerOpenEvent,
   FilePickerResult,
 } from "@edenapp/types";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -11,28 +12,28 @@ import * as FiberSet from "effect/FiberSet";
 import * as Layer from "effect/Layer";
 import * as v from "valibot";
 import { AppAssociations } from "../../applications/app-associations/service";
+import { Processes } from "../../applications/processes/service";
 import type { TargetedNotification } from "../../core/controllers/events";
 import type { Event } from "../../core/events/event";
 import { listen, scopedEvent } from "../../core/events/scoped";
 import { Permissions } from "../../core/ipc/permissions";
+import { accessRejection } from "../../platform/filesystem/errors";
 import { filesystemLocationSchema } from "../../platform/filesystem/location-schema";
+import { Filesystem } from "../../platform/filesystem/service";
 import { volumeRejection } from "../../platform/filesystem/volumes/errors";
 import { Volumes } from "../../platform/filesystem/volumes/service";
 import { log } from "../../platform/logging/logger";
+import { Notifications } from "../notification/service";
 import { createPickerDisplayProvider } from "./display-provider";
 import {
+  FilePickerIoFailed,
   type FilePickerOpenError,
   type FilePickerProviderRejected,
   FilePickerProviderUnavailable,
   FilePickerRequestRejected,
   type FilePickerResolveError,
 } from "./errors";
-import {
-  FilePickerFiles,
-  FilePickerNotifications,
-  FilePickerProcesses,
-  FilePickerViews,
-} from "./ports";
+import { FilePickerViews } from "./ports";
 import type { FilePickerCaller, FilePickerRequest } from "./types";
 
 export interface FilePicker {
@@ -62,13 +63,14 @@ export const FilePicker = Context.Service<"eden/FilePicker", FilePicker>(
 export const FilePickerLive = Layer.effect(
   FilePicker,
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const associations = yield* AppAssociations;
     const views = yield* FilePickerViews;
-    const processes = yield* FilePickerProcesses;
-    const files = yield* FilePickerFiles;
+    const processes = yield* Processes;
+    const files = yield* Filesystem;
     const volumes = yield* Volumes;
     const permissions = yield* Permissions;
-    const notifications = yield* FilePickerNotifications;
+    const notifications = yield* Notifications;
     let idCounter = 0;
     let activeRequest: FilePickerRequest | null = null;
     let idleStop: Fiber.Fiber<void> | undefined;
@@ -101,10 +103,10 @@ export const FilePickerLive = Layer.effect(
               disposed ||
               activeRequest ||
               providers.get() !== provider ||
-              !processes.isRunning(provider.appId)
+              !processes.getAppInstance(provider.appId)
             )
               return;
-            yield* Effect.match(processes.stop(provider.appId), {
+            yield* Effect.match(processes.stopApp(provider.appId), {
               onFailure: (error) =>
                 log.warn(
                   `Failed to stop idle file picker provider ${provider.appId}:`,
@@ -200,7 +202,17 @@ export const FilePickerLive = Layer.effect(
             }),
           );
         const [provider] = matches;
-        yield* processes.ensureRunning(provider.appId);
+        yield* processes.ensureAppRunning(provider.appId).pipe(
+          Effect.mapError(
+            (cause) =>
+              new FilePickerIoFailed({
+                operation: "start-provider",
+                appId: provider.appId,
+                message: cause.message,
+                cause,
+              }),
+          ),
+        );
         yield* providers.waitFor(provider.appId);
       });
     }
@@ -287,9 +299,26 @@ export const FilePickerLive = Layer.effect(
         const identity = { appId: caller.appId, viewId };
         yield* ensureDisplayProvider();
         if (activeRequest) {
-          yield* notifications.busy(
-            forceOpenPicker({ ...args }, { ...(caller ?? {}) }),
-          );
+          const replace = forceOpenPicker({ ...args }, { ...caller });
+          yield* notifications
+            .pushNotification(
+              "File picker is busy",
+              "Resolve the current file picker before opening another.",
+              0,
+              "warning",
+              [{ id: "force-open-file-picker", label: "Force open" }],
+              { "force-open-file-picker": () => Effect.asVoid(replace) },
+            )
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new FilePickerIoFailed({
+                    operation: "notify-busy",
+                    message: cause.message,
+                    cause,
+                  }),
+              ),
+            );
           return yield* Effect.fail(
             new FilePickerRequestRejected({
               operation: "open",
@@ -310,9 +339,12 @@ export const FilePickerLive = Layer.effect(
           );
         const initialLocation =
           args.initialLocation ??
-          (yield* files.accessScope(args.allowedVolumes?.[0] ?? "home"));
+          (yield* Effect.try({
+            try: () => files.accessScope(args.allowedVolumes?.[0] ?? "home"),
+            catch: accessRejection,
+          }));
         cancelIdleStop();
-        const requestId = `file-picker-${Date.now()}-${++idCounter}`;
+        const requestId = `file-picker-${clock.currentTimeMillisUnsafe()}-${++idCounter}`;
         activeRequest = {
           requestId,
           mode: args.mode,

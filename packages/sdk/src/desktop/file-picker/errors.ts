@@ -41,11 +41,7 @@ export class FilePickerProviderUnavailable extends Data.TaggedError(
 }> {}
 
 export class FilePickerIoFailed extends Data.TaggedError("FilePickerIoFailed")<{
-  operation:
-    | "reveal-provider"
-    | "start-provider"
-    | "stop-provider"
-    | "notify-busy";
+  operation: "reveal-provider" | "start-provider" | "notify-busy";
   appId?: string;
   viewId?: number;
   location?: FilesystemLocation;

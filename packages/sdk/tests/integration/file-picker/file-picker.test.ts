@@ -2,9 +2,11 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type {
+  AppInstance,
   FilePickerOpenArgs,
   FilePickerOpenEvent,
   FilePickerResult,
+  Notification,
   UserProfile,
   ViewBounds,
 } from "@edenapp/types";
@@ -24,6 +26,7 @@ import {
   InstalledPackages,
   InstalledPackagesLive,
 } from "../../../src/applications/packages/installed";
+import { Processes } from "../../../src/applications/processes/service";
 import type { TargetedNotification } from "../../../src/core/controllers/events";
 import { createEvent } from "../../../src/core/events/event";
 import {
@@ -34,23 +37,20 @@ import {
   Permissions,
   PermissionsLive,
 } from "../../../src/core/ipc/permissions";
-import {
-  createFilePickerFiles,
-  createFilePickerProcesses,
-} from "../../../src/desktop/file-picker/adapters";
 import { createFilePickerController } from "../../../src/desktop/file-picker/controller-edenapi";
-import {
-  FilePickerFiles,
-  FilePickerNotifications,
-  FilePickerProcesses,
-  FilePickerViews,
-} from "../../../src/desktop/file-picker/ports";
+import { FilePickerViews } from "../../../src/desktop/file-picker/ports";
 import {
   FilePicker,
   FilePickerLive,
 } from "../../../src/desktop/file-picker/service";
+import { NotificationViews } from "../../../src/desktop/notification/ports";
+import {
+  Notifications,
+  NotificationsLive,
+} from "../../../src/desktop/notification/service";
 import { FilesystemAccessDenied } from "../../../src/platform/filesystem/errors";
 import { FilesystemIoFailed } from "../../../src/platform/filesystem/native-errors";
+import { Filesystem } from "../../../src/platform/filesystem/service";
 import {
   Volumes,
   VolumesLive,
@@ -72,11 +72,37 @@ afterAll(() => serviceEffects.dispose());
 interface FilePickerTestPorts {
   associations: AppAssociations;
   views: FilePickerViews;
-  processes: FilePickerProcesses;
-  files: FilePickerFiles;
+  processes: Pick<
+    Processes,
+    "ensureAppRunning" | "getAppInstance" | "stopApp" | "stopped"
+  >;
+  files: Pick<Filesystem, "resolvePath" | "accessScope">;
   volumes: Volumes;
   permissions: Permissions;
-  notifications: FilePickerNotifications;
+  notifications: Notifications;
+}
+
+function dependency<T>(methods: Partial<T>): T {
+  return new Proxy(methods as T & object, {
+    get(target, key, receiver) {
+      if (!(key in target))
+        throw new Error(`Unexpected dependency access: ${String(key)}`);
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
+
+function instance(appId: string): AppInstance {
+  return {
+    manifest: testApp(appId),
+    instanceId: appId,
+    owner: { kind: "system" },
+    principal: { kind: "system" },
+    installPath: "/tmp",
+    viewId: 10,
+    state: "running",
+    installedAt: new Date(0),
+  };
 }
 
 const provider = { appId: "com.example.picker", webContentsId: 100 };
@@ -152,7 +178,19 @@ async function createScenario() {
   const revealed: number[] = [];
   const closed: TargetedNotification<FilePickerResult>[] = [];
   const opened: TargetedNotification<{ picker: FilePickerOpenEvent }>[] = [];
-  const replacements: Effect.Effect<{ requestId: string }, Error>[] = [];
+  const notificationsAdded: Notification[] = [];
+  const notifications = await runtime.acquire(
+    buildService(Notifications, NotificationsLive).pipe(
+      Effect.provideService(NotificationViews, {
+        resolve: (id) => (id === provider.webContentsId ? 10 : undefined),
+        isAlive: (id) => views.get(id)?.alive === true,
+      }),
+    ),
+  );
+  notifications.registerDisplayProvider(provider);
+  notifications.added.on(({ payload }) => {
+    notificationsAdded.push(payload.notification);
+  });
   const volumes = await runtime.acquire(buildService(Volumes, VolumesLive));
   const dependencies: FilePickerTestPorts = {
     associations,
@@ -166,45 +204,44 @@ async function createScenario() {
         }),
     },
     processes: {
-      ensureRunning: (id) =>
+      ensureAppRunning: (id) =>
         Effect.sync(() => {
           launches.push(id);
           running.add(id);
           launched();
+          return instance(id);
         }),
-      isRunning: (id) => running.has(id),
-      stop: (id) =>
+      getAppInstance: (id) => (running.has(id) ? instance(id) : undefined),
+      stopApp: (id) =>
         Effect.sync(() => {
           running.delete(id);
           stopped.emit({ appId: id });
         }),
       stopped,
     },
-    notifications: {
-      busy: (replace) =>
-        Effect.sync(() => {
-          replacements.push(replace);
-        }),
-    },
+    notifications,
     permissions,
     volumes,
     files: {
-      accessScope: (volume) => Effect.succeed({ volume, path: "/" }),
-      resolvePath: () => Effect.void,
+      accessScope: (volume) => ({ volume, path: "/" }),
+      resolvePath: () => Effect.succeed("/tmp"),
     },
   };
   const picker = await runtime.acquire(
     buildService(FilePicker, FilePickerLive).pipe(
       Effect.provideService(AppAssociations, dependencies.associations),
       Effect.provideService(FilePickerViews, dependencies.views),
-      Effect.provideService(FilePickerProcesses, dependencies.processes),
-      Effect.provideService(FilePickerFiles, dependencies.files),
+      Effect.provideService(
+        Processes,
+        dependency<Processes>(dependencies.processes),
+      ),
+      Effect.provideService(
+        Filesystem,
+        dependency<Filesystem>(dependencies.files),
+      ),
       Effect.provideService(Volumes, dependencies.volumes),
       Effect.provideService(Permissions, dependencies.permissions),
-      Effect.provideService(
-        FilePickerNotifications,
-        dependencies.notifications,
-      ),
+      Effect.provideService(Notifications, dependencies.notifications),
     ),
   );
   picker.closed.on((event) => {
@@ -230,7 +267,8 @@ async function createScenario() {
     revealed,
     closed,
     opened,
-    replacements,
+    notificationsAdded,
+    notifications,
     dependencies,
     registry,
     installProvider,
@@ -530,10 +568,7 @@ describe("file picker composition and request lifecycle", () => {
       message: "Location is unavailable",
       cause: new Error("Location is unavailable"),
     });
-    s.dependencies.files.resolvePath = createFilePickerFiles({
-      accessScope: (volume) => ({ volume, path: "/" }),
-      resolvePath: () => Effect.fail(failure),
-    }).resolvePath;
+    s.dependencies.files.resolvePath = () => Effect.fail(failure);
     await expect(
       s.open({
         mode: "open",
@@ -588,12 +623,9 @@ describe("file picker composition and request lifecycle", () => {
     const refusal = new FilesystemAccessDenied({
       message: "No filesystem principal",
     });
-    s.dependencies.files.accessScope = createFilePickerFiles({
-      accessScope: () => {
-        throw refusal;
-      },
-      resolvePath: () => Effect.die("Unexpected path resolution"),
-    }).accessScope;
+    s.dependencies.files.accessScope = () => {
+      throw refusal;
+    };
     const denied = await s.run(
       Effect.result(s.picker.openPicker({ mode: "open" }, opener)),
     );
@@ -613,11 +645,7 @@ describe("file picker composition and request lifecycle", () => {
       };
       if (boundary === "view") s.dependencies.views.resolve = broken;
       else if (boundary === "volume") s.dependencies.volumes.get = broken;
-      else
-        s.dependencies.files.accessScope = createFilePickerFiles({
-          accessScope: broken,
-          resolvePath: () => Effect.die("Unexpected path resolution"),
-        }).accessScope;
+      else s.dependencies.files.accessScope = broken;
       const exit = await s.run(
         Effect.exit(
           s.picker.openPicker(
@@ -644,7 +672,14 @@ describe("file picker composition and request lifecycle", () => {
       s.open({ mode: "save", suggestedName: "report.md" }, other),
     ).rejects.toThrow("File picker is busy");
     expect(s.opened).toHaveLength(1);
-    const second = await s.run(s.replacements[0]);
+    const [notification] = s.notificationsAdded;
+    await s.run(
+      s.notifications.handleActionClicked(
+        notification.id,
+        "force-open-file-picker",
+        provider,
+      ),
+    );
     expect(s.closed).toEqual([
       {
         viewIds: [10, 20],
@@ -655,12 +690,13 @@ describe("file picker composition and request lifecycle", () => {
       viewIds: [10, 21],
       payload: {
         picker: {
-          requestId: second.requestId,
+          requestId: expect.any(String),
           mode: "save",
           suggestedName: "report.md",
         },
       },
     });
+    expect(s.opened[1].payload.picker.requestId).not.toBe(first.requestId);
   });
 
   it("permits provider close, re-registration and cancellation to release the active request", async () => {
@@ -727,7 +763,7 @@ describe("file picker composition and request lifecycle", () => {
     s.views.set(10, { alive: true, bounds });
     await s.register();
     await expect(opening).resolves.toEqual({ requestId: expect.any(String) });
-    expect(s.replacements).toEqual([]);
+    expect(s.notificationsAdded).toEqual([]);
   });
 
   it("stops an idle provider after ten seconds and cancels shutdown on a new request", async () => {
@@ -807,18 +843,13 @@ describe("file picker composition and request lifecycle", () => {
       const finishStop = new Promise<void>((resolve) => {
         finish = resolve;
       });
-      s.dependencies.processes.stop = createFilePickerProcesses({
-        ensureAppRunning: () => Effect.succeed(undefined as never),
-        getAppInstance: () => undefined,
-        stopped: s.stopped,
-        stopApp: () =>
-          Effect.promise(async () => {
-            started();
-            await finishStop;
-            s.running.delete(provider.appId);
-            s.stopped.emit({ appId: provider.appId });
-          }),
-      }).stop;
+      s.dependencies.processes.stopApp = () =>
+        Effect.promise(async () => {
+          started();
+          await finishStop;
+          s.running.delete(provider.appId);
+          s.stopped.emit({ appId: provider.appId });
+        });
       await s.register();
       const { requestId } = await s.open();
       await s.run(s.picker.closePicker(requestId, opener));

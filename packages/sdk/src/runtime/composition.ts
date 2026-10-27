@@ -74,7 +74,7 @@ import {
 } from "../desktop/file-open/runtime";
 import { FileOpenLive } from "../desktop/file-open/service";
 import {
-  FilePickerPortsLive,
+  FilePickerViewsLive,
   registerFilePickerApi,
 } from "../desktop/file-picker/runtime";
 import { FilePickerLive } from "../desktop/file-picker/service";
@@ -173,7 +173,7 @@ const ApplicationServicesLive = Layer.mergeAll(
 const DesktopIntegrationLive = Layer.mergeAll(
   AutostartLive.pipe(Layer.provide(AutostartPortsLive)),
   PowerLive.pipe(Layer.provide(PowerHostLive)),
-  FilePickerLive.pipe(Layer.provide(FilePickerPortsLive)),
+  FilePickerLive.pipe(Layer.provide(FilePickerViewsLive)),
 ).pipe(
   Layer.provideMerge([
     SessionsLive,
