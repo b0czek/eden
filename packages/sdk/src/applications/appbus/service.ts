@@ -45,6 +45,7 @@ export const AppChannelsLive = Layer.effect(
     const clock = yield* Clock.Clock;
     const channels = yield* AppChannelTransport;
     const backends = yield* Backends;
+    let nextConnectionId = 0;
     const services = new Map<string, RegisteredService>();
     const connections = new Map<
       string,
@@ -214,7 +215,7 @@ export const AppChannelsLive = Layer.effect(
         const { port1, port2 } = yield* native("create-channel", () =>
           channels.createMessageChannel(),
         );
-        const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${clock.currentTimeMillisUnsafe()}`;
+        const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${clock.currentTimeMillisUnsafe()}:${++nextConnectionId}`;
 
         connections.set(connectionId, {
           requesterAppId,

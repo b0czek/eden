@@ -5,6 +5,7 @@ import {
   createAppBusState,
   createPortConnection,
   handleAppBusPort,
+  handlePortClosed,
   wrapDOMPort,
 } from "./port-channel";
 import type { ShellTransport } from "./shell-transport";
@@ -37,10 +38,6 @@ test("rejected duplicate exposure preserves the original working service, includ
   const { port1, port2 } = new MessageChannel();
   const peer = createPortConnection(
     wrapDOMPort(port1 as unknown as MessagePort),
-    "peer",
-    new Map(),
-    new Map(),
-    state.messageIdGenerator,
   );
   try {
     handleAppBusPort(
@@ -87,3 +84,77 @@ test.each(["rejection", "transport error"])(
     });
   },
 );
+
+test.each(["before", "after"] as const)(
+  "connect returns the connection created when its port arrives %s the command response",
+  async (arrival) => {
+    const response = gate<{
+      mode: "result";
+      result: { success: boolean; connectionId: string };
+    }>();
+    const { state, api } = setup(
+      (() => response.promise) as ShellTransport["exec"],
+    );
+    const { port1, port2 } = new MessageChannel();
+    const peer = createPortConnection(
+      wrapDOMPort(port1 as unknown as MessagePort),
+    );
+    peer.handle("echo", (value) => value);
+    const deliver = () =>
+      handleAppBusPort(
+        wrapDOMPort(port2 as unknown as MessagePort),
+        {
+          connectionId: "client",
+          role: "client",
+          serviceName: "echo",
+          targetAppId: "provider",
+        },
+        state,
+      );
+    try {
+      const connecting = api.connect("provider", "echo");
+      if (arrival === "before") deliver();
+      response.release({
+        mode: "result",
+        result: { success: true, connectionId: "client" },
+      });
+      if (arrival === "after") {
+        await response.promise;
+        expect(state.pendingConnections.has("client")).toBe(true);
+        deliver();
+      }
+      const connection = await connecting;
+      if ("error" in connection) throw new Error(connection.error);
+      expect(connection).toBe(state.connections.get("client"));
+      await expect(connection.request("echo", arrival)).resolves.toBe(arrival);
+      connection.close();
+      expect(state.connections.size).toBe(0);
+      expect(state.pendingConnections.size).toBe(0);
+    } finally {
+      peer.close();
+      for (const connection of state.connections.values()) connection.close();
+      port2.close();
+    }
+  },
+);
+
+test("main-process closure settles a connection still waiting for its port", async () => {
+  const response = gate<{
+    mode: "result";
+    result: { success: boolean; connectionId: string };
+  }>();
+  const { state, api } = setup(
+    (() => response.promise) as ShellTransport["exec"],
+  );
+  const connecting = api.connect("provider", "echo");
+  response.release({
+    mode: "result",
+    result: { success: true, connectionId: "cancelled" },
+  });
+  await response.promise;
+  handlePortClosed(state, "cancelled");
+  await expect(connecting).resolves.toEqual({
+    error: "Connection cancelled closed",
+  });
+  expect(state.pendingConnections.size).toBe(0);
+});

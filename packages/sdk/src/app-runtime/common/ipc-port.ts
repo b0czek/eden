@@ -39,6 +39,22 @@ export function wrapDOMPort(port: MessagePort): IpcPort {
   >();
   const closeListeners = new Set<() => void>();
 
+  function notifyClosed() {
+    port.removeEventListener("close", notifyClosed);
+    for (const wrapper of messageListeners.values())
+      port.removeEventListener("message", wrapper);
+    messageListeners.clear();
+    for (const listener of [...closeListeners]) {
+      try {
+        listener();
+      } catch (error) {
+        log.error("Error in close listener:", error);
+      }
+    }
+    closeListeners.clear();
+  }
+  port.addEventListener("close", notifyClosed);
+
   function on(
     event: "message",
     listener: (event: IpcPortMessageEvent) => void,
@@ -88,16 +104,12 @@ export function wrapDOMPort(port: MessagePort): IpcPort {
     off,
     start: () => port.start(),
     close: () => {
-      port.close();
-      // Manually trigger close listeners as DOM MessagePort doesn't emit 'close'
-      closeListeners.forEach((listener) => {
-        try {
-          listener();
-        } catch (e) {
-          log.error("Error in close listener:", e);
-        }
-      });
-      closeListeners.clear();
+      try {
+        port.close();
+      } finally {
+        // Main-process close notifications also cover ports without native close events.
+        notifyClosed();
+      }
     },
   };
 }

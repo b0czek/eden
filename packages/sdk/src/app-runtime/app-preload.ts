@@ -16,11 +16,9 @@ import { dispatchEvent } from "./common/event-subscriptions";
 import {
   type AppBusPortData,
   createAppBusState,
-  createMessageIdGenerator,
   createPortConnection,
   handleAppBusPort,
   handlePortClosed,
-  type PendingRequest,
   wrapDOMPort,
 } from "./common/port-channel";
 import { createKeyboardActionController } from "./keyboard/actions";
@@ -31,14 +29,7 @@ const launchContext = decodeLaunchContext(process.argv);
 const { appId } = launchContext;
 
 // MessagePort for direct frontend<->backend communication
-let _backendPort: MessagePort | null = null;
 let backendConnection: AppBusConnection | null = null;
-
-// Pending requests waiting for responses (for backend communication)
-const pendingBackendRequests: Map<string, PendingRequest> = new Map();
-
-// Message ID generator for backend communication
-const generateBackendMessageId = createMessageIdGenerator("backend");
 
 // Event subscription system
 const eventSubscriptions: Map<
@@ -65,20 +56,10 @@ ipcRenderer.on("backend-port", (event) => {
     return;
   }
 
-  _backendPort = port;
   log.info(`Backend port received for app ${appId}`);
 
-  // Wrap DOM MessagePort to IpcPort interface
-  const wrappedPort = wrapDOMPort(port);
-
-  // Create connection object - handles all message routing internally
-  backendConnection = createPortConnection(
-    wrappedPort,
-    "__backend__",
-    new Map([["__backend__", wrappedPort]]), // Dummy map since we won't close this
-    pendingBackendRequests,
-    generateBackendMessageId,
-  );
+  backendConnection?.close();
+  backendConnection = createPortConnection(wrapDOMPort(port));
 });
 
 // Set up unified message listener for shell-message channel
@@ -171,7 +152,7 @@ contextBridge.exposeInMainWorld("edenKeyboard", keyboardAPI);
 // AppBus - App-to-App Communication System
 // ===================================================================
 
-const appBusState = createAppBusState("appbus");
+const appBusState = createAppBusState();
 
 // Handle incoming MessagePorts for peer-to-peer channels
 ipcRenderer.on("appbus-port", (event, data: AppBusPortData) => {

@@ -37,7 +37,6 @@ import { installDlcModuleResolver } from "./common/dlc-module-resolver";
 import {
   type AppBusPortData,
   createAppBusState,
-  createMessageIdGenerator,
   createPortConnection,
   handlePortClosed,
   handleAppBusPort as handlePortSetup,
@@ -138,9 +137,6 @@ console.debug = (...args: unknown[]) =>
 console.trace = (...args: unknown[]) =>
   logFromConsole({ level: "trace", args, callsite: captureConsoleCallsite() });
 
-// Port for direct frontend<->backend communication (received from main)
-let _frontendPort: Electron.MessagePortMain | null = null;
-
 // Port for IPC with main process (process.parentPort)
 const parentPort = process.parentPort;
 if (!parentPort) {
@@ -167,7 +163,7 @@ const pendingCommands: Map<
 let commandIdCounter = 0;
 
 // AppBus state
-const appBusState = createAppBusState("backend-appbus");
+const appBusState = createAppBusState();
 
 /**
  * Generate unique command ID
@@ -299,16 +295,8 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
  * Set up frontend port using createPortConnection
  */
 function setupFrontendPort(port: Electron.MessagePortMain): void {
-  const wrappedPort = wrapElectronPort(port);
-
-  // Create connection using shared utility
-  frontendConnection = createPortConnection(
-    wrappedPort,
-    "__frontend__",
-    new Map([["__frontend__", wrappedPort]]),
-    new Map(),
-    createMessageIdGenerator("backend-to-frontend"),
-  );
+  frontendConnection?.close();
+  frontendConnection = createPortConnection(wrapElectronPort(port));
 }
 
 /**
@@ -356,7 +344,6 @@ async function initializeBackend(): Promise<void> {
         if (event.data.type === "init-port") {
           const [port] = event.ports;
           if (port) {
-            _frontendPort = port;
             setupFrontendPort(port);
             log.info(`Frontend port initialized`);
           }

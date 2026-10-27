@@ -8,8 +8,8 @@ import type {
   ServiceConnectCallback,
   ServiceInfo,
 } from "@edenapp/types";
-import type { AppBusState, IpcPort } from "./port-channel";
-import { createPortConnection, waitForPort } from "./port-channel";
+import type { AppBusState } from "./port-channel";
+import { waitForConnection } from "./port-channel";
 import type { ShellTransport } from "./shell-transport";
 
 /**
@@ -27,12 +27,7 @@ export function createAppBusAPI(
   state: AppBusState,
 ): AppBusAPI {
   const { transport } = config;
-  const {
-    registeredServices,
-    connectedPorts,
-    pendingRequests,
-    messageIdGenerator,
-  } = state;
+  const { registeredServices } = state;
 
   return {
     exposeService: async (
@@ -105,25 +100,14 @@ export function createAppBusAPI(
         return { error: "Connection ID was not provided" };
       }
 
-      // Wait for the port to be received via handleAppBusPort
-      let port: IpcPort;
       try {
-        port = await waitForPort(connectionId, state, 5000);
+        return await waitForConnection(connectionId, state);
       } catch (err) {
         return {
           error:
             err instanceof Error ? err.message : "MessagePort not received",
         };
       }
-
-      // Use shared utility to create connection object
-      return createPortConnection(
-        port,
-        connectionId,
-        connectedPorts,
-        pendingRequests,
-        messageIdGenerator,
-      );
     },
 
     listServices: async (): Promise<{ services: ServiceInfo[] }> => {

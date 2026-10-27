@@ -2,6 +2,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import {
   buildService,
   createEffectRuntime,
@@ -25,7 +26,7 @@ async function fixture(
   createMessageChannel: AppChannelTransport["createMessageChannel"],
   hasBackend = () => true,
 ) {
-  const runtime = createEffectRuntime();
+  const runtime = createEffectRuntime(TestClock.layer());
   const channels = await runtime.acquire(
     buildService(
       AppChannels,
@@ -51,7 +52,30 @@ async function fixture(
   return { runtime, channels };
 }
 
-describe("AppBus failure distinctions", () => {
+describe("AppBus connections and failures", () => {
+  it("assigns distinct IDs to repeated connections without advancing the clock", async () => {
+    const { runtime, channels } = await fixture(() => ({
+      port1: { close() {} },
+      port2: { close() {} },
+    }));
+    try {
+      await runtime.run(channels.registerService("provider", "documents", 0));
+      const first = await runtime.run(
+        channels.connect("client", 0, "provider", "documents"),
+      );
+      const second = await runtime.run(
+        channels.connect("client", 0, "provider", "documents"),
+      );
+      expect(first.success).toBe(true);
+      expect(second.success).toBe(true);
+      expect(first.connectionId).toEqual(expect.any(String));
+      expect(second.connectionId).toEqual(expect.any(String));
+      expect(second.connectionId).not.toBe(first.connectionId);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it("rejects duplicate registration without replacing the original service", async () => {
     const { runtime, channels } = await fixture(() => ({
       port1: { close() {} },
