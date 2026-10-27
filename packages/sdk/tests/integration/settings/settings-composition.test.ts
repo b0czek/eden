@@ -4,8 +4,7 @@ import * as path from "node:path";
 import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 import { ExecutionContext } from "../../../src/core/execution/context";
-import { I18n, I18nLive, I18nSettings } from "../../../src/core/i18n/service";
-import { createI18nSettings } from "../../../src/core/i18n/settings";
+import { I18n, I18nLive } from "../../../src/core/i18n/service";
 import {
   SettingsCatalog,
   SettingsStorage,
@@ -92,7 +91,7 @@ it("composes persisted settings with locale notifications and appearance state a
     );
     const i18n = await first.acquire(
       buildService(I18n, I18nLive).pipe(
-        Effect.provideService(I18nSettings, createI18nSettings(settings)),
+        Effect.provideService(Settings, settings),
       ),
     );
     const appearance = await first.acquire(
@@ -138,7 +137,7 @@ it("composes persisted settings with locale notifications and appearance state a
     );
     const nextI18n = await second.acquire(
       buildService(I18n, I18nLive).pipe(
-        Effect.provideService(I18nSettings, createI18nSettings(reopened)),
+        Effect.provideService(Settings, reopened),
       ),
     );
     const nextAppearance = await second.acquire(

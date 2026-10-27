@@ -345,101 +345,123 @@ describe("Processes integration", () => {
     },
   );
 
-  it("rejects launches while the package processes marks a host as changing", async () => {
-    eden = await createTestEden();
-    const target = testApp("com.example.guarded", { name: "Guarded App" });
-    eden.runtime.services.permissions.registerApp("com.example.controller", [
-      "process/manage",
-    ]);
-    const user = await eden.runtime.effects.run(
-      eden.runtime.users.create({
-        username: "operator",
-        name: "Operator",
-        password: "password",
-        grants: [`apps/launch/${target.id}`],
-      }),
-    );
-    await eden.runtime.effects.run(
-      eden.runtime.sessions.login(user.username, "password"),
-    );
-
-    const processes = eden.runtime.services.processes;
-    const source = path.join(eden.paths.root, "replacement-source");
-    const archive = path.join(eden.paths.root, "replacement.edenite");
-    await fs.mkdir(source);
-    const manifest = {
-      id: target.id,
-      name: target.name,
-      version: target.version,
-      frontend: { entry: "index.html" },
-    };
-    await fs.writeFile(
-      path.join(source, "manifest.json"),
-      JSON.stringify(manifest),
-    );
-    await fs.writeFile(
-      path.join(source, "index.html"),
-      "<html>Replacement</html>",
-    );
-    const initial = await bundle({ appDirectory: source, outputPath: archive });
-    if (!initial.success) throw new Error(initial.error);
-    await eden.runtime.effects.run(eden.runtime.packages.install(archive));
-    await fs.writeFile(
-      path.join(source, "manifest.json"),
-      JSON.stringify({ ...manifest, version: "2.0.0" }),
-    );
-    const bundled = await bundle({ appDirectory: source, outputPath: archive });
-    if (!bundled.success) throw new Error(bundled.error);
-
-    let releaseExtraction!: () => void;
-    const extractionGate = new Promise<void>((resolve) => {
-      releaseExtraction = resolve;
-    });
-    let extractionStarted!: () => void;
-    const extracting = new Promise<void>((resolve) => {
-      extractionStarted = resolve;
-    });
-    const extract = packageBundler.extract;
-    const gatedExtraction = jest
-      .spyOn(packageBundler, "extract")
-      .mockImplementation(async (options) => {
-        extractionStarted();
-        await extractionGate;
-        return extract(options);
-      });
-    const replacement = eden.runtime.effects.run(
-      eden.runtime.packages.install(archive, {
-        replace: true,
-      }),
-    );
-    try {
-      await extracting;
-      expect(eden.runtime.services.catalog.getApp(target.id)?.version).toBe(
-        target.version,
+  it.each([false, true])(
+    "rejects launches during replacement and allows them after settlement (extraction fails: %s)",
+    async (failExtraction) => {
+      eden = await createTestEden();
+      const target = testApp("com.example.guarded", { name: "Guarded App" });
+      eden.runtime.services.permissions.registerApp("com.example.controller", [
+        "process/manage",
+      ]);
+      const user = await eden.runtime.effects.run(
+        eden.runtime.users.create({
+          username: "operator",
+          name: "Operator",
+          password: "password",
+          grants: [`apps/launch/${target.id}`],
+        }),
       );
-      await expect(
-        eden.complete(
-          "process/launch",
-          { appId: target.id },
-          caller("com.example.controller", user),
-        ),
-      ).rejects.toThrow(`App ${target.id} is not installed`);
-      expect(processes.getAppInstance(target.id)).toBeUndefined();
-    } finally {
-      releaseExtraction();
-      await replacement.finally(() => gatedExtraction.mockRestore());
-    }
-    expect(eden.runtime.packages.get(target.id)?.manifest.version).toBe(
-      "2.0.0",
-    );
+      await eden.runtime.effects.run(
+        eden.runtime.sessions.login(user.username, "password"),
+      );
 
-    await eden.complete(
-      "process/launch",
-      { appId: target.id },
-      caller("com.example.controller", user),
-    );
-    expect(processes.getAppInstance(target.id)).toBeDefined();
-  });
+      const processes = eden.runtime.services.processes;
+      const source = path.join(eden.paths.root, "replacement-source");
+      const archive = path.join(eden.paths.root, "replacement.edenite");
+      await fs.mkdir(source);
+      const manifest = {
+        id: target.id,
+        name: target.name,
+        version: target.version,
+        frontend: { entry: "index.html" },
+      };
+      await fs.writeFile(
+        path.join(source, "manifest.json"),
+        JSON.stringify(manifest),
+      );
+      await fs.writeFile(
+        path.join(source, "index.html"),
+        "<html>Replacement</html>",
+      );
+      const initial = await bundle({
+        appDirectory: source,
+        outputPath: archive,
+      });
+      if (!initial.success) throw new Error(initial.error);
+      await eden.runtime.effects.run(eden.runtime.packages.install(archive));
+      await fs.writeFile(
+        path.join(source, "manifest.json"),
+        JSON.stringify({ ...manifest, version: "2.0.0" }),
+      );
+      const bundled = await bundle({
+        appDirectory: source,
+        outputPath: archive,
+      });
+      if (!bundled.success) throw new Error(bundled.error);
+
+      let releaseExtraction!: () => void;
+      const extractionGate = new Promise<void>((resolve) => {
+        releaseExtraction = resolve;
+      });
+      let extractionStarted!: () => void;
+      const extracting = new Promise<void>((resolve) => {
+        extractionStarted = resolve;
+      });
+      const extract = packageBundler.extract;
+      const extractionFailure = new Error("Replacement extraction failed");
+      const gatedExtraction = jest
+        .spyOn(packageBundler, "extract")
+        .mockImplementation(async (options) => {
+          extractionStarted();
+          await extractionGate;
+          if (failExtraction) throw extractionFailure;
+          return extract(options);
+        });
+      const replacement = eden.runtime.effects.run(
+        eden.runtime.packages.install(archive, {
+          replace: true,
+        }),
+      );
+      try {
+        await extracting;
+        expect(eden.runtime.services.catalog.getApp(target.id)?.version).toBe(
+          target.version,
+        );
+        await expect(
+          eden.complete(
+            "process/launch",
+            { appId: target.id },
+            caller("com.example.controller", user),
+          ),
+        ).rejects.toThrow(`App ${target.id} is not installed`);
+        expect(processes.getAppInstance(target.id)).toBeUndefined();
+      } finally {
+        releaseExtraction();
+        try {
+          if (failExtraction)
+            await expect(replacement).rejects.toMatchObject({
+              _tag: "PackageArchiveError",
+              path: archive,
+              operation: "extract",
+              cause: extractionFailure,
+            });
+          else await replacement;
+        } finally {
+          gatedExtraction.mockRestore();
+        }
+      }
+      expect(eden.runtime.packages.get(target.id)?.manifest.version).toBe(
+        failExtraction ? target.version : "2.0.0",
+      );
+
+      await eden.complete(
+        "process/launch",
+        { appId: target.id },
+        caller("com.example.controller", user),
+      );
+      expect(processes.getAppInstance(target.id)).toBeDefined();
+    },
+  );
 
   it("closes the acquired hot-reload watcher during shutdown", async () => {
     const stateRoot = await fs.mkdtemp(

@@ -1,35 +1,42 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
 import * as Scope from "effect/Scope";
+import { createTestExecutionContext } from "../../../tests/support/callers";
 import {
   buildService,
   createEffectRuntime,
 } from "../../../tests/support/effect-runtime";
 import { StorageReadError } from "../../platform/storage/errors";
-import { createEvent } from "../events/event";
-import { I18n, I18nLive, I18nSettings } from "./service";
-import { createI18nSettings } from "./settings";
+import { ExecutionContext } from "../execution/context";
+import { SettingsCatalog, SettingsStorage } from "../settings/ports";
+import { Settings, SettingsLive } from "../settings/service";
+import { I18n, I18nLive } from "./service";
+
+function settingsWithStorage(storage: Partial<SettingsStorage>) {
+  return buildService(Settings, SettingsLive).pipe(
+    Effect.provide(Layer.mock(SettingsStorage, storage)),
+    Effect.provideService(SettingsCatalog, { getAppSettings: () => undefined }),
+    Effect.provideServiceEffect(
+      ExecutionContext,
+      createTestExecutionContext(() => true),
+    ),
+  );
+}
 
 const serviceEffects = createEffectRuntime();
 afterAll(() => serviceEffects.dispose());
 
 describe("i18n service ownership", () => {
   it("releases its settings subscription without disconnecting another instance", () => {
-    const changed = createEvent<{
-      appId: string;
-      key: string;
-      value: string;
-    }>();
-    const settings = {
-      get: () => Effect.succeed(undefined),
-      changed,
-    };
+    const settings = serviceEffects.acquireSync(settingsWithStorage({}));
+    const changed = settings.changed;
     const firstScope = Scope.makeUnsafe();
     const secondScope = Scope.makeUnsafe();
     const first = serviceEffects.acquireSync(
       Scope.provide(
         buildService(I18n, I18nLive).pipe(
-          Effect.provideService(I18nSettings, createI18nSettings(settings)),
+          Effect.provideService(Settings, settings),
         ),
         firstScope,
       ),
@@ -37,7 +44,7 @@ describe("i18n service ownership", () => {
     const second = serviceEffects.acquireSync(
       Scope.provide(
         buildService(I18n, I18nLive).pipe(
-          Effect.provideService(I18nSettings, createI18nSettings(settings)),
+          Effect.provideService(Settings, settings),
         ),
         secondScope,
       ),
@@ -68,17 +75,15 @@ describe("i18n service ownership", () => {
   });
 
   it("releases its subscription when startup fails after acquisition", async () => {
-    const changed = createEvent<{ locale: string }>();
+    const settings = await serviceEffects.acquire(settingsWithStorage({}));
+    const changed = settings.changed;
     const failure = new Error("Startup failed");
 
     const exit = await Effect.runPromiseExit(
       Effect.scoped(
         Effect.gen(function* () {
           yield* buildService(I18n, I18nLive).pipe(
-            Effect.provideService(I18nSettings, {
-              readLocale: () => Effect.succeed(undefined),
-              localeChanged: changed,
-            }),
+            Effect.provideService(Settings, settings),
           );
           expect(changed.hasListeners()).toBe(true);
           return yield* Effect.fail(failure);
@@ -95,23 +100,22 @@ describe("i18n persisted settings", () => {
   it("reads the saved locale lazily, defaults missing values, and preserves read failures", async () => {
     let locale: string | undefined;
     let readFailure: StorageReadError | undefined;
-    const reads: string[][] = [];
-    const settings = createI18nSettings({
-      get: (appId, key) =>
+    const reads: string[] = [];
+    const settings = settingsWithStorage({
+      read: (key) =>
         Effect.suspend(() => {
-          reads.push([appId, key]);
+          reads.push(key);
           return readFailure
             ? Effect.fail(readFailure)
             : Effect.succeed(locale);
         }),
-      changed: createEvent<{ appId: string; key: string; value: string }>(),
     });
 
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
           const i18n = yield* buildService(I18n, I18nLive).pipe(
-            Effect.provideService(I18nSettings, settings),
+            Effect.provideServiceEffect(Settings, settings),
           );
           const read = i18n.getLocale();
           expect(reads).toEqual([]);
@@ -119,8 +123,8 @@ describe("i18n persisted settings", () => {
           locale = "pl";
           expect(yield* read).toBe("pl");
           expect(reads).toEqual([
-            ["com.eden", "general.locale"],
-            ["com.eden", "general.locale"],
+            "com.eden:general.locale",
+            "com.eden:general.locale",
           ]);
 
           readFailure = new StorageReadError({
@@ -138,46 +142,32 @@ describe("i18n persisted settings", () => {
           readFailure = undefined;
           locale = "en";
           expect(yield* read).toBe("en");
+          locale = "";
+          expect(yield* read).toBe("en");
         }),
       ),
     );
   });
 
   it("forwards only locale-key changes with the existing app-independent filtering", async () => {
-    const changed = createEvent<{
-      appId: string;
-      key: string;
-      value: string;
-    }>();
     const locales: string[] = [];
 
     await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
+          const settings = yield* settingsWithStorage({
+            write: () => Effect.void,
+          });
           const i18n = yield* buildService(I18n, I18nLive).pipe(
-            Effect.provideService(
-              I18nSettings,
-              createI18nSettings({
-                get: () => Effect.succeed(undefined),
-                changed,
-              }),
-            ),
+            Effect.provideService(Settings, settings),
           );
           i18n.localeChanged.on(({ locale }) => {
             locales.push(locale);
           });
 
-          changed.emit({ appId: "com.eden", key: "other", value: "ignored" });
-          changed.emit({
-            appId: "com.eden",
-            key: "general.locale",
-            value: "pl",
-          });
-          changed.emit({
-            appId: "other.app",
-            key: "general.locale",
-            value: "en",
-          });
+          yield* settings.set("com.eden", "other", "ignored");
+          yield* settings.set("com.eden", "general.locale", "pl");
+          yield* settings.set("other.app", "general.locale", "en");
         }),
       ),
     );

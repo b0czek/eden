@@ -29,7 +29,7 @@ import { registerProcessesApi } from "../applications/processes/runtime";
 import { ProcessesLive } from "../applications/processes/service";
 import { ExecutionContextLive } from "../core/execution/context";
 import { RuntimeContextsLive } from "../core/execution/runtime-contexts";
-import { I18nSettingsLive, registerI18nApi } from "../core/i18n/runtime";
+import { registerI18nApi } from "../core/i18n/runtime";
 import { I18nLive } from "../core/i18n/service";
 import { CommandsLive } from "../core/ipc/commands";
 import { PermissionsLive } from "../core/ipc/permissions";
@@ -131,7 +131,7 @@ const PlatformPersistenceLive = Layer.mergeAll(
 const CoreServicesLive = Layer.mergeAll(
   ViewsLive,
   SettingsPanelsLive,
-  I18nLive.pipe(Layer.provide(I18nSettingsLive)),
+  I18nLive,
   AppAssociationsLive.pipe(Layer.provide(AppAssociationsPortsLive)),
   AppearanceLive,
 ).pipe(

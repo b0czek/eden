@@ -54,7 +54,7 @@ export function createPackageMutations({
   installed: Event<PackageEvents["installed"]>;
   uninstalled: Event<PackageEvents["uninstalled"]>;
 }) {
-  const changingHostIds = new Map<string, number>();
+  const changingHostIds = new Set<string>();
   const installPackageFromHostPath = Effect.fn(function* (
     hostPath: string,
     replacementConfirmed: boolean = false,
@@ -411,20 +411,12 @@ export function createPackageMutations({
     operation: Effect.Effect<T, E, R>,
   ) {
     const ids = [...new Set(appIds)];
-    for (const appId of ids) {
-      changingHostIds.set(appId, (changingHostIds.get(appId) ?? 0) + 1);
-    }
+    // Install and uninstall hold the exclusive package mutation lock.
+    for (const appId of ids) changingHostIds.add(appId);
     return yield* Effect.ensuring(
       operation,
       Effect.sync(() => {
-        for (const appId of ids) {
-          const depth = changingHostIds.get(appId);
-          if (depth === undefined || depth <= 1) {
-            changingHostIds.delete(appId);
-          } else {
-            changingHostIds.set(appId, depth - 1);
-          }
-        }
+        for (const appId of ids) changingHostIds.delete(appId);
       }),
     );
   });
