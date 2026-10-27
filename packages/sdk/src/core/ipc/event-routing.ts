@@ -61,13 +61,15 @@ export interface EventRouting {
   dispose: () => void;
 }
 
-type OperationSubscriptions<T> = Map<string, Map<T, Set<boolean>>>;
+// View IDs are numbers; backend app IDs are strings.
+type Endpoint = number | string;
+type OperationSubscriptions = Map<string, Map<Endpoint, Set<boolean>>>;
 const operationKey = (handle: OperationHandle) =>
   JSON.stringify([handle.command, handle.id]);
 
-function addOperation<T>(
-  subscriptions: OperationSubscriptions<T>,
-  endpoint: T,
+function addOperation(
+  subscriptions: OperationSubscriptions,
+  endpoint: Endpoint,
   observation: OperationObservation,
 ): void {
   const key = operationKey(observation.handle);
@@ -84,9 +86,9 @@ function addOperation<T>(
   interests.add(observation.terminalOnly === true);
 }
 
-function removeOperation<T>(
-  subscriptions: OperationSubscriptions<T>,
-  endpoint: T,
+function removeOperation(
+  subscriptions: OperationSubscriptions,
+  endpoint: Endpoint,
   observation: OperationObservation,
 ): boolean {
   const key = operationKey(observation.handle);
@@ -98,26 +100,16 @@ function removeOperation<T>(
   return removed;
 }
 
-function* interested<T>(
-  subscriptions: OperationSubscriptions<T>,
+function* interested(
+  subscriptions: OperationSubscriptions,
   operation?: EventScope["operation"],
-): Iterable<T> {
+): Iterable<Endpoint> {
   if (!operation) return;
   const endpoints = subscriptions.get(operationKey(operation.handle));
   if (!endpoints) return;
   for (const [endpoint, interests] of endpoints)
     if (interests.has(false) || (operation.terminal && interests.has(true)))
       yield endpoint;
-}
-
-function removeEndpoint<T>(
-  subscriptions: OperationSubscriptions<T>,
-  endpoint: T,
-): void {
-  for (const [key, endpoints] of subscriptions) {
-    endpoints.delete(endpoint);
-    if (!endpoints.size) subscriptions.delete(key);
-  }
 }
 
 export function createEventRouting({
@@ -133,234 +125,120 @@ export function createEventRouting({
   backends: Pick<Backends, "sendMessage">;
   permissions: Pick<Permissions, "getEventPermission" | "hasPermission">;
 }): EventRouting {
-  const subscriptions: Map<string, Set<number>> = new Map();
-  const backendSubscriptions: Map<string, Set<string>> = new Map();
-  const foundationSubscriptions: Map<string, boolean> = new Map();
-  const operationViews: OperationSubscriptions<number> = new Map();
-  const operationBackends: OperationSubscriptions<string> = new Map();
-  const viewScopes = new Map<number, { appId?: string; sessionId?: string }>();
-  const backendScopes = new Map<
-    string,
-    { appId?: string; sessionId?: string }
-  >();
+  const subscriptions = new Map<string, Set<Endpoint>>();
+  const operations: OperationSubscriptions = new Map();
+  const recipients = new Map<Endpoint, { appId: string; sessionId?: string }>();
+  const foundationSubscriptions = new Set<string>();
 
   function subscribe(
-    viewId: number,
+    endpoint: Endpoint,
+    appId: string,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
-    const viewInfo = views.getViewInfo(viewId);
-    if (!viewInfo) {
-      log.warn(`Cannot subscribe: view ${viewId} not found`);
-      return false;
+    const requiredPermission = permissions.getEventPermission(eventName);
+    if (
+      requiredPermission &&
+      !permissions.hasPermission(appId, requiredPermission)
+    ) {
+      throw new EventPermissionDenied({
+        eventName,
+        permission: requiredPermission,
+        appId,
+      });
     }
 
-    // Check event permission if required
-    const requiredPermission = permissions?.getEventPermission(eventName);
-    if (requiredPermission && permissions) {
-      if (!permissions.hasPermission(viewInfo.appId, requiredPermission)) {
-        throw new EventPermissionDenied({
-          eventName,
-          permission: requiredPermission,
-          appId: viewInfo.appId,
-        });
-      }
-    }
-
-    if (operation) addOperation(operationViews, viewId, operation);
+    if (operation) addOperation(operations, endpoint, operation);
     else {
-      let recipients = subscriptions.get(eventName);
-      if (!recipients) {
-        recipients = new Set();
-        subscriptions.set(eventName, recipients);
+      let subscribers = subscriptions.get(eventName);
+      if (!subscribers) {
+        subscribers = new Set();
+        subscriptions.set(eventName, subscribers);
       }
-      recipients.add(viewId);
+      subscribers.add(endpoint);
     }
-    viewScopes.set(viewId, {
-      appId: viewInfo.appId,
-      sessionId: execution?.get()?.sessionId,
-    });
+    recipients.set(endpoint, { appId, sessionId: execution.get()?.sessionId });
     log.info(
-      `View ${viewId} (${viewInfo.appId}) subscribed to event: ${eventName}`,
+      `${typeof endpoint === "number" ? "View" : "Backend"} ${endpoint} subscribed to event: ${eventName}`,
     );
     return true;
   }
-  function subscribeFoundation(eventName: string): boolean {
-    if (!foundationSubscriptions.has(eventName)) {
-      foundationSubscriptions.set(eventName, true);
-      log.info(`Foundation subscribed to event: ${eventName}`);
-    }
-    return true;
-  }
-  function subscribeBackend(
-    appId: string,
-    eventName: string,
-    operation?: OperationObservation,
-  ): boolean {
-    // Check event permission if required
-    const requiredPermission = permissions?.getEventPermission(eventName);
-    if (requiredPermission && permissions) {
-      if (!permissions.hasPermission(appId, requiredPermission)) {
-        throw new EventPermissionDenied({
-          eventName,
-          permission: requiredPermission,
-          appId,
-        });
-      }
-    }
 
-    if (operation) addOperation(operationBackends, appId, operation);
-    else {
-      let recipients = backendSubscriptions.get(eventName);
-      if (!recipients) {
-        recipients = new Set();
-        backendSubscriptions.set(eventName, recipients);
-      }
-      recipients.add(appId);
-    }
-    backendScopes.set(appId, {
-      appId,
-      sessionId: execution?.get()?.sessionId,
-    });
-    log.info(`Backend (${appId}) subscribed to event: ${eventName}`);
-    return true;
-  }
   function unsubscribe(
-    viewId: number,
+    endpoint: Endpoint,
     eventName: string,
     operation?: OperationObservation,
   ): boolean {
-    if (operation) return removeOperation(operationViews, viewId, operation);
-    const recipients = subscriptions.get(eventName);
-    if (!recipients) {
-      return false;
-    }
+    if (operation) return removeOperation(operations, endpoint, operation);
+    const subscribers = subscriptions.get(eventName);
+    const removed = subscribers?.delete(endpoint) ?? false;
+    if (!subscribers?.size) subscriptions.delete(eventName);
+    if (removed)
+      log.info(
+        `${typeof endpoint === "number" ? "View" : "Backend"} ${endpoint} unsubscribed from event: ${eventName}`,
+      );
+    return removed;
+  }
 
-    const result = recipients.delete(viewId);
-    if (recipients.size === 0) {
-      subscriptions.delete(eventName);
-    }
-
-    if (result) {
-      log.info(`View ${viewId} unsubscribed from event: ${eventName}`);
-    }
-    return result;
-  }
-  function unsubscribeFoundation(eventName: string): boolean {
-    if (foundationSubscriptions.has(eventName)) {
-      foundationSubscriptions.delete(eventName);
-      log.info(`Foundation unsubscribed from event: ${eventName}`);
-      return true;
-    }
-    return false;
-  }
-  function unsubscribeBackend(
-    appId: string,
-    eventName: string,
-    operation?: OperationObservation,
-  ): boolean {
-    if (operation) return removeOperation(operationBackends, appId, operation);
-    const recipients = backendSubscriptions.get(eventName);
-    if (!recipients) {
-      return false;
-    }
-
-    const result = recipients.delete(appId);
-    if (recipients.size === 0) {
-      backendSubscriptions.delete(eventName);
-    }
-
-    if (result) {
-      log.info(`Backend (${appId}) unsubscribed from event: ${eventName}`);
-    }
-    return result;
-  }
-  function getSubscribedViews(eventName: string): number[] {
-    const recipients = subscriptions.get(eventName);
-    return recipients ? Array.from(recipients) : [];
-  }
-  function getSubscribedBackends(eventName: string): string[] {
-    const recipients = backendSubscriptions.get(eventName);
-    return recipients ? Array.from(recipients) : [];
-  }
-  function* viewRecipients(
+  function* subscribers(
     eventName: string,
     scope?: EventScope,
-  ): Iterable<number> {
+  ): Iterable<Endpoint> {
     const general = subscriptions.get(eventName);
-    if (general) for (const endpoint of general) yield endpoint;
-    if (eventName === "operation/changed")
-      for (const endpoint of interested(operationViews, scope?.operation))
+    if (general) yield* general;
+    if (eventName === "operation/changed") {
+      for (const endpoint of interested(operations, scope?.operation)) {
         if (!general?.has(endpoint)) yield endpoint;
+      }
+    }
   }
-  function* backendRecipients(
-    eventName: string,
+
+  function authorized(
+    endpoint: Endpoint,
     scope?: EventScope,
-  ): Iterable<string> {
-    const general = backendSubscriptions.get(eventName);
-    if (general) for (const endpoint of general) yield endpoint;
-    if (eventName === "operation/changed")
-      for (const endpoint of interested(operationBackends, scope?.operation))
-        if (!general?.has(endpoint)) yield endpoint;
-  }
-  function viewAuthorized(viewId: number, scope?: EventScope): boolean {
-    if (!scope) return true;
-    const subscriber = viewScopes.get(viewId);
+    authorize?: EventAuthorization,
+  ): boolean {
+    if (!scope && !authorize) return true;
+    const recipient = recipients.get(endpoint);
+    if (!recipient) return false;
+    if (
+      scope &&
+      (recipient.appId !== scope.appId ||
+        recipient.sessionId !== scope.sessionId)
+    )
+      return false;
+    const principal = contexts.resolvePrincipal(recipient.appId);
     return (
-      subscriber?.appId !== undefined &&
-      subscriber.appId === scope.appId &&
-      subscriber.sessionId === scope.sessionId &&
-      !!contexts.resolvePrincipal(subscriber.appId)
+      !!principal && (!authorize || authorize({ ...recipient, principal }))
     );
   }
-  function backendAuthorized(appId: string, scope?: EventScope): boolean {
-    if (!scope) return true;
-    const subscriber = backendScopes.get(appId);
-    return (
-      subscriber?.appId === scope.appId &&
-      subscriber?.sessionId === scope.sessionId &&
-      !!contexts?.resolvePrincipal(appId)
-    );
-  }
+
   function hasSubscribers(eventName: string, scope?: EventScope): boolean {
     if (!scope && foundationSubscriptions.has(eventName)) return true;
-    for (const viewId of viewRecipients(eventName, scope))
-      if (viewAuthorized(viewId, scope)) return true;
-    if (backends)
-      for (const appId of backendRecipients(eventName, scope))
-        if (backendAuthorized(appId, scope)) return true;
+    for (const endpoint of subscribers(eventName, scope)) {
+      if (authorized(endpoint, scope)) return true;
+    }
     return false;
   }
+
   function notify<T extends EventName>(
     eventName: T,
     payload: EventData<T>,
     scope?: EventScope,
     authorize?: EventAuthorization,
   ): void {
-    // Notify foundation if subscribed
     if (!scope && foundationSubscriptions.has(eventName) && !authorize) {
-      views.sendToMainWindow("shell-message", {
-        type: eventName,
-        payload,
-      });
+      views.sendToMainWindow("shell-message", { type: eventName, payload });
     }
-
-    // Notify view subscribers
-    for (const viewId of viewRecipients(eventName, scope)) {
-      if (!viewAuthorized(viewId, scope)) continue;
-      if (!recipientAuthorized(viewScopes.get(viewId), authorize)) continue;
-      views.sendToView(viewId, "shell-message", {
-        type: eventName,
-        payload,
-      });
-    }
-
-    // Notify backend subscribers
-    if (backends) {
-      for (const appId of backendRecipients(eventName, scope)) {
-        if (!backendAuthorized(appId, scope)) continue;
-        if (!recipientAuthorized(backendScopes.get(appId), authorize)) continue;
-        backends.sendMessage(appId, {
+    for (const endpoint of subscribers(eventName, scope)) {
+      if (!authorized(endpoint, scope, authorize)) continue;
+      if (typeof endpoint === "number") {
+        views.sendToView(endpoint, "shell-message", {
+          type: eventName,
+          payload,
+        });
+      } else {
+        backends.sendMessage(endpoint, {
           type: "shell-event",
           eventName,
           payload,
@@ -368,78 +246,79 @@ export function createEventRouting({
       }
     }
   }
+
   function notifyView<T extends EventName>(
     viewId: number,
     eventName: T,
     payload: EventData<T>,
     authorize?: EventAuthorization,
   ): boolean {
-    const recipients = subscriptions.get(eventName);
-    if (!recipients?.has(viewId)) {
+    if (
+      !subscriptions.get(eventName)?.has(viewId) ||
+      !authorized(viewId, undefined, authorize)
+    )
       return false;
-    }
-    if (!recipientAuthorized(viewScopes.get(viewId), authorize)) return false;
-
     return views.sendToView(viewId, "shell-message", {
       type: eventName,
       payload,
     });
   }
-  function recipientAuthorized(
-    recipient: { appId?: string; sessionId?: string } | undefined,
-    authorize?: EventAuthorization,
-  ): boolean {
-    if (!authorize) return true;
-    const appId = recipient?.appId;
-    if (!appId) return false;
-    const principal = contexts.resolvePrincipal(appId);
-    return !!principal && authorize({ ...recipient, appId, principal });
-  }
-  function removeViewSubscriptions(viewId: number): void {
-    removeEndpoint(operationViews, viewId);
-    viewScopes.delete(viewId);
-    for (const [eventName, subscribers] of subscriptions.entries()) {
-      if (subscribers.delete(viewId)) {
-        if (subscribers.size === 0) {
-          subscriptions.delete(eventName);
-        }
-      }
+
+  function removeSubscriptions(endpoint: Endpoint): void {
+    recipients.delete(endpoint);
+    for (const [eventName, subscribers] of subscriptions) {
+      subscribers.delete(endpoint);
+      if (!subscribers.size) subscriptions.delete(eventName);
+    }
+    for (const [key, subscribers] of operations) {
+      subscribers.delete(endpoint);
+      if (!subscribers.size) operations.delete(key);
     }
   }
-  function removeBackendSubscriptions(appId: string): void {
-    removeEndpoint(operationBackends, appId);
-    backendScopes.delete(appId);
-    for (const [eventName, subscribers] of backendSubscriptions.entries()) {
-      if (subscribers.delete(appId)) {
-        if (subscribers.size === 0) {
-          backendSubscriptions.delete(eventName);
-        }
-      }
-    }
-  }
-  function dispose(): void {
-    operationViews.clear();
-    operationBackends.clear();
-    viewScopes.clear();
-    backendScopes.clear();
-    subscriptions.clear();
-    backendSubscriptions.clear();
-    foundationSubscriptions.clear();
-  }
+
   return {
-    subscribe,
-    subscribeFoundation,
-    subscribeBackend,
+    subscribe(viewId, eventName, operation) {
+      const view = views.getViewInfo(viewId);
+      if (!view) {
+        log.warn(`Cannot subscribe: view ${viewId} not found`);
+        return false;
+      }
+      return subscribe(viewId, view.appId, eventName, operation);
+    },
+    subscribeBackend: (appId, eventName, operation) =>
+      subscribe(appId, appId, eventName, operation),
+    subscribeFoundation(eventName) {
+      if (!foundationSubscriptions.has(eventName)) {
+        foundationSubscriptions.add(eventName);
+        log.info(`Foundation subscribed to event: ${eventName}`);
+      }
+      return true;
+    },
     unsubscribe,
-    unsubscribeFoundation,
-    unsubscribeBackend,
-    getSubscribedViews,
-    getSubscribedBackends,
+    unsubscribeBackend: unsubscribe,
+    unsubscribeFoundation(eventName) {
+      const removed = foundationSubscriptions.delete(eventName);
+      if (removed) log.info(`Foundation unsubscribed from event: ${eventName}`);
+      return removed;
+    },
+    getSubscribedViews: (eventName) =>
+      Array.from(subscriptions.get(eventName) ?? []).filter(
+        (endpoint) => typeof endpoint === "number",
+      ),
+    getSubscribedBackends: (eventName) =>
+      Array.from(subscriptions.get(eventName) ?? []).filter(
+        (endpoint) => typeof endpoint === "string",
+      ),
     hasSubscribers,
     notify,
     notifyView,
-    removeViewSubscriptions,
-    removeBackendSubscriptions,
-    dispose,
+    removeViewSubscriptions: removeSubscriptions,
+    removeBackendSubscriptions: removeSubscriptions,
+    dispose() {
+      subscriptions.clear();
+      operations.clear();
+      recipients.clear();
+      foundationSubscriptions.clear();
+    },
   };
 }

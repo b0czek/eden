@@ -116,6 +116,11 @@ describe("EventRouting", () => {
     expect(() => routing.subscribe(1, "event/secure")).toThrow(
       "Permission denied: permissions/secure required to subscribe to event/secure",
     );
+    expect(() => routing.subscribeBackend("app.one", "event/secure")).toThrow(
+      "Permission denied: permissions/secure required to subscribe to event/secure",
+    );
+    expect(routing.getSubscribedViews("event/secure")).toEqual([]);
+    expect(routing.getSubscribedBackends("event/secure")).toEqual([]);
   });
 
   it("subscribes/unsubscribes views and sends notifications", () => {
@@ -192,7 +197,26 @@ describe("EventRouting", () => {
     expect(views.sendToView).toHaveBeenCalledTimes(1);
   });
 
-  it("cleans up subscriptions for views and backends", () => {
+  it("keeps scoped and authorized notifications out of foundation subscriptions", () => {
+    const routing = createRoutingFixture(views, backends, permissions);
+    const payload = { appId: "app.one", key: "locale", value: "en" };
+    routing.subscribeFoundation("settings/changed");
+    expect(routing.hasSubscribers("settings/changed")).toBe(true);
+
+    const scope = { appId: "app.one", sessionId: "session.one" };
+    expect(routing.hasSubscribers("settings/changed", scope)).toBe(false);
+    routing.notify("settings/changed", payload, scope);
+    routing.notify("settings/changed", payload, undefined, () => true);
+    expect(views.sendToMainWindow).not.toHaveBeenCalled();
+
+    routing.notify("settings/changed", payload);
+    expect(views.sendToMainWindow).toHaveBeenCalledTimes(1);
+    expect(routing.unsubscribeFoundation("settings/changed")).toBe(true);
+    expect(routing.unsubscribeFoundation("settings/changed")).toBe(false);
+    expect(routing.hasSubscribers("settings/changed")).toBe(false);
+  });
+
+  it("cleans up view and backend subscriptions independently when their IDs have the same digits", () => {
     const routing = createRoutingFixture(views, backends, permissions);
 
     views.getViewInfo.mockReturnValue(createViewInfo());
@@ -200,15 +224,25 @@ describe("EventRouting", () => {
     routing.subscribe(3, "event/a");
     routing.subscribe(3, "event/b");
 
-    routing.subscribeBackend("app.backend", "event/a");
-    routing.subscribeBackend("app.backend", "event/b");
+    routing.subscribeBackend("3", "event/a");
+    routing.subscribeBackend("3", "event/b");
 
     routing.removeViewSubscriptions(3);
-    routing.removeBackendSubscriptions("app.backend");
-
     expect(routing.getSubscribedViews("event/a")).toEqual([]);
     expect(routing.getSubscribedViews("event/b")).toEqual([]);
+    expect(routing.getSubscribedBackends("event/a")).toEqual(["3"]);
+    expect(routing.getSubscribedBackends("event/b")).toEqual(["3"]);
+    expect(routing.hasSubscribers("event/a")).toBe(true);
+
+    routing.subscribe(3, "event/a");
+    routing.removeBackendSubscriptions("3");
     expect(routing.getSubscribedBackends("event/a")).toEqual([]);
     expect(routing.getSubscribedBackends("event/b")).toEqual([]);
+    expect(routing.getSubscribedViews("event/a")).toEqual([3]);
+    expect(routing.hasSubscribers("event/b")).toBe(false);
+
+    routing.dispose();
+    expect(routing.getSubscribedViews("event/a")).toEqual([]);
+    expect(routing.hasSubscribers("event/a")).toBe(false);
   });
 });
