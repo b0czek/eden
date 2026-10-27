@@ -7,9 +7,7 @@ import type {
 import { log } from "../../platform/logging/logger";
 import type { ShellTransport } from "./shell-transport";
 
-export type EventSubscriptionCallback = (
-  payload: unknown,
-) => void | Promise<void>;
+type EventSubscriptionCallback = (payload: unknown) => void | Promise<void>;
 
 interface Registration {
   ready: Promise<void>;
@@ -35,10 +33,7 @@ function subscriptionKey(
 }
 
 /** Own local listeners and serialize changes to each remote subscription. */
-export function createEventSubscriptions(
-  transport: ShellTransport,
-  listeners: Map<string, Set<EventSubscriptionCallback>>,
-) {
+export function createEventSubscriptions(transport: ShellTransport) {
   const subscriptions = new Map<string, Subscription>();
 
   async function subscribe<T extends EventName>(
@@ -64,12 +59,6 @@ export function createEventSubscriptions(
     const entry = subscription;
     const registration: Registration = { ready: Promise.resolve() };
     entry.callbacks.set(listener, registration);
-    let callbacks = listeners.get(key);
-    if (!callbacks) {
-      callbacks = new Set();
-      listeners.set(key, callbacks);
-    }
-    callbacks.add(listener);
     registration.ready = enqueue(key, entry, async () => {
       if (entry.callbacks.get(listener) !== registration) return;
       if (!entry.registered) {
@@ -79,7 +68,7 @@ export function createEventSubscriptions(
     }).catch((error) => {
       // A failed older request must not remove a replacement registration.
       if (entry.callbacks.get(listener) === registration)
-        remove(key, entry, listener);
+        entry.callbacks.delete(listener);
       throw error;
     });
     return registration.ready;
@@ -94,7 +83,7 @@ export function createEventSubscriptions(
     const entry = subscriptions.get(key);
     const listener = callback as EventSubscriptionCallback;
     if (!entry?.callbacks.has(listener)) return;
-    remove(key, entry, listener);
+    entry.callbacks.delete(listener);
     void enqueue(key, entry, async () => {
       if (entry.callbacks.size || !entry.registered) return;
       entry.registered = false;
@@ -104,15 +93,28 @@ export function createEventSubscriptions(
     );
   }
 
-  function remove(
-    eventName: string,
-    entry: Subscription,
-    listener: EventSubscriptionCallback,
-  ): void {
-    entry.callbacks.delete(listener);
-    const callbacks = listeners.get(eventName);
-    callbacks?.delete(listener);
-    if (!callbacks?.size) listeners.delete(eventName);
+  function dispatch(eventName: string, payload: unknown): void {
+    const keys = [eventName];
+    if (eventName === "operation/changed") {
+      const snapshot = (payload as { snapshot: OperationSnapshot }).snapshot;
+      keys.push(subscriptionKey(eventName, { handle: snapshot }));
+      if (
+        snapshot.status === "succeeded" ||
+        snapshot.status === "failed" ||
+        snapshot.status === "cancelled"
+      )
+        keys.push(
+          subscriptionKey(eventName, { handle: snapshot, terminalOnly: true }),
+        );
+    }
+    for (const key of keys) {
+      const callbacks = subscriptions.get(key)?.callbacks;
+      if (!callbacks) continue;
+      for (const callback of [...callbacks.keys()]) {
+        if (!callbacks.has(callback)) continue;
+        invokeEventListener(callback, eventName, payload);
+      }
+    }
   }
 
   function enqueue(
@@ -134,36 +136,7 @@ export function createEventSubscriptions(
     });
     return request;
   }
-  return { subscribe, unsubscribe };
-}
-
-/** Isolate synchronous and asynchronous listener failures in both app runtimes. */
-export function dispatchEvent(
-  listeners: Map<string, Set<EventSubscriptionCallback>>,
-  eventName: string,
-  payload: unknown,
-): void {
-  const keys = [eventName];
-  if (eventName === "operation/changed") {
-    const snapshot = (payload as { snapshot: OperationSnapshot }).snapshot;
-    keys.push(subscriptionKey(eventName, { handle: snapshot }));
-    if (
-      snapshot.status === "succeeded" ||
-      snapshot.status === "failed" ||
-      snapshot.status === "cancelled"
-    )
-      keys.push(
-        subscriptionKey(eventName, { handle: snapshot, terminalOnly: true }),
-      );
-  }
-  for (const key of keys) {
-    const callbacks = listeners.get(key);
-    if (!callbacks) continue;
-    for (const callback of [...callbacks]) {
-      if (!callbacks.has(callback)) continue;
-      invokeEventListener(callback, eventName, payload);
-    }
-  }
+  return { subscribe, unsubscribe, dispatch };
 }
 
 /** Deliver a snapshot or event without leaking listener failures to its producer. */

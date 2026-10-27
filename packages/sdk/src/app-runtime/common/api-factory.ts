@@ -1,5 +1,4 @@
 export { createEdenAPI } from "./eden-api";
-export type { EventSubscriptionCallback } from "./event-subscriptions";
 export type { ShellTransport } from "./shell-transport";
 
 import type {

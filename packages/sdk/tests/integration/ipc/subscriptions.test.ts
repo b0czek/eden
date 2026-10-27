@@ -12,10 +12,6 @@ import type {
   WallpaperPreset,
 } from "@edenapp/types";
 import { createEdenAPI } from "../../../src/app-runtime/common/eden-api";
-import {
-  dispatchEvent,
-  type EventSubscriptionCallback,
-} from "../../../src/app-runtime/common/event-subscriptions";
 import type {
   ShellCommandResponse,
   ShellTransport,
@@ -34,7 +30,13 @@ describe("client subscriptions across renderer IPC", () => {
   const pendingWork = new Set<() => void>();
   const restoreRuntimes: Array<() => void> = [];
   let transport: ShellTransport;
-  let listeners: Map<string, Set<EventSubscriptionCallback>>;
+  let dispatch: ReturnType<typeof createEdenAPI>["dispatch"];
+
+  function createAPI(shellTransport = transport) {
+    const preload = createEdenAPI(shellTransport);
+    dispatch = preload.dispatch;
+    return preload.api;
+  }
   let owner: {
     appId: string;
     principal: { kind: "user"; profile: UserProfile };
@@ -59,12 +61,11 @@ describe("client subscriptions across renderer IPC", () => {
     await eden.complete("process/launch", { appId });
     const contents = eden.getAppView(appId).view.webContents;
     webContentsId = contents.id;
-    listeners = new Map();
     contents.on(
       "message-sent",
       (channel: string, message: { type: string; payload: unknown }) => {
         if (channel === "shell-message")
-          dispatchEvent(listeners, message.type, message.payload);
+          dispatch(message.type, message.payload);
       },
     );
     transport = {
@@ -165,7 +166,7 @@ describe("client subscriptions across renderer IPC", () => {
     });
 
   it("publishes localization events from a plain controller alongside legacy domains", async () => {
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const locales: string[] = [];
     const onLocale = ({ locale }: { locale: string }) => {
       locales.push(locale);
@@ -184,7 +185,7 @@ describe("client subscriptions across renderer IPC", () => {
   });
 
   it("validates and authorizes plain appearance commands and publishes their resolved events", async () => {
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const wallpaper = { type: "custom" as const, value: "#123456" };
     await expect(
       api.shellCommand("appearance/set-wallpaper", { wallpaper }),
@@ -231,20 +232,17 @@ describe("client subscriptions across renderer IPC", () => {
       const started = gate();
       const finish = gate();
       let first = true;
-      const api = createEdenAPI(
-        {
-          exec: async (command, args, submission) => {
-            if (command === "event/subscribe" && first) {
-              first = false;
-              started.release();
-              await finish.promise;
-              throw new Error("First registration failed");
-            }
-            return transport.exec(command, args, submission);
-          },
+      const api = createAPI({
+        exec: async (command, args, submission) => {
+          if (command === "event/subscribe" && first) {
+            first = false;
+            started.release();
+            await finish.promise;
+            throw new Error("First registration failed");
+          }
+          return transport.exec(command, args, submission);
         },
-        listeners,
-      );
+      });
       const updates: string[] = [];
       const client = useClient(api);
       const replacement = () => {
@@ -271,7 +269,7 @@ describe("client subscriptions across renderer IPC", () => {
   it.each(["window", "worker"] as const)(
     "keeps the remaining %s client listener active when another stops",
     async (runtime) => {
-      const api = createEdenAPI(transport, listeners);
+      const api = createAPI();
       const client = useClient(api, runtime);
       const first: string[] = [];
       const second: string[] = [];
@@ -303,20 +301,17 @@ describe("client subscriptions across renderer IPC", () => {
     pendingWork.add(finish.release);
     let first = true;
     const client = useClient(
-      createEdenAPI(
-        {
-          exec: async (command, args, submission) => {
-            const response = await transport.exec(command, args, submission);
-            if (command === "event/subscribe" && first) {
-              first = false;
-              started.release();
-              await finish.promise;
-            }
-            return response;
-          },
+      createAPI({
+        exec: async (command, args, submission) => {
+          const response = await transport.exec(command, args, submission);
+          if (command === "event/subscribe" && first) {
+            first = false;
+            started.release();
+            await finish.promise;
+          }
+          return response;
         },
-        listeners,
-      ),
+      }),
     );
     const updates: string[][] = [];
     const callback = (event: { volumes: Array<{ id: string }> }) => {
@@ -340,16 +335,37 @@ describe("client subscriptions across renderer IPC", () => {
     await tick();
   });
 
+  it("applies listener changes during delivery without notifying new listeners of the current event", async () => {
+    const api = createAPI();
+    const delivered: string[] = [];
+    const removed = () => delivered.push("removed");
+    const added = () => delivered.push("added");
+    let subscribed: Promise<void> | undefined;
+    const first = () => {
+      delivered.push("first");
+      api.unsubscribe("volume/changed", removed);
+      subscribed = api.subscribe("volume/changed", added);
+    };
+    await api.subscribe("volume/changed", first);
+    await api.subscribe("volume/changed", removed);
+    await change("first-delivery");
+    await subscribed;
+    expect(delivered).toEqual(["first"]);
+    await change("next-delivery");
+    await subscribed;
+    expect(delivered).toEqual(["first", "first", "added"]);
+    api.unsubscribe("volume/changed", first);
+    api.unsubscribe("volume/changed", added);
+    await tick();
+  });
+
   it("isolates async listener failures and failed remote cleanup", async () => {
-    const api = createEdenAPI(
-      {
-        exec: (command, args, submission) =>
-          command === "event/unsubscribe"
-            ? Promise.reject(new Error("Cleanup transport closed"))
-            : transport.exec(command, args, submission),
-      },
-      listeners,
-    );
+    const api = createAPI({
+      exec: (command, args, submission) =>
+        command === "event/unsubscribe"
+          ? Promise.reject(new Error("Cleanup transport closed"))
+          : transport.exec(command, args, submission),
+    });
     const broken = async () => {
       throw new Error("Listener failed asynchronously");
     };
@@ -378,7 +394,7 @@ describe("client subscriptions across renderer IPC", () => {
   it.each(["sync", "async"])(
     "isolates %s operation-watch failures for initial and subsequent snapshots",
     async (kind) => {
-      const api = createEdenAPI(transport, listeners);
+      const api = createAPI();
       const operation = work(`watch-failure-${kind}`);
       await operation.started;
       const broken: number[] = [];
@@ -418,7 +434,7 @@ describe("client subscriptions across renderer IPC", () => {
   );
 
   it("routes by operation and delivers only completion to waiters", async () => {
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const operations = eden.runtime.services.operations;
     const watched = work("watched");
     const waited = work("waited");
@@ -499,7 +515,7 @@ describe("client subscriptions across renderer IPC", () => {
       path.join(eden.paths.userDirectory, "source.txt"),
       "copied",
     );
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const info = await api.shellCommand("system/info", {});
     expect(info.runningApps).toContain(owner.appId);
     const args = {
@@ -543,7 +559,7 @@ describe("client subscriptions across renderer IPC", () => {
       path.join(source, "nested", "large.bin"),
       Buffer.alloc(8 * 1024 * 1024),
     );
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const copy = await api.shellCommand("fs/cp", {
       from: { volume: "home", path: "/cancel-tree" },
       to: { volume: "home", path: "/cancel-tree-copy" },
@@ -591,7 +607,7 @@ describe("client subscriptions across renderer IPC", () => {
   });
 
   it("keeps broad and targeted observers independent and rejects foreign handles", async () => {
-    const api = createEdenAPI(transport, listeners);
+    const api = createAPI();
     const watched = work("shared-interest");
     await watched.started;
     const broad: OperationSnapshot[] = [];

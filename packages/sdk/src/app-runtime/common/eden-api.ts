@@ -6,25 +6,19 @@ import type {
   FilesystemLocation,
   OperationSubmission,
 } from "@edenapp/types";
-import {
-  createEventSubscriptions,
-  type EventSubscriptionCallback,
-} from "./event-subscriptions";
+import { createEventSubscriptions } from "./event-subscriptions";
 import { createOperationsAPI } from "./operations-api";
 import type { ShellTransport } from "./shell-transport";
 
-/**
- * Create the EdenAPI object
- */
+/** Build the public EdenAPI and its private incoming event dispatcher. */
 export function createEdenAPI(
   transport: ShellTransport,
-  eventSubscriptions: Map<string, Set<EventSubscriptionCallback>>,
   options?: {
     getLaunchArgs?: () => string[];
     getLaunchFile?: () => FilesystemLocation | undefined;
   },
-): EdenAPI {
-  const subscriptions = createEventSubscriptions(transport, eventSubscriptions);
+) {
+  const subscriptions = createEventSubscriptions(transport);
   const api = {
     shellCommand: async <C extends CommandName>(
       command: C,
@@ -57,5 +51,6 @@ export function createEdenAPI(
     },
   };
   const operations = createOperationsAPI(api);
-  return { ...api, operations };
+  const edenAPI: EdenAPI = { ...api, operations };
+  return { api: edenAPI, dispatch: subscriptions.dispatch };
 }

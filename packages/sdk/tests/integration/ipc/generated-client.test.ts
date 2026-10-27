@@ -8,10 +8,6 @@ import type {
   OperationSubmission,
 } from "@edenapp/types";
 import { createEdenAPI } from "../../../src/app-runtime/common/eden-api";
-import {
-  dispatchEvent,
-  type EventSubscriptionCallback,
-} from "../../../src/app-runtime/common/event-subscriptions";
 import type { ShellCommandResponse } from "../../../src/app-runtime/common/shell-transport";
 import { testApp } from "../../support/apps";
 import { createTestCaller } from "../../support/callers";
@@ -45,30 +41,26 @@ describe.each(["window", "worker"])(
       );
       await eden.complete("process/launch", { appId });
       const contents = eden.getAppView(appId).view.webContents;
-      const listeners = new Map<string, Set<EventSubscriptionCallback>>();
+      const { api, dispatch } = createEdenAPI({
+        exec: <C extends CommandName>(
+          command: C,
+          args: CommandArgs<C>,
+          submission?: OperationSubmission,
+        ) =>
+          eden.platform.rendererIpc.invoke(
+            "shell-command",
+            contents.id,
+            command,
+            args,
+            submission,
+          ) as Promise<ShellCommandResponse<C>>,
+      });
       contents.on(
         "message-sent",
         (channel: string, message: { type: string; payload: unknown }) => {
           if (channel === "shell-message")
-            dispatchEvent(listeners, message.type, message.payload);
+            dispatch(message.type, message.payload);
         },
-      );
-      const api = createEdenAPI(
-        {
-          exec: <C extends CommandName>(
-            command: C,
-            args: CommandArgs<C>,
-            submission?: OperationSubmission,
-          ) =>
-            eden.platform.rendererIpc.invoke(
-              "shell-command",
-              contents.id,
-              command,
-              args,
-              submission,
-            ) as Promise<ShellCommandResponse<C>>,
-        },
-        listeners,
       );
       Object.defineProperty(globalThis, globalName, {
         configurable: true,

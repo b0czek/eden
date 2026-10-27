@@ -5,7 +5,6 @@ import {
   logFromConsole,
   setLogContext,
 } from "../platform/logging/logger";
-import { dispatchEvent } from "./common/event-subscriptions";
 /**
  * Backend Runtime
  *
@@ -24,7 +23,6 @@ import type {
   AppBusConnection,
   CommandArgs,
   CommandName,
-  EdenAPI,
   OperationSubmission,
 } from "@edenapp/types";
 import type { WorkerGlobal } from "@edenapp/types/worker";
@@ -144,12 +142,6 @@ if (!parentPort) {
   process.exit(1);
 }
 
-// Event subscriptions
-const eventSubscriptions: Map<
-  string,
-  Set<(payload: unknown) => void>
-> = new Map();
-
 type PendingCommandResult = ShellCommandResponse<CommandName>;
 
 // Pending shell command requests
@@ -214,7 +206,7 @@ const shellTransport: ShellTransport = {
 /**
  * Eden API implementation for utility process
  */
-const edenAPI: EdenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
+const { api: edenAPI, dispatch } = createEdenAPI(shellTransport, {
   getLaunchArgs: () => launchContext.args,
   getLaunchFile: () => launchContext.file,
 });
@@ -264,7 +256,7 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
 
     // Event notification from main
     const { eventName, payload } = message;
-    dispatchEvent(eventSubscriptions, eventName, payload);
+    dispatch(eventName, payload);
   } else if (message.type === "appbus-port") {
     // AppBus connection port
     const [port] = event.ports;

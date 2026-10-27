@@ -12,7 +12,6 @@ import {
   createEdenAPI,
   type ShellTransport,
 } from "./common/api-factory";
-import { dispatchEvent } from "./common/event-subscriptions";
 import {
   type AppBusPortData,
   createAppBusState,
@@ -30,12 +29,6 @@ const { appId } = launchContext;
 
 // MessagePort for direct frontend<->backend communication
 let backendConnection: AppBusConnection | null = null;
-
-// Event subscription system
-const eventSubscriptions: Map<
-  string,
-  Set<(payload: unknown) => void>
-> = new Map();
 
 const KEYBOARD_FOCUS_CHANNEL = "eden-keyboard:focus-state";
 const KEYBOARD_SHOW_CHANNEL = "eden-keyboard:show";
@@ -62,15 +55,6 @@ ipcRenderer.on("backend-port", (event) => {
   backendConnection = createPortConnection(wrapDOMPort(port));
 });
 
-// Set up unified message listener for shell-message channel
-ipcRenderer.on(
-  "shell-message",
-  (_event, message: { type: string; payload: unknown }) => {
-    const { type, payload } = message;
-    dispatchEvent(eventSubscriptions, type, payload);
-  },
-);
-
 // Expose safe API to the app
 contextBridge.exposeInMainWorld("getAppAPI", () => {
   if (!backendConnection) {
@@ -94,10 +78,17 @@ const shellTransport: ShellTransport = {
 };
 
 // Expose edenAPI for shell commands and event subscriptions
-const edenAPI = createEdenAPI(shellTransport, eventSubscriptions, {
+const { api: edenAPI, dispatch } = createEdenAPI(shellTransport, {
   getLaunchArgs: () => launchContext.args,
   getLaunchFile: () => launchContext.file,
 });
+
+ipcRenderer.on(
+  "shell-message",
+  (_event, message: { type: string; payload: unknown }) => {
+    dispatch(message.type, message.payload);
+  },
+);
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 
