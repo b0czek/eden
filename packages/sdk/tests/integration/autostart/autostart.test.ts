@@ -6,14 +6,14 @@ import * as Effect from "effect/Effect";
 import { createDevelopmentAutostart } from "../../../src/applications/autostart/development";
 import {
   AutostartConfig,
-  AutostartProcesses,
   DevelopmentAutostart,
 } from "../../../src/applications/autostart/ports";
-import { createAutostartProcesses } from "../../../src/applications/autostart/processes";
 import {
   Autostart,
   AutostartLive,
 } from "../../../src/applications/autostart/service";
+import { PackageCatalog } from "../../../src/applications/packages/catalog";
+import { Processes } from "../../../src/applications/processes/service";
 import { fromPromise } from "../../../src/core/effects/io";
 import { ExecutionContext } from "../../../src/core/execution/context";
 import { Operations } from "../../../src/core/operations/service";
@@ -115,24 +115,16 @@ async function scopedAutostart(
     ),
   );
   const processes = eden.runtime.services.processes;
-  const autostartProcesses = createAutostartProcesses(
-    {
-      getAppInstance: (appId) => processes.getAppInstance(appId),
-      launchApp: (appId, bounds, launchArgs, location) =>
-        Effect.gen(function* () {
-          const beforeLaunch = options.beforeLaunch;
-          if (beforeLaunch)
-            yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
-          return yield* processes.launchApp(
-            appId,
-            bounds,
-            launchArgs,
-            location,
-          );
-        }),
-    },
-    eden.runtime.services.catalog,
-  );
+  const autostartProcesses: Processes = {
+    ...processes,
+    launchApp: (appId, bounds, launchArgs, location) =>
+      Effect.gen(function* () {
+        const beforeLaunch = options.beforeLaunch;
+        if (beforeLaunch)
+          yield* fromPromise(() => beforeLaunch(appId)).pipe(Effect.orDie);
+        return yield* processes.launchApp(appId, bounds, launchArgs, location);
+      }),
+  };
   const sessions = eden.runtime.services.sessions;
   const autostart = await effects.acquire(
     buildService(Autostart, AutostartLive).pipe(
@@ -147,7 +139,8 @@ async function scopedAutostart(
         eden.runtime.services.sessionContext,
       ),
       Effect.provideService(Operations, eden.runtime.services.operations),
-      Effect.provideService(AutostartProcesses, autostartProcesses),
+      Effect.provideService(Processes, autostartProcesses),
+      Effect.provideService(PackageCatalog, eden.runtime.services.catalog),
       Effect.provideService(
         DevelopmentAutostart,
         createDevelopmentAutostart({

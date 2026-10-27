@@ -8,10 +8,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { AppAssociations } from "../../applications/app-associations/service";
 import { PackageCatalog } from "../../applications/packages/catalog";
+import { Processes } from "../../applications/processes/service";
 import type { TargetedNotification } from "../../core/controllers/events";
 import type { Event } from "../../core/events/event";
 import { scopedEvent } from "../../core/events/scoped";
 import { I18n } from "../../core/i18n/service";
+import { Filesystem } from "../../platform/filesystem/service";
 import { Views } from "../views/service";
 import {
   type FileHandlerQueryError,
@@ -22,6 +24,7 @@ import {
   type FilePreferenceWriteError,
   FileTypeUnknown,
 } from "./errors";
+import { createFileInspection } from "./filesystem";
 import {
   DIRECTORY_ASSOCIATION_KEY,
   DIRECTORY_PREFERENCE_KEY,
@@ -33,7 +36,6 @@ import {
   getMimePreferenceKey,
   getPublicPreferenceKey,
 } from "./handlers";
-import { FileOpenFilesystem, FileOpenProcesses } from "./ports";
 
 export interface FileOpen {
   opened: Event<TargetedNotification<FileOpenedEvent>>;
@@ -72,14 +74,14 @@ export const FileOpenLive = Layer.effect(
   Effect.gen(function* () {
     const associations = yield* AppAssociations;
     const catalog = yield* PackageCatalog;
-    const processes = yield* FileOpenProcesses;
+    const processes = yield* Processes;
     const views = yield* Views;
-    const filesystem = yield* FileOpenFilesystem;
+    const inspection = yield* createFileInspection(yield* Filesystem);
     const i18n = yield* I18n;
     const opened = yield* scopedEvent<TargetedNotification<FileOpenedEvent>>();
 
     function getFileContext(location: FilesystemLocation) {
-      return Effect.map(filesystem.inspect(location), (metadata) => {
+      return Effect.map(inspection.inspect(location), (metadata) => {
         const extension = metadata.isDirectory
           ? undefined
           : getExtension(location.path) || undefined;
@@ -221,8 +223,8 @@ export const FileOpenLive = Layer.effect(
       isDirectory: boolean,
     ) {
       return Effect.gen(function* () {
-        if (!processes.isRunning(appId)) {
-          yield* processes.launch(appId, location);
+        if (!processes.getAppInstance(appId)) {
+          yield* processes.launchApp(appId, undefined, undefined, location);
           return;
         }
         const focusViewId = views.getViewsByAppId(appId).at(-1);
@@ -273,7 +275,7 @@ export const FileOpenLive = Layer.effect(
       location: FilesystemLocation,
       appId: string,
     ) {
-      const isDirectory = yield* filesystem.isDirectory(location);
+      const isDirectory = yield* inspection.isDirectory(location);
       if (!catalog.getApp(appId))
         return yield* Effect.fail(
           new FileHandlerUnavailable({

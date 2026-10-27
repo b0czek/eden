@@ -68,10 +68,7 @@ import {
   registerContextMenuApi,
 } from "../desktop/context-menu/runtime";
 import { ContextMenuLive } from "../desktop/context-menu/service";
-import {
-  FileOpenPortsLive,
-  registerFileOpenApi,
-} from "../desktop/file-open/runtime";
+import { registerFileOpenApi } from "../desktop/file-open/runtime";
 import { FileOpenLive } from "../desktop/file-open/service";
 import {
   FilePickerViewsLive,
@@ -178,7 +175,7 @@ const DesktopIntegrationLive = Layer.mergeAll(
   Layer.provideMerge([
     SessionsLive,
     DaemonsLive,
-    FileOpenLive.pipe(Layer.provide(FileOpenPortsLive)),
+    FileOpenLive,
     KeyboardLive.pipe(Layer.provide(KeyboardPortsLive)),
   ]),
   Layer.provideMerge(ProcessesLive),

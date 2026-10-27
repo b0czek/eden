@@ -1,3 +1,6 @@
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -9,11 +12,12 @@ import {
 import { AppAssociations } from "../../applications/app-associations/service";
 import { PackageCatalog } from "../../applications/packages/catalog";
 import { ProcessLaunchRejected } from "../../applications/processes/errors";
+import { Processes } from "../../applications/processes/service";
 import { I18n } from "../../core/i18n/service";
 import { FilesystemIoFailed } from "../../platform/filesystem/native-errors";
+import { Filesystem } from "../../platform/filesystem/service";
 import { Views } from "../views/service";
 
-import { FileOpenFilesystem, FileOpenProcesses } from "./ports";
 import { FileOpen, FileOpenLive } from "./service";
 
 /** Fail immediately if a test starts using an unconfigured collaborator method. */
@@ -36,18 +40,35 @@ const editor = testApp("test.editor", {
 
 describe("file opening failures", () => {
   let effects: ReturnType<typeof createEffectRuntime>;
-  let filesystem: FileOpenFilesystem;
-  let processes: FileOpenProcesses;
+  let filesystem: Filesystem;
+  let processes: Processes;
+  let directory: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     effects = createEffectRuntime();
-    filesystem = {
-      inspect: () => Effect.succeed({ isDirectory: false }),
-      isDirectory: () => Effect.succeed(false),
-    };
-    processes = { isRunning: () => false, launch: () => Effect.void };
+    directory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-file-open-"));
+    const documentPath = path.join(directory, "document.txt");
+    await fs.writeFile(documentPath, "");
+    filesystem = collaborator<Filesystem>({
+      withVolume: (_location, inspect) => inspect(documentPath),
+    });
+    processes = collaborator<Processes>({
+      getAppInstance: () => undefined,
+      launchApp: () =>
+        Effect.succeed({
+          success: true,
+          appId: editor.id,
+          instanceId: "editor",
+        }),
+    });
   });
-  afterEach(() => effects.dispose());
+  afterEach(async () => {
+    try {
+      await effects.dispose();
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
 
   const acquire = (apps = [editor]) =>
     effects.acquire(
@@ -68,7 +89,7 @@ describe("file opening failures", () => {
             dlcsForHost: () => [],
           }),
         ),
-        Effect.provideService(FileOpenProcesses, processes),
+        Effect.provideService(Processes, processes),
         Effect.provideService(
           Views,
           collaborator<Views>({
@@ -77,7 +98,7 @@ describe("file opening failures", () => {
             focusView: () => Effect.void,
           }),
         ),
-        Effect.provideService(FileOpenFilesystem, filesystem),
+        Effect.provideService(Filesystem, filesystem),
         Effect.provideService(
           I18n,
           collaborator<I18n>({
@@ -116,12 +137,14 @@ describe("file opening failures", () => {
       reason: "shutting-down",
       message: "Backend not ready",
     });
-    filesystem.inspect = () => Effect.fail(metadata);
-    processes.launch = () => Effect.fail(launch);
+    const withVolume = filesystem.withVolume;
+    filesystem.withVolume = () => Effect.fail(metadata);
+    processes.launchApp = () => Effect.fail(launch);
     const service = await acquire();
     await expect(effects.run(service.openFile(location))).rejects.toBe(
       metadata,
     );
+    filesystem.withVolume = withVolume;
     await expect(
       effects.run(service.openFileWith(location, editor.id)),
     ).rejects.toBe(launch);
@@ -131,7 +154,7 @@ describe("file opening failures", () => {
     "preserves defects in %s",
     async (method) => {
       const defect = new Error("Programmer defect");
-      processes.launch = () => Effect.die(defect);
+      processes.launchApp = () => Effect.die(defect);
       const service = await acquire();
       const exit = await effects.run(
         Effect.exit(service[method](location, editor.id)),

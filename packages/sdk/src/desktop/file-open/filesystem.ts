@@ -1,3 +1,4 @@
+import type { FilesystemLocation } from "@edenapp/types";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -8,12 +9,11 @@ import type { Filesystem } from "../../platform/filesystem/service";
 import { log } from "../../platform/logging/logger";
 
 import { normalizeMimeType } from "./handlers";
-import type { FileOpenFilesystem } from "./ports";
 
 const MIME_DETECTION_BYTES = 8192;
 
 /** Keep the volume lease through metadata/content I/O and defer the WASM load. */
-export const createFileOpenFilesystem = Effect.fn(function* (
+export const createFileInspection = Effect.fn(function* (
   filesystem: Pick<Filesystem, "withVolume">,
 ) {
   const detector = yield* Effect.cachedWithTTL(
@@ -39,7 +39,7 @@ export const createFileOpenFilesystem = Effect.fn(function* (
     );
   });
   return {
-    inspect: (location) =>
+    inspect: (location: FilesystemLocation) =>
       filesystem.withVolume(location, (fullPath) =>
         Effect.gen(function* () {
           const stats = yield* io.stat(fullPath);
@@ -50,9 +50,9 @@ export const createFileOpenFilesystem = Effect.fn(function* (
           };
         }),
       ),
-    isDirectory: (location) =>
+    isDirectory: (location: FilesystemLocation) =>
       filesystem.withVolume(location, (fullPath) =>
         io.stat(fullPath).pipe(Effect.map((stat) => stat.isDirectory())),
       ),
-  } satisfies FileOpenFilesystem;
+  };
 });

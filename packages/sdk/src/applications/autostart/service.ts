@@ -14,11 +14,9 @@ import { Settings } from "../../core/settings/service";
 import { SessionContext } from "../../desktop/session/context";
 import { Sessions } from "../../desktop/session/service";
 import { log } from "../../platform/logging/logger";
-import {
-  AutostartConfig,
-  AutostartProcesses,
-  DevelopmentAutostart,
-} from "./ports";
+import { PackageCatalog } from "../packages/catalog";
+import { Processes } from "../processes/service";
+import { AutostartConfig, DevelopmentAutostart } from "./ports";
 
 export interface Autostart {
   onFoundationReady: () => void;
@@ -43,7 +41,8 @@ export const AutostartLive = Layer.effect(
     const sessions = yield* Sessions;
     const session = yield* SessionContext;
     const operations = yield* Operations;
-    const processes = yield* AutostartProcesses;
+    const processes = yield* Processes;
+    const catalog = yield* PackageCatalog;
     const developmentApps = yield* DevelopmentAutostart;
     let ready = false;
     let disposed = false;
@@ -55,8 +54,8 @@ export const AutostartLive = Layer.effect(
         const apps = yield* developmentApps.apps;
         for (const app of apps.filter((entry) => entry.launchOnStart)) {
           if (disposed) return;
-          if (processes.isRunning(app.id)) continue;
-          yield* Effect.match(processes.launch(app.id), {
+          if (processes.getAppInstance(app.id)) continue;
+          yield* Effect.match(processes.launchApp(app.id), {
             onFailure: (error) =>
               log.error(`Failed to launch development app ${app.id}:`, error),
             onSuccess: () => log.info(`Development app launched: ${app.id}`),
@@ -88,10 +87,10 @@ export const AutostartLive = Layer.effect(
             for (const [appId, enabled] of entries) {
               if (!enabled) continue;
               if (disposed) return;
-              const manifest = processes.installedManifest(appId);
+              const manifest = catalog.getApp(appId);
               if (manifest && !manifest.frontend?.entry) continue;
-              if (processes.isRunning(appId)) continue;
-              yield* Effect.match(processes.launch(appId), {
+              if (processes.getAppInstance(appId)) continue;
+              yield* Effect.match(processes.launchApp(appId), {
                 onFailure: (error) =>
                   log.error(`Failed to launch autostart app ${appId}:`, error),
                 onSuccess: () => log.info(`Autostart app launched: ${appId}`),
@@ -112,10 +111,10 @@ export const AutostartLive = Layer.effect(
           disposed ||
           sessions.getCurrentUser() ||
           !loginAppId ||
-          processes.isRunning(loginAppId)
+          processes.getAppInstance(loginAppId)
         )
           return;
-        yield* Effect.match(processes.launch(loginAppId), {
+        yield* Effect.match(processes.launchApp(loginAppId), {
           onFailure: (error) =>
             log.error(`Failed to launch login app ${loginAppId}:`, error),
           onSuccess: () => log.info(`Login app launched: ${loginAppId}`),
