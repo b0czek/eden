@@ -2,7 +2,10 @@ import type { AppManifest } from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { createEffectRuntime } from "../../../tests/support/effect-runtime";
 import { createEvent } from "../../core/events/event";
-import { createInterfaceScale } from "./interface-scale";
+import {
+  createInterfaceScale,
+  initializeInterfaceScale,
+} from "./interface-scale";
 import type { ViewInfo, ViewType } from "./types";
 
 type SettingsChanged = {
@@ -33,13 +36,12 @@ const createScaleFixture = async (
 
   const effects = createEffectRuntime();
   cleanups.unshift(() => effects.dispose());
-  const scale = await effects.acquire(
-    createInterfaceScale(settings as never, () => views, notifyScaleChanged),
-  );
+  const scale = createInterfaceScale(() => views, notifyScaleChanged);
+  await effects.acquire(initializeInterfaceScale(settings, scale));
 
   return {
     scale,
-    initialize: () => effects.run(scale.initialize()),
+    dispose: () => effects.dispose(),
     notifyScaleChanged,
     emitSettingsChanged: (value: string) =>
       changed.emit({
@@ -118,11 +120,19 @@ describe("InterfaceScale", () => {
     const view = createView("app");
     const notifyScaleChanged = jest.fn();
 
-    await (
-      await createScaleFixture([view], notifyScaleChanged, "1.5")
-    ).initialize();
+    await createScaleFixture([view], notifyScaleChanged, "1.5");
 
     expect(getSetZoomFactor(view)).toHaveBeenCalledWith(1.5);
     expect(notifyScaleChanged).toHaveBeenCalledWith(1.5, 1);
+  });
+
+  it("stops reacting to settings after its owning scope closes", async () => {
+    const { scale, emitSettingsChanged, dispose } = await createScaleFixture();
+    emitSettingsChanged("1.25");
+    expect(scale.getScale()).toBe(1.25);
+
+    await dispose();
+    emitSettingsChanged("2");
+    expect(scale.getScale()).toBe(1.25);
   });
 });

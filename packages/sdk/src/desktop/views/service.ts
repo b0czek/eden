@@ -20,7 +20,7 @@ import {
   WindowingPort,
 } from "../../platform/ports/types";
 import { DistPath, RuntimeConfig } from "../../runtime/inputs";
-import { createViewLayout, type ViewLayout } from "./coordination";
+import { createViewLayout } from "./coordination";
 import { createViewDevTools } from "./devtools";
 import type {
   ViewCreateError,
@@ -29,16 +29,18 @@ import type {
   ViewTileError,
 } from "./errors";
 import { createFloatingWindows } from "./floating-windows";
-import { createInterfaceScale } from "./interface-scale";
+import {
+  createInterfaceScale,
+  initializeInterfaceScale,
+} from "./interface-scale";
 import { createViewPresentation } from "./presentation";
-import { createViewRegistry, type ViewRegistry } from "./registry";
+import { createViewRegistry } from "./registry";
 import { createViewRendering } from "./rendering";
 import { createTiling } from "./tiling";
 import type { ViewEvents, ViewInfo, ViewMode } from "./types";
 
 /** Native setup and presentation hooks are synchronous; workflows return lazy Effects. */
 export interface Views {
-  initialize: () => Effect.Effect<void>;
   viewRemoved: Event<ViewEvents["view-removed"]>;
   viewLoaded: Event<ViewEvents["view-loaded"]>;
   viewLoadFailed: Event<ViewEvents["view-load-failed"]>;
@@ -117,18 +119,13 @@ export const ViewsLive = Layer.effect(
       yield* scopedEvent<TargetedNotification<ViewBounds>>();
     const modeChanged =
       yield* scopedEvent<TargetedNotification<ViewEvents["mode-changed"]>>();
-    let registry: ViewRegistry | undefined;
-    let layout: ViewLayout | undefined;
-    const getViews = () => registry?.views.values() ?? [];
+    const getViews = () => nativeViews.views.values();
     const devtools = createViewDevTools();
     const presentation = createViewPresentation();
-    const interfaceScale = yield* createInterfaceScale(
-      settings,
+    const interfaceScale = createInterfaceScale(
       getViews,
-      (scale, previousScale) => {
-        if (layout) layout.handleInterfaceScaleChanged(scale, previousScale);
-        else interfaceScaleChanged.emit({ scale });
-      },
+      (scale, previousScale) =>
+        coordination.handleInterfaceScaleChanged(scale, previousScale),
     );
     const tiling = createTiling(
       config.tiling || { mode: "none", gap: 0, padding: 0 },
@@ -153,7 +150,6 @@ export const ViewsLive = Layer.effect(
       devtools,
       { viewRemoved, viewLoaded, viewLoadFailed },
     );
-    registry = nativeViews;
     const coordination = createViewLayout(
       nativeViews,
       tiling,
@@ -166,8 +162,8 @@ export const ViewsLive = Layer.effect(
         modeChanged,
       },
     );
-    layout = coordination;
     yield* Effect.addFinalizer(() => Effect.sync(nativeViews.dispose));
+    yield* initializeInterfaceScale(settings, interfaceScale);
     return {
       setMainWindow: nativeViews.setMainWindow,
       updateGlobalBounds: coordination.updateGlobalBounds,
@@ -193,7 +189,6 @@ export const ViewsLive = Layer.effect(
       setViewMode: coordination.setViewMode,
       setKeyboardPresentationLift: coordination.setKeyboardPresentationLift,
       getKeyboardPresentationLift: coordination.getKeyboardPresentationLift,
-      initialize: interfaceScale.initialize,
       viewRemoved,
       viewLoaded,
       viewLoadFailed,
@@ -206,5 +201,5 @@ export const ViewsLive = Layer.effect(
       getCurrentScale: interfaceScale.getScale,
       setInterfaceScale: interfaceScale.setScale,
     } satisfies Views;
-  }).pipe(Effect.tap((value) => value.initialize())),
+  }),
 );

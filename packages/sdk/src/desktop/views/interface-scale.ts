@@ -10,43 +10,17 @@ import type { ViewInfo, ViewType } from "./types";
 
 const INTERFACE_SCALE_KEY = "general.interfaceScale";
 
-export const createInterfaceScale = Effect.fn(function* (
-  settings: Pick<Settings, "get" | "changed">,
+export function createInterfaceScale(
   getViews: () => Iterable<ViewInfo>,
   notifyScaleChanged: (scale: number, previousScale: number) => void = () => {},
 ) {
   let currentScale = 1;
-  const storedScale = (value: string) => {
-    const parsed = v.safeParse(interfaceScaleSchema, parseFloat(value));
-    return parsed.success ? parsed.output : undefined;
-  };
   function setScale(scale: number) {
     const previousScale = currentScale;
     currentScale = scale;
     for (const view of getViews()) applyToView(view);
     notifyScaleChanged(scale, previousScale);
   }
-  yield* listen(settings.changed, (data) => {
-    if (data.appId !== EDEN_SETTINGS_APP_ID || data.key !== INTERFACE_SCALE_KEY)
-      return;
-    const scale = storedScale(data.value);
-    if (scale !== undefined) setScale(scale);
-  });
-  const initialize = Effect.fn(function* () {
-    const value = yield* settings
-      .get(EDEN_SETTINGS_APP_ID, INTERFACE_SCALE_KEY)
-      .pipe(
-        Effect.catch((error) =>
-          Effect.sync(() => {
-            log.error("Failed to initialize interface scale:", error);
-            return undefined;
-          }),
-        ),
-      );
-    if (value === undefined) return;
-    const scale = storedScale(value);
-    if (scale !== undefined) setScale(scale);
-  });
   function getScalingMode(
     manifest: AppManifest,
     viewType: ViewType,
@@ -67,8 +41,32 @@ export const createInterfaceScale = Effect.fn(function* (
       log.error(`Failed to set zoom for view ${view.id}:`, error);
     }
   }
-  return { initialize, getScale: () => currentScale, setScale, applyToView };
+  return { getScale: () => currentScale, setScale, applyToView };
+}
+export type InterfaceScale = ReturnType<typeof createInterfaceScale>;
+
+export const initializeInterfaceScale = Effect.fn(function* (
+  settings: Pick<Settings, "get" | "changed">,
+  scale: InterfaceScale,
+) {
+  function applyStoredScale(value: string | undefined) {
+    if (value === undefined) return;
+    const parsed = v.safeParse(interfaceScaleSchema, parseFloat(value));
+    if (parsed.success) scale.setScale(parsed.output);
+  }
+  yield* listen(settings.changed, (data) => {
+    if (data.appId === EDEN_SETTINGS_APP_ID && data.key === INTERFACE_SCALE_KEY)
+      applyStoredScale(data.value);
+  });
+  const value = yield* settings
+    .get(EDEN_SETTINGS_APP_ID, INTERFACE_SCALE_KEY)
+    .pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          log.error("Failed to initialize interface scale:", error);
+          return undefined;
+        }),
+      ),
+    );
+  applyStoredScale(value);
 });
-export type InterfaceScale = Effect.Success<
-  ReturnType<typeof createInterfaceScale>
->;
