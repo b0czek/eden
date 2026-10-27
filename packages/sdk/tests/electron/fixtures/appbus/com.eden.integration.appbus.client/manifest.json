@@ -14,5 +14,8 @@
       "css": "none"
     }
   },
-  "permissions": ["appbus/expose", "appbus/connect"]
+  "permissions": ["appbus/expose", "appbus/connect"],
+  "backend": {
+    "entry": "backend.mjs"
+  }
 }

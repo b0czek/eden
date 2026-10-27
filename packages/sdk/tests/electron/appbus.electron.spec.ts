@@ -77,6 +77,13 @@ test.describe
         client: PROVIDER,
         provider: "client",
       });
+      expect(
+        await request("backend", "backend to backend", "backend-roundtrip"),
+      ).toEqual({
+        payload: "backend to backend",
+        client: PROVIDER,
+        provider: "client backend",
+      });
     });
 
     test("rejects clients outside the service allowlist and apps without connect permission", async () => {

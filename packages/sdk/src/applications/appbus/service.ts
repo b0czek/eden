@@ -8,9 +8,15 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { log } from "../../platform/logging/logger";
+import type { PlatformMessagePort } from "../../platform/ports/types";
 import { Backends } from "../processes/backends";
 import { AppChannelFailure, AppServiceAlreadyRegistered } from "./errors";
 import { AppChannelTransport } from "./ports";
+
+interface Destination {
+  appId: string;
+  send(channel: string, message: object, ports?: PlatformMessagePort[]): void;
+}
 
 export interface AppChannels {
   registerService: (
@@ -50,12 +56,29 @@ export const AppChannelsLive = Layer.effect(
     const connections = new Map<
       string,
       {
-        requesterAppId: string;
-        requesterWebContentsId?: number;
-        targetAppId: string;
-        targetWebContentsId?: number;
+        requester: Destination;
+        provider: Destination;
       }
     >();
+
+    function destination(
+      appId: string,
+      webContents: ReturnType<AppChannelTransport["getWebContentsById"]>,
+    ): Destination {
+      return {
+        appId,
+        send: webContents
+          ? (channel, message, ports) => {
+              if (ports) webContents.postMessage(channel, message, ports);
+              else if (!webContents.isDestroyed())
+                webContents.send(channel, message);
+            }
+          : (type, message, ports) => {
+              backends.sendMessage(appId, { type, ...message }, ports);
+            },
+      };
+    }
+
     function serviceKey(appId: string, serviceName: string): string {
       return `${appId}:${serviceName}`;
     }
@@ -217,133 +240,44 @@ export const AppChannelsLive = Layer.effect(
         );
         const connectionId = `${requesterAppId}->${targetAppId}:${serviceName}:${clock.currentTimeMillisUnsafe()}:${++nextConnectionId}`;
 
-        connections.set(connectionId, {
-          requesterAppId,
-          requesterWebContentsId: requesterWebContentsId || undefined,
-          targetAppId,
-          targetWebContentsId: service.webContentsId,
-        });
+        const requester = destination(requesterAppId, requesterWebContents);
+        const provider = destination(targetAppId, targetWebContents);
+        connections.set(connectionId, { requester, provider });
 
         log.info(
           `Creating channel: ${requesterAppId} -> ${targetAppId}:${serviceName}`,
         );
-        if (requesterWebContents) {
-          yield* native("transfer-requester", () =>
-            requesterWebContents.postMessage(
-              "appbus-port",
-              {
-                connectionId,
-                targetAppId,
-                serviceName,
-                role: "client",
-              },
-              [port1],
-            ),
-          );
-        } else {
-          yield* native("transfer-requester", () =>
-            backends.sendMessage(
-              requesterAppId,
-              {
-                type: "appbus-port",
-                connectionId,
-                targetAppId,
-                serviceName,
-                role: "client",
-              },
-              [port1],
-            ),
-          );
-        }
-        if (targetWebContents) {
-          yield* native("transfer-provider", () =>
-            targetWebContents.postMessage(
-              "appbus-port",
-              {
-                connectionId,
-                sourceAppId: requesterAppId,
-                serviceName,
-                role: "service",
-              },
-              [port2],
-            ),
-          );
-        } else {
-          yield* native("transfer-provider", () =>
-            backends.sendMessage(
-              targetAppId,
-              {
-                type: "appbus-port",
-                connectionId,
-                sourceAppId: requesterAppId,
-                serviceName,
-                role: "service",
-              },
-              [port2],
-            ),
-          );
-        }
+        yield* native("transfer-requester", () =>
+          requester.send(
+            "appbus-port",
+            { connectionId, targetAppId, serviceName, role: "client" },
+            [port1],
+          ),
+        );
+        yield* native("transfer-provider", () =>
+          provider.send(
+            "appbus-port",
+            {
+              connectionId,
+              sourceAppId: requesterAppId,
+              serviceName,
+              role: "service",
+            },
+            [port2],
+          ),
+        );
 
         return { success: true, connectionId } satisfies ConnectResult;
       });
     }
 
-    function closeConnection(connectionId: string): boolean {
-      const connection = connections.get(connectionId);
-      if (!connection) {
-        return false;
-      }
-
-      connections.delete(connectionId);
-      log.info(`Closed connection: ${connectionId}`);
-      return true;
-    }
-
     function closeConnectionsForApp(appId: string): void {
-      const connectionsToClose: string[] = [];
-
-      for (const [connectionId, conn] of connections) {
-        if (conn.requesterAppId === appId || conn.targetAppId === appId) {
-          connectionsToClose.push(connectionId);
-          if (conn.requesterAppId === appId) {
-            notifyPortClosed(
-              conn.targetAppId,
-              conn.targetWebContentsId,
-              connectionId,
-            );
-          } else {
-            notifyPortClosed(
-              conn.requesterAppId,
-              conn.requesterWebContentsId,
-              connectionId,
-            );
-          }
-        }
-      }
-
-      for (const connectionId of connectionsToClose) {
-        closeConnection(connectionId);
-      }
-    }
-
-    function notifyPortClosed(
-      appId: string,
-      webContentsId: number | undefined,
-      connectionId: string,
-    ): void {
-      log.info(
-        `Notifying port closed for app "${appId}" (webContentsId: ${webContentsId})`,
-      );
-      if (webContentsId) {
-        const wc = channels.getWebContentsById(webContentsId);
-        if (wc && !wc.isDestroyed()) {
-          wc.send("appbus-port-closed", { connectionId });
-        }
-      } else {
-        backends.sendMessage(appId, {
-          type: "appbus-port-closed",
-          connectionId,
-        });
+      for (const [connectionId, { requester, provider }] of connections) {
+        if (requester.appId !== appId && provider.appId !== appId) continue;
+        connections.delete(connectionId);
+        const peer = requester.appId === appId ? provider : requester;
+        peer.send("appbus-port-closed", { connectionId });
+        log.info(`Closed connection: ${connectionId}`);
       }
     }
 
@@ -361,8 +295,7 @@ export const AppChannelsLive = Layer.effect(
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        for (const connectionId of connections.keys())
-          closeConnection(connectionId);
+        connections.clear();
         services.clear();
         log.info("Destroyed");
       }),
