@@ -1,9 +1,15 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import {
+  type ChildProcess,
+  type SpawnOptions,
+  spawn,
+} from "node:child_process";
 import { randomBytes, scryptSync } from "node:crypto";
+import { once } from "node:events";
 import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import type { AppManifest, EdenSeedConfig } from "@edenapp/types";
 
 const PROTOCOL_VERSION = 1;
@@ -22,12 +28,6 @@ export interface StandaloneDevOptions {
   hostPath?: string;
   offline?: boolean;
   reset?: boolean;
-}
-
-interface ManagedProcess {
-  label: string;
-  child: ChildProcess;
-  expectedExit: boolean;
 }
 
 export async function standaloneDev(
@@ -55,117 +55,143 @@ export async function standaloneDev(
   // Seeding is idempotent in the host; --reset wipes the profile and re-seeds.
   await writeJsonAtomic(seedPath, developmentSeed());
 
-  const port = await findAvailablePort(5173);
-  const frontend = await resolveFrontend(manifest, appDirectory, port);
-  const backend = await resolveBackend(manifest, appDirectory);
-  let revision = 1;
-  let stopping = false;
-  const processes: ManagedProcess[] = [];
+  const session = new AbortController();
+  const { signal } = session;
+  const children: ChildProcess[] = [];
+  const onSignal = () => session.abort(null);
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
-  await writeJsonAtomic(path.join(stateDirectory, "apps.json"), {
-    protocolVersion: PROTOCOL_VERSION,
-    apps: [{ id: manifest.id, sourcePath: appDirectory, launchOnStart: true }],
-  });
-  await writeJsonAtomic(path.join(stateDirectory, "enabled.json"), {
-    apps: [manifest.id],
-  });
-
-  if (backend)
-    processes.push(startCommand("backend", backend.command, backend.cwd));
-  if (frontend) {
-    await writeServerState(
-      stateDirectory,
-      manifest.id,
-      frontend.url,
-      port,
-      "starting",
-      revision,
-    );
-    const process = startCommand("frontend", frontend.command, frontend.cwd);
-    processes.push(process);
-    try {
-      await waitForUrl(frontend.url, READY_TIMEOUT_MS, process.child);
-    } catch (error) {
-      await cleanupProcesses(processes);
-      throw error;
-    }
-    await writeServerState(
-      stateDirectory,
-      manifest.id,
-      frontend.url,
-      port,
-      "ready",
-      revision,
-    );
-    console.log(`✅ Renderer ready at ${frontend.url}`);
-  } else {
-    await writeServerState(
-      stateDirectory,
-      manifest.id,
-      "",
-      port,
-      "ready",
-      revision,
-    );
-  }
-
-  let hostExecutable: Awaited<ReturnType<typeof resolveHostExecutable>>;
-  try {
-    hostExecutable = await resolveHostExecutable(options);
-  } catch (error) {
-    await cleanupProcesses(processes);
-    throw error;
-  }
-  const host = startExecutable(
-    "host",
-    hostExecutable.command,
-    hostExecutable.args,
-    hostExecutable.cwd,
+  function start(
+    label: string,
+    command: string,
+    args: string[] = [],
     {
-      EDEN_DEV_APPS_DIRECTORY: path.join(profileDirectory, "apps"),
-      EDEN_DEV_USER_DIRECTORY: path.join(profileDirectory, "user"),
-      EDEN_DEV_HOT_RELOAD_DIRECTORY: stateDirectory,
-      EDEN_DEV_SEED_PATH: seedPath,
-    },
-  );
-  processes.push(host);
-  console.log(`🌱 Mounted ${manifest.id} from ${appDirectory}`);
-  console.log(
-    `👤 Auto-signing in as "${DEVELOPMENT_USER.username}" (password: "${DEVELOPMENT_USER.password}")`,
-  );
-
-  let failSession: (error: Error) => void = () => undefined;
-  const completion = new Promise<never>((_resolve, reject) => {
-    failSession = reject;
-    for (const managed of processes) {
-      managed.child.once("exit", (code, signal) => {
-        if (!stopping && !managed.expectedExit) {
-          reject(
-            new Error(
-              `${managed.label} exited unexpectedly (${signal ?? code ?? "unknown"})`,
-            ),
-          );
-        }
+      persistent = true,
+      ...options
+    }: SpawnOptions & { persistent?: boolean } = {},
+  ): ChildProcess {
+    signal.throwIfAborted();
+    const child = spawn(command, args, {
+      ...options,
+      stdio: "inherit",
+      env: { ...process.env, ...options.env },
+      detached: process.platform !== "win32",
+    });
+    children.push(child);
+    child.once("error", (error) => session.abort(error));
+    if (persistent) {
+      child.once("exit", (code, exitSignal) => {
+        session.abort(
+          new Error(
+            `${label} exited unexpectedly (${exitSignal ?? code ?? "unknown"})`,
+          ),
+        );
       });
     }
-  });
+    return child;
+  }
 
-  const watched = new Map<string, number>();
-  const watchPaths = [manifestPath];
-  if (manifest.backend?.entry)
-    watchPaths.push(path.resolve(appDirectory, manifest.backend.entry));
-  const interval = setInterval(async () => {
-    let changed = false;
-    for (const file of watchPaths) {
-      const mtime = await fs
-        .stat(file)
-        .then((s) => s.mtimeMs)
-        .catch(() => 0);
-      const previous = watched.get(file);
-      watched.set(file, mtime);
-      if (previous !== undefined && previous !== mtime) changed = true;
+  async function stop() {
+    let failure: unknown;
+    for (const child of children.reverse()) {
+      try {
+        await terminate(child);
+      } catch (error) {
+        failure ??= error;
+      }
     }
-    if (changed) {
+    await writeJsonAtomic(path.join(stateDirectory, "apps.json"), {
+      protocolVersion: PROTOCOL_VERSION,
+      apps: [],
+    });
+    await writeJsonAtomic(path.join(stateDirectory, "servers.json"), {
+      apps: {},
+    });
+    if (failure) throw failure;
+  }
+
+  try {
+    const port = await findAvailablePort(5173);
+    const frontend = await resolveFrontend(manifest, appDirectory, port);
+    const backend = await resolveBackend(manifest, appDirectory);
+    let revision = 1;
+    await writeJsonAtomic(path.join(stateDirectory, "apps.json"), {
+      protocolVersion: PROTOCOL_VERSION,
+      apps: [
+        { id: manifest.id, sourcePath: appDirectory, launchOnStart: true },
+      ],
+    });
+    await writeJsonAtomic(path.join(stateDirectory, "enabled.json"), {
+      apps: [manifest.id],
+    });
+
+    if (backend)
+      start("backend", backend.command, [], { cwd: backend.cwd, shell: true });
+    if (frontend) {
+      await writeServerState(
+        stateDirectory,
+        manifest.id,
+        frontend.url,
+        port,
+        "starting",
+        revision,
+      );
+      start("frontend", frontend.command, [], {
+        cwd: frontend.cwd,
+        shell: true,
+      });
+      await waitForUrl(frontend.url, READY_TIMEOUT_MS, signal);
+      console.log(`✅ Renderer ready at ${frontend.url}`);
+    }
+    await writeServerState(
+      stateDirectory,
+      manifest.id,
+      frontend?.url ?? "",
+      port,
+      "ready",
+      revision,
+    );
+
+    const host = await resolveHostExecutable(options, async (command, args) => {
+      const child = start("host installer", command, args, {
+        persistent: false,
+      });
+      const [code] = await once(child, "exit", { signal });
+      if (code !== 0) throw new Error(`${command} exited with code ${code}`);
+      children.splice(children.indexOf(child), 1);
+    });
+    start("host", host.command, host.args, {
+      cwd: host.cwd,
+      env: {
+        EDEN_DEV_APPS_DIRECTORY: path.join(profileDirectory, "apps"),
+        EDEN_DEV_USER_DIRECTORY: path.join(profileDirectory, "user"),
+        EDEN_DEV_HOT_RELOAD_DIRECTORY: stateDirectory,
+        EDEN_DEV_SEED_PATH: seedPath,
+      },
+    });
+    console.log(`🌱 Mounted ${manifest.id} from ${appDirectory}`);
+    console.log(
+      `👤 Auto-signing in as "${DEVELOPMENT_USER.username}" (password: "${DEVELOPMENT_USER.password}")`,
+    );
+
+    const watched = new Map<string, number>();
+    const watchPaths = [manifestPath];
+    if (manifest.backend?.entry)
+      watchPaths.push(path.resolve(appDirectory, manifest.backend.entry));
+    while (true) {
+      await delay(400, undefined, { signal });
+      let changed = false;
+      for (const file of watchPaths) {
+        const mtime = await fs
+          .stat(file)
+          .then((stat) => stat.mtimeMs)
+          .catch(() => 0);
+        const previous = watched.get(file);
+        watched.set(file, mtime);
+        if (previous !== undefined && previous !== mtime) changed = true;
+      }
+      if (!changed) continue;
       const currentManifest = JSON.parse(
         await fs.readFile(manifestPath, "utf-8"),
       ) as AppManifest;
@@ -174,12 +200,9 @@ export async function standaloneDev(
         JSON.stringify(currentManifest.development) !==
           JSON.stringify(manifest.development)
       ) {
-        failSession(
-          new Error(
-            "The app ID or development commands changed; restart eden-build dev",
-          ),
+        throw new Error(
+          "The app ID or development commands changed; restart eden-build dev",
         );
-        return;
       }
       revision++;
       await writeServerState(
@@ -192,30 +215,17 @@ export async function standaloneDev(
       );
       console.log(`♻️  Reloading ${manifest.id} (revision ${revision})`);
     }
-  }, 400);
-
-  const stop = async () => {
-    if (stopping) return;
-    stopping = true;
-    clearInterval(interval);
-    for (const managed of processes.reverse()) {
-      managed.expectedExit = true;
-      await terminate(managed.child);
-    }
-    await writeJsonAtomic(path.join(stateDirectory, "apps.json"), {
-      protocolVersion: PROTOCOL_VERSION,
-      apps: [],
-    });
-    await writeJsonAtomic(path.join(stateDirectory, "servers.json"), {
-      apps: {},
-    });
-  };
-  process.once("SIGINT", () => void stop().then(() => process.exit(0)));
-  process.once("SIGTERM", () => void stop().then(() => process.exit(0)));
-  try {
-    await completion;
+  } catch (error) {
+    if (!signal.aborted) throw error;
+    if (signal.reason !== null) throw signal.reason;
   } finally {
-    await stop();
+    session.abort(null);
+    try {
+      await stop();
+    } finally {
+      process.off("SIGINT", onSignal);
+      process.off("SIGTERM", onSignal);
+    }
   }
 }
 
@@ -277,39 +287,9 @@ async function resolveBackend(manifest: AppManifest, appDirectory: string) {
   return undefined;
 }
 
-function startCommand(
-  label: string,
-  command: string,
-  cwd: string,
-): ManagedProcess {
-  const child = spawn(command, {
-    cwd,
-    shell: true,
-    stdio: "inherit",
-    env: process.env,
-    detached: process.platform !== "win32",
-  });
-  return { label, child, expectedExit: false };
-}
-
-function startExecutable(
-  label: string,
-  command: string,
-  args: string[],
-  cwd: string | undefined,
-  extraEnv: NodeJS.ProcessEnv,
-): ManagedProcess {
-  const child = spawn(command, args, {
-    cwd,
-    stdio: "inherit",
-    env: { ...process.env, ...extraEnv },
-    detached: process.platform !== "win32",
-  });
-  return { label, child, expectedExit: false };
-}
-
 async function resolveHostExecutable(
   options: StandaloneDevOptions,
+  runChecked: (command: string, args: string[]) => Promise<void>,
 ): Promise<{ command: string; args: string[]; cwd?: string }> {
   if (options.hostPath) {
     const root = path.resolve(options.hostPath);
@@ -445,25 +425,21 @@ async function writeJsonAtomic(file: string, value: unknown) {
   await fs.rename(temporary, file);
 }
 
-async function waitForUrl(url: string, timeout: number, child: ChildProcess) {
+async function waitForUrl(url: string, timeout: number, signal: AbortSignal) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null || child.signalCode !== null) {
-      throw new Error(
-        `frontend exited before becoming ready (${child.signalCode ?? child.exitCode})`,
-      );
-    }
-    if (await requestUrl(url)) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    signal.throwIfAborted();
+    if (await requestUrl(url, signal)) return;
+    await delay(250, undefined, { signal });
   }
   throw new Error(
     `frontend did not become ready within ${timeout / 1000}s: ${url}`,
   );
 }
 
-function requestUrl(url: string): Promise<boolean> {
+function requestUrl(url: string, signal: AbortSignal): Promise<boolean> {
   return new Promise((resolve) => {
-    const request = http.get(url, (response) => {
+    const request = http.get(url, { signal }, (response) => {
       response.resume();
       resolve(true);
     });
@@ -512,35 +488,20 @@ async function exists(file: string) {
     .then(() => true)
     .catch(() => false);
 }
-async function runChecked(command: string, args: string[]) {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "inherit" });
-    child.once("error", reject);
-    child.once("exit", (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`${command} exited with code ${code}`)),
-    );
-  });
-}
 async function terminate(child: ChildProcess) {
-  if (child.exitCode !== null || child.signalCode !== null || !child.pid)
-    return;
-  if (process.platform !== "win32") process.kill(-child.pid, "SIGTERM");
-  else child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) {
-    if (process.platform !== "win32") process.kill(-child.pid, "SIGKILL");
-    else child.kill("SIGKILL");
+  if (!child.pid) return;
+  const target = process.platform === "win32" ? child.pid : -child.pid;
+  function send(signal: NodeJS.Signals | 0) {
+    try {
+      process.kill(target, signal);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+      throw error;
+    }
   }
-}
-
-async function cleanupProcesses(processes: ManagedProcess[]): Promise<void> {
-  for (const managed of processes.reverse()) {
-    managed.expectedExit = true;
-    await terminate(managed.child);
-  }
+  if (!send("SIGTERM")) return;
+  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
+  while (send(0) && Date.now() < deadline) await delay(50);
+  send("SIGKILL");
 }
