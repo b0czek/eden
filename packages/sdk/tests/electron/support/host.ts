@@ -42,7 +42,10 @@ export async function createElectronHost(
     const executablePath = require("electron") as string;
     electronApp = await electron.launch({
       executablePath,
-      args: [path.join(__dirname, "../host.cjs")],
+      args: [
+        ...(process.platform === "linux" ? ["--ozone-platform=x11"] : []),
+        path.join(__dirname, "../host.cjs"),
+      ],
       cwd: root,
       env: {
         ...process.env,

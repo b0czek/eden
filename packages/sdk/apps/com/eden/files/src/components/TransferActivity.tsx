@@ -2,7 +2,14 @@ import { formatFileSize } from "@edenapp/files-core";
 import { OperationStatus } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import type { OperationSnapshot } from "@edenapp/types";
-import { FiCopy, FiExternalLink, FiMove, FiTrash2, FiX } from "solid-icons/fi";
+import {
+  FiCopy,
+  FiExternalLink,
+  FiMove,
+  FiRotateCcw,
+  FiTrash2,
+  FiX,
+} from "solid-icons/fi";
 import { Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { FileOperationProgress } from "../features/useFileTransfers";
@@ -17,6 +24,9 @@ const progressLabel = (progress: FileOperationProgress): string => {
   if (progress.operation === "copy") return t("files.progressCopy", values);
   if (progress.operation === "move") return t("files.progressMove", values);
   if (progress.operation === "open") return t("files.progressOpen", values);
+  if (progress.operation === "trash") return t("files.progressTrash", values);
+  if (progress.operation === "restore")
+    return t("files.progressRestore", values);
   return t("files.progressDelete", values);
 };
 
@@ -71,9 +81,12 @@ export function TransferActivity(props: TransferActivityProps) {
       case "move":
         return FiMove;
       case "delete":
+      case "trash":
         return FiTrash2;
       case "open":
         return FiExternalLink;
+      case "restore":
+        return FiRotateCcw;
       default:
         return FiCopy;
     }

@@ -31,6 +31,44 @@ it("retains the native path, errno and cause for filesystem failure recovery", a
   });
 });
 
+describe("exclusive native rename", () => {
+  it("moves a dangling symlink and refuses an existing dangling destination", async () => {
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    await fs.symlink("missing-original", source);
+    await fs.symlink("missing-competitor", destination);
+    await expect(
+      Effect.runPromise(io.renameNoReplace(source, destination)),
+    ).rejects.toMatchObject({
+      operation: "rename",
+      code: "EEXIST",
+      path: source,
+    });
+    expect(await fs.readlink(destination)).toBe("missing-competitor");
+    expect(await fs.readlink(source)).toBe("missing-original");
+    await fs.unlink(destination);
+    const before = await fs.lstat(source);
+    await Effect.runPromise(io.renameNoReplace(source, destination));
+    expect((await fs.lstat(destination)).ino).toBe(before.ino);
+    expect(await fs.readlink(destination)).toBe("missing-original");
+    await expect(fs.lstat(source)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects null bytes before invoking the native function", async () => {
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    await fs.writeFile(source, "original");
+    await expect(
+      Effect.runPromise(io.renameNoReplace(`${source}\0suffix`, destination)),
+    ).rejects.toMatchObject({ code: "EINVAL" });
+    await expect(
+      Effect.runPromise(io.renameNoReplace(source, `${destination}\0suffix`)),
+    ).rejects.toMatchObject({ code: "EINVAL" });
+    expect(await fs.readFile(source, "utf8")).toBe("original");
+    expect(await fs.readdir(root)).toEqual(["source"]);
+  });
+});
+
 it("closes a descriptor with its scope and retains its context on subsequent read failure", async () => {
   const hostPath = path.join(root, "data");
   await fs.writeFile(hostPath, "contents");
@@ -86,6 +124,18 @@ it.each([false, true])(
     expect(bytes).toBe(withProgress ? 7 : 0);
   },
 );
+
+it("copying a dangling symlink never replaces an existing destination link", async () => {
+  const source = path.join(root, "source");
+  const destination = path.join(root, "destination");
+  await fs.symlink("original-target", source);
+  await fs.symlink("other-target", destination);
+  await expect(
+    Effect.runPromise(io.copy(source, destination)),
+  ).rejects.toMatchObject({ code: "EEXIST" });
+  expect(await fs.readlink(source)).toBe("original-target");
+  expect(await fs.readlink(destination)).toBe("other-target");
+});
 
 describe("atomic file writes", () => {
   it.each([

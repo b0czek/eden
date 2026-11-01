@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, on } from "solid-js";
 
 interface UseFileSelectionOptions {
   items: Accessor<FileItem[]>;
+  getItemKey?: (item: FileItem) => string;
   currentPath: Accessor<string>;
   selectedItem: Accessor<string | null>;
   setSelectedItem: Setter<string | null>;
@@ -11,6 +12,8 @@ interface UseFileSelectionOptions {
 }
 
 export const useFileSelection = (options: UseFileSelectionOptions) => {
+  const key = (item: FileItem) =>
+    options.getItemKey?.(item) ?? item.location.path;
   const [selectionMode, setSelectionMode] = createSignal(false);
   const [selectedPaths, setSelectedPaths] = createSignal<string[]>([]);
   const [selectionAnchor, setSelectionAnchor] = createSignal<string | null>(
@@ -33,7 +36,7 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
     setSelectionMode(true);
     setSelectedPaths(
       currentSelection &&
-        options.items().some((item) => item.location.path === currentSelection)
+        options.items().some((item) => key(item) === currentSelection)
         ? [currentSelection]
         : [],
     );
@@ -42,7 +45,7 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
 
   const focusItem = (item: FileItem) => {
     options.setScrollToSelected(false);
-    options.setSelectedItem(item.location.path);
+    options.setSelectedItem(key(item));
   };
 
   const toggleItem = (item: FileItem, event?: MouseEvent | KeyboardEvent) => {
@@ -55,32 +58,30 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
 
     if (event?.shiftKey) {
       const anchorPath =
-        selectionAnchor() ?? options.selectedItem() ?? item.location.path;
+        selectionAnchor() ?? options.selectedItem() ?? key(item);
       const anchorIndex = options
         .items()
-        .findIndex((candidate) => candidate.location.path === anchorPath);
+        .findIndex((candidate) => key(candidate) === anchorPath);
       const itemIndex = options
         .items()
-        .findIndex(
-          (candidate) => candidate.location.path === item.location.path,
-        );
+        .findIndex((candidate) => key(candidate) === key(item));
       const startIndex = Math.max(0, Math.min(anchorIndex, itemIndex));
       const endIndex = Math.max(anchorIndex, itemIndex);
       const range = options
         .items()
         .slice(startIndex, endIndex + 1)
-        .map((candidate) => candidate.location.path);
+        .map((candidate) => key(candidate));
       setSelectedPaths(
         additive ? Array.from(new Set([...paths, ...range])) : range,
       );
       setSelectionAnchor(anchorPath);
     } else {
       setSelectedPaths(
-        paths.includes(item.location.path)
-          ? paths.filter((path) => path !== item.location.path)
-          : [...paths, item.location.path],
+        paths.includes(key(item))
+          ? paths.filter((path) => path !== key(item))
+          : [...paths, key(item)],
       );
-      setSelectionAnchor(item.location.path);
+      setSelectionAnchor(key(item));
     }
 
     setSelectionMode(true);
@@ -89,10 +90,10 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
 
   const selectAll = () => {
     setSelectionMode(true);
-    setSelectedPaths(options.items().map((item) => item.location.path));
+    setSelectedPaths(options.items().map((item) => key(item)));
     const firstItem = options.items()[0];
     if (firstItem) {
-      setSelectionAnchor(firstItem.location.path);
+      setSelectionAnchor(key(firstItem));
       focusItem(firstItem);
     }
   };
@@ -115,16 +116,14 @@ export const useFileSelection = (options: UseFileSelectionOptions) => {
 
   const selectedFiles = createMemo(() => {
     const selected = new Set(selectedPaths());
-    return options.items().filter((item) => selected.has(item.location.path));
+    return options.items().filter((item) => selected.has(key(item)));
   });
 
   createEffect(on(options.currentPath, clear, { defer: true }));
 
   createEffect(() => {
     if (!selectionMode()) return;
-    const availablePaths = new Set(
-      options.items().map((item) => item.location.path),
-    );
+    const availablePaths = new Set(options.items().map((item) => key(item)));
     setSelectedPaths((paths) =>
       paths.filter((path) => availablePaths.has(path)),
     );

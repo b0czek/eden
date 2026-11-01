@@ -290,3 +290,62 @@
   width: 16px;
   height: 16px;
 }
+.files-trash {
+  flex: 1;
+  min-height: 0;
+}
+
+.files-trash-item-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.files-trash-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+.files-trash .list-view .file-name {
+  min-width: 0;
+}
+
+.files-trash .list-view .files-trash-item-meta {
+  flex: 1;
+  text-align: right;
+}
+
+@media (pointer: coarse) {
+  .files-main .explorer-header .eden-btn,
+  .files-main .selection-action-bar .eden-btn,
+  .files-main .omnibox-display {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .files-main .file-select-button {
+    width: 44px;
+  }
+}
+
+.files-item-details dd,
+.files-failure-list {
+  overflow-wrap: anywhere;
+}
+
+.files-failure-list {
+  padding-left: var(--eden-space-md);
+}
+
+.files-error-details summary {
+  cursor: pointer;
+  padding-block: var(--eden-space-sm);
+}
+
+.files-error-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

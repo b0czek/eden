@@ -1,99 +1,62 @@
 import * as eden from "@edenapp/client";
 import {
-  buildBreadcrumbs,
   DisplayOptionsModal,
-  type DisplayPreferences,
-  FileExplorerHeader,
-  type FileExplorerLabels,
   type FileItem,
   FileList,
-  getParentPath,
-  useExplorerNavigation,
+  joinPath,
   useFileActivationPreference,
   useVolumeEject,
 } from "@edenapp/files-core";
 import { createDialogs, DialogHost } from "@edenapp/solid-kit/dialogs";
 import { notification } from "@edenapp/tablets";
-import type { FileOpenedEvent, FilesystemLocation } from "@edenapp/types";
-import { FiCheckSquare, FiX } from "solid-icons/fi";
+import type { FileOpenedEvent } from "@edenapp/types";
 import type { Component } from "solid-js";
-import { createSignal, onCleanup, onMount } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import {
   SelectionActionBar,
   TransferActionBar,
 } from "./components/FileModeActionBars";
 import { FilePlaces } from "./components/FilePlaces";
+import { FilesToolbar } from "./components/FilesToolbar";
 import { TransferActivity } from "./components/TransferActivity";
+import { TrashView } from "./components/TrashView";
+import { TRASH_DIRECTORY } from "./features/trash";
+import { useDirectoryBrowser } from "./features/useDirectoryBrowser";
+import { useDisplayPreferences } from "./features/useDisplayPreferences";
 import { useExplorerContextMenus } from "./features/useExplorerContextMenus";
 import { useFileActions } from "./features/useFileActions";
-import { useFileSelection } from "./features/useFileSelection";
+import { useFileErrors } from "./features/useFileErrors";
 import { useFilesKeyboardShortcuts } from "./features/useFilesKeyboardShortcuts";
 import { useFileTransfers } from "./features/useFileTransfers";
 import { usePinnedFolders } from "./features/usePinnedFolders";
-import { initLocale, t } from "./i18n";
-
-const getExplorerLabels = (): FileExplorerLabels => ({
-  volume: t("files.volume"),
-  home: t("files.home"),
-  readOnly: t("files.readOnly"),
-  refresh: t("files.refresh"),
-  goBack: t("files.goBack"),
-  goForward: t("files.goForward"),
-  goUp: t("files.goUp"),
-  newFolder: t("files.newFolder"),
-  newFile: t("files.newFile"),
-  settings: t("common.settings"),
-  editPath: t("files.editPath"),
-  searchPlaceholder: t("files.searchPlaceholder"),
-  loading: t("common.loading"),
-  empty: t("files.empty"),
-  emptyHint: t("files.emptyHint"),
-  folder: t("files.folder"),
-  delete: t("common.delete"),
-  close: t("common.close"),
-  displayOptions: t("files.displayOptions"),
-  viewStyle: t("files.viewStyle"),
-  grid: t("files.grid"),
-  list: t("files.list"),
-  displaySize: t("files.displaySize"),
-  tiny: t("files.tiny"),
-  small: t("files.small"),
-  medium: t("files.medium"),
-  large: t("files.large"),
-  huge: t("files.huge"),
-  sortBy: t("files.sortBy"),
-  name: t("common.name"),
-  size: t("common.size"),
-  modified: t("files.modified"),
-  ascending: t("files.ascending"),
-  descending: t("files.descending"),
-  selectItem: t("files.select"),
-});
+import { useTrash } from "./features/useTrash";
+import { useTrashBrowser } from "./features/useTrashBrowser";
+import { getExplorerLabels, initLocale, t } from "./i18n";
 
 const App: Component = () => {
   const dialogs = createDialogs();
   const openWithSingleClick = useFileActivationPreference();
 
-  const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
-  const [scrollToSelected, setScrollToSelected] = createSignal(false);
-  const [showDisplayOptionsModal, setShowDisplayOptionsModal] =
-    createSignal(false);
+  const display = useDisplayPreferences({
+    onChange: () => {
+      const currentItems = items();
+      if (currentItems.length > 0) setItems(sortItems(currentItems));
+    },
+  });
+  const {
+    preferences: displayPreferences,
+    sortItems,
+    change: handlePreferencesChange,
+  } = display;
 
-  const [displayPreferences, setDisplayPreferences] =
-    createSignal<DisplayPreferences>({
-      viewStyle: "grid",
-      itemSize: "medium",
-      sortBy: "name",
-      sortOrder: "asc",
-    });
-
-  const showError = (message: string) => {
-    void dialogs.alert({
-      title: t("common.error"),
-      message,
-      okLabel: t("common.ok"),
-    });
-  };
+  const { showError, showFailures } = useFileErrors(dialogs);
 
   const volumeRemoval = useVolumeEject({
     onRemoved: (volume) => {
@@ -104,144 +67,61 @@ const App: Component = () => {
       );
     },
     onError: (error, volume) => {
-      showError(
-        `${t("files.ejectFailed")} (${volume.label}): ${error.message}`,
-      );
+      showError(`${t("files.ejectFailed")} (${volume.label})`, error);
     },
   });
 
-  const sortItems = (items: FileItem[]): FileItem[] => {
-    const prefs = displayPreferences();
-
-    return [...items].sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-
-      let comparison = 0;
-      switch (prefs.sortBy) {
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "size":
-          comparison = a.size - b.size;
-          break;
-        case "modified":
-          comparison = a.modified.getTime() - b.modified.getTime();
-          break;
-      }
-
-      return prefs.sortOrder === "asc" ? comparison : -comparison;
-    });
-  };
-
-  const {
-    currentPath,
-    currentVolume,
-    currentLocation,
-    volumes,
-    readOnly,
-    navigateToScope,
-    navigateToDirectory,
-    canGoUp,
-    items,
-    setItems,
-    loading,
-    navigationHistory,
-    historyIndex,
-    navigateTo,
-    goBack,
-    goForward,
-    goUp,
-    refresh,
-  } = useExplorerNavigation({
+  const directory = useDirectoryBrowser({
     sortItems,
-    onLoadError: showError,
+    showError,
     onVolumeRemoved: (volume) => {
-      selection.exit();
       transfers.cancelTransfer();
       if (!volumeRemoval.isPending(volume))
         void notification.push(
           t("files.volume"),
           t("files.volumeDisconnected"),
-          {
-            type: "warning",
-          },
+          { type: "warning" },
         );
     },
-    onPathUnavailable: (path, fallbackPath) => {
-      void notification.push(
-        t("files.directoryUnavailableTitle"),
-        fallbackPath
-          ? t("files.directoryUnavailableFallback", { path, fallbackPath })
-          : t("files.directoryUnavailable", { path }),
-        { type: "warning" },
-      );
-    },
-    getLoadDirectoryErrorMessage: (error) =>
-      `${t("files.errors.loadDirectoryFailed")}: ${error.message}`,
-    setSelectedItem,
-    setScrollToSelected,
   });
-
-  const selection = useFileSelection({
+  const {
+    navigation,
     items,
-    currentPath,
+    selection,
     selectedItem,
     setSelectedItem,
+    scrollToSelected,
     setScrollToSelected,
-  });
+    isTrashItem,
+    openTrash,
+    navigate: navigateWithSelectionClear,
+    goBack: goBackWithSelectionClear,
+  } = directory;
+  const {
+    currentPath,
+    currentVolume,
+    currentLocation,
+    currentPage,
+    pageLocation: trashLocation,
+    accessScope,
+    volumes,
+    readOnly,
+    setItems,
+    loading,
+    refresh,
+  } = navigation;
+  const trashSelected = () => currentPage() === "trash";
   const {
     selectionMode,
     selectedPaths,
     selectedFiles,
     allItemsSelected,
     exit: exitSelectionMode,
-    start: startSelectionMode,
     focusItem: setFocusedItem,
     toggleItem: toggleItemSelection,
     selectAll: selectAllItems,
     toggleAll: toggleAllItems,
   } = selection;
-
-  const navigateWithSelectionClear = (
-    path: string,
-    selectedPath?: string,
-    volume = currentVolume(),
-  ) => {
-    selection.clear();
-    if (!selectedPath) setSelectedItem(null);
-    navigateTo(path, selectedPath, volume);
-  };
-  const goBackWithSelectionClear = () => {
-    selection.exit();
-    goBack();
-  };
-  const goForwardWithSelectionClear = () => {
-    selection.exit();
-    goForward();
-  };
-  const goUpWithSelectionClear = () => {
-    selection.exit();
-    goUp();
-  };
-
-  const openPathInExplorer = async (location: FilesystemLocation) => {
-    const { path, volume } = location;
-    try {
-      const stats = await eden.fs.stat(location);
-
-      if (stats.isDirectory) {
-        navigateWithSelectionClear(path, undefined, volume);
-        return;
-      }
-
-      if (stats.isFile) {
-        navigateWithSelectionClear(getParentPath(path), path, volume);
-      }
-    } catch (error) {
-      showError(`${t("files.errors.openFailed")}: ${(error as Error).message}`);
-    }
-  };
 
   const pinned = usePinnedFolders({ dialogs, showError });
   const pinCurrentFolder = () =>
@@ -249,66 +129,64 @@ const App: Component = () => {
       currentLocation(),
       currentPath().split("/").filter(Boolean).pop() ?? t("files.home"),
     );
-  const openPinnedFolder = async (location: FilesystemLocation) => {
-    try {
-      if (await navigateToDirectory(location)) selection.exit();
-    } catch {
-      showError(t("files.errors.pinnedFolderUnavailable"));
-    }
-  };
-
   onMount(async () => {
-    await initLocale();
-    await pinned.load();
-    try {
-      const result = await eden.db.get("display-preferences");
-      if (result.value) {
-        setDisplayPreferences(JSON.parse(result.value));
-      }
-    } catch (error) {
-      console.error("Failed to load display preferences:", error);
-    }
-
-    const launchFile = window.edenAPI.getLaunchFile();
-    if (launchFile) void openPathInExplorer(launchFile);
-
     const handleFileOpened = (data: FileOpenedEvent) => {
       if (data.location.path) {
-        void openPathInExplorer(data.location);
+        void directory.openPath(data.location);
       }
     };
-
-    await eden.file.subscribe("opened", handleFileOpened);
+    const subscribed = eden.file.subscribe("opened", handleFileOpened);
     onCleanup(() => {
       eden.file.unsubscribe("opened", handleFileOpened);
     });
+    await initLocale();
+    await pinned.load();
+    await display.load();
+
+    const launchFile = window.edenAPI.getLaunchFile();
+    if (launchFile) void directory.openPath(launchFile);
+
+    await subscribed;
   });
-
-  const handlePreferencesChange = async (
-    newPreferences: DisplayPreferences,
-  ) => {
-    setDisplayPreferences(newPreferences);
-
-    const currentItems = items();
-    if (currentItems.length > 0) {
-      setItems(sortItems(currentItems));
-    }
-
-    try {
-      await eden.db.set("display-preferences", JSON.stringify(newPreferences));
-    } catch (error) {
-      console.error("Failed to save display preferences:", error);
-    }
-  };
 
   const transfers = useFileTransfers({
     refresh,
     dialogs,
+    showError,
+    showFailures,
+    isBlocked: () => trash.busy(),
   });
+
+  const homeTrashRoot = createMemo(() => {
+    const scope = accessScope("home");
+    return scope === undefined
+      ? undefined
+      : { volume: "home", path: joinPath(scope, TRASH_DIRECTORY) };
+  });
+  const trash = useTrash({
+    dialogs,
+    isBusy: () => transfers.busy() || Boolean(transfers.pendingTransfer()),
+    onChanged: refresh,
+    showError,
+    showFailures,
+    active: trashSelected,
+    root: () => trashLocation() ?? homeTrashRoot(),
+    volumes,
+  });
+  createEffect(
+    on(
+      transfers.busy,
+      (busy) => {
+        if (!busy && trashSelected()) void trash.refresh();
+      },
+      { defer: true },
+    ),
+  );
 
   const {
     duplicateItem,
     openItem,
+    showItemDetails,
     getOpenWithMenuItems,
     handleItemClick: handleSingleItemClick,
     handleItemActivate,
@@ -335,6 +213,11 @@ const App: Component = () => {
     event?: MouseEvent | KeyboardEvent,
   ) => {
     if (
+      isTrashItem(item) &&
+      (selectionMode() || event?.ctrlKey || event?.metaKey || event?.shiftKey)
+    )
+      return;
+    if (
       selectionMode() ||
       event?.ctrlKey ||
       event?.metaKey ||
@@ -350,12 +233,14 @@ const App: Component = () => {
     operation: "copy" | "move",
     selected = selectedFiles(),
   ) => {
+    if (trashSelected() || trash.busy()) return;
+    selected = selected.filter((item) => !isTrashItem(item));
     if (operation === "move" && readOnly()) return;
     if (transfers.beginTransfer(operation, selected)) exitSelectionMode();
   };
 
   const deleteSelected = async () => {
-    if (readOnly()) return;
+    if (trashSelected() || trash.busy() || readOnly()) return;
     const selected = selectedFiles();
     if (await transfers.deleteItems(selected)) exitSelectionMode();
   };
@@ -365,12 +250,13 @@ const App: Component = () => {
     const path = selectedItem();
     if (!path) return [];
     const item = items().find((candidate) => candidate.location.path === path);
-    return item ? [item] : [];
+    return item && !isTrashItem(item) ? [item] : [];
   };
 
   const { handleItemContextMenu, handleBackgroundContextMenu, showVolumeMenu } =
     useExplorerContextMenus({
       volumes,
+      isTrashItem,
       currentLocation,
       findPin: pinned.find,
       canPin: pinned.canPin,
@@ -380,6 +266,7 @@ const App: Component = () => {
       isVolumeEjectPending: volumeRemoval.isPending,
       ejectVolume: volumeRemoval.eject,
       openItem,
+      showItemDetails,
       getOpenWithMenuItems,
       promptRename,
       duplicateItem,
@@ -396,12 +283,15 @@ const App: Component = () => {
         startTransfer("move", [item]);
       },
       readOnly,
-      isBusy: () => transfers.busy() || Boolean(transfers.pendingTransfer()),
+      isBusy: () =>
+        trash.busy() ||
+        transfers.busy() ||
+        Boolean(transfers.pendingTransfer()),
       clearSelection: exitSelectionMode,
     });
 
   useFilesKeyboardShortcuts({
-    busy: transfers.busy,
+    busy: () => trashSelected() || trash.busy() || transfers.busy(),
     hasPendingTransfer: () => Boolean(transfers.pendingTransfer()),
     selectionMode,
     selectedCount: () => selectedPaths().length,
@@ -415,24 +305,66 @@ const App: Component = () => {
     changePreferences: handlePreferencesChange,
   });
 
+  const trashBrowser = useTrashBrowser({
+    trash,
+    dialogs,
+    get disabled() {
+      return transfers.busy() || Boolean(transfers.pendingTransfer());
+    },
+    get location() {
+      return trashLocation();
+    },
+    get labels() {
+      return getExplorerLabels();
+    },
+    sortItems: display.sortTrashItems,
+    active: trashSelected,
+  });
+  const toolbarLocation = () =>
+    trashSelected()
+      ? (trashLocation() ?? {
+          volume: "home",
+          path: joinPath(accessScope("home") ?? "/", TRASH_DIRECTORY),
+        })
+      : currentLocation();
+  const toolbarSelection = () =>
+    trashSelected() ? trashBrowser.selection : selection;
+  const toolbarLabels = () =>
+    trashSelected() ? trashBrowser.labels() : getExplorerLabels();
+  const toolbarBusy = () =>
+    trash.busy() ||
+    transfers.busy() ||
+    Boolean(transfers.pendingTransfer()) ||
+    (trashSelected() && trash.loading());
+  const activity = () =>
+    trash.progress() ??
+    (transfers.showProgress() ? transfers.progress() : null);
+
   return (
     <div class="file-explorer files-layout">
       <FilePlaces
         volumes={volumes()}
-        currentVolume={currentVolume()}
         currentLocation={currentLocation()}
+        trashSelected={trashSelected()}
+        onSelectTrash={() => openTrash()}
+        onTrashActions={(position) =>
+          void trash.showSidebarMenu(homeTrashRoot(), position)
+        }
         pins={pinned.pins()}
         pinCurrentDisabled={
-          loading() || transfers.busy() || !pinned.canPin(currentLocation())
+          trashSelected() ||
+          loading() ||
+          transfers.busy() ||
+          !pinned.canPin(currentLocation())
         }
         onPinCurrent={() => void pinCurrentFolder()}
-        onSelectPin={(pin) => void openPinnedFolder(pin.location)}
+        onSelectPin={(pin) => void directory.openPinnedFolder(pin.location)}
         onPinActions={pinned.showMenu}
         footer={
-          transfers.showProgress() && transfers.progress() ? (
+          activity() ? (
             <TransferActivity
-              progress={transfers.progress()}
-              snapshot={transfers.snapshot()}
+              progress={activity()}
+              snapshot={trash.busy() ? trash.snapshot() : transfers.snapshot()}
               cancelling={transfers.cancelling()}
               onCancel={transfers.cancelTransfer}
               dialogs={dialogs}
@@ -441,127 +373,115 @@ const App: Component = () => {
         }
         isEjectPending={volumeRemoval.isPending}
         onActions={showVolumeMenu}
-        onSelect={(volume) => {
-          selection.exit();
-          navigateToScope(volume);
-        }}
+        onSelect={directory.selectVolume}
       />
       <main class="files-main">
-        <FileExplorerHeader
-          labels={getExplorerLabels()}
-          currentPath={currentPath()}
-          currentVolume={currentVolume()}
-          canGoUp={canGoUp()}
-          volumes={volumes()}
-          showVolumeSelector={false}
-          readOnly={readOnly() || loading()}
-          onRefresh={refresh}
-          onVolumeChange={(volume) => {
-            selection.exit();
-            navigateToScope(volume);
-          }}
-          historyIndex={historyIndex()}
-          historyLength={navigationHistory().length}
-          breadcrumbs={buildBreadcrumbs(currentPath())}
-          onGoBack={goBackWithSelectionClear}
-          onGoForward={goForwardWithSelectionClear}
-          onGoUp={goUpWithSelectionClear}
-          onNavigate={navigateWithSelectionClear}
-          endActions={
-            <button
-              type="button"
-              class="eden-btn eden-btn-square eden-btn-sm file-select-button"
-              aria-label={selectionMode() ? t("files.done") : t("files.select")}
-              title={selectionMode() ? t("files.done") : t("files.select")}
-              disabled={
-                transfers.busy() || Boolean(transfers.pendingTransfer())
-              }
-              onClick={() =>
-                selectionMode() ? exitSelectionMode() : startSelectionMode()
-              }
-            >
-              {selectionMode() ? (
-                <FiX aria-hidden="true" />
-              ) : (
-                <FiCheckSquare aria-hidden="true" />
-              )}
-            </button>
-          }
-          onNewFolder={() => {
-            void promptCreateFolder();
-          }}
-          onNewFile={() => {
-            void promptCreateFile();
-          }}
-          onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
+        <FilesToolbar
+          directory={directory}
+          location={toolbarLocation()}
+          selection={toolbarSelection()}
+          labels={toolbarLabels()}
+          trashSelected={trashSelected()}
+          busy={toolbarBusy()}
+          readOnly={trashSelected() || trash.busy() || readOnly() || loading()}
+          onRefresh={() => (trashSelected() ? void trash.refresh() : refresh())}
+          onNewFolder={promptCreateFolder}
+          onNewFile={promptCreateFile}
+          onOpenDisplayOptions={display.openOptions}
         />
-
-        {selectionMode() && (
-          <SelectionActionBar
-            selectedCount={selectedPaths().length}
-            itemCount={items().length}
-            allItemsSelected={allItemsSelected()}
-            busy={transfers.busy()}
-            readOnly={readOnly() || loading()}
-            onToggleAll={toggleAllItems}
-            onTransfer={startTransfer}
-            onDelete={() => void deleteSelected()}
+        <Show when={trashSelected()}>
+          <TrashView
+            trash={trash}
+            browser={trashBrowser}
+            preferences={displayPreferences()}
+            activateOnSingleClick={openWithSingleClick()}
+            onBack={goBackWithSelectionClear}
           />
-        )}
+        </Show>
+        <Show when={!trashSelected()}>
+          {selectionMode() && (
+            <SelectionActionBar
+              selectedCount={selectedPaths().length}
+              itemCount={items().filter((item) => !isTrashItem(item)).length}
+              allItemsSelected={allItemsSelected()}
+              busy={trash.busy() || transfers.busy()}
+              readOnly={readOnly() || loading()}
+              onToggleAll={toggleAllItems}
+              onTransfer={startTransfer}
+              onDelete={() => void deleteSelected()}
+              deleteLabel={
+                currentVolume() === "home"
+                  ? t("files.moveToTrash")
+                  : t("files.deletePermanently")
+              }
+            />
+          )}
 
-        {transfers.pendingTransfer() && !transfers.busy() && (
-          <TransferActionBar
-            pendingTransfer={transfers.pendingTransfer()}
-            readOnly={readOnly() || loading()}
-            onComplete={() =>
-              void transfers.completeTransfer(currentLocation())
+          {transfers.pendingTransfer() && !transfers.busy() && (
+            <TransferActionBar
+              pendingTransfer={transfers.pendingTransfer()}
+              readOnly={readOnly() || loading()}
+              onComplete={() =>
+                void transfers.completeTransfer(currentLocation())
+              }
+              onCancel={transfers.cancelTransfer}
+            />
+          )}
+
+          <FileList
+            labels={getExplorerLabels(currentVolume())}
+            loading={loading()}
+            items={items()}
+            canSelectItem={(item) => !isTrashItem(item)}
+            canDeleteItem={(item) => !isTrashItem(item)}
+            selectedItem={selectedItem()}
+            selectedPaths={selectionMode() ? selectedPaths() : undefined}
+            selectionMode={selectionMode()}
+            scrollToSelected={scrollToSelected()}
+            viewStyle={displayPreferences().viewStyle}
+            itemSize={displayPreferences().itemSize}
+            onItemClick={handleExplorerItemClick}
+            onItemFocus={setFocusedItem}
+            onSelectionToggle={(item, event) => {
+              if (!isTrashItem(item)) toggleItemSelection(item, event);
+            }}
+            onItemActivate={handleItemActivate}
+            activateOnSingleClick={openWithSingleClick()}
+            onItemContextMenu={handleItemContextMenu}
+            onBackgroundContextMenu={handleBackgroundContextMenu}
+            onItemDelete={
+              selectionMode() || readOnly() ? undefined : handleDeleteClick
             }
-            onCancel={transfers.cancelTransfer}
+            onItemDeleteShortcut={
+              selectionMode() || readOnly()
+                ? undefined
+                : (item) => {
+                    if (!isTrashItem(item)) handleDeleteShortcut(item);
+                  }
+            }
+            onBack={goBackWithSelectionClear}
+            disabled={
+              trash.busy() ||
+              transfers.busy() ||
+              !volumes().some(
+                (volume) =>
+                  volume.id === currentVolume() && volume.state === "ready",
+              )
+            }
           />
-        )}
-
-        <FileList
-          labels={getExplorerLabels()}
-          loading={loading()}
-          items={items()}
-          selectedItem={selectedItem()}
-          selectedPaths={selectionMode() ? selectedPaths() : undefined}
-          selectionMode={selectionMode()}
-          scrollToSelected={scrollToSelected()}
-          viewStyle={displayPreferences().viewStyle}
-          itemSize={displayPreferences().itemSize}
-          onItemClick={handleExplorerItemClick}
-          onItemFocus={setFocusedItem}
-          onSelectionToggle={toggleItemSelection}
-          onItemActivate={handleItemActivate}
-          activateOnSingleClick={openWithSingleClick()}
-          onItemContextMenu={handleItemContextMenu}
-          onBackgroundContextMenu={handleBackgroundContextMenu}
-          onItemDelete={
-            selectionMode() || readOnly() ? undefined : handleDeleteClick
-          }
-          onItemDeleteShortcut={
-            selectionMode() || readOnly() ? undefined : handleDeleteShortcut
-          }
-          onBack={goBackWithSelectionClear}
-          disabled={
-            transfers.busy() ||
-            !volumes().some(
-              (volume) =>
-                volume.id === currentVolume() && volume.state === "ready",
-            )
-          }
-        />
-
-        <DialogHost dialogs={dialogs} />
-
+        </Show>
         <DisplayOptionsModal
-          labels={getExplorerLabels()}
-          show={showDisplayOptionsModal()}
-          preferences={displayPreferences()}
-          onClose={() => setShowDisplayOptionsModal(false)}
-          onChange={handlePreferencesChange}
+          labels={toolbarLabels()}
+          show={display.showOptions()}
+          preferences={
+            trashSelected() ? display.trashPreferences() : displayPreferences()
+          }
+          onClose={display.closeOptions}
+          onChange={(next) =>
+            void handlePreferencesChange(next, trashSelected())
+          }
         />
+        <DialogHost dialogs={dialogs} />
       </main>
     </div>
   );

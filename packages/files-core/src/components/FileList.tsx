@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import { createEffect, For, onCleanup, Show } from "solid-js";
 import { fileIcons } from "../fileIcons";
 import type {
@@ -12,8 +12,16 @@ import FileItemComponent from "./FileItem";
 
 export interface FileListProps {
   labels: FileExplorerLabels;
+  emptyIcon?: JSX.Element;
+  showEmpty?: boolean;
   loading: boolean;
   items: FileItem[];
+  getItemKey?: (item: FileItem) => string;
+  renderItemMetadata?: (item: FileItem) => JSX.Element;
+  getItemDisplayName?: (item: FileItem) => string;
+  renderItemIcon?: (item: FileItem) => JSX.Element;
+  canSelectItem?: (item: FileItem) => boolean;
+  canDeleteItem?: (item: FileItem) => boolean;
   selectedItem: string | null;
   selectedItems?: string[];
   selectedPaths?: readonly string[];
@@ -39,15 +47,17 @@ export interface FileListProps {
 }
 
 const FileList: Component<FileListProps> = (props) => {
+  const key = (item: FileItem) =>
+    props.getItemKey?.(item) ?? item.location.path;
   const fileRefs: Map<string, HTMLDivElement> = new Map();
   let containerRef: HTMLDivElement | undefined;
 
   const isItemSelected = (item: FileItem) => {
     const selectedItems = props.selectedPaths ?? props.selectedItems;
     if (selectedItems) {
-      return selectedItems.includes(item.location.path);
+      return selectedItems.includes(key(item));
     }
-    return props.selectedItem === item.location.path;
+    return props.selectedItem === key(item);
   };
 
   const canActivateOnClick = (item: FileItem) =>
@@ -60,6 +70,7 @@ const FileList: Component<FileListProps> = (props) => {
   ) => {
     if (props.disabled) return;
     if (props.selectionMode) {
+      if (props.canSelectItem?.(item) === false) return;
       props.onItemFocus?.(item);
       (props.onSelectionToggle ?? props.onItemClick)(item, event);
       return;
@@ -118,6 +129,12 @@ const FileList: Component<FileListProps> = (props) => {
           target.isContentEditable)
       )
         return;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("button") &&
+        !target.closest(".file-item-main")
+      )
+        return;
       if (props.disabled) return;
 
       const items = props.items;
@@ -129,10 +146,12 @@ const FileList: Component<FileListProps> = (props) => {
       if (e.key === "Enter" || (props.selectionMode && e.key === " ")) {
         if (selected) {
           e.preventDefault();
-          const item = items.find((i) => i.location.path === selected);
+          const item = items.find((i) => key(i) === selected);
           if (item) {
             if (props.selectionMode) {
-              (props.onSelectionToggle ?? props.onItemClick)(item, e);
+              if (props.canSelectItem?.(item) !== false) {
+                (props.onSelectionToggle ?? props.onItemClick)(item, e);
+              }
             } else if (!props.disabled) {
               props.onItemActivate(item);
             }
@@ -151,8 +170,8 @@ const FileList: Component<FileListProps> = (props) => {
 
       if (e.key === "Delete") {
         if (!props.selectionMode && selected && props.onItemDeleteShortcut) {
-          const item = items.find((i) => i.location.path === selected);
-          if (item) {
+          const item = items.find((i) => key(i) === selected);
+          if (item && props.canDeleteItem?.(item) !== false) {
             e.preventDefault();
             props.onItemDeleteShortcut(item);
           }
@@ -167,7 +186,7 @@ const FileList: Component<FileListProps> = (props) => {
 
       let currentIndex = -1;
       if (selected) {
-        currentIndex = items.findIndex((i) => i.location.path === selected);
+        currentIndex = items.findIndex((i) => key(i) === selected);
       }
 
       // If nothing selected, select first
@@ -216,7 +235,7 @@ const FileList: Component<FileListProps> = (props) => {
 
         // Ensure visibility during keyboard navigation
         // We use immediate scroll since the element already exists
-        const el = fileRefs.get(item.location.path);
+        const el = fileRefs.get(key(item));
         if (el) {
           el.scrollIntoView({ block: "nearest" });
         }
@@ -236,10 +255,21 @@ const FileList: Component<FileListProps> = (props) => {
         <div class="loading-message">{props.labels.loading}</div>
       </Show>
 
-      <Show when={!props.loading && props.items.length === 0}>
+      <Show
+        when={
+          !props.loading &&
+          props.showEmpty !== false &&
+          props.items.length === 0
+        }
+      >
         <div class="empty-state">
           <div class="empty-icon">
-            <FileGraphic src={fileIcons.openFolder} />
+            <Show
+              when={props.emptyIcon}
+              fallback={<FileGraphic src={fileIcons.openFolder} />}
+            >
+              {props.emptyIcon}
+            </Show>
           </div>
           <div class="empty-message">{props.labels.empty}</div>
           <div class="empty-hint">{props.labels.emptyHint}</div>
@@ -255,12 +285,14 @@ const FileList: Component<FileListProps> = (props) => {
           <For each={props.items}>
             {(item) => (
               <FileItemComponent
-                ref={(el: HTMLDivElement) =>
-                  fileRefs.set(item.location.path, el)
-                }
+                ref={(el: HTMLDivElement) => fileRefs.set(key(item), el)}
                 item={item}
+                displayName={props.getItemDisplayName?.(item)}
+                metadata={props.renderItemMetadata?.(item)}
+                icon={props.renderItemIcon?.(item)}
+                selectionDisabled={props.canSelectItem?.(item) === false}
                 isSelected={isItemSelected(item)}
-                isFocused={props.selectedItem === item.location.path}
+                isFocused={props.selectedItem === key(item)}
                 selectionMode={props.selectionMode}
                 disabled={props.disabled}
                 viewStyle={props.viewStyle}
@@ -269,7 +301,11 @@ const FileList: Component<FileListProps> = (props) => {
                 onClick={handleItemClick}
                 onDoubleClick={handleItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
-                onDelete={props.onItemDelete}
+                onDelete={
+                  props.canDeleteItem?.(item) === false
+                    ? undefined
+                    : props.onItemDelete
+                }
                 onSelectionToggle={props.onSelectionToggle}
               />
             )}

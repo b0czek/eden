@@ -13,6 +13,7 @@ export const fileIcons = {
   palette: new URL("./generated/noto/artist-palette.svg", import.meta.url).href,
   pdf: new URL("./generated/noto/closed-book.svg", import.meta.url).href,
   script: new URL("./generated/noto/scroll.svg", import.meta.url).href,
+  trash: new URL("./generated/noto/wastebasket.svg", import.meta.url).href,
 } as const;
 
 export type FileGraphicUrl = (typeof fileIcons)[keyof typeof fileIcons];

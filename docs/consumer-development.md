@@ -5,6 +5,10 @@
 This chapter creates a small Electron desktop with the built-in shell and apps.
 The consumer owns the Electron entry point. Eden owns the desktop and app lifetimes.
 
+On Linux, start Electron with `--ozone-platform=x11` to use X11 or XWayland.
+The on-screen keyboard requires this backend to open without taking focus from
+the active app. Eden's development launchers set it by default.
+
 ## Prepare the project
 
 Use Node.js 24.15 or later and Electron 43 or later for the current source tree.

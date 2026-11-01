@@ -105,6 +105,12 @@ export interface Filesystem {
   stat: (
     source: FilesystemSource,
   ) => Effect.Effect<FileStats, FilesystemFileError>;
+  lstat: (
+    location: FilesystemLocation,
+  ) => Effect.Effect<
+    FileStats & { isSymbolicLink: boolean },
+    FilesystemPathError
+  >;
   search: (
     location: FilesystemLocation,
     pattern: string,
@@ -224,6 +230,7 @@ export const FilesystemLive = Layer.effect(
       address: FilesystemLocation,
       write: boolean,
       mounted: VolumeRoot | undefined,
+      followLeaf = true,
     ) {
       const target = yield* Effect.try({
         try: () => {
@@ -248,19 +255,26 @@ export const FilesystemLive = Layer.effect(
       });
       const assertActive = () => mounted?.assertActive() ?? Effect.void;
       yield* assertActive();
-      yield* assertExistingWithin(target.rootPath, target.hostPath);
+      const checkedPath =
+        followLeaf ||
+        target.hostPath === target.accessPath ||
+        target.hostPath === target.rootPath
+          ? target.hostPath
+          : path.dirname(target.hostPath);
+      yield* assertExistingWithin(target.rootPath, checkedPath);
       if (target.accessPath !== target.rootPath)
-        yield* assertExistingWithin(target.accessPath, target.hostPath);
+        yield* assertExistingWithin(target.accessPath, checkedPath);
       yield* assertActive();
       return { ...target, assertActive };
     });
     const resolveTarget = Effect.fn(function* (
       address: FilesystemLocation,
       write = false,
+      followLeaf = true,
     ) {
       yield* Effect.try({ try: requirePrincipal, catch: accessRejection });
       const root = yield* volumes.root(address.volume);
-      return yield* resolveTargetNode(address, write, root);
+      return yield* resolveTargetNode(address, write, root, followLeaf);
     });
     function assertNotRoot(target: {
       hostPath: string;
@@ -493,6 +507,21 @@ export const FilesystemLive = Layer.effect(
         mtime: stats.mtime,
       };
     });
+    const lstat = (location: FilesystemLocation) =>
+      volumes.withVolumes(
+        [location.volume],
+        Effect.gen(function* () {
+          const target = yield* resolveTarget(location, false, false);
+          const stats = yield* io.lstat(target.hostPath);
+          return {
+            isFile: stats.isFile(),
+            isDirectory: stats.isDirectory(),
+            isSymbolicLink: stats.isSymbolicLink(),
+            size: stats.size,
+            mtime: stats.mtime,
+          };
+        }),
+      );
     const search = (
       location: FilesystemLocation,
       pattern: string,
@@ -541,12 +570,12 @@ export const FilesystemLive = Layer.effect(
         [location.volume],
         Effect.gen(function* () {
           reporter?.update("validating");
-          const target = yield* resolveTarget(location, true);
+          const target = yield* resolveTarget(location, true, false);
           yield* Effect.try({
             try: () => assertNotRoot(target),
             catch: accessRejection,
           });
-          const stats = yield* io.stat(target.hostPath);
+          const stats = yield* io.lstat(target.hostPath);
           yield* target.assertActive();
           reporter?.update("deleting");
           yield* io.delete(target.hostPath, stats.isDirectory());
@@ -591,8 +620,8 @@ export const FilesystemLive = Layer.effect(
         [from.volume, to.volume],
         Effect.gen(function* () {
           reporter?.update("validating");
-          const source = yield* resolveTarget(from, true);
-          const destination = yield* resolveTarget(to, true);
+          const source = yield* resolveTarget(from, true, false);
+          const destination = yield* resolveTarget(to, true, false);
           yield* Effect.try({
             try: () => {
               assertNotRoot(source);
@@ -669,6 +698,7 @@ export const FilesystemLive = Layer.effect(
       mkdir,
       readdir,
       stat,
+      lstat,
       search,
       delete: remove,
       copy,

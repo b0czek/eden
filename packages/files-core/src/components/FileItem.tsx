@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 import type {
   FileExplorerLabels,
   FileItem,
@@ -12,6 +12,10 @@ export interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
   labels: FileExplorerLabels;
   item: FileItem;
+  displayName?: string;
+  icon?: JSX.Element;
+  metadata?: JSX.Element;
+  selectionDisabled?: boolean;
   isSelected: boolean;
   isFocused?: boolean;
   selectionMode?: boolean;
@@ -48,6 +52,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
   return (
     <div
       ref={props.ref}
+      data-file-volume={props.item.location.volume}
+      data-file-path={props.item.location.path}
       class="file-item"
       classList={{
         selected: props.isSelected,
@@ -71,26 +77,42 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >
         <div class="file-icon">
-          <FileGraphic src={getFileIcon(props.item)} />
+          <Show
+            when={props.icon}
+            fallback={<FileGraphic src={getFileIcon(props.item)} />}
+          >
+            {props.icon}
+          </Show>
         </div>
-        <div class="file-name">{props.item.name}</div>
+        <div class="file-name">{props.displayName ?? props.item.name}</div>
 
-        {props.viewStyle === "list" && (
-          <>
-            <div class="file-size">
-              {props.item.isFile ? formatFileSize(props.item.size) : "—"}
-            </div>
-            <div class="file-modified">{formatDate(props.item.modified)}</div>
-          </>
-        )}
+        <Show
+          when={props.metadata}
+          fallback={
+            <>
+              {props.viewStyle === "list" && (
+                <>
+                  <div class="file-size">
+                    {props.item.isFile ? formatFileSize(props.item.size) : "—"}
+                  </div>
+                  <div class="file-modified">
+                    {formatDate(props.item.modified)}
+                  </div>
+                </>
+              )}
 
-        {props.viewStyle === "grid" && (
-          <div class="file-meta">
-            {props.item.isFile
-              ? formatFileSize(props.item.size)
-              : props.labels.folder}
-          </div>
-        )}
+              {props.viewStyle === "grid" && (
+                <div class="file-meta">
+                  {props.item.isFile
+                    ? formatFileSize(props.item.size)
+                    : props.labels.folder}
+                </div>
+              )}
+            </>
+          }
+        >
+          {props.metadata}
+        </Show>
       </button>
 
       {props.selectionMode && (
@@ -98,8 +120,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
           type="checkbox"
           class="eden-checkbox file-selection-checkbox"
           checked={props.isSelected}
-          disabled={props.disabled}
-          aria-label={`${props.labels.selectItem ?? "Select"} ${props.item.name}`}
+          disabled={props.disabled || props.selectionDisabled}
+          aria-label={`${props.labels.selectItem ?? "Select"} ${props.displayName ?? props.item.name}`}
           onClick={(event) => {
             event.stopPropagation();
             props.onSelectionToggle?.(props.item, event);

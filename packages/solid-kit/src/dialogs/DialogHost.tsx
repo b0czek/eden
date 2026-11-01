@@ -101,7 +101,7 @@ export const DialogHost: Component<DialogHostProps> = (props) => {
 
       if (e.key === "Enter" && current.onEnter === "submit") {
         const target = e.target as HTMLElement | null;
-        if (target?.tagName === "TEXTAREA") {
+        if (target?.tagName === "TEXTAREA" || target?.closest("summary")) {
           return;
         }
 

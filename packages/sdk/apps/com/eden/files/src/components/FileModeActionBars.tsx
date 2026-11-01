@@ -2,6 +2,7 @@ import {
   FiCheckSquare,
   FiCopy,
   FiMove,
+  FiRotateCcw,
   FiSquare,
   FiTrash2,
   FiX,
@@ -13,16 +14,22 @@ import type {
 } from "../features/fileTransfers";
 import { t } from "../i18n";
 
-interface SelectionActionBarProps {
+interface SelectionActionBarBase {
   selectedCount: number;
   itemCount: number;
   allItemsSelected: boolean;
   busy: boolean;
   readOnly: boolean;
   onToggleAll: () => void;
-  onTransfer: (operation: TransferOperation) => void;
   onDelete: () => void;
+  deleteLabel?: string;
 }
+
+type SelectionActionBarProps = SelectionActionBarBase &
+  (
+    | { onRestore: () => void; onTransfer?: never }
+    | { onRestore?: never; onTransfer: (operation: TransferOperation) => void }
+  );
 
 export const SelectionActionBar: Component<SelectionActionBarProps> = (
   props,
@@ -56,24 +63,40 @@ export const SelectionActionBar: Component<SelectionActionBarProps> = (
         </button>
       </div>
       <div class="file-action-bar-actions">
-        <button
-          type="button"
-          class="eden-btn eden-btn-sm selection-action-button"
-          disabled={props.busy || props.selectedCount === 0}
-          onClick={() => props.onTransfer("copy")}
-        >
-          <FiCopy aria-hidden="true" />
-          <span>{t("files.copy")}</span>
-        </button>
-        <button
-          type="button"
-          class="eden-btn eden-btn-sm selection-action-button"
-          disabled={props.busy || props.readOnly || props.selectedCount === 0}
-          onClick={() => props.onTransfer("move")}
-        >
-          <FiMove aria-hidden="true" />
-          <span>{t("files.move")}</span>
-        </button>
+        {props.onRestore ? (
+          <button
+            type="button"
+            class="eden-btn eden-btn-sm selection-action-button"
+            disabled={props.busy || props.readOnly || props.selectedCount === 0}
+            onClick={() => props.onRestore?.()}
+          >
+            <FiRotateCcw aria-hidden="true" />
+            <span>{t("files.restore")}</span>
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              class="eden-btn eden-btn-sm selection-action-button"
+              disabled={props.busy || props.selectedCount === 0}
+              onClick={() => props.onTransfer?.("copy")}
+            >
+              <FiCopy aria-hidden="true" />
+              <span>{t("files.copy")}</span>
+            </button>
+            <button
+              type="button"
+              class="eden-btn eden-btn-sm selection-action-button"
+              disabled={
+                props.busy || props.readOnly || props.selectedCount === 0
+              }
+              onClick={() => props.onTransfer?.("move")}
+            >
+              <FiMove aria-hidden="true" />
+              <span>{t("files.move")}</span>
+            </button>
+          </>
+        )}
         <button
           type="button"
           class="eden-btn eden-btn-danger eden-btn-sm selection-action-button"
@@ -81,7 +104,12 @@ export const SelectionActionBar: Component<SelectionActionBarProps> = (
           onClick={props.onDelete}
         >
           <FiTrash2 aria-hidden="true" />
-          <span>{t("common.delete")}</span>
+          <span>
+            {props.deleteLabel ??
+              (props.onRestore
+                ? t("files.deletePermanently")
+                : t("files.moveToTrash"))}
+          </span>
         </button>
       </div>
     </section>

@@ -303,7 +303,14 @@ async function resolveHostExecutable(
         ".bin",
         process.platform === "win32" ? "electron.cmd" : "electron",
       );
-      return { command: electron, args: [sdkEntry], cwd: root };
+      return {
+        command: electron,
+        args:
+          process.platform === "linux"
+            ? ["--ozone-platform=x11", sdkEntry]
+            : [sdkEntry],
+        cwd: root,
+      };
     }
     throw new Error(
       `--host-path is not a built @edenapp/dev-host or @edenapp/sdk package: ${root}`,

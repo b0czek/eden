@@ -87,6 +87,39 @@ test.describe
           }, APP_ID);
         })
         .toBe("Eden");
+
+      const page = host.electronApp
+        ?.context()
+        .pages()
+        .find((candidate) => candidate.url().includes(APP_ID));
+      const keyboard = host.electronApp
+        ?.context()
+        .pages()
+        .find((candidate) =>
+          candidate.url().includes("keyboard-ui/index.html"),
+        );
+      if (!page || !keyboard)
+        throw new Error("Keyboard or target view unavailable");
+      const input = page.locator("#shadow-input");
+      await expect(input).toBeFocused();
+      expect(await page.evaluate(() => document.hasFocus())).toBe(true);
+      if (process.platform === "linux") {
+        expect(
+          await host.electronApp?.evaluate(({ app }) =>
+            app.commandLine.getSwitchValue("ozone-platform"),
+          ),
+        ).toBe("x11");
+      }
+      await input.evaluate((element: HTMLInputElement) => {
+        element.value = "Updated";
+        element.dispatchEvent(
+          new InputEvent("input", { bubbles: true, composed: true }),
+        );
+      });
+      await keyboard.locator('[data-skbtn="q"]').click();
+      await expect(input).toHaveValue("Updatedq");
+      await expect(input).toBeFocused();
+      expect(await page.evaluate(() => document.hasFocus())).toBe(true);
     });
 
     test("edits number inputs and hides the on-screen keyboard", async () => {

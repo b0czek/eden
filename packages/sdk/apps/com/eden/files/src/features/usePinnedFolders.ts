@@ -12,12 +12,13 @@ import {
   parsePinnedFolders,
   sameLocation,
 } from "./pinnedFolders";
+import type { ShowFileError } from "./useFileErrors";
 
 const storageKey = "pinned-folders";
 
 export function usePinnedFolders(options: {
   dialogs: DialogController;
-  showError: (message: string) => void;
+  showError: ShowFileError;
 }) {
   const [pins, setPins] = createSignal<PinnedFolder[]>([]);
   const [loaded, setLoaded] = createSignal(false);
@@ -36,8 +37,8 @@ export function usePinnedFolders(options: {
       const result = await eden.db.get(storageKey);
       setPins(parsePinnedFolders(result.value));
       setLoaded(true);
-    } catch {
-      options.showError(t("files.errors.loadPinsFailed"));
+    } catch (error) {
+      options.showError(t("files.errors.loadPinsFailed"), error);
     }
   };
 
@@ -69,8 +70,8 @@ export function usePinnedFolders(options: {
           label: candidate.label.trim(),
         })),
       );
-    } catch {
-      options.showError(t("files.errors.savePinsFailed"));
+    } catch (error) {
+      options.showError(t("files.errors.savePinsFailed"), error);
     } finally {
       setEditing(false);
     }
@@ -89,8 +90,8 @@ export function usePinnedFolders(options: {
     setEditing(true);
     try {
       await save(pins().filter((pin) => !sameLocation(pin.location, location)));
-    } catch {
-      options.showError(t("files.errors.savePinsFailed"));
+    } catch (error) {
+      options.showError(t("files.errors.savePinsFailed"), error);
     } finally {
       setEditing(false);
     }

@@ -5,6 +5,15 @@ import { spawn } from "node:child_process";
 const electronArgs = process.argv
   .slice(2)
   .filter((arg, index) => !(index === 0 && arg === "--"));
+// The OSK needs showInactive and window positioning, which Wayland does not support.
+if (
+  process.platform === "linux" &&
+  !electronArgs.some(
+    (arg) => arg === "--ozone-platform" || arg.startsWith("--ozone-platform="),
+  )
+) {
+  electronArgs.unshift("--ozone-platform=x11");
+}
 const SHUTDOWN_TIMEOUT_MS = 5000;
 
 const prepare = spawn("pnpm", ["run", "dev:prepare"], {
@@ -28,13 +37,15 @@ prepare.on("exit", (code) => {
     },
   );
 
+  const electronEnv = { ...process.env, NODE_ENV: "development" };
+  delete electronEnv.ELECTRON_RUN_AS_NODE;
   const electron = spawn(
     "pnpm",
     ["exec", "electron", ...electronArgs, "dist/dev-host.js"],
     {
       stdio: "inherit",
       shell: false,
-      env: { ...process.env, NODE_ENV: "development" },
+      env: electronEnv,
     },
   );
 

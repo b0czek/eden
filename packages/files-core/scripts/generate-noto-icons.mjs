@@ -23,6 +23,7 @@ const icons = [
   "package",
   "page-facing-up",
   "scroll",
+  "wastebasket",
 ];
 
 const writeIfChanged = async (path, content) => {

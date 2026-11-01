@@ -127,6 +127,11 @@ export function createFilesystemController(files: Filesystem) {
         input: filesystemSourceArgsSchema,
         handle: ({ location }) => files.stat(location),
       }),
+      lstat: command({
+        permission: "read",
+        input: filesystemLocationArgsSchema,
+        handle: ({ location }) => files.lstat(location),
+      }),
       watch: command({
         permission: "read",
         input: watchArgs,

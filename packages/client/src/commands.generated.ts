@@ -254,6 +254,8 @@ const fsCommands = {
     invoke("fs/delete", { ["location"]: location }, options?.submission),
   ["exists"]: (location: CommandArgs<"fs/exists">["location"]): Promise<CommandResult<"fs/exists">> =>
     invoke("fs/exists", { ["location"]: location }),
+  ["lstat"]: (location: CommandArgs<"fs/lstat">["location"]): Promise<CommandResult<"fs/lstat">> =>
+    invoke("fs/lstat", { ["location"]: location }),
   ["mkdir"]: (location: CommandArgs<"fs/mkdir">["location"]): Promise<CommandResult<"fs/mkdir">> =>
     invoke("fs/mkdir", { ["location"]: location }),
   ["mv"]: (from: CommandArgs<"fs/mv">["from"], to: CommandArgs<"fs/mv">["to"], options?: Pick<CommandArgs<"fs/mv">, "overwrite"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/mv">> =>

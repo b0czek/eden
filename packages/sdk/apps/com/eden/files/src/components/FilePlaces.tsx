@@ -12,8 +12,8 @@ import {
   FaSolidHouse,
   FaSolidNetworkWired,
 } from "solid-icons/fa";
-import { FiPlus } from "solid-icons/fi";
-import { For, type JSX, Show } from "solid-js";
+import { FiPlus, FiTrash2 } from "solid-icons/fi";
+import { createMemo, For, type JSX, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import {
   PINNED_FOLDER_LIMIT,
@@ -23,10 +23,17 @@ import {
 import { t } from "../i18n";
 import { PinnedFolderMarker } from "./PinnedFolderMarker";
 
+type SelectedPlace =
+  | { kind: "trash" }
+  | { kind: "pin"; pin: PinnedFolder }
+  | { kind: "volume"; id: string };
+
 interface FilePlacesProps {
   volumes: FilesystemVolume[];
-  currentVolume: string;
   currentLocation: FilesystemLocation;
+  trashSelected: boolean;
+  onSelectTrash: () => void;
+  onTrashActions: (position: { left: number; top: number }) => void;
   pins: PinnedFolder[];
   pinCurrentDisabled: boolean;
   onPinCurrent: () => void;
@@ -55,14 +62,29 @@ export function FilePlaces(props: FilePlacesProps) {
     if (volume.kind === "network") return FaSolidNetworkWired;
     return FaSolidHardDrive;
   };
-  const activePin = () =>
-    props.pins.some((pin) => sameLocation(pin.location, props.currentLocation));
+  const selectedPlace = createMemo<SelectedPlace>(() => {
+    if (props.trashSelected) return { kind: "trash" };
+    const pin = props.pins.find((pin) =>
+      sameLocation(pin.location, props.currentLocation),
+    );
+    return pin
+      ? { kind: "pin", pin }
+      : { kind: "volume", id: props.currentLocation.volume };
+  });
+  const volumeSelected = (id: string) => {
+    const place = selectedPlace();
+    return place.kind === "volume" && place.id === id;
+  };
+  const pinSelected = (pin: PinnedFolder) => {
+    const place = selectedPlace();
+    return place.kind === "pin" && place.pin === pin;
+  };
   const pinTitle = () =>
     props.pins.length >= PINNED_FOLDER_LIMIT
       ? t("files.pinLimit", { count: PINNED_FOLDER_LIMIT })
       : props.currentLocation.path === "/"
         ? t("files.openFolderToPin")
-        : activePin()
+        : selectedPlace().kind === "pin"
           ? t("files.folderAlreadyPinned")
           : t("files.pinCurrentFolder");
   const openContextMenu = (volume: FilesystemVolume, event: MouseEvent) => {
@@ -90,11 +112,9 @@ export function FilePlaces(props: FilePlacesProps) {
               <SidebarItem
                 label={label(volume)}
                 description={volume.readOnly ? t("files.readOnly") : undefined}
-                selected={props.currentVolume === volume.id && !activePin()}
+                selected={volumeSelected(volume.id)}
                 aria-current={
-                  props.currentVolume === volume.id && !activePin()
-                    ? "location"
-                    : undefined
+                  volumeSelected(volume.id) ? "location" : undefined
                 }
                 title={`${label(volume)}${volume.readOnly ? ` (${t("files.readOnly")})` : ""}`}
                 disabled={volume.state !== "ready"}
@@ -131,6 +151,38 @@ export function FilePlaces(props: FilePlacesProps) {
             </div>
           )}
         </For>
+        <SidebarItem
+          label={t("files.trash")}
+          title={t("files.trash")}
+          icon={<FiTrash2 />}
+          selected={selectedPlace().kind === "trash"}
+          aria-current={
+            selectedPlace().kind === "trash" ? "location" : undefined
+          }
+          onClick={props.onSelectTrash}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            props.onTrashActions({ left: event.clientX, top: event.clientY });
+          }}
+          action={
+            <SidebarItemAction
+              aria-label={t("files.trashActions")}
+              aria-haspopup="menu"
+              onClick={(event) => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                props.onTrashActions({ left: bounds.left, top: bounds.bottom });
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                props.onTrashActions({
+                  left: event.clientX,
+                  top: event.clientY,
+                });
+              }}
+            />
+          }
+        />
       </SidebarSection>
       <SidebarDivider />
       <SidebarSection
@@ -159,12 +211,8 @@ export function FilePlaces(props: FilePlacesProps) {
                 <SidebarItem
                   label={pin.label}
                   icon={<PinnedFolderMarker color={pin.color} />}
-                  selected={sameLocation(pin.location, props.currentLocation)}
-                  aria-current={
-                    sameLocation(pin.location, props.currentLocation)
-                      ? "location"
-                      : undefined
-                  }
+                  selected={pinSelected(pin)}
+                  aria-current={pinSelected(pin) ? "location" : undefined}
                   disabled={!available()}
                   title={`${pin.label}\n${volume()?.label ?? pin.location.volume}: ${pin.location.path}${available() ? "" : `\n${t("files.pinnedVolumeUnavailable")}`}`}
                   onClick={() => props.onSelectPin(pin)}

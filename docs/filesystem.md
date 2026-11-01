@@ -44,6 +44,19 @@ Use `fs.accessScope("home")` to find the caller's accessible starting folder.
 Unknown or disconnected volumes fail explicitly.
 On an available volume, `fs.exists(location)` returns `false` for a missing file.
 
+## Trash in Files
+
+Files moves deleted Home items to Eden's Trash. Open **Trash** in the sidebar to
+restore an item, delete it permanently, or empty the Trash. Trash storage folders
+are hidden from regular directory listings in Files.
+Home uses `.eden-trash` inside the account's accessible starting folder.
+
+Mounted volumes do not use Trash. Files asks for confirmation and permanently
+deletes their files and folders.
+
+
+The `fs.delete` command permanently removes an item. It does not use Trash.
+
 ## Read and write
 
 Install `@edenapp/client` in the app:
@@ -61,6 +74,15 @@ const names = await fs.readdir({ volume: "home", path: "/Documents" });
 Text commands default to UTF-8 and accept other Node encodings.
 Writes create missing parent directories within an available volume.
 `readdir` returns entry names. Combine each name with the directory address before querying metadata.
+
+`fs.stat` follows symbolic links. Use `fs.lstat(location)` to inspect the link itself,
+including a dangling link. Its result also includes `isSymbolicLink`.
+Moves and deletions operate on the link itself; access through parent folders
+still follows volume and account restrictions.
+
+Moves refuse to replace an existing destination unless replacement is enabled.
+Moves rename the existing item and preserve its contents and modification times.
+Source and destination must be on the same filesystem.
 
 Use `readBinary` and `writeBinary` for whole-file `Uint8Array` values:
 
@@ -183,8 +205,8 @@ Volume roots and overlapping source/destination trees cannot be transfer targets
 Copies preserve symbolic links and their targets.
 Access through a copied link remains limited to the destination volume.
 If an overwrite fails, Eden restores the original destination while its volume remains available.
-A cross-filesystem move copies before deleting its source.
-If source deletion fails, the destination remains and the operation reports an incomplete move.
+Moves require native rename support and refuse cross-filesystem destinations.
+Use `fs.cp` to copy an item to another filesystem.
 
 See [operations](ipc-architecture.md#operations) for progress, cancellation, and repeated submissions.
 

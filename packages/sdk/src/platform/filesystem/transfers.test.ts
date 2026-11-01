@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -16,6 +17,209 @@ import {
   FilesystemTransferIncomplete,
 } from "./errors";
 import { createFileTransfers } from "./transfers";
+
+it("restores a relative link that becomes self-referential at the moved path", async () => {
+  await fixture(async (root) => {
+    const docs = path.join(root, "docs");
+    const entry = path.join(root, "trash-entry");
+    await fs.mkdir(docs);
+    await fs.mkdir(entry);
+    await fs.writeFile(path.join(docs, "content"), "original target");
+    const source = path.join(docs, "link");
+    const destination = path.join(entry, "content");
+    await fs.symlink("content", source);
+    const transfers = createFileTransfers();
+    await Effect.runPromise(
+      transfers.move({
+        source,
+        destination,
+        destinationLabel: destination,
+        overwrite: false,
+      }),
+    );
+    await expect(fs.stat(destination)).rejects.toMatchObject({ code: "ELOOP" });
+    await Effect.runPromise(
+      transfers.move({
+        source: destination,
+        destination: source,
+        destinationLabel: source,
+        overwrite: false,
+      }),
+    );
+    expect(await fs.readlink(source)).toBe("content");
+    expect(await fs.readFile(source, "utf8")).toBe("original target");
+    expect(await fs.readdir(entry)).toEqual([]);
+  });
+});
+
+describe.each([false, true])("native moves (overwrite=%s)", (overwrite) => {
+  it.each(["file", "directory"] as const)(
+    "keeps the %s identity, timestamps, open handles, and last-minute additions",
+    async (kind) => {
+      await fixture(async (root) => {
+        const source = path.join(root, "source");
+        const destination = path.join(root, "destination");
+        const directory = kind === "directory";
+        if (directory) await fs.mkdir(source);
+        const data = directory ? path.join(source, "data") : source;
+        const movedData = directory
+          ? path.join(destination, "data")
+          : destination;
+        await fs.writeFile(data, "original");
+        await fs.utimes(data, 946684800, 946684800);
+        const before = await fs.stat(data);
+        const beforeRoot = await fs.lstat(source);
+        if (overwrite) await fs.writeFile(destination, "old destination");
+        const handle = await fs.open(data, "a");
+        try {
+          await Effect.runPromise(
+            createFileTransfers().move({
+              source,
+              destination,
+              destinationLabel: destination,
+              overwrite,
+              reporter: {
+                commit: Effect.void,
+                update(phase) {
+                  if (phase === "moving" && directory)
+                    writeFileSync(
+                      path.join(source, "late"),
+                      "added during move",
+                    );
+                },
+              },
+            }),
+          );
+          expect((await fs.lstat(destination)).ino).toBe(beforeRoot.ino);
+          const after = await fs.stat(movedData);
+          expect(after.ino).toBe(before.ino);
+          expect(after.mtimeMs).toBe(before.mtimeMs);
+          await handle.write(" updated through the open handle");
+          expect(await fs.readFile(movedData, "utf8")).toBe(
+            "original updated through the open handle",
+          );
+          if (directory)
+            expect(
+              await fs.readFile(path.join(destination, "late"), "utf8"),
+            ).toBe("added during move");
+          await expect(fs.lstat(source)).rejects.toMatchObject({
+            code: "ENOENT",
+          });
+        } finally {
+          await handle.close();
+        }
+      });
+    },
+  );
+
+  it("cancellation before commit leaves both paths unchanged", async () => {
+    await fixture(async (root) => {
+      const source = path.join(root, "source");
+      const destination = path.join(root, "destination");
+      await fs.writeFile(source, "source");
+      if (overwrite) await fs.writeFile(destination, "destination");
+      const exit = await Effect.runPromiseExit(
+        createFileTransfers().move({
+          source,
+          destination,
+          destinationLabel: destination,
+          overwrite,
+          reporter: { update() {}, commit: Effect.interrupt },
+        }),
+      );
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(
+        true,
+      );
+      expect(await fs.readFile(source, "utf8")).toBe("source");
+      if (overwrite)
+        expect(await fs.readFile(destination, "utf8")).toBe("destination");
+      else
+        await expect(fs.lstat(destination)).rejects.toMatchObject({
+          code: "ENOENT",
+        });
+      expect((await fs.readdir(root)).sort()).toEqual(
+        overwrite ? ["destination", "source"] : ["source"],
+      );
+    });
+  });
+});
+
+it("retains a competing destination and the original backup when overwrite rollback cannot restore it", async () => {
+  await fixture(async (root) => {
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    await fs.writeFile(source, "source");
+    await fs.writeFile(destination, "original destination");
+    await expect(
+      Effect.runPromise(
+        createFileTransfers().move({
+          source,
+          destination,
+          destinationLabel: destination,
+          overwrite: true,
+          reporter: {
+            commit: Effect.void,
+            update(phase) {
+              if (phase === "moving")
+                writeFileSync(destination, "competing destination");
+            },
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(FilesystemTransferIncomplete);
+    expect(await fs.readFile(source, "utf8")).toBe("source");
+    expect(await fs.readFile(destination, "utf8")).toBe(
+      "competing destination",
+    );
+    const backup = (await fs.readdir(root)).find((name) =>
+      name.startsWith(".destination.eden-transfer-"),
+    );
+    assert(backup);
+    expect(await fs.readFile(path.join(root, backup), "utf8")).toBe(
+      "original destination",
+    );
+  });
+});
+
+it.each(["file", "directory"] as const)(
+  "a no-replace move preserves a competing %s created after validation",
+  async (kind) => {
+    await fixture(async (root) => {
+      const source = path.join(root, "source");
+      const destination = path.join(root, "destination");
+      if (kind === "directory") await fs.mkdir(source);
+      const suffix = kind === "directory" ? "/data.txt" : "";
+      await fs.writeFile(source + suffix, "trashed original");
+      let created = false;
+      await expect(
+        Effect.runPromise(
+          createFileTransfers().move({
+            source,
+            destination,
+            destinationLabel: destination,
+            overwrite: false,
+            reporter: {
+              commit: Effect.void,
+              update: (phase) => {
+                if (phase !== "moving" || created) return;
+                created = true;
+                if (kind === "directory") mkdirSync(destination);
+                writeFileSync(destination + suffix, "concurrent replacement");
+              },
+            },
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(created).toBe(true);
+      expect(await fs.readFile(source + suffix, "utf8")).toBe(
+        "trashed original",
+      );
+      expect(await fs.readFile(destination + suffix, "utf8")).toBe(
+        "concurrent replacement",
+      );
+    });
+  },
+);
 
 it.each(["cancellation", "defect"] as const)(
   "retains original contents and reports incomplete rollback after %s",
@@ -165,30 +369,33 @@ test("an interrupted commit restores the overwritten destination", async () => {
   });
 });
 
-test("a committed rename preserves moved content when the source becomes unavailable", async () => {
-  await fixture(async (root) => {
-    const source = path.join(root, "source");
-    const destination = path.join(root, "destination");
-    await fs.writeFile(source, "moved content");
-    await fs.writeFile(destination, "old content");
-    await Effect.runPromise(
-      createFileTransfers().move({
-        source,
-        destination,
-        destinationLabel: destination,
-        overwrite: true,
-        assertSourceActive: () =>
-          fromPromise(() => fs.access(source)).pipe(
-            Effect.asVoid,
-            Effect.mapError(() => new Error("source disconnected")),
-          ),
-      }),
-    );
-    assert.equal(await fs.readFile(destination, "utf8"), "moved content");
-    await assert.rejects(fs.stat(source), { code: "ENOENT" });
-    assert.deepEqual([...(await fs.readdir(root))], ["destination"]);
-  });
-});
+test.each([false, true])(
+  "a completed move preserves moved content when the source becomes unavailable (overwrite=%s)",
+  async (overwrite) => {
+    await fixture(async (root) => {
+      const source = path.join(root, "source");
+      const destination = path.join(root, "destination");
+      await fs.writeFile(source, "moved content");
+      if (overwrite) await fs.writeFile(destination, "old content");
+      await Effect.runPromise(
+        createFileTransfers().move({
+          source,
+          destination,
+          destinationLabel: destination,
+          overwrite,
+          assertSourceActive: () =>
+            fromPromise(() => fs.access(source)).pipe(
+              Effect.asVoid,
+              Effect.mapError(() => new Error("source disconnected")),
+            ),
+        }),
+      );
+      assert.equal(await fs.readFile(destination, "utf8"), "moved content");
+      await assert.rejects(fs.stat(source), { code: "ENOENT" });
+      assert.deepEqual([...(await fs.readdir(root))], ["destination"]);
+    });
+  },
+);
 
 for (const operation of ["copy", "move"] as const) {
   test(`concurrent ${operation} without overwrite preserves the winning destination`, async () => {

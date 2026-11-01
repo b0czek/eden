@@ -22,6 +22,7 @@ import {
   type NativeFailureDetails,
   nativeFailure,
 } from "./native-errors";
+import { renameNoReplace } from "./native-rename";
 
 export interface NativeFile {
   readonly descriptor: number;
@@ -121,8 +122,12 @@ const copy = Effect.fn(function* <E = never>(
   } else if (stats.isFile()) {
     yield* copyFile(source, destination, stats.mode, options.onBytes);
     yield* io.chmod(destination, stats.mode);
+  } else if (stats.isSymbolicLink()) {
+    yield* fromNative("copy", async () =>
+      fs.symlink(await fs.readlink(source), destination),
+    );
   } else {
-    // Native copy preserves link text and rejects unsupported special files.
+    // Native copy rejects unsupported special files.
     yield* fromNative("copy", () =>
       fs.cp(source, destination, {
         verbatimSymlinks: true,
@@ -272,6 +277,8 @@ export const io = {
   readdir,
   rename: (source: string, destination: string) =>
     fromNative("rename", () => fs.rename(source, destination)),
+  renameNoReplace: (source: string, destination: string) =>
+    fromNative("rename", () => renameNoReplace(source, destination)),
   rm: (hostPath: string, options: RmOptions) =>
     fromNative("rm", () => fs.rm(hostPath, options)),
   delete: (hostPath: string, directory: boolean) =>

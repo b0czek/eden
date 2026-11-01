@@ -1,5 +1,30 @@
 export const en = {
   files: {
+    restoredSuffix: "restored",
+    restoreNameConflict:
+      'An item named "{name}" already exists at the original location. Choose another name to keep both items.',
+    restoreAs: "Restore under another name",
+    technicalDetails: "Technical details",
+    location: "Location",
+    details: "Details",
+    originalLocation: "Original location",
+    dateDeleted: "Date deleted",
+    trash: "Trash",
+    moveToTrash: "Move to Trash",
+    trashConfirmation: 'Move "{name}" to Trash?',
+    volumeNoTrash: "This volume does not use Trash.",
+    volumeDeleteConfirmation:
+      'Permanently delete "{name}"? This volume does not use Trash. This cannot be undone.',
+    trashHint: "Trash temporarily stores deleted files and folders.",
+    trashEmpty: "Trash is empty",
+    trashLoadIncomplete:
+      "The list may be incomplete. Items shown below are still available.",
+    restore: "Restore",
+    emptyTrash: "Empty Trash",
+    trashActions: "Trash actions",
+    deletePermanently: "Delete permanently",
+    permanentDeleteConfirmation:
+      "Permanently delete {count} items? This cannot be undone.",
     pinnedFolders: "Pinned folders",
     pinnedFolderSlots: "Pinned folders · {count}/{max}",
     pinFolder: "Pin folder",
@@ -92,8 +117,7 @@ export const en = {
     keepBoth: "Keep Both",
     skip: "Skip",
     applyToAll: "Apply to all remaining conflicts",
-    deleteSelectedConfirmation:
-      "Are you sure you want to delete {count} selected items?",
+    deleteSelectedConfirmation: "Move {count} selected items to Trash?",
     progressOpen: "Opening {name}…",
     bytesProgress: "{size} of {total} transferred",
     cancellingCopy: "Cancelling copy…",
@@ -105,9 +129,11 @@ export const en = {
     bytesTransferred: "{size} transferred",
     progressCopy: "Copying {current} of {total}: {name}",
     progressMove: "Moving {current} of {total}: {name}",
+    progressTrash: "Moving to Trash {current} of {total}: {name}",
+    progressRestore: "Restoring {current} of {total}: {name}",
     progressDelete: "Deleting {current} of {total}: {name}",
-    partialFailureTitle: "Some items were not processed",
-    partialFailureMessage: "{failed} of {total} items could not be processed.",
+    partialFailureTitle: "Some operations could not be completed",
+    partialFailureMessage: "Completed: {succeeded}. Failed: {failed}.",
     refresh: "Refresh",
     directoryUnavailableTitle: "Folder unavailable",
     directoryUnavailableFallback:
@@ -115,6 +141,11 @@ export const en = {
     directoryUnavailable: '"{path}" is unavailable.',
     copySuffix: "copy",
     errors: {
+      loadTrashFailed: "Some Trash items could not be loaded",
+      trashStorage: "The Trash storage folder cannot be moved to Trash.",
+      trashMetadata: "An item's original location could not be read.",
+      restoreConflict:
+        "An item with this name already exists. Choose another name.",
       loadPinsFailed: "Could not load pinned folders.",
       savePinsFailed: "Could not save pinned folders.",
       pinnedFolderUnavailable:

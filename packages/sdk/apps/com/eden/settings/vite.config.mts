@@ -4,6 +4,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [solidPlugin()],
+  optimizeDeps: {
+    exclude: ["solid-icons"],
+  },
   base: "./",
   server: {
     port: 3004,

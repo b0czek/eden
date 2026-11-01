@@ -419,6 +419,11 @@ export interface FsCommands {
     args: { location: { volume: string; path: string; }; };
     response: boolean;
   };
+  "fs/lstat": {
+    mode: "result";
+    args: { location: { volume: string; path: string; }; };
+    response: import("./index").FileStats & { isSymbolicLink: boolean; };
+  };
   "fs/mkdir": {
     mode: "result";
     args: { location: { volume: string; path: string; }; };

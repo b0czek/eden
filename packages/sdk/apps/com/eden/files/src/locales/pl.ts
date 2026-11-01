@@ -1,5 +1,30 @@
 export const pl = {
   files: {
+    restoredSuffix: "przywrócony",
+    restoreNameConflict:
+      "W pierwotnym położeniu istnieje już element o nazwie „{name}”. Wybierz inną nazwę, aby zachować oba elementy.",
+    restoreAs: "Przywróć pod inną nazwą",
+    technicalDetails: "Szczegóły techniczne",
+    location: "Położenie",
+    details: "Szczegóły",
+    originalLocation: "Pierwotne położenie",
+    dateDeleted: "Data usunięcia",
+    trash: "Kosz",
+    moveToTrash: "Przenieś do kosza",
+    trashConfirmation: "Przenieść „{name}” do kosza?",
+    volumeNoTrash: "Ten wolumin nie używa kosza.",
+    volumeDeleteConfirmation:
+      "Trwale usunąć „{name}”? Ten wolumin nie używa kosza. Tej operacji nie można cofnąć.",
+    trashHint: "Kosz to tymczasowe miejsce na usunięte pliki i foldery.",
+    trashEmpty: "Kosz jest pusty",
+    trashLoadIncomplete:
+      "Lista może być niepełna. Wyświetlone elementy są nadal dostępne.",
+    restore: "Przywróć",
+    emptyTrash: "Opróżnij kosz",
+    trashActions: "Akcje kosza",
+    deletePermanently: "Usuń trwale",
+    permanentDeleteConfirmation:
+      "Trwale usunąć {count} elementów? Tej operacji nie można cofnąć.",
     pinnedFolders: "Przypięte foldery",
     pinnedFolderSlots: "Przypięte foldery · {count}/{max}",
     pinFolder: "Przypnij folder",
@@ -93,7 +118,7 @@ export const pl = {
     skip: "Pomiń",
     applyToAll: "Zastosuj do wszystkich pozostałych konfliktów",
     deleteSelectedConfirmation:
-      "Czy na pewno chcesz usunąć wybrane elementy ({count})?",
+      "Przenieść wybrane elementy ({count}) do kosza?",
     progressOpen: "Otwieranie {name}…",
     bytesProgress: "Przesłano {size} z {total}",
     cancellingCopy: "Anulowanie kopiowania…",
@@ -105,10 +130,11 @@ export const pl = {
     bytesTransferred: "Przesłano {size}",
     progressCopy: "Kopiowanie {current} z {total}: {name}",
     progressMove: "Przenoszenie {current} z {total}: {name}",
+    progressTrash: "Przenoszenie do kosza {current} z {total}: {name}",
+    progressRestore: "Przywracanie {current} z {total}: {name}",
     progressDelete: "Usuwanie {current} z {total}: {name}",
-    partialFailureTitle: "Nie przetworzono części elementów",
-    partialFailureMessage:
-      "Nie udało się przetworzyć {failed} z {total} elementów.",
+    partialFailureTitle: "Nie udało się wykonać części operacji",
+    partialFailureMessage: "Ukończono: {succeeded}. Niepowodzenia: {failed}.",
     refresh: "Odśwież",
     directoryUnavailableTitle: "Folder jest niedostępny",
     directoryUnavailableFallback:
@@ -116,6 +142,10 @@ export const pl = {
     directoryUnavailable: "Folder „{path}” jest niedostępny.",
     copySuffix: "kopia",
     errors: {
+      loadTrashFailed: "Nie udało się wczytać części elementów kosza",
+      trashStorage: "Nie można przenieść folderu kosza do kosza.",
+      trashMetadata: "Nie można odczytać pierwotnego położenia elementu.",
+      restoreConflict: "Element o tej nazwie już istnieje. Wybierz inną nazwę.",
       loadPinsFailed: "Nie udało się wczytać przypiętych folderów.",
       savePinsFailed: "Nie udało się zapisać przypiętych folderów.",
       pinnedFolderUnavailable:
