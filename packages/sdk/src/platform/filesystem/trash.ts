@@ -178,10 +178,14 @@ export function createTrash(options: TrashOptions) {
     }).pipe(
       // An incomplete cross-filesystem move keeps its copy as a restorable entry.
       Effect.onError(() => discardIfEmpty(id)),
-      Effect.ensuring(Effect.sync(() => pending.delete(id))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          pending.delete(id);
+          options.invalidate(path.dirname(source.hostPath));
+          options.changed();
+        }),
+      ),
     );
-    options.invalidate(path.dirname(source.hostPath));
-    options.changed();
   });
 
   const restore = Effect.fn(function* (
@@ -203,28 +207,36 @@ export function createTrash(options: TrashOptions) {
       ),
     );
     if (yield* occupied) return { status: "occupied" };
-    const moved = yield* options.transfer
-      .move({
-        source: contentOf(id),
-        destination: target.hostPath,
-        destinationLabel: `${location.volume}:${location.path}`,
-        overwrite: false,
-        reporter,
-        assertDestinationActive: target.assertActive,
-      })
-      .pipe(
-        Effect.as(true),
-        Effect.catchTag("FilesystemTransferRejected", (error) =>
-          Effect.flatMap(occupied, (exists) =>
-            exists ? Effect.succeed(false) : Effect.fail(error),
+    return yield* Effect.gen(function* () {
+      const moved = yield* options.transfer
+        .move({
+          source: contentOf(id),
+          destination: target.hostPath,
+          destinationLabel: `${location.volume}:${location.path}`,
+          overwrite: false,
+          reporter,
+          assertDestinationActive: target.assertActive,
+        })
+        .pipe(
+          Effect.as(true),
+          Effect.catchTag("FilesystemTransferRejected", (error) =>
+            Effect.flatMap(occupied, (exists) =>
+              exists ? Effect.succeed(false) : Effect.fail(error),
+            ),
           ),
-        ),
-      );
-    if (!moved) return { status: "occupied" };
-    yield* io.rm(directoryOf(id), { recursive: true, force: true });
-    options.invalidate(path.dirname(target.hostPath));
-    options.changed();
-    return { status: "restored", location };
+        );
+      if (!moved) return { status: "occupied" } as const;
+      yield* io.rm(directoryOf(id), { recursive: true, force: true });
+      return { status: "restored", location } as const;
+    }).pipe(
+      // A failed or partial restore can still change both Trash and the destination.
+      Effect.ensuring(
+        Effect.sync(() => {
+          options.invalidate(path.dirname(target.hostPath));
+          options.changed();
+        }),
+      ),
+    );
   });
 
   const remove = Effect.fn(function* (
@@ -234,8 +246,9 @@ export function createTrash(options: TrashOptions) {
     reporter?.update("validating");
     yield* visibleEntry(id);
     reporter?.update("deleting");
-    yield* io.rm(directoryOf(id), { recursive: true, force: true });
-    options.changed();
+    yield* io
+      .rm(directoryOf(id), { recursive: true, force: true })
+      .pipe(Effect.ensuring(Effect.sync(options.changed)));
   });
 
   const empty = Effect.fn(function* (reporter?: OperationReporter) {

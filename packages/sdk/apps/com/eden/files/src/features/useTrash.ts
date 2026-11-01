@@ -49,7 +49,12 @@ export function useTrash(options: {
     }
   };
   const handleChanged = () => void refresh();
-  void eden.fs.subscribe("trash-changed", handleChanged).then(refresh);
+  void eden.fs
+    .subscribe("trash-changed", handleChanged)
+    .then(refresh, (error) => {
+      console.warn("Failed to watch Trash changes:", error);
+      return refresh();
+    });
   onCleanup(() => {
     request += 1;
     eden.fs.unsubscribe("trash-changed", handleChanged);
