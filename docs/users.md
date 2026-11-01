@@ -82,7 +82,7 @@ Vendor users assign feature grants through the Users app.
 
 ## Shared filesystem and folder restrictions
 
-`userDirectory` backs one shared `home` volume.
+The `home` folder in `dataDirectory` backs one shared `home` volume.
 A complete address identifies the same file for all accounts and daemon identities.
 Folder restrictions limit access within that shared tree.
 
@@ -95,7 +95,7 @@ Vendor accounts and system principals have full-tree access.
 Two accounts can share a restriction or have overlapping restrictions.
 
 Restrictions cover reads, writes, metadata, listing, search, watches, and package file access.
-Paths cannot escape `userDirectory`, including through symbolic links.
+Paths cannot escape Home, including through symbolic links.
 Eden creates assigned directories as needed.
 Deleting an account leaves its files intact.
 

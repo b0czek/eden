@@ -25,7 +25,7 @@ import {
   normalizeDirectoryRestriction,
   resolveDirectoryRestriction,
 } from "../../core/user/directory-restriction";
-import { UserDirectory } from "../../runtime/inputs";
+import { HomeDirectory } from "../../runtime/inputs";
 import { log } from "../logging/logger";
 import {
   accessRejection,
@@ -180,7 +180,7 @@ function assertWithin(rootPath: string, hostPath: string, label: string): void {
 export const FilesystemLive = Layer.effect(
   Filesystem,
   Effect.gen(function* () {
-    const inputBaseDir = yield* UserDirectory;
+    const inputBaseDir = yield* HomeDirectory;
     const executionContext = yield* ExecutionContext;
     const views = yield* FilesystemViews;
     const volumes = yield* Volumes;

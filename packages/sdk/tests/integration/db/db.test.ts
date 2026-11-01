@@ -8,7 +8,7 @@ import { DbStorage } from "../../../src/platform/db/ports";
 import { Db, DbLive } from "../../../src/platform/db/service";
 import { SqliteDbStorageLive } from "../../../src/platform/db/sqlite-storage";
 import { StorageClosedError } from "../../../src/platform/storage/errors";
-import { AppsDirectory } from "../../../src/runtime/inputs";
+import { SystemDirectory } from "../../../src/runtime/inputs";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden } from "../../support/create-test-eden";
 import {
@@ -111,7 +111,7 @@ it("isolates app namespaces using trusted callers and gates cross-app commands",
 });
 
 it("acquires SQLite lazily, drains accepted writes on disposal, and reopens saved data", async () => {
-  const appsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-db-"));
+  const systemDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-db-"));
   const first = createEffectRuntime();
   const second = createEffectRuntime();
   try {
@@ -119,11 +119,11 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
       Effect.provideServiceEffect(
         DbStorage,
         buildService(DbStorage, SqliteDbStorageLive).pipe(
-          Effect.provideService(AppsDirectory, appsDirectory),
+          Effect.provideService(SystemDirectory, systemDirectory),
         ),
       ),
     );
-    expect(await fs.readdir(appsDirectory)).toEqual([]);
+    expect(await fs.readdir(systemDirectory)).toEqual([]);
     const db = await first.acquire(acquisition);
     expect(await first.run(db.get("app.first", "pending"))).toBeUndefined();
     const update = db.set("app.first", "pending", "saved");
@@ -140,7 +140,7 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
         Effect.provideServiceEffect(
           DbStorage,
           buildService(DbStorage, SqliteDbStorageLive).pipe(
-            Effect.provideService(AppsDirectory, appsDirectory),
+            Effect.provideService(SystemDirectory, systemDirectory),
           ),
         ),
       ),
@@ -156,7 +156,7 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
     );
     expect(closed).toBeInstanceOf(StorageClosedError);
     expect(closed).toMatchObject({
-      resource: path.join(appsDirectory, "storage.db"),
+      resource: path.join(systemDirectory, "storage.db"),
       operation: "read",
       keys: ["app.first:pending"],
       message: "Database connection closed",
@@ -164,15 +164,15 @@ it("acquires SQLite lazily, drains accepted writes on disposal, and reopens save
   } finally {
     await first.dispose();
     await second.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
   }
 });
 
 it("reads legacy non-string values and keeps listing permissive when SQLite iteration fails", async () => {
-  const appsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-db-"));
+  const systemDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-db-"));
   const runtime = createEffectRuntime();
   try {
-    const filename = path.join(appsDirectory, "storage.db");
+    const filename = path.join(systemDirectory, "storage.db");
     const legacy = new Keyv({ store: new KeyvSqlite(`sqlite://${filename}`) });
     try {
       await legacy.set("app.first:legacy", 42);
@@ -184,7 +184,7 @@ it("reads legacy non-string values and keeps listing permissive when SQLite iter
         Effect.provideServiceEffect(
           DbStorage,
           buildService(DbStorage, SqliteDbStorageLive).pipe(
-            Effect.provideService(AppsDirectory, appsDirectory),
+            Effect.provideService(SystemDirectory, systemDirectory),
           ),
         ),
       ),
@@ -200,6 +200,6 @@ it("reads legacy non-string values and keeps listing permissive when SQLite iter
     }
   } finally {
     await runtime.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
   }
 });

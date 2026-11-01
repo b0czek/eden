@@ -26,7 +26,7 @@ import {
   AppsDirectory,
   DistPath,
   RuntimeConfig,
-  UserDirectory,
+  SystemDirectory,
 } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
 import {
@@ -49,20 +49,20 @@ const vendor: UserProfile = {
 describe("app associations persistence and catalog integration", () => {
   const resources: Array<{
     runtime: ReturnType<typeof createEffectRuntime>;
-    userDirectory: string;
+    directory: string;
   }> = [];
 
   async function createAssociations(content?: string) {
-    const userDirectory = await fs.mkdtemp(
+    const directory = await fs.mkdtemp(
       path.join(os.tmpdir(), "eden-associations-"),
     );
     const runtime = createEffectRuntime();
-    resources.push({ runtime, userDirectory });
-    const storePath = path.join(userDirectory, "app-associations.json");
+    resources.push({ runtime, directory });
+    const storePath = path.join(directory, "app-associations.json");
     if (content !== undefined) await fs.writeFile(storePath, content);
     const storage = await runtime.acquire(
       buildService(AppAssociationStorage, AppAssociationsPortsLive).pipe(
-        Effect.provideService(UserDirectory, userDirectory),
+        Effect.provideService(SystemDirectory, directory),
       ),
     );
 
@@ -78,8 +78,8 @@ describe("app associations persistence and catalog integration", () => {
       buildService(PackageCatalog, PackageCatalogLive).pipe(
         Effect.provideService(InstalledPackages, registry),
         Effect.provideService(ExecutionContext, execution),
-        Effect.provideService(AppsDirectory, userDirectory),
-        Effect.provideService(DistPath, userDirectory),
+        Effect.provideService(AppsDirectory, directory),
+        Effect.provideService(DistPath, directory),
       ),
     );
     const open = async () => {
@@ -111,9 +111,9 @@ describe("app associations persistence and catalog integration", () => {
   }
 
   afterEach(async () => {
-    for (const { runtime, userDirectory } of resources.splice(0)) {
+    for (const { runtime, directory } of resources.splice(0)) {
       await runtime.dispose();
-      await fs.rm(userDirectory, { recursive: true, force: true });
+      await fs.rm(directory, { recursive: true, force: true });
     }
   });
 

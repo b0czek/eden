@@ -7,7 +7,7 @@ import {
   StorageReadError,
   StorageWriteError,
 } from "../../platform/storage/errors";
-import { UserDirectory } from "../../runtime/inputs";
+import { HomeDirectory } from "../../runtime/inputs";
 import { Users, UsersLive, UsersRestrictedApps } from "./service";
 import { UserStorage } from "./storage";
 
@@ -35,7 +35,7 @@ it("retries failed initialization before publishing the configured default usern
     const users = await runtime.acquire(
       buildService(Users, UsersLive).pipe(
         Effect.provideService(UserStorage, store),
-        Effect.provideService(UserDirectory, "/unused"),
+        Effect.provideService(HomeDirectory, "/unused"),
         Effect.provideService(UsersRestrictedApps, new Set()),
       ),
     );
@@ -68,7 +68,7 @@ it("keeps the committed default selection when persistence rejects a new selecti
     const users = await runtime.acquire(
       buildService(Users, UsersLive).pipe(
         Effect.provideService(UserStorage, store),
-        Effect.provideService(UserDirectory, "/unused"),
+        Effect.provideService(HomeDirectory, "/unused"),
         Effect.provideService(UsersRestrictedApps, new Set()),
       ),
     );

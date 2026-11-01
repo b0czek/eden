@@ -4,7 +4,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import { UserDirectory } from "../../runtime/inputs";
+import { HomeDirectory } from "../../runtime/inputs";
 import type { Event } from "../events/event";
 import { scopedEvent } from "../events/scoped";
 import { hashPassword, verifyPassword } from "./auth";
@@ -84,7 +84,7 @@ export const UsersLive = Layer.effect(
   Users,
   Effect.gen(function* () {
     const store = yield* UserStorage;
-    const userDirectory = yield* UserDirectory;
+    const homeDirectory = yield* HomeDirectory;
     const restrictedApps = yield* UsersRestrictedApps;
     const changed = yield* scopedEvent<UserProfile>();
     let defaultUsername: string | null = null;
@@ -132,7 +132,7 @@ export const UsersLive = Layer.effect(
         restrictedApps,
       );
       const directoryRestriction = yield* ensureDirectoryRestriction(
-        userDirectory,
+        homeDirectory,
         role,
         args.directoryRestriction,
       );
@@ -188,7 +188,7 @@ export const UsersLive = Layer.effect(
 
       if (args.directoryRestriction !== undefined) {
         const directoryRestriction = yield* ensureDirectoryRestriction(
-          userDirectory,
+          homeDirectory,
           user.role,
           args.directoryRestriction,
         );

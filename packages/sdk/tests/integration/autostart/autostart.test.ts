@@ -20,7 +20,7 @@ import { Settings, SettingsLive } from "../../../src/core/settings/service";
 import { SqliteSettingsStorageLive } from "../../../src/core/settings/sqlite-storage";
 import { SessionContext } from "../../../src/desktop/session/context";
 import { Sessions } from "../../../src/desktop/session/service";
-import { AppsDirectory, RuntimeConfig } from "../../../src/runtime/inputs";
+import { RuntimeConfig, SystemDirectory } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestExecutionContext } from "../../support/callers";
@@ -84,7 +84,7 @@ async function scopedAutostart(
     await fs.rm(directory, { recursive: true, force: true });
   });
   const storage = buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-    Effect.provideService(AppsDirectory, directory),
+    Effect.provideService(SystemDirectory, directory),
   );
   const settings = await effects.acquire(
     buildService(Settings, SettingsLive).pipe(

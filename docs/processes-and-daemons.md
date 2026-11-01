@@ -106,7 +106,7 @@ Managed daemons are system-owned.
 An instance's **principal** controls Eden authorization.
 A daemon running as a user keeps a launch-time snapshot of that account's grants and folder restriction.
 Restart it after account changes to apply the new identity.
-All accounts resolve Home against the same `userDirectory`.
+All accounts resolve Home against the same folder.
 
 This identity controls Eden commands. It does not change the backend's operating-system UID or GID.
 Backend code remains trusted Node.js code with direct host API access.

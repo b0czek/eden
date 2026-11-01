@@ -20,18 +20,7 @@ import type { PackagePermissions, PackageRuntimeContexts } from "./ports";
 import type { PackageTransactions } from "./transactions";
 import type { PackageEvents } from "./types";
 
-const RESERVED_PACKAGE_IDS = new Set([
-  "com.eden",
-  "settings.db",
-  "settings.db-shm",
-  "settings.db-wal",
-  "storage.db",
-  "storage.db-shm",
-  "storage.db-wal",
-  "users.db",
-  "users.db-shm",
-  "users.db-wal",
-]);
+const RESERVED_PACKAGE_IDS = new Set(["com.eden"]);
 
 export function createPackageMutations({
   appsDirectory,

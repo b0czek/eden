@@ -512,7 +512,7 @@ describe("client subscriptions across renderer IPC", () => {
       "fs/write",
     ]);
     await fs.writeFile(
-      path.join(eden.paths.userDirectory, "source.txt"),
+      path.join(eden.paths.homeDirectory, "source.txt"),
       "copied",
     );
     const api = createAPI();
@@ -531,7 +531,7 @@ describe("client subscriptions across renderer IPC", () => {
     await expect(copy.result()).resolves.toBeUndefined();
     expect(
       await fs.readFile(
-        path.join(eden.paths.userDirectory, "destination.txt"),
+        path.join(eden.paths.homeDirectory, "destination.txt"),
         "utf8",
       ),
     ).toBe("copied");
@@ -552,8 +552,8 @@ describe("client subscriptions across renderer IPC", () => {
       "fs/read",
       "fs/write",
     ]);
-    const source = path.join(eden.paths.userDirectory, "cancel-tree");
-    const destination = path.join(eden.paths.userDirectory, "cancel-tree-copy");
+    const source = path.join(eden.paths.homeDirectory, "cancel-tree");
+    const destination = path.join(eden.paths.homeDirectory, "cancel-tree-copy");
     await fs.mkdir(path.join(source, "nested"), { recursive: true });
     await fs.writeFile(
       path.join(source, "nested", "large.bin"),

@@ -164,8 +164,7 @@ export async function standaloneDev(
     start("host", host.command, host.args, {
       cwd: host.cwd,
       env: {
-        EDEN_DEV_APPS_DIRECTORY: path.join(profileDirectory, "apps"),
-        EDEN_DEV_USER_DIRECTORY: path.join(profileDirectory, "user"),
+        EDEN_DEV_DATA_DIRECTORY: profileDirectory,
         EDEN_DEV_HOT_RELOAD_DIRECTORY: stateDirectory,
         EDEN_DEV_SEED_PATH: seedPath,
       },

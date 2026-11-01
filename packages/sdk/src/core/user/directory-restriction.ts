@@ -30,7 +30,7 @@ export function normalizeDirectoryRestriction(
   if (path.posix.isAbsolute(portablePath) || path.win32.isAbsolute(value)) {
     throw new DirectoryRestrictionError({
       path: value,
-      message: "Directory restriction must be relative to userDirectory",
+      message: "Directory restriction must be relative to Home",
     });
   }
 
@@ -38,7 +38,7 @@ export function normalizeDirectoryRestriction(
   if (normalized === ".." || normalized.startsWith("../")) {
     throw new DirectoryRestrictionError({
       path: value,
-      message: "Directory restriction cannot leave userDirectory",
+      message: "Directory restriction cannot leave Home",
     });
   }
 
@@ -46,10 +46,10 @@ export function normalizeDirectoryRestriction(
 }
 
 export function resolveDirectoryRestriction(
-  userDirectory: string,
+  homeDirectory: string,
   directoryRestriction: string,
 ): string {
-  const resolvedRoot = path.resolve(userDirectory);
+  const resolvedRoot = path.resolve(homeDirectory);
   const resolvedDirectory = path.resolve(
     resolvedRoot,
     ...directoryRestriction.split("/"),
@@ -65,7 +65,7 @@ export function resolveDirectoryRestriction(
 }
 
 export const ensureDirectoryRestriction = Effect.fn(function* (
-  userDirectory: string,
+  homeDirectory: string,
   role: UserRole,
   directoryRestriction: string | null | undefined,
 ) {
@@ -78,7 +78,7 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
       return yield* Effect.fail(
         new DirectoryRestrictionError({
           path: normalized,
-          message: "Vendor users always use the userDirectory root",
+          message: "Vendor users always use the Home root",
         }),
       );
     }
@@ -89,7 +89,7 @@ export const ensureDirectoryRestriction = Effect.fn(function* (
     return undefined;
   }
 
-  const root = path.resolve(userDirectory);
+  const root = path.resolve(homeDirectory);
   const directory = resolveDirectoryRestriction(root, normalized);
   yield* assertExistingPathWithin(root, directory).pipe(
     Effect.mapError(directoryContainmentFailure),

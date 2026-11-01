@@ -15,7 +15,7 @@ import {
   Appearance,
   AppearanceLive,
 } from "../../../src/desktop/appearance/service";
-import { AppsDirectory } from "../../../src/runtime/inputs";
+import { SystemDirectory } from "../../../src/runtime/inputs";
 import { createTestExecutionContext } from "../../support/callers";
 import {
   buildService,
@@ -36,7 +36,7 @@ function settingsFactory(
 }
 
 it("keeps a missing first SQLite value aligned with its default in bulk reads", async () => {
-  const appsDirectory = await fs.mkdtemp(
+  const systemDirectory = await fs.mkdtemp(
     path.join(os.tmpdir(), "eden-settings-bulk-"),
   );
   const effects = createEffectRuntime();
@@ -46,7 +46,7 @@ it("keeps a missing first SQLite value aligned with its default in bulk reads", 
         Effect.provideServiceEffect(
           SettingsStorage,
           buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-            Effect.provideService(AppsDirectory, appsDirectory),
+            Effect.provideService(SystemDirectory, systemDirectory),
           ),
         ),
         Effect.provideService(SettingsCatalog, {
@@ -71,12 +71,12 @@ it("keeps a missing first SQLite value aligned with its default in bulk reads", 
     });
   } finally {
     await effects.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
   }
 });
 
 it("composes persisted settings with locale notifications and appearance state across restart", async () => {
-  const appsDirectory = await fs.mkdtemp(
+  const systemDirectory = await fs.mkdtemp(
     path.join(os.tmpdir(), "eden-settings-composition-"),
   );
   const first = createEffectRuntime();
@@ -85,7 +85,7 @@ it("composes persisted settings with locale notifications and appearance state a
     const settings = await first.acquire(
       settingsFactory(
         buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-          Effect.provideService(AppsDirectory, appsDirectory),
+          Effect.provideService(SystemDirectory, systemDirectory),
         ),
       ),
     );
@@ -131,7 +131,7 @@ it("composes persisted settings with locale notifications and appearance state a
     const reopened = await second.acquire(
       settingsFactory(
         buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-          Effect.provideService(AppsDirectory, appsDirectory),
+          Effect.provideService(SystemDirectory, systemDirectory),
         ),
       ),
     );
@@ -151,12 +151,12 @@ it("composes persisted settings with locale notifications and appearance state a
   } finally {
     await first.dispose();
     await second.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
   }
 });
 
 it("finishes a pending appearance commit and its notifications before closing settings storage", async () => {
-  const appsDirectory = await fs.mkdtemp(
+  const systemDirectory = await fs.mkdtemp(
     path.join(os.tmpdir(), "eden-settings-drain-"),
   );
   const first = createEffectRuntime();
@@ -170,7 +170,7 @@ it("finishes a pending appearance commit and its notifications before closing se
     writeStarted = resolve;
   });
   const sqlite = buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-    Effect.provideService(AppsDirectory, appsDirectory),
+    Effect.provideService(SystemDirectory, systemDirectory),
   );
   const delayed: Effect.Effect<SettingsStorage, Error, Scope.Scope> =
     Effect.map(sqlite, (connection) => ({
@@ -218,6 +218,6 @@ it("finishes a pending appearance commit and its notifications before closing se
     releaseWrite();
     await first.dispose();
     await second.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
   }
 });

@@ -31,7 +31,7 @@ import {
   RendererIpcPort,
   WindowingPort,
 } from "../../../src/platform/ports/types";
-import { AppsDirectory } from "../../../src/runtime/inputs";
+import { SystemDirectory } from "../../../src/runtime/inputs";
 import { testApp } from "../../support/apps";
 import { createTestExecutionContext } from "../../support/callers";
 import {
@@ -79,7 +79,7 @@ async function createScenario(
       Effect.provideServiceEffect(
         SettingsStorage,
         buildService(SettingsStorage, SqliteSettingsStorageLive).pipe(
-          Effect.provideService(AppsDirectory, directory),
+          Effect.provideService(SystemDirectory, directory),
         ),
       ),
       Effect.provideService(SettingsCatalog, {

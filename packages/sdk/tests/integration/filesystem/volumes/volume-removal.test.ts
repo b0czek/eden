@@ -74,7 +74,7 @@ describe("safe volume removal", () => {
         }),
     });
     await fs.writeFile(
-      path.join(eden.paths.userDirectory, "source.txt"),
+      path.join(eden.paths.homeDirectory, "source.txt"),
       "queued work",
     );
     const caller = {
@@ -155,7 +155,7 @@ describe("safe volume removal", () => {
   });
 
   it("releases a cancelled copy's destination while a conflicting copy is still blocked", async () => {
-    const source = path.join(eden.paths.userDirectory, "source.txt");
+    const source = path.join(eden.paths.homeDirectory, "source.txt");
     await fs.writeFile(source, "source contents");
     let ejected = false;
     await register({
@@ -482,7 +482,7 @@ describe("safe volume removal", () => {
           }),
       });
       await fs.writeFile(
-        path.join(eden.paths.userDirectory, "report.txt"),
+        path.join(eden.paths.homeDirectory, "report.txt"),
         "complete report",
       );
       const filesystem = eden.runtime.services.volumes;

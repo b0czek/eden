@@ -179,7 +179,7 @@ describe("account command authorization", () => {
     const contents = viewInfo.view.webContents;
     const location = { volume: "home", path: "/grant.txt" };
     await fs.writeFile(
-      path.join(eden.paths.userDirectory, "grant.txt"),
+      path.join(eden.paths.homeDirectory, "grant.txt"),
       "protected",
     );
     const read = () =>

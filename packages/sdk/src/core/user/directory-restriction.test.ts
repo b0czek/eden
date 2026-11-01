@@ -54,6 +54,6 @@ describe("user directory restrictions", () => {
       Effect.runPromise(
         ensureDirectoryRestriction(root, "vendor", "homes/vendor"),
       ),
-    ).rejects.toThrow("always use the userDirectory root");
+    ).rejects.toThrow("always use the Home root");
   });
 });

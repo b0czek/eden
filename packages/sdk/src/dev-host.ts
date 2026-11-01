@@ -1,9 +1,6 @@
-import * as path from "node:path";
 import { createEden } from "./host";
 
-const appsDirectory = process.env.EDEN_DEV_APPS_DIRECTORY ?? ".eden-dev/apps";
-const userDirectory =
-  process.env.EDEN_DEV_USER_DIRECTORY ?? path.resolve(__dirname, "..");
+const dataDirectory = process.env.EDEN_DEV_DATA_DIRECTORY ?? ".eden-dev";
 const stateDirectory =
   process.env.EDEN_DEV_HOT_RELOAD_DIRECTORY ?? ".eden-hot-reload";
 const seedPath = process.env.EDEN_DEV_SEED_PATH;
@@ -17,8 +14,7 @@ createEden({
     minTileWidth: 600,
     minTileHeight: 400,
   },
-  userDirectory,
-  appsDirectory,
+  dataDirectory,
   seedPath,
   window: {
     title: "Eden SDK Dev Host",

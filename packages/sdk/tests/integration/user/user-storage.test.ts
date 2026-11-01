@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import { UserStorage, UserStorageLive } from "../../../src/core/user/storage";
 import type { StoredUser } from "../../../src/core/user/types";
 import { openKeyvSqlite } from "../../../src/platform/storage/keyv-sqlite";
-import { AppsDirectory } from "../../../src/runtime/inputs";
+import { SystemDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,
@@ -34,7 +34,7 @@ describe("user record and index persistence", () => {
     effects = createEffectRuntime();
     store = await effects.acquire(
       buildService(UserStorage, UserStorageLive).pipe(
-        Effect.provideService(AppsDirectory, directory),
+        Effect.provideService(SystemDirectory, directory),
       ),
     );
   });
@@ -109,7 +109,7 @@ describe("user record and index persistence", () => {
     effects = createEffectRuntime();
     store = await effects.acquire(
       buildService(UserStorage, UserStorageLive).pipe(
-        Effect.provideService(AppsDirectory, directory),
+        Effect.provideService(SystemDirectory, directory),
       ),
     );
     await expectUsers(records);

@@ -109,19 +109,19 @@ describe("Filesystem native watch integration", () => {
     };
 
     await expectChange(() =>
-      fs.writeFile(path.join(eden.paths.userDirectory, "external.txt"), "a"),
+      fs.writeFile(path.join(eden.paths.homeDirectory, "external.txt"), "a"),
     );
     await expectChange(() =>
-      fs.writeFile(path.join(eden.paths.userDirectory, "external.txt"), "b"),
+      fs.writeFile(path.join(eden.paths.homeDirectory, "external.txt"), "b"),
     );
     await expectChange(() =>
       fs.rename(
-        path.join(eden.paths.userDirectory, "external.txt"),
-        path.join(eden.paths.userDirectory, "renamed.txt"),
+        path.join(eden.paths.homeDirectory, "external.txt"),
+        path.join(eden.paths.homeDirectory, "renamed.txt"),
       ),
     );
     await expectChange(() =>
-      fs.unlink(path.join(eden.paths.userDirectory, "renamed.txt")),
+      fs.unlink(path.join(eden.paths.homeDirectory, "renamed.txt")),
     );
     await expectChange(() =>
       invokeFromView("fs/write", {
@@ -133,7 +133,7 @@ describe("Filesystem native watch integration", () => {
     await invokeFromView("fs/unwatch", { watchId });
     eden.platform.effects.splice(0);
     await fs.writeFile(
-      path.join(eden.paths.userDirectory, "after-unwatch.txt"),
+      path.join(eden.paths.homeDirectory, "after-unwatch.txt"),
       "ignored",
     );
     await new Promise((resolve) => setTimeout(resolve, 180));
@@ -142,7 +142,7 @@ describe("Filesystem native watch integration", () => {
 
   it("rejects file targets and watches owned by another view", async () => {
     await fs.writeFile(
-      path.join(eden.paths.userDirectory, "file.txt"),
+      path.join(eden.paths.homeDirectory, "file.txt"),
       "content",
     );
     await expect(
@@ -268,7 +268,7 @@ describe("Filesystem integration", () => {
         caller("authorized-app", profile),
       ),
     ).resolves.toEqual({
-      realPath: `${eden.paths.userDirectory}/authorized.txt`,
+      realPath: `${eden.paths.homeDirectory}/authorized.txt`,
     });
     await expect(
       eden.execute(
@@ -281,7 +281,7 @@ describe("Filesystem integration", () => {
       ),
     ).rejects.toThrow("Permission denied: fs/write");
     await expect(
-      fs.access(`${eden.paths.userDirectory}/denied.txt`),
+      fs.access(`${eden.paths.homeDirectory}/denied.txt`),
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -300,7 +300,7 @@ describe("Filesystem integration", () => {
 
     await expect(
       fs.readFile(
-        path.join(eden.paths.userDirectory, "binary", "nested", "data.bin"),
+        path.join(eden.paths.homeDirectory, "binary", "nested", "data.bin"),
       ),
     ).resolves.toEqual(Buffer.from(content));
     const result = await eden.execute<Uint8Array>(
@@ -340,7 +340,7 @@ describe("Filesystem integration", () => {
     await eden.runtime.effects.run(filesystem.wait(handle, transferCaller));
     expect(
       await fs.readFile(
-        path.join(eden.paths.userDirectory, "operation-destination"),
+        path.join(eden.paths.homeDirectory, "operation-destination"),
         "utf8",
       ),
     ).toBe("accepted");
@@ -366,7 +366,7 @@ describe("Filesystem integration", () => {
     const transferCaller = await setUpFilesystemCaller();
     const filesystem = eden.runtime.services.operations;
     const content = Buffer.alloc(5 * 1024 * 1024, 0xa5);
-    const source = path.join(eden.paths.userDirectory, "large.bin");
+    const source = path.join(eden.paths.homeDirectory, "large.bin");
     await fs.writeFile(source, content, { mode: 0o751 });
     const updates: OperationSnapshot[] = [];
     const off = filesystem.changed.on(({ payload: { snapshot } }) => {
@@ -381,7 +381,7 @@ describe("Filesystem integration", () => {
         },
         transferCaller,
       );
-      const destination = path.join(eden.paths.userDirectory, "large-copy.bin");
+      const destination = path.join(eden.paths.homeDirectory, "large-copy.bin");
       expect((await fs.readFile(destination)).equals(content)).toBe(true);
       expect((await fs.stat(destination)).mode & 0o777).toBe(
         (await fs.stat(source)).mode & 0o777,
@@ -410,8 +410,8 @@ describe("Filesystem integration", () => {
   it("finishes a committed overwrite when cancellation is requested during backup cleanup", async () => {
     const transferCaller = await setUpFilesystemCaller();
     const operations = eden.runtime.services.operations;
-    const source = path.join(eden.paths.userDirectory, "source");
-    const destination = path.join(eden.paths.userDirectory, "destination");
+    const source = path.join(eden.paths.homeDirectory, "source");
+    const destination = path.join(eden.paths.homeDirectory, "destination");
     await fs.writeFile(source, "replacement");
     await fs.writeFile(destination, "original");
     let cleanup: OperationSnapshot | undefined;
@@ -446,7 +446,7 @@ describe("Filesystem integration", () => {
       });
       expect(await fs.readFile(destination, "utf8")).toBe("replacement");
       expect(await fs.readFile(source, "utf8")).toBe("replacement");
-      expect((await fs.readdir(eden.paths.userDirectory)).sort()).toEqual([
+      expect((await fs.readdir(eden.paths.homeDirectory)).sort()).toEqual([
         "destination",
         "source",
       ]);
@@ -460,9 +460,9 @@ describe("Filesystem integration", () => {
     async (overwrite) => {
       const transferCaller = await setUpFilesystemCaller();
       const filesystem = eden.runtime.services.operations;
-      const source = path.join(eden.paths.userDirectory, "cancel-source.bin");
+      const source = path.join(eden.paths.homeDirectory, "cancel-source.bin");
       const destination = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         "cancel-target.bin",
       );
       const content = Buffer.alloc(8 * 1024 * 1024, 0xa5);
@@ -515,7 +515,7 @@ describe("Filesystem integration", () => {
             code: "ENOENT",
           });
         expect(
-          (await fs.readdir(eden.paths.userDirectory)).some((name) =>
+          (await fs.readdir(eden.paths.homeDirectory)).some((name) =>
             name.includes(".eden-transfer-"),
           ),
         ).toBe(false);
@@ -528,8 +528,8 @@ describe("Filesystem integration", () => {
   it("cancels a queued copy without changing either file and scopes cancellation to its owner", async () => {
     const transferCaller = await setUpFilesystemCaller();
     const filesystem = eden.runtime.services.operations;
-    const source = path.join(eden.paths.userDirectory, "queued-source");
-    const destination = path.join(eden.paths.userDirectory, "queued-target");
+    const source = path.join(eden.paths.homeDirectory, "queued-source");
+    const destination = path.join(eden.paths.homeDirectory, "queued-target");
     await fs.writeFile(source, "source");
     await fs.writeFile(destination, "destination");
     const handle = await eden.execute<OperationHandle>(
@@ -581,7 +581,7 @@ describe("Filesystem integration", () => {
   it("reports recursive copy bytes without counting or following symbolic links", async () => {
     const transferCaller = await setUpFilesystemCaller();
     const filesystem = eden.runtime.services.operations;
-    const source = path.join(eden.paths.userDirectory, "tree-progress");
+    const source = path.join(eden.paths.homeDirectory, "tree-progress");
     await fs.mkdir(path.join(source, "nested"), { recursive: true });
     await fs.writeFile(path.join(source, "one"), "first");
     await fs.writeFile(path.join(source, "nested", "two"), "second");
@@ -599,7 +599,7 @@ describe("Filesystem integration", () => {
       status: "succeeded",
       progress: { completed: 11, unit: "bytes" },
     });
-    const destination = path.join(eden.paths.userDirectory, "tree-copy");
+    const destination = path.join(eden.paths.homeDirectory, "tree-copy");
     expect(
       await fs.readFile(path.join(destination, "nested", "two"), "utf8"),
     ).toBe("second");
@@ -612,8 +612,8 @@ describe("Filesystem integration", () => {
     "forwards locations and explicit overwrite through fs/%s",
     async (command) => {
       const transferCaller = await setUpFilesystemCaller();
-      const source = path.join(eden.paths.userDirectory, "source.txt");
-      const destination = path.join(eden.paths.userDirectory, "target.txt");
+      const source = path.join(eden.paths.homeDirectory, "source.txt");
+      const destination = path.join(eden.paths.homeDirectory, "target.txt");
       await fs.writeFile(source, "replacement");
       await fs.writeFile(destination, "original");
       const args = {

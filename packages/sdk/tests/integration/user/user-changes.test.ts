@@ -29,9 +29,9 @@ import {
 } from "../../../src/desktop/session/context";
 import { Sessions, SessionsLive } from "../../../src/desktop/session/service";
 import {
-  AppsDirectory,
+  HomeDirectory,
   RuntimeConfig,
-  UserDirectory,
+  SystemDirectory,
 } from "../../../src/runtime/inputs";
 import {
   buildService,
@@ -51,7 +51,7 @@ it("refreshes active grants after a committed user update even when its caller i
   try {
     const store = await effects.acquire(
       buildService(UserStorage, UserStorageLive).pipe(
-        Effect.provideService(AppsDirectory, directory),
+        Effect.provideService(SystemDirectory, directory),
       ),
     );
     const profile = {
@@ -76,7 +76,7 @@ it("refreshes active grants after a committed user update even when its caller i
               yield* Deferred.await(settled);
             }).pipe(Effect.uninterruptible),
         }),
-        Effect.provideService(UserDirectory, directory),
+        Effect.provideService(HomeDirectory, directory),
         Effect.provideService(UsersRestrictedApps, new Set()),
       ),
     );

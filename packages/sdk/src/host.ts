@@ -20,12 +20,9 @@ export function createEden(config: EdenConfig = {}) {
     config,
     platform,
     paths: {
-      appsDirectory:
-        config.appsDirectory ??
-        path.join(application.getPath("userData"), "eden-apps"),
-      userDirectory:
-        config.userDirectory ??
-        path.join(application.getPath("userData"), "eden-user"),
+      dataDirectory:
+        config.dataDirectory ??
+        path.join(application.getPath("userData"), "eden"),
       distPath: path.join(process.cwd(), "dist"),
       appPath: application.getAppPath(),
     },

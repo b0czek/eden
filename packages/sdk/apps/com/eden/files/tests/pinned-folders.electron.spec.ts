@@ -12,7 +12,7 @@ test.describe("Files pinned folders", () => {
 
   test.beforeEach(async () => {
     const host = getHost();
-    await fs.mkdir(path.join(host.userDirectory, "Projects"), {
+    await fs.mkdir(path.join(host.homeDirectory, "Projects"), {
       recursive: true,
     });
     await host.executeHostCommand("db/set/su", {

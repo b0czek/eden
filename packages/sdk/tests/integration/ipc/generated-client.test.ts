@@ -88,7 +88,7 @@ describe.each(["window", "worker"])(
       });
       expect(
         await nodeFs.readFile(
-          path.join(eden.paths.userDirectory, "client.txt"),
+          path.join(eden.paths.homeDirectory, "client.txt"),
           "utf8",
         ),
       ).toBe("hello");

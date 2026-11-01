@@ -168,7 +168,7 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("outside of the allowed directory");
     await expect(
       fs.readFile(
-        path.join(eden.paths.userDirectory, "operators/one/report.txt"),
+        path.join(eden.paths.homeDirectory, "operators/one/report.txt"),
         "utf8",
       ),
     ).resolves.toBe("private");
@@ -259,7 +259,7 @@ describe("consumer-managed filesystem volumes", () => {
         location: { volume: "usb", path: "/../outside.txt" },
       }),
     ).rejects.toThrow("outside");
-    await fs.symlink(eden.paths.userDirectory, path.join(usbRoot, "escape"));
+    await fs.symlink(eden.paths.homeDirectory, path.join(usbRoot, "escape"));
     await expect(
       execute("fs/exists", {
         location: { volume: "usb", path: "/escape/report.txt" },
@@ -416,7 +416,7 @@ describe("consumer-managed filesystem volumes", () => {
     async (operation) => {
       const source = path.join(usbRoot, "source.txt");
       const destinationRoot = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         requireValue(user.directoryRestriction),
       );
       await fs.mkdir(destinationRoot, { recursive: true });
@@ -482,7 +482,7 @@ describe("consumer-managed filesystem volumes", () => {
           volume === "usb"
             ? usbRoot
             : path.join(
-                eden.paths.userDirectory,
+                eden.paths.homeDirectory,
                 requireValue(user.directoryRestriction),
               );
         await expect(fs.readlink(path.join(root, "copy"))).resolves.toBe(
@@ -525,7 +525,7 @@ describe("consumer-managed filesystem volumes", () => {
     });
     await fs.rm(sourceRoot, { recursive: true });
     const destinationRoot = path.join(
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       requireValue(user.directoryRestriction),
       "copy",
     );
@@ -838,7 +838,7 @@ describe("consumer-managed filesystem volumes", () => {
         content: "cross-device report",
       });
       const sourceRoot = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         requireValue(user.directoryRestriction),
         "cross-device",
       );
@@ -876,7 +876,7 @@ describe("consumer-managed filesystem volumes", () => {
         path.join(process.cwd(), ".eden-volume-test-"),
       );
       const lockedDirectory = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         "operators/one/locked",
       );
       try {

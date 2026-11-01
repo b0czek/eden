@@ -4,8 +4,7 @@ import type { PanelRegistry } from "../core/settings/panels/registry";
 import type { EdenPlatform } from "../platform/ports/types";
 
 export interface EdenRuntimePaths {
-  appsDirectory: string;
-  userDirectory: string;
+  dataDirectory: string;
   distPath: string;
   appPath: string;
 }

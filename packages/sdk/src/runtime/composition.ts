@@ -105,13 +105,15 @@ import {
   WindowingPort,
 } from "../platform/ports/types";
 import { seedDatabase } from "../platform/seed/seed";
+import { resolveDataLayout } from "./data-layout";
 import { assembleDesktop, Desktop } from "./desktop";
 import { RuntimeEnvironment } from "./environment";
 import {
   AppsDirectory,
   DistPath,
+  HomeDirectory,
   RuntimeConfig,
-  UserDirectory,
+  SystemDirectory,
 } from "./inputs";
 
 /** Host capabilities, execution contexts, and persistent stores. */
@@ -223,15 +225,17 @@ export function createDesktopLayer(environment: RuntimeEnvironment) {
     Effect.gen(function* () {
       log.info("Eden starting...");
       const { paths, config, platform, registrations } = environment;
+      const layout = resolveDataLayout(paths.dataDirectory);
       yield* seedDatabase(
-        paths.appsDirectory,
+        layout.systemDirectory,
         config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
-        paths.userDirectory,
+        layout.homeDirectory,
       );
       return Context.make(RuntimeEnvironment, environment).pipe(
         Context.add(RuntimeConfig, config),
-        Context.add(AppsDirectory, paths.appsDirectory),
-        Context.add(UserDirectory, paths.userDirectory),
+        Context.add(AppsDirectory, layout.appsDirectory),
+        Context.add(HomeDirectory, layout.homeDirectory),
+        Context.add(SystemDirectory, layout.systemDirectory),
         Context.add(DistPath, paths.distPath),
         Context.add(PanelRegistry, registrations),
         Context.add(WindowingPort, platform.windows),

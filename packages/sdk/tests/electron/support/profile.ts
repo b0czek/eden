@@ -3,6 +3,10 @@ import type { Server } from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  type DataLayout,
+  resolveDataLayout,
+} from "../../../src/runtime/data-layout";
+import {
   APP_ID,
   prepareIntegrationFixture,
   prepareRemoteDlcFixture,
@@ -14,10 +18,8 @@ export interface ElectronProfileOptions {
   additionalAppsDirectory?: string;
 }
 
-export interface ElectronProfile {
+export interface ElectronProfile extends DataLayout {
   root: string;
-  appsDirectory: string;
-  userDirectory: string;
   seedPath: string;
   fixtureDirectory: string;
   remoteUrl?: string;
@@ -30,14 +32,13 @@ export async function createElectronProfile(
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-electron-"));
   const profile: ElectronProfile = {
     root,
-    appsDirectory: path.join(root, "apps"),
-    userDirectory: path.join(root, "users"),
+    ...resolveDataLayout(path.join(root, "data")),
     seedPath: path.join(root, "eden-seed.json"),
     fixtureDirectory: path.join(root, "dist/apps/prebuilt", APP_ID),
   };
   try {
     await fs.mkdir(profile.appsDirectory, { recursive: true });
-    await fs.mkdir(profile.userDirectory, { recursive: true });
+    await fs.mkdir(profile.homeDirectory, { recursive: true });
     for (const asset of [
       "foundation",
       "app-runtime",

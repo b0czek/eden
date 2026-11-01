@@ -6,8 +6,11 @@ export const RuntimeConfig = Context.Service<"eden/RuntimeConfig", EdenConfig>(
 export const AppsDirectory = Context.Service<"eden/AppsDirectory", string>(
   "eden/AppsDirectory",
 );
-export const UserDirectory = Context.Service<"eden/UserDirectory", string>(
-  "eden/UserDirectory",
+export const HomeDirectory = Context.Service<"eden/HomeDirectory", string>(
+  "eden/HomeDirectory",
+);
+export const SystemDirectory = Context.Service<"eden/SystemDirectory", string>(
+  "eden/SystemDirectory",
 );
 export const DistPath = Context.Service<"eden/DistPath", string>(
   "eden/DistPath",

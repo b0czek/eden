@@ -159,9 +159,17 @@ Eden reads runtime assets from `dist/` under the process working directory.
 Run Electron from the project root during development.
 Arrange the packaged application's working directory so that the same path exists.
 
-By default, installed packages and account data use `eden-apps` under Electron's `userData` directory.
-The shared Home volume uses `eden-user` there.
-Set `appsDirectory` and `userDirectory` to absolute writable paths when your product needs another location.
+Eden keeps all of its data in one directory, `eden` under Electron's `userData` directory by default.
+Set `dataDirectory` to an absolute writable path when your product needs another location.
+Eden creates these folders in it:
+
+| Folder | Contents |
+| --- | --- |
+| `home` | The shared Home volume |
+| `apps` | Installed packages and DLCs |
+| `system` | Accounts, settings, app storage, and default apps |
+
+Apps can address only `home`. Back up the complete data directory to keep an installation.
 
 ## Add your own app
 

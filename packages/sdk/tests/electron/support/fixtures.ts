@@ -13,7 +13,7 @@ export const REMOTE_DLC_ID = "com.eden.integration.remote.module";
 const electronDirectory = path.join(__dirname, "..");
 
 export async function prepareIntegrationFixture(profile: ElectronProfile) {
-  const { fixtureDirectory, userDirectory, appsDirectory } = profile;
+  const { fixtureDirectory, homeDirectory, appsDirectory } = profile;
   const dlcDirectory = path.join(appsDirectory, ".dlcs", DLC_ID);
   await fs.mkdir(path.join(dlcDirectory, "dist"), { recursive: true });
   await fs.cp(path.join(electronDirectory, "fixtures/app"), fixtureDirectory, {
@@ -30,7 +30,7 @@ export async function prepareIntegrationFixture(profile: ElectronProfile) {
     target: "es2022",
   });
   await fs.writeFile(
-    path.join(userDirectory, "binary-input.bin"),
+    path.join(homeDirectory, "binary-input.bin"),
     new Uint8Array([0, 255, 128, 13, 10]),
   );
   await Promise.all([

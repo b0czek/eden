@@ -4,7 +4,7 @@ export interface UserProfile {
   username: string;
   name: string;
   role: UserRole;
-  /** Optional accessible folder relative to EdenConfig.userDirectory. */
+  /** Optional accessible folder relative to the Home volume root. */
   directoryRestriction?: string;
   grants: string[];
   createdAt: number;
@@ -21,7 +21,7 @@ export interface EdenUserConfig {
   username: string;
   name: string;
   role?: UserRole;
-  /** Optional accessible folder relative to EdenConfig.userDirectory. */
+  /** Optional accessible folder relative to the Home volume root. */
   directoryRestriction?: string;
   password?: string;
   passwordHash?: string;

@@ -126,7 +126,7 @@ The Installer asks for confirmation before upgrades, same-version reinstalls, an
 ## Recover a failed package change
 
 If a package change and its rollback both fail, Eden reports both failures and a recovery directory:
-`<appsDirectory>/.package-transactions`.
+`<dataDirectory>/apps/.package-transactions`.
 Leave the directory intact. Correct the filesystem problem, then restart Eden to retry recovery.
 
 If the change commits but temporary cleanup fails, the new package remains installed.
