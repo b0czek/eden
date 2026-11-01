@@ -67,7 +67,6 @@
     "effect": "^4.0.5",
     "fast-glob": "^3.3.3",
     "keyv": "^5.6.0",
-    "koffi": "^3.3.5",
     "semver": "catalog:",
     "simple-keyboard": "^3.8.175",
     "valibot": "^1.4.2",

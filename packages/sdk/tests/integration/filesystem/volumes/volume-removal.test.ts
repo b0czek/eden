@@ -431,6 +431,7 @@ describe("safe volume removal", () => {
       readOnly: false,
       supportsWatch: true,
       supportsEject: true,
+      supportsTrash: false,
       state: "ejecting",
     });
     await expect(

@@ -1,392 +1,313 @@
 import * as eden from "@edenapp/client";
-import { getParentPath, joinPath } from "@edenapp/files-core";
-import { createOperation } from "@edenapp/solid-kit";
+import { type FileItem, getParentPath, joinPath } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import { button, menu, title } from "@edenapp/tablets";
-import type { FilesystemLocation, FilesystemVolume } from "@edenapp/types";
-import { createEffect, createSignal, on, onCleanup } from "solid-js";
+import { button, menu, separator, title } from "@edenapp/tablets";
+import type { FilesystemLocation, TrashEntry } from "@edenapp/types";
+import { createMemo, createSignal, onCleanup } from "solid-js";
+import { openFileDetailsDialog } from "../dialogs/FileDetailsDialog";
 import { t } from "../i18n";
 import { findKeepBothPath } from "./fileTransfers";
-import { readTrash, restoreTrashEntry, type TrashEntry } from "./trash";
-import type {
-  FileFailure,
-  ShowFileError,
-  ShowFileFailures,
-} from "./useFileErrors";
-import type { FileOperationProgress } from "./useFileTransfers";
+import type { FileActivity } from "./useFileActivity";
+import { useFileSelection } from "./useFileSelection";
+
+type Position = { left: number; top: number };
+
+const toItem = (entry: TrashEntry): FileItem => ({
+  name: entry.name,
+  location: entry.original,
+  isDirectory: entry.isDirectory,
+  isFile: entry.isFile,
+  size: entry.size,
+  modified: new Date(entry.deletedAt),
+});
 
 export function useTrash(options: {
+  activity: FileActivity;
   dialogs: DialogController;
-  isBusy: () => boolean;
-  onChanged: () => void;
-  showError: ShowFileError;
-  showFailures: ShowFileFailures;
-  root: () => FilesystemLocation | undefined;
-  volumes: () => FilesystemVolume[];
-  active: () => boolean;
+  sortItems: (items: FileItem[]) => FileItem[];
 }) {
-  const operation = createOperation();
+  const { activity, dialogs } = options;
   const [entries, setEntries] = createSignal<TrashEntry[]>([]);
-  const [loading, setLoading] = createSignal(false);
-  const [progress, setProgress] = createSignal<FileOperationProgress | null>(
-    null,
-  );
-  const busy = () => progress() !== null;
-  const [error, setError] = createSignal<{
-    message: string;
-    details: unknown;
-  }>();
-  let menuLoading = false;
+  const [loading, setLoading] = createSignal(true);
+  const [error, setError] = createSignal<unknown>();
+  const [selectedItem, setSelectedItem] = createSignal<string | null>(null);
+  const [scrollToSelected, setScrollToSelected] = createSignal(false);
+  const busy = activity.busy;
   let request = 0;
-  let disposed = false;
-  let refreshQueued = false;
-  const watches = new Map<
-    string,
-    { location: FilesystemLocation; watchId: string }
-  >();
-  const release = (watchId: string) =>
-    eden.fs.unwatch(watchId).catch(() => undefined);
+
+  const refresh = async () => {
+    const current = ++request;
+    try {
+      const next = await eden.fs.trashEntries();
+      if (current !== request) return;
+      setEntries(next);
+      setError(undefined);
+    } catch (cause) {
+      if (current === request) setError(cause);
+    } finally {
+      if (current === request) setLoading(false);
+    }
+  };
+  const handleChanged = () => void refresh();
+  void eden.fs.subscribe("trash-changed", handleChanged).then(refresh);
   onCleanup(() => {
-    disposed = true;
     request += 1;
-    eden.fs.unsubscribe("changed", handleChanged);
-    for (const watch of watches.values()) void release(watch.watchId);
-    watches.clear();
+    eden.fs.unsubscribe("trash-changed", handleChanged);
   });
 
-  const synchronizeWatches = async (
-    locations: FilesystemLocation[],
-    current: number,
-  ) => {
-    let added = false;
-    const desired = new Map(
-      locations
-        .filter((location) =>
-          options
-            .volumes()
-            .some(
-              (volume) =>
-                volume.id === location.volume &&
-                volume.state === "ready" &&
-                volume.supportsWatch,
-            ),
-        )
-        .map((location) => [`${location.volume}:${location.path}`, location]),
-    );
-    for (const [key, watch] of watches) {
-      if (disposed || current !== request) return;
-      if (desired.has(key)) continue;
-      watches.delete(key);
-      await release(watch.watchId);
-    }
-    for (const [key, location] of desired) {
-      if (disposed || current !== request) return;
-      if (watches.has(key)) continue;
-      try {
-        const watch = await eden.fs.watch(location);
-        if (disposed || current !== request) {
-          await release(watch.watchId);
-          return;
-        }
-        watches.set(key, { location, watchId: watch.watchId });
-        added = true;
-      } catch (error) {
-        // A shared entry can disappear between scanning and watch acquisition.
-        const exists = await eden.fs.exists(location).catch(() => false);
-        if (exists && !disposed && current === request)
-          setError({
-            message: t("files.errors.loadTrashFailed"),
-            details: error,
-          });
-      }
-    }
-    return added;
-  };
-
-  const handleChanged = (event: { watchId: string; kind: string }) => {
-    const watched = [...watches].find(
-      ([, watch]) => watch.watchId === event.watchId,
-    );
-    if (!watched || disposed || !options.active()) return;
-    if (event.kind !== "change") {
-      watches.delete(watched[0]);
-      if (event.kind !== "volume-removed") void release(event.watchId);
-    }
-    if (refreshQueued) return;
-    refreshQueued = true;
-    queueMicrotask(() => {
-      refreshQueued = false;
-      if (!disposed && options.active()) void refresh(true);
-    });
-  };
-  const subscribed = eden.fs.subscribe("changed", handleChanged);
-
-  const refresh = async (background = false) => {
-    const current = ++request;
-    if (!options.active()) {
-      await synchronizeWatches([], current);
-      setLoading(false);
-      return;
-    }
-    if (!background) setLoading(true);
-    setError(undefined);
-    try {
-      await subscribed;
-      const root = options.root();
-      if (!root) return;
-      const result = await readTrash(root);
-      if (!disposed && current === request) {
-        setEntries((previous) => {
-          const existing = new Map(
-            previous.map((entry) => [
-              `${entry.directory.volume}:${entry.directory.path}`,
-              entry,
-            ]),
-          );
-          return result.entries.map((entry) => {
-            const prior = existing.get(
-              `${entry.directory.volume}:${entry.directory.path}`,
-            );
-            // Preserve unchanged row nodes while shared Trash updates arrive.
-            return prior &&
-              prior.name === entry.name &&
-              prior.deletedAt === entry.deletedAt &&
-              prior.isDirectory === entry.isDirectory &&
-              prior.isFile === entry.isFile &&
-              prior.size === entry.size &&
-              prior.original.volume === entry.original.volume &&
-              prior.original.path === entry.original.path
-              ? prior
-              : entry;
-          });
-        });
-        if (result.errors.length)
-          setError({
-            message: t("files.errors.loadTrashFailed"),
-            details: result.errors.join("\n"),
-          });
-        const addedWatches = await synchronizeWatches(
-          result.directories,
-          current,
-        );
-        // Read once more after acquiring new watches, closing the gap between
-        // the directory snapshot and watch registration.
-        if (addedWatches && !disposed && current === request) {
-          queueMicrotask(() => {
-            if (!disposed && options.active()) void refresh(true);
-          });
-        }
-      }
-    } catch (error) {
-      if (!disposed && current === request) {
-        setEntries([]);
-        setError({
-          message: t("files.errors.loadTrashFailed"),
-          details: error,
-        });
-      }
-    } finally {
-      if (!disposed && current === request) setLoading(false);
-    }
-  };
-
-  createEffect(
-    on([options.active, options.root], () => {
-      void refresh();
-    }),
+  // Entries never change in place, so each id keeps its row.
+  const rows = createMemo<Map<string, { entry: TrashEntry; item: FileItem }>>(
+    (previous) =>
+      new Map(
+        entries().map((entry) => [
+          entry.id,
+          previous?.get(entry.id) ?? { entry, item: toItem(entry) },
+        ]),
+      ),
   );
+  const entryByItem = createMemo(
+    () => new Map([...rows().values()].map((row) => [row.item, row.entry])),
+  );
+  const items = createMemo(() =>
+    options.sortItems([...rows().values()].map((row) => row.item)),
+  );
+  const entryFor = (item: FileItem) => entryByItem().get(item);
+  const itemKey = (item: FileItem) => entryFor(item)?.id ?? item.location.path;
 
-  const remove = (entry: TrashEntry["directory"]) =>
-    operation.run(() => eden.fs.delete(entry));
+  const selection = useFileSelection({
+    items,
+    getItemKey: itemKey,
+    currentPath: () => "trash",
+    selectedItem,
+    setSelectedItem,
+    setScrollToSelected,
+  });
+  const selectedEntries = () =>
+    selection.selectedFiles().flatMap((item) => entryFor(item) ?? []);
 
-  const canModify = (entry: TrashEntry) =>
-    options
-      .volumes()
-      .some(
-        (volume) =>
-          volume.id === entry.directory.volume &&
-          volume.state === "ready" &&
-          !volume.readOnly,
-      );
-  const run = async (
-    action: "restore" | "delete",
-    selected: TrashEntry[],
-    process: (entry: TrashEntry) => Promise<boolean>,
-  ) => {
-    if (busy() || options.isBusy() || disposed) return;
-    selected = selected.filter(canModify);
-    if (!selected.length) return;
-    try {
-      const failures: FileFailure[] = [];
-      let succeeded = 0;
-      for (const [index, entry] of selected.entries()) {
-        if (disposed) break;
-        setProgress({
-          operation: action,
-          current: index + 1,
-          total: selected.length,
-          itemName: entry.name,
-        });
-        try {
-          if (await process(entry)) succeeded += 1;
-        } catch (error) {
-          failures.push({ name: entry.name, error });
-        }
-      }
-      if (!disposed) await options.showFailures(failures, succeeded);
-    } finally {
-      setProgress(null);
-      if (!disposed) {
-        options.onChanged();
-        await refresh(true);
-      }
-    }
-  };
-
-  // lstat also recognizes occupied names that are dangling or looping links.
-  const entryExists = (location: FilesystemLocation) =>
+  const occupied = (location: FilesystemLocation) =>
     eden.fs.lstat(location).then(
       () => true,
       () => false,
     );
 
-  const restoreEntry = async (entry: TrashEntry) => {
-    let destination = entry.original;
-    while (!disposed) {
-      try {
-        await restoreTrashEntry(
-          entry,
-          (from, to) => operation.run(() => eden.fs.mv(from, to)),
-          remove,
-          destination,
-        );
-        return true;
-      } catch (error) {
-        if (
-          !(await entryExists(entry.content)) ||
-          !(await entryExists(destination))
-        )
-          throw error;
-        const parent = getParentPath(entry.original.path);
-        const suggestion = await findKeepBothPath(
-          entry,
-          parent,
-          t("files.restoredSuffix"),
-          (path) => entryExists({ ...entry.original, path }),
-        );
-        if (disposed) return false;
-        const values = await options.dialogs.form({
-          title: t("files.restoreAs"),
-          message: t("files.restoreNameConflict", { name: entry.name }),
-          fields: [
-            {
-              kind: "text",
-              key: "name",
-              label: t("common.name"),
-              initialValue: suggestion.split("/").pop(),
-              required: true,
-              autofocus: true,
-            },
-          ] as const,
-          confirmLabel: t("files.restore"),
-          cancelLabel: t("common.cancel"),
-          validate: ({ name }) =>
-            !name.trim() || name === "." || name === ".." || /[/\0]/.test(name)
-              ? t("files.errors.invalidItemName")
-              : null,
-          onSubmit: async ({ name }) =>
-            (await entryExists({
-              ...entry.original,
-              path: joinPath(parent, name),
-            }))
-              ? t("files.errors.restoreConflict")
-              : null,
-        });
-        if (!values || disposed) return false;
-        destination = {
-          ...entry.original,
-          path: joinPath(parent, values.name),
-        };
-      }
-    }
-    return false;
+  const askRestoreLocation = async (entry: TrashEntry) => {
+    const parent = getParentPath(entry.original.path);
+    const atParent = (name: string) => ({
+      ...entry.original,
+      path: joinPath(parent, name),
+    });
+    const suggestion = await findKeepBothPath(
+      toItem(entry),
+      parent,
+      t("files.restoredSuffix"),
+      (path) => occupied({ ...entry.original, path }),
+    );
+    const values = await dialogs.form({
+      title: t("files.restoreAs"),
+      message: t("files.restoreNameConflict", { name: entry.name }),
+      fields: [
+        {
+          kind: "text",
+          key: "name",
+          label: t("common.name"),
+          initialValue: suggestion.split("/").pop(),
+          required: true,
+          autofocus: true,
+        },
+      ] as const,
+      confirmLabel: t("files.restore"),
+      cancelLabel: t("common.cancel"),
+      validate: ({ name }) =>
+        !name.trim() || name === "." || name === ".." || /[/\0]/.test(name)
+          ? t("files.errors.invalidItemName")
+          : null,
+      onSubmit: async ({ name }) =>
+        (await occupied(atParent(name)))
+          ? t("files.errors.restoreConflict")
+          : null,
+    });
+    return values ? atParent(values.name) : undefined;
   };
 
-  const restoreMany = (selected: TrashEntry[]) =>
-    run("restore", selected, restoreEntry);
+  const restoreEntry = async (entry: TrashEntry) => {
+    let location: FilesystemLocation | undefined;
+    while (true) {
+      const result = await activity.submit(() =>
+        eden.fs.trashRestore(entry.id, { location }),
+      );
+      if (result.status === "restored") return;
+      location = await askRestoreLocation(entry);
+      if (!location) return "skipped";
+    }
+  };
 
-  const restore = (entry: TrashEntry) => restoreMany([entry]);
+  const restore = async (selected: TrashEntry[]) => {
+    if (busy()) return;
+    await activity.batch("restore", selected, restoreEntry);
+    await refresh();
+  };
 
-  const deletePermanently = async (selected: TrashEntry[], empty = false) => {
-    selected = selected.filter(canModify);
-    if (!selected.length || busy() || options.isBusy()) return;
-    const confirmed = await options.dialogs.confirm({
-      title: empty ? t("files.emptyTrash") : t("files.deletePermanently"),
-      message: t("files.permanentDeleteConfirmation", {
-        count: selected.length,
-      }),
-      confirmLabel: empty
+  const confirmDelete = (count: number, emptyAll: boolean) =>
+    dialogs.confirm({
+      title: emptyAll ? t("files.emptyTrash") : t("files.deletePermanently"),
+      message: emptyAll
+        ? t("files.emptyTrashConfirmation")
+        : t("files.permanentDeleteConfirmation", { count }),
+      confirmLabel: emptyAll
         ? t("files.emptyTrash")
         : t("files.deletePermanently"),
       cancelLabel: t("common.cancel"),
       tone: "danger",
     });
-    if (!confirmed) return;
-    await run("delete", selected, async (entry) => {
-      await remove(entry.directory);
-      return true;
+
+  const deletePermanently = async (selected: TrashEntry[]) => {
+    if (busy() || !selected.length) return;
+    if (!(await confirmDelete(selected.length, false))) return;
+    await activity.batch("delete", selected, async (entry) => {
+      await activity.submit(() => eden.fs.trashDelete(entry.id));
+    });
+    await refresh();
+  };
+
+  const empty = async () => {
+    if (busy() || !entries().length) return;
+    if (!(await confirmDelete(entries().length, true))) return;
+    await activity.batch("delete", [{ name: t("files.trash") }], async () => {
+      await activity.submit(() => eden.fs.trashEmpty());
     });
   };
 
-  const sidebarMenu = menu((entries: TrashEntry[]) => [
-    title(t("files.trash")),
+  const showDetails = async (item: FileItem) => {
+    const entry = entryFor(item);
+    if (!entry || busy()) return;
+    const action = await openFileDetailsDialog({
+      dialogs,
+      item,
+      deletedAt: entry.deletedAt,
+      canRestore: () => !busy(),
+    });
+    if (action === "restore") await restore([entry]);
+  };
+
+  const itemMenu = menu((selected: TrashEntry[]) => [
+    title(
+      selected.length === 1
+        ? selected[0].name
+        : t("files.selectedCount", { count: selected.length }),
+    ),
+    button("restore", t("files.restore"), () => restore(selected), {
+      icon: "rotate-ccw",
+      disabled: busy(),
+    }),
+    ...(selected.length === 1
+      ? [
+          button(
+            "details",
+            t("files.details"),
+            () => {
+              const row = rows().get(selected[0].id);
+              if (row) void showDetails(row.item);
+            },
+            { icon: "info", disabled: busy() },
+          ),
+        ]
+      : []),
+    separator(),
     button(
-      "empty-trash",
-      t("files.emptyTrash"),
-      () => deletePermanently(entries, true),
-      {
-        icon: "trash",
-        danger: true,
-        disabled: busy() || options.isBusy() || !entries.some(canModify),
-      },
+      "delete-permanently",
+      t("files.deletePermanently"),
+      () => deletePermanently(selected),
+      { icon: "trash", danger: true, disabled: busy() },
     ),
   ]);
-  const showSidebarMenu = async (
-    root: FilesystemLocation | undefined,
-    position: { left: number; top: number },
+  const emptyMenu = menu(() => [
+    title(t("files.trash")),
+    button("empty-trash", t("files.emptyTrash"), empty, {
+      icon: "trash",
+      danger: true,
+      disabled: busy() || !entries().length,
+    }),
+  ]);
+  const backgroundMenu = menu(() => [
+    title(t("files.trash")),
+    button("select-all", t("files.selectAll"), selection.selectAll, {
+      icon: "check",
+      disabled: busy() || !entries().length,
+    }),
+    button("refresh", t("files.refresh"), refresh, { icon: "refresh-cw" }),
+    separator(),
+    button("empty-trash", t("files.emptyTrash"), empty, {
+      icon: "trash",
+      danger: true,
+      disabled: busy() || !entries().length,
+    }),
+  ]);
+
+  const handleItemClick = (
+    item: FileItem,
+    event?: MouseEvent | KeyboardEvent,
   ) => {
-    if (!root || disposed || busy() || options.isBusy() || menuLoading) return;
-    menuLoading = true;
-    try {
-      const result = await readTrash(root);
-      if (disposed) return;
-      await sidebarMenu.show(result.entries, position);
-      if (!disposed && result.errors.length) {
-        options.showError(
-          t("files.errors.loadTrashFailed"),
-          result.errors.join("\n"),
-        );
-      }
-    } catch (error) {
-      if (!disposed)
-        options.showError(t("files.errors.loadTrashFailed"), error);
-    } finally {
-      menuLoading = false;
-    }
+    if (
+      selection.selectionMode() ||
+      event?.ctrlKey ||
+      event?.metaKey ||
+      event?.shiftKey
+    )
+      selection.toggleItem(item, event);
+    else selection.focusItem(item);
+  };
+  const handleItemContextMenu = (item: FileItem, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const entry = entryFor(item);
+    if (!entry || busy()) return;
+    const inSelection = selection.selectedPaths().includes(entry.id);
+    if (!inSelection) selection.exit();
+    selection.focusItem(item);
+    void itemMenu.show(inSelection ? selectedEntries() : [entry], {
+      left: event.clientX,
+      top: event.clientY,
+    });
+  };
+  const handleBackgroundContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    if (busy() || (event.target as HTMLElement)?.closest(".file-item")) return;
+    void backgroundMenu.show(null, { left: event.clientX, top: event.clientY });
   };
 
   return {
     entries,
+    items,
     loading,
-    busy,
-    progress,
-    snapshot: () => (operation.pending() ? operation.snapshot() : undefined),
     error,
     refresh,
-    restore,
-    restoreMany,
-    deletePermanently,
-    canModify,
-    showSidebarMenu,
+    entryFor,
+    itemKey,
+    selection,
+    selectedItem,
+    scrollToSelected,
+    busy,
+    restoreSelected: async () => {
+      await restore(selectedEntries());
+      if (!selection.selectedFiles().length) selection.exit();
+    },
+    deleteSelected: async () => {
+      await deletePermanently(selectedEntries());
+      if (!selection.selectedFiles().length) selection.exit();
+    },
+    deleteItem: (item: FileItem) => {
+      const entry = entryFor(item);
+      if (entry) void deletePermanently([entry]);
+    },
+    showDetails,
+    handleItemClick,
+    handleItemContextMenu,
+    handleBackgroundContextMenu,
+    showEmptyMenu: (position: Position) => {
+      if (!busy()) void emptyMenu.show(null, position);
+    },
   };
 }
+
+export type Trash = ReturnType<typeof useTrash>;

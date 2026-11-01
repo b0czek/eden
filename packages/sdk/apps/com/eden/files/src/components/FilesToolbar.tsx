@@ -2,11 +2,9 @@ import {
   buildBreadcrumbs,
   FileExplorerHeader,
   type FileExplorerLabels,
-  getParentPath,
 } from "@edenapp/files-core";
 import type { FilesystemLocation } from "@edenapp/types";
 import { FiCheckSquare, FiX } from "solid-icons/fi";
-import { TRASH_DIRECTORY } from "../features/trash";
 import type { useDirectoryBrowser } from "../features/useDirectoryBrowser";
 import type { useFileSelection } from "../features/useFileSelection";
 import { t } from "../i18n";
@@ -34,7 +32,7 @@ export function FilesToolbar(props: FilesToolbarProps) {
       labels={props.labels}
       currentPath={props.location.path}
       currentVolume={props.location.volume}
-      canGoUp={props.trashSelected || props.directory.navigation.canGoUp()}
+      canGoUp={!props.trashSelected && props.directory.navigation.canGoUp()}
       volumes={props.directory.navigation.volumes()}
       showVolumeSelector={false}
       readOnly={props.readOnly}
@@ -42,22 +40,17 @@ export function FilesToolbar(props: FilesToolbarProps) {
       onVolumeChange={props.directory.selectVolume}
       historyIndex={props.directory.navigation.historyIndex()}
       historyLength={props.directory.navigation.navigationHistory().length}
-      breadcrumbs={buildBreadcrumbs(props.location.path).map((crumb) =>
-        props.trashSelected && crumb.name === TRASH_DIRECTORY
-          ? { ...crumb, name: t("files.trash") }
-          : crumb,
-      )}
+      breadcrumbs={
+        props.trashSelected
+          ? [
+              { name: "/", path: "/" },
+              { name: t("files.trash"), path: props.location.path },
+            ]
+          : buildBreadcrumbs(props.location.path)
+      }
       onGoBack={props.directory.goBack}
       onGoForward={props.directory.goForward}
-      onGoUp={() => {
-        if (props.trashSelected) {
-          props.directory.navigate(
-            getParentPath(props.location.path),
-            undefined,
-            props.location.volume,
-          );
-        } else props.directory.goUp();
-      }}
+      onGoUp={props.directory.goUp}
       onNavigate={(path) =>
         props.directory.navigate(path, undefined, props.location.volume)
       }

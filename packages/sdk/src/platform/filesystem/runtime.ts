@@ -12,6 +12,7 @@ export const registerFilesystemApi = Effect.gen(function* () {
   const ipc = yield* IpcTransport;
   const permissions = yield* Permissions;
   permissions.registerEventPermission("fs/changed", "fs/read");
+  permissions.registerEventPermission("fs/trash-changed", "fs/read");
   ipc.registerController(createFilesystemController(yield* Filesystem));
 });
 export const FilesystemPortsLive = Layer.effectContext(

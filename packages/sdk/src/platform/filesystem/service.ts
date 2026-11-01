@@ -7,6 +7,8 @@ import type {
   FilesystemOpenMode,
   FilesystemSource,
   SearchResult,
+  TrashEntry,
+  TrashRestoreResult,
 } from "@edenapp/types";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -39,6 +41,7 @@ import {
   watchRejection,
 } from "./errors";
 import { createFileHandles, type OpenedFilesystemFile } from "./file-handles";
+import { isPathWithin } from "./lexical-path";
 import { FilesystemIoFailed } from "./native-errors";
 import { io, type NativeFile } from "./native-io";
 import {
@@ -48,6 +51,7 @@ import {
 } from "./path-containment";
 import { FilesystemViews } from "./ports";
 import { createFileTransfers } from "./transfers";
+import { createTrash, TRASH_DIRECTORY } from "./trash";
 import type { VolumeUnavailable } from "./volumes/errors";
 import type { VolumeRoot } from "./volumes/service";
 import { Volumes } from "./volumes/service";
@@ -152,14 +156,36 @@ export interface Filesystem {
   }) => Effect.Effect<void>;
   releaseHandles: (sessionId?: string) => Effect.Effect<void>;
   closeHandles: () => Effect.Effect<void>;
+  trashChanged: Event<{ revision: number }>;
+  trashEntries: () => Effect.Effect<TrashEntry[], FilesystemPathError>;
+  moveToTrash: (
+    location: FilesystemLocation,
+    reporter?: OperationReporter,
+  ) => Effect.Effect<void, FilesystemTransferError>;
+  restoreFromTrash: (
+    id: string,
+    destination?: FilesystemLocation,
+    reporter?: OperationReporter,
+  ) => Effect.Effect<TrashRestoreResult, FilesystemTransferError>;
+  deleteFromTrash: (
+    id: string,
+    reporter?: OperationReporter,
+  ) => Effect.Effect<void, FilesystemPathError>;
+  emptyTrash: (
+    reporter?: OperationReporter,
+  ) => Effect.Effect<void, FilesystemPathError>;
 }
 
 export const Filesystem = Context.Service<"eden/Filesystem", Filesystem>(
   "eden/Filesystem",
 );
 
-const assertExistingWithin = (rootPath: string, hostPath: string) =>
-  assertExistingPathWithin(rootPath, hostPath).pipe(
+const assertExistingWithin = (
+  rootPath: string,
+  hostPath: string,
+  excludedPath?: string,
+) =>
+  assertExistingPathWithin(rootPath, hostPath, excludedPath).pipe(
     Effect.mapError((cause) =>
       cause instanceof FilesystemIoFailed
         ? cause
@@ -196,6 +222,9 @@ export const FilesystemLive = Layer.effect(
         TargetedNotification<{ watchId: string; kind: FilesystemChangeKind }>
       >();
     const transfer = createFileTransfers();
+    const trashRoot = path.join(baseDir, TRASH_DIRECTORY);
+    const trashChanged = yield* scopedEvent<{ revision: number }>();
+    let trashRevision = 0;
 
     function requirePrincipal(): void {
       const principal = executionContext.getPrincipal();
@@ -249,7 +278,17 @@ export const FilesystemLive = Layer.effect(
           );
           assertWithin(rootPath, hostPath, `Path '${address.path}'`);
           assertWithin(accessPath, hostPath, `Path '${address.path}'`);
-          return { rootPath, accessPath, hostPath };
+          if (!mounted && isPathWithin(trashRoot, hostPath))
+            throw new FilesystemAccessDenied({
+              path: address.path,
+              message: `Path '${address.path}' is reserved by Eden`,
+            });
+          return {
+            rootPath,
+            accessPath,
+            hostPath,
+            reservedPath: mounted ? undefined : trashRoot,
+          };
         },
         catch: accessRejection,
       });
@@ -261,9 +300,17 @@ export const FilesystemLive = Layer.effect(
         target.hostPath === target.rootPath
           ? target.hostPath
           : path.dirname(target.hostPath);
-      yield* assertExistingWithin(target.rootPath, checkedPath);
+      yield* assertExistingWithin(
+        target.rootPath,
+        checkedPath,
+        target.reservedPath,
+      );
       if (target.accessPath !== target.rootPath)
-        yield* assertExistingWithin(target.accessPath, checkedPath);
+        yield* assertExistingWithin(
+          target.accessPath,
+          checkedPath,
+          target.reservedPath,
+        );
       yield* assertActive();
       return { ...target, assertActive };
     });
@@ -441,9 +488,17 @@ export const FilesystemLive = Layer.effect(
           yield* target.assertActive();
           yield* io.mkdir(path.dirname(target.hostPath));
           yield* target.assertActive();
-          yield* assertExistingWithin(target.rootPath, target.hostPath);
+          yield* assertExistingWithin(
+            target.rootPath,
+            target.hostPath,
+            target.reservedPath,
+          );
           if (target.accessPath !== target.rootPath)
-            yield* assertExistingWithin(target.accessPath, target.hostPath);
+            yield* assertExistingWithin(
+              target.accessPath,
+              target.hostPath,
+              target.reservedPath,
+            );
           yield* target.assertActive();
           yield* io.writeFile(target.hostPath, content, encoding);
           watcher.invalidate(path.dirname(target.hostPath));
@@ -493,7 +548,17 @@ export const FilesystemLive = Layer.effect(
         }),
       );
     const readdir = (location: FilesystemLocation) =>
-      withVolume(location, (hostPath) => io.readdir(hostPath));
+      withVolume(location, (hostPath) =>
+        io
+          .readdir(hostPath)
+          .pipe(
+            Effect.map((names) =>
+              hostPath === baseDir
+                ? names.filter((name) => name !== TRASH_DIRECTORY)
+                : names,
+            ),
+          ),
+      );
     const stat = Effect.fn(function* (
       source: FilesystemSource,
     ): Effect.fn.Return<FileStats, FilesystemFileError> {
@@ -681,6 +746,24 @@ export const FilesystemLive = Layer.effect(
           );
         }),
       );
+    const trash = createTrash({
+      baseDir,
+      homeAccessPath: getHomeAccessPath,
+      resolveEntry: (location) =>
+        Effect.gen(function* () {
+          const target = yield* resolveTarget(location, true, false);
+          yield* Effect.try({
+            try: () => assertNotRoot(target),
+            catch: accessRejection,
+          });
+          return target;
+        }),
+      transfer,
+      invalidate: watcher.invalidate,
+      changed: () => trashChanged.emit({ revision: ++trashRevision }),
+    });
+    const withHome = <A, E>(effect: Effect.Effect<A, E>) =>
+      volumes.withVolumes(["home"], effect);
     return {
       getBaseDir: () => baseDir,
       changed,
@@ -710,6 +793,17 @@ export const FilesystemLive = Layer.effect(
       closeOwner: handles.closeOwner,
       releaseHandles: (sessionId?: string) => handles.closeOwner({ sessionId }),
       closeHandles: handles.dispose,
+      trashChanged,
+      trashEntries: () => withHome(trash.list),
+      moveToTrash: (location, reporter) =>
+        withHome(trash.move(location, reporter)),
+      restoreFromTrash: (id, destination, reporter) =>
+        volumes.withVolumes(
+          ["home", destination?.volume ?? "home"],
+          trash.restore(id, destination, reporter),
+        ),
+      deleteFromTrash: (id, reporter) => withHome(trash.delete(id, reporter)),
+      emptyTrash: (reporter) => withHome(trash.empty(reporter)),
     };
   }),
 );

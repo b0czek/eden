@@ -102,13 +102,20 @@ export function createFileTransfers() {
     yield* assertActive(request);
     request.reporter?.update("preparing-copy");
     const transfer = yield* prepare(request, "copy");
-    yield* runWithDestinationRollback(transfer, copyEntry(transfer), "copy");
+    yield* runWithDestinationRollback(
+      transfer,
+      copyEntry(transfer).pipe(
+        Effect.andThen(transfer.reporter?.commit ?? Effect.void),
+      ),
+      () => true,
+    );
   });
 
   const moveReserved = Effect.fn(function* (request: TransferRequest) {
     request.reporter?.update("preparing-move");
     const transfer = yield* prepare(request, "move");
-    // Stop cancellation before the rename; finish backup cleanup once it commits.
+    // A failed rename leaves the destination untouched; only a fallback copy is ours to remove.
+    let copied = false;
     yield* Effect.gen(function* () {
       yield* transfer.reporter?.commit ?? Effect.void;
       yield* runWithDestinationRollback(
@@ -116,11 +123,35 @@ export function createFileTransfers() {
         Effect.gen(function* () {
           yield* assertActive(transfer);
           transfer.reporter?.update("moving");
-          yield* io.renameNoReplace(transfer.source, transfer.destination);
+          yield* io.rename(transfer.source, transfer.destination).pipe(
+            Effect.catch((error) => {
+              if (error.code !== "EXDEV") return Effect.fail(error);
+              copied = true;
+              return copyEntry(transfer);
+            }),
+          );
         }),
-        "move",
+        () => copied,
       );
     }).pipe(Effect.uninterruptible);
+    if (copied) {
+      yield* Effect.gen(function* () {
+        yield* assertActive(transfer);
+        transfer.reporter?.update("removing-source");
+        yield* io.rm(transfer.source, { recursive: true, force: false });
+      }).pipe(
+        Effect.mapError(
+          (error) =>
+            new FilesystemTransferIncomplete({
+              source: transfer.source,
+              destination: transfer.destination,
+              message:
+                "Move copied the destination but could not completely remove the source",
+              cause: error,
+            }),
+        ),
+      );
+    }
   });
 
   const prepare = Effect.fn(function* (
@@ -188,7 +219,7 @@ export function createFileTransfers() {
   const runWithDestinationRollback = (
     transfer: PreparedTransfer,
     work: Effect.Effect<void, FilesystemTransferError>,
-    operation: "copy" | "move",
+    ownsDestination: () => boolean,
   ) =>
     Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
@@ -197,29 +228,23 @@ export function createFileTransfers() {
           ? yield* stageDestination(transfer.destination)
           : undefined;
         yield* restore(work).pipe(
-          Effect.andThen(
-            operation === "copy"
-              ? (transfer.reporter?.commit ?? Effect.void)
-              : Effect.void,
-          ),
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");
-              const rollback =
-                operation === "copy"
-                  ? [
-                      Effect.gen(function* () {
-                        yield* assertAccessible(
-                          transfer.assertDestinationActive,
-                          transfer.destination,
-                        );
-                        yield* io.rm(transfer.destination, {
-                          recursive: true,
-                          force: true,
-                        });
-                      }),
-                    ]
-                  : [];
+              const rollback: Effect.Effect<void, FilesystemPathError>[] = [];
+              if (ownsDestination())
+                rollback.push(
+                  Effect.gen(function* () {
+                    yield* assertAccessible(
+                      transfer.assertDestinationActive,
+                      transfer.destination,
+                    );
+                    yield* io.rm(transfer.destination, {
+                      recursive: true,
+                      force: true,
+                    });
+                  }),
+                );
               if (backup)
                 rollback.push(
                   Effect.gen(function* () {
@@ -227,7 +252,7 @@ export function createFileTransfers() {
                       transfer.assertDestinationActive,
                       transfer.destination,
                     );
-                    yield* io.renameNoReplace(backup, transfer.destination);
+                    yield* io.rename(backup, transfer.destination);
                   }),
                 );
               const rollbackExits = yield* Effect.forEach(rollback, (step) =>
@@ -279,7 +304,7 @@ export function createFileTransfers() {
       path.dirname(destination),
       `.${path.basename(destination)}.eden-transfer-${randomUUID()}`,
     );
-    yield* io.renameNoReplace(destination, backup);
+    yield* io.rename(destination, backup);
     return backup;
   });
 

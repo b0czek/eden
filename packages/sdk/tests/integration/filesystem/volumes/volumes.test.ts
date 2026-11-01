@@ -125,6 +125,7 @@ describe("consumer-managed filesystem volumes", () => {
       readOnly: false,
       supportsWatch: false,
       supportsEject: false,
+      supportsTrash: false,
       state: "ready",
     });
     expect(volumes.some((volume) => "rootPath" in volume)).toBe(false);
@@ -854,11 +855,68 @@ describe("consumer-managed filesystem volumes", () => {
 
   const crossDeviceTest =
     statSync(os.tmpdir()).dev !== statSync(process.cwd()).dev ? it : it.skip;
-  crossDeviceTest.each([false, true])(
-    "refuses a cross-filesystem move without changing either tree (overwrite=%s)",
-    async (overwrite) => {
+  crossDeviceTest("moves across a real filesystem boundary", async () => {
+    const otherRoot = await fs.mkdtemp(
+      path.join(process.cwd(), ".eden-volume-test-"),
+    );
+    try {
+      await eden.runtime.effects.run(
+        eden.runtime.volumes.register({
+          id: "other-device",
+          label: "Other filesystem",
+          kind: "local",
+          rootPath: otherRoot,
+        }),
+      );
+      const source = {
+        volume: "home",
+        path: "/operators/one/cross-device/report.txt",
+      };
+      await execute("fs/write", {
+        location: { ...source },
+        content: "cross-device report",
+      });
+      const sourceRoot = path.join(
+        eden.paths.homeDirectory,
+        requireValue(user.directoryRestriction),
+        "cross-device",
+      );
+      await fs.symlink("report.txt", path.join(sourceRoot, "relative.txt"));
+      const from = { volume: "home", path: "/operators/one/cross-device" };
+      await execute("fs/mv", {
+        from,
+        to: { volume: "other-device", path: "/moved" },
+      });
+      for (const name of ["report.txt", "relative.txt"]) {
+        await expect(
+          execute("fs/read", {
+            location: { volume: "other-device", path: `/moved/${name}` },
+          }),
+        ).resolves.toBe("cross-device report");
+      }
+      await expect(execute("fs/exists", { location: from })).resolves.toBe(
+        false,
+      );
+    } finally {
+      eden.runtime.volumes.unregister("other-device");
+      await fs.rm(otherRoot, { recursive: true, force: true });
+    }
+  });
+
+  const deletionFailureTest =
+    statSync(os.tmpdir()).dev !== statSync(process.cwd()).dev &&
+    process.getuid?.() !== 0
+      ? it
+      : it.skip;
+  deletionFailureTest(
+    "retains a completed cross-device copy when source deletion fails",
+    async () => {
       const otherRoot = await fs.mkdtemp(
         path.join(process.cwd(), ".eden-volume-test-"),
+      );
+      const lockedDirectory = path.join(
+        eden.paths.homeDirectory,
+        "operators/one/locked",
       );
       try {
         await eden.runtime.effects.run(
@@ -871,51 +929,25 @@ describe("consumer-managed filesystem volumes", () => {
         );
         const source = {
           volume: "home",
-          path: "/operators/one/cross-device/report.txt",
+          path: "/operators/one/locked/report.txt",
         };
+        const destination = { volume: "other-device", path: "/report.txt" };
         await execute("fs/write", {
-          location: source,
-          content: "cross-device report",
+          location: { ...source },
+          content: "preserve this copy",
         });
-        const sourceRoot = path.join(
-          eden.paths.homeDirectory,
-          requireValue(user.directoryRestriction),
-          "cross-device",
-        );
-        await fs.symlink("report.txt", path.join(sourceRoot, "relative.txt"));
-        const from = { volume: "home", path: "/operators/one/cross-device" };
-        const destinationRoot = path.join(otherRoot, "moved");
-        if (overwrite) {
-          await fs.mkdir(destinationRoot);
-          await fs.writeFile(
-            path.join(destinationRoot, "original.txt"),
-            "destination original",
-          );
-        }
+        await fs.chmod(lockedDirectory, 0o555);
         await expect(
-          execute("fs/mv", {
-            from,
-            to: { volume: "other-device", path: "/moved" },
-            overwrite,
-          }),
-        ).rejects.toThrow("EXDEV");
-        expect(
-          await fs.readFile(path.join(sourceRoot, "report.txt"), "utf8"),
-        ).toBe("cross-device report");
-        expect(await fs.readlink(path.join(sourceRoot, "relative.txt"))).toBe(
-          "report.txt",
+          execute("fs/mv", { from: source, to: destination }),
+        ).rejects.toThrow("could not completely remove the source");
+        await expect(
+          execute("fs/read", { location: destination }),
+        ).resolves.toBe("preserve this copy");
+        await expect(execute("fs/read", { location: source })).resolves.toBe(
+          "preserve this copy",
         );
-        if (overwrite) {
-          expect(await fs.readdir(otherRoot)).toEqual(["moved"]);
-          expect(await fs.readdir(destinationRoot)).toEqual(["original.txt"]);
-          expect(
-            await fs.readFile(
-              path.join(destinationRoot, "original.txt"),
-              "utf8",
-            ),
-          ).toBe("destination original");
-        } else expect(await fs.readdir(otherRoot)).toEqual([]);
       } finally {
+        await fs.chmod(lockedDirectory, 0o755);
         eden.runtime.volumes.unregister("other-device");
         await fs.rm(otherRoot, { recursive: true, force: true });
       }

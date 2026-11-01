@@ -274,6 +274,31 @@ const fsCommands = {
     invoke("fs/search", { ["location"]: location, ["pattern"]: pattern, ["limit"]: options?.["limit"] }),
   ["stat"]: (location: CommandArgs<"fs/stat">["location"]): Promise<CommandResult<"fs/stat">> =>
     invoke("fs/stat", { ["location"]: location }),
+  /**
+   * Move a Home item to Trash.
+   */
+  ["trash"]: (location: CommandArgs<"fs/trash">["location"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/trash">> =>
+    invoke("fs/trash", { ["location"]: location }, options?.submission),
+  /**
+   * Permanently delete one Trash item.
+   */
+  ["trashDelete"]: (id: CommandArgs<"fs/trash-delete">["id"], options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/trash-delete">> =>
+    invoke("fs/trash-delete", { ["id"]: id }, options?.submission),
+  /**
+   * Permanently delete every Trash item visible to the caller.
+   */
+  ["trashEmpty"]: (options?: { submission?: OperationSubmission }): Promise<CommandResult<"fs/trash-empty">> =>
+    invoke("fs/trash-empty", {  }, options?.submission),
+  /**
+   * List Trash items from folders the caller can access, newest first.
+   */
+  ["trashEntries"]: (): Promise<CommandResult<"fs/trash-entries">> =>
+    invoke("fs/trash-entries", {  }),
+  /**
+   * Restore a Trash item to its original location or another destination.
+   */
+  ["trashRestore"]: (id: CommandArgs<"fs/trash-restore">["id"], options?: Pick<CommandArgs<"fs/trash-restore">, "location"> & { submission?: OperationSubmission }): Promise<CommandResult<"fs/trash-restore">> =>
+    invoke("fs/trash-restore", { ["id"]: id, ["location"]: options?.["location"] }, options?.submission),
   ["unwatch"]: (watchId: CommandArgs<"fs/unwatch">["watchId"]): Promise<CommandResult<"fs/unwatch">> =>
     invoke("fs/unwatch", { ["watchId"]: watchId }),
   ["watch"]: (location: CommandArgs<"fs/watch">["location"]): Promise<CommandResult<"fs/watch">> =>
@@ -282,9 +307,9 @@ const fsCommands = {
     invoke("fs/write", { ["location"]: location, ["content"]: content, ["encoding"]: options?.["encoding"] }),
   ["writeBinary"]: (location: CommandArgs<"fs/write-binary">["location"], content: CommandArgs<"fs/write-binary">["content"]): Promise<CommandResult<"fs/write-binary">> =>
     invoke("fs/write-binary", { ["location"]: location, ["content"]: content }),
-  ["subscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): Promise<void> =>
+  ["subscribe"]: <E extends "changed" | "trash-changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): Promise<void> =>
     subscribe(`fs/${event}`, callback),
-  ["unsubscribe"]: <E extends "changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "changed" | "trash-changed">(event: E, callback: (data: EventData<`fs/${E}`>) => void): void =>
     unsubscribe(`fs/${event}`, callback),
 };
 export { fsCommands as fs };

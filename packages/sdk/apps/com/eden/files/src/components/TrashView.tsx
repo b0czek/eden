@@ -7,117 +7,105 @@ import {
 } from "@edenapp/files-core";
 import { FiAlertTriangle } from "solid-icons/fi";
 import { Show } from "solid-js";
-import type { useTrash } from "../features/useTrash";
-import type { useTrashBrowser } from "../features/useTrashBrowser";
-import { locale, t } from "../i18n";
-import { errorDetails } from "./FileError";
+import type { Trash } from "../features/useTrash";
+import { getTrashLabels, locale, t } from "../i18n";
+import { FileError } from "./FileError";
 import { SelectionActionBar } from "./FileModeActionBars";
 
+const formatDeletedAt = (value: string) => {
+  const date = new Date(value);
+  return date.toLocaleString(locale(), {
+    month: "short",
+    day: "numeric",
+    year:
+      date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 export function TrashView(props: {
-  trash: ReturnType<typeof useTrash>;
-  browser: ReturnType<typeof useTrashBrowser>;
+  trash: Trash;
   preferences: DisplayPreferences;
   activateOnSingleClick: boolean;
   onBack: () => void;
 }) {
+  const trash = props.trash;
+  const selection = trash.selection;
   return (
     <section
       class="files-trash eden-flex-col"
       aria-label={t("files.trash")}
-      aria-busy={props.trash.busy() || props.trash.loading()}
+      aria-busy={trash.busy() || trash.loading()}
     >
-      <Show when={props.browser.selection.selectionMode()}>
+      <Show when={selection.selectionMode()}>
         <SelectionActionBar
-          selectedCount={props.browser.selection.selectedPaths().length}
-          itemCount={props.browser.items().length}
-          allItemsSelected={props.browser.selection.allItemsSelected()}
-          busy={props.browser.busy()}
-          readOnly={props.browser.selectionReadOnly()}
-          onToggleAll={props.browser.selection.toggleAll}
-          onRestore={() => void props.browser.restoreSelected()}
-          onDelete={() => void props.browser.deleteSelected()}
+          selectedCount={selection.selectedPaths().length}
+          itemCount={trash.items().length}
+          allItemsSelected={selection.allItemsSelected()}
+          busy={trash.busy()}
+          readOnly={false}
+          onToggleAll={selection.toggleAll}
+          onRestore={() => void trash.restoreSelected()}
+          onDelete={() => void trash.deleteSelected()}
+          deleteLabel={t("files.deletePermanently")}
         />
       </Show>
-      <Show when={props.trash.error()}>
+      <Show when={trash.error()}>
         {(error) => (
           <div
-            class="eden-alert eden-alert-warning eden-flex eden-gap-sm files-trash-load-error"
+            class="eden-alert eden-alert-warning eden-flex eden-gap-sm"
             role="alert"
           >
             <FiAlertTriangle aria-hidden="true" />
-            <div class="eden-flex-col eden-gap-xs">
-              <strong>{error().message}</strong>
-              <span class="eden-text-sm">{t("files.trashLoadIncomplete")}</span>
-              <Show when={error().details != null}>
-                <details class="files-error-details">
-                  <summary>{t("files.technicalDetails")}</summary>
-                  <pre class="eden-text-sm">
-                    {errorDetails(error().details)}
-                  </pre>
-                </details>
-              </Show>
-            </div>
+            <FileError
+              message={t("files.errors.loadTrashFailed")}
+              details={error()}
+            />
           </div>
         )}
       </Show>
       <FileList
-        labels={props.browser.labels()}
-        loading={props.trash.loading()}
-        items={props.browser.items()}
-        getItemKey={props.browser.itemKey}
+        labels={getTrashLabels()}
+        loading={trash.loading()}
+        items={trash.items()}
+        getItemKey={trash.itemKey}
         emptyIcon={<FileGraphic src={fileIcons.trash} />}
-        showEmpty={!props.trash.error()}
-        selectedItem={props.browser.selectedItem()}
+        showEmpty={!trash.error()}
+        selectedItem={trash.selectedItem()}
         selectedPaths={
-          props.browser.selection.selectionMode()
-            ? props.browser.selection.selectedPaths()
-            : undefined
+          selection.selectionMode() ? selection.selectedPaths() : undefined
         }
-        selectionMode={props.browser.selection.selectionMode()}
-        scrollToSelected={props.browser.scrollToSelected()}
+        selectionMode={selection.selectionMode()}
+        scrollToSelected={trash.scrollToSelected()}
         viewStyle={props.preferences.viewStyle}
         itemSize={props.preferences.itemSize}
-        onItemClick={props.browser.handleItemClick}
-        onItemFocus={props.browser.selection.focusItem}
-        onSelectionToggle={props.browser.toggleItem}
-        onItemContextMenu={props.browser.handleItemContextMenu}
-        onBackgroundContextMenu={props.browser.handleBackgroundContextMenu}
-        onItemActivate={(item) => void props.browser.showDetails(item)}
+        onItemClick={trash.handleItemClick}
+        onItemFocus={selection.focusItem}
+        onSelectionToggle={selection.toggleItem}
+        onItemContextMenu={trash.handleItemContextMenu}
+        onBackgroundContextMenu={trash.handleBackgroundContextMenu}
+        onItemActivate={(item) => void trash.showDetails(item)}
         activateOnSingleClick={props.activateOnSingleClick}
-        onItemDeleteShortcut={(item) => {
-          const entry = props.browser.entryFor(item);
-          if (entry) void props.trash.deletePermanently([entry]);
-        }}
+        onItemDeleteShortcut={
+          selection.selectionMode() ? undefined : trash.deleteItem
+        }
         onBack={props.onBack}
-        disabled={props.browser.busy()}
+        disabled={trash.busy()}
         renderItemMetadata={(item) => {
-          const entry = props.browser.entryFor(item);
+          const entry = trash.entryFor(item);
+          if (!entry) return undefined;
           return (
-            entry && (
-              <div class="file-meta files-trash-item-meta">
-                <span
-                  title={`${t("files.originalLocation")}: ${entry.original.path}`}
-                >
-                  {getParentPath(entry.original.path)}
-                </span>
-                <time dateTime={entry.deletedAt} title={t("files.dateDeleted")}>
-                  {new Date(entry.deletedAt).toLocaleString(locale(), {
-                    month: "short",
-                    day: "numeric",
-                    year:
-                      new Date(entry.deletedAt).getFullYear() ===
-                      new Date().getFullYear()
-                        ? undefined
-                        : "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </time>
-                <Show when={!props.trash.canModify(entry)}>
-                  <span>{t("files.readOnly")}</span>
-                </Show>
-              </div>
-            )
+            <div class="file-meta files-trash-item-meta">
+              <span
+                title={`${t("files.originalLocation")}: ${entry.original.path}`}
+              >
+                {getParentPath(entry.original.path)}
+              </span>
+              <time dateTime={entry.deletedAt} title={t("files.dateDeleted")}>
+                {formatDeletedAt(entry.deletedAt)}
+              </time>
+            </div>
           );
         }}
       />

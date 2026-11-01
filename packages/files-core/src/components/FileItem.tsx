@@ -12,10 +12,7 @@ export interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
   labels: FileExplorerLabels;
   item: FileItem;
-  displayName?: string;
-  icon?: JSX.Element;
   metadata?: JSX.Element;
-  selectionDisabled?: boolean;
   isSelected: boolean;
   isFocused?: boolean;
   selectionMode?: boolean;
@@ -77,14 +74,9 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         onContextMenu={(e) => props.onContextMenu?.(props.item, e)}
       >
         <div class="file-icon">
-          <Show
-            when={props.icon}
-            fallback={<FileGraphic src={getFileIcon(props.item)} />}
-          >
-            {props.icon}
-          </Show>
+          <FileGraphic src={getFileIcon(props.item)} />
         </div>
-        <div class="file-name">{props.displayName ?? props.item.name}</div>
+        <div class="file-name">{props.item.name}</div>
 
         <Show
           when={props.metadata}
@@ -120,8 +112,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
           type="checkbox"
           class="eden-checkbox file-selection-checkbox"
           checked={props.isSelected}
-          disabled={props.disabled || props.selectionDisabled}
-          aria-label={`${props.labels.selectItem ?? "Select"} ${props.displayName ?? props.item.name}`}
+          disabled={props.disabled}
+          aria-label={`${props.labels.selectItem ?? "Select"} ${props.item.name}`}
           onClick={(event) => {
             event.stopPropagation();
             props.onSelectionToggle?.(props.item, event);

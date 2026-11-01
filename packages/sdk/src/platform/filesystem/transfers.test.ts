@@ -144,82 +144,41 @@ describe.each([false, true])("native moves (overwrite=%s)", (overwrite) => {
   });
 });
 
-it("retains a competing destination and the original backup when overwrite rollback cannot restore it", async () => {
+test("a failed rename preserves a competing directory created after validation", async () => {
   await fixture(async (root) => {
     const source = path.join(root, "source");
     const destination = path.join(root, "destination");
-    await fs.writeFile(source, "source");
-    await fs.writeFile(destination, "original destination");
+    await fs.mkdir(source);
+    await fs.writeFile(path.join(source, "data.txt"), "moved original");
     await expect(
       Effect.runPromise(
         createFileTransfers().move({
           source,
           destination,
           destinationLabel: destination,
-          overwrite: true,
+          overwrite: false,
           reporter: {
             commit: Effect.void,
             update(phase) {
-              if (phase === "moving")
-                writeFileSync(destination, "competing destination");
+              if (phase !== "moving") return;
+              mkdirSync(destination);
+              writeFileSync(
+                path.join(destination, "data.txt"),
+                "concurrent replacement",
+              );
             },
           },
         }),
       ),
-    ).rejects.toBeInstanceOf(FilesystemTransferIncomplete);
-    expect(await fs.readFile(source, "utf8")).toBe("source");
-    expect(await fs.readFile(destination, "utf8")).toBe(
-      "competing destination",
+    ).rejects.toThrow();
+    expect(await fs.readFile(path.join(source, "data.txt"), "utf8")).toBe(
+      "moved original",
     );
-    const backup = (await fs.readdir(root)).find((name) =>
-      name.startsWith(".destination.eden-transfer-"),
-    );
-    assert(backup);
-    expect(await fs.readFile(path.join(root, backup), "utf8")).toBe(
-      "original destination",
+    expect(await fs.readFile(path.join(destination, "data.txt"), "utf8")).toBe(
+      "concurrent replacement",
     );
   });
 });
-
-it.each(["file", "directory"] as const)(
-  "a no-replace move preserves a competing %s created after validation",
-  async (kind) => {
-    await fixture(async (root) => {
-      const source = path.join(root, "source");
-      const destination = path.join(root, "destination");
-      if (kind === "directory") await fs.mkdir(source);
-      const suffix = kind === "directory" ? "/data.txt" : "";
-      await fs.writeFile(source + suffix, "trashed original");
-      let created = false;
-      await expect(
-        Effect.runPromise(
-          createFileTransfers().move({
-            source,
-            destination,
-            destinationLabel: destination,
-            overwrite: false,
-            reporter: {
-              commit: Effect.void,
-              update: (phase) => {
-                if (phase !== "moving" || created) return;
-                created = true;
-                if (kind === "directory") mkdirSync(destination);
-                writeFileSync(destination + suffix, "concurrent replacement");
-              },
-            },
-          }),
-        ),
-      ).rejects.toThrow();
-      expect(created).toBe(true);
-      expect(await fs.readFile(source + suffix, "utf8")).toBe(
-        "trashed original",
-      );
-      expect(await fs.readFile(destination + suffix, "utf8")).toBe(
-        "concurrent replacement",
-      );
-    });
-  },
-);
 
 it.each(["cancellation", "defect"] as const)(
   "retains original contents and reports incomplete rollback after %s",

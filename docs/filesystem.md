@@ -44,19 +44,6 @@ Use `fs.accessScope("home")` to find the caller's accessible starting folder.
 Unknown or disconnected volumes fail explicitly.
 On an available volume, `fs.exists(location)` returns `false` for a missing file.
 
-## Trash in Files
-
-Files moves deleted Home items to Eden's Trash. Open **Trash** in the sidebar to
-restore an item, delete it permanently, or empty the Trash. Trash storage folders
-are hidden from regular directory listings in Files.
-Home uses `.eden-trash` inside the account's accessible starting folder.
-
-Mounted volumes do not use Trash. Files asks for confirmation and permanently
-deletes their files and folders.
-
-
-The `fs.delete` command permanently removes an item. It does not use Trash.
-
 ## Read and write
 
 Install `@edenapp/client` in the app:
@@ -79,10 +66,6 @@ Writes create missing parent directories within an available volume.
 including a dangling link. Its result also includes `isSymbolicLink`.
 Moves and deletions operate on the link itself; access through parent folders
 still follows volume and account restrictions.
-
-Moves refuse to replace an existing destination unless replacement is enabled.
-Moves rename the existing item and preserve its contents and modification times.
-Source and destination must be on the same filesystem.
 
 Use `readBinary` and `writeBinary` for whole-file `Uint8Array` values:
 
@@ -205,10 +188,40 @@ Volume roots and overlapping source/destination trees cannot be transfer targets
 Copies preserve symbolic links and their targets.
 Access through a copied link remains limited to the destination volume.
 If an overwrite fails, Eden restores the original destination while its volume remains available.
-Moves require native rename support and refuse cross-filesystem destinations.
-Use `fs.cp` to copy an item to another filesystem.
+A cross-filesystem move copies before deleting its source.
+If source deletion fails, the destination remains and the operation reports an incomplete move.
 
 See [operations](ipc-architecture.md#operations) for progress, cancellation, and repeated submissions.
+
+## Trash
+
+`fs.delete` permanently removes an item.
+To let the user recover a Home item, move it to Trash instead:
+
+```ts
+const trashing = await fs.trash({ volume: "home", path: "/Documents/draft.txt" });
+await trashing.result();
+```
+
+Only volumes with `supportsTrash: true` accept Trash. Currently, this is only Home.
+Delete items on other volumes with `fs.delete`, after the user confirms.
+
+Each item in `fs.trashEntries()` has an `id`, its `original` location, and `deletedAt`.
+The list contains only items from folders that the caller can access, newest first.
+
+| Command | Result |
+| --- | --- |
+| `fs.trashRestore(id)` | Moves the item back to its original location and creates missing parent folders |
+| `fs.trashRestore(id, { location })` | Restores the item to another location |
+| `fs.trashDelete(id)` | Permanently deletes one item |
+| `fs.trashEmpty()` | Permanently deletes every item in the list |
+
+These commands return [operations](ipc-architecture.md#operations).
+If the destination is occupied, the restore result is `{ status: "occupied" }` and the item stays in Trash.
+Ask the user for another name, then restore to that location.
+
+Subscribe to `trash-changed` to refresh a Trash view. It requires `fs/read`.
+Eden stores Trash in a reserved Home folder. Filesystem commands cannot list or change that folder.
 
 ## Watch a directory
 

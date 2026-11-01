@@ -24,7 +24,6 @@ interface UseExplorerNavigationOptions {
 
 interface NavigationEntry extends FilesystemLocation {
   page?: string;
-  pageLocation?: FilesystemLocation;
 }
 
 export const useExplorerNavigation = (
@@ -38,7 +37,6 @@ export const useExplorerNavigation = (
     createSignal<FilesystemLocation>(initialLocation);
   const currentVolume = createMemo(() => currentLocation().volume);
   const [currentPage, setCurrentPage] = createSignal<string>();
-  const [pageLocation, setPageLocation] = createSignal<FilesystemLocation>();
   const currentPath = createMemo(() => currentLocation().path);
   const [volumeInventory, setVolumeInventory] = createSignal<
     FilesystemVolume[]
@@ -391,7 +389,6 @@ export const useExplorerNavigation = (
     navigationSequence += 1;
     requestSequence += 1;
     setCurrentPage(location.page);
-    setPageLocation(location.pageLocation);
     setCurrentLocation({ volume: location.volume, path: location.path });
     setItems([]);
     options.setSelectedItem(null);
@@ -460,19 +457,12 @@ export const useExplorerNavigation = (
     );
   };
 
-  const navigateToPage = (page: string, location?: FilesystemLocation) => {
+  const navigateToPage = (page: string) => {
     const navigation = ++navigationSequence;
     void subscribed.then(() => {
       if (disposed || navigation !== navigationSequence) return;
-      if (location && !canNavigate(location.path, location.volume)) {
-        reportLoadError(new Error("Path is outside of the allowed directory"));
-        return;
-      }
-      const entry: NavigationEntry = {
-        ...currentLocation(),
-        page,
-        pageLocation: location,
-      };
+      if (currentPage() === page) return;
+      const entry: NavigationEntry = { ...currentLocation(), page };
       transitionTo(entry, () => {
         const index = historyIndex();
         setNavigationHistory([
@@ -550,7 +540,6 @@ export const useExplorerNavigation = (
 
   return {
     currentPage,
-    pageLocation,
     navigateToPage,
     currentVolume,
     currentLocation,

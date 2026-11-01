@@ -12,7 +12,7 @@ import {
 } from "solid-icons/fi";
 import { Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import type { FileOperationProgress } from "../features/useFileTransfers";
+import type { FileOperationProgress } from "../features/useFileActivity";
 import { t } from "../i18n";
 
 const progressLabel = (progress: FileOperationProgress): string => {
@@ -57,6 +57,7 @@ interface TransferActivityProps {
   progress: FileOperationProgress | null;
   snapshot?: OperationSnapshot;
   cancelling: boolean;
+  cancellable: boolean;
   onCancel: () => void;
   dialogs: DialogController;
 }
@@ -64,7 +65,7 @@ interface TransferActivityProps {
 export function TransferActivity(props: TransferActivityProps) {
   const label = () =>
     props.cancelling
-      ? t("files.cancellingCopy")
+      ? t("files.cancellingOperation")
       : props.progress
         ? progressLabel(props.progress)
         : t("files.operationFinished");
@@ -92,13 +93,13 @@ export function TransferActivity(props: TransferActivityProps) {
     }
   };
   const cancelButton = () => (
-    <Show when={props.progress?.operation === "copy"}>
+    <Show when={props.cancellable}>
       <button
         type="button"
         class="eden-btn eden-btn-ghost eden-btn-sm"
         disabled={props.cancelling}
-        aria-label={t("files.cancelTransfer")}
-        title={t("files.cancelTransfer")}
+        aria-label={t("files.cancelOperation")}
+        title={t("files.cancelOperation")}
         onClick={props.onCancel}
       >
         <FiX aria-hidden="true" />

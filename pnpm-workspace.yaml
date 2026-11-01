@@ -26,7 +26,6 @@ catalog:
 allowBuilds:
   electron: true
   esbuild: true
-  koffi: true
   lightningcss-cli: true
   simple-git-hooks: true
   sqlite3: true
@@ -36,5 +35,4 @@ onlyBuiltDependencies:
   - electron
   - esbuild
   - lightningcss-cli
-  - koffi
   - sqlite3

@@ -18,10 +18,6 @@ export interface FileListProps {
   items: FileItem[];
   getItemKey?: (item: FileItem) => string;
   renderItemMetadata?: (item: FileItem) => JSX.Element;
-  getItemDisplayName?: (item: FileItem) => string;
-  renderItemIcon?: (item: FileItem) => JSX.Element;
-  canSelectItem?: (item: FileItem) => boolean;
-  canDeleteItem?: (item: FileItem) => boolean;
   selectedItem: string | null;
   selectedItems?: string[];
   selectedPaths?: readonly string[];
@@ -70,7 +66,6 @@ const FileList: Component<FileListProps> = (props) => {
   ) => {
     if (props.disabled) return;
     if (props.selectionMode) {
-      if (props.canSelectItem?.(item) === false) return;
       props.onItemFocus?.(item);
       (props.onSelectionToggle ?? props.onItemClick)(item, event);
       return;
@@ -149,9 +144,7 @@ const FileList: Component<FileListProps> = (props) => {
           const item = items.find((i) => key(i) === selected);
           if (item) {
             if (props.selectionMode) {
-              if (props.canSelectItem?.(item) !== false) {
-                (props.onSelectionToggle ?? props.onItemClick)(item, e);
-              }
+              (props.onSelectionToggle ?? props.onItemClick)(item, e);
             } else if (!props.disabled) {
               props.onItemActivate(item);
             }
@@ -171,7 +164,7 @@ const FileList: Component<FileListProps> = (props) => {
       if (e.key === "Delete") {
         if (!props.selectionMode && selected && props.onItemDeleteShortcut) {
           const item = items.find((i) => key(i) === selected);
-          if (item && props.canDeleteItem?.(item) !== false) {
+          if (item) {
             e.preventDefault();
             props.onItemDeleteShortcut(item);
           }
@@ -287,10 +280,7 @@ const FileList: Component<FileListProps> = (props) => {
               <FileItemComponent
                 ref={(el: HTMLDivElement) => fileRefs.set(key(item), el)}
                 item={item}
-                displayName={props.getItemDisplayName?.(item)}
                 metadata={props.renderItemMetadata?.(item)}
-                icon={props.renderItemIcon?.(item)}
-                selectionDisabled={props.canSelectItem?.(item) === false}
                 isSelected={isItemSelected(item)}
                 isFocused={props.selectedItem === key(item)}
                 selectionMode={props.selectionMode}
@@ -301,11 +291,7 @@ const FileList: Component<FileListProps> = (props) => {
                 onClick={handleItemClick}
                 onDoubleClick={handleItemDoubleClick}
                 onContextMenu={props.onItemContextMenu}
-                onDelete={
-                  props.canDeleteItem?.(item) === false
-                    ? undefined
-                    : props.onItemDelete
-                }
+                onDelete={props.onItemDelete}
                 onSelectionToggle={props.onSelectionToggle}
               />
             )}

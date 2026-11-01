@@ -18,6 +18,7 @@ import type { FileOperations } from "./useFileTransfers";
 
 interface UseFileActionsOptions {
   operations: FileOperations;
+  usesTrash: (location: FilesystemLocation) => boolean;
   currentPath: Accessor<string>;
   currentVolume: Accessor<string>;
   refresh: () => void;
@@ -481,7 +482,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   };
 
   const promptDelete = async (item: FileItem) => {
-    const toTrash = item.location.volume === "home";
+    const toTrash = options.usesTrash(item.location);
     const label = toTrash
       ? t("files.moveToTrash")
       : t("files.deletePermanently");

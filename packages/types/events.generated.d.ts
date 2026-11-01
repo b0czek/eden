@@ -48,6 +48,7 @@ export interface FilePickerEvents {
  */
 export interface FsEvents {
   "fs/changed": { watchId: string; kind: import("./index").FilesystemChangeKind; };
+  "fs/trash-changed": { revision: number; };
 }
 
 /**

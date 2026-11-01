@@ -22,7 +22,9 @@ export const { t, locale, setLocale, initLocale } = setupI18n<AllTranslations>({
   resources,
 });
 
-export const getExplorerLabels = (volume = "home"): FileExplorerLabels => ({
+export const getExplorerLabels = (
+  deleteMovesToTrash = true,
+): FileExplorerLabels => ({
   volume: t("files.volume"),
   home: t("files.home"),
   readOnly: t("files.readOnly"),
@@ -39,8 +41,9 @@ export const getExplorerLabels = (volume = "home"): FileExplorerLabels => ({
   empty: t("files.empty"),
   emptyHint: t("files.emptyHint"),
   folder: t("files.folder"),
-  delete:
-    volume === "home" ? t("files.moveToTrash") : t("files.deletePermanently"),
+  delete: deleteMovesToTrash
+    ? t("files.moveToTrash")
+    : t("files.deletePermanently"),
   close: t("common.close"),
   displayOptions: t("files.displayOptions"),
   viewStyle: t("files.viewStyle"),
@@ -59,4 +62,11 @@ export const getExplorerLabels = (volume = "home"): FileExplorerLabels => ({
   ascending: t("files.ascending"),
   descending: t("files.descending"),
   selectItem: t("files.select"),
+});
+
+export const getTrashLabels = (): FileExplorerLabels => ({
+  ...getExplorerLabels(false),
+  empty: t("files.trashEmpty"),
+  emptyHint: t("files.trashHint"),
+  modified: t("files.dateDeleted"),
 });

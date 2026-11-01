@@ -12,15 +12,14 @@ export const en = {
     trash: "Trash",
     moveToTrash: "Move to Trash",
     trashConfirmation: 'Move "{name}" to Trash?',
-    volumeNoTrash: "This volume does not use Trash.",
     volumeDeleteConfirmation:
       'Permanently delete "{name}"? This volume does not use Trash. This cannot be undone.',
     trashHint: "Trash temporarily stores deleted files and folders.",
     trashEmpty: "Trash is empty",
-    trashLoadIncomplete:
-      "The list may be incomplete. Items shown below are still available.",
     restore: "Restore",
     emptyTrash: "Empty Trash",
+    emptyTrashConfirmation:
+      "Permanently delete all items in Trash? This cannot be undone.",
     trashActions: "Trash actions",
     deletePermanently: "Delete permanently",
     permanentDeleteConfirmation:
@@ -40,7 +39,7 @@ export const en = {
     activity: "Activity",
     transferDetails: "Operation details",
     operationFinished: "Operation finished",
-    cancelTransfer: "Cancel copy",
+    cancelOperation: "Cancel operation",
     pinColors: {
       blue: "Blue",
       purple: "Purple",
@@ -120,8 +119,8 @@ export const en = {
     deleteSelectedConfirmation: "Move {count} selected items to Trash?",
     progressOpen: "Opening {name}…",
     bytesProgress: "{size} of {total} transferred",
-    cancellingCopy: "Cancelling copy…",
-    cancelFailed: "Could not cancel copy",
+    cancellingOperation: "Cancelling…",
+    cancelFailed: "Could not cancel the operation",
     restoringDestination: "Restoring the destination…",
     cleaningUp: "Finishing up…",
     removingSource: "Removing the original…",
@@ -141,9 +140,7 @@ export const en = {
     directoryUnavailable: '"{path}" is unavailable.',
     copySuffix: "copy",
     errors: {
-      loadTrashFailed: "Some Trash items could not be loaded",
-      trashStorage: "The Trash storage folder cannot be moved to Trash.",
-      trashMetadata: "An item's original location could not be read.",
+      loadTrashFailed: "Could not load Trash",
       restoreConflict:
         "An item with this name already exists. Choose another name.",
       loadPinsFailed: "Could not load pinned folders.",

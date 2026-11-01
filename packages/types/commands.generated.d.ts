@@ -470,6 +470,50 @@ export interface FsCommands {
     args: { location: import("./index").FilesystemSource; };
     response: import("./index").FileStats;
   };
+  /**
+   * Move a Home item to Trash.
+   */
+  "fs/trash": {
+    mode: "operation";
+    args: { location: { volume: string; path: string; }; };
+    response: import("./index").OperationHandle<"fs/trash">;
+    completion: void;
+  };
+  /**
+   * Permanently delete one Trash item.
+   */
+  "fs/trash-delete": {
+    mode: "operation";
+    args: { id: string; };
+    response: import("./index").OperationHandle<"fs/trash-delete">;
+    completion: void;
+  };
+  /**
+   * Permanently delete every Trash item visible to the caller.
+   */
+  "fs/trash-empty": {
+    mode: "operation";
+    args: Record<string, never>;
+    response: import("./index").OperationHandle<"fs/trash-empty">;
+    completion: void;
+  };
+  /**
+   * List Trash items from folders the caller can access, newest first.
+   */
+  "fs/trash-entries": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").TrashEntry[];
+  };
+  /**
+   * Restore a Trash item to its original location or another destination.
+   */
+  "fs/trash-restore": {
+    mode: "operation";
+    args: { id: string; location?: { volume: string; path: string; } | undefined; };
+    response: import("./index").OperationHandle<"fs/trash-restore">;
+    completion: { status: "restored"; location: import("./index").FilesystemLocation; } | { status: "occupied"; };
+  };
   "fs/unwatch": {
     mode: "result";
     args: { watchId: string; };

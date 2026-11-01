@@ -30,18 +30,37 @@ function containmentRejection(cause: unknown): PathOutsideRoot {
   throw cause;
 }
 
-/** Check existing ancestors too, allowing missing descendants within the root. */
+function assertPathOutside(excludedPath: string, targetPath: string): void {
+  if (isPathWithin(excludedPath, targetPath)) {
+    throw new PathOutsideRoot({
+      path: targetPath,
+      message: "Path is reserved by Eden",
+    });
+  }
+}
+
+/**
+ * Check existing ancestors too, allowing missing descendants within the root.
+ * An excluded directory inside the root stays unreachable, including through links.
+ */
 export const assertExistingPathWithin = Effect.fn(function* (
   rootPath: string,
   targetPath: string,
+  excludedPath?: string,
 ) {
   const resolvedRoot = path.resolve(rootPath);
   const resolvedTarget = path.resolve(targetPath);
   yield* Effect.try({
-    try: () => assertPathWithin(resolvedRoot, resolvedTarget),
+    try: () => {
+      assertPathWithin(resolvedRoot, resolvedTarget);
+      if (excludedPath) assertPathOutside(excludedPath, resolvedTarget);
+    },
     catch: containmentRejection,
   });
   const realRoot = yield* io.realpath(resolvedRoot);
+  const realExcluded =
+    excludedPath &&
+    path.join(realRoot, path.relative(resolvedRoot, excludedPath));
   const relative = path.relative(resolvedRoot, resolvedTarget);
   let current = resolvedRoot;
   for (const component of relative.split(path.sep).filter(Boolean)) {
@@ -58,7 +77,10 @@ export const assertExistingPathWithin = Effect.fn(function* (
     if (!stats) return;
     const realCurrent = yield* io.realpath(current);
     yield* Effect.try({
-      try: () => assertPathWithin(realRoot, realCurrent),
+      try: () => {
+        assertPathWithin(realRoot, realCurrent);
+        if (realExcluded) assertPathOutside(realExcluded, realCurrent);
+      },
       catch: containmentRejection,
     });
   }

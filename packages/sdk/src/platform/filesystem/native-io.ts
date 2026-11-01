@@ -22,8 +22,6 @@ import {
   type NativeFailureDetails,
   nativeFailure,
 } from "./native-errors";
-import { renameNoReplace } from "./native-rename";
-
 export interface NativeFile {
   readonly descriptor: number;
   stat(): Effect.Effect<Stats, FilesystemIoFailed>;
@@ -277,8 +275,6 @@ export const io = {
   readdir,
   rename: (source: string, destination: string) =>
     fromNative("rename", () => fs.rename(source, destination)),
-  renameNoReplace: (source: string, destination: string) =>
-    fromNative("rename", () => renameNoReplace(source, destination)),
   rm: (hostPath: string, options: RmOptions) =>
     fromNative("rm", () => fs.rm(hostPath, options)),
   delete: (hostPath: string, directory: boolean) =>

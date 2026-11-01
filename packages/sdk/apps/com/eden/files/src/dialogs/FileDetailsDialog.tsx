@@ -1,17 +1,16 @@
 import { type FileItem, formatFileSize } from "@edenapp/files-core";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
-import type { FilesystemLocation } from "@edenapp/types";
 import { Show } from "solid-js";
 import { locale, t } from "../i18n";
 
 export function openFileDetailsDialog(options: {
   dialogs: DialogController;
   item: FileItem;
-  original?: FilesystemLocation;
+  /** A Trash item: its location is where it was deleted from. */
   deletedAt?: string;
   canRestore?: () => boolean;
 }) {
-  const location = options.original ?? options.item.location;
+  const location = options.item.location;
   return options.dialogs.custom<undefined, "restore" | null>({
     title: t("files.details"),
     initialValue: undefined,
@@ -25,7 +24,7 @@ export function openFileDetailsDialog(options: {
         </div>
         <div>
           <dt class="eden-text-muted eden-text-sm">
-            {options.original
+            {options.deletedAt
               ? t("files.originalLocation")
               : t("files.location")}
           </dt>

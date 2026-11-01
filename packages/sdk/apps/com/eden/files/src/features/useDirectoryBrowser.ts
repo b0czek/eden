@@ -6,11 +6,12 @@ import {
 } from "@edenapp/files-core";
 import { notification } from "@edenapp/tablets";
 import type { FilesystemLocation } from "@edenapp/types";
-import { createMemo, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import { t } from "../i18n";
-import { getTrashRootForPath, isTrashFolder } from "./trash";
 import type { ShowFileError } from "./useFileErrors";
 import { useFileSelection } from "./useFileSelection";
+
+export const TRASH_PAGE = "trash";
 
 export function useDirectoryBrowser(options: {
   sortItems: (items: FileItem[]) => FileItem[];
@@ -39,33 +40,23 @@ export function useDirectoryBrowser(options: {
     setSelectedItem,
     setScrollToSelected,
   });
-  const isTrashItem = (item: FileItem) =>
-    item.isDirectory && isTrashFolder(item.location);
-  const items = createMemo(() =>
-    navigation.items().filter((item) => !isTrashItem(item)),
-  );
   const selection = useFileSelection({
-    items,
+    items: navigation.items,
     currentPath: navigation.currentPath,
     selectedItem,
     setSelectedItem,
     setScrollToSelected,
   });
 
-  const openTrash = (location?: FilesystemLocation) => {
+  const openTrash = () => {
     selection.exit();
-    navigation.navigateToPage("trash", location);
+    navigation.navigateToPage(TRASH_PAGE);
   };
   const navigate = (
     path: string,
     selectedPath?: string,
     volume = navigation.currentVolume(),
   ) => {
-    const root = getTrashRootForPath({ volume, path });
-    if (root) {
-      openTrash(root);
-      return;
-    }
     selection.clear();
     if (!selectedPath) setSelectedItem(null);
     navigation.navigateTo(path, selectedPath, volume);
@@ -101,11 +92,6 @@ export function useDirectoryBrowser(options: {
     }
   };
   const openPinnedFolder = async (location: FilesystemLocation) => {
-    const root = getTrashRootForPath(location);
-    if (root) {
-      openTrash(root);
-      return;
-    }
     try {
       if (await navigation.navigateToDirectory(location)) selection.exit();
     } catch {
@@ -115,13 +101,12 @@ export function useDirectoryBrowser(options: {
 
   return {
     navigation,
-    items,
     selection,
     selectedItem,
     setSelectedItem,
     scrollToSelected,
     setScrollToSelected,
-    isTrashItem,
+    trashSelected: () => navigation.currentPage() === TRASH_PAGE,
     navigate,
     openTrash,
     goBack,

@@ -14,7 +14,7 @@ import { t } from "../i18n";
 import type { PinnedFolder } from "./pinnedFolders";
 
 interface UseExplorerContextMenusOptions {
-  isTrashItem: (item: FileItem) => boolean;
+  usesTrash: (location: FilesystemLocation) => boolean;
   volumes: () => FilesystemVolume[];
   currentLocation: () => FilesystemLocation;
   findPin: (location: FilesystemLocation) => PinnedFolder | undefined;
@@ -77,13 +77,6 @@ export const useExplorerContextMenus = (
 
   const fileItemMenu = menu(
     (data: { item: FileItem; openWithItems: ContextMenuAction[] }) => {
-      if (options.isTrashItem(data.item))
-        return [
-          title(t("files.trash")),
-          button("open", t("files.open"), () => options.openItem(data.item), {
-            icon: "trash",
-          }),
-        ];
       return [
         title(data.item.name),
         button("open", t("files.open"), () => options.openItem(data.item), {
@@ -153,7 +146,7 @@ export const useExplorerContextMenus = (
         separator(),
         button(
           "delete",
-          data.item.location.volume === "home"
+          options.usesTrash(data.item.location)
             ? t("files.moveToTrash")
             : t("files.deletePermanently"),
           () => options.promptDelete(data.item),
@@ -209,7 +202,7 @@ export const useExplorerContextMenus = (
     options.setScrollToSelected(false);
     options.setSelectedItem(item.location.path);
     const openWithItems =
-      !options.isTrashItem(item) && (item.isFile || item.isDirectory)
+      item.isFile || item.isDirectory
         ? await options.getOpenWithMenuItems(item)
         : [];
     void fileItemMenu.show(

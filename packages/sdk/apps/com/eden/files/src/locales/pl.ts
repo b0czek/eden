@@ -12,15 +12,14 @@ export const pl = {
     trash: "Kosz",
     moveToTrash: "Przenieś do kosza",
     trashConfirmation: "Przenieść „{name}” do kosza?",
-    volumeNoTrash: "Ten wolumin nie używa kosza.",
     volumeDeleteConfirmation:
       "Trwale usunąć „{name}”? Ten wolumin nie używa kosza. Tej operacji nie można cofnąć.",
     trashHint: "Kosz to tymczasowe miejsce na usunięte pliki i foldery.",
     trashEmpty: "Kosz jest pusty",
-    trashLoadIncomplete:
-      "Lista może być niepełna. Wyświetlone elementy są nadal dostępne.",
     restore: "Przywróć",
     emptyTrash: "Opróżnij kosz",
+    emptyTrashConfirmation:
+      "Trwale usunąć wszystkie elementy z kosza? Tej operacji nie można cofnąć.",
     trashActions: "Akcje kosza",
     deletePermanently: "Usuń trwale",
     permanentDeleteConfirmation:
@@ -40,7 +39,7 @@ export const pl = {
     activity: "Aktywność",
     transferDetails: "Szczegóły operacji",
     operationFinished: "Operacja zakończona",
-    cancelTransfer: "Anuluj kopiowanie",
+    cancelOperation: "Anuluj operację",
     pinColors: {
       blue: "Niebieski",
       purple: "Fioletowy",
@@ -121,8 +120,8 @@ export const pl = {
       "Przenieść wybrane elementy ({count}) do kosza?",
     progressOpen: "Otwieranie {name}…",
     bytesProgress: "Przesłano {size} z {total}",
-    cancellingCopy: "Anulowanie kopiowania…",
-    cancelFailed: "Nie udało się anulować kopiowania",
+    cancellingOperation: "Anulowanie…",
+    cancelFailed: "Nie udało się anulować operacji",
     restoringDestination: "Przywracanie plików docelowych…",
     cleaningUp: "Kończenie operacji…",
     removingSource: "Usuwanie oryginału…",
@@ -142,9 +141,7 @@ export const pl = {
     directoryUnavailable: "Folder „{path}” jest niedostępny.",
     copySuffix: "kopia",
     errors: {
-      loadTrashFailed: "Nie udało się wczytać części elementów kosza",
-      trashStorage: "Nie można przenieść folderu kosza do kosza.",
-      trashMetadata: "Nie można odczytać pierwotnego położenia elementu.",
+      loadTrashFailed: "Nie udało się wczytać kosza",
       restoreConflict: "Element o tej nazwie już istnieje. Wybierz inną nazwę.",
       loadPinsFailed: "Nie udało się wczytać przypiętych folderów.",
       savePinsFailed: "Nie udało się zapisać przypiętych folderów.",
