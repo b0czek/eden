@@ -114,6 +114,7 @@ import {
   HomeDirectory,
   RuntimeConfig,
   SystemDirectory,
+  TrashDirectory,
 } from "./inputs";
 
 /** Host capabilities, execution contexts, and persistent stores. */
@@ -236,6 +237,7 @@ export function createDesktopLayer(environment: RuntimeEnvironment) {
         Context.add(AppsDirectory, layout.appsDirectory),
         Context.add(HomeDirectory, layout.homeDirectory),
         Context.add(SystemDirectory, layout.systemDirectory),
+        Context.add(TrashDirectory, layout.trashDirectory),
         Context.add(DistPath, paths.distPath),
         Context.add(PanelRegistry, registrations),
         Context.add(WindowingPort, platform.windows),

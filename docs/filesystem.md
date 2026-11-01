@@ -221,7 +221,8 @@ If the destination is occupied, the restore result is `{ status: "occupied" }` a
 Ask the user for another name, then restore to that location.
 
 Subscribe to `trash-changed` to refresh a Trash view. It requires `fs/read`.
-Eden stores Trash in a reserved Home folder. Filesystem commands cannot list or change that folder.
+Eden stores Trash in the `trash` folder of its data directory, outside every volume.
+Use the Trash commands to read or change it.
 
 ## Watch a directory
 

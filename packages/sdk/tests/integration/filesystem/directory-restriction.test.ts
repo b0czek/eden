@@ -14,7 +14,7 @@ import {
   Volumes,
   VolumesLive,
 } from "../../../src/platform/filesystem/volumes/service";
-import { HomeDirectory } from "../../../src/runtime/inputs";
+import { HomeDirectory, TrashDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,
@@ -33,6 +33,7 @@ describe("Filesystem shared addresses and folder restrictions", () => {
     return effects.acquire(
       buildService(Filesystem, FilesystemLive).pipe(
         Effect.provideService(HomeDirectory, root),
+        Effect.provideService(TrashDirectory, "/unused-trash"),
         Effect.provideService(ExecutionContext, executionContext),
         Effect.provideService(FilesystemViews, views),
         Effect.provideService(Volumes, volumes),

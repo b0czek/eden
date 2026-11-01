@@ -172,8 +172,10 @@ Eden creates these folders in it:
 | `home` | The shared Home volume |
 | `apps` | Installed packages and DLCs |
 | `system` | Accounts, settings, app storage, and default apps |
+| `trash` | Home items moved to Trash |
 
-Apps can address only `home`. Back up the complete data directory to keep an installation.
+Apps can address only `home`.
+Keep `home` and `trash` on one filesystem, so that moving items to Trash does not copy them. Back up the complete data directory to keep an installation.
 
 ## Add your own app
 

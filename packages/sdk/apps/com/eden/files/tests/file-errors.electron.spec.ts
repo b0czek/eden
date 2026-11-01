@@ -9,7 +9,7 @@ const appId = "com.eden.files";
 test.describe("Files error reporting", () => {
   const getHost = useElectronHost({ apps: [appId] });
   test.beforeEach(async () => {
-    const root = path.join(getHost().userDirectory, "Scenarios");
+    const root = path.join(getHost().homeDirectory, "Scenarios");
     await fs.rm(root, { recursive: true, force: true });
     await fs.mkdir(root);
   });
@@ -37,7 +37,7 @@ test.describe("Files error reporting", () => {
     try {
       await dialog.getByRole("button", { name: "OK", exact: true }).click();
       await paused.waitUntilPending();
-      const target = path.join(host.userDirectory, "Scenarios", "created");
+      const target = path.join(host.homeDirectory, "Scenarios", "created");
       await fs.writeFile(target, "concurrent file");
       await paused.release();
       await paused.waitUntilCompleted();
@@ -55,7 +55,7 @@ test.describe("Files error reporting", () => {
       );
       await expect(
         fs
-          .stat(path.join(host.userDirectory, "Scenarios", "another-folder"))
+          .stat(path.join(host.homeDirectory, "Scenarios", "another-folder"))
           .then((stat) => stat.isDirectory()),
       ).resolves.toBe(true);
     } finally {
@@ -65,7 +65,7 @@ test.describe("Files error reporting", () => {
 
   test("reports successful copies separately from missing source items", async () => {
     const host = getHost();
-    const root = path.join(host.userDirectory, "Scenarios");
+    const root = path.join(host.homeDirectory, "Scenarios");
     await fs.mkdir(path.join(root, "destination"));
     for (const name of ["good.txt", "missing.txt"])
       await fs.writeFile(path.join(root, name), name);

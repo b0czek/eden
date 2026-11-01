@@ -40,8 +40,8 @@ async function restoreItem(page: ElectronPage, item: Locator) {
 
 test.describe("Files Trash", () => {
   const getHost = useElectronHost({ apps: [appId, menuId] });
-  const scenarios = () => path.join(getHost().userDirectory, "Scenarios");
-  const storage = () => path.join(getHost().userDirectory, ".eden-trash");
+  const scenarios = () => path.join(getHost().homeDirectory, "Scenarios");
+  const storage = () => getHost().trashDirectory;
 
   const evaluateMenu = (script: string) =>
     getHost().evaluateApp(menuId, script);
@@ -114,9 +114,6 @@ test.describe("Files Trash", () => {
     );
     await fs.writeFile(path.join(scenarios(), "Project", "notes.txt"), "notes");
     const page = await host.launchApp(appId);
-    await expect(
-      page.locator(".file-item").filter({ hasText: ".eden-trash" }),
-    ).toHaveCount(0);
     await openFolder(page, "Scenarios");
     await openFolder(page, "Project");
     await page.getByRole("button", { name: "Select", exact: true }).click();
@@ -246,10 +243,10 @@ test.describe("Files Trash with restricted Home and another volume", () => {
 
   test("shows each account only its own items and deletes volume items permanently", async () => {
     const host = getHost();
-    const scopedRoot = path.join(host.userDirectory, "Scoped");
+    const scopedRoot = path.join(host.homeDirectory, "Scoped");
     const driveRoot = path.join(host.root, "trash-drive");
     await fs.mkdir(scopedRoot);
-    await fs.mkdir(path.join(host.userDirectory, "Second"));
+    await fs.mkdir(path.join(host.homeDirectory, "Second"));
     await fs.mkdir(driveRoot);
     await fs.writeFile(path.join(scopedRoot, "home.txt"), "home contents");
     await fs.writeFile(path.join(driveRoot, "drive.txt"), "drive contents");
@@ -331,9 +328,7 @@ test.describe("Files Trash with restricted Home and another volume", () => {
     await expect(
       page.getByText("Trash is empty", { exact: true }),
     ).toBeVisible();
-    await expect(
-      fs.readdir(path.join(host.userDirectory, ".eden-trash")),
-    ).resolves.toHaveLength(1);
+    await expect(fs.readdir(host.trashDirectory)).resolves.toHaveLength(1);
     await host.executeHostCommand("process/stop", { appId });
   });
 });

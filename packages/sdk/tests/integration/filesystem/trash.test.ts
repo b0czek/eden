@@ -14,7 +14,8 @@ import {
   Volumes,
   VolumesLive,
 } from "../../../src/platform/filesystem/volumes/service";
-import { UserDirectory } from "../../../src/runtime/inputs";
+import { resolveDataLayout } from "../../../src/runtime/data-layout";
+import { HomeDirectory, TrashDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,
@@ -24,7 +25,9 @@ import {
 const home = (path: string) => ({ volume: "home", path });
 
 describe("Filesystem Trash", () => {
+  let dataRoot: string;
   let root: string;
+  let trashRoot: string;
   let currentUser: UserProfile;
   let filesystem: Filesystem;
   let effects: EffectRuntime;
@@ -43,13 +46,19 @@ describe("Filesystem Trash", () => {
   });
 
   beforeEach(async () => {
-    root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-trash-"));
+    dataRoot = await fs.mkdtemp(path.join(os.tmpdir(), "eden-trash-"));
+    const layout = resolveDataLayout(dataRoot);
+    root = layout.homeDirectory;
+    trashRoot = layout.trashDirectory;
+    await fs.mkdir(root);
+    await fs.mkdir(trashRoot);
     currentUser = user("operator");
     effects = createEffectRuntime();
     const volumes = await effects.acquire(buildService(Volumes, VolumesLive));
     filesystem = await effects.acquire(
       buildService(Filesystem, FilesystemLive).pipe(
-        Effect.provideService(UserDirectory, root),
+        Effect.provideService(HomeDirectory, root),
+        Effect.provideService(TrashDirectory, trashRoot),
         Effect.provideService(ExecutionContext, {
           getPrincipal: () => ({ kind: "user", profile: currentUser }),
         } as ExecutionContext),
@@ -64,7 +73,7 @@ describe("Filesystem Trash", () => {
 
   afterEach(async () => {
     await effects.dispose();
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(dataRoot, { recursive: true, force: true });
   });
 
   const entries = () => effects.run(filesystem.trashEntries());
@@ -137,25 +146,16 @@ describe("Filesystem Trash", () => {
     expect(await fs.readlink(path.join(root, "link"))).toBe("missing-target");
   });
 
-  it("keeps Trash storage out of reach of the filesystem API", async () => {
+  it("stores Trash outside Home", async () => {
     await fs.writeFile(path.join(root, "secret.txt"), "secret");
     await effects.run(filesystem.moveToTrash(home("/secret.txt")));
-    await fs.symlink(".eden-trash", path.join(root, "alias"));
 
-    expect(await effects.run(filesystem.readdir(home("/")))).toEqual(["alias"]);
-    for (const location of [home("/.eden-trash"), home("/alias")]) {
-      await expect(
-        effects.run(filesystem.readdir(location)),
-      ).rejects.toMatchObject({ message: expect.stringContaining("reserved") });
-    }
-    await expect(
-      effects.run(filesystem.writeFile(home("/alias/injected.json"), "{}")),
-    ).rejects.toMatchObject({ message: expect.stringContaining("reserved") });
-    await expect(
-      effects.run(filesystem.delete(home("/.eden-trash"))),
-    ).rejects.toMatchObject({ message: expect.stringContaining("reserved") });
-    await effects.run(filesystem.delete(home("/alias")));
-    expect(await entries()).toHaveLength(1);
+    expect(await fs.readdir(root)).toEqual([]);
+    expect(await effects.run(filesystem.readdir(home("/")))).toEqual([]);
+    const [entry] = await entries();
+    expect(
+      await fs.readFile(path.join(trashRoot, entry.id, "content"), "utf8"),
+    ).toBe("secret");
   });
 
   it("shows each user only items deleted from folders they can access", async () => {
@@ -195,7 +195,7 @@ describe("Filesystem Trash", () => {
       expect(await entries()).toHaveLength(2);
       await effects.run(filesystem.emptyTrash());
       expect(await entries()).toEqual([]);
-      expect(await fs.readdir(path.join(root, ".eden-trash"))).toEqual([]);
+      expect(await fs.readdir(trashRoot)).toEqual([]);
       expect(revisions).toEqual([1, 2, 3, 4, 5]);
     } finally {
       stop();
@@ -212,6 +212,6 @@ describe("Filesystem Trash", () => {
       effects.run(filesystem.moveToTrash(home("/missing.txt"))),
     ).rejects.toThrow();
     expect(await entries()).toEqual([]);
-    expect(await fs.readdir(path.join(root, ".eden-trash"))).toEqual([]);
+    expect(await fs.readdir(trashRoot)).toEqual([]);
   });
 });

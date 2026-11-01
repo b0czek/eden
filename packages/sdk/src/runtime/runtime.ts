@@ -39,6 +39,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   syncIo.mkdir(layout.homeDirectory, { recursive: true });
   syncIo.mkdir(layout.appsDirectory, { recursive: true });
   syncIo.mkdir(layout.systemDirectory, { recursive: true });
+  syncIo.mkdir(layout.trashDirectory, { recursive: true });
   resolveBrandingName(config.branding);
   const registrations = createPanelRegistry();
   const settings = createSettingsSdkController({ panels: registrations });

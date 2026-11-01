@@ -21,8 +21,6 @@ import { type FilesystemIoFailed, nativeFailure } from "./native-errors";
 import { io } from "./native-io";
 import type { createFileTransfers } from "./transfers";
 
-/** Home-root folder reserved for Trash storage; the public filesystem API cannot reach it. */
-export const TRASH_DIRECTORY = ".eden-trash";
 const ENTRY_FILE = "entry.json";
 const CONTENT = "content";
 
@@ -37,6 +35,8 @@ interface ResolvedTarget {
 }
 
 interface TrashOptions {
+  /** Trash storage outside every volume, preferably on Home's filesystem so moves stay renames. */
+  root: string;
   baseDir: string;
   /** Host path of the caller's Home access scope. Throws FilesystemAccessDenied. */
   homeAccessPath: () => string;
@@ -50,7 +50,7 @@ interface TrashOptions {
 }
 
 export function createTrash(options: TrashOptions) {
-  const root = path.join(options.baseDir, TRASH_DIRECTORY);
+  const { root } = options;
   // Entries being written; their missing content is not an abandoned move.
   const pending = new Set<string>();
 

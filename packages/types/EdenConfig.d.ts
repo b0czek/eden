@@ -67,7 +67,7 @@ export interface EdenPowerCapabilities {
 export interface EdenConfig {
   /**
    * Root directory for all Eden data: the Home volume in `home`, installed
-   * packages in `apps`, and system databases in `system`.
+   * packages in `apps`, system databases in `system`, and Trash in `trash`.
    * Defaults to `eden` in Electron's `userData` directory.
    */
   dataDirectory?: string;

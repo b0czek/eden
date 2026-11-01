@@ -12,6 +12,9 @@ export const HomeDirectory = Context.Service<"eden/HomeDirectory", string>(
 export const SystemDirectory = Context.Service<"eden/SystemDirectory", string>(
   "eden/SystemDirectory",
 );
+export const TrashDirectory = Context.Service<"eden/TrashDirectory", string>(
+  "eden/TrashDirectory",
+);
 export const DistPath = Context.Service<"eden/DistPath", string>(
   "eden/DistPath",
 );
