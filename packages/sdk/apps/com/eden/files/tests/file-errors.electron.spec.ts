@@ -2,12 +2,16 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
 import { pauseCommand } from "../../../../../tests/electron/support/commands.js";
+import {
+  attachContextMenu,
+  CONTEXT_MENU_APP_ID,
+} from "../../../../../tests/electron/support/context-menu.js";
 import { useElectronHost } from "../../../../../tests/electron/support/host.js";
 
 const appId = "com.eden.files";
 
 test.describe("Files error reporting", () => {
-  const getHost = useElectronHost({ apps: [appId] });
+  const getHost = useElectronHost({ apps: [appId, CONTEXT_MENU_APP_ID] });
   test.beforeEach(async () => {
     const root = path.join(getHost().homeDirectory, "Scenarios");
     await fs.rm(root, { recursive: true, force: true });
@@ -19,12 +23,14 @@ test.describe("Files error reporting", () => {
 
   test("keeps a failed creation editable with a short explanation and expandable details", async () => {
     const host = getHost();
+    const menu = await attachContextMenu(host);
     const page = await host.launchApp(appId);
     await page
       .locator(".file-item")
       .filter({ hasText: "Scenarios" })
       .dblclick();
-    await page.getByRole("button", { name: "New Folder", exact: true }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
+    await menu.choose("New Folder");
     const dialog = page.getByRole("dialog", {
       name: "New Folder",
       exact: true,

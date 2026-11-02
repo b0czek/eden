@@ -64,6 +64,7 @@ export const en = {
     readOnly: "Read-only",
     volumeDisconnected: "Drive disconnected. Showing Home.",
 
+    new: "New",
     newFolder: "New Folder",
     newFile: "New File",
     modified: "Date Modified",

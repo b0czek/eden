@@ -3,8 +3,9 @@ import {
   FileExplorerHeader,
   type FileExplorerLabels,
 } from "@edenapp/files-core";
+import { button, menu } from "@edenapp/tablets";
 import type { FilesystemLocation } from "@edenapp/types";
-import { FiCheckSquare, FiX } from "solid-icons/fi";
+import { FiCheckSquare, FiPlus, FiX } from "solid-icons/fi";
 import type { useDirectoryBrowser } from "../features/useDirectoryBrowser";
 import type { useFileSelection } from "../features/useFileSelection";
 import { t } from "../i18n";
@@ -26,6 +27,23 @@ interface FilesToolbarProps {
 export function FilesToolbar(props: FilesToolbarProps) {
   const selectionLabel = () =>
     props.selection.selectionMode() ? t("files.done") : t("files.select");
+
+  const newItemMenu = menu<null>(() => [
+    button("new-folder", t("files.newFolder"), props.onNewFolder, {
+      icon: "folder-plus",
+    }),
+    button("new-file", t("files.newFile"), props.onNewFile, {
+      icon: "file-plus",
+    }),
+  ]);
+
+  const showNewItemMenu = (event: MouseEvent) => {
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    void newItemMenu.show(null, {
+      left: Math.round(bounds.left),
+      top: Math.round(bounds.bottom),
+    });
+  };
 
   return (
     <FileExplorerHeader
@@ -55,27 +73,38 @@ export function FilesToolbar(props: FilesToolbarProps) {
         props.directory.navigate(path, undefined, props.location.volume)
       }
       endActions={
-        <button
-          type="button"
-          class="eden-btn eden-btn-square eden-btn-sm file-select-button"
-          aria-label={selectionLabel()}
-          title={selectionLabel()}
-          disabled={props.busy}
-          onClick={() =>
-            props.selection.selectionMode()
-              ? props.selection.exit()
-              : props.selection.start()
-          }
-        >
-          {props.selection.selectionMode() ? (
-            <FiX aria-hidden="true" />
-          ) : (
-            <FiCheckSquare aria-hidden="true" />
-          )}
-        </button>
+        <>
+          <button
+            type="button"
+            class="eden-btn eden-btn-square eden-btn-sm file-select-button"
+            aria-label={selectionLabel()}
+            title={selectionLabel()}
+            disabled={props.busy}
+            onClick={() =>
+              props.selection.selectionMode()
+                ? props.selection.exit()
+                : props.selection.start()
+            }
+          >
+            {props.selection.selectionMode() ? (
+              <FiX aria-hidden="true" />
+            ) : (
+              <FiCheckSquare aria-hidden="true" />
+            )}
+          </button>
+          <button
+            type="button"
+            class="eden-btn eden-btn-square eden-btn-sm"
+            aria-label={t("files.new")}
+            aria-haspopup="menu"
+            title={t("files.new")}
+            disabled={props.readOnly}
+            onClick={showNewItemMenu}
+          >
+            <FiPlus aria-hidden="true" />
+          </button>
+        </>
       }
-      onNewFolder={() => void props.onNewFolder()}
-      onNewFile={() => void props.onNewFile()}
       onOpenDisplayOptions={props.onOpenDisplayOptions}
     />
   );

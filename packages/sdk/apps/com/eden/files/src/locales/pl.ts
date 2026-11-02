@@ -64,6 +64,7 @@ export const pl = {
     readOnly: "Tylko do odczytu",
     volumeDisconnected: "Dysk został odłączony. Wyświetlono katalog domowy.",
 
+    new: "Nowy",
     newFolder: "Nowy Folder",
     newFile: "Nowy Plik",
     modified: "Data Modyfikacji",
