@@ -3,12 +3,16 @@ import * as path from "node:path";
 import type { Eden } from "@edenapp/sdk";
 import { expect, type Locator, test } from "@playwright/test";
 import {
+  attachContextMenu,
+  CONTEXT_MENU_APP_ID,
+  type ContextMenu,
+} from "../../../../../tests/electron/support/context-menu.js";
+import {
   type ElectronPage,
   useElectronHost,
 } from "../../../../../tests/electron/support/host.js";
 
 const appId = "com.eden.files";
-const menuId = "com.eden.context-menu";
 
 const trashRows = (page: ElectronPage) =>
   page.locator(".files-trash .file-item");
@@ -39,29 +43,11 @@ async function restoreItem(page: ElectronPage, item: Locator) {
 }
 
 test.describe("Files Trash", () => {
-  const getHost = useElectronHost({ apps: [appId, menuId] });
+  const getHost = useElectronHost({ apps: [appId, CONTEXT_MENU_APP_ID] });
   const scenarios = () => path.join(getHost().homeDirectory, "Scenarios");
   const storage = () => getHost().trashDirectory;
+  let menu: ContextMenu;
 
-  const evaluateMenu = (script: string) =>
-    getHost().evaluateApp(menuId, script);
-  const menuOpen = () =>
-    evaluateMenu(
-      `document.querySelector('#context-menu-root').classList.contains('is-open')`,
-    );
-  const choose = async (label: string) => {
-    await expect
-      .poll(() =>
-        evaluateMenu(
-          `Array.from(document.querySelectorAll('#context-menu-root.is-open .context-menu-item:not([aria-disabled="true"])')).map(item => item.textContent)`,
-        ),
-      )
-      .toContain(label);
-    await evaluateMenu(
-      `Array.from(document.querySelectorAll('.context-menu-item')).find(item => item.textContent === ${JSON.stringify(label)}).click()`,
-    );
-    await expect.poll(menuOpen).toBe(false);
-  };
   const rightClick = async (target: Locator, background = false) => {
     const point = await target.evaluate((element, background) => {
       const bounds = element.getBoundingClientRect();
@@ -81,7 +67,7 @@ test.describe("Files Trash", () => {
       contents.sendInputEvent({ type: "mouseDown", button: "right", ...point });
       contents.sendInputEvent({ type: "mouseUp", button: "right", ...point });
     }, point);
-    await expect.poll(menuOpen).toBe(true);
+    await expect(menu.panel).toBeVisible();
   };
 
   test.beforeEach(async () => {
@@ -89,15 +75,7 @@ test.describe("Files Trash", () => {
     await fs.rm(storage(), { recursive: true, force: true });
     await fs.rm(scenarios(), { recursive: true, force: true });
     await fs.mkdir(scenarios());
-    const menuRunning = await host.electronApp?.evaluate(({ webContents }) =>
-      webContents
-        .getAllWebContents()
-        .some((contents) =>
-          contents.getURL().includes("com.eden.context-menu"),
-        ),
-    );
-    if (!menuRunning)
-      await host.executeHostCommand("process/launch", { appId: menuId });
+    menu = await attachContextMenu(host);
   });
   test.afterEach(async () => {
     await getHost().executeHostCommand("process/stop", { appId });
@@ -203,7 +181,7 @@ test.describe("Files Trash", () => {
     await expect(rows).toHaveCount(3);
 
     await rightClick(row(rows, "details.txt"));
-    await choose("Details");
+    await menu.choose("Details");
     const details = page.getByRole("dialog", { name: "Details", exact: true });
     await expect(details).toContainText("Original location");
     await expect(details).toContainText("/Scenarios/details.txt");
@@ -216,11 +194,11 @@ test.describe("Files Trash", () => {
 
     const confirm = page.getByRole("dialog");
     await rightClick(row(rows, "delete.txt"));
-    await choose("Delete permanently");
+    await menu.choose("Delete permanently");
     await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(rows).toHaveCount(2);
     await rightClick(row(rows, "delete.txt"));
-    await choose("Delete permanently");
+    await menu.choose("Delete permanently");
     await confirm
       .getByRole("button", { name: "Delete permanently", exact: true })
       .click();
@@ -228,7 +206,7 @@ test.describe("Files Trash", () => {
     await expect(row(rows, "keep.txt")).toHaveCount(1);
 
     await rightClick(page.locator(".files-trash .explorer-content"), true);
-    await choose("Empty Trash");
+    await menu.choose("Empty Trash");
     await confirm
       .getByRole("button", { name: "Empty Trash", exact: true })
       .click();
