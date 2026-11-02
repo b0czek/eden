@@ -114,6 +114,7 @@ export const VolumesLive = Layer.effect(
       readOnly: false,
       supportsWatch: true,
       supportsEject: false,
+      supportsTrash: true,
       state: "ready",
     };
     function list(): FilesystemVolume[] {
@@ -186,6 +187,7 @@ export const VolumesLive = Layer.effect(
         readOnly: input.readOnly ?? false,
         supportsWatch: input.supportsWatch ?? input.kind !== "network",
         supportsEject: eject !== undefined,
+        supportsTrash: false,
         state: "ready",
       };
       mounted.set(input.id, {

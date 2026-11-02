@@ -9,17 +9,21 @@ import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import { button, type ContextMenuAction, separator } from "@edenapp/tablets";
 import type { FilesystemLocation, RuntimeAppManifest } from "@edenapp/types";
 import type { Accessor, Setter } from "solid-js";
+import { fileErrorMessage } from "../components/FileError";
+import { openFileDetailsDialog } from "../dialogs/FileDetailsDialog";
 import { openOpenWithDialog } from "../dialogs/OpenWithDialog";
 import { locale, t } from "../i18n";
+import type { ShowFileError } from "./useFileErrors";
 import type { FileOperations } from "./useFileTransfers";
 
 interface UseFileActionsOptions {
   operations: FileOperations;
+  usesTrash: (location: FilesystemLocation) => boolean;
   currentPath: Accessor<string>;
   currentVolume: Accessor<string>;
   refresh: () => void;
   navigateTo: (path: string) => void;
-  showError: (message: string) => void;
+  showError: ShowFileError;
   dialogs: DialogController;
   setSelectedItem: Setter<string | null>;
   setScrollToSelected: Setter<boolean>;
@@ -67,11 +71,11 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       volume: options.currentVolume(),
       path: options.currentPath(),
     },
-  ): Promise<string | null> => {
+  ): Promise<{ message: string; details?: unknown } | null> => {
     const trimmedName = name.trim();
     const invalid = validateName(trimmedName, "files.errors.invalidFolderName");
     if (invalid) {
-      return invalid;
+      return { message: invalid };
     }
 
     const folderPath = joinPath(directory.path, trimmedName);
@@ -82,13 +86,13 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         volume: directory.volume,
       });
       if (exists) {
-        return t("files.errors.itemAlreadyExists");
+        return { message: t("files.errors.itemAlreadyExists") };
       }
 
       await eden.fs.mkdir({ path: folderPath, volume: directory.volume });
       options.refresh();
     } catch (error) {
-      return `${t("files.errors.createFolderFailed")}: ${(error as Error).message}`;
+      return { message: t("files.errors.createFolderFailed"), details: error };
     }
 
     return null;
@@ -97,7 +101,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const createFolder = async (name: string) => {
     const error = await tryCreateFolder(name);
     if (error) {
-      options.showError(error);
+      options.showError(error.message, error.details);
     }
   };
 
@@ -107,11 +111,11 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       volume: options.currentVolume(),
       path: options.currentPath(),
     },
-  ): Promise<string | null> => {
+  ): Promise<{ message: string; details?: unknown } | null> => {
     const trimmedName = name.trim();
     const invalid = validateName(trimmedName, "files.errors.invalidFileName");
     if (invalid) {
-      return invalid;
+      return { message: invalid };
     }
 
     const filePath = joinPath(directory.path, trimmedName);
@@ -122,13 +126,13 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         volume: directory.volume,
       });
       if (exists) {
-        return t("files.errors.itemAlreadyExists");
+        return { message: t("files.errors.itemAlreadyExists") };
       }
 
       await eden.fs.write({ path: filePath, volume: directory.volume }, "");
       options.refresh();
     } catch (error) {
-      return `${t("files.errors.createFileFailed")}: ${(error as Error).message}`;
+      return { message: t("files.errors.createFileFailed"), details: error };
     }
 
     return null;
@@ -137,7 +141,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const createFile = async (name: string) => {
     const error = await tryCreateFile(name);
     if (error) {
-      options.showError(error);
+      options.showError(error.message, error.details);
     }
   };
 
@@ -195,9 +199,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         options.refresh();
         return;
       }
-      options.showError(
-        `${t("files.errors.duplicateFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.duplicateFailed"), error);
     }
   };
 
@@ -210,12 +212,10 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     try {
       const result = await options.operations.open(item);
       if (!result.success) {
-        options.showError(`${t("files.errors.openFailed")}: ${result.error}`);
+        options.showError(t("files.errors.openFailed"), result.error);
       }
     } catch (error) {
-      options.showError(
-        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.openFailed"), error);
     }
   };
 
@@ -224,17 +224,13 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       const openResult = await options.operations.openWith(item, appId);
 
       if (!openResult.success) {
-        options.showError(
-          `${t("files.errors.openFailed")}: ${openResult.error}`,
-        );
+        options.showError(t("files.errors.openFailed"), openResult.error);
         return false;
       }
 
       return true;
     } catch (error) {
-      options.showError(
-        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.openFailed"), error);
       return false;
     }
   };
@@ -243,9 +239,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     try {
       await eden.file.setDefaultHandler(item.location, appId);
     } catch (error) {
-      options.showError(
-        `${t("files.errors.setDefaultHandlerFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.setDefaultHandlerFailed"), error);
     }
   };
 
@@ -296,9 +290,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         await setItemDefaultHandler(item, selection.appId);
       }
     } catch (error) {
-      options.showError(
-        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.openFailed"), error);
     }
   };
 
@@ -347,9 +339,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
 
       return [...menuItems, separator(), moreItem];
     } catch (error) {
-      options.showError(
-        `${t("files.errors.openFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.openFailed"), error);
       return getNoOpenWithOptions();
     }
   };
@@ -357,11 +347,11 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const tryRenameItem = async (
     item: FileItem,
     name: string,
-  ): Promise<string | null> => {
+  ): Promise<{ message: string; details?: unknown } | null> => {
     const trimmedName = name.trim();
     const invalid = validateName(trimmedName, "files.errors.invalidItemName");
     if (invalid) {
-      return invalid;
+      return { message: invalid };
     }
 
     const targetPath = joinPath(getParentPath(item.location.path), trimmedName);
@@ -376,7 +366,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
         volume: item.location.volume,
       });
       if (exists) {
-        return t("files.errors.itemAlreadyExists");
+        return { message: t("files.errors.itemAlreadyExists") };
       }
 
       await options.operations.move(item, {
@@ -388,7 +378,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       options.setSelectedItem(targetPath);
       options.refresh();
     } catch (error) {
-      return `${t("files.errors.renameFailed")}: ${(error as Error).message}`;
+      return { message: t("files.errors.renameFailed"), details: error };
     }
 
     return null;
@@ -397,7 +387,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
   const renameItem = async (item: FileItem, name: string) => {
     const error = await tryRenameItem(item, name);
     if (error) {
-      options.showError(error);
+      options.showError(error.message, error.details);
     }
   };
 
@@ -406,9 +396,7 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       await options.operations.delete(item);
       options.refresh();
     } catch (error) {
-      options.showError(
-        `${t("files.errors.deleteFailed")}: ${(error as Error).message}`,
-      );
+      options.showError(t("files.errors.deleteFailed"), error);
     }
   };
 
@@ -434,7 +422,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       validate: (values) =>
         validateName(values.name, "files.errors.invalidFolderName"),
       onSubmit: async (values) => {
-        return await tryCreateFolder(values.name, directory);
+        const error = await tryCreateFolder(values.name, directory);
+        return error ? fileErrorMessage(error.message, error.details) : null;
       },
     });
   };
@@ -462,7 +451,8 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       validate: (values) =>
         validateName(values.name, "files.errors.invalidFileName"),
       onSubmit: async (values) => {
-        return await tryCreateFile(values.name, directory);
+        const error = await tryCreateFile(values.name, directory);
+        return error ? fileErrorMessage(error.message, error.details) : null;
       },
     });
   };
@@ -485,16 +475,24 @@ export const useFileActions = (options: UseFileActionsOptions) => {
       validate: (values) =>
         validateName(values.name, "files.errors.invalidItemName"),
       onSubmit: async (values) => {
-        return await tryRenameItem(item, values.name);
+        const error = await tryRenameItem(item, values.name);
+        return error ? fileErrorMessage(error.message, error.details) : null;
       },
     });
   };
 
   const promptDelete = async (item: FileItem) => {
+    const toTrash = options.usesTrash(item.location);
+    const label = toTrash
+      ? t("files.moveToTrash")
+      : t("files.deletePermanently");
     const confirmed = await options.dialogs.confirm({
-      title: t("common.delete"),
-      message: t("common.deleteConfirmation", { name: item.name }),
-      confirmLabel: t("common.delete"),
+      title: label,
+      message: t(
+        toTrash ? "files.trashConfirmation" : "files.volumeDeleteConfirmation",
+        { name: item.name },
+      ),
+      confirmLabel: label,
       cancelLabel: t("common.cancel"),
       tone: "danger",
     });
@@ -529,6 +527,9 @@ export const useFileActions = (options: UseFileActionsOptions) => {
     createFile,
     duplicateItem,
     openItem,
+    showItemDetails: async (item: FileItem) => {
+      await openFileDetailsDialog({ dialogs: options.dialogs, item });
+    },
     getOpenWithMenuItems,
     renameItem,
     deleteItem,

@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 import type {
   FileExplorerLabels,
   FileItem,
@@ -12,6 +12,7 @@ export interface FileItemComponentProps {
   ref?: (el: HTMLDivElement) => void;
   labels: FileExplorerLabels;
   item: FileItem;
+  metadata?: JSX.Element;
   isSelected: boolean;
   isFocused?: boolean;
   selectionMode?: boolean;
@@ -48,6 +49,8 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
   return (
     <div
       ref={props.ref}
+      data-file-volume={props.item.location.volume}
+      data-file-path={props.item.location.path}
       class="file-item"
       classList={{
         selected: props.isSelected,
@@ -75,22 +78,33 @@ const FileItemComponent: Component<FileItemComponentProps> = (props) => {
         </div>
         <div class="file-name">{props.item.name}</div>
 
-        {props.viewStyle === "list" && (
-          <>
-            <div class="file-size">
-              {props.item.isFile ? formatFileSize(props.item.size) : "—"}
-            </div>
-            <div class="file-modified">{formatDate(props.item.modified)}</div>
-          </>
-        )}
+        <Show
+          when={props.metadata}
+          fallback={
+            <>
+              {props.viewStyle === "list" && (
+                <>
+                  <div class="file-size">
+                    {props.item.isFile ? formatFileSize(props.item.size) : "—"}
+                  </div>
+                  <div class="file-modified">
+                    {formatDate(props.item.modified)}
+                  </div>
+                </>
+              )}
 
-        {props.viewStyle === "grid" && (
-          <div class="file-meta">
-            {props.item.isFile
-              ? formatFileSize(props.item.size)
-              : props.labels.folder}
-          </div>
-        )}
+              {props.viewStyle === "grid" && (
+                <div class="file-meta">
+                  {props.item.isFile
+                    ? formatFileSize(props.item.size)
+                    : props.labels.folder}
+                </div>
+              )}
+            </>
+          }
+        >
+          {props.metadata}
+        </Show>
       </button>
 
       {props.selectionMode && (

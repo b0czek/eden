@@ -15,11 +15,15 @@ interface UseExplorerNavigationOptions {
   onVolumeRemoved?: (volume: string) => void;
   active?: Accessor<boolean>;
   sortItems: (items: FileItem[]) => FileItem[];
-  onLoadError: (message: string) => void;
+  onLoadError: (message: string, error?: unknown) => void;
   onPathUnavailable?: (path: string, fallbackPath?: string) => void;
   getLoadDirectoryErrorMessage?: (error: Error) => string;
   setSelectedItem: Setter<string | null>;
   setScrollToSelected: Setter<boolean>;
+}
+
+interface NavigationEntry extends FilesystemLocation {
+  page?: string;
 }
 
 export const useExplorerNavigation = (
@@ -32,6 +36,7 @@ export const useExplorerNavigation = (
   const [currentLocation, setCurrentLocation] =
     createSignal<FilesystemLocation>(initialLocation);
   const currentVolume = createMemo(() => currentLocation().volume);
+  const [currentPage, setCurrentPage] = createSignal<string>();
   const currentPath = createMemo(() => currentLocation().path);
   const [volumeInventory, setVolumeInventory] = createSignal<
     FilesystemVolume[]
@@ -63,7 +68,7 @@ export const useExplorerNavigation = (
   const [items, setItems] = createSignal<FileItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [navigationHistory, setNavigationHistory] = createSignal<
-    FilesystemLocation[]
+    NavigationEntry[]
   >([initialLocation]);
   const [historyIndex, setHistoryIndex] = createSignal(0);
   let watchId: string | undefined;
@@ -80,6 +85,7 @@ export const useExplorerNavigation = (
     options.onLoadError(
       options.getLoadDirectoryErrorMessage?.(loadError) ??
         `Failed to load directory: ${loadError.message}`,
+      error,
     );
   };
 
@@ -147,7 +153,9 @@ export const useExplorerNavigation = (
       dirItems.map(async (name: string) => {
         const itemPath = joinPath(path, name);
         try {
-          const stats = await eden.fs.stat({ volume, path: itemPath });
+          const stats = await eden.fs
+            .stat({ volume, path: itemPath })
+            .catch(() => eden.fs.lstat({ volume, path: itemPath }));
           return {
             name,
             location: { volume, path: itemPath },
@@ -184,21 +192,22 @@ export const useExplorerNavigation = (
   const loadDirectory = async (
     location: FilesystemLocation,
     settings: { background?: boolean; replaceWatch?: boolean } = {},
-  ): Promise<boolean> => {
+  ): Promise<boolean | undefined> => {
     const request = ++requestSequence;
     await subscribed;
-    if (request !== requestSequence || disposed) return false;
+    if (request !== requestSequence || disposed) return;
     if (!settings.background) setLoading(true);
     if (settings.replaceWatch !== false) await establishWatch(location);
-    if (request !== requestSequence || disposed) return false;
+    if (request !== requestSequence || disposed) return;
     try {
       const nextItems = await readDirectory(location);
-      if (request !== requestSequence || disposed) return false;
+      if (request !== requestSequence || disposed) return;
       setCurrentLocation(location);
       setItems(nextItems);
       return true;
     } catch (error) {
-      if (request === requestSequence) reportLoadError(error);
+      if (request !== requestSequence || disposed) return;
+      reportLoadError(error);
       return false;
     } finally {
       if (!settings.background && request === requestSequence)
@@ -206,13 +215,19 @@ export const useExplorerNavigation = (
     }
   };
 
-  const recoverUnavailablePath = async (unavailablePath: string) => {
+  const recoverUnavailablePath = async (
+    unavailablePath: string,
+    navigation: number,
+  ) => {
+    if (disposed || navigation !== navigationSequence || currentPage()) return;
     const volume = currentVolume();
     await stopWatch();
     const fallbackPath = await findNearestParent(unavailablePath, volume);
     if (
       volume !== currentVolume() ||
       unavailablePath !== currentPath() ||
+      navigation !== navigationSequence ||
+      currentPage() ||
       disposed
     )
       return;
@@ -234,22 +249,27 @@ export const useExplorerNavigation = (
   };
 
   const refresh = () => {
+    if (currentPage()) return;
     if (refreshQueued) return;
     refreshQueued = true;
     queueMicrotask(async () => {
       refreshQueued = false;
+      if (currentPage()) return;
       const location = currentLocation();
+      const navigation = navigationSequence;
       const path = location.path;
       const loaded = await loadDirectory(location, {
         background: true,
         replaceWatch: !watchId,
       });
       if (
-        !loaded &&
+        loaded === false &&
+        navigation === navigationSequence &&
+        !currentPage() &&
         path === currentPath() &&
         location.volume === currentVolume()
       )
-        await recoverUnavailablePath(path);
+        await recoverUnavailablePath(path, navigation);
     });
   };
 
@@ -287,6 +307,7 @@ export const useExplorerNavigation = (
       (volume) => volume.id === previous && volume.state === "ready",
     );
     setVolumeInventory(inventory);
+    if (currentPage()) return;
     const selectedVolume = inventory.find((volume) => volume.id === previous);
     if (selectedVolume) {
       if (selectedVolume.state !== "ready") {
@@ -343,7 +364,7 @@ export const useExplorerNavigation = (
     });
   if (!options.active) {
     void subscribed.then(() => {
-      if (!disposed) void loadDirectory(currentLocation());
+      if (!disposed && !currentPage()) void loadDirectory(currentLocation());
     });
   }
 
@@ -361,16 +382,21 @@ export const useExplorerNavigation = (
   }
 
   const transitionTo = (
-    location: FilesystemLocation,
+    location: NavigationEntry,
     updateHistory?: () => void,
     selectedItem?: string,
   ) => {
     navigationSequence += 1;
-    setCurrentLocation(location);
+    requestSequence += 1;
+    setCurrentPage(location.page);
+    setCurrentLocation({ volume: location.volume, path: location.path });
     setItems([]);
     options.setSelectedItem(null);
     updateHistory?.();
-    void loadDirectory(location);
+    if (location.page) {
+      setLoading(false);
+      void stopWatch();
+    } else void loadDirectory(location);
     if (selectedItem) {
       options.setScrollToSelected(true);
       options.setSelectedItem(selectedItem);
@@ -429,6 +455,23 @@ export const useExplorerNavigation = (
       },
       selectedItem,
     );
+  };
+
+  const navigateToPage = (page: string) => {
+    const navigation = ++navigationSequence;
+    void subscribed.then(() => {
+      if (disposed || navigation !== navigationSequence) return;
+      if (currentPage() === page) return;
+      const entry: NavigationEntry = { ...currentLocation(), page };
+      transitionTo(entry, () => {
+        const index = historyIndex();
+        setNavigationHistory([
+          ...navigationHistory().slice(0, index + 1),
+          entry,
+        ]);
+        setHistoryIndex(index + 1);
+      });
+    });
   };
 
   const navigateToScope = (volume: string) => {
@@ -496,6 +539,8 @@ export const useExplorerNavigation = (
   });
 
   return {
+    currentPage,
+    navigateToPage,
     currentVolume,
     currentLocation,
     accessScope,

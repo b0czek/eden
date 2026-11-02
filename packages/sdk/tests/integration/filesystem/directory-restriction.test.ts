@@ -14,7 +14,7 @@ import {
   Volumes,
   VolumesLive,
 } from "../../../src/platform/filesystem/volumes/service";
-import { UserDirectory } from "../../../src/runtime/inputs";
+import { HomeDirectory, TrashDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,
@@ -32,7 +32,8 @@ describe("Filesystem shared addresses and folder restrictions", () => {
     const volumes = await effects.acquire(buildService(Volumes, VolumesLive));
     return effects.acquire(
       buildService(Filesystem, FilesystemLive).pipe(
-        Effect.provideService(UserDirectory, root),
+        Effect.provideService(HomeDirectory, root),
+        Effect.provideService(TrashDirectory, "/unused-trash"),
         Effect.provideService(ExecutionContext, executionContext),
         Effect.provideService(FilesystemViews, views),
         Effect.provideService(Volumes, volumes),
@@ -64,7 +65,7 @@ describe("Filesystem shared addresses and folder restrictions", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it("keeps userDirectory as the root for unrestricted users and vendors", async () => {
+  it("keeps the Home directory as the root for unrestricted users and vendors", async () => {
     await expect(
       effects.run(
         filesystem.resolvePath({ volume: "home", path: "/Documents" }),
@@ -83,7 +84,7 @@ describe("Filesystem shared addresses and folder restrictions", () => {
     ).resolves.toBe(path.join(root, "Documents"));
   });
 
-  it("maps system daemons to userDirectory", async () => {
+  it("maps system daemons to the Home directory", async () => {
     const executionContext = {
       getPrincipal: () => ({ kind: "system" as const }),
     } as unknown as ExecutionContext;

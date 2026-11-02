@@ -268,7 +268,7 @@ test.describe
 
       expect(
         await fs.readFile(
-          path.join(host.userDirectory, "quit-completed.txt"),
+          path.join(host.homeDirectory, "quit-completed.txt"),
           "utf-8",
         ),
       ).toBe("finished");

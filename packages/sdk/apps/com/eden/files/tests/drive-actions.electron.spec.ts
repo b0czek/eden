@@ -2,29 +2,23 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Eden } from "@edenapp/sdk";
 import { expect, test } from "@playwright/test";
+import {
+  attachContextMenu,
+  CONTEXT_MENU_APP_ID,
+} from "../../../../../tests/electron/support/context-menu.js";
 import { useElectronHost } from "../../../../../tests/electron/support/host.js";
 
 test.describe
   .serial("Files drive actions", () => {
     const getHost = useElectronHost({
-      apps: ["com.eden.files", "com.eden.context-menu", "com.eden.toaster"],
+      apps: ["com.eden.files", CONTEXT_MENU_APP_ID, "com.eden.toaster"],
     });
 
     test("Files opens drive actions by touch and permits retry after a busy device", async () => {
       const host = getHost();
 
       const appId = "com.eden.files";
-      const running = await host.executeHostCommand<
-        { manifest: { id: string } }[]
-      >("process/list", {});
-      if (
-        !running.some(
-          (process) => process.manifest.id === "com.eden.context-menu",
-        )
-      )
-        await host.executeHostCommand("process/launch", {
-          appId: "com.eden.context-menu",
-        });
+      const menu = await attachContextMenu(host);
       const toasterRunning = await host.electronApp?.evaluate(
         ({ webContents }) =>
           webContents
@@ -42,15 +36,6 @@ test.describe
       await fs.mkdir(driveRoot);
       await fs.writeFile(path.join(driveRoot, "before.txt"), "before");
 
-      const evaluateMenu = (script: string) =>
-        host.electronApp?.evaluate(async ({ webContents }, script) => {
-          const contents = webContents
-            .getAllWebContents()
-            .find((candidate) =>
-              candidate.getURL().includes("com.eden.context-menu"),
-            );
-          return contents?.executeJavaScript(script);
-        }, script);
       const openVolumeMenu = async (
         inputMethod: "touch" | "context-menu" = "touch",
       ) => {
@@ -120,13 +105,7 @@ test.describe
             volumeId,
           );
         }
-        await expect
-          .poll(() =>
-            evaluateMenu(
-              `document.querySelector('#context-menu-root.is-open #context-menu-title')?.textContent`,
-            ),
-          )
-          .toBe("Toolbar USB");
+        await expect(menu.title).toHaveText("Toolbar USB");
       };
       await host.electronApp?.evaluate(
         async (_electron, input) => {
@@ -186,32 +165,23 @@ test.describe
         ),
       ).toBe(true);
       await openVolumeMenu();
-      await expect
-        .poll(() =>
-          evaluateMenu(
-            `document.querySelector('.context-menu-item:not(.context-menu-item-disabled)')?.textContent`,
-          ),
-        )
-        .toContain("Safely remove drive");
+      await expect(menu.item("Safely remove drive")).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
       const filesPage = host.electronApp
         ?.context()
         .pages()
         .find((page) => page.url().includes("com.eden.files"));
-      const menuPage = host.electronApp
-        ?.context()
-        .pages()
-        .find((page) => page.url().includes("com.eden.context-menu"));
       await filesPage?.screenshot({
         path: test.info().outputPath("files-places.png"),
       });
-      await menuPage?.screenshot({
+      await menu.page.screenshot({
         path: test.info().outputPath("files-volume-menu.png"),
       });
       if (!filesPage || !host.electronApp)
         throw new Error("Files page unavailable");
-      await evaluateMenu(
-        `document.querySelector('#context-menu-overlay').click()`,
-      );
+      await menu.dismiss();
       const originalBounds = await host.electronApp.evaluate(
         ({ BrowserWindow }, appId) => {
           const view = BrowserWindow.getAllWindows()
@@ -288,9 +258,7 @@ test.describe
           bounds: originalBounds,
         });
       }
-      await evaluateMenu(
-        `document.querySelector('.context-menu-item').click()`,
-      );
+      await menu.choose("Safely remove drive");
       await expect
         .poll(() =>
           host.evaluateApp(
@@ -300,16 +268,11 @@ test.describe
         )
         .toBe("true");
       await openVolumeMenu("context-menu");
-      await expect
-        .poll(() =>
-          evaluateMenu(
-            `document.querySelector('.context-menu-item-disabled')?.textContent`,
-          ),
-        )
-        .toContain("Removing drive");
-      await evaluateMenu(
-        `document.querySelector('#context-menu-overlay').click()`,
+      await expect(menu.item("Removing drive…")).toHaveAttribute(
+        "aria-disabled",
+        "true",
       );
+      await menu.dismiss();
       await expect
         .poll(() =>
           host.executeHostCommand<{ id: string; state: string }[]>(
@@ -380,16 +343,7 @@ test.describe
           .__uiEjectFinish;
       });
       await openVolumeMenu();
-      await expect
-        .poll(() =>
-          evaluateMenu(
-            `document.querySelector('.context-menu-item:not(.context-menu-item-disabled)')?.textContent`,
-          ),
-        )
-        .toContain("Safely remove drive");
-      await evaluateMenu(
-        `document.querySelector('.context-menu-item').click()`,
-      );
+      await menu.choose("Safely remove drive");
       await expect
         .poll(() =>
           host.executeHostCommand<{ id: string; state: string }[]>(

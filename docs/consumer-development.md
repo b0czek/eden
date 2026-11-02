@@ -5,6 +5,10 @@
 This chapter creates a small Electron desktop with the built-in shell and apps.
 The consumer owns the Electron entry point. Eden owns the desktop and app lifetimes.
 
+On Linux, start Electron with `--ozone-platform=x11` to use X11 or XWayland.
+The on-screen keyboard requires this backend to open without taking focus from
+the active app. Eden's development launchers set it by default.
+
 ## Prepare the project
 
 Use Node.js 24.15 or later and Electron 43 or later for the current source tree.
@@ -159,9 +163,19 @@ Eden reads runtime assets from `dist/` under the process working directory.
 Run Electron from the project root during development.
 Arrange the packaged application's working directory so that the same path exists.
 
-By default, installed packages and account data use `eden-apps` under Electron's `userData` directory.
-The shared Home volume uses `eden-user` there.
-Set `appsDirectory` and `userDirectory` to absolute writable paths when your product needs another location.
+Eden keeps all of its data in one directory, `eden` under Electron's `userData` directory by default.
+Set `dataDirectory` to an absolute writable path when your product needs another location.
+Eden creates these folders in it:
+
+| Folder | Contents |
+| --- | --- |
+| `home` | The shared Home volume |
+| `apps` | Installed packages and DLCs |
+| `system` | Accounts, settings, app storage, and default apps |
+| `trash` | Home items moved to Trash |
+
+Apps can address only `home`.
+Keep `home` and `trash` on one filesystem, so that moving items to Trash does not copy them. Back up the complete data directory to keep an installation.
 
 ## Add your own app
 

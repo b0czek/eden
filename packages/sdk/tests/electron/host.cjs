@@ -16,8 +16,7 @@ const platform = createElectronPlatform();
 platform.resources.registerSchemes(["eden-dlc"]);
 platform.application.appendCommandLineSwitch("enable-features", "V8CodeCache");
 const config = {
-  appsDirectory: process.env.EDEN_TEST_APPS_DIRECTORY,
-  userDirectory: process.env.EDEN_TEST_USER_DIRECTORY,
+  dataDirectory: process.env.EDEN_TEST_DATA_DIRECTORY,
   seedPath: process.env.EDEN_TEST_SEED_PATH,
   loginAppId: "",
   window: { title: "Eden Electron Integration" },
@@ -26,8 +25,7 @@ const runtime = createEdenRuntime({
   config,
   platform,
   paths: {
-    appsDirectory: config.appsDirectory,
-    userDirectory: config.userDirectory,
+    dataDirectory: config.dataDirectory,
     distPath: path.join(process.cwd(), "dist"),
     appPath: platform.application.getAppPath(),
   },

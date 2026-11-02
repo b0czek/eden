@@ -164,8 +164,7 @@ export async function standaloneDev(
     start("host", host.command, host.args, {
       cwd: host.cwd,
       env: {
-        EDEN_DEV_APPS_DIRECTORY: path.join(profileDirectory, "apps"),
-        EDEN_DEV_USER_DIRECTORY: path.join(profileDirectory, "user"),
+        EDEN_DEV_DATA_DIRECTORY: profileDirectory,
         EDEN_DEV_HOT_RELOAD_DIRECTORY: stateDirectory,
         EDEN_DEV_SEED_PATH: seedPath,
       },
@@ -304,7 +303,14 @@ async function resolveHostExecutable(
         ".bin",
         process.platform === "win32" ? "electron.cmd" : "electron",
       );
-      return { command: electron, args: [sdkEntry], cwd: root };
+      return {
+        command: electron,
+        args:
+          process.platform === "linux"
+            ? ["--ozone-platform=x11", sdkEntry]
+            : [sdkEntry],
+        cwd: root,
+      };
     }
     throw new Error(
       `--host-path is not a built @edenapp/dev-host or @edenapp/sdk package: ${root}`,

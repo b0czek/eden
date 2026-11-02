@@ -65,9 +65,12 @@ export interface EdenPowerCapabilities {
 }
 
 export interface EdenConfig {
-  appsDirectory?: string;
-  /** Root directory backing Eden's managed virtual filesystem. */
-  userDirectory?: string;
+  /**
+   * Root directory for all Eden data: the Home volume in `home`, installed
+   * packages in `apps`, system databases in `system`, and Trash in `trash`.
+   * Defaults to `eden` in Electron's `userData` directory.
+   */
+  dataDirectory?: string;
   /**
    * Path to the seed config JSON file for one-time data seeding.
    * Defaults to eden-seed.json in the consumer's dist directory.

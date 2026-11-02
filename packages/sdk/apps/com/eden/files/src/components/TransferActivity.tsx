@@ -2,10 +2,17 @@ import { formatFileSize } from "@edenapp/files-core";
 import { OperationStatus } from "@edenapp/solid-kit";
 import type { DialogController } from "@edenapp/solid-kit/dialogs";
 import type { OperationSnapshot } from "@edenapp/types";
-import { FiCopy, FiExternalLink, FiMove, FiTrash2, FiX } from "solid-icons/fi";
+import {
+  FiCopy,
+  FiExternalLink,
+  FiMove,
+  FiRotateCcw,
+  FiTrash2,
+  FiX,
+} from "solid-icons/fi";
 import { Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import type { FileOperationProgress } from "../features/useFileTransfers";
+import type { FileOperationProgress } from "../features/useFileActivity";
 import { t } from "../i18n";
 
 const progressLabel = (progress: FileOperationProgress): string => {
@@ -17,6 +24,9 @@ const progressLabel = (progress: FileOperationProgress): string => {
   if (progress.operation === "copy") return t("files.progressCopy", values);
   if (progress.operation === "move") return t("files.progressMove", values);
   if (progress.operation === "open") return t("files.progressOpen", values);
+  if (progress.operation === "trash") return t("files.progressTrash", values);
+  if (progress.operation === "restore")
+    return t("files.progressRestore", values);
   return t("files.progressDelete", values);
 };
 
@@ -47,6 +57,7 @@ interface TransferActivityProps {
   progress: FileOperationProgress | null;
   snapshot?: OperationSnapshot;
   cancelling: boolean;
+  cancellable: boolean;
   onCancel: () => void;
   dialogs: DialogController;
 }
@@ -54,7 +65,7 @@ interface TransferActivityProps {
 export function TransferActivity(props: TransferActivityProps) {
   const label = () =>
     props.cancelling
-      ? t("files.cancellingCopy")
+      ? t("files.cancellingOperation")
       : props.progress
         ? progressLabel(props.progress)
         : t("files.operationFinished");
@@ -71,21 +82,24 @@ export function TransferActivity(props: TransferActivityProps) {
       case "move":
         return FiMove;
       case "delete":
+      case "trash":
         return FiTrash2;
       case "open":
         return FiExternalLink;
+      case "restore":
+        return FiRotateCcw;
       default:
         return FiCopy;
     }
   };
   const cancelButton = () => (
-    <Show when={props.progress?.operation === "copy"}>
+    <Show when={props.cancellable}>
       <button
         type="button"
         class="eden-btn eden-btn-ghost eden-btn-sm"
         disabled={props.cancelling}
-        aria-label={t("files.cancelTransfer")}
-        title={t("files.cancelTransfer")}
+        aria-label={t("files.cancelOperation")}
+        title={t("files.cancelOperation")}
         onClick={props.onCancel}
       >
         <FiX aria-hidden="true" />

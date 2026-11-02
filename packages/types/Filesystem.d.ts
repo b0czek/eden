@@ -26,6 +26,8 @@ export interface FilesystemVolume {
   readOnly: boolean;
   supportsWatch: boolean;
   supportsEject: boolean;
+  /** Deleted items can move to Trash instead of being removed permanently. */
+  supportsTrash: boolean;
   state: FilesystemVolumeState;
 }
 
@@ -38,6 +40,23 @@ export interface FilesystemVolumeRegistration {
   readOnly?: boolean;
   supportsWatch?: boolean;
 }
+
+/** A Home item held in Trash, visible to callers that can access its original folder. */
+export interface TrashEntry {
+  id: string;
+  name: string;
+  original: FilesystemLocation;
+  /** ISO 8601 time when the item was moved to Trash. */
+  deletedAt: string;
+  isDirectory: boolean;
+  isFile: boolean;
+  size: number;
+}
+
+/** An occupied destination keeps both the existing item and the Trash entry. */
+export type TrashRestoreResult =
+  | { status: "restored"; location: FilesystemLocation }
+  | { status: "occupied" };
 
 export interface FilesystemTransferArgs {
   from: FilesystemLocation;

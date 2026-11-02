@@ -29,6 +29,11 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   const [suggestions, setSuggestions] = createSignal<Suggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [isLoading, setIsLoading] = createSignal(false);
+  const displayPath = () =>
+    `/${props.breadcrumbs
+      .filter((crumb) => crumb.name !== "/")
+      .map((crumb) => crumb.name)
+      .join("/")}`;
 
   let searchSequence = 0;
   createEffect(
@@ -132,7 +137,14 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       setInputValue("");
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (suggestionList.length > 0) {
+      if (
+        displayPath() !== props.currentPath &&
+        inputValue().trim() === displayPath()
+      ) {
+        setIsEditing(false);
+        setSuggestions([]);
+        setInputValue("");
+      } else if (suggestionList.length > 0) {
         const selected = suggestionList[selectedIndex()];
         if (selected) {
           props.onNavigate(selected.location.path);
@@ -171,7 +183,6 @@ const Omnibox: Component<OmniboxProps> = (props) => {
     if (isEditing()) {
       document.addEventListener("mousedown", handleClickOutside);
       inputRef?.focus();
-      setInputValue(props.currentPath);
     } else {
       document.removeEventListener("mousedown", handleClickOutside);
     }
@@ -183,9 +194,10 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   });
 
   const handleOmniboxClick = () => {
+    setInputValue(displayPath());
     setIsEditing(true);
     // Show suggestions immediately
-    generateSuggestions("");
+    if (displayPath() === props.currentPath) generateSuggestions("");
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {

@@ -16,6 +16,7 @@ import { resolveBrandingName } from "../desktop/branding/service";
 import { syncIo } from "../platform/filesystem/native-sync";
 import { log } from "../platform/logging/logger";
 import { createDesktopLayer } from "./composition";
+import { resolveDataLayout } from "./data-layout";
 import { Desktop } from "./desktop";
 import type { EdenRuntimeOptions } from "./environment";
 
@@ -34,8 +35,11 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   };
   const paths = { ...options.paths };
   const platform = options.platform;
-  syncIo.mkdir(paths.appsDirectory, { recursive: true });
-  syncIo.mkdir(paths.userDirectory, { recursive: true });
+  const layout = resolveDataLayout(paths.dataDirectory);
+  syncIo.mkdir(layout.homeDirectory, { recursive: true });
+  syncIo.mkdir(layout.appsDirectory, { recursive: true });
+  syncIo.mkdir(layout.systemDirectory, { recursive: true });
+  syncIo.mkdir(layout.trashDirectory, { recursive: true });
   resolveBrandingName(config.branding);
   const registrations = createPanelRegistry();
   const settings = createSettingsSdkController({ panels: registrations });

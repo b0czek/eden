@@ -152,7 +152,7 @@ describe("DLC package lifecycle", () => {
     };
     const archive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       manifest,
       { "index.html": "<html>operation</html>" },
     );
@@ -313,13 +313,13 @@ describe("DLC package lifecycle", () => {
     });
   });
 
-  it("rejects package IDs owned by runtime storage", async () => {
+  it("keeps runtime storage apart from installed packages", async () => {
     const caller = { principal: { kind: "user" as const, profile: vendor } };
-    const storagePath = path.join(eden.paths.appsDirectory, "storage.db");
-    await fs.writeFile(storagePath, "persistent runtime data");
+    const storagePath = path.join(eden.paths.systemDirectory, "storage.db");
+    const storage = await fs.readFile(storagePath);
     const archive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       {
         id: "storage.db",
         name: "Storage collision",
@@ -329,16 +329,18 @@ describe("DLC package lifecycle", () => {
       { "index.html": "package data" },
     );
 
-    await expect(
-      eden.complete(
-        "package/install",
-        { source: { volume: "home", path: archive } },
-        caller,
-      ),
-    ).rejects.toThrow('Package ID "storage.db" is reserved');
-    await expect(fs.readFile(storagePath, "utf-8")).resolves.toBe(
-      "persistent runtime data",
+    await eden.complete(
+      "package/install",
+      { source: { volume: "home", path: archive } },
+      caller,
     );
+    await expect(
+      fs.readFile(
+        path.join(eden.paths.appsDirectory, "storage.db", "index.html"),
+        "utf-8",
+      ),
+    ).resolves.toBe("package data");
+    await expect(fs.readFile(storagePath)).resolves.toEqual(storage);
   });
 
   it("installs host-first, scopes access, persists, and cascades removal", async () => {
@@ -365,7 +367,7 @@ describe("DLC package lifecycle", () => {
     };
     const hostArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       host,
       {
         "index.html": "<html></html>",
@@ -373,11 +375,11 @@ describe("DLC package lifecycle", () => {
     );
     const hostWithoutDlcsArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       hostWithoutDlcs,
       { "index.html": "<html></html>" },
     );
-    const dlcArchive = await makeArchive(root, eden.paths.userDirectory, dlc, {
+    const dlcArchive = await makeArchive(root, eden.paths.homeDirectory, dlc, {
       "payload/theme.json": '{"accent":"blue"}',
       "payload/value.mjs": 'export const accent = "blue";',
       "payload/entry.mjs":
@@ -390,7 +392,7 @@ describe("DLC package lifecycle", () => {
     };
     const secondDlcArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       secondDlc,
       { "payload/theme.json": '{"accent":"yellow"}' },
     );
@@ -653,7 +655,7 @@ describe("DLC package lifecycle", () => {
     };
     const missingArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       missing,
     );
     await expect(
@@ -673,7 +675,7 @@ describe("DLC package lifecycle", () => {
     };
     const hostArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       host,
       {
         "index.html": "<html></html>",
@@ -691,7 +693,7 @@ describe("DLC package lifecycle", () => {
     };
     const incompatibleArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       incompatible,
     );
     await expect(
@@ -712,7 +714,7 @@ describe("DLC package lifecycle", () => {
     };
     const unknownPointArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       unknownPoint,
     );
     await expect(
@@ -731,7 +733,7 @@ describe("DLC package lifecycle", () => {
     };
     const compatibleArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       compatible,
     );
     await eden.complete(
@@ -799,13 +801,13 @@ describe("DLC package lifecycle", () => {
       dlc: { extensionPoints: [{ id: "themes", version: "2.0.0" }] },
     };
     const [hostV1Archive, hostV2Archive, dlcArchive] = await Promise.all([
-      makeArchive(root, eden.paths.userDirectory, hostV1, {
+      makeArchive(root, eden.paths.homeDirectory, hostV1, {
         "index.html": "v1",
       }),
-      makeArchive(root, eden.paths.userDirectory, hostV2, {
+      makeArchive(root, eden.paths.homeDirectory, hostV2, {
         "index.html": "v2",
       }),
-      makeArchive(root, eden.paths.userDirectory, dlc),
+      makeArchive(root, eden.paths.homeDirectory, dlc),
     ]);
     const caller = { principal: { kind: "user" as const, profile: vendor } };
     await eden.complete(
@@ -928,7 +930,7 @@ describe("DLC package lifecycle", () => {
     await eden.start();
     const replacementArchive = await makeArchive(
       root,
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       { ...dlc, version: "2.0.0" },
       { "payload/theme.json": '{"builtIn":false}' },
     );

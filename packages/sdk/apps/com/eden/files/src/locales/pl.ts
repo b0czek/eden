@@ -1,5 +1,29 @@
 export const pl = {
   files: {
+    restoredSuffix: "przywrócony",
+    restoreNameConflict:
+      "W pierwotnym położeniu istnieje już element o nazwie „{name}”. Wybierz inną nazwę, aby zachować oba elementy.",
+    restoreAs: "Przywróć pod inną nazwą",
+    technicalDetails: "Szczegóły techniczne",
+    location: "Położenie",
+    details: "Szczegóły",
+    originalLocation: "Pierwotne położenie",
+    dateDeleted: "Data usunięcia",
+    trash: "Kosz",
+    moveToTrash: "Przenieś do kosza",
+    trashConfirmation: "Przenieść „{name}” do kosza?",
+    volumeDeleteConfirmation:
+      "Trwale usunąć „{name}”? Ten wolumin nie używa kosza. Tej operacji nie można cofnąć.",
+    trashHint: "Kosz to tymczasowe miejsce na usunięte pliki i foldery.",
+    trashEmpty: "Kosz jest pusty",
+    restore: "Przywróć",
+    emptyTrash: "Opróżnij kosz",
+    emptyTrashConfirmation:
+      "Trwale usunąć wszystkie elementy z kosza? Tej operacji nie można cofnąć.",
+    trashActions: "Akcje kosza",
+    deletePermanently: "Usuń trwale",
+    permanentDeleteConfirmation:
+      "Trwale usunąć {count} elementów? Tej operacji nie można cofnąć.",
     pinnedFolders: "Przypięte foldery",
     pinnedFolderSlots: "Przypięte foldery · {count}/{max}",
     pinFolder: "Przypnij folder",
@@ -15,7 +39,7 @@ export const pl = {
     activity: "Aktywność",
     transferDetails: "Szczegóły operacji",
     operationFinished: "Operacja zakończona",
-    cancelTransfer: "Anuluj kopiowanie",
+    cancelOperation: "Anuluj operację",
     pinColors: {
       blue: "Niebieski",
       purple: "Fioletowy",
@@ -40,6 +64,7 @@ export const pl = {
     readOnly: "Tylko do odczytu",
     volumeDisconnected: "Dysk został odłączony. Wyświetlono katalog domowy.",
 
+    new: "Nowy",
     newFolder: "Nowy Folder",
     newFile: "Nowy Plik",
     modified: "Data Modyfikacji",
@@ -93,11 +118,11 @@ export const pl = {
     skip: "Pomiń",
     applyToAll: "Zastosuj do wszystkich pozostałych konfliktów",
     deleteSelectedConfirmation:
-      "Czy na pewno chcesz usunąć wybrane elementy ({count})?",
+      "Przenieść wybrane elementy ({count}) do kosza?",
     progressOpen: "Otwieranie {name}…",
     bytesProgress: "Przesłano {size} z {total}",
-    cancellingCopy: "Anulowanie kopiowania…",
-    cancelFailed: "Nie udało się anulować kopiowania",
+    cancellingOperation: "Anulowanie…",
+    cancelFailed: "Nie udało się anulować operacji",
     restoringDestination: "Przywracanie plików docelowych…",
     cleaningUp: "Kończenie operacji…",
     removingSource: "Usuwanie oryginału…",
@@ -105,10 +130,11 @@ export const pl = {
     bytesTransferred: "Przesłano {size}",
     progressCopy: "Kopiowanie {current} z {total}: {name}",
     progressMove: "Przenoszenie {current} z {total}: {name}",
+    progressTrash: "Przenoszenie do kosza {current} z {total}: {name}",
+    progressRestore: "Przywracanie {current} z {total}: {name}",
     progressDelete: "Usuwanie {current} z {total}: {name}",
-    partialFailureTitle: "Nie przetworzono części elementów",
-    partialFailureMessage:
-      "Nie udało się przetworzyć {failed} z {total} elementów.",
+    partialFailureTitle: "Nie udało się wykonać części operacji",
+    partialFailureMessage: "Ukończono: {succeeded}. Niepowodzenia: {failed}.",
     refresh: "Odśwież",
     directoryUnavailableTitle: "Folder jest niedostępny",
     directoryUnavailableFallback:
@@ -116,6 +142,8 @@ export const pl = {
     directoryUnavailable: "Folder „{path}” jest niedostępny.",
     copySuffix: "kopia",
     errors: {
+      loadTrashFailed: "Nie udało się wczytać kosza",
+      restoreConflict: "Element o tej nazwie już istnieje. Wybierz inną nazwę.",
       loadPinsFailed: "Nie udało się wczytać przypiętych folderów.",
       savePinsFailed: "Nie udało się zapisać przypiętych folderów.",
       pinnedFolderUnavailable:

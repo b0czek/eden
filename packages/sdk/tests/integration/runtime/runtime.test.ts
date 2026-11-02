@@ -145,14 +145,14 @@ describe("EdenRuntime integration", () => {
       caller("isolated-app", firstUser),
     );
     await fs.writeFile(
-      `${second.paths.userDirectory}/runtime.txt`,
+      `${second.paths.homeDirectory}/runtime.txt`,
       "second-root",
     );
     expect(
-      await fs.readFile(`${first.paths.userDirectory}/runtime.txt`, "utf8"),
+      await fs.readFile(`${first.paths.homeDirectory}/runtime.txt`, "utf8"),
     ).toBe("first-root");
     expect(
-      await fs.readFile(`${second.paths.userDirectory}/runtime.txt`, "utf8"),
+      await fs.readFile(`${second.paths.homeDirectory}/runtime.txt`, "utf8"),
     ).toBe("second-root");
     expect(first.paths.root).not.toBe(second.paths.root);
   });

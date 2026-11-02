@@ -7,6 +7,10 @@ import type { EdenConfig } from "../../src/api/config";
 import type { CommandCallerContext } from "../../src/core/execution/context";
 import type { ViewInfo } from "../../src/desktop/views/types";
 import {
+  type DataLayout,
+  resolveDataLayout,
+} from "../../src/runtime/data-layout";
+import {
   createEdenRuntime,
   type EdenRuntime,
   type EdenRuntimePaths,
@@ -32,7 +36,7 @@ export interface ExecuteFromViewOptions {
 export interface TestEden {
   readonly runtime: EdenRuntime;
   readonly platform: InMemoryPlatform;
-  readonly paths: EdenRuntimePaths & { root: string };
+  readonly paths: EdenRuntimePaths & DataLayout & { root: string };
   start(): Promise<void>;
   getAppView(appId: string): ViewInfo;
   getBackendProcess(appId: string): InMemoryUtilityProcess;
@@ -70,16 +74,11 @@ export async function createTestEden(
     options.root ?? (await fs.mkdtemp(path.join(os.tmpdir(), "eden-runtime-")));
   const paths: TestEden["paths"] = {
     root,
-    appsDirectory: path.join(root, "apps"),
-    userDirectory: path.join(root, "users"),
+    ...resolveDataLayout(path.join(root, "data")),
     distPath: path.join(root, "dist"),
     appPath: root,
   };
-  await Promise.all([
-    fs.mkdir(paths.appsDirectory, { recursive: true }),
-    fs.mkdir(paths.userDirectory, { recursive: true }),
-    fs.mkdir(paths.distPath, { recursive: true }),
-  ]);
+  await fs.mkdir(paths.distPath, { recursive: true });
 
   const platform = new InMemoryPlatform(root, options.platform);
   const runtime = createEdenRuntime({

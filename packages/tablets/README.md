@@ -7,7 +7,7 @@ Tiny renderer toolkit for Eden apps. It provides runtime helpers for Eden’s sy
 - Provides `contextMenu` runtime helper for opening/closing menus.
 - Provides `filePicker` async helpers for opening and saving file paths.
 - Provides `notification` helpers with automatically routed action callbacks.
-- Provides menu builder helpers (`menu`, `button`, `title`, `separator`, `when`).
+- Provides menu builder helpers (`menu`, `button`, `title`, `section`, `submenu`, `separator`, `when`).
 
 ## Install
 
@@ -53,6 +53,19 @@ void appMenu.show(
 
 // Close the active menu
 void contextMenu.close();
+```
+
+### Checkable items
+
+Set `checked` on a button to show a check mark. Use `section` to label a group
+of choices inside the menu.
+
+```ts
+const viewMenu = menu((view: "grid" | "list") => [
+  section("View"),
+  button("grid", "Grid", () => setView("grid"), { checked: view === "grid" }),
+  button("list", "List", () => setView("list"), { checked: view === "list" }),
+]);
 ```
 
 ## File picker

@@ -2,14 +2,14 @@ import * as path from "node:path";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { openKeyvSqlite } from "../../platform/storage/keyv-sqlite";
-import { AppsDirectory } from "../../runtime/inputs";
+import { SystemDirectory } from "../../runtime/inputs";
 import { SettingsStorage } from "./ports";
 export const SqliteSettingsStorageLive = Layer.effect(
   SettingsStorage,
   Effect.gen(function* () {
-    const appsDirectory = yield* AppsDirectory;
+    const systemDirectory = yield* SystemDirectory;
     const connection = yield* openKeyvSqlite({
-      dbPath: path.join(appsDirectory, "settings.db"),
+      dbPath: path.join(systemDirectory, "settings.db"),
       label: "settings storage",
       closedMessage: "Settings storage closed",
     });

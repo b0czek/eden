@@ -59,8 +59,8 @@ export function createFileTransfers() {
         const paths = [
           path.resolve(request.source),
           path.resolve(request.destination),
-          yield* resolveCanonicalPath(request.source),
-          yield* resolveCanonicalPath(request.destination),
+          yield* resolveCanonicalEntry(request.source),
+          yield* resolveCanonicalEntry(request.destination),
         ];
         const predecessors = [...reservations].filter((reservation) =>
           reservation.paths.some((reserved) =>
@@ -102,33 +102,38 @@ export function createFileTransfers() {
     yield* assertActive(request);
     request.reporter?.update("preparing-copy");
     const transfer = yield* prepare(request, "copy");
-    yield* runWithDestinationRollback(transfer, copyEntry(transfer));
+    yield* runWithDestinationRollback(
+      transfer,
+      copyEntry(transfer).pipe(
+        Effect.andThen(transfer.reporter?.commit ?? Effect.void),
+      ),
+      () => true,
+    );
   });
 
   const moveReserved = Effect.fn(function* (request: TransferRequest) {
     request.reporter?.update("preparing-move");
     const transfer = yield* prepare(request, "move");
+    // A failed rename leaves the destination untouched; only a fallback copy is ours to remove.
     let copied = false;
-    // Finish a committed rename and its backup cleanup before interruption.
-    yield* runWithDestinationRollback(
-      transfer,
-      Effect.gen(function* () {
-        yield* assertActive(transfer);
-        transfer.reporter?.update("moving");
-        yield* io.rename(transfer.source, transfer.destination).pipe(
-          Effect.catch((error) => {
-            if (error.code !== "EXDEV") return Effect.fail(error);
-            return copyEntry(transfer).pipe(
-              Effect.tap(() =>
-                Effect.sync(() => {
-                  copied = true;
-                }),
-              ),
-            );
-          }),
-        );
-      }),
-    ).pipe(Effect.uninterruptible);
+    yield* Effect.gen(function* () {
+      yield* transfer.reporter?.commit ?? Effect.void;
+      yield* runWithDestinationRollback(
+        transfer,
+        Effect.gen(function* () {
+          yield* assertActive(transfer);
+          transfer.reporter?.update("moving");
+          yield* io.rename(transfer.source, transfer.destination).pipe(
+            Effect.catch((error) => {
+              if (error.code !== "EXDEV") return Effect.fail(error);
+              copied = true;
+              return copyEntry(transfer);
+            }),
+          );
+        }),
+        () => copied,
+      );
+    }).pipe(Effect.uninterruptible);
     if (copied) {
       yield* Effect.gen(function* () {
         yield* assertActive(transfer);
@@ -153,8 +158,13 @@ export function createFileTransfers() {
     request: TransferRequest,
     operation: "copy" | "move",
   ) {
-    const sourceStats = yield* io.stat(request.source);
-    const canonicalSource = yield* io.realpath(request.source);
+    const sourceStats = yield* operation === "move"
+      ? io.lstat(request.source)
+      : io.stat(request.source);
+    const canonicalSource =
+      operation === "move"
+        ? yield* resolveCanonicalEntry(request.source)
+        : yield* io.realpath(request.source);
     const canonicalDestination = yield* resolveCanonicalPath(
       request.destination,
     );
@@ -209,6 +219,7 @@ export function createFileTransfers() {
   const runWithDestinationRollback = (
     transfer: PreparedTransfer,
     work: Effect.Effect<void, FilesystemTransferError>,
+    ownsDestination: () => boolean,
   ) =>
     Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
@@ -217,22 +228,23 @@ export function createFileTransfers() {
           ? yield* stageDestination(transfer.destination)
           : undefined;
         yield* restore(work).pipe(
-          Effect.andThen(transfer.reporter?.commit ?? Effect.void),
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               transfer.reporter?.update("rolling-back");
-              const rollback = [
-                Effect.gen(function* () {
-                  yield* assertAccessible(
-                    transfer.assertDestinationActive,
-                    transfer.destination,
-                  );
-                  yield* io.rm(transfer.destination, {
-                    recursive: true,
-                    force: true,
-                  });
-                }),
-              ];
+              const rollback: Effect.Effect<void, FilesystemPathError>[] = [];
+              if (ownsDestination())
+                rollback.push(
+                  Effect.gen(function* () {
+                    yield* assertAccessible(
+                      transfer.assertDestinationActive,
+                      transfer.destination,
+                    );
+                    yield* io.rm(transfer.destination, {
+                      recursive: true,
+                      force: true,
+                    });
+                  }),
+                );
               if (backup)
                 rollback.push(
                   Effect.gen(function* () {
@@ -356,6 +368,12 @@ export function createFileTransfers() {
       Effect.catch((error) =>
         error.code === "ENOENT" ? Effect.succeed(false) : Effect.fail(error),
       ),
+    );
+
+  // Resolve directory aliases while reserving the entry itself, not its link target.
+  const resolveCanonicalEntry = (hostPath: string) =>
+    resolveCanonicalPath(path.dirname(hostPath)).pipe(
+      Effect.map((parent) => path.join(parent, path.basename(hostPath))),
     );
 
   const resolveCanonicalPath = Effect.fn(function* (hostPath: string) {

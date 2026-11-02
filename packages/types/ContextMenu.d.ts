@@ -170,6 +170,8 @@ export type ContextMenuItem =
       shortcut?: string;
       disabled?: boolean;
       danger?: boolean;
+      /** Makes the item checkable and shows whether it is checked. */
+      checked?: boolean;
       items?: ContextMenuItem[];
     }
   | { type: "separator" }

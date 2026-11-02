@@ -8,6 +8,9 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [solidPlugin()],
+  optimizeDeps: {
+    exclude: ["solid-icons"],
+  },
   base: "./",
   root: __dirname,
   build: {

@@ -67,6 +67,14 @@ const transferArgs = v.object({
   overwrite: v.optional(v.boolean(), false),
 });
 
+const trashEntryArgs = v.object({
+  id: v.pipe(v.string(), v.uuid()),
+});
+const trashRestoreArgs = v.object({
+  id: v.pipe(v.string(), v.uuid()),
+  location: v.optional(filesystemLocationSchema),
+});
+
 export function createFilesystemController(files: Filesystem) {
   return defineController("fs", {
     commands: {
@@ -127,6 +135,11 @@ export function createFilesystemController(files: Filesystem) {
         input: filesystemSourceArgsSchema,
         handle: ({ location }) => files.stat(location),
       }),
+      lstat: command({
+        permission: "read",
+        input: filesystemLocationArgsSchema,
+        handle: ({ location }) => files.lstat(location),
+      }),
       watch: command({
         permission: "read",
         input: watchArgs,
@@ -181,7 +194,55 @@ export function createFilesystemController(files: Filesystem) {
             files.move(from, to, overwrite, reporter),
           ),
       }),
+      /** Move a Home item to Trash. */
+      trash: command({
+        permission: "write",
+        mode: "operation",
+        input: filesystemLocationArgsSchema,
+        handle: ({ location }) =>
+          files.prepareVolumeOperation([location.volume], (reporter) =>
+            files.moveToTrash(location, reporter),
+          ),
+      }),
+      /** List Trash items from folders the caller can access, newest first. */
+      "trash-entries": command({
+        permission: "read",
+        handle: () => files.trashEntries(),
+      }),
+      /** Restore a Trash item to its original location or another destination. */
+      "trash-restore": command({
+        permission: "write",
+        mode: "operation",
+        input: trashRestoreArgs,
+        handle: ({ id, location }) =>
+          files.prepareVolumeOperation(
+            ["home", location?.volume ?? "home"],
+            (reporter) => files.restoreFromTrash(id, location, reporter),
+          ),
+      }),
+      /** Permanently delete one Trash item. */
+      "trash-delete": command({
+        permission: "write",
+        mode: "operation",
+        input: trashEntryArgs,
+        handle: ({ id }) =>
+          files.prepareVolumeOperation(["home"], (reporter) =>
+            files.deleteFromTrash(id, reporter),
+          ),
+      }),
+      /** Permanently delete every Trash item visible to the caller. */
+      "trash-empty": command({
+        permission: "write",
+        mode: "operation",
+        handle: () =>
+          files.prepareVolumeOperation(["home"], (reporter) =>
+            files.emptyTrash(reporter),
+          ),
+      }),
     },
-    events: { changed: targetedEvent(files.changed) },
+    events: {
+      changed: targetedEvent(files.changed),
+      "trash-changed": files.trashChanged,
+    },
   });
 }

@@ -35,7 +35,7 @@ const location: FilesystemLocation = { volume: "home", path: "/Documents/notes.t
 `/` means the selected volume's root.
 Store and exchange both fields. The same path on another volume identifies a different file.
 
-The built-in `home` volume maps `/` to the consumer's `userDirectory` for every account.
+The built-in `home` volume maps `/` to the `home` folder in the consumer's `dataDirectory` for every account.
 A folder restriction limits access without changing the address.
 For example, a restriction of `projects/design` permits `home:/projects/design/notes.txt`.
 See [shared folders](users.md#shared-filesystem-and-folder-restrictions).
@@ -61,6 +61,11 @@ const names = await fs.readdir({ volume: "home", path: "/Documents" });
 Text commands default to UTF-8 and accept other Node encodings.
 Writes create missing parent directories within an available volume.
 `readdir` returns entry names. Combine each name with the directory address before querying metadata.
+
+`fs.stat` follows symbolic links. Use `fs.lstat(location)` to inspect the link itself,
+including a dangling link. Its result also includes `isSymbolicLink`.
+Moves and deletions operate on the link itself; access through parent folders
+still follows volume and account restrictions.
 
 Use `readBinary` and `writeBinary` for whole-file `Uint8Array` values:
 
@@ -187,6 +192,37 @@ A cross-filesystem move copies before deleting its source.
 If source deletion fails, the destination remains and the operation reports an incomplete move.
 
 See [operations](ipc-architecture.md#operations) for progress, cancellation, and repeated submissions.
+
+## Trash
+
+`fs.delete` permanently removes an item.
+To let the user recover a Home item, move it to Trash instead:
+
+```ts
+const trashing = await fs.trash({ volume: "home", path: "/Documents/draft.txt" });
+await trashing.result();
+```
+
+Only volumes with `supportsTrash: true` accept Trash. Currently, this is only Home.
+Delete items on other volumes with `fs.delete`, after the user confirms.
+
+Each item in `fs.trashEntries()` has an `id`, its `original` location, and `deletedAt`.
+The list contains only items from folders that the caller can access, newest first.
+
+| Command | Result |
+| --- | --- |
+| `fs.trashRestore(id)` | Moves the item back to its original location and creates missing parent folders |
+| `fs.trashRestore(id, { location })` | Restores the item to another location |
+| `fs.trashDelete(id)` | Permanently deletes one item |
+| `fs.trashEmpty()` | Permanently deletes every item in the list |
+
+These commands return [operations](ipc-architecture.md#operations).
+If the destination is occupied, the restore result is `{ status: "occupied" }` and the item stays in Trash.
+Ask the user for another name, then restore to that location.
+
+Subscribe to `trash-changed` to refresh a Trash view. It requires `fs/read`.
+Eden stores Trash in the `trash` folder of its data directory, outside every volume.
+Use the Trash commands to read or change it.
 
 ## Watch a directory
 

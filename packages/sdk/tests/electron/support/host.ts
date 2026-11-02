@@ -33,7 +33,7 @@ export async function createElectronHost(
   options: ElectronProfileOptions = {},
 ): Promise<ElectronHost> {
   const profile = await createElectronProfile(options);
-  const { root, appsDirectory, userDirectory, seedPath } = profile;
+  const { root, dataDirectory, seedPath } = profile;
   const logs: string[] = [];
   let electronApp: ElectronApplication | undefined;
   let foundation: ElectronPage;
@@ -42,13 +42,15 @@ export async function createElectronHost(
     const executablePath = require("electron") as string;
     electronApp = await electron.launch({
       executablePath,
-      args: [path.join(__dirname, "../host.cjs")],
+      args: [
+        ...(process.platform === "linux" ? ["--ozone-platform=x11"] : []),
+        path.join(__dirname, "../host.cjs"),
+      ],
       cwd: root,
       env: {
         ...process.env,
         EDEN_LOG_CALLSITE: "false",
-        EDEN_TEST_APPS_DIRECTORY: appsDirectory,
-        EDEN_TEST_USER_DIRECTORY: userDirectory,
+        EDEN_TEST_DATA_DIRECTORY: dataDirectory,
         EDEN_TEST_SEED_PATH: seedPath,
       },
     });

@@ -36,7 +36,6 @@ export interface FileExplorerLabels {
   goUp: string;
   newFolder: string;
   newFile: string;
-  settings: string;
   editPath: string;
   searchPlaceholder: string;
   loading: string;
@@ -44,7 +43,6 @@ export interface FileExplorerLabels {
   emptyHint: string;
   folder: string;
   delete: string;
-  close: string;
   displayOptions: string;
   viewStyle: string;
   grid: string;

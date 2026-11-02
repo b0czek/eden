@@ -8,7 +8,7 @@ import {
   UsersRestrictedApps,
 } from "../../../src/core/user/service";
 import { UserStorage, UserStorageLive } from "../../../src/core/user/storage";
-import { AppsDirectory, UserDirectory } from "../../../src/runtime/inputs";
+import { HomeDirectory, SystemDirectory } from "../../../src/runtime/inputs";
 import {
   buildService,
   createEffectRuntime,
@@ -16,26 +16,28 @@ import {
 } from "../../support/effect-runtime";
 
 describe("Users accounts", () => {
-  let appsDirectory: string;
-  let userDirectory: string;
+  let systemDirectory: string;
+  let homeDirectory: string;
   let users: Users;
   let effects: EffectRuntime;
 
   beforeEach(async () => {
-    appsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "eden-users-db-"));
-    userDirectory = await fs.mkdtemp(
+    systemDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "eden-users-db-"),
+    );
+    homeDirectory = await fs.mkdtemp(
       path.join(os.tmpdir(), "eden-users-home-"),
     );
     effects = createEffectRuntime();
     const store = await effects.acquire(
       buildService(UserStorage, UserStorageLive).pipe(
-        Effect.provideService(AppsDirectory, appsDirectory),
+        Effect.provideService(SystemDirectory, systemDirectory),
       ),
     );
     users = await effects.acquire(
       buildService(Users, UsersLive).pipe(
         Effect.provideService(UserStorage, store),
-        Effect.provideService(UserDirectory, userDirectory),
+        Effect.provideService(HomeDirectory, homeDirectory),
         Effect.provideService(UsersRestrictedApps, new Set()),
       ),
     );
@@ -44,8 +46,8 @@ describe("Users accounts", () => {
 
   afterEach(async () => {
     await effects.dispose();
-    await fs.rm(appsDirectory, { recursive: true, force: true });
-    await fs.rm(userDirectory, { recursive: true, force: true });
+    await fs.rm(systemDirectory, { recursive: true, force: true });
+    await fs.rm(homeDirectory, { recursive: true, force: true });
   });
 
   it("creates assigned restriction folders and preserves them when deleting a user", async () => {
@@ -57,7 +59,7 @@ describe("Users accounts", () => {
         directoryRestriction: "teams/operators",
       }),
     );
-    const marker = path.join(userDirectory, "teams", "operators", "keep.txt");
+    const marker = path.join(homeDirectory, "teams", "operators", "keep.txt");
     await fs.writeFile(marker, "keep");
 
     await effects.run(users.deleteUser("operator"));

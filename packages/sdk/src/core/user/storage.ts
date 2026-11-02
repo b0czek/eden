@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import { openKeyvSqlite } from "../../platform/storage/keyv-sqlite";
-import { AppsDirectory } from "../../runtime/inputs";
+import { SystemDirectory } from "../../runtime/inputs";
 import type {
   UserDefaultWriteFailure,
   UserRecordDeleteFailure,
@@ -41,9 +41,9 @@ const DEFAULT_USER_KEY = "users:default";
 export const UserStorageLive = Layer.effect(
   UserStorage,
   Effect.gen(function* () {
-    const appsDirectory = yield* AppsDirectory;
+    const systemDirectory = yield* SystemDirectory;
     const connection = yield* openKeyvSqlite({
-      dbPath: path.join(appsDirectory, "users.db"),
+      dbPath: path.join(systemDirectory, "users.db"),
       label: "user storage",
       closedMessage: "User storage closed",
     });

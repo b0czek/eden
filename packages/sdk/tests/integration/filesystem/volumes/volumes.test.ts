@@ -60,6 +60,43 @@ describe("consumer-managed filesystem volumes", () => {
       args,
     );
 
+  it("inspects and moves dangling links without following their leaf targets", async () => {
+    const location = (name: string) => ({ volume: "usb", path: `/${name}` });
+    await fs.mkdir(path.join(usbRoot, "docs"));
+    await fs.mkdir(path.join(usbRoot, "trash"));
+    await fs.writeFile(
+      path.join(usbRoot, "docs", "target.txt"),
+      "target contents",
+    );
+    await fs.symlink("target.txt", path.join(usbRoot, "docs", "link.txt"));
+    await execute("fs/mv", {
+      from: location("docs/link.txt"),
+      to: location("trash/content"),
+    });
+    await expect(
+      execute("fs/lstat", { location: location("trash/content") }),
+    ).resolves.toMatchObject({ isSymbolicLink: true });
+    await execute("fs/mv", {
+      from: location("trash/content"),
+      to: location("docs/link.txt"),
+    });
+    expect(await fs.readlink(path.join(usbRoot, "docs", "link.txt"))).toBe(
+      "target.txt",
+    );
+    expect(
+      await fs.readFile(path.join(usbRoot, "docs", "target.txt"), "utf8"),
+    ).toBe("target contents");
+    await fs.symlink(eden.paths.homeDirectory, path.join(usbRoot, "escape"));
+    await expect(
+      execute("fs/lstat", { location: location("escape/private.txt") }),
+    ).rejects.toThrow("outside");
+    await expect(
+      execute("fs/lstat", { location: location("escape") }),
+    ).resolves.toMatchObject({ isSymbolicLink: true });
+    await execute("fs/delete", { location: location("escape") });
+    expect((await fs.stat(eden.paths.homeDirectory)).isDirectory()).toBe(true);
+  });
+
   it("publishes detached metadata without revealing mount paths", async () => {
     const changes: FilesystemVolume[][] = [];
     const stop = eden.runtime.volumes.onChanged((volumes) =>
@@ -88,6 +125,7 @@ describe("consumer-managed filesystem volumes", () => {
       readOnly: false,
       supportsWatch: false,
       supportsEject: false,
+      supportsTrash: false,
       state: "ready",
     });
     expect(volumes.some((volume) => "rootPath" in volume)).toBe(false);
@@ -168,7 +206,7 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("outside of the allowed directory");
     await expect(
       fs.readFile(
-        path.join(eden.paths.userDirectory, "operators/one/report.txt"),
+        path.join(eden.paths.homeDirectory, "operators/one/report.txt"),
         "utf8",
       ),
     ).resolves.toBe("private");
@@ -185,6 +223,7 @@ describe("consumer-managed filesystem volumes", () => {
         "fs/mkdir",
         "fs/readdir",
         "fs/stat",
+        "fs/lstat",
         "fs/watch",
         "fs/resolve",
         "fs/delete",
@@ -259,7 +298,7 @@ describe("consumer-managed filesystem volumes", () => {
         location: { volume: "usb", path: "/../outside.txt" },
       }),
     ).rejects.toThrow("outside");
-    await fs.symlink(eden.paths.userDirectory, path.join(usbRoot, "escape"));
+    await fs.symlink(eden.paths.homeDirectory, path.join(usbRoot, "escape"));
     await expect(
       execute("fs/exists", {
         location: { volume: "usb", path: "/escape/report.txt" },
@@ -416,7 +455,7 @@ describe("consumer-managed filesystem volumes", () => {
     async (operation) => {
       const source = path.join(usbRoot, "source.txt");
       const destinationRoot = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         requireValue(user.directoryRestriction),
       );
       await fs.mkdir(destinationRoot, { recursive: true });
@@ -482,7 +521,7 @@ describe("consumer-managed filesystem volumes", () => {
           volume === "usb"
             ? usbRoot
             : path.join(
-                eden.paths.userDirectory,
+                eden.paths.homeDirectory,
                 requireValue(user.directoryRestriction),
               );
         await expect(fs.readlink(path.join(root, "copy"))).resolves.toBe(
@@ -525,7 +564,7 @@ describe("consumer-managed filesystem volumes", () => {
     });
     await fs.rm(sourceRoot, { recursive: true });
     const destinationRoot = path.join(
-      eden.paths.userDirectory,
+      eden.paths.homeDirectory,
       requireValue(user.directoryRestriction),
       "copy",
     );
@@ -838,7 +877,7 @@ describe("consumer-managed filesystem volumes", () => {
         content: "cross-device report",
       });
       const sourceRoot = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         requireValue(user.directoryRestriction),
         "cross-device",
       );
@@ -876,7 +915,7 @@ describe("consumer-managed filesystem volumes", () => {
         path.join(process.cwd(), ".eden-volume-test-"),
       );
       const lockedDirectory = path.join(
-        eden.paths.userDirectory,
+        eden.paths.homeDirectory,
         "operators/one/locked",
       );
       try {

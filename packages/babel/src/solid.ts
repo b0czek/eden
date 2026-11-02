@@ -44,7 +44,8 @@ export function setupI18n<T extends object = Record<string, void>>(
   config: EdenI18nConfig = {},
 ): EdenI18nHandle<T> {
   return createRoot(() => {
-    const [locale, setLocale] = createSignal("en");
+    // Common resources can load while the locale stays the same.
+    const [locale, setLocale] = createSignal("en", { equals: false });
 
     const [i18nInstance] = createResource(async () => {
       return await createEdenI18n(config);

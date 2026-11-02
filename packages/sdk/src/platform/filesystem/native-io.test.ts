@@ -87,6 +87,18 @@ it.each([false, true])(
   },
 );
 
+it("copying a dangling symlink never replaces an existing destination link", async () => {
+  const source = path.join(root, "source");
+  const destination = path.join(root, "destination");
+  await fs.symlink("original-target", source);
+  await fs.symlink("other-target", destination);
+  await expect(
+    Effect.runPromise(io.copy(source, destination)),
+  ).rejects.toMatchObject({ code: "EEXIST" });
+  expect(await fs.readlink(source)).toBe("original-target");
+  expect(await fs.readlink(destination)).toBe("other-target");
+});
+
 describe("atomic file writes", () => {
   it.each([
     {

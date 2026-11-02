@@ -1,4 +1,4 @@
-import type { ContextMenuIcon } from "@edenapp/types";
+import type { ContextMenuIcon, ContextMenuPosition } from "@edenapp/types";
 import {
   type ContextMenuAction,
   type ContextMenuActionItem,
@@ -16,12 +16,23 @@ export type MenuElement =
 /** Menu title - will be extracted and used as the context menu title */
 export const title = (text: string): MenuTitle => ({ __brand: "title", text });
 
+/** Section heading inside the menu items */
+export const section = (label: string): ContextMenuAction => ({
+  type: "title",
+  label,
+});
+
 /** Menu button */
 export const button = (
   id: string,
   label: string,
   onSelect: () => void | Promise<void>,
-  opts?: { icon?: ContextMenuIcon; danger?: boolean; disabled?: boolean },
+  opts?: {
+    icon?: ContextMenuIcon;
+    danger?: boolean;
+    disabled?: boolean;
+    checked?: boolean;
+  },
 ): ContextMenuAction => ({ type: "item", id, label, onSelect, ...opts });
 
 /** Menu item with nested submenu items */
@@ -66,11 +77,9 @@ const buildMenu = <T>(
   };
 };
 
-type Position = { left: number; top: number };
-
 export interface Menu<T> {
   /** Show context menu with data */
-  show(data: T, position?: Position): Promise<void>;
+  show(data: T, position?: ContextMenuPosition): Promise<void>;
   /** Create event handler for onContextMenu */
   handler(data: T | (() => T)): (e: MouseEvent) => void;
   /** Get menu config (for advanced use) */

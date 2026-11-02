@@ -14,6 +14,7 @@ import { t } from "../i18n";
 import type { PinnedFolder } from "./pinnedFolders";
 
 interface UseExplorerContextMenusOptions {
+  usesTrash: (location: FilesystemLocation) => boolean;
   volumes: () => FilesystemVolume[];
   currentLocation: () => FilesystemLocation;
   findPin: (location: FilesystemLocation) => PinnedFolder | undefined;
@@ -24,6 +25,7 @@ interface UseExplorerContextMenusOptions {
   isVolumeEjectPending: (volume: string) => boolean;
   ejectVolume: (volume: FilesystemVolume) => Promise<void>;
   openItem: (item: FileItem) => Promise<void>;
+  showItemDetails: (item: FileItem) => Promise<void>;
   getOpenWithMenuItems: (item: FileItem) => Promise<ContextMenuAction[]>;
   promptRename: (item: FileItem) => Promise<void>;
   duplicateItem: (item: FileItem) => Promise<void>;
@@ -74,75 +76,88 @@ export const useExplorerContextMenus = (
   };
 
   const fileItemMenu = menu(
-    (data: { item: FileItem; openWithItems: ContextMenuAction[] }) => [
-      title(data.item.name),
-      button("open", t("files.open"), () => options.openItem(data.item), {
-        icon: "play",
-      }),
-      when(
-        data.item.isFile || data.item.isDirectory,
-        submenu("open-with", t("files.openWith"), data.openWithItems, {
-          icon: "external-link",
+    (data: { item: FileItem; openWithItems: ContextMenuAction[] }) => {
+      return [
+        title(data.item.name),
+        button("open", t("files.open"), () => options.openItem(data.item), {
+          icon: "play",
         }),
-      ),
-      separator(),
-      when(
-        data.item.isDirectory,
-        button(
-          "pin-folder",
-          options.findPin(data.item.location)
-            ? t("files.unpinFolder")
-            : t("files.pinFolder"),
-          () =>
+        when(
+          data.item.isFile || data.item.isDirectory,
+          submenu("open-with", t("files.openWith"), data.openWithItems, {
+            icon: "external-link",
+          }),
+        ),
+        separator(),
+        when(
+          data.item.isDirectory,
+          button(
+            "pin-folder",
             options.findPin(data.item.location)
-              ? options.unpinFolder(data.item.location)
-              : options.pinFolder(data.item.location, data.item.name),
+              ? t("files.unpinFolder")
+              : t("files.pinFolder"),
+            () =>
+              options.findPin(data.item.location)
+                ? options.unpinFolder(data.item.location)
+                : options.pinFolder(data.item.location, data.item.name),
+            {
+              icon: "bookmark",
+              disabled:
+                !options.findPin(data.item.location) &&
+                !options.canPin(data.item.location),
+            },
+          ),
+        ),
+        button("copy", t("files.copy"), () => options.copyItem(data.item), {
+          icon: "copy",
+        }),
+        button("move", t("files.move"), () => options.moveItem(data.item), {
+          icon: "move",
+          disabled: options.readOnly(),
+        }),
+        separator(),
+        button(
+          "rename",
+          t("files.rename"),
+          () => options.promptRename(data.item),
           {
-            icon: "bookmark",
-            disabled:
-              !options.findPin(data.item.location) &&
-              !options.canPin(data.item.location),
+            icon: "edit-2",
+            disabled: options.readOnly(),
           },
         ),
-      ),
-      button("copy", t("files.copy"), () => options.copyItem(data.item), {
-        icon: "copy",
-      }),
-      button("move", t("files.move"), () => options.moveItem(data.item), {
-        icon: "move",
-        disabled: options.readOnly(),
-      }),
-      separator(),
-      button(
-        "rename",
-        t("files.rename"),
-        () => options.promptRename(data.item),
-        {
-          icon: "edit-2",
-          disabled: options.readOnly(),
-        },
-      ),
-      button(
-        "duplicate",
-        t("files.duplicate"),
-        () => options.duplicateItem(data.item),
-        {
-          icon: "copy",
-          disabled: options.readOnly(),
-        },
-      ),
-      separator(),
-      button(
-        "delete",
-        t("common.delete"),
-        () => options.promptDelete(data.item),
-        {
-          icon: "trash",
-          disabled: options.readOnly(),
-          danger: true,
-        },
-      ),
-    ],
+        button(
+          "duplicate",
+          t("files.duplicate"),
+          () => options.duplicateItem(data.item),
+          {
+            icon: "copy",
+            disabled: options.readOnly(),
+          },
+        ),
+        separator(),
+        button(
+          "details",
+          t("files.details"),
+          () => options.showItemDetails(data.item),
+          {
+            icon: "info",
+          },
+        ),
+        separator(),
+        button(
+          "delete",
+          options.usesTrash(data.item.location)
+            ? t("files.moveToTrash")
+            : t("files.deletePermanently"),
+          () => options.promptDelete(data.item),
+          {
+            icon: "trash",
+            disabled: options.readOnly(),
+            danger: true,
+          },
+        ),
+      ];
+    },
   );
 
   const emptyAreaMenu = menu<null>(() => [

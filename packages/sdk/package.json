@@ -25,7 +25,7 @@
     "build:electron-test-dependencies": "pnpm --filter '@edenapp/sdk^...' --filter 'com.eden.*^...' run build",
     "dev": "node ./scripts/dev.mjs",
     "dev:electron": "NODE_ENV=development electron dist/dev-host.js",
-    "dev:prepare": "pnpm run tokens:build && pnpm run css:build && pnpm run build:client && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:apps && pnpm run copy-assets && eden-build seed -c eden.dev.config.json -o dist",
+    "dev:prepare": "pnpm run tokens:build && pnpm run css:build && pnpm run build:client && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:keyboard-ui && pnpm run build:apps && pnpm run copy-assets && eden-build seed -c eden.dev.config.json -o dist",
     "dev:watch": "eden-build watch -c eden.dev.config.json --sdk-source-path .",
     "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
     "clean": "rm -rf dist",

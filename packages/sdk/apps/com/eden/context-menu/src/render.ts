@@ -42,6 +42,9 @@ function resolveIcon(
   return svg ? { type: "glyph", svg } : null;
 }
 
+const glyphMarkup = (paths: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+
 function createItemIcon(
   item: Extract<ContextMenuItem, { type: "item" }>,
   getAppIcon: (appId: string) => string | undefined,
@@ -67,8 +70,18 @@ function createItemIcon(
 
   const icon = document.createElement("span");
   icon.className = "context-menu-icon";
-  icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${resolvedIcon.svg}</svg>`;
+  icon.innerHTML = glyphMarkup(resolvedIcon.svg);
   return icon;
+}
+
+function createCheckSlot(checked: boolean | undefined): HTMLSpanElement {
+  const slot = document.createElement("span");
+  slot.className = "context-menu-icon context-menu-check";
+  const svg = checked ? resolveIconSvg("check") : undefined;
+  if (svg) {
+    slot.innerHTML = glyphMarkup(svg);
+  }
+  return slot;
 }
 
 export function renderPanel(
@@ -85,6 +98,9 @@ export function renderPanel(
   titleEl.classList.toggle("is-visible", Boolean(title));
 
   itemsEl.innerHTML = "";
+  const hasCheckable = items.some(
+    (item) => item.type === "item" && item.checked !== undefined,
+  );
   items.forEach((item, index) => {
     const itemPath = [...pathPrefix, index];
     const pathValue = serializePath(itemPath);
@@ -110,6 +126,12 @@ export function renderPanel(
     if (item.danger) entry.classList.add("context-menu-item-danger");
     if (item.disabled) entry.classList.add("context-menu-item-disabled");
 
+    if (hasCheckable) entry.appendChild(createCheckSlot(item.checked));
+    if (item.checked !== undefined) {
+      entry.setAttribute("role", "menuitemcheckbox");
+      entry.setAttribute("aria-checked", String(item.checked));
+    }
+
     const icon = createItemIcon(item, options.getAppIcon);
     if (icon) {
       entry.appendChild(icon);
@@ -134,7 +156,7 @@ export function renderPanel(
       const indicator = document.createElement("span");
       indicator.className = "context-menu-submenu-indicator";
       if (submenuIndicatorSvg) {
-        indicator.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${submenuIndicatorSvg}</svg>`;
+        indicator.innerHTML = glyphMarkup(submenuIndicatorSvg);
       } else {
         indicator.textContent = ">";
       }

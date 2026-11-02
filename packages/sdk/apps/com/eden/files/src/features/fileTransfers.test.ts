@@ -18,6 +18,19 @@ const item = (overrides: Partial<FileItem> = {}): FileItem => ({
 });
 
 describe("file transfer planning", () => {
+  it("keeps literal backslashes in POSIX filenames and directory addresses", () => {
+    const file = item({
+      name: "a\\b.txt",
+      location: { volume: "home", path: "/Documents/a\\b.txt" },
+    });
+    expect(
+      planTransfer(file, { volume: "home", path: "/Documents" }, "move"),
+    ).toEqual({ kind: "no-op" });
+    expect(
+      planTransfer(file, { volume: "home", path: "/a\\..\\folder" }, "copy"),
+    ).toEqual({ kind: "transfer", targetPath: "/a\\..\\folder/a\\b.txt" });
+  });
+
   it("preserves file extensions in localized keep-both names", () => {
     expect(createCopyName(item(), "copy", 1)).toBe("report-copy.txt");
     expect(createCopyName(item(), "copy", 3)).toBe("report-copy-3.txt");

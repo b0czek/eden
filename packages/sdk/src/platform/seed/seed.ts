@@ -28,9 +28,9 @@ const DEFAULT_USER_KEY = "users:default";
  * are initialized. After seeding, services simply read from the database.
  */
 export const seedDatabase = Effect.fn(function* (
-  appsDirectory: string,
+  systemDirectory: string,
   seedPath: string,
-  userDirectory: string,
+  homeDirectory: string,
 ) {
   const seedConfig = yield* io.readFile(seedPath, "utf-8").pipe(
     Effect.flatMap((content) =>
@@ -43,7 +43,7 @@ export const seedDatabase = Effect.fn(function* (
     return;
   }
   const usersDb = yield* openKeyvSqlite({
-    dbPath: path.join(appsDirectory, "users.db"),
+    dbPath: path.join(systemDirectory, "users.db"),
     label: "user seed storage",
     closedMessage: "User seed storage closed",
   });
@@ -52,7 +52,7 @@ export const seedDatabase = Effect.fn(function* (
   const settingsDb =
     Object.keys(settingsSeed).length > 0
       ? yield* openKeyvSqlite({
-          dbPath: path.join(appsDirectory, "settings.db"),
+          dbPath: path.join(systemDirectory, "settings.db"),
           label: "settings seed storage",
           closedMessage: "Settings seed storage closed",
         })
@@ -67,7 +67,7 @@ export const seedDatabase = Effect.fn(function* (
   log.info("Seeding database...");
   if (!usersSeeded) {
     if (seedConfig.users?.length)
-      yield* seedUsers(usersDb, seedConfig.users, userDirectory);
+      yield* seedUsers(usersDb, seedConfig.users, homeDirectory);
     if (seedConfig.defaultUsername) {
       yield* usersDb.write(DEFAULT_USER_KEY, seedConfig.defaultUsername);
       log.info(`Seeded default user: ${seedConfig.defaultUsername}`);
@@ -93,7 +93,7 @@ function getUserKey(username: string): string {
 const seedUsers = Effect.fn(function* (
   db: SeedConnection,
   users: EdenUserConfig[],
-  userDirectory: string,
+  homeDirectory: string,
 ) {
   const usernames: string[] = [];
 
@@ -107,7 +107,7 @@ const seedUsers = Effect.fn(function* (
     const now = Date.now();
     const role = user.role ?? "standard";
     const directoryRestriction = yield* ensureDirectoryRestriction(
-      userDirectory,
+      homeDirectory,
       role,
       user.directoryRestriction,
     );

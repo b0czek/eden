@@ -10,7 +10,7 @@ createEden({
     minTileWidth: 600,
     minTileHeight: 400,
   },
-  userDirectory: ".",
+  dataDirectory: ".eden-dev",
   window: {
     title: "Eden SDK Example",
   },

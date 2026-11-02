@@ -53,6 +53,7 @@ pnpm check:effects
 
 For Electron, append a suite filename or use `--project=sdk` / `--project=apps`.
 On headless Linux, prefix the command with `xvfb-run --auto-servernum`.
+The Linux Electron host uses X11, matching Eden's development launchers.
 
 Node integration tests use `createTestEden`.
 Its `executeFromView` helper returns an operation handle for operation commands.

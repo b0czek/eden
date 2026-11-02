@@ -93,7 +93,7 @@ describe("file opening integration", () => {
       eden.runtime.effects.run(operations.wait(handle, caller)),
     ).rejects.toMatchObject({
       _tag: "FilesystemIoFailed",
-      path: path.join(eden.paths.userDirectory, "missing.txt"),
+      path: path.join(eden.paths.homeDirectory, "missing.txt"),
       operation: "stat",
       cause: { code: "ENOENT" },
     });

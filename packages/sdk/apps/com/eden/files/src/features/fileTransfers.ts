@@ -25,7 +25,7 @@ const joinVirtualPath = (...parts: string[]) =>
 
 export const normalizeVirtualPath = (value: string): string => {
   const segments: string[] = [];
-  for (const segment of value.replaceAll("\\", "/").split("/")) {
+  for (const segment of value.split("/")) {
     if (!segment || segment === ".") continue;
     if (segment === "..") {
       segments.pop();
