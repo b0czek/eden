@@ -373,12 +373,15 @@ test.describe
 
       const app = host.electronApp;
       if (!app) throw new Error("Electron app is not running");
-      const directory = path.join(host.root, "users/projects/design");
+      const directory = path.join(host.homeDirectory, "projects/design");
       const driveRoot = path.join(host.root, "scope-usb");
       await fs.mkdir(directory, { recursive: true });
       await fs.mkdir(driveRoot);
       await fs.writeFile(path.join(directory, "notes.txt"), "project notes");
-      await fs.writeFile(path.join(host.root, "users/notes.txt"), "root decoy");
+      await fs.writeFile(
+        path.join(host.homeDirectory, "notes.txt"),
+        "root decoy",
+      );
       await fs.writeFile(
         path.join(driveRoot, "drive-notes.txt"),
         "drive notes",

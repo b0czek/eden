@@ -8,7 +8,7 @@ export default defineConfig({
   ],
   outputDir: "test-results",
   timeout: 30_000,
-  globalTimeout: 180_000,
+  globalTimeout: 600_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,

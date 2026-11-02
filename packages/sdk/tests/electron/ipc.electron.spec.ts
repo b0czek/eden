@@ -47,7 +47,7 @@ test.describe
       });
       expect(
         await fs.readFile(
-          path.join(host.root, "users/generated-copy.txt"),
+          path.join(host.homeDirectory, "generated-copy.txt"),
           "utf8",
         ),
       ).toBe("generated client");
@@ -213,13 +213,13 @@ test.describe
           });
         expect(
           await fs.readFile(
-            path.join(host.root, "users", "operation-renderer.txt"),
+            path.join(host.homeDirectory, "operation-renderer.txt"),
             "utf8",
           ),
         ).toBe("renderer");
         expect(
           await fs.readFile(
-            path.join(host.root, "users", "operation-backend.txt"),
+            path.join(host.homeDirectory, "operation-backend.txt"),
             "utf8",
           ),
         ).toBe("backend");
@@ -267,7 +267,7 @@ test.describe
         isUint8Array: true,
       });
       await expect(
-        fs.readFile(path.join(host.root, "users", "renderer-output.bin")),
+        fs.readFile(path.join(host.homeDirectory, "renderer-output.bin")),
       ).resolves.toEqual(Buffer.from([0, 255, 128, 1, 0]));
     });
 
@@ -291,7 +291,7 @@ test.describe
       expect(watchId).toEqual(expect.any(String));
 
       await fs.writeFile(
-        path.join(host.root, "users", "external.txt"),
+        path.join(host.homeDirectory, "external.txt"),
         "changed",
       );
       await expect
@@ -330,7 +330,7 @@ test.describe
       await host.evaluateApp(APP_ID, "globalThis.__fsChanges = []");
       try {
         await fs.writeFile(
-          path.join(host.root, "users", "after-unwatch.txt"),
+          path.join(host.homeDirectory, "after-unwatch.txt"),
           "still observed",
         );
         await expect
