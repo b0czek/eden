@@ -1,5 +1,5 @@
 import * as eden from "@edenapp/client";
-import type { FilesystemLocation } from "@edenapp/types";
+import type { CommandStream, FilesystemLocation } from "@edenapp/types";
 import { FaSolidSpinner } from "solid-icons/fa";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
@@ -29,6 +29,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   const [suggestions, setSuggestions] = createSignal<Suggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [isLoading, setIsLoading] = createSignal(false);
+  const [searched, setSearched] = createSignal(0);
   const displayPath = () =>
     `/${props.breadcrumbs
       .filter((crumb) => crumb.name !== "/")
@@ -36,81 +37,74 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       .join("/")}`;
 
   let searchSequence = 0;
-  createEffect(
-    on(
-      () => props.currentVolume,
-      () => {
-        searchSequence += 1;
-        setIsEditing(false);
-        setSuggestions([]);
-        setIsLoading(false);
-      },
-      { defer: true },
-    ),
-  );
+  let activeSearch: CommandStream<"fs/search"> | undefined;
+  const stopSearch = () => {
+    searchSequence += 1;
+    void activeSearch?.cancel();
+    activeSearch = undefined;
+    setIsLoading(false);
+  };
+  const closeOmnibox = () => {
+    stopSearch();
+    setIsEditing(false);
+    setSuggestions([]);
+    setInputValue("");
+  };
+  createEffect(on(() => props.currentVolume, closeOmnibox, { defer: true }));
+  onCleanup(stopSearch);
 
   let inputRef: HTMLInputElement | undefined;
   let containerRef: HTMLDivElement | undefined;
 
-  // Generate suggestions based on input
+  /** A leading slash searches from the typed folder; otherwise from the current folder. */
+  const searchScope = (value: string) => {
+    if (!value.startsWith("/")) return { path: props.currentPath, term: value };
+    const parts = value.split("/").filter(Boolean);
+    const folder = parts.slice(0, -1).join("/");
+    return { path: folder ? `/${folder}/` : "/", term: parts.at(-1) ?? "" };
+  };
+
   const generateSuggestions = async (value: string) => {
-    const sequence = ++searchSequence;
-    const volume = props.currentVolume;
+    stopSearch();
+    const sequence = searchSequence;
+    const { path, term } = searchScope(value);
     setIsLoading(true);
+    setSearched(0);
 
     try {
-      // If it looks like a path (starts with /)
-      if (value.startsWith("/")) {
-        const pathParts = value.split("/").filter((p) => p);
-        let basePath = "/";
-        let searchTerm = "";
-
-        if (pathParts.length > 0) {
-          basePath = `/${pathParts.slice(0, -1).join("/")}`;
-          if (basePath !== "/") basePath += "/";
-          searchTerm = pathParts[pathParts.length - 1]?.toLowerCase() || "";
-        }
-
-        const results = await eden.fs.search(
-          { volume, path: basePath === "//" ? "/" : basePath },
-          searchTerm,
-          { limit: 10 },
+      const search = await eden.fs.search(
+        { volume: props.currentVolume, path },
+        term,
+        { limit: 10 },
+      );
+      if (sequence !== searchSequence) {
+        await search.cancel();
+        return;
+      }
+      activeSearch = search;
+      let first = true;
+      for await (const progress of search) {
+        setSuggestions(
+          progress.results.map((result) => ({
+            ...result,
+            icon:
+              result.type === "folder" ? fileIcons.folder : fileIcons.document,
+          })),
         );
-
-        if (sequence !== searchSequence || volume !== props.currentVolume)
-          return;
-        // Add icons on frontend based on type
-        const resultsWithIcons = results.map((r) => ({
-          ...r,
-          icon: r.type === "folder" ? fileIcons.folder : fileIcons.document,
-        }));
-
-        setSuggestions(resultsWithIcons);
-        setSelectedIndex(0);
-      } else {
-        // Search in current directory (empty value shows all items)
-        const results = await eden.fs.search(
-          { volume, path: props.currentPath },
-          value.toLowerCase(),
-          { limit: 10 },
+        setSearched(progress.searched);
+        setSelectedIndex((index) =>
+          first ? 0 : Math.min(index, Math.max(progress.results.length - 1, 0)),
         );
-
-        if (sequence !== searchSequence || volume !== props.currentVolume)
-          return;
-        // Add icons on frontend based on type
-        const resultsWithIcons = results.map((r) => ({
-          ...r,
-          icon: r.type === "folder" ? fileIcons.folder : fileIcons.document,
-        }));
-
-        setSuggestions(resultsWithIcons);
-        setSelectedIndex(0);
+        first = false;
       }
     } catch (error) {
       console.error("Error searching:", error);
       if (sequence === searchSequence) setSuggestions([]);
     } finally {
-      if (sequence === searchSequence) setIsLoading(false);
+      if (sequence === searchSequence) {
+        activeSearch = undefined;
+        setIsLoading(false);
+      }
     }
   };
 
@@ -132,32 +126,20 @@ const Omnibox: Component<OmniboxProps> = (props) => {
 
     if (e.key === "Escape") {
       e.preventDefault();
-      setIsEditing(false);
-      setSuggestions([]);
-      setInputValue("");
+      closeOmnibox();
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (
         displayPath() !== props.currentPath &&
         inputValue().trim() === displayPath()
       ) {
-        setIsEditing(false);
-        setSuggestions([]);
-        setInputValue("");
+        closeOmnibox();
       } else if (suggestionList.length > 0) {
         const selected = suggestionList[selectedIndex()];
-        if (selected) {
-          props.onNavigate(selected.location.path);
-          setIsEditing(false);
-          setSuggestions([]);
-          setInputValue("");
-        }
+        if (selected) openSuggestion(selected);
       } else if (inputValue().trim()) {
-        // Navigate to entered path
         props.onNavigate(inputValue().trim());
-        setIsEditing(false);
-        setSuggestions([]);
-        setInputValue("");
+        closeOmnibox();
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -173,9 +155,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   // Handle click outside
   const handleClickOutside = (e: MouseEvent) => {
     if (containerRef && !containerRef.contains(e.target as Node)) {
-      setIsEditing(false);
-      setSuggestions([]);
-      setInputValue("");
+      closeOmnibox();
     }
   };
 
@@ -200,7 +180,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
     if (displayPath() === props.currentPath) generateSuggestions("");
   };
 
-  const handleSuggestionClick = (suggestion: Suggestion) => {
+  const openSuggestion = (suggestion: Suggestion) => {
     if (suggestion.type === "file") {
       // For files, navigate to parent directory and select the file
       const parentPath = getParentPath(suggestion.location.path);
@@ -209,9 +189,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
       // For folders, navigate to the folder itself
       props.onNavigate(suggestion.location.path);
     }
-    setIsEditing(false);
-    setSuggestions([]);
-    setInputValue("");
+    closeOmnibox();
   };
 
   const handleOmniboxKeyDown = (e: KeyboardEvent) => {
@@ -260,7 +238,14 @@ const Omnibox: Component<OmniboxProps> = (props) => {
             onKeyDown={handleKeyDown}
             placeholder={props.labels.searchPlaceholder}
           />
-          {isLoading() && <FaSolidSpinner class="omnibox-loading" />}
+          <Show when={isLoading()}>
+            <Show when={searched() > 0}>
+              <span class="eden-text-xs eden-text-tertiary">
+                {props.labels.searchedItems(searched())}
+              </span>
+            </Show>
+            <FaSolidSpinner class="omnibox-loading" />
+          </Show>
         </div>
 
         <Show when={suggestions().length > 0}>
@@ -272,7 +257,7 @@ const Omnibox: Component<OmniboxProps> = (props) => {
                   class={`suggestion-item ${
                     index() === selectedIndex() ? "selected" : ""
                   }`}
-                  onClick={() => handleSuggestionClick(suggestion)}
+                  onClick={() => openSuggestion(suggestion)}
                   onMouseEnter={() => setSelectedIndex(index())}
                 >
                   <span class="suggestion-icon">

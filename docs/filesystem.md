@@ -74,8 +74,25 @@ const bytes = await fs.readBinary(location);
 await fs.writeBinary({ volume: "home", path: "/notes-copy.bin" }, bytes);
 ```
 
-`fs.search` searches beneath a path on one volume.
-Each result includes its complete `location`.
+`fs.search` searches file and folder names beneath a path on one volume.
+Matching ignores case and accepts characters in order with gaps, so `nts` finds `Notes.md`.
+Results put the best and nearest matches first. Each result includes its complete `location`.
+An empty pattern lists the folder's own entries.
+Search skips hidden entries and `node_modules` folders, and does not follow symbolic links.
+On very large folder trees, it checks a limited number of entries, nearest folders first.
+
+Search is a [stream](ipc-architecture.md#streams). Each chunk contains the best `results` found
+so far and the number of entries `searched`. The last chunk contains the final results.
+`limit` sets the number of results in each chunk, from 0 to 1000. The default is 10.
+
+```ts
+const search = await fs.search(location, "notes", { limit: 20 });
+for await (const { results, searched } of search) {
+  showResults(results, searched);
+}
+```
+
+Stop reading when you no longer need more results, for example when the user changes the query.
 
 ### File handles
 

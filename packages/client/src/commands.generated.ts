@@ -6,8 +6,10 @@
  * Run 'pnpm run codegen' to regenerate.
  */
 
-import type { CommandArgs, CommandResult, EventData, OperationSubmission } from "@edenapp/types";
+import type { CommandArgs, CommandResult, CommandStream, EventData, OperationSubmission } from "@edenapp/types";
 import { invoke } from "./invoke.js";
+
+import { openStream } from "./streams.js";
 
 import { subscribe, unsubscribe } from "./subscriptions.js";
 
@@ -270,8 +272,8 @@ const fsCommands = {
     invoke("fs/readdir", { ["location"]: location }),
   ["resolve"]: (location: CommandArgs<"fs/resolve">["location"]): Promise<CommandResult<"fs/resolve">> =>
     invoke("fs/resolve", { ["location"]: location }),
-  ["search"]: (location: CommandArgs<"fs/search">["location"], pattern: CommandArgs<"fs/search">["pattern"], options?: Pick<CommandArgs<"fs/search">, "limit">): Promise<CommandResult<"fs/search">> =>
-    invoke("fs/search", { ["location"]: location, ["pattern"]: pattern, ["limit"]: options?.["limit"] }),
+  ["search"]: (location: CommandArgs<"fs/search">["location"], pattern: CommandArgs<"fs/search">["pattern"], options?: Pick<CommandArgs<"fs/search">, "limit">): Promise<CommandStream<"fs/search">> =>
+    openStream("fs/search", { ["location"]: location, ["pattern"]: pattern, ["limit"]: options?.["limit"] }),
   ["stat"]: (location: CommandArgs<"fs/stat">["location"]): Promise<CommandResult<"fs/stat">> =>
     invoke("fs/stat", { ["location"]: location }),
   /**

@@ -461,9 +461,10 @@ export interface FsCommands {
     response: { realPath: string; };
   };
   "fs/search": {
-    mode: "result";
+    mode: "stream";
     args: { location: { volume: string; path: string; }; pattern: string; limit?: number | undefined; };
-    response: import("./index").SearchResult[];
+    response: import("./index").StreamHandle<"fs/search">;
+    chunk: import("./index").SearchProgress;
   };
   "fs/stat": {
     mode: "result";

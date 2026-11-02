@@ -75,6 +75,7 @@ export const pl = {
     folder: "Folder",
     editPath: "Edytuj ścieżkę",
     searchPlaceholder: "Wpisz ścieżkę lub szukaj...",
+    searchedItems: "Przeszukano: {count}",
     extensionHelp: "Uwzględnij rozszerzenie pliku (np. .txt, .js, .md)",
     displayOptions: "Opcje Wyświetlania",
     viewStyle: "Styl Widoku",

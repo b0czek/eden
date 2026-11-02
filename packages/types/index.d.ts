@@ -139,6 +139,14 @@ export interface SearchResult {
   type: "file" | "folder";
 }
 
+/** Progress of a filesystem search stream. */
+export interface SearchProgress {
+  /** Best matches found so far, ranked from best to worst. */
+  results: SearchResult[];
+  /** Number of entries examined so far. */
+  searched: number;
+}
+
 /**
  * Notification type/variant for styling
  */

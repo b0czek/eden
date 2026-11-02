@@ -2,7 +2,11 @@ import { statSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { FilesystemVolume, UserProfile } from "@edenapp/types";
+import type {
+  FilesystemVolume,
+  SearchProgress,
+  UserProfile,
+} from "@edenapp/types";
 import * as Effect from "effect/Effect";
 import { fromPromise } from "../../../../src/core/effects/io";
 import { decodeLaunchContext } from "../../../../src/core/utils/app-launch-context";
@@ -15,6 +19,7 @@ import {
   type TestEden,
 } from "../../../support/create-test-eden";
 import { registerTestVolume } from "../../../support/filesystem";
+import { connectViewStreams, readAll } from "../../../support/streams";
 
 const appId = "com.example.volumes";
 
@@ -52,6 +57,22 @@ describe("consumer-managed filesystem volumes", () => {
       appId,
       principal: { kind: "user", profile: user },
     });
+
+  async function connectSearch() {
+    eden.runtime.services.installedPackages.register(testApp(appId));
+    await eden.complete("process/launch", { appId });
+    const view = connectViewStreams(eden, appId);
+    return async (location: string, pattern: string, limit?: number) =>
+      readAll<SearchProgress>(
+        await view.open("fs/search", {
+          location: { volume: "usb", path: location },
+          pattern,
+          limit,
+        }),
+      );
+  }
+  const paths = (progress: SearchProgress | undefined) =>
+    progress?.results.map((result) => `${result.type}:${result.location.path}`);
 
   const invoke = (id: string, command: string, args: unknown) =>
     eden.executeFromView(
@@ -424,18 +445,63 @@ describe("consumer-managed filesystem volumes", () => {
     ).rejects.toThrow("Permission denied");
   });
 
+  it("searches nested folders by ranked, case-insensitive fuzzy name", async () => {
+    const files = [
+      "Report.pdf",
+      "archive/old-report.txt",
+      "archive/2024/q1/q2/q3/deep/quarterly-report.txt",
+      "Projects/NewTestSuite/notes.txt",
+      ".hidden/report.txt",
+      "node_modules/report/index.js",
+    ];
+    for (const file of files) {
+      await fs.mkdir(path.dirname(path.join(usbRoot, file)), {
+        recursive: true,
+      });
+      await fs.writeFile(path.join(usbRoot, file), "");
+    }
+    await fs.symlink(eden.paths.homeDirectory, path.join(usbRoot, "linked"));
+    const search = await connectSearch();
+
+    const progress = await search("/", "REPORT");
+    expect(paths(progress[0])).toEqual(["file:/Report.pdf"]);
+    expect(progress[0]?.searched).toBe(5);
+    expect(paths(progress.at(-1))).toEqual([
+      "file:/Report.pdf",
+      "file:/archive/old-report.txt",
+      "file:/archive/2024/q1/q2/q3/deep/quarterly-report.txt",
+    ]);
+    const searched = progress.map((chunk) => chunk.searched);
+    expect(searched).toEqual([...searched].sort((a, b) => a - b));
+    expect(searched.at(-1)).toBe(14);
+
+    expect(paths((await search("/", "nts", 2)).at(-1))).toEqual([
+      "folder:/Projects/NewTestSuite",
+      "file:/Projects/NewTestSuite/notes.txt",
+    ]);
+    expect(paths((await search("/archive/", "report")).at(-1))).toEqual([
+      "file:/archive/old-report.txt",
+      "file:/archive/2024/q1/q2/q3/deep/quarterly-report.txt",
+    ]);
+    const listing = await search("/", "");
+    expect(listing).toHaveLength(1);
+    expect(paths(listing[0])).toEqual([
+      "folder:/archive",
+      "folder:/node_modules",
+      "folder:/Projects",
+      "file:/linked",
+      "file:/Report.pdf",
+    ]);
+  });
+
   it("copies and moves files across Home and registered volumes", async () => {
     const home = { volume: "home", path: "/operators/one/nested/report.txt" };
     const usb = { volume: "usb", path: "/nested/report.txt" };
     await execute("fs/write", { location: { ...home }, content: "report" });
     await execute("fs/cp", { from: home, to: usb });
     await expect(execute("fs/read", { location: usb })).resolves.toBe("report");
-    await expect(
-      execute("fs/search", {
-        location: { volume: "usb", path: "/" },
-        pattern: "report",
-      }),
-    ).resolves.toEqual([
+    const search = await connectSearch();
+    expect((await search("/", "report")).at(-1)?.results).toEqual([
       {
         location: { volume: "usb", path: "/nested/report.txt" },
         name: "report.txt",

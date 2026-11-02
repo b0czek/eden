@@ -33,7 +33,7 @@ export interface FileExplorerHeaderProps {
   onGoBack: () => void;
   onGoForward: () => void;
   onGoUp: () => void;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, selectedItem?: string) => void;
   onNewFolder?: () => void;
   onNewFile?: () => void;
   onOpenDisplayOptions?: (event: MouseEvent) => void;

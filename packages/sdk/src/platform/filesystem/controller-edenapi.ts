@@ -59,7 +59,10 @@ const unwatchArgs = v.object({
 const searchArgs = v.object({
   location: filesystemLocationSchema,
   pattern: v.string(),
-  limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 10),
+  limit: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
+    10,
+  ),
 });
 const transferArgs = v.object({
   from: filesystemLocationSchema,
@@ -160,6 +163,7 @@ export function createFilesystemController(files: Filesystem) {
       }),
       search: command({
         permission: "read",
+        mode: "stream",
         input: searchArgs,
         handle: ({ location, pattern, limit }) =>
           files.search(location, pattern, limit),

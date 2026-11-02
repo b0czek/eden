@@ -59,6 +59,8 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   newFile: "",
   editPath: t("filePicker.editPath"),
   searchPlaceholder: t("filePicker.searchPlaceholder"),
+  searchedItems: (count) =>
+    t("filePicker.searchedItems", { count: count.toLocaleString() }),
   loading: t("common.loading"),
   empty: t("filePicker.empty"),
   emptyHint: t("filePicker.emptyHint"),

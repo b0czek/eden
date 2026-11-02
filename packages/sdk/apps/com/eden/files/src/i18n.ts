@@ -36,6 +36,8 @@ export const getExplorerLabels = (
   newFile: t("files.newFile"),
   editPath: t("files.editPath"),
   searchPlaceholder: t("files.searchPlaceholder"),
+  searchedItems: (count) =>
+    t("files.searchedItems", { count: count.toLocaleString() }),
   loading: t("common.loading"),
   empty: t("files.empty"),
   emptyHint: t("files.emptyHint"),
