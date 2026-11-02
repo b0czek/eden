@@ -66,8 +66,11 @@ export function extractControllers(source: SourceFile): {
           `${namespace}/${command}: client arguments require an object with declared fields`,
         );
       const modeType = descriptor.getProperty("mode")?.getTypeAtLocation(node);
+      const modeValue = modeType?.getLiteralValue();
       const mode =
-        modeType?.getLiteralValue() === "operation" ? "operation" : "result";
+        modeValue === "operation" || modeValue === "stream"
+          ? modeValue
+          : "result";
       const result: Type | undefined = commandContract
         .getProperty("success")
         ?.getTypeAtLocation(node);

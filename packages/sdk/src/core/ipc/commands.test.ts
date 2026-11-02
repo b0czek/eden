@@ -16,6 +16,7 @@ import { command, defineController } from "../controllers/controller";
 import { fromPromise } from "../effects/io";
 import { ExecutionContext, ExecutionContextLive } from "../execution/context";
 import { Operations } from "../operations/service";
+import { Streams } from "../streams/service";
 import { Commands, CommandsLive } from "./commands";
 import { Permissions, PermissionsLive } from "./permissions";
 
@@ -41,6 +42,7 @@ function harness() {
       Effect.provideService(SessionContext, session),
       Effect.provideService(ExecutionContext, execution),
       Effect.provideService(Operations, {} as Operations),
+      Effect.provideService(Streams, {} as Streams),
     ),
   );
   const registry = {

@@ -1,6 +1,6 @@
 import type { CommandCompletion, CommandName } from "./commands";
 
-export type CommunicationMode = "result" | "operation";
+export type CommunicationMode = "result" | "operation" | "stream";
 
 export interface OperationHandle<C extends string = string> {
   command: C;

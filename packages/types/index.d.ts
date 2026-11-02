@@ -61,6 +61,7 @@ export * from "./channels";
 // Export new command types
 export type {
   CommandArgs,
+  CommandChunk,
   CommandCompletion,
   CommandMap,
   CommandName,
@@ -179,3 +180,4 @@ export type WallpaperConfig =
   | { type: "custom"; value: string };
 
 export * from "./Operations";
+export * from "./Streams";

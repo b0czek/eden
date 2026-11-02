@@ -2,14 +2,16 @@ import type { OperationSubmission } from "@edenapp/types";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
 import { SessionContext } from "../../desktop/session/context";
-import type { Controller } from "../controllers/controller";
+import type { CommandMode, Controller } from "../controllers/controller";
 import {
   type CommandCallerContext,
   ExecutionContext,
 } from "../execution/context";
 import { Operations } from "../operations/service";
 import type { OperationTask } from "../operations/task";
+import { Streams } from "../streams/service";
 import {
   CallerPrincipalUnavailable,
   CommandGrantDenied,
@@ -56,7 +58,7 @@ export interface RegisteredCommand {
   namespace: string;
   command: string;
   handler: CommandHandler;
-  mode: "result" | "operation";
+  mode: CommandMode;
   permission?: string; // Full permission: "namespace/action"
 }
 
@@ -68,6 +70,7 @@ export const CommandsLive = Layer.effect(
       const sessionContext = yield* SessionContext;
       const executionContext = yield* ExecutionContext;
       const operations = yield* Operations;
+      const streams = yield* Streams;
       const handlers = new Map<string, RegisteredCommand>();
 
       function registerController(controller: Controller): void {
@@ -182,6 +185,15 @@ export const CommandsLive = Layer.effect(
             () => metadata.handler(preparedArgs) as OperationTask<unknown>,
             submission,
           );
+        }
+        if (metadata.mode === "stream") {
+          const source = metadata.handler(sanitizeArgs(args));
+          if (!Stream.isStream(source))
+            throw new Error(`Stream command ${fullCommand} returned no Stream`);
+          // command() rejects unmet requirements before heterogeneous registry erasure.
+          // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off
+          const provided = source as Stream.Stream<unknown, unknown>;
+          return streams.open(fullCommand, context, provided);
         }
         return metadata.handler(sanitizeArgs(args));
       }

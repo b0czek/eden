@@ -1,3 +1,4 @@
+import { STREAM_CHANNEL, type StreamMessage } from "../core/streams/protocol";
 import { decodeLaunchContext } from "../core/utils/app-launch-context";
 import {
   type CallsiteInfo,
@@ -56,6 +57,7 @@ type RuntimeMessage = {
   serviceName?: string;
   targetAppId?: string;
   sourceAppId?: string;
+  message?: StreamMessage;
 };
 
 // Electron utility process extends the Node process with parentPort
@@ -206,7 +208,11 @@ const shellTransport: ShellTransport = {
 /**
  * Eden API implementation for utility process
  */
-const { api: edenAPI, dispatch } = createEdenAPI(shellTransport, {
+const {
+  api: edenAPI,
+  dispatch,
+  dispatchStream,
+} = createEdenAPI(shellTransport, {
   getLaunchArgs: () => launchContext.args,
   getLaunchFile: () => launchContext.file,
 });
@@ -257,6 +263,8 @@ parentPort.on("message", (event: Electron.MessageEvent) => {
     // Event notification from main
     const { eventName, payload } = message;
     dispatch(eventName, payload);
+  } else if (message.type === STREAM_CHANNEL) {
+    if (message.message) dispatchStream(message.message);
   } else if (message.type === "appbus-port") {
     // AppBus connection port
     const [port] = event.ports;

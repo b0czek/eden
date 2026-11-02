@@ -16,10 +16,13 @@ import {
 } from "../../platform/ports/types";
 import type { Controller } from "../controllers/controller";
 import { asError } from "../effects/io";
+import { listen } from "../events/scoped";
 import type { CommandCallerContext } from "../execution/context";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
 import { Operations } from "../operations/service";
+import { STREAM_CHANNEL } from "../streams/protocol";
+import { type StreamDelivery, Streams } from "../streams/service";
 import { Commands } from "./commands";
 import { createEventController } from "./controller-edenapi";
 import { createEventRouting, type EventRouting } from "./event-routing";
@@ -48,6 +51,7 @@ export const IpcTransportLive = Layer.effect(
     const execution = yield* ExecutionContext;
     const rendererIpc = yield* RendererIpcPort;
     const operations = yield* Operations;
+    const streams = yield* Streams;
     const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
     const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
     let eventSubscribers: EventRouting;
@@ -71,6 +75,16 @@ export const IpcTransportLive = Layer.effect(
     );
     setupIPCHandlers();
     setupBackendMessageHandlers();
+    yield* listen(streams.messages, deliverStreamMessage);
+    function deliverStreamMessage({ owner, message }: StreamDelivery): void {
+      if (owner.kind === "backend") {
+        backends.sendMessage(owner.appId, { type: STREAM_CHANNEL, message });
+        return;
+      }
+      const viewId = views.getViewIdByWebContentsId(owner.webContentsId);
+      if (viewId !== undefined)
+        views.sendToView(viewId, STREAM_CHANNEL, message);
+    }
     function registerController(controller: Controller): void {
       for (const event of Object.keys(controller.events)) {
         const name = `${controller.namespace}/${event}`;
@@ -232,8 +246,8 @@ export const IpcTransportLive = Layer.effect(
         function respond(exit: Exit.Exit<unknown, unknown>) {
           if (Exit.isSuccess(exit)) {
             resolve(
-              mode === "operation"
-                ? { mode: "operation", handle: exit.value }
+              mode === "operation" || mode === "stream"
+                ? { mode, handle: exit.value }
                 : { mode: "result", result: exit.value },
             );
           } else {

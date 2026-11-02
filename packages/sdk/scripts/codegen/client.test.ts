@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { Project } from "ts-morph";
 import { generateClientCode } from "./client";
-import { groupCommandsByNamespace } from "./commands";
+import { generateCommandsCode, groupCommandsByNamespace } from "./commands";
 import { extractControllers } from "./controllers";
 import type { NamespaceEvents } from "./events";
 
@@ -110,6 +110,44 @@ it("rejects operation submission field collisions", () => {
     }),
   `),
   ).toThrow("fs/copy: argument submission conflicts");
+});
+
+it("generates stream commands with their chunk type and a stream client method", () => {
+  const commands = groupCommandsByNamespace(
+    extract(
+      `
+    search: command({
+      input: v.object({ pattern: v.string(), limit: v.optional(v.number()) }),
+      mode: "stream",
+      handle: () => Stream.fromIterable<{ name: string }>([]),
+    }),
+  `,
+      "fs",
+      'import * as Stream from "effect/Stream";',
+    ),
+  );
+  expect(commands[0].commands[0]).toMatchObject({
+    mode: "stream",
+    returnType: "{ name: string; }",
+  });
+  expect(generateCommandsCode(commands, new Set())).toContain(
+    [
+      '  "fs/search": {',
+      '    mode: "stream";',
+      "    args: { pattern: string; limit?: number | undefined; };",
+      '    response: import("./index").StreamHandle<"fs/search">;',
+      "    chunk: { name: string; };",
+      "  };",
+    ].join("\n"),
+  );
+  const client = generateClientCode(commands);
+  expect(client).toContain('import { openStream } from "./streams.js";');
+  expect(client).toContain(
+    [
+      '  ["search"]: (pattern: CommandArgs<"fs/search">["pattern"], options?: Pick<CommandArgs<"fs/search">, "limit">): Promise<CommandStream<"fs/search">> =>',
+      '    openStream("fs/search", { ["pattern"]: pattern, ["limit"]: options?.["limit"] }),',
+    ].join("\n"),
+  );
 });
 
 const events: NamespaceEvents[] = [

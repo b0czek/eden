@@ -1,10 +1,11 @@
 import type * as Effect from "effect/Effect";
+import type * as Stream from "effect/Stream";
 import * as v from "valibot";
 import type { CommandCallerContext } from "../execution/context";
 import { type OperationTask, operationTask } from "../operations/task";
 import type { ControllerEvent } from "./events";
 
-type CommandMode = "result" | "operation";
+export type CommandMode = "result" | "operation" | "stream";
 
 /** The value sent across IPC, independent of the service's execution model. */
 type ResultSuccess<Result> =
@@ -12,11 +13,16 @@ type ResultSuccess<Result> =
     ? Success
     : Result;
 
+/** Operations complete with one value; streams send each element as a chunk. */
 type CommandSuccess<Result, Mode extends CommandMode> = Mode extends "operation"
   ? Result extends OperationTask<infer Completion, infer _Error>
     ? Completion
     : never
-  : ResultSuccess<Result>;
+  : Mode extends "stream"
+    ? Result extends Stream.Stream<infer Chunk, infer _Error, infer _Services>
+      ? Chunk
+      : never
+    : ResultSuccess<Result>;
 
 export interface ControllerCommand {
   readonly permission?: string;
@@ -60,8 +66,18 @@ interface CommandOptions<Args, Result, Mode extends CommandMode> {
       ? Result extends OperationTask<infer _Completion, infer _Error>
         ? Result
         : never
-      : ProvidedResult<Result>);
+      : Mode extends "stream"
+        ? ProvidedStream<Result>
+        : ProvidedResult<Result>);
 }
+
+/** Stream commands return a lazy, fully provided Stream; Eden runs it after acceptance. */
+type ProvidedStream<Result> =
+  Result extends Stream.Stream<infer _Chunk, infer _Error, infer Services>
+    ? [Services] extends [never]
+      ? Result
+      : never
+    : never;
 
 export function command<
   Schema extends v.GenericSchema,

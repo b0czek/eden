@@ -16,6 +16,7 @@ export * from "./commands.generated";
 
 import { CommandMap } from "./commands.generated";
 import type { Operation } from "./Operations";
+import type { StreamReader } from "./Streams";
 
 /**
  * Type-safe command name
@@ -28,20 +29,29 @@ export type CommandName = keyof CommandMap;
 export type CommandArgs<T extends CommandName> = CommandMap[T]["args"];
 
 /**
- * Serializable command response before app-side operation controls are attached.
+ * Serializable command response before app-side operation or stream controls are attached.
  */
 export type CommandResponse<T extends CommandName> = CommandMap[T]["response"];
 
-/** App-facing result: operation commands expose controls bound to their handle. */
+/** App-facing result: operation and stream commands expose controls bound to their handle. */
 export type CommandResult<T extends CommandName> = T extends CommandName
   ? CommandMap[T]["mode"] extends "operation"
     ? Operation<T>
-    : CommandResponse<T>
+    : CommandMap[T]["mode"] extends "stream"
+      ? StreamReader<T>
+      : CommandResponse<T>
   : never;
 
 /** Eventual completion; result commands have no separate completion. */
 export type CommandCompletion<T extends CommandName> = CommandMap[T] extends {
   completion: infer R;
+}
+  ? R
+  : never;
+
+/** Value type of each chunk that a stream command sends. */
+export type CommandChunk<T extends CommandName> = CommandMap[T] extends {
+  chunk: infer R;
 }
   ? R
   : never;

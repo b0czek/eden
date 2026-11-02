@@ -48,6 +48,8 @@ import {
 } from "../core/settings/runtime";
 import { SettingsLive } from "../core/settings/service";
 import { SqliteSettingsStorageLive } from "../core/settings/sqlite-storage";
+import { registerStreamsApi } from "../core/streams/runtime";
+import { StreamsLive } from "../core/streams/service";
 import { GrantCatalogLive } from "../core/user/grant-catalog";
 import { registerUsersApi, UsersPortsLive } from "../core/user/runtime";
 import { UsersLive } from "../core/user/service";
@@ -154,6 +156,7 @@ const ApplicationServicesLive = Layer.mergeAll(
 ).pipe(
   Layer.provideMerge([
     OperationsLive.pipe(Layer.provide(OperationTransitionPreparationLive)),
+    StreamsLive,
     BackendsLive,
   ]),
   Layer.provideMerge([
@@ -212,6 +215,7 @@ const ApiLive = Layer.effectDiscard(
       registerSessionsApi,
       registerSettingsApi,
       registerSettingsPanelsApi,
+      registerStreamsApi,
       registerUsersApi,
       registerViewsApi,
       registerSystemApi,

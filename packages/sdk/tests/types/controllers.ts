@@ -1,5 +1,6 @@
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
 import * as v from "valibot";
 import { command, operation } from "../../src/core/controllers/controller";
 import { fromPromise } from "../../src/core/effects/io";
@@ -31,6 +32,18 @@ command({
   input: v.object({ value: v.number() }),
   handle: ({ value }) => Effect.succeed(value),
 });
+command({ mode: "stream", handle: () => Stream.range(1, 3) });
+command({
+  mode: "stream",
+  handle: () => Stream.fail(new Error("expected")),
+});
+// @ts-expect-error Stream commands must return a Stream.
+command({ mode: "stream", handle: () => [1, 2, 3] });
+// @ts-expect-error Stream commands cannot return an Effect that produces a Stream.
+command({ mode: "stream", handle: () => Effect.succeed(Stream.make(1)) });
+declare const requiresService: Stream.Stream<number, never, "service">;
+// @ts-expect-error A stream's requirements must be provided.
+command({ mode: "stream", handle: () => requiresService });
 
 // Native async work must be adapted to an Effect before returning it.
 // @ts-expect-error Async handlers return a Promise.

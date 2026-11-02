@@ -5,6 +5,7 @@ import type {
 } from "@edenapp/types";
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
+import { STREAM_CHANNEL, type StreamMessage } from "../core/streams/protocol";
 import { decodeLaunchContext } from "../core/utils/app-launch-context";
 import { log, setLogContext } from "../platform/logging/logger";
 import {
@@ -78,7 +79,11 @@ const shellTransport: ShellTransport = {
 };
 
 // Expose edenAPI for shell commands and event subscriptions
-const { api: edenAPI, dispatch } = createEdenAPI(shellTransport, {
+const {
+  api: edenAPI,
+  dispatch,
+  dispatchStream,
+} = createEdenAPI(shellTransport, {
   getLaunchArgs: () => launchContext.args,
   getLaunchFile: () => launchContext.file,
 });
@@ -89,6 +94,10 @@ ipcRenderer.on(
     dispatch(message.type, message.payload);
   },
 );
+
+ipcRenderer.on(STREAM_CHANNEL, (_event, message: StreamMessage) => {
+  dispatchStream(message);
+});
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 

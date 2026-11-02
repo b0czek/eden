@@ -494,6 +494,21 @@ const settingsCommands = {
 };
 export { settingsCommands as settings };
 
+const streamCommands = {
+  /**
+   * Return credit for chunks that the caller consumed from its stream.
+   * Stream readers send this automatically.
+   */
+  ["ack"]: (handle: CommandArgs<"stream/ack">["handle"], count: CommandArgs<"stream/ack">["count"]): Promise<CommandResult<"stream/ack">> =>
+    invoke("stream/ack", { ["handle"]: handle, ["count"]: count }),
+  /**
+   * Stop a stream that the caller opened.
+   */
+  ["cancel"]: (handle: CommandArgs<"stream/cancel">["handle"]): Promise<CommandResult<"stream/cancel">> =>
+    invoke("stream/cancel", { ["handle"]: handle }),
+};
+export { streamCommands as stream };
+
 const systemCommands = {
   /**
    * Get consumer-controlled product branding for SDK-owned interfaces.

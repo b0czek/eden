@@ -17,6 +17,26 @@ it("can be imported without a runtime and rejects calls clearly", async () => {
   );
 });
 
+it("iterates a bridged stream reader and cancels it when the loop exits early", async () => {
+  const chunks = [1, 2, 3];
+  const cancel = vi.fn(async () => {});
+  const stream = eden.toCommandStream({
+    handle: { command: "example/feed", id: "stream" },
+    next: async () =>
+      chunks.length
+        ? { done: false, value: chunks.shift() }
+        : { done: true, value: undefined },
+    cancel,
+  });
+  const received: unknown[] = [];
+  for await (const chunk of stream) {
+    received.push(chunk);
+    if (received.length === 2) break;
+  }
+  expect(received).toEqual([1, 2]);
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
 it.each(["window", "worker"])(
   "resolves a %s API installed after import and preserves errors",
   async (runtime) => {
