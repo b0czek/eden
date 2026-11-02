@@ -36,7 +36,7 @@ export interface FileExplorerHeaderProps {
   onNavigate: (path: string) => void;
   onNewFolder?: () => void;
   onNewFile?: () => void;
-  onOpenDisplayOptions?: () => void;
+  onOpenDisplayOptions?: (event: MouseEvent) => void;
   endActions?: JSX.Element;
 }
 
@@ -182,8 +182,9 @@ const FileExplorerHeader: Component<FileExplorerHeaderProps> = (props) => {
             <button
               type="button"
               class="eden-btn eden-btn-sm eden-btn-square"
+              aria-haspopup="menu"
               onClick={props.onOpenDisplayOptions}
-              title={props.labels.settings}
+              title={props.labels.displayOptions}
             >
               <FaSolidEllipsis />
             </button>

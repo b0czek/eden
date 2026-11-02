@@ -9,7 +9,6 @@ export function useDisplayPreferences(options: { onChange: () => void }) {
     sortBy: "name",
     sortOrder: "asc",
   });
-  const [showOptions, setShowOptions] = createSignal(false);
   const [trashSort, setTrashSort] = createSignal<
     Pick<DisplayPreferences, "sortBy" | "sortOrder">
   >({ sortBy: "modified", sortOrder: "desc" });
@@ -86,8 +85,5 @@ export function useDisplayPreferences(options: { onChange: () => void }) {
       sortItems(items, trashPreferences(), false),
     load,
     change,
-    showOptions,
-    openOptions: () => setShowOptions(true),
-    closeOptions: () => setShowOptions(false),
   };
 }

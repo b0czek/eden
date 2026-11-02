@@ -1,7 +1,10 @@
 import {
   buildBreadcrumbs,
+  createDisplayMenu,
+  type DisplayPreferences,
   FileExplorerHeader,
   type FileExplorerLabels,
+  menuBelow,
 } from "@edenapp/files-core";
 import { button, menu } from "@edenapp/tablets";
 import type { FilesystemLocation } from "@edenapp/types";
@@ -18,10 +21,11 @@ interface FilesToolbarProps {
   trashSelected: boolean;
   busy: boolean;
   readOnly: boolean;
+  displayPreferences: DisplayPreferences;
   onRefresh: () => void;
   onNewFolder: () => Promise<void>;
   onNewFile: () => Promise<void>;
-  onOpenDisplayOptions: () => void;
+  onDisplayChange: (preferences: DisplayPreferences) => void;
 }
 
 export function FilesToolbar(props: FilesToolbarProps) {
@@ -36,13 +40,16 @@ export function FilesToolbar(props: FilesToolbarProps) {
       icon: "file-plus",
     }),
   ]);
+  const displayMenu = createDisplayMenu((next) => props.onDisplayChange(next));
 
   const showNewItemMenu = (event: MouseEvent) => {
-    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    void newItemMenu.show(null, {
-      left: Math.round(bounds.left),
-      top: Math.round(bounds.bottom),
-    });
+    void newItemMenu.show(null, menuBelow(event, "left"));
+  };
+  const showDisplayMenu = (event: MouseEvent) => {
+    void displayMenu.show(
+      { labels: props.labels, preferences: props.displayPreferences },
+      menuBelow(event, "right"),
+    );
   };
 
   return (
@@ -105,7 +112,7 @@ export function FilesToolbar(props: FilesToolbarProps) {
           </button>
         </>
       }
-      onOpenDisplayOptions={props.onOpenDisplayOptions}
+      onOpenDisplayOptions={showDisplayMenu}
     />
   );
 }

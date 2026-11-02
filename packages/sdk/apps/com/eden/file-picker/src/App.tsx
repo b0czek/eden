@@ -1,7 +1,7 @@
 import * as eden from "@edenapp/client";
 import {
   buildBreadcrumbs,
-  DisplayOptionsModal,
+  createDisplayMenu,
   type DisplayPreferences,
   FILES_APP_ID,
   FileExplorerHeader,
@@ -11,6 +11,7 @@ import {
   getParentPath,
   isValidName,
   joinPath,
+  menuBelow,
   useExplorerNavigation,
   useFileActivationPreference,
 } from "@edenapp/files-core";
@@ -56,7 +57,6 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   goUp: t("filePicker.goUp"),
   newFolder: t("filePicker.newFolder"),
   newFile: "",
-  settings: t("common.settings"),
   editPath: t("filePicker.editPath"),
   searchPlaceholder: t("filePicker.searchPlaceholder"),
   loading: t("common.loading"),
@@ -64,7 +64,6 @@ const getExplorerLabels = (): FileExplorerLabels => ({
   emptyHint: t("filePicker.emptyHint"),
   folder: t("filePicker.folder"),
   delete: t("common.delete"),
-  close: t("common.close"),
   displayOptions: t("filePicker.displayOptions"),
   viewStyle: t("filePicker.viewStyle"),
   grid: t("filePicker.grid"),
@@ -168,8 +167,6 @@ const App: Component = () => {
   const [fileName, setFileName] = createSignal("");
   const [filterIndex, setFilterIndex] = createSignal(0);
   const [error, setError] = createSignal<string | null>(null);
-  const [showDisplayOptionsModal, setShowDisplayOptionsModal] =
-    createSignal(false);
   const [showNewFolderDialog, setShowNewFolderDialog] = createSignal(false);
   const [newFolderName, setNewFolderName] = createSignal("");
   const [pendingOverwritePath, setPendingOverwritePath] =
@@ -349,6 +346,7 @@ const App: Component = () => {
       setItems(sortItems(currentItems));
     }
   };
+  const displayMenu = createDisplayMenu(handleDisplayPreferencesChange);
 
   const getWindowSize = async () => {
     const cached = windowSize();
@@ -400,7 +398,6 @@ const App: Component = () => {
     setActiveRequest(request);
     setFilterIndex(0);
     setError(null);
-    setShowDisplayOptionsModal(false);
     setShowNewFolderDialog(false);
     setPendingOverwritePath(null);
     clearSelection();
@@ -431,7 +428,6 @@ const App: Component = () => {
     setActiveRequest(null);
     setError(null);
     setFileName("");
-    setShowDisplayOptionsModal(false);
     setShowNewFolderDialog(false);
     setPendingOverwritePath(null);
     clearSelection();
@@ -749,7 +745,15 @@ const App: Component = () => {
                     }
                   : undefined
               }
-              onOpenDisplayOptions={() => setShowDisplayOptionsModal(true)}
+              onOpenDisplayOptions={(event) =>
+                void displayMenu.show(
+                  {
+                    labels: getExplorerLabels(),
+                    preferences: displayPreferences(),
+                  },
+                  menuBelow(event, "right"),
+                )
+              }
             />
 
             <FileList
@@ -835,14 +839,6 @@ const App: Component = () => {
               </div>
             </div>
           </div>
-
-          <DisplayOptionsModal
-            labels={getExplorerLabels()}
-            show={showDisplayOptionsModal()}
-            preferences={displayPreferences()}
-            onClose={() => setShowDisplayOptionsModal(false)}
-            onChange={handleDisplayPreferencesChange}
-          />
 
           <Show when={showNewFolderDialog()}>
             <div class="eden-modal-overlay">

@@ -1,6 +1,5 @@
 import * as eden from "@edenapp/client";
 import {
-  DisplayOptionsModal,
   type FileItem,
   FileList,
   useFileActivationPreference,
@@ -295,14 +294,19 @@ const App: Component = () => {
           directory={directory}
           location={currentLocation()}
           selection={activeSelection()}
-          labels={getExplorerLabels()}
+          labels={trashSelected() ? getTrashLabels() : getExplorerLabels()}
           trashSelected={trashSelected()}
           busy={busy() || (trashSelected() && trash.loading())}
           readOnly={trashSelected() || busy() || readOnly() || loading()}
+          displayPreferences={
+            trashSelected() ? display.trashPreferences() : displayPreferences()
+          }
           onRefresh={() => (trashSelected() ? void trash.refresh() : refresh())}
           onNewFolder={promptCreateFolder}
           onNewFile={promptCreateFile}
-          onOpenDisplayOptions={display.openOptions}
+          onDisplayChange={(next) =>
+            void handlePreferencesChange(next, trashSelected())
+          }
         />
         <Show
           when={!trashSelected()}
@@ -383,17 +387,6 @@ const App: Component = () => {
             }
           />
         </Show>
-        <DisplayOptionsModal
-          labels={trashSelected() ? getTrashLabels() : getExplorerLabels()}
-          show={display.showOptions()}
-          preferences={
-            trashSelected() ? display.trashPreferences() : displayPreferences()
-          }
-          onClose={display.closeOptions}
-          onChange={(next) =>
-            void handlePreferencesChange(next, trashSelected())
-          }
-        />
         <DialogHost dialogs={dialogs} />
       </main>
     </div>

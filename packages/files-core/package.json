@@ -33,7 +33,8 @@
   },
   "dependencies": {
     "solid-icons": "catalog:",
-    "@edenapp/client": "workspace:*"
+    "@edenapp/client": "workspace:*",
+    "@edenapp/tablets": "workspace:*"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",

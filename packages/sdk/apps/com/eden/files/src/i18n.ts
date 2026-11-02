@@ -34,7 +34,6 @@ export const getExplorerLabels = (
   goUp: t("files.goUp"),
   newFolder: t("files.newFolder"),
   newFile: t("files.newFile"),
-  settings: t("common.settings"),
   editPath: t("files.editPath"),
   searchPlaceholder: t("files.searchPlaceholder"),
   loading: t("common.loading"),
@@ -44,7 +43,6 @@ export const getExplorerLabels = (
   delete: deleteMovesToTrash
     ? t("files.moveToTrash")
     : t("files.deletePermanently"),
-  close: t("common.close"),
   displayOptions: t("files.displayOptions"),
   viewStyle: t("files.viewStyle"),
   grid: t("files.grid"),
