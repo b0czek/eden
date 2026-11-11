@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/client",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "Generated typed shell-command client for Eden apps",
   "type": "module",
   "main": "dist/index.js",

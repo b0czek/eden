@@ -1,5 +1,13 @@
 # @edenapp/sdk
 
+## 0.15.2
+
+### Patch Changes
+
+- fffc566: Fix settings actions with parameters, including display brightness, failing when reactive panel state is sent across Electron IPC.
+  - @edenapp/types@0.15.2
+  - @edenapp/genesis@0.15.2
+
 ## 0.15.1
 
 ### Patch Changes

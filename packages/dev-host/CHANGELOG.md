@@ -1,5 +1,12 @@
 # @edenapp/dev-host
 
+## 0.15.2
+
+### Patch Changes
+
+- Updated dependencies [fffc566]
+  - @edenapp/sdk@0.15.2
+
 ## 0.15.1
 
 ### Patch Changes
