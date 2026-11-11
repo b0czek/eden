@@ -1,5 +1,12 @@
 # @edenapp/genesis
 
+## 0.15.1
+
+### Patch Changes
+
+- Updated dependencies [7d204e5]
+  - @edenapp/types@0.15.1
+
 ## 0.15.0
 
 ### Patch Changes

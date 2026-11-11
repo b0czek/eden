@@ -1,5 +1,11 @@
 # @edenapp/types
 
+## 0.15.1
+
+### Patch Changes
+
+- 7d204e5: Consumers can set `homeDirectory` to keep the Home volume in a folder outside `dataDirectory`, such as an existing data partition. Account folder restrictions apply inside it as before.
+
 ## 0.15.0
 
 ### Minor Changes

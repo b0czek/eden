@@ -1,5 +1,14 @@
 # com.eden.editor
 
+## 0.15.1
+
+### Patch Changes
+
+- @edenapp/client@0.15.1
+- @edenapp/solid-kit@0.15.1
+- @edenapp/tablets@0.15.1
+- @edenapp/editor-dlc@0.15.1
+
 ## 0.15.0
 
 ### Patch Changes

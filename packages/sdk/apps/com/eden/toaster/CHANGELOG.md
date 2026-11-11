@@ -1,5 +1,11 @@
 # com.eden.toaster
 
+## 0.15.1
+
+### Patch Changes
+
+- @edenapp/client@0.15.1
+
 ## 0.15.0
 
 ### Patch Changes
