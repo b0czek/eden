@@ -177,6 +177,12 @@ Eden creates these folders in it:
 Apps can address only `home`.
 Keep `home` and `trash` on one filesystem, so that moving items to Trash does not copy them. Back up the complete data directory to keep an installation.
 
+Set `homeDirectory` to an absolute path when the Home volume must use a folder outside the data directory,
+such as a product data partition that other services also share.
+Eden then does not create `home` in the data directory.
+The Home directory must not contain the data directory, because apps can address everything in Home.
+Back up the Home directory together with the data directory.
+
 ## Add your own app
 
 Create an app with the [app guide](app-development.md).

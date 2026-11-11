@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
 import type {
   OperationHandle,
@@ -218,6 +219,67 @@ describe("Filesystem integration", () => {
 
   afterEach(async () => {
     await eden?.dispose();
+  });
+
+  it("backs Home with a configured directory outside the data directory", async () => {
+    const homeDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "eden-external-home-"),
+    );
+    try {
+      eden = await createTestEden({ config: { homeDirectory } });
+      const profile = await eden.runtime.effects.run(
+        eden.runtime.users.create({
+          username: "restricted-user",
+          name: "Restricted User",
+          password: "password",
+          directoryRestriction: "programs",
+        }),
+      );
+      eden.runtime.services.permissions.registerApp("external-home-app", [
+        "fs/write",
+        "fs/read",
+      ]);
+
+      await eden.execute(
+        "fs/write",
+        {
+          location: { path: "/programs/part.ngc", volume: "home" },
+          content: "G0 X0",
+        },
+        caller("external-home-app", profile),
+      );
+      await expect(
+        fs.readFile(path.join(homeDirectory, "programs/part.ngc"), "utf8"),
+      ).resolves.toBe("G0 X0");
+      await expect(
+        eden.execute(
+          "fs/write",
+          {
+            location: { path: "/configs/machine.ini", volume: "home" },
+            content: "[EMC]",
+          },
+          caller("external-home-app", profile),
+        ),
+      ).rejects.toThrow("outside of the allowed directory");
+      await expect(
+        fs.access(path.join(eden.paths.systemDirectory, "users.db")),
+      ).resolves.toBeUndefined();
+      await expect(fs.readdir(homeDirectory)).resolves.toEqual(["programs"]);
+    } finally {
+      await eden?.dispose();
+      await fs.rm(homeDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a Home directory that contains the data directory", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-home-root-"));
+    try {
+      await expect(
+        createTestEden({ root, config: { homeDirectory: root } }),
+      ).rejects.toThrow("must not contain dataDirectory");
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it("enforces command permissions while using the real isolated root", async () => {

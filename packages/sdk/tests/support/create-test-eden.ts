@@ -74,7 +74,10 @@ export async function createTestEden(
     options.root ?? (await fs.mkdtemp(path.join(os.tmpdir(), "eden-runtime-")));
   const paths: TestEden["paths"] = {
     root,
-    ...resolveDataLayout(path.join(root, "data")),
+    ...resolveDataLayout(
+      path.join(root, "data"),
+      options.config?.homeDirectory,
+    ),
     distPath: path.join(root, "dist"),
     appPath: root,
   };

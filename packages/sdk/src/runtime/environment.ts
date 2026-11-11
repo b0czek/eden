@@ -5,6 +5,8 @@ import type { EdenPlatform } from "../platform/ports/types";
 
 export interface EdenRuntimePaths {
   dataDirectory: string;
+  /** Overrides the Home volume folder; defaults to `home` in the data directory. */
+  homeDirectory?: string;
   distPath: string;
   appPath: string;
 }

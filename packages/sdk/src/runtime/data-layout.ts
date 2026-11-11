@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-/** Fixed folders that Eden keeps under its data directory. */
+/** Folders that Eden keeps under its data directory, with an optional external Home. */
 export interface DataLayout {
   dataDirectory: string;
   /** Backs the Home volume; the only folder that apps can address. */
@@ -12,11 +12,27 @@ export interface DataLayout {
   trashDirectory: string;
 }
 
-export function resolveDataLayout(dataDirectory: string): DataLayout {
+export function resolveDataLayout(
+  dataDirectory: string,
+  homeDirectory?: string,
+): DataLayout {
   const root = path.resolve(dataDirectory);
+  const home = homeDirectory
+    ? path.resolve(homeDirectory)
+    : path.join(root, "home");
+  const fromHome = path.relative(home, root);
+  const outsideHome =
+    fromHome === ".." ||
+    fromHome.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(fromHome);
+  if (!outsideHome) {
+    throw new Error(
+      `homeDirectory '${home}' must not contain dataDirectory '${root}'`,
+    );
+  }
   return {
     dataDirectory: root,
-    homeDirectory: path.join(root, "home"),
+    homeDirectory: home,
     appsDirectory: path.join(root, "apps"),
     systemDirectory: path.join(root, "system"),
     trashDirectory: path.join(root, "trash"),

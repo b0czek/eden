@@ -72,6 +72,11 @@ export interface EdenConfig {
    */
   dataDirectory?: string;
   /**
+   * Directory that backs the Home volume instead of `home` in `dataDirectory`.
+   * It must not contain `dataDirectory`, so that apps cannot address system data.
+   */
+  homeDirectory?: string;
+  /**
    * Path to the seed config JSON file for one-time data seeding.
    * Defaults to eden-seed.json in the consumer's dist directory.
    */

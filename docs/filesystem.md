@@ -35,7 +35,8 @@ const location: FilesystemLocation = { volume: "home", path: "/Documents/notes.t
 `/` means the selected volume's root.
 Store and exchange both fields. The same path on another volume identifies a different file.
 
-The built-in `home` volume maps `/` to the `home` folder in the consumer's `dataDirectory` for every account.
+The built-in `home` volume maps `/` to the consumer's Home directory for every account.
+This is the `home` folder in `dataDirectory`, or the configured `homeDirectory`.
 A folder restriction limits access without changing the address.
 For example, a restriction of `projects/design` permits `home:/projects/design/notes.txt`.
 See [shared folders](users.md#shared-filesystem-and-folder-restrictions).
