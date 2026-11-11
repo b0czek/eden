@@ -35,7 +35,7 @@ export function createEdenRuntime(options: EdenRuntimeOptions) {
   };
   const paths = { ...options.paths };
   const platform = options.platform;
-  const layout = resolveDataLayout(paths.dataDirectory);
+  const layout = resolveDataLayout(paths.dataDirectory, paths.homeDirectory);
   syncIo.mkdir(layout.homeDirectory, { recursive: true });
   syncIo.mkdir(layout.appsDirectory, { recursive: true });
   syncIo.mkdir(layout.systemDirectory, { recursive: true });

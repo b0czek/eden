@@ -82,7 +82,7 @@ Vendor users assign feature grants through the Users app.
 
 ## Shared filesystem and folder restrictions
 
-The `home` folder in `dataDirectory` backs one shared `home` volume.
+The Home directory backs one shared `home` volume. See [Build and run](consumer-development.md#build-and-run) for its location.
 A complete address identifies the same file for all accounts and daemon identities.
 Folder restrictions limit access within that shared tree.
 

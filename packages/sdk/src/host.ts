@@ -23,6 +23,7 @@ export function createEden(config: EdenConfig = {}) {
       dataDirectory:
         config.dataDirectory ??
         path.join(application.getPath("userData"), "eden"),
+      homeDirectory: config.homeDirectory,
       distPath: path.join(process.cwd(), "dist"),
       appPath: application.getAppPath(),
     },

@@ -230,7 +230,10 @@ export function createDesktopLayer(environment: RuntimeEnvironment) {
     Effect.gen(function* () {
       log.info("Eden starting...");
       const { paths, config, platform, registrations } = environment;
-      const layout = resolveDataLayout(paths.dataDirectory);
+      const layout = resolveDataLayout(
+        paths.dataDirectory,
+        paths.homeDirectory,
+      );
       yield* seedDatabase(
         layout.systemDirectory,
         config.seedPath ?? path.join(paths.distPath, "eden-seed.json"),
