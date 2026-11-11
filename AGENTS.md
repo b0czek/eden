@@ -6,6 +6,10 @@ Changesets describe user-facing release units, not individual tasks or commits. 
 
 A changeset summary is a concise release note, not a work log or an inventory of edits. Fixing bugs in an unreleased feature is part of delivering that feature: do not add separate changesets, bug-fix bullets, or extra sentences for those corrections. Do not list tests, refactors, implementation details, review changes, or minor UI adjustments. Describe a bug fix as a release change only when it corrects behavior users have already received in a released version. Rewrite an existing entry only when the final user-facing scope materially changes; summarize the resulting feature as a whole instead of appending every follow-up change.
 
+# Commits
+
+Never add AI co-author or attribution trailers (such as `Co-Authored-By`) to commit messages or "Generated with" lines to pull request descriptions.
+
 # Testing
 
 Review warnings as well as errors from verification. Resolve both within the
