@@ -9,6 +9,7 @@ import type {
 } from "@edenapp/types";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { unwrap } from "solid-js/store";
 import SettingsContent from "./components/SettingsContent";
 import SettingsSidebar from "./components/SettingsSidebar";
 import { initLocale } from "./i18n";
@@ -146,7 +147,9 @@ const App: Component = () => {
     setOperationError(null);
     let result: SettingsPanelActionResponse;
     try {
-      result = await eden.settings.action(panelId, actionId, { invocation });
+      result = await eden.settings.action(panelId, actionId, {
+        invocation: unwrap(invocation),
+      });
       if (result.error) setOperationError(result.error);
     } catch {
       result = {
