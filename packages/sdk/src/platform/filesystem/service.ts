@@ -560,19 +560,25 @@ export const FilesystemLive = Layer.effect(
       Stream.suspend(() => {
         const walk = createSearchWalk(pattern, limit);
         const base = location.path.replace(/\/+$/, "");
-        const progress = (): SearchProgress => {
-          const { matches, searched } = walk.snapshot();
-          return {
-            searched,
-            results: matches.map((match) => ({
+        let results: SearchProgress["results"] = [];
+        let sentVersion = -1;
+        let sentSearched = -1;
+        /** Only pages that found or examined something new are sent. */
+        const progress = (): SearchProgress[] => {
+          const { matches, searched, version } = walk.snapshot();
+          if (version === sentVersion && searched === sentSearched) return [];
+          if (version !== sentVersion)
+            results = matches.map((match) => ({
               location: {
                 volume: location.volume,
                 path: `${base}/${match.relativePath}`,
               },
               name: match.name,
               type: match.isDirectory ? "folder" : "file",
-            })),
-          };
+            }));
+          sentVersion = version;
+          sentSearched = searched;
+          return [{ searched, results }];
         };
         // Each page holds its own volume lease, so an unread search cannot block eject.
         return Stream.paginate(true, (first: boolean) =>
@@ -582,7 +588,7 @@ export const FilesystemLive = Layer.effect(
             ),
             (complete) =>
               [
-                [progress()],
+                progress(),
                 complete ? Option.none() : Option.some(false),
               ] as const,
           ),

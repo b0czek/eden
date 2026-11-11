@@ -66,3 +66,7 @@ it("treats glob syntax in the query as plain characters", () => {
   expect(scoreName("draft v2 final.txt", "[v2]")).toBeUndefined();
   expect(scoreName("anything", "*")).toBeUndefined();
 });
+
+it("finds a tight match after an earlier occurrence of its first character", () => {
+  expect(scoreName("o-legacy-build-omnibox.tsx", "omnbx")).toBeDefined();
+});

@@ -34,21 +34,42 @@ function isWordBoundary(name: string, lowerName: string, index: number) {
   );
 }
 
-function subsequenceScore(name: string, lowerName: string, query: string) {
+/** Greedily matches `query` in order from `first`, within a window sized by the query. */
+function subsequencePoints(
+  name: string,
+  lowerName: string,
+  query: string,
+  first: number,
+) {
   let points = 0;
-  let previous = -1;
-  let first = -1;
+  let previous = first - 1;
   for (const char of query) {
     const index = lowerName.indexOf(char, previous + 1);
     if (index < 0) return undefined;
-    if (first < 0) first = index;
     if (index - first >= query.length * 3 + 2) return undefined;
     points += 1;
     if (index === previous + 1) points += 3;
     if (isWordBoundary(name, lowerName, index)) points += 4;
     previous = index + char.length - 1;
   }
-  const quality = points / (8 * query.length);
+  return points;
+}
+
+function subsequenceScore(name: string, lowerName: string, query: string) {
+  const [lead = ""] = query;
+  let best: number | undefined;
+  // A stray early occurrence of the first character must not hide a tighter match later.
+  for (
+    let first = lowerName.indexOf(lead);
+    first >= 0;
+    first = lowerName.indexOf(lead, first + 1)
+  ) {
+    const points = subsequencePoints(name, lowerName, query, first);
+    if (points !== undefined && (best === undefined || points > best))
+      best = points;
+  }
+  if (best === undefined) return undefined;
+  const quality = best / (8 * query.length);
   if (quality < minimumSubsequenceQuality) return undefined;
   return (
     Math.round(300 + 300 * quality) -
@@ -96,8 +117,15 @@ export interface SearchWalk {
    * Succeeds with true when the walk is complete.
    */
   step: (root: string, millis: number) => Effect.Effect<boolean>;
-  /** The best matches so far, ranked, and the number of entries examined. */
-  snapshot: () => { matches: SearchMatch[]; searched: number };
+  /**
+   * The best matches so far, ranked, the number of entries examined, and a
+   * version that changes whenever the matches do.
+   */
+  snapshot: () => {
+    matches: SearchMatch[];
+    searched: number;
+    version: number;
+  };
 }
 
 /**
@@ -107,20 +135,32 @@ export interface SearchWalk {
  */
 export function createSearchWalk(query: string, limit: number): SearchWalk {
   const trimmed = query.trim();
-  let matches: SearchMatch[] = [];
+  const matches: SearchMatch[] = [];
   let frontier = [""];
   let next: string[] = [];
   let position = 0;
   let depth = 0;
   let visited = 0;
   let complete = limit <= 0;
+  let version = 0;
 
-  const rank = () => {
-    matches = matches.sort(compareMatches).slice(0, limit);
+  /** Keeps `matches` ranked and no longer than `limit`. */
+  const insert = (match: SearchMatch) => {
+    let low = 0;
+    let high = matches.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      const current = matches[middle] as SearchMatch;
+      if (compareMatches(current, match) <= 0) low = middle + 1;
+      else high = middle;
+    }
+    if (low >= limit) return;
+    matches.splice(low, 0, match);
+    if (matches.length > limit) matches.pop();
+    version += 1;
   };
 
   const advance = () => {
-    rank();
     frontier = next;
     next = [];
     position = 0;
@@ -148,7 +188,7 @@ export function createSearchWalk(query: string, limit: number): SearchWalk {
       }
       const score = scoreName(entry.name, trimmed);
       if (score === undefined) continue;
-      matches.push({
+      insert({
         relativePath,
         name: entry.name,
         isDirectory,
@@ -165,12 +205,11 @@ export function createSearchWalk(query: string, limit: number): SearchWalk {
       else if (position >= frontier.length) advance();
       if ((yield* Clock.currentTimeMillis) >= deadline) break;
     }
-    rank();
     return complete;
   });
 
   return {
     step,
-    snapshot: () => ({ matches: [...matches], searched: visited }),
+    snapshot: () => ({ matches: [...matches], searched: visited, version }),
   };
 }
