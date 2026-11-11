@@ -36,6 +36,13 @@ export function shouldExcludeFile(
   ].some((pattern) => pattern.test(filePath));
 }
 
+export const MANIFEST_FILE = "manifest.json";
+
+/** Serializes the resolved manifest that a built package ships with. */
+export function serializeManifest(manifest: PackageManifest): string {
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
 export async function listPackageFiles(
   packageDirectory: string,
   manifest: PackageManifest,
@@ -63,7 +70,11 @@ export async function copyPackageFiles(
   for (const relative of await listPackageFiles(packageDirectory, manifest)) {
     const target = path.join(path.resolve(targetDirectory), relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.copyFile(path.join(packageDirectory, relative), target);
+    if (relative === MANIFEST_FILE) {
+      await fs.writeFile(target, serializeManifest(manifest), "utf-8");
+    } else {
+      await fs.copyFile(path.join(packageDirectory, relative), target);
+    }
     if (verbose) console.log(`  + ${relative}`);
   }
 }
