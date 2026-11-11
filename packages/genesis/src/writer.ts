@@ -43,29 +43,30 @@ export async function createArchive(options: {
   }
   let processed = 0;
   try {
-    await tar.create(
-      {
-        file: tarPath,
-        cwd: packageDirectory,
-        gzip: false,
-        portable: true,
-        filter: (entryPath) => {
-          progress?.update(++processed);
-          if (verbose && !progress) console.log(`  + ${entryPath}`);
-          return true;
-        },
-      },
-      files,
-    );
     await fs.writeFile(
       path.join(manifestDirectory, MANIFEST_FILE),
       serializeManifest(manifest),
       "utf-8",
     );
-    await tar.replace(
-      { file: tarPath, cwd: manifestDirectory, portable: true },
+    await tar.create(
+      { file: tarPath, cwd: manifestDirectory, gzip: false, portable: true },
       [MANIFEST_FILE],
     );
+    if (files.length > 0) {
+      await tar.replace(
+        {
+          file: tarPath,
+          cwd: packageDirectory,
+          portable: true,
+          filter: (entryPath) => {
+            progress?.update(++processed);
+            if (verbose && !progress) console.log(`  + ${entryPath}`);
+            return true;
+          },
+        },
+        files,
+      );
+    }
     progress?.stop();
     const { checksum } = await compressor.compressFileStreaming(
       tarPath,

@@ -403,6 +403,34 @@ describe("bundler module", () => {
         fs.readFile(path.join(extracted, "payload", "theme.json"), "utf-8"),
       ).resolves.toBe("{}");
     });
+    it("bundles a package that contains only its manifest", async () => {
+      const source = path.join(tempDir, "manifest-only");
+      const archive = path.join(tempDir, "manifest-only.edenite");
+      const manifest: DlcManifest = {
+        kind: "dlc",
+        id: "com.example.empty",
+        name: "Empty",
+        version: "1.0.0",
+        hostAppId: "com.example.host",
+        contributions: [{ extensionPoint: "themes", requires: "^1.0.0" }],
+      };
+      await fs.mkdir(source);
+      await fs.writeFile(
+        path.join(source, "manifest.json"),
+        JSON.stringify(manifest),
+      );
+
+      await expect(
+        bundler.bundle({ appDirectory: source, outputPath: archive }),
+      ).resolves.toMatchObject({ success: true, manifest });
+      await expect(
+        bundler.extract({
+          edenitePath: archive,
+          outputDirectory: path.join(tempDir, "manifest-only-extracted"),
+        }),
+      ).resolves.toMatchObject({ success: true, manifest });
+    });
+
     it("should bundle the sample app successfully", async () => {
       const outputPath = path.join(tempDir, "test-app.edenite");
 
