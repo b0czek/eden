@@ -6,16 +6,13 @@ import type {
   RuntimeDlcManifest,
 } from "@edenapp/types";
 import * as Effect from "effect/Effect";
-import { asError } from "../../core/effects/io";
 import type { Event } from "../../core/events/event";
 import {
   isHotReloadEnabled as readHotReloadEnabled,
   toggleHotReload as updateHotReload,
 } from "../../hotreload-config";
-import { FilesystemIoFailed } from "../../platform/filesystem/native-errors";
-import { io } from "../../platform/filesystem/native-io";
 import type { PackageCatalog } from "./catalog";
-import { PackageDevelopmentError, PackageRejected } from "./errors";
+import { PackageRejected } from "./errors";
 import type { InstalledPackages } from "./installed";
 import type { PackageManifests } from "./manifests";
 import type { PackagePermissions } from "./ports";
@@ -51,13 +48,9 @@ export function createPackageDevelopment({
         }),
       );
     }
-    const manifestPath = path.join(appPath, "manifest.json");
-    const manifestContent = yield* io.readFile(manifestPath, "utf-8");
-    const validation = genesisBundler.validatePackageManifestObject(
-      yield* Effect.try({
-        try: () => JSON.parse(manifestContent),
-        catch: asError,
-      }),
+    // Source manifests can take their version from package.json.
+    const validation = yield* Effect.promise(() =>
+      genesisBundler.validateManifest(path.join(appPath, "manifest.json")),
     );
     if (
       !validation.valid ||
@@ -135,20 +128,7 @@ export function createPackageDevelopment({
     return Effect.succeed(manifest);
   }
   return {
-    reloadPackage: (packageId: string) =>
-      reloadPackage(packageId).pipe(
-        Effect.mapError((cause) =>
-          cause instanceof PackageRejected ||
-          cause instanceof FilesystemIoFailed
-            ? cause
-            : new PackageDevelopmentError({
-                packageId,
-                operation: "reload",
-                message: cause.message,
-                cause,
-              }),
-        ),
-      ),
+    reloadPackage,
     isHotReloadEnabled,
     toggleHotReload,
   };

@@ -35,16 +35,12 @@ export function createPackageDiscovery({
       yield* Effect.catch(
         Effect.gen(function* () {
           const sourcePath = path.resolve(entry.sourcePath);
-          const manifestContents = yield* io.readFile(
-            path.join(sourcePath, "manifest.json"),
-            "utf-8",
+          // Source manifests can take their version from package.json.
+          const validation = yield* Effect.promise(() =>
+            genesisBundler.validateManifest(
+              path.join(sourcePath, "manifest.json"),
+            ),
           );
-          const parsed = (yield* Effect.try({
-            try: () => JSON.parse(manifestContents),
-            catch: asError,
-          })) as PackageManifest;
-          const validation =
-            genesisBundler.validatePackageManifestObject(parsed);
           if (
             !validation.valid ||
             !validation.manifest ||

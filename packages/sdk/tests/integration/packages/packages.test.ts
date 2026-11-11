@@ -52,4 +52,50 @@ describe("Packages development packages", () => {
     await eden.runtime.effects.run(packages.reloadPackage(manifest.id));
     expect(catalog.getPath(manifest.id)).toBe(sourcePath);
   });
+
+  it("takes a development app version from package.json", async () => {
+    root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-dev-package-"));
+    const sourcePath = path.join(root, "source");
+    const stateDirectory = path.join(root, "state");
+    const id = "com.example.inferred-version";
+    await fs.mkdir(sourcePath, { recursive: true });
+    await fs.mkdir(stateDirectory, { recursive: true });
+    await fs.writeFile(
+      path.join(sourcePath, "manifest.json"),
+      JSON.stringify({
+        id,
+        name: "Inferred Version App",
+        frontend: { entry: "index.html" },
+      }),
+    );
+    await fs.writeFile(
+      path.join(sourcePath, "package.json"),
+      JSON.stringify({ name: id, version: "2.3.4" }),
+    );
+    await fs.writeFile(
+      path.join(stateDirectory, "apps.json"),
+      JSON.stringify({
+        protocolVersion: 1,
+        apps: [{ id, sourcePath, launchOnStart: false }],
+      }),
+    );
+
+    eden = await createTestEden({
+      root: path.join(root, "runtime"),
+      config: {
+        development: true,
+        hotReload: { enabled: true, stateDirectory },
+      },
+    });
+    const packages = eden.runtime.services.packages;
+    const catalog = eden.runtime.services.catalog;
+
+    expect(catalog.get(id)?.version).toBe("2.3.4");
+    await fs.writeFile(
+      path.join(sourcePath, "package.json"),
+      JSON.stringify({ name: id, version: "2.3.5" }),
+    );
+    await eden.runtime.effects.run(packages.reloadPackage(id));
+    expect(catalog.get(id)?.version).toBe("2.3.5");
+  });
 });

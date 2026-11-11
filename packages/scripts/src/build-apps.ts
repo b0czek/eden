@@ -175,17 +175,20 @@ async function getSourceTimestamp(appDir: string): Promise<number> {
       }
     }
   } catch {
-    // No src directory, check manifest timestamp
+    // No src directory; the package files below decide the timestamp.
+  }
+
+  // The built manifest takes values such as the version from package.json.
+  for (const file of ["manifest.json", "package.json"]) {
     try {
-      const manifestPath = path.join(appDir, "manifest.json");
-      const stats = await fs.stat(manifestPath);
-      latestTime = stats.mtimeMs;
+      const stats = await fs.stat(path.join(appDir, file));
+      latestTime = Math.max(latestTime, stats.mtimeMs);
     } catch {
-      latestTime = Date.now();
+      // The file is optional.
     }
   }
 
-  return latestTime;
+  return latestTime || Date.now();
 }
 
 async function needsRebuild(
