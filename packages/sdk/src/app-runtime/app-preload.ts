@@ -72,9 +72,23 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
 // ===================================================================
 
 // Shell transport implementation using ipcRenderer
+// Identifies this page load; a reload gets a new connection and its own streams.
+// getRandomValues, unlike randomUUID, also works outside secure contexts.
+const connection = Array.from(
+  crypto.getRandomValues(new Uint8Array(16)),
+  (byte) => byte.toString(16).padStart(2, "0"),
+).join("");
+// Renderer IPC stays ordered, so main records the page before its first command.
+void ipcRenderer.invoke("shell-connect", connection);
 const shellTransport: ShellTransport = {
   exec: (command, args, submission) => {
-    return ipcRenderer.invoke("shell-command", command, args, submission);
+    return ipcRenderer.invoke(
+      "shell-command",
+      command,
+      args,
+      submission,
+      connection,
+    );
   },
 };
 

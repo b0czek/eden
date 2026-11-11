@@ -50,10 +50,6 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
       ipc.eventSubscribers.removeViewSubscriptions(viewId);
       streams.closeOwner({ kind: "view", webContentsId });
     });
-    // A reloaded renderer has a fresh reader and never consumes the old streams.
-    yield* listen(views.viewDocumentReset, ({ webContentsId }) =>
-      streams.closeOwner({ kind: "view", webContentsId }),
-    );
     const forkCleanup = yield* FiberSet.makeRuntime<never, void, never>();
     function closeProcessHandles({ appId }: { appId: string }) {
       forkCleanup(

@@ -126,13 +126,26 @@ export const IpcTransportLive = Layer.effect(
     }
     function setupIPCHandlers(): void {
       // Handle shell commands
-      rendererIpc.handle<[string, unknown, OperationSubmission?], unknown>(
+      // Each app preload connects once per page load, before its first command.
+      rendererIpc.handle<[unknown], void>(
+        "shell-connect",
+        (event, connection) => {
+          if (typeof connection !== "string" || !connection) return;
+          if (!views.getAppIdByWebContentsId(event.sender.id)) return;
+          streams.connect(event.sender.id, connection);
+        },
+      );
+      rendererIpc.handle<
+        [string, unknown, OperationSubmission?, unknown?],
+        unknown
+      >(
         "shell-command",
         async (
           event,
           command: string,
           args: unknown,
           submission?: OperationSubmission,
+          connection?: unknown,
         ) => {
           // Build caller context for commands that need it
           const appId = views.getAppIdByWebContentsId(event.sender.id);
@@ -151,6 +164,8 @@ export const IpcTransportLive = Layer.effect(
               sessionId: appId ? callerSession(appId) : undefined,
               appId,
               webContentsId: event.sender.id,
+              connection:
+                typeof connection === "string" ? connection : undefined,
               principal: appId
                 ? runtimeContexts.resolvePrincipal(appId)
                 : undefined,
@@ -285,6 +300,7 @@ export const IpcTransportLive = Layer.effect(
     function destroy(): void {
       // Remove global IPC handlers
       rendererIpc.removeHandler("shell-command");
+      rendererIpc.removeHandler("shell-connect");
       if (backendMessageListener) {
         stopBackendMessages?.();
         backendMessageListener = undefined;

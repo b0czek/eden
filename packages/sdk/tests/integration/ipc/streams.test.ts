@@ -20,7 +20,6 @@ import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
-import type { InMemoryWebContents } from "../../support/in-memory-platform";
 import { connectViewStreams, readAll } from "../../support/streams";
 
 type Reader = StreamReader<string>;
@@ -97,12 +96,6 @@ describe("stream commands", () => {
     sent = view.sent;
     return view;
   }
-
-  const navigate = (isSameDocument: boolean) =>
-    (eden.getAppView(appId).view.webContents as InMemoryWebContents).emit(
-      "did-start-navigation",
-      { isMainFrame: true, isSameDocument },
-    );
 
   const chunksSent = () =>
     sent.filter((message) => message.kind === "chunk").length;
@@ -205,23 +198,25 @@ describe("stream commands", () => {
     await stopped.promise;
   });
 
-  it("stops a view's streams and frees its capacity when the renderer reloads", async () => {
-    let view = connectView();
+  it("stops a view's streams and frees its capacity when its page reloads", async () => {
+    const previous = connectView();
+    const readers = [];
     for (let index = 0; index < streamCapacityPerOwner; index++)
-      await view.open("feed/idle");
-    navigate(false);
+      readers.push(await previous.open("feed/idle"));
+    const reloaded = connectView();
     await stopped.promise;
     await tick();
-    expect(sent.some((message) => message.kind !== "chunk")).toBe(false);
-    view = connectView();
-    await expect(view.open("feed/idle")).resolves.toBeDefined();
+    expect(sent).toEqual([]);
+    await expect(reloaded.open("feed/idle")).resolves.toBeDefined();
   });
 
-  it("keeps a view's streams across same-document navigation", async () => {
-    const view = connectView();
-    const reader = await view.open("feed/numbers", { count: 3 });
-    navigate(true);
-    await expect(readAll(reader)).resolves.toEqual([1, 2, 3]);
+  it("rejects stream commands from a page that was reloaded", async () => {
+    const previous = connectView();
+    const reloaded = connectView();
+    await expect(previous.open("feed/idle")).rejects.toThrow("was reloaded");
+    const current = await reloaded.open("feed/numbers", { count: 3 });
+    await previous.transport.exec("stream/cancel", { handle: current.handle });
+    await expect(readAll(current)).resolves.toEqual([1, 2, 3]);
   });
 
   it("requires an app view or backend caller", async () => {

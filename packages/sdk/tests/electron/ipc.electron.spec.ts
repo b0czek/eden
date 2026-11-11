@@ -53,6 +53,47 @@ test.describe
       ).toBe("generated client");
     });
 
+    test("streams search results to the renderer before and after a page reload", async () => {
+      const host = getHost();
+      await fs.mkdir(path.join(host.homeDirectory, "stream-search/nested"), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(host.homeDirectory, "stream-search/nested/needle.txt"),
+        "",
+      );
+      const search = () =>
+        host.electronApp?.evaluate(async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          return contents.executeJavaScript(`(async () => {
+            const location = { volume: "home", path: "/stream-search" };
+            const stream = await window.edenClient.fs.search(location, "needle");
+            let last;
+            for await (const progress of stream) last = progress;
+            return last.results.map((result) => result.location.path);
+          })()`);
+        }, APP_ID);
+      const reload = () =>
+        host.electronApp?.evaluate(async ({ webContents }, appId) => {
+          const contents = webContents
+            .getAllWebContents()
+            .find((candidate) => candidate.getURL().includes(appId));
+          if (!contents) throw new Error("Integration app view not found");
+          await new Promise<void>((resolve) => {
+            contents.once("did-finish-load", () => resolve());
+            contents.reload();
+          });
+        }, APP_ID);
+
+      const expected = ["/stream-search/nested/needle.txt"];
+      expect(await search()).toEqual(expected);
+      await reload();
+      expect(await search()).toEqual(expected);
+    });
+
     test("accepts renderer and backend operations and observes work beyond former IPC deadlines", async () => {
       const host = getHost();
 

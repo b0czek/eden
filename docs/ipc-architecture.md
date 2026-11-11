@@ -311,7 +311,8 @@ For a command outside the generated client, `window.edenAPI.shellCommand` return
 with `next()` and `cancel()`. Wrap it with `toCommandStream` from `@edenapp/client` to use `for await`.
 
 A stream belongs to the view or backend that opened it.
-Eden stops the stream when that view or backend closes, or when the view reloads or its renderer crashes.
+Eden stops the stream when that view or backend closes, or when the view loads a new page.
+A reloaded page cannot read, acknowledge, or cancel the previous page's streams.
 Other apps cannot read or stop it.
 Eden does not keep streams after they end and does not list them with operations.
 

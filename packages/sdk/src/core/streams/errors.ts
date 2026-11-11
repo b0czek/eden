@@ -7,6 +7,13 @@ export class StreamOwnerUnavailable extends Data.TaggedError(
     return `Stream command '${this.command}' requires an app view or backend caller`;
   }
 }
+export class StreamConnectionReplaced extends Data.TaggedError(
+  "StreamConnectionReplaced",
+)<{ command: string }> {
+  override get message() {
+    return `The page that requested '${this.command}' was reloaded`;
+  }
+}
 export class StreamCapacityExhausted extends Data.TaggedError(
   "StreamCapacityExhausted",
 )<{ command: string; capacity: number }> {

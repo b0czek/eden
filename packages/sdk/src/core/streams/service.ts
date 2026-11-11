@@ -20,13 +20,17 @@ import {
 import {
   StreamAdmissionClosed,
   StreamCapacityExhausted,
+  StreamConnectionReplaced,
   StreamOwnerUnavailable,
 } from "./errors";
 import { STREAM_WINDOW, type StreamMessage } from "./protocol";
 
-/** The caller that receives a stream's messages; streams end when it closes. */
+/**
+ * The caller that receives a stream's messages; streams end when it closes.
+ * A view's connection identifies one loaded page, so a reload starts a new owner.
+ */
 export type StreamOwner =
-  | { kind: "view"; webContentsId: number }
+  | { kind: "view"; webContentsId: number; connection?: string }
   | { kind: "backend"; appId: string };
 
 export interface StreamDelivery {
@@ -51,7 +55,15 @@ export interface Streams {
   ) => Effect.Effect<void>;
   /** Stop a stream, then send its end message. Ignores finished streams and other callers' streams. */
   cancel: (handle: StreamHandle, context?: CommandCallerContext) => void;
-  /** Stop an owner's streams without messages after its view or backend closes. */
+  /**
+   * Record a view's newly loaded page. Streams from the view's previous page
+   * stop without messages, and its commands can no longer open or control streams.
+   */
+  connect: (webContentsId: number, connection: string) => void;
+  /**
+   * Stop an owner's streams without messages after its view or backend closes.
+   * A view owner without a connection covers all of the view's pages.
+   */
   closeOwner: (owner: StreamOwner) => void;
 }
 
@@ -74,15 +86,32 @@ interface StreamRecord {
 function ownerOf(context: CommandCallerContext): StreamOwner | undefined {
   if (context.foundation) return undefined;
   if (context.webContentsId !== undefined)
-    return { kind: "view", webContentsId: context.webContentsId };
+    return {
+      kind: "view",
+      webContentsId: context.webContentsId,
+      connection: context.connection,
+    };
   if (context.appId) return { kind: "backend", appId: context.appId };
   return undefined;
 }
 
 function sameOwner(left: StreamOwner, right: StreamOwner | undefined) {
   if (left.kind === "view")
-    return right?.kind === "view" && right.webContentsId === left.webContentsId;
+    return (
+      right?.kind === "view" &&
+      right.webContentsId === left.webContentsId &&
+      right.connection === left.connection
+    );
   return right?.kind === "backend" && right.appId === left.appId;
+}
+
+/** Whether `owner` is `target`, or one of its pages when `target` names no connection. */
+function belongsTo(owner: StreamOwner, target: StreamOwner) {
+  if (target.kind === "view" && target.connection === undefined)
+    return (
+      owner.kind === "view" && owner.webContentsId === target.webContentsId
+    );
+  return sameOwner(target, owner);
 }
 
 export const StreamsLive = Layer.effect(
@@ -92,6 +121,8 @@ export const StreamsLive = Layer.effect(
     const messages = yield* scopedEvent<StreamDelivery>();
     const forkStream = yield* FiberSet.makeRuntime<never, void, never>();
     const records = new Map<string, StreamRecord>();
+    /** The connection of each view's current page. */
+    const connections = new Map<number, string>();
     let closing = false;
     // Runs before the FiberSet interrupts streams, so shutdown sends no messages.
     yield* Effect.addFinalizer(() =>
@@ -132,6 +163,8 @@ export const StreamsLive = Layer.effect(
       if (closing) throw new StreamAdmissionClosed({ command });
       const owner = ownerOf(context);
       if (!owner) throw new StreamOwnerUnavailable({ command });
+      if (owner.kind === "view" && !isCurrent(owner))
+        throw new StreamConnectionReplaced({ command });
       let owned = 0;
       for (const record of records.values())
         if (!record.stopping && sameOwner(record.owner, owner)) owned += 1;
@@ -175,6 +208,11 @@ export const StreamsLive = Layer.effect(
       return { ...handle };
     }
 
+    function isCurrent(owner: StreamOwner & { kind: "view" }) {
+      const current = connections.get(owner.webContentsId);
+      return current === undefined || current === owner.connection;
+    }
+
     function owned(handle: StreamHandle, context: CommandCallerContext) {
       const record = records.get(handle.id);
       return record?.handle.command === handle.command &&
@@ -208,9 +246,26 @@ export const StreamsLive = Layer.effect(
       record.fiber?.interruptUnsafe();
     }
 
+    function connect(webContentsId: number, connection: string): void {
+      if (connections.get(webContentsId) === connection) return;
+      connections.set(webContentsId, connection);
+      stop(
+        (owner) =>
+          owner.kind === "view" &&
+          owner.webContentsId === webContentsId &&
+          owner.connection !== connection,
+      );
+    }
+
     function closeOwner(owner: StreamOwner): void {
+      if (owner.kind === "view" && owner.connection === undefined)
+        connections.delete(owner.webContentsId);
+      stop((candidate) => belongsTo(candidate, owner));
+    }
+
+    function stop(matches: (owner: StreamOwner) => boolean): void {
       for (const record of [...records.values()]) {
-        if (!sameOwner(record.owner, owner)) continue;
+        if (!matches(record.owner)) continue;
         record.silent = true;
         record.stopping = true;
         record.fiber?.interruptUnsafe();
@@ -222,6 +277,7 @@ export const StreamsLive = Layer.effect(
       open,
       acknowledge,
       cancel,
+      connect,
       closeOwner,
     } satisfies Streams;
   }),
