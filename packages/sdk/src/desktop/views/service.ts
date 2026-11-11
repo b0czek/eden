@@ -37,13 +37,20 @@ import { createViewPresentation } from "./presentation";
 import { createViewRegistry } from "./registry";
 import { createViewRendering } from "./rendering";
 import { createTiling } from "./tiling";
-import type { ViewEvents, ViewInfo, ViewMode } from "./types";
+import type {
+  ViewDocumentReset,
+  ViewEvents,
+  ViewInfo,
+  ViewMode,
+} from "./types";
 
 /** Native setup and presentation hooks are synchronous; workflows return lazy Effects. */
 export interface Views {
   viewRemoved: Event<ViewEvents["view-removed"]>;
   viewLoaded: Event<ViewEvents["view-loaded"]>;
   viewLoadFailed: Event<ViewEvents["view-load-failed"]>;
+  /** Internal: the view's renderer document was replaced; its page state is gone. */
+  viewDocumentReset: Event<ViewDocumentReset>;
   interfaceScaleChanged: Event<ViewEvents["interface-scale-changed"]>;
   globalBoundsChanged: Event<ViewEvents["global-bounds-changed"]>;
   boundsUpdated: Event<TargetedNotification<ViewBounds>>;
@@ -111,6 +118,7 @@ export const ViewsLive = Layer.effect(
     const viewRemoved = yield* scopedEvent<ViewEvents["view-removed"]>();
     const viewLoaded = yield* scopedEvent<ViewEvents["view-loaded"]>();
     const viewLoadFailed = yield* scopedEvent<ViewEvents["view-load-failed"]>();
+    const viewDocumentReset = yield* scopedEvent<ViewDocumentReset>();
     const interfaceScaleChanged =
       yield* scopedEvent<ViewEvents["interface-scale-changed"]>();
     const globalBoundsChanged =
@@ -148,7 +156,7 @@ export const ViewsLive = Layer.effect(
       rendering,
       interfaceScale,
       devtools,
-      { viewRemoved, viewLoaded, viewLoadFailed },
+      { viewRemoved, viewLoaded, viewLoadFailed, viewDocumentReset },
     );
     const coordination = createViewLayout(
       nativeViews,
@@ -192,6 +200,7 @@ export const ViewsLive = Layer.effect(
       viewRemoved,
       viewLoaded,
       viewLoadFailed,
+      viewDocumentReset,
       interfaceScaleChanged,
       globalBoundsChanged,
       boundsUpdated,

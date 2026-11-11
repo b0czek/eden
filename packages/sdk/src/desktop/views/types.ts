@@ -62,6 +62,13 @@ export function compareOverlayViews(a: ViewInfo, b: ViewInfo): number {
   return a.id - b.id;
 }
 
+/** A view's renderer document was replaced by a navigation, reload, or crash. */
+export interface ViewDocumentReset {
+  viewId: number;
+  appId: string;
+  webContentsId: number;
+}
+
 /**
  * View lifecycle notifications.
  */

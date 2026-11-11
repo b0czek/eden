@@ -311,10 +311,11 @@ For a command outside the generated client, `window.edenAPI.shellCommand` return
 with `next()` and `cancel()`. Wrap it with `toCommandStream` from `@edenapp/client` to use `for await`.
 
 A stream belongs to the view or backend that opened it.
-Eden stops the stream when that view or backend closes. Other apps cannot read or stop it.
+Eden stops the stream when that view or backend closes, or when the view reloads or its renderer crashes.
+Other apps cannot read or stop it.
 Eden does not keep streams after they end and does not list them with operations.
 
 Eden sends a limited number of chunks before the reader consumes them.
 A stream that you do not read pauses, but it keeps its resources until it ends.
 Cancel a stream when you no longer need its chunks.
-Each view or backend can have 16 open streams. Opening another stream fails until one ends.
+Each view or backend can have 16 open streams. Opening another stream fails until one ends or is cancelled.

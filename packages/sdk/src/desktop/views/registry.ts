@@ -29,7 +29,7 @@ import {
 } from "./lifecycle";
 import type { ViewRendering } from "./rendering";
 import type { Views } from "./service";
-import type { ViewEvents, ViewInfo } from "./types";
+import type { ViewDocumentReset, ViewEvents, ViewInfo } from "./types";
 
 type ViewLifecycleLayout = Pick<
   ViewLayout,
@@ -82,12 +82,13 @@ export function createViewRegistry(
     viewRemoved: Event<ViewEvents["view-removed"]>;
     viewLoaded: Event<ViewEvents["view-loaded"]>;
     viewLoadFailed: Event<ViewEvents["view-load-failed"]>;
+    viewDocumentReset: Event<ViewDocumentReset>;
   },
 ): ViewRegistry {
   const _views = new Map<number, ViewInfo>();
   const _viewsByWebContentsId = new Map<number, ViewInfo>();
   let _mainWindow: PlatformWindow | null = null;
-  const { viewRemoved, viewLoaded, viewLoadFailed } = events;
+  const { viewRemoved, viewLoaded, viewLoadFailed, viewDocumentReset } = events;
   function markViewFocused(viewInfo: ViewInfo): void {
     viewInfo.lastFocusedAt = Date.now();
   }
@@ -151,6 +152,17 @@ export function createViewRegistry(
           viewInfo.view.webContents.on("did-finish-load", () =>
             _interfaceScale.applyToView(viewInfo),
           );
+          const webContentsId = viewInfo.view.webContents.id;
+          const documentReset = () =>
+            viewDocumentReset.emit({ viewId, appId, webContentsId });
+          viewInfo.view.webContents.on(
+            "did-start-navigation",
+            (details: { isMainFrame?: boolean; isSameDocument?: boolean }) => {
+              if (details.isMainFrame && !details.isSameDocument)
+                documentReset();
+            },
+          );
+          viewInfo.view.webContents.on("render-process-gone", documentReset);
           viewInfo.view.webContents.on(
             "did-fail-load",
             (_event, errorCode: number, errorDescription: string) => {

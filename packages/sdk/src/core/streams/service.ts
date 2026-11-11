@@ -65,6 +65,8 @@ interface StreamRecord {
   credits: Semaphore.Semaphore;
   /** Chunks sent and not yet acknowledged; bounds the credit a reader can return. */
   outstanding: number;
+  /** Cancelled or closed; no longer counts toward its owner's capacity. */
+  stopping: boolean;
   silent: boolean;
   fiber?: Fiber.Fiber<void>;
 }
@@ -111,7 +113,10 @@ export const StreamsLive = Layer.effect(
         return;
       }
       const error = asError(Cause.squash(exit.cause));
-      log.error(`Stream ${record.handle.command} failed:`, error.message);
+      // Typed failures are expected outcomes the reader handles; defects are bugs.
+      if (Cause.hasDies(exit.cause))
+        log.error(`Stream ${record.handle.command} failed:`, error.message);
+      else log.debug(`Stream ${record.handle.command} failed:`, error.message);
       send(record, {
         id,
         kind: "error",
@@ -129,7 +134,7 @@ export const StreamsLive = Layer.effect(
       if (!owner) throw new StreamOwnerUnavailable({ command });
       let owned = 0;
       for (const record of records.values())
-        if (sameOwner(record.owner, owner)) owned += 1;
+        if (!record.stopping && sameOwner(record.owner, owner)) owned += 1;
       if (owned >= streamCapacityPerOwner)
         throw new StreamCapacityExhausted({
           command,
@@ -141,6 +146,7 @@ export const StreamsLive = Layer.effect(
         owner,
         credits: Semaphore.makeUnsafe(STREAM_WINDOW),
         outstanding: 0,
+        stopping: false,
         silent: false,
       };
       records.set(handle.id, record);
@@ -195,13 +201,18 @@ export const StreamsLive = Layer.effect(
       handle: StreamHandle,
       context = execution.get() ?? {},
     ): void {
-      owned(handle, context)?.fiber?.interruptUnsafe();
+      const record = owned(handle, context);
+      if (!record) return;
+      // Free the slot now: an interrupt may wait on I/O that cannot be cancelled.
+      record.stopping = true;
+      record.fiber?.interruptUnsafe();
     }
 
     function closeOwner(owner: StreamOwner): void {
       for (const record of [...records.values()]) {
         if (!sameOwner(record.owner, owner)) continue;
         record.silent = true;
+        record.stopping = true;
         record.fiber?.interruptUnsafe();
       }
     }

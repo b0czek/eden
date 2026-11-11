@@ -20,6 +20,7 @@ import { testApp } from "../../support/apps";
 import { gate, tick } from "../../support/async";
 import { createTestCaller } from "../../support/callers";
 import { createTestEden, type TestEden } from "../../support/create-test-eden";
+import type { InMemoryWebContents } from "../../support/in-memory-platform";
 import { connectViewStreams, readAll } from "../../support/streams";
 
 type Reader = StreamReader<string>;
@@ -29,11 +30,13 @@ describe("stream commands", () => {
   let eden: TestEden;
   let webContentsId: number;
   let stopped: ReturnType<typeof gate<void>>;
+  let unstuck: ReturnType<typeof gate<void>>;
   let sent: StreamMessage[];
 
   beforeEach(async () => {
     eden = await createTestEden();
     stopped = gate();
+    unstuck = gate();
     sent = [];
     eden.runtime.services.installedPackages.register(testApp(appId));
     const { user } = await createTestCaller(eden, appId, ["feed/*"]);
@@ -64,6 +67,13 @@ describe("stream commands", () => {
                 Stream.ensuring(Effect.sync(() => stopped.release())),
               ),
           }),
+          stuck: command({
+            mode: "stream",
+            handle: () =>
+              Stream.fromEffect(
+                Effect.uninterruptible(Effect.promise(() => unstuck.promise)),
+              ),
+          }),
           failing: command({
             mode: "stream",
             handle: () =>
@@ -78,6 +88,7 @@ describe("stream commands", () => {
   });
 
   afterEach(async () => {
+    unstuck.release();
     await eden?.dispose();
   });
 
@@ -86,6 +97,12 @@ describe("stream commands", () => {
     sent = view.sent;
     return view;
   }
+
+  const navigate = (isSameDocument: boolean) =>
+    (eden.getAppView(appId).view.webContents as InMemoryWebContents).emit(
+      "did-start-navigation",
+      { isMainFrame: true, isSameDocument },
+    );
 
   const chunksSent = () =>
     sent.filter((message) => message.kind === "chunk").length;
@@ -155,6 +172,15 @@ describe("stream commands", () => {
     await expect(view.open("feed/idle")).resolves.toBeDefined();
   });
 
+  it("releases capacity on cancel before an uninterruptible source exits", async () => {
+    const view = connectView();
+    const readers = [];
+    for (let index = 0; index < streamCapacityPerOwner; index++)
+      readers.push(await view.open("feed/stuck"));
+    await Promise.all(readers.map((reader) => reader.cancel()));
+    await expect(view.open("feed/idle")).resolves.toBeDefined();
+  });
+
   it("ignores acknowledgement and cancellation from other callers", async () => {
     const view = connectView();
     const reader = await view.open("feed/endless");
@@ -177,6 +203,25 @@ describe("stream commands", () => {
     await view.open("feed/idle");
     await eden.complete("process/stop", { appId });
     await stopped.promise;
+  });
+
+  it("stops a view's streams and frees its capacity when the renderer reloads", async () => {
+    let view = connectView();
+    for (let index = 0; index < streamCapacityPerOwner; index++)
+      await view.open("feed/idle");
+    navigate(false);
+    await stopped.promise;
+    await tick();
+    expect(sent.some((message) => message.kind !== "chunk")).toBe(false);
+    view = connectView();
+    await expect(view.open("feed/idle")).resolves.toBeDefined();
+  });
+
+  it("keeps a view's streams across same-document navigation", async () => {
+    const view = connectView();
+    const reader = await view.open("feed/numbers", { count: 3 });
+    navigate(true);
+    await expect(readAll(reader)).resolves.toEqual([1, 2, 3]);
   });
 
   it("requires an app view or backend caller", async () => {

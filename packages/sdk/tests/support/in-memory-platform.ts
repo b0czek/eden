@@ -50,7 +50,10 @@ class InMemoryMessagePort implements PlatformMessagePort {
   }
 }
 
-class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
+export class InMemoryWebContents
+  extends EventEmitter
+  implements PlatformWebContents
+{
   private destroyed = false;
   private zoomFactor = 1;
   private devToolsOpened = false;
