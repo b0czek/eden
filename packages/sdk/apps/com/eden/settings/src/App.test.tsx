@@ -9,6 +9,81 @@ afterEach(() => {
 });
 
 describe("Settings app transport", () => {
+  it("sends cloneable brightness parameters from the reconciled panel", async () => {
+    let brightness = 100;
+    const received: unknown[] = [];
+    const shellCommand = vi.fn(async (command: string, args: unknown) => {
+      const request = structuredClone(args) as {
+        invocation: { params: { output: string }; value: number };
+      };
+      if (command === "system/branding") return { name: "Eden" };
+      if (command === "settings/panels") {
+        return {
+          panels: [{ id: "vendor.display", title: "Display", source: "host" }],
+        };
+      }
+      if (command === "settings/panel") {
+        return {
+          panel: {
+            id: "vendor.display",
+            title: "Display",
+            source: "host",
+            renderer: "generic",
+            view: {
+              sections: [
+                {
+                  id: "brightness",
+                  nodes: [
+                    {
+                      kind: "input",
+                      input: "range",
+                      id: "panel",
+                      label: "Panel brightness",
+                      value: brightness,
+                      validation: { min: 0, max: 100, step: 1 },
+                      action: {
+                        actionId: "set-brightness",
+                        params: { output: "eDP-1" },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            actions: [{ id: "set-brightness", authorized: true }],
+          },
+        };
+      }
+      if (command === "settings/action") {
+        received.push(request.invocation);
+        brightness = request.invocation.value;
+        return { success: true };
+      }
+      throw new Error(`Unexpected command ${command}`);
+    });
+    window.edenAPI = {
+      shellCommand,
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      getLaunchArgs: () => [],
+    } as unknown as EdenAPI;
+
+    const view = render(() => <App />);
+    await waitFor(() => expect(view.getByText("Display")).toBeTruthy());
+    await fireEvent.click(view.getByText("Display"));
+    await waitFor(() =>
+      expect(view.getByText("Panel brightness")).toBeTruthy(),
+    );
+    const slider = view.getByLabelText("Panel brightness") as HTMLInputElement;
+    await fireEvent.input(slider, { target: { value: "45" } });
+    await fireEvent.change(slider);
+    await waitFor(() =>
+      expect(received).toEqual([{ params: { output: "eDP-1" }, value: 45 }]),
+    );
+    await waitFor(() => expect(slider.value).toBe("45"));
+    expect(view.queryByRole("alert")).toBeNull();
+  });
+
   it("refreshes selected state and clears a panel removed from the catalog", async () => {
     let catalog = [
       {
