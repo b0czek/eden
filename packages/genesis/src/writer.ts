@@ -6,7 +6,11 @@ import cliProgress from "cli-progress";
 import * as tar from "tar";
 import { ARCHIVE_FORMAT_VERSION, type ArchiveMetadata } from "./archive";
 import type { Compressor } from "./compression";
-import { listPackageFiles } from "./package-files";
+import {
+  listPackageFiles,
+  MANIFEST_FILE,
+  serializeManifest,
+} from "./package-files";
 
 export async function createArchive(options: {
   packageDirectory: string;
@@ -23,7 +27,12 @@ export async function createArchive(options: {
     path.join(process.cwd(), `${manifest.id}-${manifest.version}.edenite`);
   const tarPath = `${outputPath}.tmp.tar`;
   const compressedPath = `${tarPath}.zst`;
-  const files = await listPackageFiles(packageDirectory, manifest);
+  // Ship the resolved manifest so values inferred at build time, such as a
+  // version from package.json, are available when the package is loaded.
+  const files = (await listPackageFiles(packageDirectory, manifest)).filter(
+    (file) => file !== MANIFEST_FILE,
+  );
+  const manifestDirectory = await fs.mkdtemp(`${outputPath}.manifest-`);
   let progress: cliProgress.SingleBar | undefined;
   if (verbose && files.length > 50) {
     progress = new cliProgress.SingleBar({
@@ -47,6 +56,15 @@ export async function createArchive(options: {
         },
       },
       files,
+    );
+    await fs.writeFile(
+      path.join(manifestDirectory, MANIFEST_FILE),
+      serializeManifest(manifest),
+      "utf-8",
+    );
+    await tar.replace(
+      { file: tarPath, cwd: manifestDirectory, portable: true },
+      [MANIFEST_FILE],
     );
     progress?.stop();
     const { checksum } = await compressor.compressFileStreaming(
@@ -77,5 +95,6 @@ export async function createArchive(options: {
     progress?.stop();
     await fs.rm(tarPath, { force: true });
     await fs.rm(compressedPath, { force: true });
+    await fs.rm(manifestDirectory, { recursive: true, force: true });
   }
 }

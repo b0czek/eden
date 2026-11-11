@@ -521,6 +521,62 @@ describe("bundler module", () => {
         fs.stat(path.join(extractPath, "src", "excluded.txt")),
       ).rejects.toMatchObject({ code: "ENOENT" });
     });
+
+    describe("with a version inferred from package.json", () => {
+      let appPath: string;
+
+      beforeEach(async () => {
+        appPath = path.join(tempDir, "inferred-version-app");
+        await fs.cp(sampleAppPath, appPath, { recursive: true });
+        const manifestPath = path.join(appPath, "manifest.json");
+        const { version: _, ...manifest } = JSON.parse(
+          await fs.readFile(manifestPath, "utf-8"),
+        );
+        await fs.writeFile(manifestPath, JSON.stringify(manifest));
+        await fs.writeFile(
+          path.join(appPath, "package.json"),
+          JSON.stringify({ version: "0.1.0" }),
+        );
+      });
+
+      async function expectLoadableManifest(directory: string): Promise<void> {
+        const shipped = JSON.parse(
+          await fs.readFile(path.join(directory, "manifest.json"), "utf-8"),
+        );
+        expect(bundler.validatePackageManifestObject(shipped)).toMatchObject({
+          valid: true,
+          manifest: { id: "com.example.hello", version: "0.1.0" },
+        });
+      }
+
+      it("writes the inferred version into an extracted package", async () => {
+        const target = path.join(tempDir, "prebuilt");
+        const result = await bundler.bundle({
+          appDirectory: appPath,
+          extractToDirectory: target,
+        });
+        expect(result).toMatchObject({ success: true });
+        await expectLoadableManifest(target);
+      });
+
+      it("writes the inferred version into an archive", async () => {
+        const archive = path.join(tempDir, "inferred.edenite");
+        const extracted = path.join(tempDir, "inferred-extracted");
+        await expect(
+          bundler.bundle({ appDirectory: appPath, outputPath: archive }),
+        ).resolves.toMatchObject({ success: true });
+        await expect(
+          bundler.extract({ edenitePath: archive, outputDirectory: extracted }),
+        ).resolves.toMatchObject({
+          success: true,
+          manifest: { version: "0.1.0" },
+        });
+        await expectLoadableManifest(extracted);
+        await expect(fs.readdir(tempDir)).resolves.not.toContainEqual(
+          expect.stringContaining(".manifest-"),
+        );
+      });
+    });
   });
 
   describe("getInfo", () => {
