@@ -26,10 +26,14 @@ export function generateClientCode(
   const lines = generateHeader(
     "Typed app client generated from command and event declarations",
   );
+  const hasStreams = commandNamespaces.some((namespace) =>
+    namespace.commands.some((command) => command.mode === "stream"),
+  );
   lines.push(
-    'import type { CommandArgs, CommandResult, EventData, OperationSubmission } from "@edenapp/types";',
+    `import type { CommandArgs, CommandResult, ${hasStreams ? "CommandStream, " : ""}EventData, OperationSubmission } from "@edenapp/types";`,
   );
   lines.push('import { invoke } from "./invoke.js";', "");
+  if (hasStreams) lines.push('import { openStream } from "./streams.js";', "");
   if (eventNamespaces.some((namespace) => namespace.events.length)) {
     lines.push(
       'import { subscribe, unsubscribe } from "./subscriptions.js";',
@@ -137,6 +141,13 @@ export function generateClientCode(
             `[${JSON.stringify(field.name)}]: ${options}?.[${JSON.stringify(field.name)}]`,
         ),
       ];
+      if (command.mode === "stream") {
+        lines.push(
+          `  [${JSON.stringify(method)}]: (${parameters.join(", ")}): Promise<CommandStream<${JSON.stringify(id)}>> =>`,
+          `    openStream(${JSON.stringify(id)}, { ${properties.join(", ")} }),`,
+        );
+        continue;
+      }
       lines.push(
         `  [${JSON.stringify(method)}]: (${parameters.join(", ")}): Promise<CommandResult<${JSON.stringify(id)}>> =>`,
       );

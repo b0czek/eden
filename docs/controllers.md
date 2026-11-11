@@ -175,6 +175,35 @@ Supply `encodeFailure` only when a command has a typed public failure response.
 Defects remain failures. A successful `false` or `{ success: false }` value is still a successful execution.
 See [app operation behavior](ipc-architecture.md#operations) for the client contract.
 
+## Add a stream command
+
+Use `mode: "stream"` when a caller can use results before the work completes:
+
+```ts
+countdown: command({
+  mode: "stream",
+  input: v.object({ from: v.pipe(v.number(), v.integer(), v.minValue(0)) }),
+  handle: ({ from }) =>
+    Stream.range(0, from).pipe(
+      Stream.map((step) => ({ remaining: from - step })),
+      Stream.schedule(Schedule.spaced(Duration.seconds(1))),
+    ),
+}),
+```
+
+The handler validates and admits work synchronously, like other commands.
+It returns a lazy, fully provided `Stream`. Each element becomes one chunk for the caller.
+Eden runs the stream with the caller's identity after it accepts the request.
+Codegen declares the element type as the command's `chunk`
+and generates a client method that returns a `CommandStream`.
+
+The stream runtime owns delivery, backpressure, cancellation, and cleanup.
+A stream waits while the caller has not consumed earlier chunks.
+Cancellation or a closed caller interrupts the stream, so finalizers run.
+Keep each chunk serializable, and emit summaries instead of very frequent small updates.
+A failure ends the stream and reaches the caller as a sanitized error.
+Only app views and backends can open streams.
+
 ## SDK controllers
 
 Host controllers return synchronous snapshots, lazy Effects, and unsubscribe functions.

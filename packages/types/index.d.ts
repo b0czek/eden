@@ -61,6 +61,7 @@ export * from "./channels";
 // Export new command types
 export type {
   CommandArgs,
+  CommandChunk,
   CommandCompletion,
   CommandMap,
   CommandName,
@@ -138,6 +139,14 @@ export interface SearchResult {
   type: "file" | "folder";
 }
 
+/** Progress of a filesystem search stream. */
+export interface SearchProgress {
+  /** Best matches found so far, ranked from best to worst. */
+  results: SearchResult[];
+  /** Number of entries examined so far. */
+  searched: number;
+}
+
 /**
  * Notification type/variant for styling
  */
@@ -179,3 +188,4 @@ export type WallpaperConfig =
   | { type: "custom"; value: string };
 
 export * from "./Operations";
+export * from "./Streams";

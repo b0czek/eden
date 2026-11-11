@@ -76,8 +76,8 @@ export function FilesToolbar(props: FilesToolbarProps) {
       onGoBack={props.directory.goBack}
       onGoForward={props.directory.goForward}
       onGoUp={props.directory.goUp}
-      onNavigate={(path) =>
-        props.directory.navigate(path, undefined, props.location.volume)
+      onNavigate={(path, selectedItem) =>
+        props.directory.navigate(path, selectedItem, props.location.volume)
       }
       endActions={
         <>

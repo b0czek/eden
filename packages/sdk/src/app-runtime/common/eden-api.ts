@@ -5,10 +5,12 @@ import type {
   EdenAPI,
   FilesystemLocation,
   OperationSubmission,
+  StreamHandle,
 } from "@edenapp/types";
 import { createEventSubscriptions } from "./event-subscriptions";
 import { createOperationsAPI } from "./operations-api";
 import type { ShellTransport } from "./shell-transport";
+import { createStreamReaders } from "./stream-readers";
 
 /** Build the public EdenAPI and its private incoming event dispatcher. */
 export function createEdenAPI(
@@ -19,16 +21,26 @@ export function createEdenAPI(
   },
 ) {
   const subscriptions = createEventSubscriptions(transport);
+  const streams = createStreamReaders(transport);
   const api = {
     shellCommand: async <C extends CommandName>(
       command: C,
       args: CommandArgs<C>,
       submission?: OperationSubmission,
     ): Promise<CommandResult<C>> => {
-      const response = await transport.exec(command, args, submission);
-      if (response.mode === "operation")
-        return operations.from(response.handle) as CommandResult<C>;
-      return response.result as CommandResult<C>;
+      const commandEnded = streams.commandStarted();
+      try {
+        const response = await transport.exec(command, args, submission);
+        if (response.mode === "operation")
+          return operations.from(response.handle) as CommandResult<C>;
+        if (response.mode === "stream")
+          return streams.open(
+            response.handle as StreamHandle<C>,
+          ) as CommandResult<C>;
+        return response.result as CommandResult<C>;
+      } finally {
+        commandEnded();
+      }
     },
 
     subscribe: subscriptions.subscribe,
@@ -52,5 +64,9 @@ export function createEdenAPI(
   };
   const operations = createOperationsAPI(api);
   const edenAPI: EdenAPI = { ...api, operations };
-  return { api: edenAPI, dispatch: subscriptions.dispatch };
+  return {
+    api: edenAPI,
+    dispatch: subscriptions.dispatch,
+    dispatchStream: streams.dispatch,
+  };
 }

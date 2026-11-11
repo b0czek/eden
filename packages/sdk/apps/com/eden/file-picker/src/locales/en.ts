@@ -28,6 +28,7 @@ export const en = {
     currentFolder: "Current folder",
     editPath: "Edit path",
     searchPlaceholder: "Type a path or search...",
+    searchedItems: "{count} searched",
     folder: "Folder",
     empty: "This folder is empty",
     emptyHint: "Choose another folder or create a new one",

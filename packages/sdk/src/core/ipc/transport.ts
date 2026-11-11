@@ -16,10 +16,13 @@ import {
 } from "../../platform/ports/types";
 import type { Controller } from "../controllers/controller";
 import { asError } from "../effects/io";
+import { listen } from "../events/scoped";
 import type { CommandCallerContext } from "../execution/context";
 import { ExecutionContext } from "../execution/context";
 import { RuntimeContexts } from "../execution/runtime-contexts";
 import { Operations } from "../operations/service";
+import { STREAM_CHANNEL } from "../streams/protocol";
+import { type StreamDelivery, Streams } from "../streams/service";
 import { Commands } from "./commands";
 import { createEventController } from "./controller-edenapi";
 import { createEventRouting, type EventRouting } from "./event-routing";
@@ -48,6 +51,7 @@ export const IpcTransportLive = Layer.effect(
     const execution = yield* ExecutionContext;
     const rendererIpc = yield* RendererIpcPort;
     const operations = yield* Operations;
+    const streams = yield* Streams;
     const forkCommand = yield* FiberSet.makeRuntime<never, unknown, unknown>();
     const forkResponse = yield* FiberSet.makeRuntime<never, unknown, unknown>();
     let eventSubscribers: EventRouting;
@@ -71,6 +75,16 @@ export const IpcTransportLive = Layer.effect(
     );
     setupIPCHandlers();
     setupBackendMessageHandlers();
+    yield* listen(streams.messages, deliverStreamMessage);
+    function deliverStreamMessage({ owner, message }: StreamDelivery): void {
+      if (owner.kind === "backend") {
+        backends.sendMessage(owner.appId, { type: STREAM_CHANNEL, message });
+        return;
+      }
+      const viewId = views.getViewIdByWebContentsId(owner.webContentsId);
+      if (viewId !== undefined)
+        views.sendToView(viewId, STREAM_CHANNEL, message);
+    }
     function registerController(controller: Controller): void {
       for (const event of Object.keys(controller.events)) {
         const name = `${controller.namespace}/${event}`;
@@ -112,13 +126,26 @@ export const IpcTransportLive = Layer.effect(
     }
     function setupIPCHandlers(): void {
       // Handle shell commands
-      rendererIpc.handle<[string, unknown, OperationSubmission?], unknown>(
+      // Each app preload connects once per page load, before its first command.
+      rendererIpc.handle<[unknown], void>(
+        "shell-connect",
+        (event, connection) => {
+          if (typeof connection !== "string" || !connection) return;
+          if (!views.getAppIdByWebContentsId(event.sender.id)) return;
+          streams.connect(event.sender.id, connection);
+        },
+      );
+      rendererIpc.handle<
+        [string, unknown, OperationSubmission?, unknown?],
+        unknown
+      >(
         "shell-command",
         async (
           event,
           command: string,
           args: unknown,
           submission?: OperationSubmission,
+          connection?: unknown,
         ) => {
           // Build caller context for commands that need it
           const appId = views.getAppIdByWebContentsId(event.sender.id);
@@ -137,6 +164,8 @@ export const IpcTransportLive = Layer.effect(
               sessionId: appId ? callerSession(appId) : undefined,
               appId,
               webContentsId: event.sender.id,
+              connection:
+                typeof connection === "string" ? connection : undefined,
               principal: appId
                 ? runtimeContexts.resolvePrincipal(appId)
                 : undefined,
@@ -232,8 +261,8 @@ export const IpcTransportLive = Layer.effect(
         function respond(exit: Exit.Exit<unknown, unknown>) {
           if (Exit.isSuccess(exit)) {
             resolve(
-              mode === "operation"
-                ? { mode: "operation", handle: exit.value }
+              mode === "operation" || mode === "stream"
+                ? { mode, handle: exit.value }
                 : { mode: "result", result: exit.value },
             );
           } else {
@@ -271,6 +300,7 @@ export const IpcTransportLive = Layer.effect(
     function destroy(): void {
       // Remove global IPC handlers
       rendererIpc.removeHandler("shell-command");
+      rendererIpc.removeHandler("shell-connect");
       if (backendMessageListener) {
         stopBackendMessages?.();
         backendMessageListener = undefined;

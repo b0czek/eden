@@ -75,6 +75,7 @@ export const en = {
     folder: "Folder",
     editPath: "Edit path",
     searchPlaceholder: "Type a path or search...",
+    searchedItems: "{count} searched",
     extensionHelp: "Include file extension (e.g., .txt, .js, .md)",
     displayOptions: "Display Options",
     viewStyle: "View Style",

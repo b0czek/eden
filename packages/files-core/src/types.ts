@@ -38,6 +38,7 @@ export interface FileExplorerLabels {
   newFile: string;
   editPath: string;
   searchPlaceholder: string;
+  searchedItems: (count: number) => string;
   loading: string;
   empty: string;
   emptyHint: string;

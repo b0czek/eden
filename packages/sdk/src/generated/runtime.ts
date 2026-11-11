@@ -121,6 +121,8 @@ export const COMMAND_NAMES: readonly string[] = [
   "settings/reset/su",
   "settings/set",
   "settings/set/su",
+  "stream/ack",
+  "stream/cancel",
   "system/branding",
   "system/info",
   "system/power",

@@ -461,9 +461,10 @@ export interface FsCommands {
     response: { realPath: string; };
   };
   "fs/search": {
-    mode: "result";
+    mode: "stream";
     args: { location: { volume: string; path: string; }; pattern: string; limit?: number | undefined; };
-    response: import("./index").SearchResult[];
+    response: import("./index").StreamHandle<"fs/search">;
+    chunk: import("./index").SearchProgress;
   };
   "fs/stat": {
     mode: "result";
@@ -830,6 +831,29 @@ export interface SettingsCommands {
 }
 
 /**
+ * StreamCommands - Commands for the "stream" namespace
+ */
+export interface StreamCommands {
+  /**
+   * Return credit for chunks that the caller consumed from its stream.
+   * Stream readers send this automatically.
+   */
+  "stream/ack": {
+    mode: "result";
+    args: { handle: { command: string; id: string; }; count: number; };
+    response: void;
+  };
+  /**
+   * Stop a stream that the caller opened.
+   */
+  "stream/cancel": {
+    mode: "result";
+    args: { handle: { command: string; id: string; }; };
+    response: void;
+  };
+}
+
+/**
  * SystemCommands - Commands for the "system" namespace
  */
 export interface SystemCommands {
@@ -1041,4 +1065,4 @@ export interface VolumeCommands {
 /**
  * Global command map - merge all command namespaces
  */
-export interface CommandMap extends AppbusCommands, AppearanceCommands, AssociationsCommands, ContextMenuCommands, DaemonCommands, DbCommands, EventCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, SystemCommands, UserCommands, ViewCommands, VolumeCommands {}
+export interface CommandMap extends AppbusCommands, AppearanceCommands, AssociationsCommands, ContextMenuCommands, DaemonCommands, DbCommands, EventCommands, FileCommands, FilePickerCommands, FsCommands, I18nCommands, NotificationCommands, OperationCommands, PackageCommands, ProcessCommands, SessionCommands, SettingsCommands, StreamCommands, SystemCommands, UserCommands, ViewCommands, VolumeCommands {}

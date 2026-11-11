@@ -12,6 +12,7 @@ import { connectSettingsLifecycle } from "../core/settings/lifecycle";
 import { registerBuiltinSettingsPanels } from "../core/settings/panels/builtin/registration";
 import { SettingsPanels } from "../core/settings/panels/service";
 import { Settings } from "../core/settings/service";
+import { Streams } from "../core/streams/service";
 import { GrantCatalog } from "../core/user/grant-catalog";
 import { Users } from "../core/user/service";
 import { Appearance } from "../desktop/appearance/service";
@@ -35,6 +36,7 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
   const grants = yield* GrantCatalog;
   const users = yield* Users;
   const views = yield* Views;
+  const streams = yield* Streams;
   yield* connectDaemonLifecycle(daemons, processes, packages);
   yield* connectSettingsLifecycle(
     settingsPanels,
@@ -44,9 +46,10 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
     grants,
   );
   yield* Effect.gen(function* () {
-    yield* listen(views.viewRemoved, ({ viewId }) =>
-      ipc.eventSubscribers.removeViewSubscriptions(viewId),
-    );
+    yield* listen(views.viewRemoved, ({ viewId, webContentsId }) => {
+      ipc.eventSubscribers.removeViewSubscriptions(viewId);
+      streams.closeOwner({ kind: "view", webContentsId });
+    });
     const forkCleanup = yield* FiberSet.makeRuntime<never, void, never>();
     function closeProcessHandles({ appId }: { appId: string }) {
       forkCleanup(
@@ -59,6 +62,7 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
     // Native exit closes handle admission before asynchronous instance teardown.
     yield* listen(backends.backendExit, ({ appId }) => {
       ipc.eventSubscribers.removeBackendSubscriptions(appId);
+      streams.closeOwner({ kind: "backend", appId });
       closeProcessHandles({ appId });
     });
   });

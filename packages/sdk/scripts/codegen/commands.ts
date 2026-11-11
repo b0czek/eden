@@ -11,12 +11,15 @@ import {
   replaceTypesWithInlineImports,
 } from "./utils";
 
+export type CommandMode = "result" | "operation" | "stream";
+
 export interface CommandInfo {
   namespace: string;
   command: string;
   argsType: string;
+  /** Result response, operation completion, or stream chunk type. */
   returnType: string;
-  mode: "result" | "operation";
+  mode: CommandMode;
   docs: string[];
   fields: CommandField[];
 }
@@ -33,7 +36,7 @@ export interface NamespaceCommands {
     command: string;
     argsType: string;
     returnType: string;
-    mode: "result" | "operation";
+    mode: CommandMode;
     docs: string[];
     fields: CommandField[];
   }>;
@@ -116,6 +119,11 @@ export function generateCommandsCode(
       lines.push(`    args: ${argsType};`);
       if (cmd.mode === "result") {
         lines.push(`    response: ${returnType};`);
+      } else if (cmd.mode === "stream") {
+        lines.push(
+          `    response: import("./index").StreamHandle<"${ns.namespace}/${cmd.command}">;`,
+        );
+        lines.push(`    chunk: ${returnType};`);
       } else {
         lines.push(
           `    response: import("./index").OperationHandle<"${ns.namespace}/${cmd.command}">;`,

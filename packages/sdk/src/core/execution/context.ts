@@ -48,6 +48,8 @@ export interface CommandCallerContext {
   operationId?: string;
   appId?: string;
   webContentsId?: number;
+  /** The view's current page connection, chosen by its preload on each load. */
+  connection?: string;
   principal?: EffectivePrincipal;
   foundation?: boolean;
 }

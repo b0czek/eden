@@ -5,6 +5,7 @@ import type {
 } from "@edenapp/types";
 import type { AppBusConnection } from "@edenapp/types/ipc/appbus";
 import { contextBridge, ipcRenderer } from "electron";
+import { STREAM_CHANNEL, type StreamMessage } from "../core/streams/protocol";
 import { decodeLaunchContext } from "../core/utils/app-launch-context";
 import { log, setLogContext } from "../platform/logging/logger";
 import {
@@ -71,14 +72,32 @@ contextBridge.exposeInMainWorld("getAppAPI", () => {
 // ===================================================================
 
 // Shell transport implementation using ipcRenderer
+// Identifies this page load; a reload gets a new connection and its own streams.
+// getRandomValues, unlike randomUUID, also works outside secure contexts.
+const connection = Array.from(
+  crypto.getRandomValues(new Uint8Array(16)),
+  (byte) => byte.toString(16).padStart(2, "0"),
+).join("");
+// Renderer IPC stays ordered, so main records the page before its first command.
+void ipcRenderer.invoke("shell-connect", connection);
 const shellTransport: ShellTransport = {
   exec: (command, args, submission) => {
-    return ipcRenderer.invoke("shell-command", command, args, submission);
+    return ipcRenderer.invoke(
+      "shell-command",
+      command,
+      args,
+      submission,
+      connection,
+    );
   },
 };
 
 // Expose edenAPI for shell commands and event subscriptions
-const { api: edenAPI, dispatch } = createEdenAPI(shellTransport, {
+const {
+  api: edenAPI,
+  dispatch,
+  dispatchStream,
+} = createEdenAPI(shellTransport, {
   getLaunchArgs: () => launchContext.args,
   getLaunchFile: () => launchContext.file,
 });
@@ -89,6 +108,10 @@ ipcRenderer.on(
     dispatch(message.type, message.payload);
   },
 );
+
+ipcRenderer.on(STREAM_CHANNEL, (_event, message: StreamMessage) => {
+  dispatchStream(message);
+});
 
 contextBridge.exposeInMainWorld("edenAPI", edenAPI);
 

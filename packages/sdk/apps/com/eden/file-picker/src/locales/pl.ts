@@ -28,6 +28,7 @@ export const pl = {
     currentFolder: "Bieżący folder",
     editPath: "Edytuj ścieżkę",
     searchPlaceholder: "Wpisz ścieżkę lub szukaj...",
+    searchedItems: "Przeszukano: {count}",
     folder: "Folder",
     empty: "Ten folder jest pusty",
     emptyHint: "Wybierz inny folder lub utwórz nowy",

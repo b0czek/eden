@@ -6,7 +6,7 @@ import type {
   FilesystemLocation,
   FilesystemOpenMode,
   FilesystemSource,
-  SearchResult,
+  SearchProgress,
   TrashEntry,
   TrashRestoreResult,
 } from "@edenapp/types";
@@ -15,6 +15,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FiberSet from "effect/FiberSet";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Stream from "effect/Stream";
 import type { TargetedNotification } from "../../core/controllers/events";
 import type { Event } from "../../core/events/event";
 import { listen, scopedEvent } from "../../core/events/scoped";
@@ -49,6 +51,7 @@ import {
   PathOutsideRoot,
 } from "./path-containment";
 import { FilesystemViews } from "./ports";
+import { createSearchWalk } from "./search";
 import { createFileTransfers } from "./transfers";
 import { createTrash } from "./trash";
 import type { VolumeUnavailable } from "./volumes/errors";
@@ -114,11 +117,12 @@ export interface Filesystem {
     FileStats & { isSymbolicLink: boolean },
     FilesystemPathError
   >;
+  /** Emits the ranked matches so far about every 100 ms, then the final ranking. */
   search: (
     location: FilesystemLocation,
     pattern: string,
     limit?: number,
-  ) => Effect.Effect<SearchResult[], FilesystemPathError>;
+  ) => Stream.Stream<SearchProgress, FilesystemPathError>;
   delete: (
     location: FilesystemLocation,
     reporter?: OperationReporter,
@@ -178,6 +182,8 @@ export interface Filesystem {
 export const Filesystem = Context.Service<"eden/Filesystem", Filesystem>(
   "eden/Filesystem",
 );
+
+const searchPageMillis = 100;
 
 const assertExistingWithin = (rootPath: string, hostPath: string) =>
   assertExistingPathWithin(rootPath, hostPath).pipe(
@@ -551,41 +557,43 @@ export const FilesystemLive = Layer.effect(
       pattern: string,
       limit = 10,
     ) =>
-      withVolume(location, (fullPath) =>
-        Effect.gen(function* () {
-          const entries = yield* io.glob(pattern ? `**/*${pattern}*` : "**/*", {
-            cwd: fullPath,
-            onlyFiles: false,
-            deep: 3,
-            suppressErrors: true,
-            stats: true,
-            followSymbolicLinks: false,
-          });
-          const results: SearchResult[] = [];
-          for (const entry of entries) {
-            if (results.length >= limit) break;
-            results.push({
+      Stream.suspend(() => {
+        const walk = createSearchWalk(pattern, limit);
+        const base = location.path.replace(/\/+$/, "");
+        let results: SearchProgress["results"] = [];
+        let sentVersion = -1;
+        let sentSearched = -1;
+        /** Only pages that found or examined something new are sent. */
+        const progress = (): SearchProgress[] => {
+          const { matches, searched, version } = walk.snapshot();
+          if (version === sentVersion && searched === sentSearched) return [];
+          if (version !== sentVersion)
+            results = matches.map((match) => ({
               location: {
                 volume: location.volume,
-                path:
-                  location.path === "/"
-                    ? `/${entry.path}`
-                    : `${location.path}/${entry.path}`,
+                path: `${base}/${match.relativePath}`,
               },
-              name: path.basename(entry.path),
-              type: entry.stats?.isDirectory() ? "folder" : "file",
-            });
-          }
-          return results;
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.sync(() => {
-              log.error("Search error:", error);
-              return [] as SearchResult[];
-            }),
+              name: match.name,
+              type: match.isDirectory ? "folder" : "file",
+            }));
+          sentVersion = version;
+          sentSearched = searched;
+          return [{ searched, results }];
+        };
+        // Each page holds its own volume lease, so an unread search cannot block eject.
+        return Stream.paginate(true, (first: boolean) =>
+          Effect.map(
+            withVolume(location, (root) =>
+              walk.step(root, first ? 0 : searchPageMillis),
+            ),
+            (complete) =>
+              [
+                progress(),
+                complete ? Option.none() : Option.some(false),
+              ] as const,
           ),
-        ),
-      );
+        );
+      });
     const remove = (
       location: FilesystemLocation,
       reporter?: OperationReporter,
