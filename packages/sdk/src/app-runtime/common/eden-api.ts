@@ -28,14 +28,19 @@ export function createEdenAPI(
       args: CommandArgs<C>,
       submission?: OperationSubmission,
     ): Promise<CommandResult<C>> => {
-      const response = await transport.exec(command, args, submission);
-      if (response.mode === "operation")
-        return operations.from(response.handle) as CommandResult<C>;
-      if (response.mode === "stream")
-        return streams.open(
-          response.handle as StreamHandle<C>,
-        ) as CommandResult<C>;
-      return response.result as CommandResult<C>;
+      const commandEnded = streams.commandStarted();
+      try {
+        const response = await transport.exec(command, args, submission);
+        if (response.mode === "operation")
+          return operations.from(response.handle) as CommandResult<C>;
+        if (response.mode === "stream")
+          return streams.open(
+            response.handle as StreamHandle<C>,
+          ) as CommandResult<C>;
+        return response.result as CommandResult<C>;
+      } finally {
+        commandEnded();
+      }
     },
 
     subscribe: subscriptions.subscribe,

@@ -26,9 +26,25 @@ function streamError(failure: StreamFailure): Error {
 /**
  * Own app-side stream state. Messages can arrive before the command response,
  * so each stream buffers until its reader opens; credit bounds that buffer.
+ * Buffers are only kept while a command is in flight: once every pending
+ * command has settled, a stream nobody opened will never be read.
  */
 export function createStreamReaders(transport: ShellTransport) {
   const states = new Map<string, ReaderState>();
+  let pendingCommands = 0;
+
+  /** Call around every shell command; `end` runs after any reader opens. */
+  function commandStarted(): () => void {
+    pendingCommands += 1;
+    let ended = false;
+    return () => {
+      if (ended) return;
+      ended = true;
+      pendingCommands -= 1;
+      if (pendingCommands > 0) return;
+      for (const [id, entry] of states) if (!entry.handle) states.delete(id);
+    };
+  }
 
   function state(id: string): ReaderState {
     let entry = states.get(id);
@@ -51,6 +67,8 @@ export function createStreamReaders(transport: ShellTransport) {
   }
 
   function dispatch(message: StreamMessage): void {
+    // No command can still return this stream's handle, so nothing would read it.
+    if (!states.has(message.id) && pendingCommands === 0) return;
     const entry = state(message.id);
     if (entry.closed) {
       // A cancelled stream still sends its end; only then is its state released.
@@ -121,5 +139,5 @@ export function createStreamReaders(transport: ShellTransport) {
     };
   }
 
-  return { open, dispatch };
+  return { open, dispatch, commandStarted };
 }
