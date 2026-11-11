@@ -40,7 +40,8 @@ const Omnibox: Component<OmniboxProps> = (props) => {
   let activeSearch: CommandStream<"fs/search"> | undefined;
   const stopSearch = () => {
     searchSequence += 1;
-    void activeSearch?.cancel();
+    // The stream ends on its own when the view or runtime is going away.
+    activeSearch?.cancel().catch(() => undefined);
     activeSearch = undefined;
     setIsLoading(false);
   };
