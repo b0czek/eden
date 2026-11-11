@@ -4,7 +4,6 @@
     "en": "Process Manager",
     "pl": "Menedżer Procesów"
   },
-  "version": "1.0.0",
   "description": "Monitor Eden apps and shared system processes",
   "author": "Dariusz Majnert",
   "build": {

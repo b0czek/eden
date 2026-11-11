@@ -1,7 +1,6 @@
 {
   "id": "com.eden.login",
   "name": "Login",
-  "version": "1.0.0",
   "description": "Session login screen",
   "author": "Dariusz Majnert",
   "build": {

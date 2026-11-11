@@ -1,6 +1,6 @@
 {
   "name": "com.eden.login",
-  "version": "1.0.19",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
   "scripts": {

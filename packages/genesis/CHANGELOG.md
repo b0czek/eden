@@ -1,5 +1,21 @@
 # @edenapp/genesis
 
+## 0.15.0
+
+### Patch Changes
+
+- acb1347: Apps that take their version from package.json now load at runtime, both from built packages and when mounted for development. App builds now run again when manifest.json or package.json changes.
+- Updated dependencies [39e850b]
+- Updated dependencies [2b43225]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [11c0e4a]
+- Updated dependencies [0153e67]
+- Updated dependencies [7a39b41]
+- Updated dependencies [2484d8a]
+- Updated dependencies [80295f7]
+  - @edenapp/types@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes

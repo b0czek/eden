@@ -1,5 +1,29 @@
 # @edenapp/types
 
+## 0.15.0
+
+### Minor Changes
+
+- 39e850b: Eden keeps all of its data under one `dataDirectory`, with the Home volume in `home`, installed packages in `apps`, and accounts, settings, app storage, and default apps in `system`. It replaces the `appsDirectory` and `userDirectory` options and defaults to `eden` in Electron's `userData` directory. Existing data in the previous locations is not migrated. Apps can no longer read or change system data through the Home volume, and package IDs that match system database names are now allowed.
+- 2b43225: Files address bar search finds files and folders at any depth with case-insensitive fuzzy matching, and shows the best and nearest matches first. Results update while the search continues, with the number of searched items. Choosing a file result opens its folder with the file selected.
+
+  **Breaking:** `fs/search` is now a stream command. It sends the best results so far and the number of searched entries until the search completes, instead of one result array. `limit` accepts at most 1000.
+
+- b1eb229: Add a recoverable Trash for Home. Apps can move items to Trash, list the items the user can access, restore them to the original or another location, delete them permanently, and subscribe to Trash changes. Volumes report whether they support Trash. Files shows Trash in the sidebar with restore and permanent-delete controls.
+- 41357aa: Support local, removable, and mounted network volumes that the consumer registers. Files and the file picker let users change between volumes, show Home and drive-type icons, keep read-only volumes read-only, and handle disconnected drives. Home addresses stay the same across accounts, and the consumer can restrict access to shared or overlapping folders.
+
+  Files can safely remove drives through an OS operation that the consumer supplies. Safe removal requires a permission. It finishes running file operations, waits for open file handles to close, and tells the user when the drive can be unplugged. Volumes on the same physical device are removed together. Apps can keep file handles open across operations, and Eden closes them when their owner exits.
+
+  `fs.lstat` inspects symbolic links without following them. `fs.delete` and `fs.move` act on the symbolic link itself, and copies keep the original link targets. A failed overwrite restores the destination, and a move across filesystems keeps the copied files if Eden cannot delete the source.
+
+  **Breaking:** File commands that take one address now take a `location` property with the volume and path. Raw picker selections return `locations[]`, and single-selection picker helpers return the first selected location.
+
+- 11c0e4a: Create Electron hosts with `createEden(config)`. Asynchronous host APIs return lazy Effects that compose before execution through `eden.runPromise` or `eden.runFork`; `dispose()` explicitly shuts down the host. Host settings and power providers also return Effects, with their contracts exported by the SDK. Sandboxed apps keep the Promise-based Eden client.
+- 0153e67: Add typed long-running IPC operations with immediate acceptance and guaranteed capacity per app. Apps can observe progress, completion, and failures. Built-in apps display operation progress and status. Solid apps can use `createOperation` and `OperationStatus` for their own UI.
+- 7a39b41: Add stream commands, which send results to the calling app while their work continues. Generated client methods return a stream that apps read with `for await`, with backpressure and cancellation. Eden stops a stream when its view or backend closes, or when its view reloads.
+- 2484d8a: Remove the built-in Web Browser app and the `frontend.allowEmbedding` option that disabled response security headers.
+- 80295f7: Context menu items can be checkable: set `checked` on a `button` to show a check mark, and use `section` to label a group of choices inside a menu.
+
 ## 0.14.0
 
 ### Minor Changes

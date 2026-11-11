@@ -4,7 +4,6 @@
     "en": "Calculator",
     "pl": "Kalkulator"
   },
-  "version": "1.0.0",
   "description": "Solves math",
   "author": "Dariusz Majnert",
   "frontend": {

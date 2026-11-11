@@ -13,12 +13,14 @@
       "@edenapp/tablets",
       "@edenapp/solid-kit",
       "@edenapp/editor-dlc",
-      "@edenapp/client"
+      "@edenapp/client",
+      "@edenapp/files-core",
+      "com.eden.*"
     ]
   ],
   "linked": [],
   "access": "public",
-  "baseBranch": "master",
+  "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": ["@edenapp/example"]
 }

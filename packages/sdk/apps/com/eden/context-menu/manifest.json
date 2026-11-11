@@ -1,7 +1,6 @@
 {
   "id": "com.eden.context-menu",
   "name": "Context Menu",
-  "version": "1.0.0",
   "overlay": true,
   "autostart": true,
   "permissions": ["context-menu/display", "package/read"],

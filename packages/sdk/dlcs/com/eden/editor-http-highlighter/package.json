@@ -1,6 +1,6 @@
 {
   "name": "com.eden.editor.http-highlighter",
-  "version": "1.0.0",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
   "scripts": {

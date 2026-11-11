@@ -4,7 +4,6 @@
     "en": "Users",
     "pl": "Użytkownicy"
   },
-  "version": "1.0.0",
   "description": "User management and access control",
   "author": "Dariusz Majnert",
   "build": {

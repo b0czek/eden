@@ -1,7 +1,6 @@
 {
   "id": "com.eden.eveshell",
   "name": "Shell for Eden",
-  "version": "1.0.0",
   "overlay": true,
   "permissions": [
     "db/rw",

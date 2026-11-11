@@ -1,5 +1,32 @@
 # @edenapp/dev-host
 
+## 0.15.0
+
+### Patch Changes
+
+- b1eb229: Start Linux development hosts through XWayland so the on-screen keyboard opens without taking focus from the active app.
+- Updated dependencies [8ab978e]
+- Updated dependencies [acb1347]
+- Updated dependencies [6d30504]
+- Updated dependencies [49e28ca]
+- Updated dependencies [36c9e32]
+- Updated dependencies [39e850b]
+- Updated dependencies [2b43225]
+- Updated dependencies [b1eb229]
+- Updated dependencies [37c6acd]
+- Updated dependencies [cf3eeea]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [11c0e4a]
+- Updated dependencies [0153e67]
+- Updated dependencies [7a39b41]
+- Updated dependencies [5e1d8d7]
+- Updated dependencies [2484d8a]
+- Updated dependencies [24a3659]
+- Updated dependencies [2b1dd09]
+- Updated dependencies [37c6acd]
+  - @edenapp/sdk@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes

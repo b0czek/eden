@@ -5,7 +5,6 @@
     "en": "HTTP request highlighting",
     "pl": "Kolorowanie żądań HTTP"
   },
-  "version": "1.0.0",
   "description": "Syntax highlighting for HTTP Client .http and .rest files",
   "author": "Dariusz Majnert",
   "hostAppId": "com.eden.editor",

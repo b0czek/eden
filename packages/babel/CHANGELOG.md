@@ -1,5 +1,16 @@
 # @edenapp/babel
 
+## 0.15.0
+
+### Patch Changes
+
+- b1eb229: Refresh translated text when common translations finish loading in the current locale.
+- Updated dependencies [8ab978e]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [7a39b41]
+  - @edenapp/client@0.15.0
+
 ## 0.14.0
 
 ## 0.13.0

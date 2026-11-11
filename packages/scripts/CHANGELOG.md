@@ -1,5 +1,26 @@
 # @edenapp/scripts
 
+## 0.15.0
+
+### Patch Changes
+
+- b1eb229: Start Linux development hosts through XWayland so the on-screen keyboard opens without taking focus from the active app.
+- acb1347: Apps that take their version from package.json now load at runtime, both from built packages and when mounted for development. App builds now run again when manifest.json or package.json changes.
+- 26f78ac: Clean up standalone development processes and hot-reload state when startup fails or the launcher is interrupted.
+- 39e850b: Eden keeps all of its data under one `dataDirectory`, with the Home volume in `home`, installed packages in `apps`, and accounts, settings, app storage, and default apps in `system`. It replaces the `appsDirectory` and `userDirectory` options and defaults to `eden` in Electron's `userData` directory. Existing data in the previous locations is not migrated. Apps can no longer read or change system data through the Home volume, and package IDs that match system database names are now allowed.
+- Updated dependencies [acb1347]
+- Updated dependencies [39e850b]
+- Updated dependencies [2b43225]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [11c0e4a]
+- Updated dependencies [0153e67]
+- Updated dependencies [7a39b41]
+- Updated dependencies [2484d8a]
+- Updated dependencies [80295f7]
+  - @edenapp/genesis@0.15.0
+  - @edenapp/types@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes

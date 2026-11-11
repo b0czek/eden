@@ -1,5 +1,27 @@
 # @edenapp/tablets
 
+## 0.15.0
+
+### Minor Changes
+
+- 41357aa: Support local, removable, and mounted network volumes that the consumer registers. Files and the file picker let users change between volumes, show Home and drive-type icons, keep read-only volumes read-only, and handle disconnected drives. Home addresses stay the same across accounts, and the consumer can restrict access to shared or overlapping folders.
+
+  Files can safely remove drives through an OS operation that the consumer supplies. Safe removal requires a permission. It finishes running file operations, waits for open file handles to close, and tells the user when the drive can be unplugged. Volumes on the same physical device are removed together. Apps can keep file handles open across operations, and Eden closes them when their owner exits.
+
+  `fs.lstat` inspects symbolic links without following them. `fs.delete` and `fs.move` act on the symbolic link itself, and copies keep the original link targets. A failed overwrite restores the destination, and a move across filesystems keeps the copied files if Eden cannot delete the source.
+
+  **Breaking:** File commands that take one address now take a `location` property with the volume and path. Raw picker selections return `locations[]`, and single-selection picker helpers return the first selected location.
+
+- 80295f7: Context menu items can be checkable: set `checked` on a `button` to show a check mark, and use `section` to label a group of choices inside a menu.
+
+### Patch Changes
+
+- Updated dependencies [8ab978e]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [7a39b41]
+  - @edenapp/client@0.15.0
+
 ## 0.14.0
 
 ## 0.13.0

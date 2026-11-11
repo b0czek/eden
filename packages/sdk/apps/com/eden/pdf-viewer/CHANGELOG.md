@@ -1,5 +1,19 @@
 # com.eden.pdf-viewer
 
+## 0.15.0
+
+### Patch Changes
+
+- Updated dependencies [b1eb229]
+- Updated dependencies [8ab978e]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [7a39b41]
+- Updated dependencies [80295f7]
+  - @edenapp/babel@0.15.0
+  - @edenapp/client@0.15.0
+  - @edenapp/tablets@0.15.0
+
 ## 1.0.9
 
 ### Patch Changes

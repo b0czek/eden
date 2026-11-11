@@ -4,7 +4,6 @@
     "en": "File Picker",
     "pl": "Wybór Pliku"
   },
-  "version": "1.0.0",
   "description": "Overlay file picker for Eden apps",
   "overlay": true,
   "autostart": false,

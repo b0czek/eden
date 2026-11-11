@@ -1,5 +1,21 @@
 # @edenapp/solid-kit
 
+## 0.15.0
+
+### Minor Changes
+
+- 0153e67: Add typed long-running IPC operations with immediate acceptance and guaranteed capacity per app. Apps can observe progress, completion, and failures. Built-in apps display operation progress and status. Solid apps can use `createOperation` and `OperationStatus` for their own UI.
+- 37c6acd: Add collapsible EdenCSS sidebars and Solid Kit sidebar components with accessible controls and responsive defaults. Files and Settings let users fold or expand their navigation while preserving their choice during window resizing.
+
+### Patch Changes
+
+- b1eb229: Dialogs let users expand details with Enter without submitting or closing the dialog.
+- Updated dependencies [8ab978e]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [7a39b41]
+  - @edenapp/client@0.15.0
+
 ## 0.14.0
 
 ## 0.13.0

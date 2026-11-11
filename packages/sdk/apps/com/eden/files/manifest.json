@@ -4,7 +4,6 @@
     "en": "Files",
     "pl": "Pliki"
   },
-  "version": "1.0.0",
   "description": "A file explorer for managing files and directories",
   "author": "Dariusz Majnert",
   "build": {

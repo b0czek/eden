@@ -4,7 +4,6 @@
     "en": "Text Editor",
     "pl": "Edytor Tekstu"
   },
-  "version": "1.0.0",
   "description": "A CodeMirror-based text editor for editing files",
   "author": "Dariusz Majnert",
   "build": {

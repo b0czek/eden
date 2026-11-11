@@ -4,7 +4,6 @@
     "en": "PDF Viewer",
     "pl": "Przeglądarka PDF"
   },
-  "version": "1.0.0",
   "description": "View PDF documents",
   "build": {
     "command": "pnpm run build",

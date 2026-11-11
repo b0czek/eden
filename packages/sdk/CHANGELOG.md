@@ -1,5 +1,55 @@
 # @edenapp/sdk
 
+## 0.15.0
+
+### Minor Changes
+
+- 8ab978e: Add `@edenapp/client` with generated, typed system commands and event subscriptions for frontend and backend apps, including positional required arguments, optional settings, and operation controls.
+- 39e850b: Eden keeps all of its data under one `dataDirectory`, with the Home volume in `home`, installed packages in `apps`, and accounts, settings, app storage, and default apps in `system`. It replaces the `appsDirectory` and `userDirectory` options and defaults to `eden` in Electron's `userData` directory. Existing data in the previous locations is not migrated. Apps can no longer read or change system data through the Home volume, and package IDs that match system database names are now allowed.
+- 2b43225: Files address bar search finds files and folders at any depth with case-insensitive fuzzy matching, and shows the best and nearest matches first. Results update while the search continues, with the number of searched items. Choosing a file result opens its folder with the file selected.
+
+  **Breaking:** `fs/search` is now a stream command. It sends the best results so far and the number of searched entries until the search completes, instead of one result array. `limit` accepts at most 1000.
+
+- 37c6acd: Files lets users pin folders with customizable color markers that remain recognizable in the folded sidebar. Ongoing operations appear in sidebar activity, with progress details and copy cancellation available in either sidebar mode.
+- cf3eeea: Files and the file picker show display options as a menu with the current view, size, and sort order checked. In Files, New Folder and New File are grouped under one New menu.
+- b1eb229: Add a recoverable Trash for Home. Apps can move items to Trash, list the items the user can access, restore them to the original or another location, delete them permanently, and subscribe to Trash changes. Volumes report whether they support Trash. Files shows Trash in the sidebar with restore and permanent-delete controls.
+- 41357aa: Support local, removable, and mounted network volumes that the consumer registers. Files and the file picker let users change between volumes, show Home and drive-type icons, keep read-only volumes read-only, and handle disconnected drives. Home addresses stay the same across accounts, and the consumer can restrict access to shared or overlapping folders.
+
+  Files can safely remove drives through an OS operation that the consumer supplies. Safe removal requires a permission. It finishes running file operations, waits for open file handles to close, and tells the user when the drive can be unplugged. Volumes on the same physical device are removed together. Apps can keep file handles open across operations, and Eden closes them when their owner exits.
+
+  `fs.lstat` inspects symbolic links without following them. `fs.delete` and `fs.move` act on the symbolic link itself, and copies keep the original link targets. A failed overwrite restores the destination, and a move across filesystems keeps the copied files if Eden cannot delete the source.
+
+  **Breaking:** File commands that take one address now take a `location` property with the volume and path. Raw picker selections return `locations[]`, and single-selection picker helpers return the first selected location.
+
+- 11c0e4a: Create Electron hosts with `createEden(config)`. Asynchronous host APIs return lazy Effects that compose before execution through `eden.runPromise` or `eden.runFork`; `dispose()` explicitly shuts down the host. Host settings and power providers also return Effects, with their contracts exported by the SDK. Sandboxed apps keep the Promise-based Eden client.
+- 0153e67: Add typed long-running IPC operations with immediate acceptance and guaranteed capacity per app. Apps can observe progress, completion, and failures. Built-in apps display operation progress and status. Solid apps can use `createOperation` and `OperationStatus` for their own UI.
+- 7a39b41: Add stream commands, which send results to the calling app while their work continues. Generated client methods return a stream that apps read with `for await`, with backpressure and cancellation. Eden stops a stream when its view or backend closes, or when its view reloads.
+- 2484d8a: Remove the built-in Web Browser app and the `frontend.allowEmbedding` option that disabled response security headers.
+- 37c6acd: Add collapsible EdenCSS sidebars and Solid Kit sidebar components with accessible controls and responsive defaults. Files and Settings let users fold or expand their navigation while preserving their choice during window resizing.
+
+### Patch Changes
+
+- acb1347: Apps that take their version from package.json now load at runtime, both from built packages and when mounted for development. App builds now run again when manifest.json or package.json changes.
+- 6d30504: Keep app icon reads within their package directory, including symbolic links.
+- 49e28ca: Preserve working AppBus services when duplicate registration is rejected, and allow retrying registrations that fail before completion.
+- 36c9e32: Cancel unfinished autostart work and wait for cleanup before logout or account changes complete.
+- b1eb229: Files adds file and folder details and clearer operation errors with expandable technical details.
+- 5e1d8d7: Preserve installed packages when cleanup after a committed package change fails, and retry leftover cleanup on startup.
+- 24a3659: Deliver settings change values only to apps authorized to read them, including after user grants change.
+- 2b1dd09: Preserve setting keys such as `__proto__` in responses that return all settings.
+- Updated dependencies [acb1347]
+- Updated dependencies [39e850b]
+- Updated dependencies [2b43225]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [11c0e4a]
+- Updated dependencies [0153e67]
+- Updated dependencies [7a39b41]
+- Updated dependencies [2484d8a]
+- Updated dependencies [80295f7]
+  - @edenapp/genesis@0.15.0
+  - @edenapp/types@0.15.0
+
 ## 0.14.0
 
 ### Minor Changes

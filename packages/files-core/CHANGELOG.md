@@ -1,5 +1,22 @@
 # @edenapp/files-core
 
+## 0.15.0
+
+### Patch Changes
+
+- 2b43225: Files address bar search finds files and folders at any depth with case-insensitive fuzzy matching, and shows the best and nearest matches first. Results update while the search continues, with the number of searched items. Choosing a file result opens its folder with the file selected.
+
+  **Breaking:** `fs/search` is now a stream command. It sends the best results so far and the number of searched entries until the search completes, instead of one result array. `limit` accepts at most 1000.
+
+- 0153e67: Add typed long-running IPC operations with immediate acceptance and guaranteed capacity per app. Apps can observe progress, completion, and failures. Built-in apps display operation progress and status. Solid apps can use `createOperation` and `OperationStatus` for their own UI.
+- Updated dependencies [8ab978e]
+- Updated dependencies [b1eb229]
+- Updated dependencies [41357aa]
+- Updated dependencies [7a39b41]
+- Updated dependencies [80295f7]
+  - @edenapp/client@0.15.0
+  - @edenapp/tablets@0.15.0
+
 ## 0.11.0
 
 ### Minor Changes

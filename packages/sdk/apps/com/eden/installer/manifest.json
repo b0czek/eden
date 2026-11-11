@@ -4,7 +4,6 @@
     "en": "Package Installer",
     "pl": "Instalator pakietów"
   },
-  "version": "1.0.0",
   "description": "Install Eden packages",
   "build": {
     "command": "npm run build"
