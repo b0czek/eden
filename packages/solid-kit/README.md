@@ -93,6 +93,62 @@ a stop. `run()` remains pending until cleanup finishes, then rejects with an
 `AbortError` when cancelled. Filesystem copies remove incomplete destinations and
 restore overwritten files before reaching the `cancelled` status.
 
+## Notices
+
+`@edenapp/solid-kit/notices` shows notices inside the app window, at the top
+centre below the app frame. Use them for failures of actions that the user
+started in the app, and for problems that the app observes. Use the toaster
+(`notification` from `@edenapp/tablets`) for failures that are not owned by
+one app.
+
+Wrap the app in `NoticeProvider` and pass localized labels:
+
+```tsx
+import { NoticeProvider, useNotices } from "@edenapp/solid-kit/notices";
+
+<NoticeProvider
+  labels={{
+    dismiss: t("common.dismiss"),
+    showMore: (hidden) => t("notices.showMore", { count: hidden }),
+    showLess: t("notices.showLess"),
+  }}
+>
+  <App />
+</NoticeProvider>
+```
+
+Report notices with `useNotices()`:
+
+```tsx
+const notices = useNotices();
+
+// A failure of an action. It stays until the user dismisses it.
+notices.report({
+  severity: "danger",
+  title: t("offsets.writeFailed"),
+  detail: reason,
+  key: "offset:G54:X",
+});
+
+// Run an action. When it throws, the error is logged and reported.
+const file = await notices.attempt(() => openFile(path), {
+  title: t("program.openFailed"),
+});
+
+// A problem that lasts while the condition is true. Call inside a component.
+notices.condition(() => !connected(), {
+  severity: "warning",
+  title: t("connection.lost"),
+});
+```
+
+Severities match notification types: `danger`, `warning`, `info`, and
+`success`. Danger and warning notices stay until the user dismisses them; info
+and success notices hide after four seconds. A report with the `key` of a shown
+notice replaces it and shows a count. Condition notices are listed first, have
+no dismiss button, and clear when their condition is false or their owner is
+disposed. Three notices are visible at a time; a button shows the others.
+
 ## Dialogs
 
 `@edenapp/solid-kit/dialogs` provides local, in-renderer dialogs with a tiny promise API.

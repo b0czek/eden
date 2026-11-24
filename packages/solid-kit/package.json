@@ -16,6 +16,11 @@
       "import": "./src/dialogs.ts",
       "default": "./src/dialogs.ts"
     },
+    "./notices": {
+      "types": "./src/notices.ts",
+      "import": "./src/notices.ts",
+      "default": "./src/notices.ts"
+    },
     "./sidebar": {
       "types": "./src/sidebar.tsx",
       "import": "./src/sidebar.tsx",
@@ -27,7 +32,8 @@
   ],
   "scripts": {
     "build": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "solid-js": "catalog:"
@@ -38,7 +44,11 @@
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",
-    "typescript": "catalog:"
+    "@solidjs/testing-library": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vite-plugin-solid": "catalog:",
+    "vitest": "catalog:"
   },
   "keywords": [
     "eden",
