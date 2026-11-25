@@ -38,6 +38,17 @@ JavaScript owns the folded state and the toggle's accessible label and
 behaviors and the corresponding EdenCSS markup; see the
 [Solid Kit sidebar guide](../../solid-kit/README.md#sidebars).
 
+## Notices
+
+`.eden-notice-region` floats at the top centre of the app window, below the app
+frame. It holds a `.eden-notice-list` of `.eden-notice` items with a
+`.eden-notice-danger`, `.eden-notice-warning`, or `.eden-notice-success`
+variant (the default variant is info), and an optional `.eden-notice-more`
+button. The region lets clicks through to the app; only the notices and the
+button take them. Solid apps use `@edenapp/solid-kit/notices`, which owns the notice
+state and markup; see the
+[Solid Kit notices guide](../../solid-kit/README.md#notices).
+
 ## Tokens
 
 All tokens are defined in `tokens.css`.

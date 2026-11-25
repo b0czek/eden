@@ -1,0 +1,112 @@
+/**
+ * Eden Design System - In-app Notices
+ * Floating notices at the top centre of an app window
+ */
+
+.eden-notice-region {
+  position: fixed;
+  top: calc(var(--eden-app-frame-inset, 0px) + var(--eden-space-md));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--eden-z-tooltip);
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--eden-space-sm);
+  width: min(480px, calc(100vw - 2 * var(--eden-space-md)));
+  max-height: calc(
+    100vh -
+    var(--eden-app-frame-inset, 0px) -
+    2 *
+    var(--eden-space-md)
+  );
+  overflow-y: auto;
+
+  /* The empty region must not block the app below it. */
+  pointer-events: none;
+}
+
+.eden-notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.eden-notice,
+.eden-notice-more {
+  pointer-events: auto;
+}
+
+.eden-notice {
+  --eden-notice-accent: var(--eden-color-info);
+
+  display: flex;
+  align-items: flex-start;
+  gap: var(--eden-space-md);
+  padding: var(--eden-space-md);
+  border-radius: var(--eden-radius-md);
+
+  background: var(--eden-color-bg-glass-strong);
+  backdrop-filter: var(--eden-glass-ultra);
+  -webkit-backdrop-filter: var(--eden-glass-ultra);
+
+  border: 1px solid var(--eden-color-border-light);
+  border-left: 4px solid var(--eden-notice-accent);
+  box-shadow: var(--eden-shadow-md);
+  color: var(--eden-color-text-primary);
+}
+
+.eden-notice-danger {
+  --eden-notice-accent: var(--eden-color-danger);
+}
+
+.eden-notice-warning {
+  --eden-notice-accent: var(--eden-color-warning);
+}
+
+.eden-notice-success {
+  --eden-notice-accent: var(--eden-color-success);
+}
+
+.eden-notice-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding-top: 1px;
+  color: var(--eden-notice-accent);
+}
+
+.eden-notice-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.eden-notice-title {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  font-size: var(--eden-font-size-md);
+  font-weight: var(--eden-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.eden-notice-count {
+  text-transform: none;
+}
+
+.eden-notice-detail {
+  margin-top: var(--eden-space-xs);
+  font-size: var(--eden-font-size-sm);
+  color: var(--eden-color-text-secondary);
+  line-height: var(--eden-font-line-height-normal);
+  overflow-wrap: anywhere;
+}
+
+.eden-notice-dismiss {
+  flex-shrink: 0;
+  margin: calc(-1 * var(--eden-space-xs));
+}
+
+.eden-notice-more {
+  align-self: center;
+}

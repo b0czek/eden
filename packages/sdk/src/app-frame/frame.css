@@ -394,5 +394,6 @@ body::before {
 
 /* Adjust body to account for title bar */
 body.eden-framed.eden-framed {
-  padding-top: 41px;
+  --eden-app-frame-inset: 41px;
+  padding-top: var(--eden-app-frame-inset);
 }
