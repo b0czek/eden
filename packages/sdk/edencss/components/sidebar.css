@@ -249,7 +249,7 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
   color: var(--eden-color-text-muted);
   background: var(--eden-color-bg-glass-medium);
   padding: var(--eden-space-xs) var(--eden-space-sm);
-  border-radius: var(--eden-radius-round);
+  border-radius: var(--eden-radius-xs);
   flex-shrink: 0;
 }
 
