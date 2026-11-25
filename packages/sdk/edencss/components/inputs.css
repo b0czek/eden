@@ -1,13 +1,17 @@
 /**
  * Eden Design System - Input Components
  * Frosted glass styled form inputs
+ *
+ * Inputs and selects are at least --eden-layout-control-min-size high.
+ * Hover styles apply only where the primary pointer can hover.
  */
 
 /* ===== Base Input ===== */
 .eden-input {
   font-family: var(--eden-font-family-base);
   font-size: var(--eden-font-size-md);
-  padding: var(--eden-space-md) var(--eden-space-lg);
+  min-height: var(--eden-layout-control-min-size);
+  padding: var(--eden-space-sm) var(--eden-space-lg);
   border-radius: var(--eden-radius-md);
   border: 1px solid var(--eden-color-border-light);
 
@@ -26,9 +30,11 @@
   color: var(--eden-color-text-muted);
 }
 
-.eden-input:hover {
-  border-color: var(--eden-color-border-medium);
-  background: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-input:hover {
+    border-color: var(--eden-color-border-medium);
+    background: var(--eden-color-bg-glass-strong);
+  }
 }
 
 .eden-input:focus {
@@ -79,9 +85,11 @@
   color: var(--eden-color-text-muted);
 }
 
-.eden-textarea:hover {
-  border-color: var(--eden-color-border-medium);
-  background: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-textarea:hover {
+    border-color: var(--eden-color-border-medium);
+    background: var(--eden-color-bg-glass-strong);
+  }
 }
 
 .eden-textarea:focus {
@@ -95,7 +103,7 @@
   font-family: var(--eden-font-family-base);
   font-size: var(--eden-font-size-md);
   line-height: var(--eden-font-line-height-normal);
-  min-height: calc(3 * var(--eden-space-md));
+  min-height: var(--eden-layout-control-min-size);
   padding: 0 var(--eden-space-md);
   border-radius: var(--eden-radius-md);
   border: 1px solid var(--eden-color-border-light);
@@ -114,9 +122,11 @@
   appearance: base-select;
 }
 
-.eden-select:hover {
-  border-color: var(--eden-color-border-medium);
-  background-color: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-select:hover {
+    border-color: var(--eden-color-border-medium);
+    background-color: var(--eden-color-bg-glass-strong);
+  }
 }
 
 .eden-select:focus {
@@ -159,9 +169,18 @@
   cursor: pointer;
 }
 
-.eden-select option:hover,
+@media (hover: hover) {
+  .eden-select option:hover {
+    background: var(--eden-color-surface-hover);
+  }
+}
+
 .eden-select option:focus {
   background: var(--eden-color-surface-hover);
+}
+
+.eden-select option:active:not(:disabled) {
+  background: var(--eden-color-surface-active);
 }
 
 .eden-select option:checked {
@@ -196,9 +215,11 @@
   flex-shrink: 0;
 }
 
-.eden-checkbox:hover {
-  border-color: var(--eden-color-accent-primary);
-  background: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-checkbox:hover {
+    border-color: var(--eden-color-accent-primary);
+    background: var(--eden-color-bg-glass-strong);
+  }
 }
 
 .eden-checkbox:checked {
@@ -241,9 +262,11 @@
   flex-shrink: 0;
 }
 
-.eden-radio:hover {
-  border-color: var(--eden-color-accent-primary);
-  background: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-radio:hover {
+    border-color: var(--eden-color-accent-primary);
+    background: var(--eden-color-bg-glass-strong);
+  }
 }
 
 .eden-radio:checked {
@@ -299,8 +322,10 @@
   box-shadow: var(--eden-shadow-sm);
 }
 
-.eden-toggle:hover {
-  border-color: var(--eden-color-accent-primary);
+@media (hover: hover) {
+  .eden-toggle:hover {
+    border-color: var(--eden-color-accent-primary);
+  }
 }
 
 .eden-toggle:checked {
@@ -342,9 +367,11 @@
   transition: all var(--eden-transition-base);
 }
 
-.eden-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: var(--eden-shadow-lg);
+@media (hover: hover) {
+  .eden-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: var(--eden-shadow-lg);
+  }
 }
 
 .eden-slider::-moz-range-thumb {
@@ -358,9 +385,11 @@
   transition: all var(--eden-transition-base);
 }
 
-.eden-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: var(--eden-shadow-lg);
+@media (hover: hover) {
+  .eden-slider::-moz-range-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: var(--eden-shadow-lg);
+  }
 }
 
 /* ===== Form Group ===== */
@@ -420,9 +449,11 @@
   transition: transform var(--eden-transition-base);
 }
 
-.eden-range input[type="range"]::-webkit-slider-thumb:hover,
-.eden-range-input::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+@media (hover: hover) {
+  .eden-range input[type="range"]::-webkit-slider-thumb:hover,
+  .eden-range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
 }
 
 .eden-range-value {

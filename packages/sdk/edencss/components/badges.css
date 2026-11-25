@@ -109,9 +109,11 @@
   transition: all var(--eden-transition-base);
 }
 
-.eden-tag:hover {
-  border-color: var(--eden-color-border-medium);
-  background: var(--eden-color-bg-glass-strong);
+@media (hover: hover) {
+  .eden-tag:hover {
+    border-color: var(--eden-color-border-medium);
+    background: var(--eden-color-bg-glass-strong);
+  }
 }
 
 /* ===== Tag with Close Button ===== */
@@ -132,9 +134,11 @@
   margin-left: var(--eden-space-xs);
 }
 
-.eden-tag-close:hover {
-  background: var(--eden-color-surface-hover);
-  color: var(--eden-color-text-primary);
+@media (hover: hover) {
+  .eden-tag-close:hover {
+    background: var(--eden-color-surface-hover);
+    color: var(--eden-color-text-primary);
+  }
 }
 
 /* ===== Tag Group ===== */

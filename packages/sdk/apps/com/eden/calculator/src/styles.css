@@ -73,7 +73,6 @@ body {
 .sci-btn {
   font-size: 0.8rem;
   font-weight: var(--eden-font-weight-medium);
-  min-height: 40px;
 }
 
 /* Main buttons grid */

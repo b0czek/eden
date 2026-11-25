@@ -57,8 +57,6 @@
 }
 
 .eden-sidebar-toggle.eden-btn {
-  width: 32px;
-  height: 32px;
   flex-shrink: 0;
   box-shadow: none;
   backdrop-filter: none;
@@ -179,16 +177,20 @@ button.eden-sidebar-item.eden-sidebar-item-selected:hover {
   color: var(--eden-color-text-primary);
 }
 
-button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
-  .eden-sidebar-item-disabled
-) {
-  background: var(--eden-color-bg-glass-medium);
-  color: var(--eden-color-text-primary);
+@media (hover: hover) {
+  button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
+    .eden-sidebar-item-disabled
+  ) {
+    background: var(--eden-color-bg-glass-medium);
+    color: var(--eden-color-text-primary);
+  }
 }
 
-.eden-sidebar-item:hover {
-  background: var(--eden-color-bg-glass-medium);
-  color: var(--eden-color-text-primary);
+@media (hover: hover) {
+  .eden-sidebar-item:hover {
+    background: var(--eden-color-bg-glass-medium);
+    color: var(--eden-color-text-primary);
+  }
 }
 
 .eden-sidebar-item-selected {
@@ -201,9 +203,15 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
   cursor: default;
 }
 
-.eden-sidebar-item-disabled:hover {
-  background: transparent;
-  color: var(--eden-color-text-secondary);
+@media (hover: hover) {
+  .eden-sidebar-item-disabled:hover {
+    background: transparent;
+    color: var(--eden-color-text-secondary);
+  }
+}
+
+.eden-sidebar-item:active:not(.eden-sidebar-item-disabled):not(:disabled) {
+  box-shadow: inset 0 0 0 100vmax var(--eden-color-surface-active);
 }
 
 /* ===== Sidebar Item Content ===== */
@@ -324,7 +332,10 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
 }
 
 .eden-sidebar-row-with-action .eden-sidebar-item {
-  padding-right: calc(var(--eden-space-xl) + var(--eden-space-sm));
+  padding-right: calc(
+    var(--eden-layout-control-min-size) +
+    var(--eden-space-md)
+  );
 }
 
 .eden-sidebar-row-action {
@@ -335,9 +346,6 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
 }
 
 .eden-sidebar-item-action.eden-btn {
-  width: 28px;
-  height: 28px;
-  padding: var(--eden-space-xs);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -398,7 +406,8 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
 }
 
 .eden-sidebar-collapsed .eden-sidebar-controls {
-  padding-inline: calc(var(--eden-space-md) + var(--eden-space-xs) - 1px);
+  /* Centre the toggle in the 72px rail. */
+  padding-inline: calc((72px - 2px - var(--eden-layout-control-min-size)) / 2);
 }
 
 .eden-sidebar-collapsed .eden-sidebar-controls-title,
@@ -433,8 +442,11 @@ button.eden-sidebar-item:hover:not(.eden-sidebar-item-selected):not(
 }
 
 .eden-sidebar-collapsed .eden-sidebar-item-action.eden-btn {
+  /* A corner marker; a full-size control would cover the rail item. */
   width: 24px;
   height: 24px;
+  min-width: 0;
+  min-height: 0;
   border-radius: 0 var(--eden-radius-md) 0 var(--eden-radius-xs);
 }
 

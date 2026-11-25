@@ -10,13 +10,6 @@
   flex-shrink: 0;
 }
 
-.file-select-button {
-  width: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0;
-}
-
 .file-select-button svg {
   width: 16px;
   height: 16px;
@@ -47,10 +40,6 @@
 
 .selection-action-bar .file-action-bar-summary {
   flex: 1;
-}
-
-.file-action-bar .eden-btn {
-  min-height: 40px;
 }
 
 .transfer-status {
@@ -194,6 +183,10 @@
   flex-direction: column;
   padding-inline: var(--eden-space-xs);
   border-color: transparent;
+}
+
+/* Keep the EdenCSS pressed overlay; only drop the resting shadow. */
+.files-pin-colors .eden-btn.eden-btn-ghost:not(:active) {
   box-shadow: none;
 }
 
@@ -316,19 +309,6 @@
 .files-trash .list-view .files-trash-item-meta {
   flex: 1;
   text-align: right;
-}
-
-@media (pointer: coarse) {
-  .files-main .explorer-header .eden-btn,
-  .files-main .selection-action-bar .eden-btn,
-  .files-main .omnibox-display {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  .files-main .file-select-button {
-    width: 44px;
-  }
 }
 
 .files-item-details dd,

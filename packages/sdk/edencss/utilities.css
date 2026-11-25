@@ -288,14 +288,18 @@
   transition: all var(--eden-transition-base);
 }
 
-.eden-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--eden-shadow-lg);
+@media (hover: hover) {
+  .eden-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--eden-shadow-lg);
+  }
 }
 
 .eden-interactive:active {
-  transform: translateY(0);
-  box-shadow: var(--eden-shadow-md);
+  transform: none;
+  box-shadow:
+    var(--eden-shadow-md),
+    inset 0 0 0 100vmax var(--eden-color-surface-active);
 }
 
 /* ===== Scrollbar ===== */

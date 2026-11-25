@@ -20,9 +20,11 @@
   transition: all var(--eden-transition-base);
 }
 
-.eden-card:hover {
-  box-shadow: var(--eden-shadow-lg);
-  border-color: var(--eden-color-border-medium);
+@media (hover: hover) {
+  .eden-card:hover {
+    box-shadow: var(--eden-shadow-lg);
+    border-color: var(--eden-color-border-medium);
+  }
 }
 
 /* ===== Glass Card ===== */
@@ -46,9 +48,11 @@
   box-shadow: var(--eden-shadow-xl);
 }
 
-.eden-card-elevated:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--eden-shadow-2xl);
+@media (hover: hover) {
+  .eden-card-elevated:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--eden-shadow-2xl);
+  }
 }
 
 /* ===== Interactive Card ===== */
@@ -57,14 +61,18 @@
   user-select: none;
 }
 
-.eden-card-interactive:hover {
-  transform: translateY(-2px);
-  border-color: var(--eden-color-accent-primary);
+@media (hover: hover) {
+  .eden-card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--eden-color-accent-primary);
+  }
 }
 
 .eden-card-interactive:active {
-  transform: translateY(0);
-  box-shadow: var(--eden-shadow-md);
+  transform: none;
+  box-shadow:
+    var(--eden-shadow-md),
+    inset 0 0 0 100vmax var(--eden-color-surface-active);
 }
 
 /* ===== Card Header ===== */

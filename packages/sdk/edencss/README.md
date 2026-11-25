@@ -22,6 +22,23 @@ Shared frontend styling for Eden apps.
 - Reuse nearby Eden apps under `packages/sdk/apps/com/eden/` before inventing new frontend patterns.
 - Use `@edenapp/tablets` for app context menus; do not treat EdenCSS popover styles as the app-side context-menu authoring API.
 
+## Controls And Touch
+
+`.eden-btn`, `.eden-input`, and `.eden-select` are at least
+`--eden-layout-control-min-size` (44px) high on all devices. Buttons are also
+at least that wide. Size classes such as `.eden-btn-sm` and `.eden-btn-xs` change
+the text size and padding, but do not make a control smaller than this size.
+`.eden-btn-square` is exactly this size, with its icon in the centre. Use
+`eden-btn eden-btn-ghost eden-btn-square` for an icon button without a frame.
+
+Use the token for app-specific controls that sit beside EdenCSS controls. Do not
+repeat the 44px value. To change the size, set the token on `:root` for the full
+app, or on a container for the controls in it.
+
+Hover styles apply only when the device can hover (`@media (hover: hover)`), so a
+tap does not leave a control in its hover state. Buttons, list items, sidebar
+items, tabs, and interactive cards show a pressed state while they are pressed.
+
 ## Sidebars
 
 `.eden-sidebar` supports `.eden-sidebar-compact` and `.eden-sidebar-wide` sizes.
@@ -63,6 +80,7 @@ Common groups:
 - `--eden-font-*`
 - `--eden-transition-*`
 - `--eden-z-*`
+- `--eden-layout-*`
 
 ## Maintenance
 

@@ -39,8 +39,10 @@
   border-bottom: none;
 }
 
-.eden-list-item:hover {
-  background: var(--eden-color-surface-hover);
+@media (hover: hover) {
+  .eden-list-item:hover {
+    background: var(--eden-color-surface-hover);
+  }
 }
 
 .eden-list-item-active {
@@ -75,10 +77,12 @@ button.eden-list-item.eden-list-item-active:hover {
   background: var(--eden-color-surface-active);
 }
 
-button.eden-list-item:hover:not(.eden-list-item-active):not(
-  .eden-list-item-disabled
-) {
-  background: var(--eden-color-surface-hover);
+@media (hover: hover) {
+  button.eden-list-item:hover:not(.eden-list-item-active):not(
+    .eden-list-item-disabled
+  ) {
+    background: var(--eden-color-surface-hover);
+  }
 }
 
 .eden-list-item-disabled {
@@ -86,8 +90,15 @@ button.eden-list-item:hover:not(.eden-list-item-active):not(
   cursor: not-allowed;
 }
 
-.eden-list-item-disabled:hover {
-  background: transparent;
+@media (hover: hover) {
+  .eden-list-item-disabled:hover {
+    background: transparent;
+  }
+}
+
+.eden-list-item-interactive:active:not(.eden-list-item-disabled),
+button.eden-list-item:active:not(:disabled):not(.eden-list-item-disabled) {
+  box-shadow: inset 0 0 0 100vmax var(--eden-color-surface-active);
 }
 
 /* ===== List Item Content ===== */

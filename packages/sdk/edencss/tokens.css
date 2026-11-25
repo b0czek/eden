@@ -113,6 +113,7 @@
   --eden-z-popover: 2001;
   --eden-z-tooltip: 3000;
   --eden-layout-dock-height: 72px;
+  --eden-layout-control-min-size: 44px;
   --eden-layout-icon-size-sm: 24px;
   --eden-layout-icon-size-md: 40px;
   --eden-layout-icon-size-lg: 64px;
