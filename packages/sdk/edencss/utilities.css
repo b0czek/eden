@@ -266,7 +266,7 @@
 }
 
 .eden-rounded-full {
-  border-radius: var(--eden-radius-round);
+  border-radius: 9999px;
 }
 
 /* ===== Transitions ===== */
