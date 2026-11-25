@@ -26,7 +26,7 @@ describe("createNotices", () => {
     notices.report({ severity: "success", title: "saved" });
 
     vi.advanceTimersByTime(1_000);
-    expect(titles(notices)).toEqual(["limit", "write"]);
+    expect(titles(notices)).toEqual(["write", "limit"]);
 
     notices.dismiss(dangerId);
     expect(titles(notices)).toEqual(["limit"]);
@@ -55,14 +55,14 @@ describe("createNotices", () => {
     expect(titles(notices)).toEqual([]);
   });
 
-  it("shows a condition while it is true, before other notices, and removes it with its owner", () => {
+  it("shows a condition while it is true, before events of its severity, and removes it with its owner", () => {
     const notices = create();
     const [offline, setOffline] = createSignal(false);
     const disposeOwner = createRoot((disposeCondition) => {
       notices.condition(offline, { severity: "warning", title: "offline" });
       return disposeCondition;
     });
-    notices.report({ severity: "danger", title: "write" });
+    notices.report({ severity: "warning", title: "write" });
 
     expect(titles(notices)).toEqual(["write"]);
     setOffline(true);
@@ -76,6 +76,23 @@ describe("createNotices", () => {
     setOffline(true);
     disposeOwner();
     expect(titles(notices)).toEqual(["write"]);
+  });
+
+  it("shows more severe notices first, so a failure is not hidden behind warnings", () => {
+    const notices = create();
+    createRoot(() => {
+      notices.condition(() => true, { severity: "warning", title: "offline" });
+      notices.condition(() => true, { severity: "info", title: "syncing" });
+    });
+    notices.report({ severity: "danger", title: "stop failed" });
+    notices.report({ severity: "warning", title: "invalid value" });
+
+    expect(titles(notices)).toEqual([
+      "stop failed",
+      "offline",
+      "invalid value",
+      "syncing",
+    ]);
   });
 
   it("follows reactive condition content", () => {

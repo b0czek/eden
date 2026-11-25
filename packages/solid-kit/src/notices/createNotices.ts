@@ -34,7 +34,10 @@ export interface NoticeAttemptOptions {
 }
 
 export interface Notices {
-  /** Shown notices: conditions first, then events, newest first. */
+  /**
+   * Shown notices, most severe first. Within a severity, conditions come
+   * first, then events, newest first.
+   */
   readonly list: Accessor<readonly Notice[]>;
   report(notice: NoticeReport): string;
   dismiss(id: string): void;
@@ -62,6 +65,14 @@ export interface CreateNoticesOptions {
 }
 
 export const DEFAULT_NOTICE_AUTO_HIDE_MS = 4_000;
+
+/** The more urgent a severity, the earlier its notices are shown. */
+const SEVERITY_RANK: Record<NoticeSeverity, number> = {
+  danger: 0,
+  warning: 1,
+  info: 2,
+  success: 3,
+};
 
 const hidesBySelf = (severity: NoticeSeverity) =>
   severity === "info" || severity === "success";
@@ -174,7 +185,14 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
     timers.clear();
   });
 
-  const list = createMemo(() => [...conditions(), ...events()]);
+  // Array.prototype.sort is stable, so each severity keeps conditions first
+  // and events newest first.
+  const list = createMemo(() =>
+    [...conditions(), ...events()].sort(
+      (left, right) =>
+        SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity],
+    ),
+  );
 
   return { list, report, dismiss, condition, attempt };
 }

@@ -145,8 +145,9 @@ notices.condition(() => !connected(), {
 Severities match notification types: `danger`, `warning`, `info`, and
 `success`. Danger and warning notices stay until the user dismisses them; info
 and success notices hide after four seconds. A report with the `key` of a shown
-notice replaces it and shows a count. Condition notices are listed first, have
-no dismiss button, and clear when their condition is false or their owner is
+notice replaces it and shows a count. Notices are listed most severe first;
+within a severity, condition notices come first. Condition notices have no
+dismiss button and clear when their condition is false or their owner is
 disposed. Three notices are visible at a time; a button shows the others.
 
 ## Dialogs
