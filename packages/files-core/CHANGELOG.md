@@ -1,5 +1,12 @@
 # @edenapp/files-core
 
+## 0.16.0
+
+### Patch Changes
+
+- @edenapp/tablets@0.16.0
+- @edenapp/client@0.16.0
+
 ## 0.15.2
 
 ### Patch Changes

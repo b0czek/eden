@@ -1,5 +1,18 @@
 # @edenapp/sdk
 
+## 0.16.0
+
+### Minor Changes
+
+- 8472765: EdenCSS controls are touch-friendly. Buttons, inputs, and selects are at least `--eden-layout-control-min-size` (44px) high, and buttons are at least that wide at every size. `.eden-btn-square` is exactly that size. Hover styles apply only on devices that can hover, and buttons, list items, sidebar items, tabs, and interactive cards show a pressed state.
+- 72450f6: Apps can show notices inside their window with `NoticeProvider` and `useNotices` from `@edenapp/solid-kit/notices`: failures stay until dismissed, repeated reports are counted, and condition notices last while their cause is true. EdenCSS adds the matching `eden-notice` styles.
+
+### Patch Changes
+
+- 35e3ad4: EdenCSS no longer draws ovals: sidebar item counts and labels (`eden-sidebar-item-meta`) have rounded corners, `eden-rounded-full` gives a pill on elements that are not square, and fixed-size circles such as `eden-badge-dot` and `eden-spinner` keep their shape in crowded flex rows.
+  - @edenapp/types@0.16.0
+  - @edenapp/genesis@0.16.0
+
 ## 0.15.2
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @edenapp/solid-kit
 
+## 0.16.0
+
+### Minor Changes
+
+- 72450f6: Apps can show notices inside their window with `NoticeProvider` and `useNotices` from `@edenapp/solid-kit/notices`: failures stay until dismissed, repeated reports are counted, and condition notices last while their cause is true. EdenCSS adds the matching `eden-notice` styles.
+
+### Patch Changes
+
+- @edenapp/client@0.16.0
+
 ## 0.15.2
 
 ### Patch Changes
