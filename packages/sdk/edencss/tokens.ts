@@ -112,6 +112,7 @@ export const EdenZModal = 2000;
 export const EdenZPopover = 2001;
 export const EdenZTooltip = 3000;
 export const EdenLayoutDockHeight = "72px";
+export const EdenLayoutControlMinSize = "44px";
 export const EdenLayoutIconSizeSm = "24px";
 export const EdenLayoutIconSizeMd = "40px";
 export const EdenLayoutIconSizeLg = "64px";

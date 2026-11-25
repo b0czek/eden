@@ -1,6 +1,10 @@
 /**
  * Eden Design System - Button Components
  * Frosted glass styled buttons with various states and sizes
+ *
+ * Every button is at least --eden-layout-control-min-size in both
+ * directions, so it stays a usable touch target at every size. Hover styles
+ * apply only where the primary pointer can hover.
  */
 
 /* ===== Base Button ===== */
@@ -8,7 +12,9 @@
   font-family: var(--eden-font-family-base);
   font-size: var(--eden-font-size-md);
   font-weight: var(--eden-font-weight-medium);
-  padding: var(--eden-space-md);
+  min-width: var(--eden-layout-control-min-size);
+  min-height: var(--eden-layout-control-min-size);
+  padding: var(--eden-space-sm) var(--eden-space-md);
   border-radius: var(--eden-radius-md);
   border: 1px solid var(--eden-color-border-light);
   cursor: pointer;
@@ -31,18 +37,15 @@
   outline: none;
 }
 
-.eden-btn:hover {
-  background: var(--eden-color-bg-glass-strong);
-  backdrop-filter: var(--eden-glass-strong);
-  -webkit-backdrop-filter: var(--eden-glass-strong);
-  border-color: var(--eden-color-border-medium);
-  transform: translateY(-1px);
-  box-shadow: var(--eden-shadow-md);
-}
-
-.eden-btn:active {
-  transform: translateY(0);
-  box-shadow: var(--eden-shadow-sm);
+@media (hover: hover) {
+  .eden-btn:hover {
+    background: var(--eden-color-bg-glass-strong);
+    backdrop-filter: var(--eden-glass-strong);
+    -webkit-backdrop-filter: var(--eden-glass-strong);
+    border-color: var(--eden-color-border-medium);
+    transform: translateY(-1px);
+    box-shadow: var(--eden-shadow-md);
+  }
 }
 
 .eden-btn:focus-visible {
@@ -69,10 +72,12 @@
   font-weight: var(--eden-font-weight-semibold);
 }
 
-.eden-btn-primary:hover {
-  filter: brightness(1.15);
-  box-shadow: var(--eden-shadow-lg);
-  border-color: transparent;
+@media (hover: hover) {
+  .eden-btn-primary:hover {
+    filter: brightness(1.15);
+    box-shadow: var(--eden-shadow-lg);
+    border-color: transparent;
+  }
 }
 
 .eden-btn-secondary {
@@ -80,8 +85,10 @@
   border-color: var(--eden-color-border-medium);
 }
 
-.eden-btn-secondary:hover {
-  background: var(--eden-color-surface-hover);
+@media (hover: hover) {
+  .eden-btn-secondary:hover {
+    background: var(--eden-color-surface-hover);
+  }
 }
 
 .eden-btn-success {
@@ -91,9 +98,11 @@
   font-weight: var(--eden-font-weight-semibold);
 }
 
-.eden-btn-success:hover {
-  background: var(--eden-color-success-hover);
-  box-shadow: var(--eden-shadow-lg);
+@media (hover: hover) {
+  .eden-btn-success:hover {
+    background: var(--eden-color-success-hover);
+    box-shadow: var(--eden-shadow-lg);
+  }
 }
 
 .eden-btn-danger {
@@ -103,9 +112,11 @@
   font-weight: var(--eden-font-weight-semibold);
 }
 
-.eden-btn-danger:hover {
-  background: var(--eden-color-danger-hover);
-  box-shadow: var(--eden-shadow-lg);
+@media (hover: hover) {
+  .eden-btn-danger:hover {
+    background: var(--eden-color-danger-hover);
+    box-shadow: var(--eden-shadow-lg);
+  }
 }
 
 .eden-btn-ghost {
@@ -114,9 +125,11 @@
   box-shadow: none;
 }
 
-.eden-btn-ghost:hover {
-  background: var(--eden-color-bg-glass-light);
-  border-color: var(--eden-color-border-light);
+@media (hover: hover) {
+  .eden-btn-ghost:hover {
+    background: var(--eden-color-bg-glass-light);
+    border-color: var(--eden-color-border-light);
+  }
 }
 
 .eden-btn-outline {
@@ -124,12 +137,22 @@
   border-color: var(--eden-color-border-medium);
 }
 
-.eden-btn-outline:hover {
-  background: var(--eden-color-bg-glass-light);
-  border-color: var(--eden-color-accent-primary);
+@media (hover: hover) {
+  .eden-btn-outline:hover {
+    background: var(--eden-color-bg-glass-light);
+    border-color: var(--eden-color-accent-primary);
+  }
+}
+
+/* ===== Pressed State ===== */
+/* An inset overlay tints every variant, so taps show feedback without hover. */
+.eden-btn:active:not(:disabled) {
+  transform: none;
+  box-shadow: inset 0 0 0 100vmax var(--eden-color-surface-active);
 }
 
 /* ===== Button Sizes ===== */
+/* Sizes change type and padding; the minimum control size still applies. */
 .eden-btn-xs {
   font-size: var(--eden-font-size-xs);
   padding: var(--eden-space-xs);
@@ -144,7 +167,7 @@
 
 .eden-btn-md {
   font-size: var(--eden-font-size-md);
-  padding: var(--eden-space-md);
+  padding: var(--eden-space-sm) var(--eden-space-md);
   border-radius: var(--eden-radius-md);
 }
 
@@ -161,8 +184,11 @@
 }
 
 /* ===== Button Shapes ===== */
+/* An icon button exactly one control size wide and high. */
 .eden-btn-square {
-  aspect-ratio: 1;
+  width: var(--eden-layout-control-min-size);
+  height: var(--eden-layout-control-min-size);
+  padding: 0;
 }
 
 .eden-btn-pill {
@@ -219,11 +245,16 @@
   z-index: var(--eden-z-sticky);
 }
 
-.eden-fab:hover {
-  transform: scale(1.1);
-  box-shadow: var(--eden-shadow-xl);
+@media (hover: hover) {
+  .eden-fab:hover {
+    transform: scale(1.1);
+    box-shadow: var(--eden-shadow-xl);
+  }
 }
 
 .eden-fab:active {
   transform: scale(1);
+  box-shadow:
+    var(--eden-shadow-xl),
+    inset 0 0 0 100vmax var(--eden-color-surface-active);
 }

@@ -100,6 +100,7 @@ export const EdenZModal: number;
 export const EdenZPopover: number;
 export const EdenZTooltip: number;
 export const EdenLayoutDockHeight: string;
+export const EdenLayoutControlMinSize: string;
 export const EdenLayoutIconSizeSm: string;
 export const EdenLayoutIconSizeMd: string;
 export const EdenLayoutIconSizeLg: string;

@@ -82,7 +82,9 @@
   transition: transform var(--eden-transition-fast);
 }
 
-.eden-avatar-group .eden-avatar:hover {
-  transform: translateY(-4px);
-  z-index: 10;
+@media (hover: hover) {
+  .eden-avatar-group .eden-avatar:hover {
+    transform: translateY(-4px);
+    z-index: 10;
+  }
 }

@@ -146,6 +146,7 @@
   },
   "layout": {
     "dock-height": { "value": "72px" },
+    "control-min-size": { "value": "44px" },
     "icon-size": {
       "sm": { "value": "24px" },
       "md": { "value": "40px" },

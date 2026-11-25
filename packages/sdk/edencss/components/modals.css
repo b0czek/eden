@@ -93,8 +93,15 @@
   flex-shrink: 0;
 }
 
-.eden-modal-close:hover {
-  background: var(--eden-color-surface-hover);
+@media (hover: hover) {
+  .eden-modal-close:hover {
+    background: var(--eden-color-surface-hover);
+    color: var(--eden-color-text-primary);
+  }
+}
+
+.eden-modal-close:active {
+  background: var(--eden-color-surface-active);
   color: var(--eden-color-text-primary);
 }
 
