@@ -4,7 +4,9 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  getOwner,
   onCleanup,
+  untrack,
 } from "solid-js";
 
 export type NoticeSeverity = NotificationType;
@@ -43,7 +45,9 @@ export interface Notices {
   dismiss(id: string): void;
   /**
    * Shows a notice while `when` is true. The operator cannot dismiss it. Call
-   * inside a reactive owner; the notice is removed when the owner is disposed.
+   * inside a reactive owner, such as a component body; the notice is removed
+   * when the owner is disposed. Throws when called without an owner, for
+   * example after an `await` or in an event handler.
    */
   condition(
     when: Accessor<boolean>,
@@ -93,6 +97,7 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
   const [events, setEvents] = createSignal<readonly Notice[]>([]);
   const [conditions, setConditions] = createSignal<readonly Notice[]>([]);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  let disposed = false;
   let nextId = 0;
   const createId = () => `eden-notice-${nextId++}`;
 
@@ -109,10 +114,14 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
   };
 
   const report = (input: NoticeReport) => {
+    // A report after the owner is disposed has nowhere to show.
+    if (disposed) return createId();
+    // Untracked, so that a caller inside a reactive computation does not
+    // depend on the notices it reports and re-run on its own report.
     const existing =
       input.key === undefined
         ? undefined
-        : events().find((notice) => notice.key === input.key);
+        : untrack(events).find((notice) => notice.key === input.key);
     const notice: Notice = {
       ...contentOf(input),
       id: existing?.id ?? createId(),
@@ -139,6 +148,11 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
     setConditions((list) => list.filter((notice) => notice.id !== id));
 
   const condition: Notices["condition"] = (when, content) => {
+    if (!getOwner()) {
+      throw new Error(
+        "notices.condition must be called inside a reactive owner, such as a component body",
+      );
+    }
     const id = createId();
     const read = typeof content === "function" ? content : () => content;
 
@@ -181,6 +195,7 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
   };
 
   onCleanup(() => {
+    disposed = true;
     for (const timer of timers.values()) clearTimeout(timer);
     timers.clear();
   });

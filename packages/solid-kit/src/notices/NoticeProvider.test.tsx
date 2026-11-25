@@ -1,6 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
 import { createSignal, onMount } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Notices } from "./createNotices.js";
 import { NoticeProvider, useNotices } from "./NoticeProvider.js";
 
 const labels = {
@@ -12,7 +19,7 @@ const labels = {
 describe("NoticeProvider", () => {
   afterEach(cleanup);
 
-  it("announces danger as an alert, lets the user dismiss it, and hides extra notices", async () => {
+  it("announces danger as an alert and others politely, lets the user dismiss them, and hides extra notices", () => {
     function Reporter() {
       const notices = useNotices();
       onMount(() => {
@@ -31,14 +38,40 @@ describe("NoticeProvider", () => {
     ));
 
     expect(screen.getByRole("alert").textContent).toContain("write failed");
-    expect(screen.getAllByRole("status")).toHaveLength(2);
+    const announced = within(screen.getByRole("status"));
+    expect(announced.getByText("d")).toBeTruthy();
+    expect(announced.getByText("c")).toBeTruthy();
+    expect(announced.queryByText("b")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "2 more" }));
-    expect(screen.getAllByRole("status")).toHaveLength(4);
+    expect(announced.getByText("b")).toBeTruthy();
+    expect(announced.getByText("a")).toBeTruthy();
 
     const dismissButtons = screen.getAllByRole("button", { name: "Dismiss" });
     fireEvent.click(dismissButtons[0]);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps focus on the dismiss button when a keyed notice is replaced", () => {
+    let notices!: Notices;
+    function Reporter() {
+      notices = useNotices();
+      return null;
+    }
+
+    render(() => (
+      <NoticeProvider labels={labels}>
+        <Reporter />
+      </NoticeProvider>
+    ));
+
+    notices.report({ severity: "warning", title: "limit", key: "feed" });
+    const dismiss = screen.getByRole("button", { name: "Dismiss" });
+    dismiss.focus();
+    notices.report({ severity: "warning", title: "limit again", key: "feed" });
+
+    expect(screen.getByText("limit again")).toBeTruthy();
+    expect(document.activeElement).toBe(dismiss);
   });
 
   it("gives condition notices no dismiss button", () => {

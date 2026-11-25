@@ -135,7 +135,8 @@ const file = await notices.attempt(() => openFile(path), {
   title: t("program.openFailed"),
 });
 
-// A problem that lasts while the condition is true. Call inside a component.
+// A problem that lasts while the condition is true. Call it in a component
+// body, not after an `await` or in an event handler.
 notices.condition(() => !connected(), {
   severity: "warning",
   title: t("connection.lost"),
@@ -149,6 +150,7 @@ notice replaces it and shows a count. Notices are listed most severe first;
 within a severity, condition notices come first. Condition notices have no
 dismiss button and clear when their condition is false or their owner is
 disposed. Three notices are visible at a time; a button shows the others.
+Screen readers announce danger notices immediately and other notices politely.
 
 ## Dialogs
 

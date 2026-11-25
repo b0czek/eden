@@ -6,7 +6,7 @@ import {
   FiInfo,
   FiX,
 } from "solid-icons/fi";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { Notice, NoticeSeverity, Notices } from "./createNotices.js";
 
@@ -33,12 +33,12 @@ function NoticeItem(props: {
   labels: NoticeLabels;
   onDismiss: (id: string) => void;
 }) {
-  const urgent = () => props.notice.severity === "danger";
+  // Most screen readers announce an alert inserted into the page. Other
+  // notices are announced by the polite live region that contains them.
   return (
     <div
       class={`eden-notice eden-notice-${props.notice.severity}`}
-      role={urgent() ? "alert" : "status"}
-      aria-live={urgent() ? "assertive" : "polite"}
+      role={props.notice.severity === "danger" ? "alert" : undefined}
     >
       <span class="eden-notice-icon" aria-hidden="true">
         <Dynamic component={severityIcons[props.notice.severity]} size={18} />
@@ -80,6 +80,12 @@ export function NoticeRegion(props: {
   const visible = () =>
     expanded() ? list() : list().slice(0, NOTICE_MAX_VISIBLE);
   const hidden = () => list().length - visible().length;
+  const byId = createMemo(
+    () => new Map(list().map((notice) => [notice.id, notice])),
+  );
+  // Keyed by id, so a keyed replacement updates the shown element in place and
+  // keeps focus on its dismiss button.
+  const visibleIds = () => visible().map((notice) => notice.id);
 
   createEffect(() => {
     if (list().length <= NOTICE_MAX_VISIBLE) setExpanded(false);
@@ -87,15 +93,23 @@ export function NoticeRegion(props: {
 
   return (
     <div class="eden-notice-region">
-      <For each={visible()}>
-        {(notice) => (
-          <NoticeItem
-            notice={notice}
-            labels={props.labels}
-            onDismiss={props.notices.dismiss}
-          />
-        )}
-      </For>
+      {/* The live region stays in the page, so screen readers announce the
+          notices added to it. aria-atomic="false" announces only the change. */}
+      <div class="eden-notice-list" role="status" aria-atomic="false">
+        <For each={visibleIds()}>
+          {(id) => (
+            <Show when={byId().get(id)}>
+              {(notice) => (
+                <NoticeItem
+                  notice={notice()}
+                  labels={props.labels}
+                  onDismiss={props.notices.dismiss}
+                />
+              )}
+            </Show>
+          )}
+        </For>
+      </div>
       <Show when={hidden() > 0 || expanded()}>
         <button
           type="button"

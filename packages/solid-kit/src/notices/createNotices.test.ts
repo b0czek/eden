@@ -1,4 +1,4 @@
-import { createRoot, createSignal } from "solid-js";
+import { createEffect, createRoot, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createNotices, type Notices } from "./createNotices.js";
 
@@ -44,6 +44,26 @@ describe("createNotices", () => {
     ]);
   });
 
+  it("reports a keyed notice from an effect once per change of its source", () => {
+    const notices = create();
+    const [failure, setFailure] = createSignal("timeout");
+    let runs = 0;
+    createRoot(() =>
+      createEffect(() => {
+        runs++;
+        notices.report({
+          severity: "danger",
+          title: failure(),
+          key: "link",
+        });
+      }),
+    );
+    setFailure("refused");
+
+    expect(runs).toBe(2);
+    expect(notices.list()).toMatchObject([{ title: "refused", count: 2 }]);
+  });
+
   it("restarts the hide timer when a keyed info notice repeats", () => {
     const notices = create();
     notices.report({ severity: "info", title: "synced", key: "sync" });
@@ -76,6 +96,21 @@ describe("createNotices", () => {
     setOffline(true);
     disposeOwner();
     expect(titles(notices)).toEqual(["write"]);
+  });
+
+  it("refuses a condition without a reactive owner, which could never remove it", () => {
+    const notices = create();
+    expect(() =>
+      notices.condition(() => true, { severity: "warning", title: "offline" }),
+    ).toThrow(/reactive owner/);
+    expect(notices.list()).toEqual([]);
+  });
+
+  it("leaves no hide timer pending for a report after the notices are disposed", () => {
+    const notices = create();
+    dispose?.();
+    notices.report({ severity: "info", title: "saved" });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("shows more severe notices first, so a failure is not hidden behind warnings", () => {

@@ -27,7 +27,14 @@
   pointer-events: none;
 }
 
-.eden-notice-region > * {
+.eden-notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-sm);
+}
+
+.eden-notice,
+.eden-notice-more {
   pointer-events: auto;
 }
 
