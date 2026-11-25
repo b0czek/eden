@@ -103,7 +103,8 @@ body {
   padding: var(--eden-space-sm) var(--eden-space-md);
   cursor: text;
   transition: all var(--eden-transition-base);
-  min-height: 32px;
+  /* Match the EdenCSS controls beside it in every app that shows it. */
+  min-height: var(--eden-layout-control-min-size);
 }
 
 .omnibox-display:hover {

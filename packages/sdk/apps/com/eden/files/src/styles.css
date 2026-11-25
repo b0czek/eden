@@ -183,6 +183,10 @@
   flex-direction: column;
   padding-inline: var(--eden-space-xs);
   border-color: transparent;
+}
+
+/* Keep the EdenCSS pressed overlay; only drop the resting shadow. */
+.files-pin-colors .eden-btn.eden-btn-ghost:not(:active) {
   box-shadow: none;
 }
 
@@ -305,11 +309,6 @@
 .files-trash .list-view .files-trash-item-meta {
   flex: 1;
   text-align: right;
-}
-
-/* Match the height of the EdenCSS controls beside the omnibox. */
-.files-main .omnibox-display {
-  min-height: var(--eden-layout-control-min-size);
 }
 
 .files-item-details dd,
