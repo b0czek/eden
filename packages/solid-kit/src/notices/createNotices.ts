@@ -38,7 +38,8 @@ export interface NoticeAttemptOptions {
 export interface Notices {
   /**
    * Shown notices, most severe first. Within a severity, conditions come
-   * first, then events, newest first.
+   * first, then events, most recently added first. A keyed repeat keeps its
+   * notice's place.
    */
   readonly list: Accessor<readonly Notice[]>;
   report(notice: NoticeReport): string;
@@ -130,10 +131,13 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
       count: (existing?.count ?? 0) + 1,
     };
 
-    setEvents((list) => [
-      notice,
-      ...list.filter((shown) => shown.id !== notice.id),
-    ]);
+    // A repeat replaces its notice in place, so the notices around it, and
+    // the one under the pointer or keyboard focus, do not move.
+    setEvents((list) =>
+      existing
+        ? list.map((shown) => (shown.id === notice.id ? notice : shown))
+        : [notice, ...list],
+    );
     clearTimer(notice.id);
     if (hidesBySelf(notice.severity)) {
       timers.set(
@@ -201,7 +205,7 @@ export function createNotices(options: CreateNoticesOptions = {}): Notices {
   });
 
   // Array.prototype.sort is stable, so each severity keeps conditions first
-  // and events newest first.
+  // and events most recently added first.
   const list = createMemo(() =>
     [...conditions(), ...events()].sort(
       (left, right) =>

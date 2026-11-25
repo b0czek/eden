@@ -66,12 +66,14 @@ describe("NoticeProvider", () => {
     ));
 
     notices.report({ severity: "warning", title: "limit", key: "feed" });
-    const dismiss = screen.getByRole("button", { name: "Dismiss" });
+    notices.report({ severity: "warning", title: "speed" });
+    const [, dismiss] = screen.getAllByRole("button", { name: "Dismiss" });
     dismiss.focus();
     notices.report({ severity: "warning", title: "limit again", key: "feed" });
 
     expect(screen.getByText("limit again")).toBeTruthy();
     expect(document.activeElement).toBe(dismiss);
+    expect(screen.getAllByRole("button", { name: "Dismiss" })[1]).toBe(dismiss);
   });
 
   it("gives condition notices no dismiss button", () => {

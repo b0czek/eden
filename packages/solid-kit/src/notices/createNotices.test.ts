@@ -32,15 +32,15 @@ describe("createNotices", () => {
     expect(titles(notices)).toEqual(["limit"]);
   });
 
-  it("replaces a notice with the same key and counts the repeats", () => {
+  it("replaces a notice with the same key in place and counts the repeats", () => {
     const notices = create();
     notices.report({ severity: "danger", title: "first", key: "offset" });
     notices.report({ severity: "danger", title: "other" });
     notices.report({ severity: "danger", title: "second", key: "offset" });
 
     expect(notices.list()).toMatchObject([
-      { title: "second", count: 2 },
       { title: "other", count: 1 },
+      { title: "second", count: 2 },
     ]);
   });
 
