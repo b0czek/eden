@@ -152,6 +152,37 @@ dismiss button and clear when their condition is false or their owner is
 disposed. Three notices are visible at a time; a button shows the others.
 Screen readers announce danger notices immediately and other notices politely.
 
+## Date and time fields
+
+`@edenapp/solid-kit/datetime` lets the user choose a date and time by touch.
+`DateTimeField` shows its value on a button. The button opens steppers for the
+day, hour, and minute. Hold a stepper to repeat it. Minutes move in steps of
+`minuteStep` (5 by default), and the field stays between `min` and `max`.
+
+```tsx
+import { DateTimeField } from "@edenapp/solid-kit/datetime";
+
+<DateTimeField
+  label={t("logs.from")}
+  value={from()}
+  onChange={setFrom}
+  placeholder={t("logs.anyTime")}
+  max={new Date()}
+  locale={locale()}
+  labels={{
+    day: t("time.day"),
+    hour: t("time.hour"),
+    minute: t("time.minute"),
+    decrease: (unit) => t("time.earlier", { unit }),
+    increase: (unit) => t("time.later", { unit }),
+    done: t("common.done"),
+  }}
+/>
+```
+
+The field's styles are part of this entry point, not EdenCSS, so only apps that
+import it load them. The root `@edenapp/solid-kit` entry does not export it.
+
 ## Dialogs
 
 `@edenapp/solid-kit/dialogs` provides local, in-renderer dialogs with a tiny promise API.

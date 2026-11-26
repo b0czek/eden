@@ -11,6 +11,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./datetime": {
+      "types": "./src/datetime.ts",
+      "import": "./src/datetime.ts",
+      "default": "./src/datetime.ts"
+    },
     "./dialogs": {
       "types": "./src/dialogs.ts",
       "import": "./src/dialogs.ts",

@@ -1,0 +1,69 @@
+.eden-datetime-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--eden-space-xs);
+  min-width: 0;
+  font-family: var(--eden-font-family-base);
+}
+
+.eden-datetime-label {
+  font-size: var(--eden-font-size-base);
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-datetime-value {
+  display: flex;
+  align-items: center;
+  gap: var(--eden-space-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.eden-datetime-value svg {
+  flex: none;
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-datetime-value [data-placeholder="true"] {
+  color: var(--eden-color-text-muted);
+}
+
+.eden-datetime-panel {
+  display: grid;
+  grid-template-columns: max-content auto minmax(6em, 1fr) auto;
+  align-items: center;
+  gap: var(--eden-space-xs) var(--eden-space-sm);
+  padding: var(--eden-space-sm);
+  border: 1px solid var(--eden-color-border-light);
+  border-radius: var(--eden-radius-md);
+  background: var(--eden-color-surface-secondary);
+}
+
+.eden-datetime-step {
+  display: contents;
+}
+
+.eden-datetime-step-name {
+  font-size: var(--eden-font-size-base);
+  color: var(--eden-color-text-secondary);
+}
+
+.eden-datetime-step-value {
+  text-align: center;
+  font-size: var(--eden-font-size-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--eden-color-text-primary);
+}
+
+/* Holding a stepper repeats it; keep the long press from selecting text. */
+.eden-datetime-step .eden-btn {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.eden-datetime-done {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
