@@ -97,7 +97,10 @@ export function DateTimeField(props: DateTimeFieldProps) {
     );
   };
   const toggle = () => {
-    if (open()) return setOpen(false);
+    if (open()) {
+      setOpen(false);
+      return;
+    }
     placePanel();
     setOpen(true);
     // Measured once shown, to flip it above the field if needed.
