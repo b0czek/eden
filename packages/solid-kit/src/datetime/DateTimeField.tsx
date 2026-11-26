@@ -113,7 +113,7 @@ export function DateTimeField(props: DateTimeFieldProps) {
         setOpen(false);
       }
     };
-    const escape = (event: KeyboardEvent) => {
+    const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopPropagation();
       setOpen(false);
@@ -123,12 +123,12 @@ export function DateTimeField(props: DateTimeFieldProps) {
     };
     const close = () => setOpen(false);
     document.addEventListener("pointerdown", outside, true);
-    window.addEventListener("keydown", escape, true);
+    window.addEventListener("keydown", closeOnEscape, true);
     window.addEventListener("scroll", scroll, true);
     window.addEventListener("resize", close);
     onCleanup(() => {
       document.removeEventListener("pointerdown", outside, true);
-      window.removeEventListener("keydown", escape, true);
+      window.removeEventListener("keydown", closeOnEscape, true);
       window.removeEventListener("scroll", scroll, true);
       window.removeEventListener("resize", close);
     });
