@@ -195,8 +195,7 @@ import { t } from "./i18n";
 ```
 
 The field formats its value and shows its text in the
-[app's language](#language). Its `labels` prop replaces any of its text on one
-field, such as `labels={{ done: "Apply" }}`.
+[app's language](#language).
 
 The field's styles are part of this entry point, not EdenCSS, so only apps that
 import it load them. The root `@edenapp/solid-kit` entry does not export it.
