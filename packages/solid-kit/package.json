@@ -16,6 +16,11 @@
       "import": "./src/dialogs.ts",
       "default": "./src/dialogs.ts"
     },
+    "./locale": {
+      "types": "./src/locale.ts",
+      "import": "./src/locale.ts",
+      "default": "./src/locale.ts"
+    },
     "./notices": {
       "types": "./src/notices.ts",
       "import": "./src/notices.ts",
@@ -39,8 +44,9 @@
     "solid-js": "catalog:"
   },
   "dependencies": {
-    "solid-icons": "catalog:",
-    "@edenapp/client": "workspace:*"
+    "@edenapp/babel": "workspace:*",
+    "@edenapp/client": "workspace:*",
+    "solid-icons": "catalog:"
   },
   "devDependencies": {
     "@edenapp/types": "workspace:*",

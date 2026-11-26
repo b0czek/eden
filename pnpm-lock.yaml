@@ -808,6 +808,9 @@ importers:
 
   packages/solid-kit:
     dependencies:
+      '@edenapp/babel':
+        specifier: workspace:*
+        version: link:../babel
       '@edenapp/client':
         specifier: workspace:*
         version: link:../client

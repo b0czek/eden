@@ -9,13 +9,15 @@ import {
   Show,
   splitProps,
 } from "solid-js";
+import { solidKitStrings } from "./locale.js";
 
 export interface SidebarProps extends JSX.HTMLAttributes<HTMLElement> {
   label: string;
   heading?: JSX.Element;
   footer?: JSX.Element;
   size?: "default" | "compact" | "wide";
-  toggleLabels: { collapse: string; expand: string };
+  /** Replaces the built-in names of the fold button. */
+  toggleLabels?: { collapse?: string; expand?: string };
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   /** Automatically fold below this viewport width until the user toggles. Set 0 to disable. */
@@ -45,8 +47,10 @@ export function Sidebar(props: SidebarProps) {
   const collapsed = () => local.collapsed ?? manualCollapsed() ?? narrow();
   const contentId = `eden-sidebar-${createUniqueId()}`;
   const footer = children(() => local.footer);
-  const toggleLabel = () =>
-    collapsed() ? local.toggleLabels.expand : local.toggleLabels.collapse;
+  const toggleLabel = () => {
+    const labels = solidKitStrings("sidebar", local.toggleLabels);
+    return collapsed() ? labels.expand : labels.collapse;
+  };
 
   createEffect(() => {
     const breakpoint = local.collapseBelow ?? 760;
