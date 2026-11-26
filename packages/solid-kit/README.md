@@ -152,6 +152,29 @@ dismiss button and clear when their condition is false or their owner is
 disposed. Three notices are visible at a time; a button shows the others.
 Screen readers announce danger notices immediately and other notices politely.
 
+## Language
+
+Components with their own text, such as `DateTimeField`, show it in English or
+Polish. They follow the system locale: no setup is needed. A regional locale
+such as `pl-PL` uses its language, and other locales use English.
+
+Add a language, or replace built-in strings, once at app start.
+Strings you leave out stay in English:
+
+```ts
+import { addSolidKitStrings } from "@edenapp/solid-kit/locale";
+
+addSolidKitStrings("de", {
+  datetime: {
+    unit: { day: "Tag", hour: "Stunde", minute: "Minute" },
+    done: "Fertig",
+  },
+});
+```
+
+`setSolidKitLocale(locale)` uses a different locale than the system's, such as
+an app's own language setting.
+
 ## Date and time fields
 
 `@edenapp/solid-kit/datetime` lets the user choose a date and time by touch.
@@ -161,7 +184,7 @@ day, hour, and minute. Hold a stepper to repeat it. Minutes move in steps of
 
 ```tsx
 import { DateTimeField } from "@edenapp/solid-kit/datetime";
-import { locale, t } from "./i18n";
+import { t } from "./i18n";
 
 <DateTimeField
   label={t("logs.from")}
@@ -169,12 +192,10 @@ import { locale, t } from "./i18n";
   onChange={setFrom}
   placeholder={t("logs.anyTime")}
   max={new Date()}
-  locale={locale()}
 />
 ```
 
-Pass the app's Eden locale from `@edenapp/babel/solid`. The field formats its
-value for that locale and has its own strings for each Eden locale.
+The field formats its value for the [solid-kit locale](#language).
 
 The field's styles are part of this entry point, not EdenCSS, so only apps that
 import it load them. The root `@edenapp/solid-kit` entry does not export it.

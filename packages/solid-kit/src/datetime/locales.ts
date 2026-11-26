@@ -1,13 +1,13 @@
 import type { DateTimeUnit } from "./DateTimeField.js";
 
-interface DateTimeStrings {
+export interface DateTimeStrings {
   unit: Record<DateTimeUnit, string>;
   earlier: Record<DateTimeUnit, string>;
   later: Record<DateTimeUnit, string>;
   done: string;
 }
 
-const en: DateTimeStrings = {
+export const en: DateTimeStrings = {
   unit: { day: "Day", hour: "Hour", minute: "Minute" },
   earlier: {
     day: "Earlier day",
@@ -18,7 +18,7 @@ const en: DateTimeStrings = {
   done: "Done",
 };
 
-const pl: DateTimeStrings = {
+export const pl: DateTimeStrings = {
   unit: { day: "Dzień", hour: "Godzina", minute: "Minuta" },
   earlier: {
     day: "Wcześniejszy dzień",
@@ -32,9 +32,3 @@ const pl: DateTimeStrings = {
   },
   done: "Gotowe",
 };
-
-const strings: Record<string, DateTimeStrings> = { en, pl };
-
-/** The field's own strings for an Eden locale such as "pl" or "en-GB". */
-export const dateTimeStrings = (locale: string): DateTimeStrings =>
-  strings[locale] ?? strings[locale.split("-")[0]] ?? en;

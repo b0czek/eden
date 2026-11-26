@@ -1,13 +1,10 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setSolidKitLocale } from "../locale.js";
 import { DateTimeField, stepDateTime } from "./DateTimeField.js";
 
-function renderField(
-  initial: Date,
-  bounds: { min?: Date; max?: Date } = {},
-  locale = "en-GB",
-) {
+function renderField(initial: Date, bounds: { min?: Date; max?: Date } = {}) {
   const [value, setValue] = createSignal<Date | undefined>(initial);
   render(() => (
     <DateTimeField
@@ -15,7 +12,6 @@ function renderField(
       value={value()}
       onChange={setValue}
       placeholder="Any time"
-      locale={locale}
       {...bounds}
     />
   ));
@@ -43,6 +39,7 @@ describe("stepDateTime", () => {
 describe("DateTimeField", () => {
   afterEach(() => {
     cleanup();
+    setSolidKitLocale("en");
     vi.useRealTimers();
   });
 
@@ -65,14 +62,11 @@ describe("DateTimeField", () => {
     ).toBe(false);
   });
 
-  it("speaks the app's locale and falls back to English for others", () => {
-    renderField(new Date(2026, 10, 25, 14, 0), {}, "pl");
-    expect(screen.getByRole("button", { name: "Gotowe" })).toBeTruthy();
-    expect(screen.getByText("Godzina")).toBeTruthy();
-    cleanup();
-
-    renderField(new Date(2026, 10, 25, 14, 0), {}, "de");
+  it("switches language with the solid-kit locale while open", () => {
+    renderField(new Date(2026, 10, 25, 14, 0));
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+    setSolidKitLocale("pl");
+    expect(screen.getByRole("button", { name: "Gotowe" })).toBeTruthy();
   });
 
   it("steps once per tap and repeats while held", () => {

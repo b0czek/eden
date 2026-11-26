@@ -21,6 +21,11 @@
       "import": "./src/dialogs.ts",
       "default": "./src/dialogs.ts"
     },
+    "./locale": {
+      "types": "./src/locale.ts",
+      "import": "./src/locale.ts",
+      "default": "./src/locale.ts"
+    },
     "./notices": {
       "types": "./src/notices.ts",
       "import": "./src/notices.ts",

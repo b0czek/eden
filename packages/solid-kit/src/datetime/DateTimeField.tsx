@@ -5,7 +5,7 @@ import {
 } from "solid-icons/bi";
 import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import "./DateTimeField.css";
-import { dateTimeStrings } from "./locales.js";
+import { solidKitLocale, solidKitStrings } from "../locale.js";
 
 export type DateTimeUnit = "day" | "hour" | "minute";
 
@@ -20,11 +20,6 @@ export interface DateTimeFieldProps {
   max?: Date;
   /** Minutes moved by one minute step. Defaults to 5. */
   minuteStep?: number;
-  /**
-   * The app's Eden locale, such as `locale()` from `@edenapp/babel/solid`.
-   * It formats the value and picks the field's own strings.
-   */
-  locale: string;
   class?: string;
 }
 
@@ -64,10 +59,10 @@ export function stepDateTime(
  */
 export function DateTimeField(props: DateTimeFieldProps) {
   const [open, setOpen] = createSignal(false);
-  const strings = () => dateTimeStrings(props.locale);
+  const strings = () => solidKitStrings().datetime;
   const id = `eden-datetime-${createUniqueId()}`;
   const format = (options: Intl.DateTimeFormatOptions, time: Date) =>
-    new Intl.DateTimeFormat(props.locale, options).format(time);
+    new Intl.DateTimeFormat(solidKitLocale(), options).format(time);
   const bounds = () => ({
     minuteStep: props.minuteStep,
     min: props.min,
