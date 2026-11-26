@@ -29,14 +29,18 @@
 }
 
 .eden-datetime-panel {
+  position: fixed;
+  z-index: var(--eden-z-popover);
+  font-family: var(--eden-font-family-base);
+  box-shadow: var(--eden-shadow-lg);
   display: grid;
   grid-template-columns: max-content auto minmax(6em, 1fr) auto;
   align-items: center;
   gap: var(--eden-space-xs) var(--eden-space-sm);
   padding: var(--eden-space-sm);
-  border: 1px solid var(--eden-color-border-light);
-  border-radius: var(--eden-radius-md);
-  background: var(--eden-color-surface-secondary);
+  border: 1px solid var(--eden-color-border-medium);
+  border-radius: var(--eden-radius-lg);
+  background: var(--eden-color-bg-secondary);
 }
 
 .eden-datetime-step {

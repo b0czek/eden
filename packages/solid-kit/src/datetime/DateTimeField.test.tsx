@@ -71,6 +71,29 @@ describe("DateTimeField", () => {
     expect(screen.getByRole("button", { name: "Gotowe" })).toBeTruthy();
   });
 
+  it("floats until a tap outside or Escape, which stop at its panel", () => {
+    renderField(new Date(2026, 10, 25, 14, 0));
+    const seen: string[] = [];
+    const listen = (event: Event) => seen.push(event.type);
+    document.addEventListener("pointerdown", listen);
+    document.addEventListener("keydown", listen);
+    try {
+      // Steppers inside do not count as a tap outside a surrounding panel.
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Later hour" }));
+      expect(seen).toEqual([]);
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+      expect(seen).toEqual([]);
+
+      fireEvent.click(screen.getByLabelText("From"));
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    } finally {
+      document.removeEventListener("pointerdown", listen);
+      document.removeEventListener("keydown", listen);
+    }
+  });
+
   it("steps once per tap and repeats while held", () => {
     vi.useFakeTimers();
     const value = renderField(new Date(2026, 10, 25, 14, 0));

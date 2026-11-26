@@ -3,7 +3,15 @@ import {
   BiRegularMinus,
   BiRegularPlus,
 } from "solid-icons/bi";
-import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  createUniqueId,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
+import { Portal } from "solid-js/web";
 import "./DateTimeField.css";
 import { solidKitLocale, solidKitStrings } from "../locale.js";
 
@@ -59,6 +67,72 @@ export function stepDateTime(
  */
 export function DateTimeField(props: DateTimeFieldProps) {
   const [open, setOpen] = createSignal(false);
+  const [place, setPlace] = createSignal<{
+    left: number;
+    width: number;
+    top?: number;
+    bottom?: number;
+  }>({ left: 0, width: 0 });
+  let field: HTMLButtonElement | undefined;
+  let panel: HTMLDivElement | undefined;
+  const gap = 4;
+  // Under the field, or above it when it does not fit below.
+  const placePanel = () => {
+    if (!field) return;
+    const rect = field.getBoundingClientRect();
+    const width = Math.min(
+      Math.max(rect.width, 300),
+      window.innerWidth - 2 * gap,
+    );
+    const left = Math.min(
+      Math.max(gap, rect.left),
+      window.innerWidth - width - gap,
+    );
+    const height = panel?.offsetHeight ?? 0;
+    const below = window.innerHeight - rect.bottom - gap;
+    setPlace(
+      height > below && rect.top - gap > below
+        ? { left, width, bottom: window.innerHeight - rect.top + gap }
+        : { left, width, top: rect.bottom + gap },
+    );
+  };
+  const toggle = () => {
+    if (open()) return setOpen(false);
+    placePanel();
+    setOpen(true);
+    // Measured once shown, to flip it above the field if needed.
+    queueMicrotask(placePanel);
+  };
+  // While open: a tap outside, Escape, a scroll or a resize closes it. Escape
+  // and taps inside stop here, so a panel the field sits in stays open.
+  createEffect(() => {
+    if (!open()) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!field?.contains(target) && !panel?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
+    };
+    const scroll = (event: Event) => {
+      if (!panel?.contains(event.target as Node)) setOpen(false);
+    };
+    const close = () => setOpen(false);
+    document.addEventListener("pointerdown", outside, true);
+    window.addEventListener("keydown", closeOnEscape, true);
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", close);
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("keydown", closeOnEscape, true);
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", close);
+    });
+  });
   const strings = () => solidKitStrings("datetime");
   const id = `eden-datetime-${createUniqueId()}`;
   const format = (options: Intl.DateTimeFormatOptions, time: Date) =>
@@ -114,7 +188,7 @@ export function DateTimeField(props: DateTimeFieldProps) {
         title={name()}
         aria-label={name()}
         disabled={!canStep(unit, direction)}
-        onPointerDown={(event) => {
+        on:pointerdown={(event) => {
           if (event.button > 0) return;
           stop();
           pressed = true;
@@ -145,10 +219,11 @@ export function DateTimeField(props: DateTimeFieldProps) {
       </label>
       <button
         id={id}
+        ref={field}
         type="button"
         class="eden-input eden-datetime-value"
         aria-expanded={open()}
-        onClick={() => setOpen(!open())}
+        onClick={toggle}
       >
         <BiRegularCalendar />
         <span data-placeholder={!props.value}>
@@ -167,29 +242,46 @@ export function DateTimeField(props: DateTimeFieldProps) {
         </span>
       </button>
       <Show when={open()}>
-        <div class="eden-datetime-panel">
-          <For each={units}>
-            {(unit) => (
-              <div class="eden-datetime-step">
-                <span class="eden-datetime-step-name">
-                  {strings().unit[unit]}
-                </span>
-                {stepper(unit, -1)}
-                <output class="eden-datetime-step-value">
-                  {text(unit, shown())}
-                </output>
-                {stepper(unit, 1)}
-              </div>
-            )}
-          </For>
-          <button
-            type="button"
-            class="eden-btn eden-btn-primary eden-datetime-done"
-            onClick={() => setOpen(false)}
+        <Portal>
+          <div
+            class="eden-datetime-panel"
+            ref={panel}
+            style={{
+              left: `${place().left}px`,
+              width: `${place().width}px`,
+              top: place().top === undefined ? undefined : `${place().top}px`,
+              bottom:
+                place().bottom === undefined
+                  ? undefined
+                  : `${place().bottom}px`,
+            }}
+            // Native, not delegated: the steppers' own pointerdown listeners
+            // run first, then the event stops before document listeners.
+            on:pointerdown={(event) => event.stopPropagation()}
           >
-            {strings().done}
-          </button>
-        </div>
+            <For each={units}>
+              {(unit) => (
+                <div class="eden-datetime-step">
+                  <span class="eden-datetime-step-name">
+                    {strings().unit[unit]}
+                  </span>
+                  {stepper(unit, -1)}
+                  <output class="eden-datetime-step-value">
+                    {text(unit, shown())}
+                  </output>
+                  {stepper(unit, 1)}
+                </div>
+              )}
+            </For>
+            <button
+              type="button"
+              class="eden-btn eden-btn-primary eden-datetime-done"
+              onClick={() => setOpen(false)}
+            >
+              {strings().done}
+            </button>
+          </div>
+        </Portal>
       </Show>
     </div>
   );

@@ -177,9 +177,11 @@ Screen readers announce danger notices immediately and other notices politely.
 ## Date and time fields
 
 `@edenapp/solid-kit/datetime` lets the user choose a date and time by touch.
-`DateTimeField` shows its value on a button. The button opens steppers for the
-day, hour, and minute. Hold a stepper to repeat it. Minutes move in steps of
-`minuteStep` (5 by default), and the field stays between `min` and `max`.
+`DateTimeField` shows its value on a button. The button opens a floating panel
+with steppers for the day, hour, and minute. Hold a stepper to repeat it. Minutes move in steps of
+`minuteStep` (5 by default), and the field stays between `min` and `max`. A tap
+outside the panel, Escape, scrolling, or resizing closes it. Inside another
+panel, such as a filter popover, these close only the field's panel.
 
 ```tsx
 import { DateTimeField } from "@edenapp/solid-kit/datetime";
