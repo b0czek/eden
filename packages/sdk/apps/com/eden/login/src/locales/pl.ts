@@ -8,7 +8,6 @@ export const pl = {
     signingIn: "Logowanie...",
     loginFailed: "Logowanie nie powiodło się.",
     failedToLoadUsers: "Nie udało się załadować użytkowników.",
-    toggleKeyboard: "Przełącz klawiaturę",
     reboot: "Uruchom ponownie",
     poweroff: "Wyłącz",
     rebootConfirmation:

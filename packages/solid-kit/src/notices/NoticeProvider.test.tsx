@@ -11,12 +11,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Notices } from "./createNotices.js";
 import { NoticeProvider, useNotices } from "./NoticeProvider.js";
 
-const labels = {
-  dismiss: "Dismiss",
-  showMore: (hidden: number) => `${hidden} more`,
-  showLess: "Show less",
-};
-
 const app = setupI18n({ resources: {} });
 
 describe("NoticeProvider", () => {
@@ -38,7 +32,7 @@ describe("NoticeProvider", () => {
     }
 
     render(() => (
-      <NoticeProvider labels={labels}>
+      <NoticeProvider>
         <Reporter />
       </NoticeProvider>
     ));
@@ -66,7 +60,7 @@ describe("NoticeProvider", () => {
     }
 
     render(() => (
-      <NoticeProvider labels={labels}>
+      <NoticeProvider>
         <Reporter />
       </NoticeProvider>
     ));
@@ -93,7 +87,7 @@ describe("NoticeProvider", () => {
     }
 
     render(() => (
-      <NoticeProvider labels={labels}>
+      <NoticeProvider>
         <Condition />
       </NoticeProvider>
     ));
@@ -102,7 +96,7 @@ describe("NoticeProvider", () => {
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
   });
 
-  it("labels its controls in the app's language without labels", () => {
+  it("labels its controls in the app's language", () => {
     app.setLocale("pl");
     function Reporter() {
       const notices = useNotices();

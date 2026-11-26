@@ -82,10 +82,6 @@ const SettingsSidebar: Component<SettingsSidebarProps> = (props) => {
     <Sidebar
       label={t("settings.sidebar.navigation")}
       heading={props.brandName()}
-      toggleLabels={{
-        collapse: t("settings.sidebar.collapse"),
-        expand: t("settings.sidebar.expand"),
-      }}
     >
       <SidebarSection>
         <For each={systemPanels()}>{item}</For>

@@ -11,15 +11,6 @@ import { Dynamic } from "solid-js/web";
 import { fillString, solidKitStrings } from "../locale.js";
 import type { Notice, NoticeSeverity, Notices } from "./createNotices.js";
 
-export interface NoticeLabels {
-  /** Accessible name of the dismiss button. */
-  dismiss: string;
-  /** Text of the button that shows the hidden notices. */
-  showMore: (hidden: number) => string;
-  /** Text of the button that collapses the list again. */
-  showLess: string;
-}
-
 export const NOTICE_MAX_VISIBLE = 3;
 
 const severityIcons: Record<NoticeSeverity, IconTypes> = {
@@ -72,16 +63,11 @@ function NoticeItem(props: {
   );
 }
 
-export function NoticeRegion(props: {
-  notices: Notices;
-  /** Replaces the built-in text of the notice controls. */
-  labels?: Partial<NoticeLabels>;
-}) {
+export function NoticeRegion(props: { notices: Notices }) {
   const [expanded, setExpanded] = createSignal(false);
   const text = () => solidKitStrings("notices");
-  const dismiss = () => props.labels?.dismiss ?? text().dismiss;
+  const dismiss = () => text().dismiss;
   const showMore = (hidden: number) =>
-    props.labels?.showMore?.(hidden) ??
     fillString(text().showMore, { count: hidden });
   const list = () => props.notices.list();
   const visible = () =>
@@ -124,9 +110,7 @@ export function NoticeRegion(props: {
           aria-expanded={expanded()}
           onClick={() => setExpanded(!expanded())}
         >
-          {expanded()
-            ? (props.labels?.showLess ?? text().showLess)
-            : showMore(hidden())}
+          {expanded() ? text().showLess : showMore(hidden())}
         </button>
       </Show>
     </div>

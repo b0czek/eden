@@ -8,7 +8,7 @@ export interface SolidKitStrings {
 
 export const en: SolidKitStrings = {
   dialogs: { ok: "OK", cancel: "Cancel" },
-  keyboard: { toggle: "Keyboard" },
+  keyboard: { toggle: "Toggle keyboard" },
   notices: {
     dismiss: "Dismiss",
     showMore: "{count} more",

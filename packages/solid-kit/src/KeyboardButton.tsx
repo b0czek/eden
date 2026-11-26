@@ -5,8 +5,6 @@ import "./KeyboardButton.css";
 import { solidKitStrings } from "./locale.js";
 
 export interface KeyboardButtonProps {
-  /** Replaces the built-in name of the button. */
-  label?: string;
   class?: string;
 }
 
@@ -20,7 +18,7 @@ const defaultKeyboardState: EdenKeyboardState = {
 };
 
 export function KeyboardButton(props: KeyboardButtonProps) {
-  const label = () => props.label ?? solidKitStrings("keyboard").toggle;
+  const label = () => solidKitStrings("keyboard").toggle;
   const [keyboardState, setKeyboardState] =
     createSignal<EdenKeyboardState>(defaultKeyboardState);
   let keyboardVisibleAtPointerDown: boolean | null = null;

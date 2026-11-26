@@ -24,14 +24,12 @@ export function solidKitLocale(): string {
 }
 
 /**
- * One component's strings for the app's locale. Each is the component's
- * `override`, else the app's translation under `solidKit.`, else solid-kit's
- * for that locale or its language, else English. Read it in a reactive scope
- * to follow locale changes.
+ * One component's strings for the app's locale. Each is the app's translation
+ * under `solidKit.`, else solid-kit's for that locale or its language, else
+ * English. Read it in a reactive scope to follow locale changes.
  */
 export function solidKitStrings<G extends keyof SolidKitStrings>(
   group: G,
-  override?: DeepPartial<SolidKitStrings[G]>,
 ): SolidKitStrings[G] {
   const app = appI18n();
   const value = solidKitLocale();
@@ -39,7 +37,6 @@ export function solidKitStrings<G extends keyof SolidKitStrings>(
   const resolve = (
     english: object,
     local: object | undefined,
-    over: object | undefined,
     path: string,
   ): object =>
     Object.fromEntries(
@@ -52,15 +49,13 @@ export function solidKitStrings<G extends keyof SolidKitStrings>(
             resolve(
               fallback,
               at(local) as object | undefined,
-              at(over) as object | undefined,
               `${path}.${key}`,
             ),
           ];
         }
         return [
           key,
-          (at(over) as string | undefined) ??
-            app?.find(`${path}.${key}`) ??
+          app?.find(`${path}.${key}`) ??
             (at(local) as string | undefined) ??
             fallback,
         ];
@@ -69,7 +64,6 @@ export function solidKitStrings<G extends keyof SolidKitStrings>(
   return resolve(
     en[group],
     own[group],
-    override,
     `solidKit.${group}`,
   ) as SolidKitStrings[G];
 }

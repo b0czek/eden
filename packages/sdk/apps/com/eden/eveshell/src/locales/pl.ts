@@ -28,7 +28,6 @@ export const pl = {
     powerActionFailed: "Nie udało się wykonać żądanej operacji zasilania.",
     currentUser: "Aktualny",
     changePassword: "Zmień hasło",
-    toggleKeyboard: "Przełącz klawiaturę",
     dock: "Dock",
     currentPassword: "Aktualne hasło",
     newPassword: "Nowe hasło",

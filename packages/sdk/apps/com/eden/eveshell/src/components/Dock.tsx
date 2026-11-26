@@ -142,7 +142,7 @@ export default function Dock(props: DockProps) {
         </div>
       </div>
       <div class="dock-right">
-        <KeyboardButton label={t("shell.toggleKeyboard")} />
+        <KeyboardButton />
         <Clock />
       </div>
     </div>
