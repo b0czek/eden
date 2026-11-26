@@ -2,8 +2,6 @@ export const pl = {
   settings: {
     sidebar: {
       navigation: "Nawigacja ustawień",
-      collapse: "Zwiń pasek boczny",
-      expand: "Rozwiń pasek boczny",
       applications: "Aplikacje",
       noAppsWithSettings: "Brak aplikacji z ustawieniami",
     },

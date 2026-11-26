@@ -26,8 +26,8 @@ export const de = {
 } as const;
 ```
 
-To change a string on one component only, pass it to that component, such as
-`cancelLabel` on a dialog or `labels` on `NoticeProvider`.
+Dialogs still take `okLabel`, `confirmLabel`, and `cancelLabel` for text that
+belongs to one dialog, such as "Delete".
 
 ## Sidebars
 
@@ -57,7 +57,7 @@ import { FiHome } from "solid-icons/fi";
 ```
 
 Pass the sidebar and item labels from your app. The fold button has a
-[built-in name](#language); `toggleLabels` replaces it. Items retain their accessible names and
+[built-in name](#language). Items retain their accessible names and
 tooltips when folded. `SidebarSection` accepts an optional `title`;
 `SidebarDivider` separates sections. `SidebarItem` supports `description`,
 `disabled`, and an optional `action` containing a `SidebarItemAction`. Action
@@ -129,7 +129,7 @@ started in the app, and for problems that the app observes. Use the toaster
 one app.
 
 Wrap the app in `NoticeProvider`. Its buttons have
-[built-in text](#language); `labels` replaces any of it:
+[built-in text](#language):
 
 ```tsx
 import { NoticeProvider, useNotices } from "@edenapp/solid-kit/notices";

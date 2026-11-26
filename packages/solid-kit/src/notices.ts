@@ -17,6 +17,5 @@ export {
 } from "./notices/NoticeProvider.js";
 export {
   NOTICE_MAX_VISIBLE,
-  type NoticeLabels,
   NoticeRegion,
 } from "./notices/NoticeRegion.js";

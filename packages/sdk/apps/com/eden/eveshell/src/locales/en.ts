@@ -28,7 +28,6 @@ export const en = {
     powerActionFailed: "The requested system power action failed.",
     currentUser: "Current",
     changePassword: "Change password",
-    toggleKeyboard: "Toggle keyboard",
     dock: "Dock",
     currentPassword: "Current password",
     newPassword: "New password",

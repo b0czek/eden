@@ -32,13 +32,6 @@ describe("solid-kit strings", () => {
     expect(solidKitStrings("dialogs").cancel).toBe("Anuluj");
   });
 
-  it("lets a component's labels win over every translation", async () => {
-    await vi.waitFor(() =>
-      expect(solidKitStrings("dialogs").cancel).toBe("Back"),
-    );
-    expect(solidKitStrings("dialogs", { cancel: "Keep" }).cancel).toBe("Keep");
-  });
-
   it("fills named values and leaves unknown ones", () => {
     expect(fillString("{count} more of {name}", { count: 2 })).toBe(
       "2 more of {name}",

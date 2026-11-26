@@ -16,8 +16,6 @@ export interface SidebarProps extends JSX.HTMLAttributes<HTMLElement> {
   heading?: JSX.Element;
   footer?: JSX.Element;
   size?: "default" | "compact" | "wide";
-  /** Replaces the built-in names of the fold button. */
-  toggleLabels?: { collapse?: string; expand?: string };
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   /** Automatically fold below this viewport width until the user toggles. Set 0 to disable. */
@@ -31,7 +29,6 @@ export function Sidebar(props: SidebarProps) {
     "heading",
     "footer",
     "size",
-    "toggleLabels",
     "collapsed",
     "defaultCollapsed",
     "collapseBelow",
@@ -48,7 +45,7 @@ export function Sidebar(props: SidebarProps) {
   const contentId = `eden-sidebar-${createUniqueId()}`;
   const footer = children(() => local.footer);
   const toggleLabel = () => {
-    const labels = solidKitStrings("sidebar", local.toggleLabels);
+    const labels = solidKitStrings("sidebar");
     return collapsed() ? labels.expand : labels.collapse;
   };
 

@@ -12,7 +12,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { createAppMenu, createUserContextMenu } from "../context-menu";
 import { useAppOperations } from "../features/useAppOperations";
 import { useSessionTransition } from "../features/useSessionTransition";
-import { getLocalizedValue, initLocale, locale, t } from "../i18n";
+import { getLocalizedValue, initLocale, locale } from "../i18n";
 import type { AppInfo } from "../types";
 import AllApps from "./AllApps";
 import { openChangePasswordDialog } from "./ChangePasswordDialog";
@@ -330,7 +330,7 @@ export default function ShellOverlay() {
 
       <Show when={isFullscreen() && !sessionTransition.visible()}>
         <div class="shell-overlay-keyboard-fab">
-          <KeyboardButton label={t("shell.toggleKeyboard")} />
+          <KeyboardButton />
         </div>
       </Show>
 
