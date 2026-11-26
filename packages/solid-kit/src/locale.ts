@@ -1,5 +1,4 @@
-import * as eden from "@edenapp/client";
-import { createSignal } from "solid-js";
+import { appI18n } from "@edenapp/babel/solid";
 import * as datetime from "./datetime/locales.js";
 
 /** Every string solid-kit components show, grouped by component. */
@@ -7,86 +6,76 @@ export interface SolidKitStrings {
   datetime: datetime.DateTimeStrings;
 }
 
-type DeepPartial<T> = {
+export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends string ? T[K] : DeepPartial<T[K]>;
 };
 
-/** Strings for a locale; any string left out falls back to English. */
-export type SolidKitStringsOverride = DeepPartial<SolidKitStrings>;
+/**
+ * The keys an app can put in its own locale files to replace solid-kit's
+ * strings, such as `solidKit.datetime.done`.
+ */
+export interface SolidKitTranslations {
+  solidKit?: DeepPartial<SolidKitStrings>;
+}
 
 const builtIn: Record<string, SolidKitStrings> = {
   en: { datetime: datetime.en },
   pl: { datetime: datetime.pl },
 };
 
-const [locale, setLocale] = createSignal("en");
-const [added, setAdded] = createSignal<Record<string, SolidKitStringsOverride>>(
-  {},
-);
-
-let following = false;
-/** Follow the system locale, once per window; outside Eden, stay on English. */
-function follow() {
-  if (following) return;
-  following = true;
-  const update = (event: { locale: string }) => setLocale(event.locale);
-  try {
-    eden.i18n.getLocale().then(update, () => {});
-    eden.i18n.subscribe("locale-changed", update).catch(() => {});
-  } catch {
-    // Not running in Eden.
-  }
-}
-
-/** The locale solid-kit components use: the system locale unless set. */
+/** The app's locale from `@edenapp/babel/solid`, or English without one. */
 export function solidKitLocale(): string {
-  follow();
-  return locale();
-}
-
-/** Use `value` in place of the system locale, such as an app's own choice. */
-export function setSolidKitLocale(value: string) {
-  follow();
-  setLocale(value);
+  return appI18n()?.locale() ?? "en";
 }
 
 /**
- * Adds or replaces strings for a locale, such as a language solid-kit does
- * not include. Strings already added for the locale are kept.
+ * The strings for the app's locale. Each one is the app's own translation
+ * under `solidKit.`, else solid-kit's for that locale or its language, else
+ * English. `override` replaces strings for one component.
  */
-export function addSolidKitStrings(
-  value: string,
-  strings: SolidKitStringsOverride,
-) {
-  setAdded((all) => ({ ...all, [value]: merge(all[value] ?? {}, strings) }));
-}
-
-function merge<T extends object>(base: T, over: object | undefined): T {
-  if (!over) return base;
-  const result: Record<string, unknown> = {
-    ...(base as Record<string, unknown>),
-  };
-  for (const [key, value] of Object.entries(over)) {
-    const current = result[key];
-    result[key] =
-      value &&
-      typeof value === "object" &&
-      current &&
-      typeof current === "object"
-        ? merge(current, value)
-        : value;
-  }
-  return result as T;
-}
-
-/** The strings for the current locale: "pl-PL" uses "pl", then English. */
-export function solidKitStrings(): SolidKitStrings {
+export function solidKitStrings<G extends keyof SolidKitStrings>(
+  group: G,
+  override?: DeepPartial<SolidKitStrings[G]>,
+): SolidKitStrings[G] {
+  const app = appI18n();
   const value = solidKitLocale();
-  const language = value.split("-")[0];
-  return [
-    builtIn[language],
-    builtIn[value],
-    added()[language],
-    added()[value],
-  ].reduce<SolidKitStrings>((all, over) => merge(all, over), builtIn.en);
+  const own = builtIn[value] ?? builtIn[value.split("-")[0]] ?? builtIn.en;
+  const resolve = (
+    english: object,
+    local: object | undefined,
+    over: object | undefined,
+    path: string,
+  ): object =>
+    Object.fromEntries(
+      Object.entries(english).map(([key, fallback]) => {
+        const localValue = (local as Record<string, unknown> | undefined)?.[
+          key
+        ];
+        const overValue = (over as Record<string, unknown> | undefined)?.[key];
+        if (typeof fallback === "object") {
+          return [
+            key,
+            resolve(
+              fallback,
+              localValue as object | undefined,
+              overValue as object | undefined,
+              `${path}.${key}`,
+            ),
+          ];
+        }
+        return [
+          key,
+          (overValue as string | undefined) ??
+            app?.find(`${path}.${key}`) ??
+            (localValue as string | undefined) ??
+            fallback,
+        ];
+      }),
+    );
+  return resolve(
+    builtIn.en[group],
+    own[group],
+    override,
+    `solidKit.${group}`,
+  ) as SolidKitStrings[G];
 }

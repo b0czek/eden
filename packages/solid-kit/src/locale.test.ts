@@ -1,34 +1,41 @@
-import { afterEach, describe, expect, it } from "vitest";
-import {
-  addSolidKitStrings,
-  setSolidKitLocale,
-  solidKitStrings,
-} from "./locale.js";
+import { setupI18n } from "@edenapp/babel/solid";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { solidKitStrings } from "./locale.js";
+
+const app = setupI18n({
+  resources: {
+    en: { translation: { solidKit: { datetime: { done: "Apply" } } } },
+    de: {
+      translation: {
+        solidKit: { datetime: { done: "Fertig", unit: { hour: "Stunde" } } },
+      },
+    },
+  },
+});
 
 describe("solid-kit strings", () => {
-  afterEach(() => setSolidKitLocale("en"));
+  afterEach(() => app.setLocale("en"));
 
-  it("uses a regional locale's language and English for unknown locales", () => {
-    setSolidKitLocale("pl-PL");
-    expect(solidKitStrings().datetime.done).toBe("Gotowe");
-    setSolidKitLocale("ja");
-    expect(solidKitStrings().datetime.done).toBe("Done");
+  it("prefers the app's translation, then solid-kit's, then English", async () => {
+    app.setLocale("de-AT");
+    await vi.waitFor(() =>
+      expect(solidKitStrings("datetime").done).toBe("Fertig"),
+    );
+    expect(solidKitStrings("datetime").unit.hour).toBe("Stunde");
+    expect(solidKitStrings("datetime").unit.day).toBe("Day");
+
+    // The app's English override is not used for Polish, which solid-kit has.
+    app.setLocale("pl-PL");
+    expect(solidKitStrings("datetime").done).toBe("Gotowe");
+    expect(solidKitStrings("datetime").unit.hour).toBe("Godzina");
   });
 
-  it("lets an app add a language, with English for strings it leaves out", () => {
-    addSolidKitStrings("de", { datetime: { done: "Fertig" } });
-    addSolidKitStrings("de", { datetime: { unit: { hour: "Stunde" } } });
-    setSolidKitLocale("de-AT");
-    const strings = solidKitStrings().datetime;
-    expect(strings.done).toBe("Fertig");
-    expect(strings.unit.hour).toBe("Stunde");
-    expect(strings.unit.day).toBe("Day");
-  });
-
-  it("lets an app replace a built-in string", () => {
-    addSolidKitStrings("pl", { datetime: { done: "OK" } });
-    setSolidKitLocale("pl");
-    expect(solidKitStrings().datetime.done).toBe("OK");
-    expect(solidKitStrings().datetime.unit.hour).toBe("Godzina");
+  it("lets a component's labels win over every translation", async () => {
+    await vi.waitFor(() =>
+      expect(solidKitStrings("datetime").done).toBe("Apply"),
+    );
+    expect(solidKitStrings("datetime", { done: "Use time" }).done).toBe(
+      "Use time",
+    );
   });
 });

@@ -1,7 +1,7 @@
+import { setupI18n } from "@edenapp/babel/solid";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setSolidKitLocale } from "../locale.js";
 import { DateTimeField, stepDateTime } from "./DateTimeField.js";
 
 function renderField(initial: Date, bounds: { min?: Date; max?: Date } = {}) {
@@ -18,6 +18,8 @@ function renderField(initial: Date, bounds: { min?: Date; max?: Date } = {}) {
   fireEvent.click(screen.getByLabelText("From"));
   return value;
 }
+
+const app = setupI18n({ resources: {} });
 
 describe("stepDateTime", () => {
   it("steps minutes onto whole steps, carries into the hour and drops seconds", () => {
@@ -39,7 +41,7 @@ describe("stepDateTime", () => {
 describe("DateTimeField", () => {
   afterEach(() => {
     cleanup();
-    setSolidKitLocale("en");
+    app.setLocale("en");
     vi.useRealTimers();
   });
 
@@ -62,10 +64,10 @@ describe("DateTimeField", () => {
     ).toBe(false);
   });
 
-  it("switches language with the solid-kit locale while open", () => {
+  it("switches language with the app's locale while open", () => {
     renderField(new Date(2026, 10, 25, 14, 0));
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
-    setSolidKitLocale("pl");
+    app.setLocale("pl");
     expect(screen.getByRole("button", { name: "Gotowe" })).toBeTruthy();
   });
 

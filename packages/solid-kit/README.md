@@ -154,26 +154,28 @@ Screen readers announce danger notices immediately and other notices politely.
 
 ## Language
 
-Components with their own text, such as `DateTimeField`, show it in English or
-Polish. They follow the system locale: no setup is needed. A regional locale
-such as `pl-PL` uses its language, and other locales use English.
+Components with their own text, such as `DateTimeField`, show it in the app's
+language. They use the locale of the app's `setupI18n` from
+`@edenapp/babel/solid` (see [Translate an app](../../docs/localizing-apps.md)).
+Without it, they show English.
 
-Add a language, or replace built-in strings, once at app start.
-Strings you leave out stay in English:
+Solid-kit includes English and Polish. A regional locale such as `pl-PL` uses
+its language. To add a language or change a string, put it under `solidKit` in
+the app's locale files. Strings the app leaves out use solid-kit's own, then
+English. `SolidKitTranslations` from `@edenapp/solid-kit/locale` lists the
+keys:
 
 ```ts
-import { addSolidKitStrings } from "@edenapp/solid-kit/locale";
-
-addSolidKitStrings("de", {
-  datetime: {
-    unit: { day: "Tag", hour: "Stunde", minute: "Minute" },
-    done: "Fertig",
+export const de = {
+  solidKit: {
+    datetime: { unit: { hour: "Stunde" }, done: "Fertig" },
   },
-});
+  notes: { welcome: "Willkommen" },
+} as const;
 ```
 
-`setSolidKitLocale(locale)` uses a different locale than the system's, such as
-an app's own language setting.
+To change a string on one component only, pass it in that component's
+`labels`, such as `labels={{ done: "Apply" }}` on `DateTimeField`.
 
 ## Date and time fields
 
@@ -195,7 +197,7 @@ import { t } from "./i18n";
 />
 ```
 
-The field formats its value for the [solid-kit locale](#language).
+The field formats its value for the [app's locale](#language).
 
 The field's styles are part of this entry point, not EdenCSS, so only apps that
 import it load them. The root `@edenapp/solid-kit` entry does not export it.
