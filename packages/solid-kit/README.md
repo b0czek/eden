@@ -2,6 +2,33 @@
 
 High-level SolidJS UI utilities for Eden renderer apps.
 
+## Language
+
+Solid-kit components have built-in text, such as the Cancel button of a dialog
+and the names of icon buttons. They show it in the app's language: the locale
+of the app's `setupI18n` from `@edenapp/babel/solid` (see
+[Translate an app](../../docs/localizing-apps.md)). Without it, they show
+English.
+
+Solid-kit includes English and Polish. A regional locale such as `pl-PL` uses
+its language. To add a language or change a string, put it under `solidKit` in
+the app's locale files. Strings the app leaves out use solid-kit's own, then
+English. `SolidKitTranslations` from `@edenapp/solid-kit/locale` lists the
+keys:
+
+```ts
+export const de = {
+  solidKit: {
+    dialogs: { cancel: "Abbrechen" },
+    notices: { showMore: "{count} weitere" },
+  },
+  notes: { welcome: "Willkommen" },
+} as const;
+```
+
+To change a string on one component only, pass it to that component, such as
+`cancelLabel` on a dialog or `labels` on `NoticeProvider`.
+
 ## Sidebars
 
 `@edenapp/solid-kit/sidebar` wraps EdenCSS sidebar classes with Solid components.
@@ -16,7 +43,6 @@ import { FiHome } from "solid-icons/fi";
   label="Navigation"
   heading="Places"
   size="compact"
-  toggleLabels={{ collapse: "Collapse sidebar", expand: "Expand sidebar" }}
 >
   <SidebarSection>
     <SidebarItem
@@ -30,7 +56,8 @@ import { FiHome } from "solid-icons/fi";
 </Sidebar>
 ```
 
-Pass localized labels from your app. Items retain their accessible names and
+Pass the sidebar and item labels from your app. The fold button has a
+[built-in name](#language); `toggleLabels` replaces it. Items retain their accessible names and
 tooltips when folded. `SidebarSection` accepts an optional `title`;
 `SidebarDivider` separates sections. `SidebarItem` supports `description`,
 `disabled`, and an optional `action` containing a `SidebarItemAction`. Action
@@ -101,18 +128,13 @@ started in the app, and for problems that the app observes. Use the toaster
 (`notification` from `@edenapp/tablets`) for failures that are not owned by
 one app.
 
-Wrap the app in `NoticeProvider` and pass localized labels:
+Wrap the app in `NoticeProvider`. Its buttons have
+[built-in text](#language); `labels` replaces any of it:
 
 ```tsx
 import { NoticeProvider, useNotices } from "@edenapp/solid-kit/notices";
 
-<NoticeProvider
-  labels={{
-    dismiss: t("common.dismiss"),
-    showMore: (hidden) => t("notices.showMore", { count: hidden }),
-    showLess: t("notices.showLess"),
-  }}
->
+<NoticeProvider>
   <App />
 </NoticeProvider>
 ```
@@ -152,31 +174,6 @@ dismiss button and clear when their condition is false or their owner is
 disposed. Three notices are visible at a time; a button shows the others.
 Screen readers announce danger notices immediately and other notices politely.
 
-## Language
-
-Components with their own text, such as `DateTimeField`, show it in the app's
-language. They use the locale of the app's `setupI18n` from
-`@edenapp/babel/solid` (see [Translate an app](../../docs/localizing-apps.md)).
-Without it, they show English.
-
-Solid-kit includes English and Polish. A regional locale such as `pl-PL` uses
-its language. To add a language or change a string, put it under `solidKit` in
-the app's locale files. Strings the app leaves out use solid-kit's own, then
-English. `SolidKitTranslations` from `@edenapp/solid-kit/locale` lists the
-keys:
-
-```ts
-export const de = {
-  solidKit: {
-    datetime: { unit: { hour: "Stunde" }, done: "Fertig" },
-  },
-  notes: { welcome: "Willkommen" },
-} as const;
-```
-
-To change a string on one component only, pass it in that component's
-`labels`, such as `labels={{ done: "Apply" }}` on `DateTimeField`.
-
 ## Date and time fields
 
 `@edenapp/solid-kit/datetime` lets the user choose a date and time by touch.
@@ -197,7 +194,9 @@ import { t } from "./i18n";
 />
 ```
 
-The field formats its value for the [app's locale](#language).
+The field formats its value and shows its text in the
+[app's language](#language). Its `labels` prop replaces any of its text on one
+field, such as `labels={{ done: "Apply" }}`.
 
 The field's styles are part of this entry point, not EdenCSS, so only apps that
 import it load them. The root `@edenapp/solid-kit` entry does not export it.

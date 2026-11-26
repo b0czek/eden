@@ -5,8 +5,8 @@ import { type NoticeLabels, NoticeRegion } from "./NoticeRegion.js";
 const NoticesContext = createContext<Notices>();
 
 export interface NoticeProviderProps {
-  /** Localized labels for the notice controls. */
-  labels: NoticeLabels;
+  /** Replaces the built-in text of the notice controls. */
+  labels?: Partial<NoticeLabels>;
   autoHideMs?: number;
   children: JSX.Element;
 }

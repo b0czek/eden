@@ -1,10 +1,8 @@
 import { appI18n } from "@edenapp/babel/solid";
-import * as datetime from "./datetime/locales.js";
+import { en, type SolidKitStrings } from "./locales/en.js";
+import { pl } from "./locales/pl.js";
 
-/** Every string solid-kit components show, grouped by component. */
-export interface SolidKitStrings {
-  datetime: datetime.DateTimeStrings;
-}
+export type { SolidKitStrings };
 
 export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends string ? T[K] : DeepPartial<T[K]>;
@@ -12,16 +10,13 @@ export type DeepPartial<T> = {
 
 /**
  * The keys an app can put in its own locale files to replace solid-kit's
- * strings, such as `solidKit.datetime.done`.
+ * strings, such as `solidKit.dialogs.cancel`.
  */
 export interface SolidKitTranslations {
   solidKit?: DeepPartial<SolidKitStrings>;
 }
 
-const builtIn: Record<string, SolidKitStrings> = {
-  en: { datetime: datetime.en },
-  pl: { datetime: datetime.pl },
-};
+const builtIn: Record<string, SolidKitStrings> = { en, pl };
 
 /** The app's locale from `@edenapp/babel/solid`, or English without one. */
 export function solidKitLocale(): string {
@@ -29,9 +24,10 @@ export function solidKitLocale(): string {
 }
 
 /**
- * The strings for the app's locale. Each one is the app's own translation
- * under `solidKit.`, else solid-kit's for that locale or its language, else
- * English. `override` replaces strings for one component.
+ * One component's strings for the app's locale. Each is the component's
+ * `override`, else the app's translation under `solidKit.`, else solid-kit's
+ * for that locale or its language, else English. Read it in a reactive scope
+ * to follow locale changes.
  */
 export function solidKitStrings<G extends keyof SolidKitStrings>(
   group: G,
@@ -39,7 +35,7 @@ export function solidKitStrings<G extends keyof SolidKitStrings>(
 ): SolidKitStrings[G] {
   const app = appI18n();
   const value = solidKitLocale();
-  const own = builtIn[value] ?? builtIn[value.split("-")[0]] ?? builtIn.en;
+  const own = builtIn[value] ?? builtIn[value.split("-")[0]] ?? en;
   const resolve = (
     english: object,
     local: object | undefined,
@@ -48,34 +44,42 @@ export function solidKitStrings<G extends keyof SolidKitStrings>(
   ): object =>
     Object.fromEntries(
       Object.entries(english).map(([key, fallback]) => {
-        const localValue = (local as Record<string, unknown> | undefined)?.[
-          key
-        ];
-        const overValue = (over as Record<string, unknown> | undefined)?.[key];
+        const at = (from: object | undefined) =>
+          (from as Record<string, unknown> | undefined)?.[key];
         if (typeof fallback === "object") {
           return [
             key,
             resolve(
               fallback,
-              localValue as object | undefined,
-              overValue as object | undefined,
+              at(local) as object | undefined,
+              at(over) as object | undefined,
               `${path}.${key}`,
             ),
           ];
         }
         return [
           key,
-          (overValue as string | undefined) ??
+          (at(over) as string | undefined) ??
             app?.find(`${path}.${key}`) ??
-            (localValue as string | undefined) ??
+            (at(local) as string | undefined) ??
             fallback,
         ];
       }),
     );
   return resolve(
-    builtIn.en[group],
+    en[group],
     own[group],
     override,
     `solidKit.${group}`,
   ) as SolidKitStrings[G];
+}
+
+/** `template` with each `{name}` replaced by its value. */
+export function fillString(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in values ? String(values[name]) : match,
+  );
 }

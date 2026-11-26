@@ -210,7 +210,7 @@ export const createDialogs = (): DialogController => {
           class="eden-btn eden-btn-primary"
           onClick={() => ctx.submit()}
         >
-          {options.okLabel ?? "OK"}
+          {options.okLabel ?? solidKitStrings("dialogs").ok}
         </button>
       ),
     });
@@ -234,7 +234,7 @@ export const createDialogs = (): DialogController => {
       footer: (ctx) => (
         <>
           <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
-            {options.cancelLabel ?? "Cancel"}
+            {options.cancelLabel ?? solidKitStrings("dialogs").cancel}
           </button>
           <button
             type="button"
@@ -242,7 +242,7 @@ export const createDialogs = (): DialogController => {
             class={confirmButtonClass(tone)}
             onClick={() => ctx.submit(true)}
           >
-            {options.confirmLabel ?? "OK"}
+            {options.confirmLabel ?? solidKitStrings("dialogs").ok}
           </button>
         </>
       ),
@@ -287,7 +287,7 @@ export const createDialogs = (): DialogController => {
       footer: (ctx) => (
         <>
           <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
-            {options.cancelLabel ?? "Cancel"}
+            {options.cancelLabel ?? solidKitStrings("dialogs").cancel}
           </button>
           <button
             type="button"
@@ -295,7 +295,7 @@ export const createDialogs = (): DialogController => {
             class={confirmButtonClass(tone)}
             onClick={() => ctx.submit()}
           >
-            {options.confirmLabel ?? "OK"}
+            {options.confirmLabel ?? solidKitStrings("dialogs").ok}
           </button>
         </>
       ),
@@ -452,7 +452,7 @@ export const createDialogs = (): DialogController => {
       footer: (ctx) => (
         <>
           <button type="button" class="eden-btn" onClick={() => ctx.cancel()}>
-            {options.cancelLabel ?? "Cancel"}
+            {options.cancelLabel ?? solidKitStrings("dialogs").cancel}
           </button>
           <button
             type="button"
@@ -461,7 +461,7 @@ export const createDialogs = (): DialogController => {
             disabled={!ctx.canSubmit()}
             onClick={() => ctx.submit()}
           >
-            {options.confirmLabel ?? "OK"}
+            {options.confirmLabel ?? solidKitStrings("dialogs").ok}
           </button>
         </>
       ),
@@ -490,3 +490,5 @@ export type {
   DialogFormValues,
   FormDialogOptions,
 } from "./types.js";
+
+import { solidKitStrings } from "../locale.js";

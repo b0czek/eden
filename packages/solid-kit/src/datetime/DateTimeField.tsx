@@ -7,10 +7,10 @@ import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import "./DateTimeField.css";
 import {
   type DeepPartial,
+  type SolidKitStrings,
   solidKitLocale,
   solidKitStrings,
 } from "../locale.js";
-import type { DateTimeStrings } from "./locales.js";
 
 export type DateTimeUnit = "day" | "hour" | "minute";
 
@@ -26,7 +26,7 @@ export interface DateTimeFieldProps {
   /** Minutes moved by one minute step. Defaults to 5. */
   minuteStep?: number;
   /** Replaces the field's built-in strings, such as `{ done: "Apply" }`. */
-  labels?: DeepPartial<DateTimeStrings>;
+  labels?: DeepPartial<SolidKitStrings["datetime"]>;
   class?: string;
 }
 

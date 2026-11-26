@@ -1,3 +1,4 @@
+import { setupI18n } from "@edenapp/babel/solid";
 import {
   cleanup,
   fireEvent,
@@ -16,8 +17,13 @@ const labels = {
   showLess: "Show less",
 };
 
+const app = setupI18n({ resources: {} });
+
 describe("NoticeProvider", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    app.setLocale("en");
+  });
 
   it("announces danger as an alert and others politely, lets the user dismiss them, and hides extra notices", () => {
     function Reporter() {
@@ -94,5 +100,27 @@ describe("NoticeProvider", () => {
 
     expect(screen.getByRole("status").textContent).toContain("offline");
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
+  });
+
+  it("labels its controls in the app's language without labels", () => {
+    app.setLocale("pl");
+    function Reporter() {
+      const notices = useNotices();
+      onMount(() => {
+        for (const title of ["a", "b", "c", "d"]) {
+          notices.report({ severity: "warning", title });
+        }
+      });
+      return null;
+    }
+
+    render(() => (
+      <NoticeProvider>
+        <Reporter />
+      </NoticeProvider>
+    ));
+
+    expect(screen.getByRole("button", { name: "Więcej: 1" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Zamknij" })).toHaveLength(3);
   });
 });
