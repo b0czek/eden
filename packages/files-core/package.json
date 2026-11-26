@@ -1,6 +1,6 @@
 {
   "name": "@edenapp/files-core",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "Reusable file explorer primitives for Eden apps",
   "private": true,
   "type": "module",

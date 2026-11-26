@@ -1,5 +1,11 @@
 # com.eden.context-menu
 
+## 0.17.2
+
+### Patch Changes
+
+- @edenapp/client@0.17.2
+
 ## 0.17.1
 
 ### Patch Changes

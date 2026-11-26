@@ -1,5 +1,13 @@
 # @edenapp/solid-kit
 
+## 0.17.2
+
+### Patch Changes
+
+- c7083df: `DateTimeField` type-checks in apps that enable `noImplicitReturns`.
+  - @edenapp/babel@0.17.2
+  - @edenapp/client@0.17.2
+
 ## 0.17.1
 
 ### Patch Changes

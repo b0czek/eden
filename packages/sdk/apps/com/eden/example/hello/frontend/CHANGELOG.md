@@ -1,5 +1,7 @@
 # com.eden.example.hello-frontend
 
+## 0.17.2
+
 ## 0.17.1
 
 ## 0.17.0

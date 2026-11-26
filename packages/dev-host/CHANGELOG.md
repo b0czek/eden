@@ -1,5 +1,11 @@
 # @edenapp/dev-host
 
+## 0.17.2
+
+### Patch Changes
+
+- @edenapp/sdk@0.17.2
+
 ## 0.17.1
 
 ### Patch Changes
