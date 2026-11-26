@@ -3,16 +3,11 @@ import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DateTimeField, stepDateTime } from "./DateTimeField.js";
 
-const labels = {
-  day: "Day",
-  hour: "Hour",
-  minute: "Minute",
-  decrease: (unit: string) => `Earlier ${unit}`,
-  increase: (unit: string) => `Later ${unit}`,
-  done: "Done",
-};
-
-function renderField(initial: Date, bounds: { min?: Date; max?: Date } = {}) {
+function renderField(
+  initial: Date,
+  bounds: { min?: Date; max?: Date } = {},
+  locale = "en-GB",
+) {
   const [value, setValue] = createSignal<Date | undefined>(initial);
   render(() => (
     <DateTimeField
@@ -20,8 +15,7 @@ function renderField(initial: Date, bounds: { min?: Date; max?: Date } = {}) {
       value={value()}
       onChange={setValue}
       placeholder="Any time"
-      locale="en-GB"
-      labels={labels}
+      locale={locale}
       {...bounds}
     />
   ));
@@ -56,25 +50,35 @@ describe("DateTimeField", () => {
     const min = new Date(2026, 10, 25, 14, 0);
     const value = renderField(new Date(2026, 10, 25, 14, 30), { min });
 
-    fireEvent.click(screen.getByRole("button", { name: "Earlier Day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Earlier day" }));
     expect(value()).toEqual(min);
     expect(
       (
         screen.getByRole("button", {
-          name: "Earlier Hour",
+          name: "Earlier hour",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(
-      (screen.getByRole("button", { name: "Later Hour" }) as HTMLButtonElement)
+      (screen.getByRole("button", { name: "Later hour" }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
+  });
+
+  it("speaks the app's locale and falls back to English for others", () => {
+    renderField(new Date(2026, 10, 25, 14, 0), {}, "pl");
+    expect(screen.getByRole("button", { name: "Gotowe" })).toBeTruthy();
+    expect(screen.getByText("Godzina")).toBeTruthy();
+    cleanup();
+
+    renderField(new Date(2026, 10, 25, 14, 0), {}, "de");
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
   });
 
   it("steps once per tap and repeats while held", () => {
     vi.useFakeTimers();
     const value = renderField(new Date(2026, 10, 25, 14, 0));
-    const later = screen.getByRole("button", { name: "Later Minute" });
+    const later = screen.getByRole("button", { name: "Later minute" });
 
     // A tap fires pointerdown, pointerup and click: one step.
     fireEvent.pointerDown(later);

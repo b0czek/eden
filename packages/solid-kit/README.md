@@ -161,6 +161,7 @@ day, hour, and minute. Hold a stepper to repeat it. Minutes move in steps of
 
 ```tsx
 import { DateTimeField } from "@edenapp/solid-kit/datetime";
+import { locale, t } from "./i18n";
 
 <DateTimeField
   label={t("logs.from")}
@@ -169,16 +170,11 @@ import { DateTimeField } from "@edenapp/solid-kit/datetime";
   placeholder={t("logs.anyTime")}
   max={new Date()}
   locale={locale()}
-  labels={{
-    day: t("time.day"),
-    hour: t("time.hour"),
-    minute: t("time.minute"),
-    decrease: (unit) => t("time.earlier", { unit }),
-    increase: (unit) => t("time.later", { unit }),
-    done: t("common.done"),
-  }}
 />
 ```
+
+Pass the app's Eden locale from `@edenapp/babel/solid`. The field formats its
+value for that locale and has its own strings for each Eden locale.
 
 The field's styles are part of this entry point, not EdenCSS, so only apps that
 import it load them. The root `@edenapp/solid-kit` entry does not export it.

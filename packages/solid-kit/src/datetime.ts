@@ -1,6 +1,5 @@
 export {
   DateTimeField,
-  type DateTimeFieldLabels,
   type DateTimeFieldProps,
   type DateTimeUnit,
   stepDateTime,

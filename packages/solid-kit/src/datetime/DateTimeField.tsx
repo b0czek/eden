@@ -5,19 +5,9 @@ import {
 } from "solid-icons/bi";
 import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import "./DateTimeField.css";
+import { dateTimeStrings } from "./locales.js";
 
 export type DateTimeUnit = "day" | "hour" | "minute";
-
-export interface DateTimeFieldLabels {
-  day: string;
-  hour: string;
-  minute: string;
-  /** Names the button that moves `unit` back, such as "Earlier hour". */
-  decrease: (unit: string) => string;
-  /** Names the button that moves `unit` forward, such as "Later hour". */
-  increase: (unit: string) => string;
-  done: string;
-}
 
 export interface DateTimeFieldProps {
   /** Names the field, such as "From". */
@@ -30,9 +20,11 @@ export interface DateTimeFieldProps {
   max?: Date;
   /** Minutes moved by one minute step. Defaults to 5. */
   minuteStep?: number;
-  /** Formats dates and times; defaults to the runtime's locale. */
-  locale?: string;
-  labels: DateTimeFieldLabels;
+  /**
+   * The app's Eden locale, such as `locale()` from `@edenapp/babel/solid`.
+   * It formats the value and picks the field's own strings.
+   */
+  locale: string;
   class?: string;
 }
 
@@ -72,6 +64,7 @@ export function stepDateTime(
  */
 export function DateTimeField(props: DateTimeFieldProps) {
   const [open, setOpen] = createSignal(false);
+  const strings = () => dateTimeStrings(props.locale);
   const id = `eden-datetime-${createUniqueId()}`;
   const format = (options: Intl.DateTimeFormatOptions, time: Date) =>
     new Intl.DateTimeFormat(props.locale, options).format(time);
@@ -118,10 +111,7 @@ export function DateTimeField(props: DateTimeFieldProps) {
       props.onChange(step(unit, direction));
     };
     onCleanup(stop);
-    const name = () =>
-      (direction > 0 ? props.labels.increase : props.labels.decrease)(
-        props.labels[unit],
-      );
+    const name = () => strings()[direction > 0 ? "later" : "earlier"][unit];
     return (
       <button
         type="button"
@@ -187,7 +177,7 @@ export function DateTimeField(props: DateTimeFieldProps) {
             {(unit) => (
               <div class="eden-datetime-step">
                 <span class="eden-datetime-step-name">
-                  {props.labels[unit]}
+                  {strings().unit[unit]}
                 </span>
                 {stepper(unit, -1)}
                 <output class="eden-datetime-step-value">
@@ -202,7 +192,7 @@ export function DateTimeField(props: DateTimeFieldProps) {
             class="eden-btn eden-btn-primary eden-datetime-done"
             onClick={() => setOpen(false)}
           >
-            {props.labels.done}
+            {strings().done}
           </button>
         </div>
       </Show>
