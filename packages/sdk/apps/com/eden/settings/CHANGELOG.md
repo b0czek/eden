@@ -1,5 +1,13 @@
 # com.eden.settings
 
+## 0.17.1
+
+### Patch Changes
+
+- Updated dependencies [c92c8a3]
+  - @edenapp/solid-kit@0.17.1
+  - @edenapp/client@0.17.1
+
 ## 0.17.0
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @edenapp/solid-kit
 
+## 0.17.1
+
+### Patch Changes
+
+- c92c8a3: `DateTimeField` opens its steppers in a floating panel under the field, or above it when there is no room, instead of pushing the content below it down. A tap outside, Escape, scrolling, or resizing closes it, and inside another panel these do not close that panel too.
+  - @edenapp/babel@0.17.1
+  - @edenapp/client@0.17.1
+
 ## 0.17.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @edenapp/babel
 
+## 0.17.1
+
+### Patch Changes
+
+- @edenapp/client@0.17.1
+
 ## 0.17.0
 
 ### Minor Changes
