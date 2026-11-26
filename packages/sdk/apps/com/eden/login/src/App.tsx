@@ -197,7 +197,7 @@ const App = () => {
                 {t("login.subtitle")}
               </p>
             </div>
-            <KeyboardButton label={t("login.toggleKeyboard")} />
+            <KeyboardButton />
           </header>
 
           <Show

@@ -2,9 +2,9 @@ import type { EdenKeyboardState } from "@edenapp/types";
 import { BiSolidKeyboard } from "solid-icons/bi";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import "./KeyboardButton.css";
+import { solidKitStrings } from "./locale.js";
 
 export interface KeyboardButtonProps {
-  label: string;
   class?: string;
 }
 
@@ -18,6 +18,7 @@ const defaultKeyboardState: EdenKeyboardState = {
 };
 
 export function KeyboardButton(props: KeyboardButtonProps) {
+  const label = () => solidKitStrings("keyboard").toggle;
   const [keyboardState, setKeyboardState] =
     createSignal<EdenKeyboardState>(defaultKeyboardState);
   let keyboardVisibleAtPointerDown: boolean | null = null;
@@ -70,8 +71,8 @@ export function KeyboardButton(props: KeyboardButtonProps) {
         classList={{ active: keyboardState().visible }}
         onClick={() => void handleToggle()}
         onPointerDown={handlePointerDown}
-        title={props.label}
-        aria-label={props.label}
+        title={label()}
+        aria-label={label()}
       >
         <BiSolidKeyboard />
       </button>

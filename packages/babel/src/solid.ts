@@ -22,6 +22,19 @@ export interface EdenI18nHandle<T = Record<string, void>> {
   locale: Accessor<string>;
   setLocale: Setter<string>;
   initLocale: () => Promise<void>;
+  /**
+   * The app's own translation of `key` for the current locale or its
+   * language, without falling back to another language; undefined if the app
+   * has none. Lets shared components prefer the app's strings to their own.
+   */
+  find: (key: string, args?: Record<string, unknown>) => string | undefined;
+}
+
+let current: EdenI18nHandle<object> | undefined;
+
+/** The handle of the app running in this window, once it set one up. */
+export function appI18n(): EdenI18nHandle<object> | undefined {
+  return current;
 }
 
 /**
@@ -91,7 +104,21 @@ export function setupI18n<T extends object = Record<string, void>>(
       }
     };
 
-    return { t, locale, setLocale, initLocale };
+    const find = (key: string, args?: Record<string, unknown>) => {
+      const instance = i18nInstance();
+      if (!instance) return undefined;
+      const value = locale();
+      const lng = [value, value.split("-")[0]].find(
+        (candidate) =>
+          typeof instance.getResource(candidate, "translation", key) ===
+          "string",
+      );
+      return lng ? instance.t(key, { lng, ...args }) : undefined;
+    };
+
+    const handle = { t, locale, setLocale, initLocale, find };
+    current = handle as EdenI18nHandle<object>;
+    return handle;
   });
 }
 

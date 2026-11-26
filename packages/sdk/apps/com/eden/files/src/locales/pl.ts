@@ -50,8 +50,6 @@ export const pl = {
       teal: "Turkusowy",
       pink: "Różowy",
     },
-    collapseSidebar: "Zwiń pasek boczny",
-    expandSidebar: "Rozwiń pasek boczny",
     places: "Miejsca",
     driveActions: "Opcje dysku {name}",
     eject: "Bezpiecznie usuń dysk",

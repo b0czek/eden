@@ -8,16 +8,8 @@ import {
 } from "solid-icons/fi";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import { fillString, solidKitStrings } from "../locale.js";
 import type { Notice, NoticeSeverity, Notices } from "./createNotices.js";
-
-export interface NoticeLabels {
-  /** Accessible name of the dismiss button. */
-  dismiss: string;
-  /** Text of the button that shows the hidden notices. */
-  showMore: (hidden: number) => string;
-  /** Text of the button that collapses the list again. */
-  showLess: string;
-}
 
 export const NOTICE_MAX_VISIBLE = 3;
 
@@ -30,7 +22,7 @@ const severityIcons: Record<NoticeSeverity, IconTypes> = {
 
 function NoticeItem(props: {
   notice: Notice;
-  labels: NoticeLabels;
+  dismiss: string;
   onDismiss: (id: string) => void;
 }) {
   // Most screen readers announce an alert inserted into the page. Other
@@ -60,8 +52,8 @@ function NoticeItem(props: {
         <button
           type="button"
           class="eden-btn eden-btn-ghost eden-btn-sm eden-btn-square eden-notice-dismiss"
-          aria-label={props.labels.dismiss}
-          title={props.labels.dismiss}
+          aria-label={props.dismiss}
+          title={props.dismiss}
           onClick={() => props.onDismiss(props.notice.id)}
         >
           <FiX size={16} aria-hidden="true" />
@@ -71,11 +63,12 @@ function NoticeItem(props: {
   );
 }
 
-export function NoticeRegion(props: {
-  notices: Notices;
-  labels: NoticeLabels;
-}) {
+export function NoticeRegion(props: { notices: Notices }) {
   const [expanded, setExpanded] = createSignal(false);
+  const text = () => solidKitStrings("notices");
+  const dismiss = () => text().dismiss;
+  const showMore = (hidden: number) =>
+    fillString(text().showMore, { count: hidden });
   const list = () => props.notices.list();
   const visible = () =>
     expanded() ? list() : list().slice(0, NOTICE_MAX_VISIBLE);
@@ -102,7 +95,7 @@ export function NoticeRegion(props: {
               {(notice) => (
                 <NoticeItem
                   notice={notice()}
-                  labels={props.labels}
+                  dismiss={dismiss()}
                   onDismiss={props.notices.dismiss}
                 />
               )}
@@ -117,7 +110,7 @@ export function NoticeRegion(props: {
           aria-expanded={expanded()}
           onClick={() => setExpanded(!expanded())}
         >
-          {expanded() ? props.labels.showLess : props.labels.showMore(hidden())}
+          {expanded() ? text().showLess : showMore(hidden())}
         </button>
       </Show>
     </div>

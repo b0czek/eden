@@ -50,8 +50,6 @@ export const en = {
       teal: "Teal",
       pink: "Pink",
     },
-    collapseSidebar: "Collapse sidebar",
-    expandSidebar: "Expand sidebar",
     places: "Places",
     driveActions: "Actions for {name}",
     eject: "Safely remove drive",

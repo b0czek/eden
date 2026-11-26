@@ -100,10 +100,6 @@ export function FilePlaces(props: FilePlacesProps) {
       label={t("files.places")}
       heading={t("files.places")}
       footer={props.footer}
-      toggleLabels={{
-        collapse: t("files.collapseSidebar"),
-        expand: t("files.expandSidebar"),
-      }}
     >
       <SidebarSection>
         <For each={props.volumes}>

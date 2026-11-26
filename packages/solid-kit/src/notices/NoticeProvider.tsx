@@ -1,12 +1,10 @@
 import { createContext, type JSX, useContext } from "solid-js";
 import { createNotices, type Notices } from "./createNotices.js";
-import { type NoticeLabels, NoticeRegion } from "./NoticeRegion.js";
+import { NoticeRegion } from "./NoticeRegion.js";
 
 const NoticesContext = createContext<Notices>();
 
 export interface NoticeProviderProps {
-  /** Localized labels for the notice controls. */
-  labels: NoticeLabels;
   autoHideMs?: number;
   children: JSX.Element;
 }
@@ -17,7 +15,7 @@ export function NoticeProvider(props: NoticeProviderProps) {
   return (
     <NoticesContext.Provider value={notices}>
       {props.children}
-      <NoticeRegion notices={notices} labels={props.labels} />
+      <NoticeRegion notices={notices} />
     </NoticesContext.Provider>
   );
 }
