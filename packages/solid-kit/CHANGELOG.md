@@ -1,5 +1,18 @@
 # @edenapp/solid-kit
 
+## 0.17.0
+
+### Minor Changes
+
+- 1bef4f3: Apps can let the user choose a date and time by touch with `DateTimeField` from `@edenapp/solid-kit/datetime`: steppers for the day, hour, and minute that repeat while held and stay within the given bounds, labelled in the app's language.
+- 7f39f4c: Solid-kit components show their built-in text in the app's `@edenapp/babel` language, with English and Polish included. Apps add languages or change strings under `solidKit` in their own locale files. Dialogs no longer default to English buttons. `NoticeProvider` no longer takes `labels`, `Sidebar` no longer takes `toggleLabels`, and `KeyboardButton` no longer takes `label`.
+
+### Patch Changes
+
+- Updated dependencies [7f39f4c]
+  - @edenapp/babel@0.17.0
+  - @edenapp/client@0.17.0
+
 ## 0.16.0
 
 ### Minor Changes

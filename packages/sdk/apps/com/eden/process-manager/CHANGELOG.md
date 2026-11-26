@@ -1,5 +1,13 @@
 # com.eden.process-manager
 
+## 0.17.0
+
+### Patch Changes
+
+- Updated dependencies [7f39f4c]
+  - @edenapp/babel@0.17.0
+  - @edenapp/client@0.17.0
+
 ## 0.16.0
 
 ### Patch Changes
