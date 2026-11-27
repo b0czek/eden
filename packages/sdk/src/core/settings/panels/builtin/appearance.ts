@@ -27,6 +27,11 @@ export const appearanceSettingsCategory = {
       },
       defaultValue: '{"type":"preset","id":"eden-default"}',
     },
+    {
+      key: "appearance.theme",
+      label: { en: "Theme", pl: "Motyw" },
+      type: "text",
+    },
   ],
 } satisfies SettingsCategory;
 
@@ -53,6 +58,11 @@ export const appearancePanel: BuiltinPanelModule = {
           yield* appearance.setWallpaper(input);
         }),
     },
+    "set-theme": {
+      value: { type: "string", required: true },
+      handler: ({ appearance }, invocation) =>
+        appearance.setTheme(invocation.value as string),
+    },
   },
   createLoader:
     ({ appearance }) =>
@@ -61,6 +71,8 @@ export const appearancePanel: BuiltinPanelModule = {
         data: cloneRendererValue({
           presets: appearance.getPresets(),
           wallpaper: appearance.getWallpaper(),
+          theme: appearance.getState().theme.id,
+          themes: appearance.getThemes(),
         }) as unknown as SettingsPanelValue,
       })),
 };

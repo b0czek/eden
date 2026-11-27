@@ -50,3 +50,4 @@ Documentation must describe supported workflows and useful behavior. Do not docu
 - [Adding Settings](docs/settings.md)
 - [Processes and Daemons](docs/processes-and-daemons.md)
 - [Localizing Apps](docs/localizing-apps.md)
+- [Themes](docs/themes.md)

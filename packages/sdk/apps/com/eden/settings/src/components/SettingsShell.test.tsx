@@ -122,6 +122,15 @@ describe("Settings shell", () => {
           type: "color",
           value: "#000000",
         },
+        theme: "eden-dark",
+        themes: [
+          {
+            id: "eden-dark",
+            name: "Eden Dark",
+            colorScheme: "dark",
+            colors: {},
+          },
+        ],
       },
     };
     const view = render(() => (

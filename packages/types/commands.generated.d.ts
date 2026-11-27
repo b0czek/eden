@@ -62,15 +62,30 @@ export interface AppbusCommands {
  * AppearanceCommands - Commands for the "appearance" namespace
  */
 export interface AppearanceCommands {
+  "appearance/get-appearance": {
+    mode: "result";
+    args: Record<string, never>;
+    response: import("./index").AppearanceState;
+  };
   "appearance/get-presets": {
     mode: "result";
     args: Record<string, never>;
     response: { solid: import("./index").WallpaperPreset[]; gradients: import("./index").WallpaperPreset[]; };
   };
+  "appearance/get-themes": {
+    mode: "result";
+    args: Record<string, never>;
+    response: { themes: import("./index").EdenTheme[]; };
+  };
   "appearance/get-wallpaper": {
     mode: "result";
     args: Record<string, never>;
     response: { wallpaper: import("./index").WallpaperPreset; };
+  };
+  "appearance/set-theme": {
+    mode: "result";
+    args: { themeId: string; };
+    response: void;
   };
   "appearance/set-wallpaper": {
     mode: "result";

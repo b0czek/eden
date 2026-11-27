@@ -25,31 +25,35 @@
 
 /* ===== Badge Variants ===== */
 .eden-badge-primary {
-  background: rgba(74, 158, 255, 0.2);
+  background: color-mix(
+    in srgb,
+    var(--eden-color-accent-primary) 20%,
+    transparent
+  );
   border-color: var(--eden-color-accent-primary);
   color: var(--eden-color-accent-primary);
 }
 
 .eden-badge-success {
-  background: rgba(81, 207, 102, 0.2);
+  background: color-mix(in srgb, var(--eden-color-success) 20%, transparent);
   border-color: var(--eden-color-success);
   color: var(--eden-color-success);
 }
 
 .eden-badge-danger {
-  background: rgba(255, 59, 48, 0.2);
+  background: color-mix(in srgb, var(--eden-color-danger) 20%, transparent);
   border-color: var(--eden-color-danger);
   color: var(--eden-color-danger);
 }
 
 .eden-badge-warning {
-  background: rgba(255, 217, 61, 0.2);
+  background: color-mix(in srgb, var(--eden-color-warning) 20%, transparent);
   border-color: var(--eden-color-warning);
   color: var(--eden-color-warning);
 }
 
 .eden-badge-info {
-  background: rgba(77, 171, 247, 0.2);
+  background: color-mix(in srgb, var(--eden-color-info) 20%, transparent);
   border-color: var(--eden-color-info);
   color: var(--eden-color-info);
 }

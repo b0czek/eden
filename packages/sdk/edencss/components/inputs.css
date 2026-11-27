@@ -40,7 +40,8 @@
 .eden-input:focus {
   border-color: var(--eden-color-accent-primary);
   background: var(--eden-color-bg-glass-strong);
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--eden-color-accent-primary) 15%, transparent);
 }
 
 .eden-input:disabled {
@@ -95,7 +96,8 @@
 .eden-textarea:focus {
   border-color: var(--eden-color-accent-primary);
   background: var(--eden-color-bg-glass-strong);
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--eden-color-accent-primary) 15%, transparent);
 }
 
 /* ===== Select ===== */
@@ -131,7 +133,8 @@
 
 .eden-select:focus {
   border-color: var(--eden-color-accent-primary);
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--eden-color-accent-primary) 15%, transparent);
 }
 
 .eden-select::picker-icon {

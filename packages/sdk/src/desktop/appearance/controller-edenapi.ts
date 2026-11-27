@@ -17,7 +17,21 @@ export function createAppearanceController(appearance: Appearance) {
       "get-presets": command({
         handle: () => appearance.getPresets(),
       }),
+      "get-appearance": command({
+        handle: () => appearance.getState(),
+      }),
+      "get-themes": command({
+        handle: () => ({ themes: appearance.getThemes() }),
+      }),
+      "set-theme": command({
+        input: v.object({ themeId: v.string() }),
+        permission: "manage",
+        handle: ({ themeId }) => appearance.setTheme(themeId),
+      }),
     },
-    events: { "wallpaper-changed": appearance.wallpaperChanged },
+    events: {
+      "wallpaper-changed": appearance.wallpaperChanged,
+      "appearance-changed": appearance.appearanceChanged,
+    },
   });
 }

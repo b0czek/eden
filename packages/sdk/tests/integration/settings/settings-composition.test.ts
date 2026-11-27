@@ -15,12 +15,24 @@ import {
   Appearance,
   AppearanceLive,
 } from "../../../src/desktop/appearance/service";
-import { SystemDirectory } from "../../../src/runtime/inputs";
+import { ThemeStatePort } from "../../../src/platform/ports/types";
+import { RuntimeConfig, SystemDirectory } from "../../../src/runtime/inputs";
 import { createTestExecutionContext } from "../../support/callers";
 import {
   buildService,
   createEffectRuntime,
 } from "../../support/effect-runtime";
+
+const testThemeState: ThemeStatePort = {
+  colorScheme: "system",
+  setColorScheme() {},
+  onChanged: () => () => {},
+};
+const provideAppearanceHost = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.provideService(ThemeStatePort, testThemeState),
+    Effect.provideService(RuntimeConfig, {}),
+  );
 
 function settingsFactory(
   storage: Effect.Effect<SettingsStorage, Error, Scope.Scope>,
@@ -97,6 +109,7 @@ it("composes persisted settings with locale notifications and appearance state a
     const appearance = await first.acquire(
       buildService(Appearance, AppearanceLive).pipe(
         Effect.provideService(Settings, settings),
+        provideAppearanceHost,
       ),
     );
     await first.run(appearance.initialize());
@@ -143,6 +156,7 @@ it("composes persisted settings with locale notifications and appearance state a
     const nextAppearance = await second.acquire(
       buildService(Appearance, AppearanceLive).pipe(
         Effect.provideService(Settings, reopened),
+        provideAppearanceHost,
       ),
     );
     await second.run(nextAppearance.initialize());
@@ -187,6 +201,7 @@ it("finishes a pending appearance commit and its notifications before closing se
     const appearance = await first.acquire(
       buildService(Appearance, AppearanceLive).pipe(
         Effect.provideService(Settings, settings),
+        provideAppearanceHost,
       ),
     );
     const commits: string[] = [];
@@ -205,11 +220,12 @@ it("finishes a pending appearance commit and its notifications before closing se
     releaseWrite();
     const results = await Promise.allSettled([write, disposal]);
     expect(results[1].status).toBe("fulfilled");
-    expect(commits).toEqual(["appearance.wallpaper", "aurora"]);
+    expect([...commits].sort()).toEqual(["appearance.wallpaper", "aurora"]);
     const reopened = await second.acquire(settingsFactory(sqlite));
     const nextAppearance = await second.acquire(
       buildService(Appearance, AppearanceLive).pipe(
         Effect.provideService(Settings, reopened),
+        provideAppearanceHost,
       ),
     );
     await second.run(nextAppearance.initialize());

@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Scope from "effect/Scope";
 import type { Autostart } from "../applications/autostart/service";
 import type { IpcTransport } from "../core/ipc/transport";
+import type { Appearance } from "../desktop/appearance/service";
 import type { Branding } from "../desktop/branding/service";
 import type { Keyboard } from "../desktop/keyboard/service";
 import type { Views } from "../desktop/views/service";
@@ -15,6 +16,7 @@ export const createFoundationWindow = Effect.fn(function* ({
   paths,
   platform,
   branding,
+  appearance,
   views,
   ipc,
   keyboard,
@@ -24,6 +26,7 @@ export const createFoundationWindow = Effect.fn(function* ({
   paths: { distPath: string };
   platform: EdenPlatform;
   branding: Branding;
+  appearance: Appearance;
   views: Views;
   ipc: IpcTransport;
   keyboard: Keyboard;
@@ -54,7 +57,8 @@ export const createFoundationWindow = Effect.fn(function* ({
               ),
               additionalArguments: [`--window-title=${title}`],
             },
-            backgroundColor: windowConfig.backgroundColor || "#1e1e1e",
+            backgroundColor:
+              windowConfig.backgroundColor || appearance.getBackgroundColor(),
             autoHideMenuBar: true,
             show: false,
           }),

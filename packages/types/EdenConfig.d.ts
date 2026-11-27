@@ -1,3 +1,5 @@
+import type { EdenAppearanceConfig } from "./Appearance";
+
 /**
  * Tiling Configuration
  *
@@ -82,6 +84,8 @@ export interface EdenConfig {
    */
   seedPath?: string;
   branding?: EdenBrandingConfig;
+  /** Themes offered in Settings. See docs/themes.md. */
+  appearance?: EdenAppearanceConfig;
   window?: {
     width?: number;
     height?: number;

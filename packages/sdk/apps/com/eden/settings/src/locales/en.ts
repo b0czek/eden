@@ -76,6 +76,9 @@ export const en = {
       },
     },
     appearance: {
+      light: "Light",
+      dark: "Dark",
+      theme: "Theme",
       wallpaper: "Wallpaper",
       solidColors: "Solid Colors",
       gradients: "Gradients",

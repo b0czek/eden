@@ -1,6 +1,7 @@
 import type { FilesystemLocation } from "./Filesystem";
 
 export * from "./AppAssociation";
+export * from "./Appearance";
 export * from "./AppManifest";
 export * from "./Branding";
 export * from "./EdenConfig";

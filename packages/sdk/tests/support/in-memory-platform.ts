@@ -119,7 +119,7 @@ class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
 
   async loadURL(url: string): Promise<void> {
     this.effects.push({ type: "url-loaded", webContentsId: this.id, url });
-    queueMicrotask(() => this.emit("did-finish-load"));
+    this.startDocument();
   }
 
   async loadFile(filePath: string): Promise<void> {
@@ -128,11 +128,31 @@ class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
       webContentsId: this.id,
       filePath,
     });
+    this.startDocument();
+  }
+
+  /** A new document discards the stylesheets of the previous one. */
+  private startDocument() {
+    this.emit("did-start-navigation", {
+      isMainFrame: true,
+      isSameDocument: false,
+    });
+    this.insertedCSS.clear();
     queueMicrotask(() => this.emit("did-finish-load"));
   }
 
-  async insertCSS(): Promise<string> {
-    return "in-memory-css";
+  /** Stylesheets currently inserted, by key. */
+  public readonly insertedCSS = new Map<string, string>();
+  private nextCSSKey = 1;
+
+  async insertCSS(css: string): Promise<string> {
+    const key = `in-memory-css-${this.nextCSSKey++}`;
+    this.insertedCSS.set(key, css);
+    return key;
+  }
+
+  async removeInsertedCSS(key: string): Promise<void> {
+    this.insertedCSS.delete(key);
   }
 
   async executeJavaScript<T = unknown>(): Promise<T> {
@@ -552,6 +572,10 @@ class InMemoryShortcuts implements ShortcutPort {
 class InMemoryTheme implements ThemeStatePort {
   public colorScheme: "light" | "dark" | "system" = "system";
   private readonly listeners = new Set<() => void>();
+  setColorScheme(colorScheme: "light" | "dark"): void {
+    this.colorScheme = colorScheme;
+    for (const listener of this.listeners) listener();
+  }
   onChanged(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

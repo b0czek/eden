@@ -49,15 +49,21 @@ const appbusCommands = {
 export { appbusCommands as appbus };
 
 const appearanceCommands = {
+  ["getAppearance"]: (): Promise<CommandResult<"appearance/get-appearance">> =>
+    invoke("appearance/get-appearance", {  }),
   ["getPresets"]: (): Promise<CommandResult<"appearance/get-presets">> =>
     invoke("appearance/get-presets", {  }),
+  ["getThemes"]: (): Promise<CommandResult<"appearance/get-themes">> =>
+    invoke("appearance/get-themes", {  }),
   ["getWallpaper"]: (): Promise<CommandResult<"appearance/get-wallpaper">> =>
     invoke("appearance/get-wallpaper", {  }),
+  ["setTheme"]: (themeId: CommandArgs<"appearance/set-theme">["themeId"]): Promise<CommandResult<"appearance/set-theme">> =>
+    invoke("appearance/set-theme", { ["themeId"]: themeId }),
   ["setWallpaper"]: (wallpaper: CommandArgs<"appearance/set-wallpaper">["wallpaper"]): Promise<CommandResult<"appearance/set-wallpaper">> =>
     invoke("appearance/set-wallpaper", { ["wallpaper"]: wallpaper }),
-  ["subscribe"]: <E extends "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): Promise<void> =>
+  ["subscribe"]: <E extends "appearance-changed" | "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): Promise<void> =>
     subscribe(`appearance/${event}`, callback),
-  ["unsubscribe"]: <E extends "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): void =>
+  ["unsubscribe"]: <E extends "appearance-changed" | "wallpaper-changed">(event: E, callback: (data: EventData<`appearance/${E}`>) => void): void =>
     unsubscribe(`appearance/${event}`, callback),
 };
 export { appearanceCommands as appearance };
