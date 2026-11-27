@@ -117,6 +117,7 @@ export interface PlatformWindow {
   getContentBounds(): Bounds;
   setBounds(bounds: Bounds): void;
   setMovable(movable: boolean): void;
+  setBackgroundColor(color: string): void;
   setAlwaysOnTop(flag: boolean, level?: string): void;
   setVisibleOnAllWorkspaces(
     visible: boolean,

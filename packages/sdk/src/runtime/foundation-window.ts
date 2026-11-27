@@ -83,7 +83,12 @@ export const createFoundationWindow = Effect.fn(function* ({
       autostart.onFoundationReady(),
     );
     window.once("ready-to-show", () => window.show());
+    const stopBackground = appearance.appearanceChanged.on(() => {
+      if (!windowConfig.backgroundColor && !window.isDestroyed())
+        window.setBackgroundColor(appearance.getBackgroundColor());
+    });
     window.on("closed", () => {
+      stopBackground();
       if (mainWindow === window) mainWindow = null;
     });
   });

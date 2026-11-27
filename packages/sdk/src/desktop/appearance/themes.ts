@@ -25,33 +25,58 @@ export const BUILTIN_THEMES: Record<ColorScheme, EdenTheme> = {
   },
 };
 
-// A value is inserted into a stylesheet, so it must not end its declaration
-// or start a comment.
+/**
+ * A value is inserted into a stylesheet, so it must be one complete CSS
+ * value. It must not end its declaration, open a string or comment, leave a
+ * parenthesis open, load a resource, or change the declaration's priority.
+ */
+function isSingleCssValue(value: string) {
+  if (/[;{}<>\\"'\n\r!]|\/\*|url\(/i.test(value)) return false;
+  let depth = 0;
+  for (const character of value) {
+    if (character === "(") depth++;
+    else if (character === ")" && --depth < 0) return false;
+  }
+  return depth === 0;
+}
+
 const cssColorSchema = v.pipe(
   v.string(),
   v.trim(),
   v.nonEmpty(),
-  v.regex(/^[^;{}<>\\\n\r]+$/, "must be a single CSS value"),
-  v.check((value) => !value.includes("/*"), "must not contain a comment"),
+  v.check(isSingleCssValue, "must be a single CSS value"),
 );
+
+const nameSchema = v.union([
+  v.pipe(v.string(), v.trim(), v.nonEmpty()),
+  v.pipe(
+    v.record(v.string(), v.pipe(v.string(), v.trim(), v.nonEmpty())),
+    v.check((names) => Object.keys(names).length > 0, "must not be empty"),
+  ),
+]);
 
 const themeSchema = v.object({
   id: v.pipe(v.string(), v.trim(), v.nonEmpty()),
-  name: v.union([
-    v.pipe(v.string(), v.nonEmpty()),
-    v.record(v.string(), v.string()),
-  ]),
+  name: nameSchema,
   colorScheme: colorSchemeSchema,
-  colors: v.strictObject(
-    Object.fromEntries(
-      THEME_COLOR_TOKENS.map((token) => [token, v.optional(cssColorSchema)]),
+  colors: v.pipe(
+    v.strictObject(
+      Object.fromEntries(
+        THEME_COLOR_TOKENS.map((token) => [token, v.optional(cssColorSchema)]),
+      ),
+    ),
+    // A key set to undefined uses the inherited color.
+    v.transform((colors) =>
+      Object.fromEntries(
+        Object.entries(colors).filter(([, value]) => value !== undefined),
+      ),
     ),
   ),
 });
 
 const appearanceConfigSchema = v.object({
   themes: v.optional(v.array(themeSchema)),
-  defaultTheme: v.optional(v.string()),
+  defaultTheme: v.optional(v.pipe(v.string(), v.trim())),
 });
 
 export interface ThemeCatalog {
@@ -118,13 +143,21 @@ export function resolveTheme(theme: EdenTheme): EdenTheme {
   };
 }
 
+const NUMBER = String.raw`\s*\d+(?:\.\d+)?%?\s*`;
+// Forms that Electron and CSS read the same way. Electron reads 4- and
+// 8-digit hex as ARGB, so those use the scheme default.
+const WINDOW_COLOR = new RegExp(
+  String.raw`^(?:#(?:[0-9a-f]{3}|[0-9a-f]{6})|(?:rgb|hsl)a?\(${NUMBER}(?:,${NUMBER}){2,3}\))$`,
+  "i",
+);
+
 /**
- * The window color shown before the page paints. Electron accepts only
- * hex, rgb() and named colors, so other values use the scheme default.
+ * The window color shown where no page is painted. Values Electron cannot
+ * read use the scheme default.
  */
 export function themeBackgroundColor(theme: EdenTheme) {
   const color = theme.colors["bg-primary"];
-  return color && /^(#[0-9a-f]{3,8}|rgba?\([^()]*\)|[a-z]+)$/i.test(color)
+  return color && WINDOW_COLOR.test(color)
     ? color
     : THEME_COLOR_DEFAULTS[theme.colorScheme]["bg-primary"];
 }

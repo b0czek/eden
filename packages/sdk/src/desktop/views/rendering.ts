@@ -39,13 +39,11 @@ export const createViewRendering = Effect.fn(function* (
   const _floatingWindows = floatingWindows;
   const _windows = windows;
   let _themeSource: () => string = () => "";
-  // Each document load gets a new number. Inserted stylesheets belong to one
-  // document, and its replacement discards them.
-  const _documents = new WeakMap<PlatformWebContents, number>();
-  // The theme stylesheet of documents that have Eden CSS.
+  // The theme stylesheet of each view that has Eden CSS. A page load
+  // replaces the record when it injects Eden CSS again.
   const _themeSheets = new WeakMap<
     PlatformWebContents,
-    { document: number; key: string | undefined; css: string }
+    { key: string | undefined; css: string }
   >();
   const _cssLocks = new WeakMap<PlatformWebContents, Semaphore.Semaphore>();
 
@@ -56,15 +54,6 @@ export const createViewRendering = Effect.fn(function* (
       _cssLocks.set(webContents, lock);
     }
     return lock;
-  }
-
-  function documentOf(webContents: PlatformWebContents) {
-    return _documents.get(webContents) ?? 0;
-  }
-
-  function startDocument(webContents: PlatformWebContents) {
-    _documents.set(webContents, documentOf(webContents) + 1);
-    _themeSheets.delete(webContents);
   }
 
   function isRemoteEntry(entry: string): boolean {
@@ -102,12 +91,19 @@ export const createViewRendering = Effect.fn(function* (
 
       const css = yield* _fileReader.read(cssPath);
       const webContents = view.webContents;
-      const document = documentOf(webContents);
       yield* cssLock(webContents).withPermit(
         Effect.gen(function* () {
           yield* fromPromise(() => webContents.insertCSS(css));
-          if (documentOf(webContents) !== document) return;
-          _themeSheets.set(webContents, { document, key: undefined, css: "" });
+          // The theme goes after Eden CSS. A theme stylesheet inserted
+          // earlier is gone with the previous page or is removed here.
+          const previous = _themeSheets.get(webContents);
+          _themeSheets.set(webContents, { key: undefined, css: "" });
+          if (previous?.key) {
+            const key = previous.key;
+            yield* fromPromise(() => webContents.removeInsertedCSS(key)).pipe(
+              Effect.ignore,
+            );
+          }
           yield* applyThemeCSS(webContents);
         }),
       );
@@ -125,8 +121,8 @@ export const createViewRendering = Effect.fn(function* (
   });
 
   /**
-   * Swaps the theme stylesheet of a document that has Eden CSS for the
-   * current one. The caller holds the view's CSS lock.
+   * Swaps the theme stylesheet of a view that has Eden CSS for the current
+   * one. The caller holds the view's CSS lock.
    */
   const applyThemeCSS = Effect.fn(function* (webContents: PlatformWebContents) {
     const sheet = _themeSheets.get(webContents);
@@ -140,14 +136,8 @@ export const createViewRendering = Effect.fn(function* (
     }
     if (!css || webContents.isDestroyed()) return;
     const key = yield* fromPromise(() => webContents.insertCSS(css));
-    if (documentOf(webContents) === sheet.document) {
-      sheet.key = key;
-      sheet.css = css;
-      return;
-    }
-    // A new document started meanwhile. Remove the stylesheet in case it
-    // went to that document. Its own Eden CSS injection adds the theme.
-    yield* fromPromise(() => webContents.removeInsertedCSS(key));
+    sheet.key = key;
+    sheet.css = css;
   });
 
   /** Reapplies the theme stylesheet to views that use Eden CSS. */
@@ -382,13 +372,6 @@ export const createViewRendering = Effect.fn(function* (
       // Setup injections after view is loaded
       yield* Effect.fromResult(
         callViewNative("register", { id: viewId, appId }, () => {
-          view.webContents.on(
-            "did-start-navigation",
-            (details: { isMainFrame: boolean; isSameDocument: boolean }) => {
-              if (details.isMainFrame && !details.isSameDocument)
-                startDocument(view.webContents);
-            },
-          );
           view.webContents.on("did-finish-load", () => {
             forkInjection(
               Effect.gen(function* () {

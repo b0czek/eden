@@ -47,10 +47,13 @@ The `EdenThemeColorToken` type lists the keys, and
 [tokens.css](../packages/sdk/edencss/tokens.css) shows the default values.
 Colors you leave out use the built-in theme of the same scheme,
 so a theme can change only its accent.
+A color set to `undefined` also uses the built-in color.
 
-Eden refuses to start when a theme repeats an ID, uses an unknown key,
-or has a value that is not a single CSS value,
+Eden refuses to start when a theme repeats an ID, has an empty name,
+uses an unknown key, or has a value that is not a single CSS value,
 or when `defaultTheme` names a theme that is not configured.
+A value must not contain `;`, braces, quotes, comments, `url()`,
+`!important`, or an unclosed parenthesis.
 If a saved theme is no longer configured, Eden uses `defaultTheme`.
 Themes are startup configuration; restart the consumer to apply changes.
 

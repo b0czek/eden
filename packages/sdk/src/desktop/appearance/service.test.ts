@@ -482,6 +482,29 @@ describe("themes", () => {
         ],
       },
     ],
+    ...[
+      "rgb(1, 2, 3",
+      "red /* comment",
+      'url("https://example.test/a.png")',
+      "red !important",
+      '"unclosed',
+    ].map((value): [string, unknown] => [
+      `the value ${value}`,
+      {
+        themes: [
+          {
+            id: "x",
+            name: "X",
+            colorScheme: "dark",
+            colors: { "bg-primary": value },
+          },
+        ],
+      },
+    ]),
+    [
+      "an empty name",
+      { themes: [{ id: "x", name: {}, colorScheme: "dark", colors: {} }] },
+    ],
     [
       "a duplicate ID",
       {

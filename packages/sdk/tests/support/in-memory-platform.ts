@@ -133,10 +133,6 @@ class InMemoryWebContents extends EventEmitter implements PlatformWebContents {
 
   /** A new document discards the stylesheets of the previous one. */
   private startDocument() {
-    this.emit("did-start-navigation", {
-      isMainFrame: true,
-      isSameDocument: false,
-    });
     this.insertedCSS.clear();
     queueMicrotask(() => this.emit("did-finish-load"));
   }
@@ -205,6 +201,7 @@ class InMemoryWindow extends EventEmitter implements PlatformWindow {
   private destroyed = false;
   private visible = false;
   private readonly children = new Set<PlatformView>();
+  public backgroundColor: string | undefined;
   public readonly contentView = {
     addChildView: (view: PlatformView) => this.children.add(view),
     removeChildView: (view: PlatformView) => this.children.delete(view),
@@ -222,6 +219,11 @@ class InMemoryWindow extends EventEmitter implements PlatformWindow {
       height: options.height ?? 600,
     };
     this.visible = options.show ?? true;
+    this.backgroundColor = options.backgroundColor;
+  }
+
+  setBackgroundColor(color: string): void {
+    this.backgroundColor = color;
   }
 
   override on<TListener extends PlatformListener>(

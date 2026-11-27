@@ -97,12 +97,22 @@ describe("appearance themes", () => {
 
   it("applies appearance settings written without the appearance API", async () => {
     eden = await createTestEden({ config: { appearance } });
+    const [mainWindow] = eden.platform.windows.windows;
+    expect(mainWindow.backgroundColor).toBe("#151518");
     const settings = eden.runtime.services.settings;
     await eden.runtime.effects.run(
       settings.set("com.eden", "appearance.theme", "acme-light"),
     );
     expect(eden.platform.theme.colorScheme).toBe("light");
     expect(eden.runtime.appearance.getState().theme.id).toBe("acme-light");
+    expect(mainWindow.backgroundColor).toBe("#f5f5f7");
+
+    // A theme that is not configured uses the default, as after a restart.
+    await eden.runtime.effects.run(
+      settings.set("com.eden", "appearance.theme", "missing"),
+    );
+    expect(eden.runtime.appearance.getState().theme.id).toBe("eden-dark");
+    expect(eden.platform.theme.colorScheme).toBe("dark");
 
     await eden.runtime.effects.run(
       settings.set(

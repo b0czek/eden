@@ -103,11 +103,18 @@ export const AppearanceLive = Layer.effect(
       }
     }
 
+    // A saved theme that is not configured falls back to the default.
+    function savedTheme(themeId: string | undefined) {
+      const found = themeId ? catalog.find(themeId) : undefined;
+      if (themeId && !found)
+        log.warn(`Theme "${themeId}" is not configured; using the default`);
+      return found ?? catalog.defaultTheme;
+    }
+
     function initialize() {
       return Effect.gen(function* () {
         const themeId = yield* settings.get(EDEN_SETTINGS_APP_ID, THEME_KEY);
-        // A theme removed from the configuration falls back to the default.
-        theme = (themeId && catalog.find(themeId)) || catalog.defaultTheme;
+        theme = savedTheme(themeId);
         themeState.setColorScheme(theme.colorScheme);
 
         const savedWallpaper = yield* settings.get(
@@ -131,35 +138,30 @@ export const AppearanceLive = Layer.effect(
       }
     }
 
-    function applyWallpaper(config: WallpaperConfig) {
-      if (JSON.stringify(config) === JSON.stringify(wallpaperConfig)) return;
+    function applyWallpaper(config: WallpaperConfig | undefined) {
       wallpaperConfig = config;
       resolveCurrentWallpaper();
       wallpaperChanged.emit(currentWallpaper);
     }
 
-    // Every write to the appearance settings takes effect, including writes
-    // that do not use this service.
+    // Each committed write to the appearance settings applies here, also
+    // when it does not use this service. Values that are not usable fall
+    // back to the defaults, the same as at startup.
     yield* listen(settings.changed, ({ appId, key, value }) => {
       if (appId !== EDEN_SETTINGS_APP_ID) return;
-      if (key === THEME_KEY) {
-        const next = catalog.find(value);
-        if (next) applyTheme(next);
-        else log.warn(`Ignoring unknown theme "${value}"`);
-      } else if (key === WALLPAPER_KEY) {
-        const config = parseWallpaper(value);
-        if (config) applyWallpaper(config);
-      }
+      if (key === THEME_KEY) applyTheme(savedTheme(value));
+      else if (key === WALLPAPER_KEY)
+        applyWallpaper(value ? parseWallpaper(value) : undefined);
     });
 
     // The store cannot cancel a write already in progress. Each setter
-    // finishes publishing its commit before honoring interruption.
+    // finishes its commit, which the settings listener applies, before
+    // honoring interruption.
     function setTheme(themeId: string) {
       return Effect.gen(function* () {
         const next = catalog.find(themeId);
         if (!next) return yield* new UnknownTheme({ themeId });
         yield* settings.set(EDEN_SETTINGS_APP_ID, THEME_KEY, next.id);
-        applyTheme(next);
       }).pipe(Effect.uninterruptible);
     }
 
@@ -170,7 +172,6 @@ export const AppearanceLive = Layer.effect(
           WALLPAPER_KEY,
           JSON.stringify(config),
         );
-        applyWallpaper(config);
       }).pipe(Effect.uninterruptible);
     }
 

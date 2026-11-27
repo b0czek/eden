@@ -1,3 +1,4 @@
+import type { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -159,6 +160,22 @@ it("loads the theme stylesheet after Eden CSS and swaps it on refresh or reload"
     expect(sheets(0)).toEqual([
       ":root { --eden-color-accent-primary: blue; }",
       ":root { --eden-color-accent-primary: green; }",
+    ]);
+
+    // A navigation that keeps the page, such as a download, keeps its theme
+    // stylesheet replaceable.
+    (views[0].view.webContents as unknown as EventEmitter).emit(
+      "did-start-navigation",
+      { isMainFrame: true, isSameDocument: false },
+    );
+    theme = ":root { --eden-color-accent-primary: red; }";
+    creator.refreshThemeStylesheet(views);
+    await waitFor(() =>
+      sheets(0).includes(":root { --eden-color-accent-primary: red; }"),
+    );
+    expect(sheets(0)).toEqual([
+      ":root { --eden-color-accent-primary: blue; }",
+      ":root { --eden-color-accent-primary: red; }",
     ]);
   } finally {
     await effects.dispose();
