@@ -1,5 +1,34 @@
 :root {
-  color-scheme: dark;
+  /* Follows the active Eden theme's scheme through prefers-color-scheme. */
+  color-scheme: light dark;
+  --osk-shell-top: light-dark(
+    rgba(246, 247, 250, 0.95),
+    rgba(25, 30, 38, 0.94)
+  );
+  --osk-shell-bottom: light-dark(
+    rgba(228, 231, 238, 0.96),
+    rgba(12, 15, 20, 0.96)
+  );
+  --osk-shell-border: light-dark(
+    rgba(0, 0, 0, 0.08),
+    rgba(255, 255, 255, 0.08)
+  );
+  --osk-shell-shadow: light-dark(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.28));
+  --osk-key-bg: light-dark(
+    rgba(255, 255, 255, 0.92),
+    rgba(255, 255, 255, 0.09)
+  );
+  --osk-key-pressed: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.16));
+  --osk-key-text: light-dark(rgba(20, 22, 28, 0.92), rgba(255, 255, 255, 0.95));
+  --osk-key-edge: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.06));
+  --osk-function-bg: light-dark(rgba(0, 0, 0, 0.09), rgba(255, 255, 255, 0.14));
+  --osk-mode-bg: light-dark(rgba(0, 0, 0, 0.07), rgba(255, 255, 255, 0.13));
+  --osk-drag-bg: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.08));
+  --osk-drag-pressed: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
+  --osk-drag-text: light-dark(rgba(20, 22, 28, 0.6), rgba(255, 255, 255, 0.72));
+  --osk-close-bg: light-dark(rgba(200, 52, 36, 0.9), rgba(162, 56, 39, 0.78));
+  --osk-enter-bg: light-dark(rgba(31, 122, 224, 0.92), rgba(49, 97, 162, 0.85));
+  --osk-on-accent: rgba(255, 255, 255, 0.98);
 }
 
 html,
@@ -30,12 +59,12 @@ button,
   padding: 10px 12px 12px;
   background: linear-gradient(
     180deg,
-    rgba(25, 30, 38, 0.94),
-    rgba(12, 15, 20, 0.96)
+    var(--osk-shell-top),
+    var(--osk-shell-bottom)
   );
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--osk-shell-border);
   border-radius: 22px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 40px var(--osk-shell-shadow);
   backdrop-filter: blur(18px);
 }
 
@@ -82,9 +111,9 @@ button,
   height: 48px;
   border: none;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.09);
-  color: rgba(255, 255, 255, 0.95);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--osk-key-bg);
+  color: var(--osk-key-text);
+  box-shadow: inset 0 -1px 0 var(--osk-key-edge);
   font-size: 16px;
   font-weight: 500;
   transition:
@@ -153,12 +182,12 @@ button,
 }
 
 .eden-osk-theme .hg-button:active {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--osk-key-pressed);
   transform: translateY(1px);
 }
 
 .eden-osk-theme .hg-button.hg-functionBtn {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--osk-function-bg);
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{bksp}"],
@@ -175,7 +204,7 @@ button,
 
 .eden-osk-theme .hg-button[data-skbtn="{letters}"],
 .eden-osk-theme .hg-button[data-skbtn="{symbols}"] {
-  background: rgba(255, 255, 255, 0.13);
+  background: var(--osk-mode-bg);
   font-size: 14px;
   letter-spacing: 0.02em;
 }
@@ -185,8 +214,8 @@ button,
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{drag}"] {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
+  background: var(--osk-drag-bg);
+  color: var(--osk-drag-text);
   cursor: grab;
   touch-action: none;
 }
@@ -198,7 +227,7 @@ button,
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{drag}"]:active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--osk-drag-pressed);
   transform: none;
 }
 
@@ -218,19 +247,20 @@ button,
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{close}"] {
-  background: rgba(162, 56, 39, 0.78);
-  color: rgba(255, 255, 255, 0.98);
+  background: var(--osk-close-bg);
+  color: var(--osk-on-accent);
   font-size: 26px;
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{enter}"] {
-  background: rgba(49, 97, 162, 0.85);
+  background: var(--osk-enter-bg);
+  color: var(--osk-on-accent);
   font-size: 24px;
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{shift}"] {
   position: relative;
-  background: rgba(255, 255, 255, 0.13);
+  background: var(--osk-mode-bg);
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{shift}"] span {
@@ -271,11 +301,11 @@ button,
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-active {
-  background: rgba(255, 255, 255, 0.13);
+  background: var(--osk-mode-bg);
 }
 
 .eden-osk-theme .hg-button[data-skbtn="{shift}"].hg-button-locked {
-  background: rgba(255, 255, 255, 0.13);
+  background: var(--osk-mode-bg);
 }
 
 .eden-osk-theme

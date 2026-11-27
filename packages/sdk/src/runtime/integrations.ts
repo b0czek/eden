@@ -38,11 +38,14 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
   const views = yield* Views;
   const streams = yield* Streams;
   yield* connectDaemonLifecycle(daemons, processes, packages);
+  views.setThemeSource(appearance.getThemeStylesheet);
+  yield* listen(appearance.appearanceChanged, views.refreshThemeStylesheet);
   yield* connectSettingsLifecycle(
     settingsPanels,
     sessions,
     packages,
     daemons,
+    appearance,
     grants,
   );
   yield* Effect.gen(function* () {

@@ -63,8 +63,8 @@
 .eden-btn-primary {
   background: linear-gradient(
     135deg,
-    var(--eden-color-accent-blue),
-    var(--eden-color-accent-blue-dark)
+    var(--eden-color-accent-primary),
+    var(--eden-color-accent-primary-active)
   );
   border-color: transparent;
   color: white;
@@ -230,8 +230,8 @@
 
   background: linear-gradient(
     135deg,
-    var(--eden-color-accent-blue),
-    var(--eden-color-accent-blue-dark)
+    var(--eden-color-accent-primary),
+    var(--eden-color-accent-primary-active)
   );
   border: none;
   box-shadow: var(--eden-shadow-2xl);

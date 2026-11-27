@@ -1,15 +1,18 @@
 import * as Effect from "effect/Effect";
 import type { Daemons } from "../../applications/daemon/service";
 import type { Packages } from "../../applications/packages/service";
+import type { Appearance } from "../../desktop/appearance/service";
 import type { Sessions } from "../../desktop/session/service";
 import { listen } from "../events/scoped";
 import type { GrantCatalog } from "../user/grant-catalog";
+import { appearanceSettingsCategory } from "./panels/builtin/appearance";
 import type { SettingsPanels } from "./panels/service";
 export const connectSettingsLifecycle = Effect.fn(function* (
   panels: SettingsPanels,
   sessions: Sessions,
   packages: Packages,
   daemons: Daemons,
+  appearance: Appearance,
   grants: GrantCatalog,
 ) {
   yield* listen(sessions.changed, ({ currentUser, previousUsername }) =>
@@ -26,6 +29,11 @@ export const connectSettingsLifecycle = Effect.fn(function* (
     panels.invalidate("catalog");
   });
   yield* listen(daemons.changed, () => panels.invalidate("state"));
+  // The Appearance panel shows the active theme and scheme-specific wallpapers.
+  const refreshAppearance = () =>
+    panels.invalidate("state", `eden.${appearanceSettingsCategory.id}`);
+  yield* listen(appearance.appearanceChanged, refreshAppearance);
+  yield* listen(appearance.wallpaperChanged, refreshAppearance);
   yield* listen(panels.changed, ({ reason }) => {
     if (reason === "catalog") grants.invalidate();
   });

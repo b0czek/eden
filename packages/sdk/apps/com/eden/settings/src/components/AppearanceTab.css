@@ -25,15 +25,81 @@
   font-weight: var(--eden-font-weight-medium);
   cursor: pointer;
   transition: all var(--eden-transition-base);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  color: var(--eden-color-text-on-dark);
+  /* Wallpapers are light in light mode and dark in dark mode. */
+  text-shadow: 0 1px 2px
+    light-dark(rgba(255, 255, 255, 0.7), rgba(0, 0, 0, 0.8));
+  color: light-dark(
+    var(--eden-color-text-primary),
+    var(--eden-color-text-on-dark)
+  );
 }
 
-.wallpaper-item-inactive {
+:is(.wallpaper-item, .theme-item).wallpaper-item-inactive {
   border: 1px solid var(--eden-color-border-light);
 }
 
-.wallpaper-item-active {
-  border: 2px solid var(--eden-color-accent-primary);
-  transform: scale(1.02);
+/* The ring stays inside the item so the scroll area never clips it. */
+:is(.wallpaper-item, .theme-item).wallpaper-item-active {
+  border: 1px solid var(--eden-color-accent-primary);
+  box-shadow:
+    inset 0 0 0 1px var(--eden-color-accent-primary),
+    var(--eden-shadow-sm);
+}
+
+.theme-grid {
+  display: grid;
+  gap: var(--eden-space-sm);
+  grid-template-columns: repeat(
+      auto-fill,
+      minmax(calc(9 * var(--eden-space-md)), 1fr)
+    );
+  margin-top: var(--eden-space-sm);
+  margin-bottom: var(--eden-space-md);
+}
+
+.theme-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--eden-space-sm);
+  min-height: var(--eden-layout-control-min-size);
+  padding: var(--eden-space-md);
+  appearance: none;
+  font: inherit;
+  font-size: var(--eden-font-size-sm);
+  font-weight: var(--eden-font-weight-medium);
+  border-radius: var(--eden-radius-sm);
+  box-shadow: var(--eden-shadow-sm);
+  cursor: pointer;
+  transition: all var(--eden-transition-base);
+}
+
+.theme-swatches {
+  display: flex;
+  gap: var(--eden-space-xs);
+}
+
+.theme-swatches span {
+  width: var(--eden-space-md);
+  height: var(--eden-space-md);
+  border-radius: var(--eden-radius-round);
+  border: 1px solid var(--eden-color-border-medium);
+}
+
+.theme-scheme {
+  font-size: var(--eden-font-size-xs);
+  font-weight: var(--eden-font-weight-normal);
+  opacity: 0.7;
+}
+
+.theme-grid,
+.wallpaper-grid {
+  min-inline-size: 0;
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+}
+
+:is(.wallpaper-item, .theme-item)[aria-disabled="true"] {
+  cursor: progress;
 }

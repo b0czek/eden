@@ -229,6 +229,9 @@ function createElectronThemeState(): ThemeStatePort {
     get colorScheme(): "light" | "dark" | "system" {
       return nativeTheme.themeSource;
     },
+    setColorScheme(colorScheme) {
+      nativeTheme.themeSource = colorScheme;
+    },
     onChanged(listener: () => void): () => void {
       nativeTheme.on("updated", listener);
       return () => nativeTheme.removeListener("updated", listener);

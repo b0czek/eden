@@ -3,51 +3,97 @@
  *
  * ⚠️  AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY
  *
- * This file is generated from src/edencss/tokens.json
+ * This file is generated from edencss/tokens.json
  * Run `npm run tokens:build` to regenerate
  *
  * These CSS custom properties define the visual language of Eden.
- * They can be used in any app or component.
+ * Colors and shadows follow the active light or dark color scheme.
  */
 
 :root {
-  --eden-color-bg-primary: #151518;
-  --eden-color-bg-secondary: #252529;
-  --eden-color-bg-glass-light: rgba(255, 255, 255, 0.04);
-  --eden-color-bg-glass-medium: rgba(255, 255, 255, 0.08);
-  --eden-color-bg-glass-strong: rgba(18, 24, 42, 0.55);
-  --eden-color-bg-overlay: rgba(8, 12, 24, 0.62);
+  color-scheme: light dark;
+  --eden-color-bg-primary: light-dark(#f5f5f7, #151518);
+  --eden-color-bg-secondary: light-dark(#ebebef, #252529);
+  --eden-color-bg-glass-light: light-dark(
+    rgba(0, 0, 0, 0.03),
+    rgba(255, 255, 255, 0.04)
+  );
+  --eden-color-bg-glass-medium: light-dark(
+    rgba(0, 0, 0, 0.05),
+    rgba(255, 255, 255, 0.08)
+  );
+  --eden-color-bg-glass-strong: light-dark(
+    rgba(250, 251, 255, 0.72),
+    rgba(18, 24, 42, 0.55)
+  );
+  --eden-color-bg-overlay: light-dark(
+    rgba(20, 24, 36, 0.32),
+    rgba(8, 12, 24, 0.62)
+  );
   --eden-color-bg-dark: rgba(0, 0, 0, 0.04);
-  --eden-color-surface-primary: #1e1e2e;
-  --eden-color-surface-secondary: #2d2d44;
-  --eden-color-surface-tertiary: #3d3d5c;
-  --eden-color-surface-elevated: rgba(255, 255, 255, 0.06);
-  --eden-color-surface-hover: rgba(255, 255, 255, 0.12);
-  --eden-color-surface-active: rgba(255, 255, 255, 0.18);
-  --eden-color-text-primary: rgba(239, 244, 255, 0.96);
-  --eden-color-text-secondary: rgba(234, 234, 234, 0.95);
-  --eden-color-text-tertiary: rgba(189, 189, 189, 0.9);
-  --eden-color-text-muted: rgba(255, 255, 255, 0.6);
-  --eden-color-text-inverse: #1a1a1a;
+  --eden-color-surface-primary: light-dark(#ffffff, #1e1e2e);
+  --eden-color-surface-secondary: light-dark(#f0f1f6, #2d2d44);
+  --eden-color-surface-tertiary: light-dark(#e2e4ee, #3d3d5c);
+  --eden-color-surface-elevated: light-dark(
+    rgba(255, 255, 255, 0.72),
+    rgba(255, 255, 255, 0.06)
+  );
+  --eden-color-surface-hover: light-dark(
+    rgba(0, 0, 0, 0.06),
+    rgba(255, 255, 255, 0.12)
+  );
+  --eden-color-surface-active: light-dark(
+    rgba(0, 0, 0, 0.1),
+    rgba(255, 255, 255, 0.18)
+  );
+  --eden-color-text-primary: light-dark(
+    rgba(17, 20, 32, 0.94),
+    rgba(239, 244, 255, 0.96)
+  );
+  --eden-color-text-secondary: light-dark(
+    rgba(30, 32, 40, 0.82),
+    rgba(234, 234, 234, 0.95)
+  );
+  --eden-color-text-tertiary: light-dark(
+    rgba(60, 62, 72, 0.72),
+    rgba(189, 189, 189, 0.9)
+  );
+  --eden-color-text-muted: light-dark(
+    rgba(0, 0, 0, 0.5),
+    rgba(255, 255, 255, 0.6)
+  );
+  --eden-color-text-inverse: light-dark(#ffffff, #1a1a1a);
   --eden-color-text-on-dark: #ffffff;
-  --eden-color-accent-primary: #4a9eff;
-  --eden-color-accent-primary-hover: #5ca8ff;
-  --eden-color-accent-primary-active: #3b8ee8;
-  --eden-color-accent-blue: rgb(82, 163, 255);
-  --eden-color-accent-blue-dark: rgb(54, 123, 255);
-  --eden-color-accent-purple: #667eea;
-  --eden-color-accent-purple-light: #7c92f0;
-  --eden-color-success: #51cf66;
-  --eden-color-success-hover: #69db7c;
-  --eden-color-danger: #ff3b30;
-  --eden-color-danger-hover: #ff6b6b;
+  --eden-color-accent-primary: light-dark(#1f7ae0, #4a9eff);
+  --eden-color-accent-primary-hover: light-dark(#2f86ea, #5ca8ff);
+  --eden-color-accent-primary-active: light-dark(#1866c2, #3b8ee8);
+  --eden-color-accent-blue: light-dark(rgb(31, 122, 224), rgb(82, 163, 255));
+  --eden-color-accent-blue-dark: light-dark(
+    rgb(20, 92, 200),
+    rgb(54, 123, 255)
+  );
+  --eden-color-accent-purple: light-dark(#5466d6, #667eea);
+  --eden-color-accent-purple-light: light-dark(#6a7ce0, #7c92f0);
+  --eden-color-success: light-dark(#2f9e44, #51cf66);
+  --eden-color-success-hover: light-dark(#37b24d, #69db7c);
+  --eden-color-danger: light-dark(#e03131, #ff3b30);
+  --eden-color-danger-hover: light-dark(#f03e3e, #ff6b6b);
   --eden-color-danger-bg: rgba(255, 59, 48, 0.1);
-  --eden-color-warning: #ffd93d;
-  --eden-color-info: #4dabf7;
-  --eden-color-border-light: rgba(255, 255, 255, 0.06);
-  --eden-color-border-medium: rgba(255, 255, 255, 0.12);
+  --eden-color-warning: light-dark(#a16207, #ffd93d);
+  --eden-color-info: light-dark(#1c7ed6, #4dabf7);
+  --eden-color-border-light: light-dark(
+    rgba(0, 0, 0, 0.06),
+    rgba(255, 255, 255, 0.06)
+  );
+  --eden-color-border-medium: light-dark(
+    rgba(0, 0, 0, 0.12),
+    rgba(255, 255, 255, 0.12)
+  );
   --eden-color-border-dark: rgba(0, 0, 0, 0.1);
-  --eden-color-border-separator: rgba(255, 255, 255, 0.18);
+  --eden-color-border-separator: light-dark(
+    rgba(0, 0, 0, 0.14),
+    rgba(255, 255, 255, 0.18)
+  );
   --eden-space-xs: 4px;
   --eden-space-sm: 8px;
   --eden-space-md: 16px;
@@ -123,4 +169,16 @@
   --eden-duration-normal: 0.22s;
   --eden-duration-slow: 0.32s;
   --eden-duration-slower: 0.5s;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --eden-shadow-xs: 0 1px 2px rgba(20, 24, 36, 0.08);
+    --eden-shadow-sm: 0 1px 4px rgba(20, 24, 36, 0.1);
+    --eden-shadow-md: 0 6px 16px rgba(20, 24, 36, 0.08);
+    --eden-shadow-lg: 0 8px 24px rgba(20, 24, 36, 0.08);
+    --eden-shadow-xl: 0 16px 48px rgba(20, 24, 36, 0.12);
+    --eden-shadow-2xl: 0 24px 64px rgba(20, 24, 36, 0.16);
+    --eden-shadow-inner: inset 0 1px 2px rgba(20, 24, 36, 0.08);
+  }
 }

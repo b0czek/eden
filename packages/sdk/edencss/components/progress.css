@@ -23,11 +23,12 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--eden-color-accent-blue),
-    var(--eden-color-accent-blue-dark)
+    var(--eden-color-accent-primary),
+    var(--eden-color-accent-primary-active)
   );
   transition: width var(--eden-duration-slow) var(--eden-transition-ease-out);
-  box-shadow: 0 0 10px rgba(82, 163, 255, 0.5);
+  box-shadow: 0 0 10px
+    color-mix(in srgb, var(--eden-color-accent-primary) 50%, transparent);
 }
 
 .eden-progress-bar-success {
@@ -36,7 +37,8 @@
     var(--eden-color-success),
     var(--eden-color-success-hover)
   );
-  box-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
+  box-shadow: 0 0 10px
+    color-mix(in srgb, var(--eden-color-success) 50%, transparent);
 }
 
 .eden-progress-bar-danger {
@@ -45,12 +47,14 @@
     var(--eden-color-danger),
     var(--eden-color-danger-hover)
   );
-  box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
+  box-shadow: 0 0 10px
+    color-mix(in srgb, var(--eden-color-danger) 50%, transparent);
 }
 
 .eden-progress-bar-warning {
   background: var(--eden-color-warning);
-  box-shadow: 0 0 10px rgba(255, 217, 61, 0.5);
+  box-shadow: 0 0 10px
+    color-mix(in srgb, var(--eden-color-warning) 50%, transparent);
 }
 
 .eden-progress-animated .eden-progress-bar {

@@ -69,6 +69,7 @@ export interface PlatformWebContents {
   loadURL(url: string): Promise<void>;
   loadFile(filePath: string): Promise<void>;
   insertCSS(css: string): Promise<string>;
+  removeInsertedCSS(key: string): Promise<void>;
   executeJavaScript<T = unknown>(code: string): Promise<T>;
   getZoomFactor(): number;
   setZoomFactor(factor: number): void;
@@ -116,6 +117,7 @@ export interface PlatformWindow {
   getContentBounds(): Bounds;
   setBounds(bounds: Bounds): void;
   setMovable(movable: boolean): void;
+  setBackgroundColor(color: string): void;
   setAlwaysOnTop(flag: boolean, level?: string): void;
   setVisibleOnAllWorkspaces(
     visible: boolean,
@@ -301,8 +303,14 @@ export interface ShortcutPort {
 
 export interface ThemeStatePort {
   get colorScheme(): "light" | "dark" | "system";
+  /** Sets the scheme web contents see through `prefers-color-scheme`. */
+  setColorScheme(colorScheme: "light" | "dark"): void;
   onChanged(listener: () => void): () => void;
 }
+export const ThemeStatePort = Context.Service<
+  "eden/ThemeStatePort",
+  ThemeStatePort
+>("eden/ThemeStatePort");
 
 export type ApplicationLifecycleEvent =
   | "window-all-closed"

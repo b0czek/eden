@@ -70,6 +70,11 @@ state and markup; see the
 
 All tokens are defined in `tokens.css`.
 
+Colors and shadows follow the selected theme, which is light or dark.
+Use `--eden-color-*` variables instead of fixed colors so an app follows
+the theme. For other values that differ by scheme, use
+`@media (prefers-color-scheme: light)`. See [themes](../../../docs/themes.md).
+
 Common groups:
 
 - `--eden-color-*`

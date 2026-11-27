@@ -10,6 +10,7 @@
  * AppearanceEvents - Events for the "appearance" namespace
  */
 export interface AppearanceEvents {
+  "appearance/appearance-changed": import("./index").AppearanceState;
   "appearance/wallpaper-changed": import("./index").WallpaperPreset;
 }
 

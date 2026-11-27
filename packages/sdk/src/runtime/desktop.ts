@@ -36,6 +36,7 @@ export const assembleDesktop = Effect.fn(function* () {
     paths,
     platform,
     branding: yield* Branding,
+    appearance: yield* Appearance,
     views: yield* Views,
     ipc: yield* IpcTransport,
     keyboard: yield* Keyboard,

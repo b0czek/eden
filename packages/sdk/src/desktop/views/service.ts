@@ -95,6 +95,10 @@ export interface Views {
   ) => Effect.Effect<void, ViewModeError>;
   getCurrentScale: () => number;
   setInterfaceScale: (scale: number) => void;
+  /** Supplies CSS that every view using Eden CSS loads after it. */
+  setThemeSource: (source: () => string) => void;
+  /** Reapplies the theme source's current CSS to open views. */
+  refreshThemeStylesheet: () => void;
   setKeyboardPresentationLift: (lift: number) => void;
   getKeyboardPresentationLift: () => number;
 }
@@ -200,6 +204,9 @@ export const ViewsLive = Layer.effect(
       removeView: (viewId) => nativeViews.removeView(coordination, viewId),
       getCurrentScale: interfaceScale.getScale,
       setInterfaceScale: interfaceScale.setScale,
+      setThemeSource: (source) => rendering.setThemeSource(source, getViews()),
+      refreshThemeStylesheet: () =>
+        rendering.refreshThemeStylesheet(getViews()),
     } satisfies Views;
   }),
 );

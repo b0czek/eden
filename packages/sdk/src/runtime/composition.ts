@@ -103,6 +103,7 @@ import {
   DisplayPort,
   ProcessMetricsPort,
   RendererIpcPort,
+  ThemeStatePort,
   UtilityProcessPort,
   WindowingPort,
 } from "../platform/ports/types";
@@ -252,6 +253,7 @@ export function createDesktopLayer(environment: RuntimeEnvironment) {
         Context.add(UtilityProcessPort, platform.utilityProcesses),
         Context.add(DisplayPort, platform.display),
         Context.add(ProcessMetricsPort, platform.processMetrics),
+        Context.add(ThemeStatePort, platform.theme),
       );
     }),
   );

@@ -7,6 +7,7 @@ import type {
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FiberSet from "effect/FiberSet";
+import * as Semaphore from "effect/Semaphore";
 import { logBackgroundFailure } from "../../core/effects/failure-policy";
 import { fromPromise } from "../../core/effects/io";
 import { encodeLaunchContext } from "../../core/utils/app-launch-context";
@@ -15,6 +16,7 @@ import { log } from "../../platform/logging/logger";
 import type {
   Bounds,
   PlatformView,
+  PlatformWebContents,
   WindowingPort,
 } from "../../platform/ports/types";
 import { callViewNative } from "./errors";
@@ -36,6 +38,23 @@ export const createViewRendering = Effect.fn(function* (
   const _tiling = tilingController;
   const _floatingWindows = floatingWindows;
   const _windows = windows;
+  let _themeSource: () => string = () => "";
+  // The theme stylesheet of each view that has Eden CSS. A page load
+  // replaces the record when it injects Eden CSS again.
+  const _themeSheets = new WeakMap<
+    PlatformWebContents,
+    { key: string | undefined; css: string }
+  >();
+  const _cssLocks = new WeakMap<PlatformWebContents, Semaphore.Semaphore>();
+
+  function cssLock(webContents: PlatformWebContents) {
+    let lock = _cssLocks.get(webContents);
+    if (!lock) {
+      lock = Semaphore.makeUnsafe(1);
+      _cssLocks.set(webContents, lock);
+    }
+    return lock;
+  }
 
   function isRemoteEntry(entry: string): boolean {
     return /^https?:\/\//i.test(entry);
@@ -71,7 +90,23 @@ export const createViewRendering = Effect.fn(function* (
       const cssPath = path.join(edenCssPath, cssFileName);
 
       const css = yield* _fileReader.read(cssPath);
-      yield* fromPromise(() => view.webContents.insertCSS(css));
+      const webContents = view.webContents;
+      yield* cssLock(webContents).withPermit(
+        Effect.gen(function* () {
+          yield* fromPromise(() => webContents.insertCSS(css));
+          // The theme goes after Eden CSS. A theme stylesheet inserted
+          // earlier is gone with the previous page or is removed here.
+          const previous = _themeSheets.get(webContents);
+          _themeSheets.set(webContents, { key: undefined, css: "" });
+          if (previous?.key) {
+            const key = previous.key;
+            yield* fromPromise(() => webContents.removeInsertedCSS(key)).pipe(
+              Effect.ignore,
+            );
+          }
+          yield* applyThemeCSS(webContents);
+        }),
+      );
 
       log.info(`Injected Eden CSS (${mode})`);
       return true;
@@ -84,6 +119,46 @@ export const createViewRendering = Effect.fn(function* (
       ),
     );
   });
+
+  /**
+   * Swaps the theme stylesheet of a view that has Eden CSS for the current
+   * one. The caller holds the view's CSS lock.
+   */
+  const applyThemeCSS = Effect.fn(function* (webContents: PlatformWebContents) {
+    const sheet = _themeSheets.get(webContents);
+    const css = _themeSource();
+    if (!sheet || webContents.isDestroyed() || sheet.css === css) return;
+    if (sheet.key) {
+      const key = sheet.key;
+      yield* fromPromise(() => webContents.removeInsertedCSS(key));
+      sheet.key = undefined;
+      sheet.css = "";
+    }
+    if (!css || webContents.isDestroyed()) return;
+    const key = yield* fromPromise(() => webContents.insertCSS(css));
+    sheet.key = key;
+    sheet.css = css;
+  });
+
+  /** Reapplies the theme stylesheet to views that use Eden CSS. */
+  function refreshThemeStylesheet(views: Iterable<ViewInfo>) {
+    for (const { view, manifest } of views) {
+      if (getCSSInjectionMode(manifest.window) === "none") continue;
+      const webContents = view.webContents;
+      if (!_themeSheets.has(webContents)) continue;
+      forkInjection(
+        cssLock(webContents)
+          .withPermit(applyThemeCSS(webContents))
+          .pipe(logBackgroundFailure("Theme stylesheet update failed:")),
+      );
+    }
+  }
+
+  /** Each view loads this stylesheet after Eden CSS. */
+  function setThemeSource(source: () => string, views: Iterable<ViewInfo>) {
+    _themeSource = source;
+    refreshThemeStylesheet(views);
+  }
 
   const injectAppFrame = Effect.fn(function* (
     view: PlatformView,
@@ -296,7 +371,7 @@ export const createViewRendering = Effect.fn(function* (
 
       // Setup injections after view is loaded
       yield* Effect.fromResult(
-        callViewNative("register", { id: viewId, appId }, () =>
+        callViewNative("register", { id: viewId, appId }, () => {
           view.webContents.on("did-finish-load", () => {
             forkInjection(
               Effect.gen(function* () {
@@ -316,8 +391,8 @@ export const createViewRendering = Effect.fn(function* (
                   );
               }).pipe(logBackgroundFailure("View injection failed:")),
             );
-          }),
-        ),
+          });
+        }),
       );
 
       // Return view info
@@ -355,6 +430,8 @@ export const createViewRendering = Effect.fn(function* (
     injectEdenCSS,
     injectAppFrame,
     createView,
+    setThemeSource,
+    refreshThemeStylesheet,
   };
 });
 

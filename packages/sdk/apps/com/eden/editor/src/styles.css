@@ -241,7 +241,7 @@
 }
 
 .error-banner.warning button {
-  color: var(--eden-color-text-inverse);
+  color: #1a1a1a;
 }
 
 .error-banner button:hover {

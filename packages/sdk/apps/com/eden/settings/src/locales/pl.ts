@@ -76,6 +76,9 @@ export const pl = {
       },
     },
     appearance: {
+      light: "Jasny",
+      dark: "Ciemny",
+      theme: "Motyw",
       wallpaper: "Tapeta",
       solidColors: "Kolory Jednolite",
       gradients: "Gradienty",

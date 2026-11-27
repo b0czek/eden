@@ -1,9 +1,11 @@
 import type {
   AppAssociation,
+  AppearanceState,
   DaemonDefinition,
   DaemonStatus,
   PackageInfo as EdenPackageInfo,
   SessionChange as EdenSessionChange,
+  EdenTheme,
   FilesystemVolume,
   FilesystemVolumeRegistration,
   InstalledPackageInfo,
@@ -37,6 +39,7 @@ import type {
   UpdateUserFailure,
   UserRecordReadFailure,
 } from "../core/user/errors";
+import type { UnknownTheme } from "../desktop/appearance/errors";
 import type {
   LoginFailure,
   SessionTransitionFailure,
@@ -203,6 +206,7 @@ export interface EdenWallpaperPresets {
 
 export interface EdenAppearanceApi {
   getWallpaper(): WallpaperPreset;
+  /** Presets as they look in the current color scheme. */
   getPresets(): EdenWallpaperPresets;
   setWallpaper(
     config: WallpaperConfig,
@@ -210,7 +214,21 @@ export interface EdenAppearanceApi {
     void,
     EdenInputError | StorageWriteFailure | SettingValueError
   >;
+  /** Called with the wallpaper as shown, including after a scheme change. */
   onChanged(listener: (wallpaper: WallpaperPreset) => void): EdenUnsubscribe;
+  getState(): AppearanceState;
+  /** Built-in and configured themes, with the colors they inherit. */
+  getThemes(): EdenTheme[];
+  /** Selects a theme, switching Eden to the theme's color scheme. */
+  setTheme(
+    themeId: string,
+  ): Effect.Effect<
+    void,
+    EdenInputError | UnknownTheme | StorageWriteFailure | SettingValueError
+  >;
+  onAppearanceChanged(
+    listener: (state: AppearanceState) => void,
+  ): EdenUnsubscribe;
 }
 
 export interface EdenAssociationListOptions {

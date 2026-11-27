@@ -27,7 +27,7 @@
     "dev:electron": "NODE_ENV=development electron dist/dev-host.js",
     "dev:prepare": "pnpm run tokens:build && pnpm run css:build && pnpm run build:client && pnpm run build:main && pnpm run bundle:app-frame && pnpm run bundle:app-runtime && pnpm run build:keyboard-ui && pnpm run build:apps && pnpm run copy-assets && eden-build seed -c eden.dev.config.json -o dist",
     "dev:watch": "eden-build watch -c eden.dev.config.json --sdk-source-path .",
-    "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css",
+    "tokens:build": "cd edencss && npx style-dictionary build --config style-dictionary.config.mjs && cd .. && pnpm exec biome format --write edencss/tokens.css src/desktop/appearance/theme-color-tokens.ts ../types/ThemeColorTokens.d.ts",
     "clean": "rm -rf dist",
     "test": "pnpm run test:unit && pnpm run test:integration:node",
     "pretest:unit": "pnpm run build:test-dependencies",

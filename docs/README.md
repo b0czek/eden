@@ -14,6 +14,7 @@ Read these chapters in order for your first product:
 2. [Use the host API](main-process-api.md). Wait for startup and run host operations.
 3. [Configure users](users.md). Seed accounts, set grants, and limit folder access.
 4. [Set product branding](branding.md). Supply the product name, logo, and window icon.
+5. [Add themes](themes.md). Offer light and dark color themes in Settings.
 
 Add [mounted drives](filesystem.md#registering-mounted-drives),
 [host Settings panels](settings.md#host-registered-panels), or

@@ -23,5 +23,13 @@ export function createAppearanceSdkController({
       sdk.subscribe(listener, (notify) =>
         appearance.wallpaperChanged.on(notify),
       ),
+    getState: () => sdk.run(() => structuredClone(appearance.getState())),
+    getThemes: () => sdk.run(() => structuredClone(appearance.getThemes())),
+    setTheme: (input) =>
+      sdk.effect(() => appearance.setTheme(v.parse(v.string(), input))),
+    onAppearanceChanged: (listener) =>
+      sdk.subscribe(listener, (notify) =>
+        appearance.appearanceChanged.on(notify),
+      ),
   };
 }

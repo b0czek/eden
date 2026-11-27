@@ -1,3 +1,4 @@
+import type { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -95,3 +96,96 @@ it.each([false, true])(
     }
   },
 );
+
+it("loads the theme stylesheet after Eden CSS and swaps it on refresh or reload", async () => {
+  const directory = await fs.mkdtemp(
+    path.join(os.tmpdir(), "eden-view-theme-"),
+  );
+  const effects = createEffectRuntime();
+  try {
+    await fs.mkdir(path.join(directory, "edencss"));
+    await fs.writeFile(
+      path.join(directory, "edencss/eden.css"),
+      ":root { --eden-color-accent-primary: blue; }",
+    );
+    const platform = new InMemoryPlatform(directory);
+    const tiling = createTiling();
+    const floating = createFloatingWindows(tiling.getWorkspaceBounds, () => []);
+    const creator = await effects.acquire(
+      createViewRendering(directory, tiling, floating, platform.windows),
+    );
+    let theme = ":root { --eden-color-accent-primary: pink; }";
+    creator.setThemeSource(() => theme, []);
+    const bounds = { x: 0, y: 0, width: 640, height: 480 };
+    const themed = testApp("com.example.themed", {
+      window: { mode: "floating", injections: { appFrame: false } },
+    });
+    const unstyled = testApp("com.example.unstyled", {
+      window: {
+        mode: "floating",
+        injections: { appFrame: false, css: "none" },
+      },
+    });
+    const views = [themed, unstyled].map((app) =>
+      Effect.runSync(creator.createView(app.id, app, directory, bounds, [])),
+    );
+    const sheets = (index: number) => [
+      ...(
+        views[index].view.webContents as unknown as {
+          insertedCSS: Map<string, string>;
+        }
+      ).insertedCSS.values(),
+    ];
+    await waitFor(() => sheets(0).length === 2);
+
+    expect(sheets(0)).toEqual([
+      ":root { --eden-color-accent-primary: blue; }",
+      ":root { --eden-color-accent-primary: pink; }",
+    ]);
+    expect(sheets(1)).toEqual([]);
+
+    theme = "";
+    creator.refreshThemeStylesheet(views);
+    await waitFor(() => sheets(0).length === 1);
+    expect(sheets(0)).toEqual([":root { --eden-color-accent-primary: blue; }"]);
+    expect(sheets(1)).toEqual([]);
+
+    // A theme change while the page reloads applies once to the new page.
+    theme = ":root { --eden-color-accent-primary: green; }";
+    await views[0].view.webContents.loadURL("https://example.test/");
+    creator.refreshThemeStylesheet(views);
+    await waitFor(() => sheets(0).length === 2);
+    creator.refreshThemeStylesheet(views);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sheets(0)).toEqual([
+      ":root { --eden-color-accent-primary: blue; }",
+      ":root { --eden-color-accent-primary: green; }",
+    ]);
+
+    // A navigation that keeps the page, such as a download, keeps its theme
+    // stylesheet replaceable.
+    (views[0].view.webContents as unknown as EventEmitter).emit(
+      "did-start-navigation",
+      { isMainFrame: true, isSameDocument: false },
+    );
+    theme = ":root { --eden-color-accent-primary: red; }";
+    creator.refreshThemeStylesheet(views);
+    await waitFor(() =>
+      sheets(0).includes(":root { --eden-color-accent-primary: red; }"),
+    );
+    expect(sheets(0)).toEqual([
+      ":root { --eden-color-accent-primary: blue; }",
+      ":root { --eden-color-accent-primary: red; }",
+    ]);
+  } finally {
+    await effects.dispose();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+async function waitFor(condition: () => boolean) {
+  for (let attempt = 0; attempt < 100 && !condition(); attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  expect(condition()).toBe(true);
+}
