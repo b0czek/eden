@@ -46,6 +46,8 @@ const ThemeGrid: Component<{
               : "wallpaper-item-inactive"
           }`}
           style={{
+            // Scheme-dependent colors inside the card follow the previewed theme.
+            "color-scheme": theme.colorScheme,
             background: themeColor(theme, "bg-primary"),
             color: themeColor(theme, "text-primary"),
           }}

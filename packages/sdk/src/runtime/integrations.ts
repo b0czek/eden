@@ -45,6 +45,7 @@ export const connectRuntimeLifecycle = Effect.fn(function* () {
     sessions,
     packages,
     daemons,
+    appearance,
     grants,
   );
   yield* Effect.gen(function* () {

@@ -79,7 +79,7 @@
   --eden-color-danger: light-dark(#e03131, #ff3b30);
   --eden-color-danger-hover: light-dark(#f03e3e, #ff6b6b);
   --eden-color-danger-bg: rgba(255, 59, 48, 0.1);
-  --eden-color-warning: light-dark(#e0a800, #ffd93d);
+  --eden-color-warning: light-dark(#a16207, #ffd93d);
   --eden-color-info: light-dark(#1c7ed6, #4dabf7);
   --eden-color-border-light: light-dark(
     rgba(0, 0, 0, 0.06),

@@ -25,12 +25,16 @@
   margin-bottom: var(--eden-space-sm);
   padding: var(--eden-space-xs) var(--eden-space-sm);
   border-radius: var(--eden-radius-sm);
-  background: var(--eden-color-bg-surface);
+  background: var(--eden-color-surface-elevated);
   font-size: var(--eden-font-size-sm);
 }
 
 .chat-message.own {
-  background: var(--eden-color-accent-primary-muted);
+  background: color-mix(
+    in srgb,
+    var(--eden-color-accent-primary) 20%,
+    transparent
+  );
   margin-left: 20%;
 }
 
@@ -48,5 +52,6 @@
 }
 
 .direct-chat {
-  border: 1px solid var(--eden-color-accent-warning-muted);
+  border: 1px solid
+    color-mix(in srgb, var(--eden-color-warning) 40%, transparent);
 }

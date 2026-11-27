@@ -25,6 +25,21 @@ it("uses the inherited color for a color set to undefined", () => {
   expect(resolveTheme(acme).colors["accent-primary"]).toBe("#1f7ae0");
 });
 
+it.each([
+  "RebeccaPurple",
+  "transparent",
+  "#abcd",
+  "oklch(70% 0.1 200)",
+  "rgb(0 0 0 / 50%)",
+  "color-mix(in srgb, var(--eden-color-accent-primary) 20%, transparent)",
+  "light-dark(#ffffff, #000000)",
+])("accepts the color %s", (color) => {
+  const catalog = createThemeCatalog({
+    themes: [theme({ "accent-primary": color })],
+  });
+  expect(catalog.find("acme")?.colors["accent-primary"]).toBe(color);
+});
+
 it("matches the default theme ID after trimming", () => {
   const catalog = createThemeCatalog({
     themes: [theme({})],

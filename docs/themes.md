@@ -49,11 +49,15 @@ Colors you leave out use the built-in theme of the same scheme,
 so a theme can change only its accent.
 A color set to `undefined` also uses the built-in color.
 
+Primary actions, such as primary buttons, active tab pills, and progress bars,
+use `accent-primary` and `accent-primary-active`.
+
+A value must be one CSS color: a hex color, a color keyword such as `teal`,
+or one call to `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`,
+`oklch()`, `color()`, `color-mix()`, `light-dark()`, or `var()`.
 Eden refuses to start when a theme repeats an ID, has an empty name,
-uses an unknown key, or has a value that is not a single CSS value,
+uses an unknown key, or has a value that is not a CSS color,
 or when `defaultTheme` names a theme that is not configured.
-A value must not contain `;`, braces, quotes, comments, `url()`,
-`!important`, or an unclosed parenthesis.
 If a saved theme is no longer configured, Eden uses `defaultTheme`.
 Themes are startup configuration; restart the consumer to apply changes.
 

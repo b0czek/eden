@@ -25,26 +25,59 @@ export const BUILTIN_THEMES: Record<ColorScheme, EdenTheme> = {
   },
 };
 
+const COLOR_FUNCTIONS = new Set([
+  "rgb",
+  "rgba",
+  "hsl",
+  "hsla",
+  "hwb",
+  "lab",
+  "lch",
+  "oklab",
+  "oklch",
+  "color",
+  "color-mix",
+  "light-dark",
+  "var",
+]);
+const CSS_WIDE_KEYWORDS = new Set([
+  "inherit",
+  "initial",
+  "unset",
+  "revert",
+  "revert-layer",
+]);
+
 /**
- * A value is inserted into a stylesheet, so it must be one complete CSS
- * value. It must not end its declaration, open a string or comment, leave a
- * parenthesis open, load a resource, or change the declaration's priority.
+ * A value is inserted into a stylesheet, so it must be one CSS color: a hex
+ * color, a color keyword, or one call to a color function. It must not end
+ * its declaration, open a string or comment, load a resource, or change the
+ * declaration's priority.
  */
-function isSingleCssValue(value: string) {
-  if (/[;{}<>\\"'\n\r!]|\/\*|url\(/i.test(value)) return false;
-  let depth = 0;
-  for (const character of value) {
-    if (character === "(") depth++;
-    else if (character === ")" && --depth < 0) return false;
+function isCssColor(value: string) {
+  if (/[;{}<>[\]\\"'\n\r!]|\/\*|url\(/i.test(value)) return false;
+  if (/^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.test(value)) return true;
+  if (/^[a-z]+$/i.test(value)) {
+    return !CSS_WIDE_KEYWORDS.has(value.toLowerCase());
   }
-  return depth === 0;
+  const call = /^([a-z-]+)\(/i.exec(value);
+  if (!call || !COLOR_FUNCTIONS.has(call[1].toLowerCase())) return false;
+  // The function's own parenthesis must close at the end of the value.
+  let depth = 0;
+  for (let index = call[0].length - 1; index < value.length; index++) {
+    if (value[index] === "(") depth++;
+    else if (value[index] === ")" && --depth === 0) {
+      return index === value.length - 1;
+    }
+  }
+  return false;
 }
 
 const cssColorSchema = v.pipe(
   v.string(),
   v.trim(),
   v.nonEmpty(),
-  v.check(isSingleCssValue, "must be a single CSS value"),
+  v.check(isCssColor, "must be a single CSS color"),
 );
 
 const nameSchema = v.union([

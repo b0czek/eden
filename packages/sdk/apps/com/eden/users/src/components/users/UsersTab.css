@@ -44,7 +44,7 @@
 }
 
 .user-row:hover {
-  border-color: var(--eden-color-border-hover);
+  border-color: var(--eden-color-border-medium);
 }
 
 .user-row-info {

@@ -488,6 +488,12 @@ describe("themes", () => {
       'url("https://example.test/a.png")',
       "red !important",
       '"unclosed',
+      "red [",
+      "10px",
+      "inherit",
+      "rgb(1, 2, 3) 10px",
+      "rgb(1, 2, 3))",
+      "calc(1px)",
     ].map((value): [string, unknown] => [
       `the value ${value}`,
       {

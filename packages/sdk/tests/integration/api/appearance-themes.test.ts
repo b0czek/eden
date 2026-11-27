@@ -124,6 +124,25 @@ describe("appearance themes", () => {
     expect(eden.runtime.appearance.getWallpaper().value).toBe("#123456");
   });
 
+  it("refreshes the open Appearance panel when the host changes the theme", async () => {
+    eden = await createTestEden({ config: { appearance } });
+    const changes: unknown[] = [];
+    const stop = eden.runtime.services.settingsPanels.changed.on((change) =>
+      changes.push(change),
+    );
+    try {
+      await eden.runtime.effects.run(
+        eden.runtime.appearance.setTheme("acme-light"),
+      );
+      expect(changes).toContainEqual({
+        reason: "state",
+        panelId: "eden.appearance",
+      });
+    } finally {
+      stop();
+    }
+  });
+
   it("restores the chosen scheme and theme after a restart", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "eden-appearance-"));
     try {

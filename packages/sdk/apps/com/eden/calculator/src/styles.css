@@ -114,7 +114,7 @@ body {
 
 .num-btn:hover {
   background: var(--eden-color-surface-secondary);
-  border-color: var(--eden-color-border);
+  border-color: var(--eden-color-border-medium);
 }
 
 /* Zero button spans 2 columns */
@@ -128,14 +128,5 @@ body {
     135deg,
     var(--eden-color-success),
     var(--eden-color-success-hover)
-  );
-}
-
-/* Primary operator button enhancements */
-.buttons-grid .eden-btn-primary {
-  background: linear-gradient(
-    135deg,
-    var(--eden-color-primary),
-    var(--eden-color-primary-hover)
   );
 }

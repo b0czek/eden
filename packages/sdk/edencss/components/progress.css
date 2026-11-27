@@ -23,12 +23,12 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--eden-color-accent-blue),
-    var(--eden-color-accent-blue-dark)
+    var(--eden-color-accent-primary),
+    var(--eden-color-accent-primary-active)
   );
   transition: width var(--eden-duration-slow) var(--eden-transition-ease-out);
   box-shadow: 0 0 10px
-    color-mix(in srgb, var(--eden-color-accent-blue) 50%, transparent);
+    color-mix(in srgb, var(--eden-color-accent-primary) 50%, transparent);
 }
 
 .eden-progress-bar-success {

@@ -224,7 +224,7 @@
 
 .error-banner.warning {
   background: var(--eden-color-warning);
-  color: #1a1a1a;
+  color: var(--eden-color-text-inverse);
 }
 
 .error-banner button {

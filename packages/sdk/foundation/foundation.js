@@ -129,14 +129,12 @@
   const container = document.getElementById("wallpaper-container");
   let zIndexCounter = 1;
 
-  // Initialize with default
+  // The base layer stays empty until the stored wallpaper arrives, so the
+  // window background (which follows the active theme) shows meanwhile.
   function createBaseLayer() {
     if (!container) return;
     const layer = document.createElement("div");
     layer.className = "wallpaper-layer";
-    // Matches the appearance service default
-    layer.style.background =
-      "linear-gradient(135deg, #1e1e2e 0%, #1a1b26 100%)";
     layer.style.zIndex = zIndexCounter++;
     layer.style.opacity = "1";
     container.appendChild(layer);

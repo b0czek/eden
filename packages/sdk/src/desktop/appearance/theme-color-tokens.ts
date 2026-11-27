@@ -81,7 +81,7 @@ export const THEME_COLOR_DEFAULTS = {
     danger: "#e03131",
     "danger-hover": "#f03e3e",
     "danger-bg": "rgba(255, 59, 48, 0.1)",
-    warning: "#e0a800",
+    warning: "#a16207",
     info: "#1c7ed6",
     "border-light": "rgba(0, 0, 0, 0.06)",
     "border-medium": "rgba(0, 0, 0, 0.12)",
