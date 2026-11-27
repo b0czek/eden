@@ -127,9 +127,9 @@ describe("appearance themes", () => {
   it("refreshes the open Appearance panel when the host changes the theme", async () => {
     eden = await createTestEden({ config: { appearance } });
     const changes: unknown[] = [];
-    const stop = eden.runtime.services.settingsPanels.changed.on((change) =>
-      changes.push(change),
-    );
+    const stop = eden.runtime.services.settingsPanels.changed.on((change) => {
+      changes.push(change);
+    });
     try {
       await eden.runtime.effects.run(
         eden.runtime.appearance.setTheme("acme-light"),
